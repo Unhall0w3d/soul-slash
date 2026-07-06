@@ -1,0 +1,22 @@
+---
+projects:
+  aletheiauc:
+    display_name: "AletheiaUC"
+    aliases:
+      - "Aletheia"
+      - "AletheiaUC"
+      - "Aetheia"
+    protected_terms:
+      - "aletheia"
+      - "aletheiauc"
+      - "aetheia"
+    notes:
+      - "Aetheia is likely a typo/alias for AletheiaUC and should be treated cautiously during file classification."
+  soul:
+    display_name: "Soul/"
+    aliases:
+      - "Soul"
+      - "Soul/"
+    protected_terms:
+      - "soul"
+      - "soul project"

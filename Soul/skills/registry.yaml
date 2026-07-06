@@ -1,0 +1,41 @@
+---
+skills:
+  system.status:
+    path: "Soul/skills/system/status.rb"
+    language: "ruby"
+    description: "Read-only local system and Soul runtime status check."
+    risk: "read_only"
+    requires_approval: false
+    writes_files: false
+    expected_output: "json"
+    verifier: "schema_basic"
+
+  downloads.inspect:
+    path: "Soul/skills/downloads/inspect.rb"
+    language: "ruby"
+    description: "Read-only Downloads inspection and cleanup-candidate planning."
+    risk: "read_only"
+    requires_approval: false
+    writes_files: false
+    expected_output: "json"
+    verifier: "schema_basic"
+
+  downloads.cleanup_plan:
+    path: "Soul/skills/downloads/plan.rb"
+    language: "ruby"
+    description: "Read-only human-oriented cleanup plan based on downloads.inspect."
+    risk: "read_only"
+    requires_approval: false
+    writes_files: false
+    expected_output: "json"
+    verifier: "schema_basic"
+
+  downloads.move_to_trash:
+    path: "Soul/skills/downloads/move_to_trash.rb"
+    language: "ruby"
+    description: "Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan."
+    risk: "write_trash"
+    requires_approval: true
+    writes_files: true
+    expected_output: "json"
+    verifier: "schema_basic"

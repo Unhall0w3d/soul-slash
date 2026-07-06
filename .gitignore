@@ -1,0 +1,47 @@
+# Local runtime artifacts
+run/
+tmp/
+*.log
+
+# Soul local data/logs/state
+Soul/logs/tasks/*.json
+Soul/logs/tool_runs/*.json
+Soul/workflows/pending/*.json
+Soul/workflows/sessions/*.json
+Soul/reflection/pending/*.json
+Soul/reflection/pending/*.md
+Soul/reflection/approved/*.json
+Soul/reflection/approved/*.md
+Soul/reflection/rejected/*.json
+Soul/reflection/rejected/*.md
+
+# Keep directory sentinels
+!Soul/logs/tasks/.keep
+!Soul/logs/tool_runs/.keep
+!Soul/workflows/pending/.keep
+!Soul/workflows/sessions/.keep
+!Soul/reflection/pending/.keep
+!Soul/reflection/approved/.keep
+!Soul/reflection/rejected/.keep
+
+# Local secrets/config
+.env
+*.local.yaml
+*.secret*
+secrets/
+.envrc
+
+# Model files
+*.gguf
+*.safetensors
+*.bin
+
+# Editor/OS cruft
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Root-level local logs
+logs/

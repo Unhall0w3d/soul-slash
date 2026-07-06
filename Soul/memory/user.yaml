@@ -1,0 +1,10 @@
+---
+user:
+  name: "Kenneth Perry"
+  handle: "@kenoperry"
+  timezone: "America/New_York"
+  default_location: "Syracuse, NY"
+preferences:
+  assistant_style: "plain, technical, lightly snarky when appropriate"
+  local_runtime_default_mode: "fast"
+  require_verification_before_success: true

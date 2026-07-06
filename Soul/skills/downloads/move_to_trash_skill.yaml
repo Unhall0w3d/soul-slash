@@ -1,0 +1,21 @@
+---
+name: "downloads.move_to_trash"
+language: "ruby"
+entrypoint: "move_to_trash.rb"
+description: "Moves verified cleanup-plan candidates to Trash only after explicit approval."
+risk: "write_trash"
+requires_approval: true
+inputs:
+  latest_plan:
+    type: "boolean"
+  plan_log:
+    type: "string"
+  execute:
+    type: "boolean"
+  confirm:
+    type: "string"
+outputs:
+  moved:
+    type: "array"
+  verification:
+    type: "object"

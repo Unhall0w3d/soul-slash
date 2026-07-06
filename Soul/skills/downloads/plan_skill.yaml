@@ -1,0 +1,21 @@
+---
+name: "downloads.cleanup_plan"
+language: "ruby"
+entrypoint: "plan.rb"
+description: "Creates a read-only cleanup plan from downloads.inspect output."
+risk: "read_only"
+requires_approval: false
+inputs:
+  path:
+    type: "string"
+    default: "~/Downloads"
+  older_than_days:
+    type: "integer"
+    default: 30
+outputs:
+  recommendation:
+    type: "string"
+  proposed_actions:
+    type: "object"
+  verification:
+    type: "object"

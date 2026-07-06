@@ -1,0 +1,25 @@
+---
+name: "downloads.inspect"
+language: "ruby"
+entrypoint: "inspect.rb"
+description: "Scans a directory, defaults to ~/Downloads, and classifies old files without moving or deleting anything."
+risk: "read_only"
+requires_approval: false
+inputs:
+  path:
+    type: "string"
+    default: "~/Downloads"
+  older_than_days:
+    type: "integer"
+    default: 30
+outputs:
+  summary:
+    type: "object"
+  protected_files:
+    type: "array"
+  cleanup_candidates:
+    type: "array"
+  uncertain:
+    type: "array"
+  verification:
+    type: "object"

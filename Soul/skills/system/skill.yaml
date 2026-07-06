@@ -1,0 +1,17 @@
+---
+name: "system.status"
+language: "ruby"
+entrypoint: "status.rb"
+description: "Reports read-only host, GPU, llama-server, and endpoint status."
+risk: "read_only"
+requires_approval: false
+inputs: {}
+outputs:
+  status:
+    type: "string"
+  host:
+    type: "object"
+  runtime:
+    type: "object"
+  gpu:
+    type: "object"

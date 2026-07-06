@@ -1,0 +1,257 @@
+# frozen_string_literal: true
+
+require "json"
+require_relative "model_client"
+require_relative "skill_registry"
+require_relative "skill_runner"
+require_relative "task_log"
+require_relative "reflection"
+require_relative "reflection_review"
+require_relative "intent_router"
+require_relative "workflow_runner"
+
+module SoulCore
+  class App
+    def initialize(argv)
+      @argv = argv
+      @log = TaskLog.new
+    end
+
+    def run
+      command = @argv.shift
+
+      case command
+      when "doctor" then doctor
+      when "ask" then ask
+      when "do" then do_request
+      when "workflow" then workflow
+      when "workflows" then workflows
+      when "skill" then skill
+      when "skills" then skills
+      when "reflect" then reflect
+      when "reflection" then reflection
+      when "reflections" then reflections
+      when "help", nil then help
+      else
+        warn "Unknown command: #{command}"
+        help
+        exit 1
+      end
+    end
+
+    private
+
+    def doctor
+      client = ModelClient.new
+      registry = SkillRegistry.new
+      puts "Soul/ doctor"
+      puts "base_url: #{client.base_url}"
+      puts "model: #{client.model}"
+      puts "skills: #{registry.list.keys.join(', ')}"
+      begin
+        models = client.models
+        puts "model endpoint: ok"
+        puts JSON.pretty_generate(models)
+      rescue StandardError => e
+        puts "model endpoint: failed"
+        puts "#{e.class}: #{e.message}"
+      end
+    end
+
+    def ask
+      mode = (@argv.shift || "fast").to_sym
+      prompt = @argv.join(" ").strip
+      if prompt.empty?
+        warn "Usage: ruby bin/soul ask fast|think \"your prompt\""
+        exit 1
+      end
+      client = ModelClient.new
+      result = client.chat(prompt, mode: mode)
+      puts(result[:content].to_s.strip.empty? ? result[:reasoning_content] : result[:content])
+      path = @log.write(kind: "ask.#{mode}", payload: result)
+      warn "logged: #{path}"
+    end
+
+    def do_request
+      text = @argv.join(" ").strip
+      if text.empty?
+        warn 'Usage: ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
+        exit 1
+      end
+      router = IntentRouter.new
+      routed = router.route(text)
+      unless routed.ok
+        warn "No deterministic workflow matched."
+        warn "Reason: #{routed.reason}"
+        warn
+        warn "Currently supported example:"
+        warn '  ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
+        exit 1
+      end
+      runner = WorkflowRunner.new
+      result = runner.run(intent: routed.intent, parameters: routed.parameters, original_text: text)
+      puts "Intent: #{routed.intent}"
+      puts "Confidence: #{routed.confidence}"
+      puts "Reason: #{routed.reason}"
+      puts
+      puts result[:user_message]
+      exit 1 unless result[:ok]
+    rescue StandardError => e
+      warn "do failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
+    def workflow
+      subcommand = @argv.shift || "show"
+      runner = WorkflowRunner.new
+      case subcommand
+      when "show"
+        target = @argv.shift || "latest"
+        puts runner.show(target)
+      else
+        warn "Unknown workflow subcommand: #{subcommand}"
+        warn "Usage: ruby bin/soul workflow show latest"
+        exit 1
+      end
+    rescue StandardError => e
+      warn "workflow #{subcommand} failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
+    def workflows
+      runner = WorkflowRunner.new
+      pending = runner.list_pending
+      if pending.empty?
+        puts "No pending workflow states."
+      else
+        pending.each { |path| puts path }
+      end
+    end
+
+    def skill
+      name = @argv.shift
+      unless name
+        warn "Usage: ruby bin/soul skill system.status"
+        exit 1
+      end
+      @argv.shift if @argv.first == "--"
+      skill_args = @argv
+      registry = SkillRegistry.new
+      runner = SkillRunner.new(registry: registry)
+      result = runner.run(name, args: skill_args)
+      if result[:json]
+        puts JSON.pretty_generate(result[:json])
+      else
+        puts result[:stdout]
+      end
+      path = @log.write(kind: "skill.#{name}", payload: result)
+      warn "logged: #{path}"
+      exit 1 unless result[:ok]
+    end
+
+    def skills
+      registry = SkillRegistry.new
+      registry.list.each { |name, meta| puts "#{name} - #{meta['description']} [risk=#{meta['risk']}]" }
+    end
+
+    def reflect
+      target = @argv.shift || "last"
+      reflection = Reflection.new
+      result = reflection.reflect(target)
+      puts "Reflection candidate staged."
+      puts "source: #{result[:source_log]}"
+      puts "json: #{result[:json_path]}"
+      puts "markdown: #{result[:markdown_path]}"
+    rescue StandardError => e
+      warn "reflect failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
+    def reflection
+      subcommand = @argv.shift || "show"
+      review = ReflectionReview.new
+      case subcommand
+      when "show"
+        target = @argv.shift || "latest"
+        puts review.show(target)
+      when "approve"
+        target = @argv.shift || "latest"
+        note = extract_option_value("--note")
+        result = review.approve(target, note: note)
+        puts "Reflection candidate approved."
+        puts "json: #{result[:approved_json_path]}"
+        puts "markdown: #{result[:approved_markdown_path]}"
+        puts "lessons: #{result[:lessons_appended_to]}"
+        puts "rules: #{result[:rules_appended_to]}"
+      when "reject"
+        target = @argv.shift || "latest"
+        reason = extract_option_value("--reason") || @argv.join(" ")
+        result = review.reject(target, reason: reason)
+        puts "Reflection candidate rejected."
+        puts "json: #{result[:rejected_json_path]}"
+        puts "markdown: #{result[:rejected_markdown_path]}"
+      else
+        warn "Unknown reflection subcommand: #{subcommand}"
+        warn "Usage: ruby bin/soul reflection show|approve|reject latest"
+        exit 1
+      end
+    rescue StandardError => e
+      warn "reflection #{subcommand} failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
+    def reflections
+      reflection = Reflection.new
+      pending = reflection.pending
+      if pending.empty?
+        puts "No pending reflection candidates."
+      else
+        pending.each { |path| puts path }
+      end
+    end
+
+    def extract_option_value(name)
+      index = @argv.index(name)
+      return nil unless index
+      value = @argv[index + 1]
+      @argv.slice!(index, 2)
+      value
+    end
+
+    def help
+      puts <<~HELP
+        Soul/ CLI
+
+        Commands:
+          ruby bin/soul doctor
+          ruby bin/soul skills
+
+          ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
+          ruby bin/soul workflows
+          ruby bin/soul workflow show latest
+
+          ruby bin/soul skill system.status
+          ruby bin/soul skill downloads.inspect
+          ruby bin/soul skill downloads.inspect -- --older-than-days 30
+          ruby bin/soul skill downloads.cleanup_plan
+          ruby bin/soul skill downloads.cleanup_plan -- --older-than-days 30
+          ruby bin/soul skill downloads.move_to_trash -- --latest-plan
+          ruby bin/soul skill downloads.move_to_trash -- --latest-plan --execute --confirm MOVE_TO_TRASH
+
+          ruby bin/soul reflect last
+          ruby bin/soul reflections
+          ruby bin/soul reflection show latest
+          ruby bin/soul reflection approve latest
+          ruby bin/soul reflection approve latest --note "Approved after review"
+          ruby bin/soul reflection reject latest --reason "Not useful"
+
+          ruby bin/soul ask fast "Say exactly: Soul CLI is online."
+          ruby bin/soul ask think "Why should Soul verify actions?"
+
+        Environment:
+          SOUL_OPENAI_BASE_URL=http://127.0.0.1:8082/v1
+          SOUL_MODEL_ALIAS=soul-qwen3-8b-q4
+      HELP
+    end
+  end
+end

@@ -1,0 +1,26 @@
+---
+name: "downloads.cleanup"
+description: "Plan cleanup of top-level files and folders in ~/Downloads older than a requested age threshold."
+status: "active"
+intent_examples:
+  - "cleanup files in my downloads folder older than 30 days"
+  - "clean up downloads older than 7 days"
+  - "trash old downloads"
+  - "remove old files from my downloads"
+default_parameters:
+  target_path: "~/Downloads"
+  older_than_days: 30
+  include_directories: true
+  recursive: false
+workflow:
+  - skill: "downloads.cleanup_plan"
+    mode: "read_only"
+    requires_confirmation: false
+  - step: "present_plan"
+  - step: "wait_for_user_confirmation"
+  - skill: "downloads.move_to_trash"
+    mode: "write_trash"
+    requires_confirmation: true
+completion_policy:
+  trash_is_terminal_cleanup_action: true
+  permanent_delete_supported: false

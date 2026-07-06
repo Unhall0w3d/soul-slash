@@ -1,0 +1,21 @@
+name: Ruby Smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ruby-syntax:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Ruby syntax check
+        run: |
+          ruby -c bin/soul
+          find lib Soul/skills -name "*.rb" -print0 | xargs -0 -n1 ruby -c
