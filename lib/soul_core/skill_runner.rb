@@ -18,13 +18,13 @@ module SoulCore
 
       unless risk == "read_only"
         explicit_execution = args.include?("--execute")
-        explicit_confirmation = args.each_cons(2).any? { |key, value| key == "--confirm" && value == "MOVE_TO_TRASH" }
+        confirmation_phrase = skill.fetch("confirmation_phrase", nil)
+        explicit_confirmation =
+          confirmation_phrase &&
+          args.each_cons(2).any? { |key, value| key == "--confirm" && value == confirmation_phrase }
 
-        unless explicit_execution && explicit_confirmation
-          # Non-read-only skills may still be invoked in dry-run mode.
-          if args.include?("--execute")
-            raise "write skill requires exact confirmation: --confirm MOVE_TO_TRASH"
-          end
+        if explicit_execution && !explicit_confirmation
+          raise "write skill requires exact confirmation: --confirm #{confirmation_phrase || '<missing confirmation_phrase>'}"
         end
       end
 

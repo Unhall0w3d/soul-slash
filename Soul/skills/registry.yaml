@@ -36,6 +36,18 @@ skills:
     description: "Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan."
     risk: "write_trash"
     requires_approval: true
+    confirmation_phrase: "MOVE_TO_TRASH"
+    writes_files: true
+    expected_output: "json"
+    verifier: "schema_basic"
+
+  downloads.restore_last_cleanup:
+    path: "Soul/skills/downloads/restore_last_cleanup.rb"
+    language: "ruby"
+    description: "Approval-gated restore of the latest successful Downloads cleanup from Trash."
+    risk: "write_file"
+    requires_approval: true
+    confirmation_phrase: "RESTORE_FROM_TRASH"
     writes_files: true
     expected_output: "json"
     verifier: "schema_basic"

@@ -9,6 +9,7 @@ require_relative "reflection"
 require_relative "reflection_review"
 require_relative "intent_router"
 require_relative "workflow_runner"
+require_relative "workflow_session"
 
 module SoulCore
   class App
@@ -21,17 +22,32 @@ module SoulCore
       command = @argv.shift
 
       case command
-      when "doctor" then doctor
-      when "ask" then ask
-      when "do" then do_request
-      when "workflow" then workflow
-      when "workflows" then workflows
-      when "skill" then skill
-      when "skills" then skills
-      when "reflect" then reflect
-      when "reflection" then reflection
-      when "reflections" then reflections
-      when "help", nil then help
+      when "doctor"
+        doctor
+      when "ask"
+        ask
+      when "intent"
+        intent
+      when "do"
+        do_request
+      when "respond"
+        respond
+      when "workflow"
+        workflow
+      when "workflows"
+        workflows
+      when "skill"
+        skill
+      when "skills"
+        skills
+      when "reflect"
+        reflect
+      when "reflection"
+        reflection
+      when "reflections"
+        reflections
+      when "help", nil
+        help
       else
         warn "Unknown command: #{command}"
         help
@@ -44,10 +60,12 @@ module SoulCore
     def doctor
       client = ModelClient.new
       registry = SkillRegistry.new
+
       puts "Soul/ doctor"
       puts "base_url: #{client.base_url}"
       puts "model: #{client.model}"
       puts "skills: #{registry.list.keys.join(', ')}"
+
       begin
         models = client.models
         puts "model endpoint: ok"
@@ -61,49 +79,105 @@ module SoulCore
     def ask
       mode = (@argv.shift || "fast").to_sym
       prompt = @argv.join(" ").strip
+
       if prompt.empty?
         warn "Usage: ruby bin/soul ask fast|think \"your prompt\""
         exit 1
       end
+
       client = ModelClient.new
       result = client.chat(prompt, mode: mode)
+
       puts(result[:content].to_s.strip.empty? ? result[:reasoning_content] : result[:content])
       path = @log.write(kind: "ask.#{mode}", payload: result)
       warn "logged: #{path}"
     end
 
+    def intent
+      text = @argv.join(" ").strip
+
+      if text.empty?
+        warn 'Usage: ruby bin/soul intent "run a file cleanup in Downloads"'
+        exit 1
+      end
+
+      router = IntentRouter.new
+      routed = router.route(text)
+
+      puts JSON.pretty_generate({
+        ok: routed.ok,
+        intent: routed.intent,
+        confidence: routed.confidence,
+        source: routed.source,
+        reason: routed.reason,
+        parameters: routed.parameters
+      })
+
+      exit 1 unless routed.ok
+    rescue StandardError => e
+      warn "intent failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
     def do_request
       text = @argv.join(" ").strip
+
       if text.empty?
         warn 'Usage: ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
         exit 1
       end
+
       router = IntentRouter.new
       routed = router.route(text)
+
       unless routed.ok
-        warn "No deterministic workflow matched."
+        warn "No workflow matched."
         warn "Reason: #{routed.reason}"
         warn
-        warn "Currently supported example:"
+        warn "Currently supported examples:"
         warn '  ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
+        warn '  ruby bin/soul do "run a file cleanup in Downloads"'
+        warn '  ruby bin/soul do "restore the last downloads cleanup"'
         exit 1
       end
+
       runner = WorkflowRunner.new
       result = runner.run(intent: routed.intent, parameters: routed.parameters, original_text: text)
+
       puts "Intent: #{routed.intent}"
       puts "Confidence: #{routed.confidence}"
+      puts "Source: #{routed.source}"
       puts "Reason: #{routed.reason}"
       puts
       puts result[:user_message]
+
       exit 1 unless result[:ok]
     rescue StandardError => e
       warn "do failed: #{e.class}: #{e.message}"
       exit 1
     end
 
+    def respond
+      text = @argv.join(" ").strip
+
+      if text.empty?
+        warn 'Usage: ruby bin/soul respond "move all except F1"'
+        exit 1
+      end
+
+      session = WorkflowSession.new
+      result = session.respond(text)
+      puts result[:message]
+      exit 1 unless result[:ok]
+    rescue StandardError => e
+      warn "respond failed: #{e.class}: #{e.message}"
+      exit 1
+    end
+
     def workflow
       subcommand = @argv.shift || "show"
       runner = WorkflowRunner.new
+
       case subcommand
       when "show"
         target = @argv.shift || "latest"
@@ -121,8 +195,9 @@ module SoulCore
     def workflows
       runner = WorkflowRunner.new
       pending = runner.list_pending
+
       if pending.empty?
-        puts "No pending workflow states."
+        puts "No workflow sessions."
       else
         pending.each { |path| puts path }
       end
@@ -134,30 +209,38 @@ module SoulCore
         warn "Usage: ruby bin/soul skill system.status"
         exit 1
       end
+
       @argv.shift if @argv.first == "--"
       skill_args = @argv
+
       registry = SkillRegistry.new
       runner = SkillRunner.new(registry: registry)
       result = runner.run(name, args: skill_args)
+
       if result[:json]
         puts JSON.pretty_generate(result[:json])
       else
         puts result[:stdout]
       end
+
       path = @log.write(kind: "skill.#{name}", payload: result)
       warn "logged: #{path}"
+
       exit 1 unless result[:ok]
     end
 
     def skills
       registry = SkillRegistry.new
-      registry.list.each { |name, meta| puts "#{name} - #{meta['description']} [risk=#{meta['risk']}]" }
+      registry.list.each do |name, meta|
+        puts "#{name} - #{meta['description']} [risk=#{meta['risk']}]"
+      end
     end
 
     def reflect
       target = @argv.shift || "last"
       reflection = Reflection.new
       result = reflection.reflect(target)
+
       puts "Reflection candidate staged."
       puts "source: #{result[:source_log]}"
       puts "json: #{result[:json_path]}"
@@ -170,6 +253,7 @@ module SoulCore
     def reflection
       subcommand = @argv.shift || "show"
       review = ReflectionReview.new
+
       case subcommand
       when "show"
         target = @argv.shift || "latest"
@@ -203,6 +287,7 @@ module SoulCore
     def reflections
       reflection = Reflection.new
       pending = reflection.pending
+
       if pending.empty?
         puts "No pending reflection candidates."
       else
@@ -213,6 +298,7 @@ module SoulCore
     def extract_option_value(name)
       index = @argv.index(name)
       return nil unless index
+
       value = @argv[index + 1]
       @argv.slice!(index, 2)
       value
@@ -226,23 +312,37 @@ module SoulCore
           ruby bin/soul doctor
           ruby bin/soul skills
 
+          ruby bin/soul intent "run a file cleanup in Downloads"
+          ruby bin/soul intent "restore the last downloads cleanup"
+
           ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
+          ruby bin/soul do "run a file cleanup in Downloads"
+          ruby bin/soul do "restore the last downloads cleanup"
+
+          ruby bin/soul respond "move all"
+          ruby bin/soul respond "move all except F1"
+          ruby bin/soul respond "only move F1 and D1"
+          ruby bin/soul respond "restore all"
+          ruby bin/soul respond "restore all except F1"
+          ruby bin/soul respond "only restore F1 and D1"
+          ruby bin/soul respond "yeah, do it"
+          ruby bin/soul respond "cancel"
+
           ruby bin/soul workflows
           ruby bin/soul workflow show latest
 
           ruby bin/soul skill system.status
           ruby bin/soul skill downloads.inspect
-          ruby bin/soul skill downloads.inspect -- --older-than-days 30
           ruby bin/soul skill downloads.cleanup_plan
-          ruby bin/soul skill downloads.cleanup_plan -- --older-than-days 30
           ruby bin/soul skill downloads.move_to_trash -- --latest-plan
           ruby bin/soul skill downloads.move_to_trash -- --latest-plan --execute --confirm MOVE_TO_TRASH
+          ruby bin/soul skill downloads.restore_last_cleanup
+          ruby bin/soul skill downloads.restore_last_cleanup -- --execute --confirm RESTORE_FROM_TRASH
 
           ruby bin/soul reflect last
           ruby bin/soul reflections
           ruby bin/soul reflection show latest
           ruby bin/soul reflection approve latest
-          ruby bin/soul reflection approve latest --note "Approved after review"
           ruby bin/soul reflection reject latest --reason "Not useful"
 
           ruby bin/soul ask fast "Say exactly: Soul CLI is online."

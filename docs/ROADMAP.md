@@ -13,7 +13,7 @@
 - [x] early `do` workflow command
 - [x] early `respond` workflow continuation
 - [x] hybrid deterministic/LLM intent routing
-- [ ] restore-last-cleanup workflow
+- [x] restore-last-cleanup workflow
 - [ ] better conversational summaries
 - [ ] workflow session cleanup/listing
 - [ ] richer test suite

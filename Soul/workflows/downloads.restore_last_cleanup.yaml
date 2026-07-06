@@ -1,0 +1,26 @@
+---
+name: "downloads.restore_last_cleanup"
+description: "Plan and optionally restore files and folders moved to Trash by the latest successful Downloads cleanup."
+status: "active"
+intent_examples:
+  - "restore the last downloads cleanup"
+  - "undo the last downloads cleanup"
+  - "rollback the last file cleanup"
+  - "put back what Soul moved to trash"
+  - "restore the files from the last cleanup"
+default_parameters:
+  target_path: "~/Downloads"
+workflow:
+  - skill: "downloads.restore_last_cleanup"
+    mode: "dry_run"
+    requires_confirmation: false
+  - step: "present_restore_candidates"
+  - step: "wait_for_restore_selection"
+  - step: "wait_for_restore_final_confirmation"
+  - skill: "downloads.restore_last_cleanup"
+    mode: "write_file"
+    requires_confirmation: true
+completion_policy:
+  restores_from_trash_only: true
+  permanent_delete_supported: false
+  refuses_overwrite: true
