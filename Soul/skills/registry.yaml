@@ -51,3 +51,14 @@ skills:
     writes_files: true
     expected_output: "json"
     verifier: "schema_basic"
+
+  weather.report:
+    path: "Soul/skills/weather/report.rb"
+    language: "ruby"
+    description: "Read-only weather report with temperature, humidity, air quality, and optional 3-day outlook."
+    risk: "read_only"
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: "json"
+    verifier: "schema_basic"

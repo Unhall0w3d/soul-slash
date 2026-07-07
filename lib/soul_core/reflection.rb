@@ -19,13 +19,11 @@ module SoulCore
 
     def reflect(target = "last")
       source_path = target == "last" ? latest_log_path : target
-
       raise "no task logs found in #{@log_root}" unless source_path
       raise "task log not found: #{source_path}" unless File.exist?(source_path)
 
       payload = JSON.parse(File.read(source_path))
       candidate = build_candidate(source_path, payload)
-
       timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
       slug = candidate.fetch(:slug)
       json_path = File.join(@pending_root, "#{timestamp}-#{slug}.json")
@@ -71,10 +69,10 @@ module SoulCore
       }
 
       case task_kind
+      when "skill.weather.report"
+        reflect_weather_report(base, payload)
       when "skill.downloads.move_to_trash"
         reflect_downloads_move_to_trash(base, payload)
-      when "skill.downloads.restore_last_cleanup"
-        reflect_downloads_restore_last_cleanup(base, payload)
       when "skill.downloads.cleanup_plan"
         reflect_downloads_cleanup_plan(base, payload)
       when "skill.downloads.inspect"
@@ -102,6 +100,33 @@ module SoulCore
       end
     end
 
+    def reflect_weather_report(base, payload)
+      data = payload["json"] || payload
+      verification = data["verification"] || {}
+      current = data["current"] || {}
+      detailed = data["detailed_report"] || {}
+
+      base[:observations] << "weather.report completed with status #{data['status']}."
+      base[:observations] << "Mode: #{data['mode']}."
+      base[:observations] << "Outcome: #{data['outcome']}."
+      base[:observations] << "Resolved location: #{data.dig('resolved_location', 'name')}." if data.dig("resolved_location", "name")
+      base[:observations] << "Current condition: #{current['condition']}." if current["condition"]
+      base[:observations] << "Air quality fetch OK: #{verification['air_quality_fetch_ok']}."
+      base[:observations] << "Workflow complete: #{verification['complete']}."
+      base[:observations] << "Detailed outlook days: #{Array(detailed['outlook_days']).length}." if detailed
+
+      base[:candidate_lessons] << "weather.report is a read-only network skill that can complete without any write approval."
+      base[:candidate_lessons] << "The brief weather workflow should ask whether the user wants a detailed 3-day outlook before closing as complete."
+      base[:candidate_lessons] << "Detailed weather reports should close with final_state complete rather than success language."
+
+      base[:candidate_rules] << "weather.report must remain read-only and must not write local files from the skill itself."
+      base[:candidate_rules] << "weather.report should distinguish brief completion from detailed workflow completion."
+      base[:candidate_rules] << "Weather workflows should use deterministic API data for temperature, humidity, and air quality rather than model guessing."
+
+      base[:verification_summary] = verification
+      base[:warnings].concat(Array(data["warnings"]))
+    end
+
     def reflect_downloads_move_to_trash(base, payload)
       data = payload["json"] || payload
       verification = data["verification"] || {}
@@ -126,53 +151,6 @@ module SoulCore
       base[:candidate_rules] << "downloads.move_to_trash must require --execute and --confirm MOVE_TO_TRASH before moving anything."
 
       base[:verification_summary] = verification
-    end
-
-    def reflect_downloads_restore_last_cleanup(base, payload)
-      data = payload["json"] || payload
-      verification = data["verification"] || {}
-
-      restored = data["restored"] || []
-      failed = data["failed"] || []
-
-      restored_files = verification["restored_files"] || restored.count { |item| item["type"] == "file" }
-      restored_directories = verification["restored_directories"] || restored.count { |item| item["type"] == "directory" }
-      planned_total = verification["planned_total"] || data["planned_restore_count"] || data["planned_candidate_count"] || restored.length + failed.length
-      restored_total = verification["restored_total"] || restored.length
-      job_complete = verification.key?("job_complete") ? verification["job_complete"] : (data["outcome"] == "complete" && failed.empty? && restored_total.to_i == planned_total.to_i)
-
-      base[:observations] << "downloads.restore_last_cleanup completed with status #{data['status']} in #{data['mode']} mode."
-      base[:observations] << "Outcome: #{data['outcome']}." if data["outcome"]
-      base[:observations] << "Recommendation: #{data['recommendation']}." if data["recommendation"]
-      base[:observations] << "Source move log: #{data['source_move_log']}." if data["source_move_log"]
-      base[:observations] << "Planned restore candidates: #{planned_total}."
-      base[:observations] << "Restored files: #{restored_files}."
-      base[:observations] << "Restored directories: #{restored_directories}."
-      base[:observations] << "Permanent deletions: #{verification['deleted_files'] || 0}."
-      base[:observations] << "Restore job complete: #{job_complete}."
-
-      if job_complete == true
-        base[:candidate_lessons] << "A Downloads restore job is complete when all approved restore candidates are returned from Trash to their original paths."
-        base[:candidate_lessons] << "The restore-last-cleanup workflow provides the rollback path for approved Downloads cleanup actions."
-      end
-
-      base[:candidate_rules] << "downloads.restore_last_cleanup must consume a successful downloads.move_to_trash log."
-      base[:candidate_rules] << "downloads.restore_last_cleanup must restore only items that Soul/ previously moved to Trash."
-      base[:candidate_rules] << "downloads.restore_last_cleanup must require --execute and --confirm RESTORE_FROM_TRASH before restoring anything."
-      base[:candidate_rules] << "downloads.restore_last_cleanup must refuse to overwrite an existing original path."
-      base[:candidate_rules] << "downloads.restore_last_cleanup must not permanently delete files or empty Trash."
-
-      base[:verification_summary] = verification.merge(
-        "planned_total" => planned_total,
-        "restored_total" => restored_total,
-        "restored_files" => restored_files,
-        "restored_directories" => restored_directories,
-        "job_complete" => job_complete
-      )
-
-      unless failed.empty?
-        base[:warnings] << "Some restore candidates failed and should be reviewed before approving broad restore rules."
-      end
     end
 
     def reflect_downloads_cleanup_plan(base, payload)
@@ -223,7 +201,6 @@ module SoulCore
       base[:observations] << "Candidate directories: #{summary['cleanup_candidate_directory_count'] || 0}."
 
       base[:candidate_lessons] << "downloads.inspect provides a safe read-only file and top-level folder classification layer for later planning."
-
       base[:candidate_rules] << "downloads.inspect should never move, rename, or delete files."
       base[:candidate_rules] << "Protected project terms must be checked before any entry is considered a cleanup candidate."
 
@@ -249,7 +226,6 @@ module SoulCore
       base[:observations] << "Model endpoint reachable: #{verification['model_endpoint_reachable']}."
 
       base[:candidate_lessons] << "system.status is a verified read-only baseline skill for checking Soul/ runtime health."
-
       base[:candidate_rules] << "Runtime status should distinguish host process memory from GPU VRAM usage in future output."
 
       base[:verification_summary] = verification
@@ -285,7 +261,6 @@ module SoulCore
 
     def render_markdown(candidate)
       lines = []
-
       lines << "# Soul/ Reflection Candidate"
       lines << ""
       lines << "- Type: `#{candidate[:type]}`"
@@ -314,9 +289,7 @@ module SoulCore
       end
 
       lines << ""
-
       markdown_section(lines, "Warnings", candidate[:warnings])
-
       lines.join("\n")
     end
 

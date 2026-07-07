@@ -9,21 +9,23 @@ module SoulCore
     def route(text)
       input = text.to_s.strip
       normalized = input.downcase
-
       return no_match("empty request", source: "deterministic") if normalized.empty?
 
-      deterministic = route_deterministic(normalized)
+      deterministic = route_deterministic(input, normalized)
       return deterministic if deterministic.ok
 
       llm_result = LlmIntentClassifier.new.classify(input)
-      return Result.new(
-        ok: true,
-        intent: llm_result[:intent],
-        parameters: llm_result[:parameters],
-        confidence: llm_result[:confidence],
-        reason: llm_result[:reason],
-        source: llm_result[:source]
-      ) if llm_result[:ok]
+
+      if llm_result[:ok]
+        return Result.new(
+          ok: true,
+          intent: llm_result[:intent],
+          parameters: llm_result[:parameters],
+          confidence: llm_result[:confidence],
+          reason: llm_result[:reason],
+          source: llm_result[:source]
+        )
+      end
 
       no_match(llm_result[:reason] || deterministic.reason, source: "hybrid")
     end
@@ -34,14 +36,27 @@ module SoulCore
 
     private
 
-    def route_deterministic(normalized)
+    def route_deterministic(input, normalized)
+      if weather_report?(normalized)
+        location = extract_weather_location(input) || ENV.fetch("SOUL_WEATHER_LOCATION", nil)
+        return Result.new(
+          ok: true,
+          intent: "weather.report",
+          parameters: {
+            "location" => location,
+            "units" => ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
+          },
+          confidence: location.to_s.strip.empty? ? 0.74 : 0.93,
+          reason: location.to_s.strip.empty? ? "Matched weather phrasing but no location was found." : "Matched weather phrasing and extracted location.",
+          source: "deterministic"
+        )
+      end
+
       if downloads_restore_last_cleanup?(normalized)
         return Result.new(
           ok: true,
           intent: "downloads.restore_last_cleanup",
-          parameters: {
-            "target_path" => File.join(Dir.home, "Downloads")
-          },
+          parameters: { "target_path" => File.join(Dir.home, "Downloads") },
           confidence: 0.91,
           reason: "Matched restore/undo phrasing for the last Downloads cleanup.",
           source: "deterministic"
@@ -68,47 +83,79 @@ module SoulCore
       no_match("no deterministic workflow matched", source: "deterministic")
     end
 
+    def weather_report?(normalized)
+      weather_terms = normalized.match?(/\bweather\b/) ||
+                      normalized.match?(/\bforecast\b/) ||
+                      normalized.match?(/\btemperature\b/) ||
+                      normalized.match?(/\bhumidity\b/) ||
+                      normalized.match?(/\bair quality\b/) ||
+                      normalized.match?(/\baqi\b/)
+
+      today_context = normalized.match?(/\btoday\b/) ||
+                      normalized.match?(/\bnow\b/) ||
+                      normalized.match?(/\bcurrent\b/) ||
+                      normalized.match?(/\bwhat'?s it like\b/) ||
+                      normalized.match?(/\boutside\b/) ||
+                      normalized.match?(/\bforecast\b/)
+
+      weather_terms && today_context
+    end
+
+    def extract_weather_location(input)
+      patterns = [
+        /\bweather\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
+        /\bforecast\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
+        /\b(?:in|for|near)\s+([A-Za-z][A-Za-z0-9\s,.'-]+)\??$/i
+      ]
+
+      patterns.each do |pattern|
+        match = input.match(pattern)
+        next unless match
+
+        location = match[1].to_s.strip
+        location = location.sub(/[?.!]\z/, "").strip
+        return location unless location.empty?
+      end
+
+      nil
+    end
+
     def downloads_restore_last_cleanup?(normalized)
-      restore_action =
-        normalized.match?(/\brestore\b/) ||
-        normalized.match?(/\bundo\b/) ||
-        normalized.match?(/\brollback\b/) ||
-        normalized.match?(/\broll back\b/) ||
-        normalized.match?(/\bput back\b/)
+      restore_action = normalized.match?(/\brestore\b/) ||
+                       normalized.match?(/\bundo\b/) ||
+                       normalized.match?(/\brollback\b/) ||
+                       normalized.match?(/\broll back\b/) ||
+                       normalized.match?(/\bput back\b/)
 
-      cleanup_context =
-        normalized.include?("downloads") ||
-        normalized.include?("download folder") ||
-        normalized.include?("cleanup") ||
-        normalized.include?("clean up") ||
-        normalized.include?("trash")
+      cleanup_context = normalized.include?("downloads") ||
+                        normalized.include?("download folder") ||
+                        normalized.include?("cleanup") ||
+                        normalized.include?("clean up") ||
+                        normalized.include?("trash")
 
-      last_context =
-        normalized.include?("last") ||
-        normalized.include?("latest") ||
-        normalized.include?("previous") ||
-        normalized.include?("what soul moved")
+      last_context = normalized.include?("last") ||
+                     normalized.include?("latest") ||
+                     normalized.include?("previous") ||
+                     normalized.include?("what soul moved")
 
       restore_action && cleanup_context && last_context
     end
 
     def downloads_cleanup?(normalized)
-      mentions_downloads =
-        normalized.include?("downloads") ||
-        normalized.include?("download folder") ||
-        normalized.include?("downloads folder") ||
-        normalized.include?("download directory") ||
-        normalized.include?("downloads directory")
+      mentions_downloads = normalized.include?("downloads") ||
+                           normalized.include?("download folder") ||
+                           normalized.include?("downloads folder") ||
+                           normalized.include?("download directory") ||
+                           normalized.include?("downloads directory")
 
-      cleanup_action =
-        normalized.match?(/\bclean ?up\b/) ||
-        normalized.match?(/\bcleanup\b/) ||
-        normalized.match?(/\bclear\b/) ||
-        normalized.match?(/\bremove\b/) ||
-        normalized.match?(/\btrash\b/) ||
-        normalized.match?(/\bdelete\b/) ||
-        normalized.match?(/\bget rid of\b/) ||
-        normalized.match?(/\bfile cleanup\b/)
+      cleanup_action = normalized.match?(/\bclean ?up\b/) ||
+                       normalized.match?(/\bcleanup\b/) ||
+                       normalized.match?(/\bclear\b/) ||
+                       normalized.match?(/\bremove\b/) ||
+                       normalized.match?(/\btrash\b/) ||
+                       normalized.match?(/\bdelete\b/) ||
+                       normalized.match?(/\bget rid of\b/) ||
+                       normalized.match?(/\bfile cleanup\b/)
 
       mentions_downloads && cleanup_action
     end

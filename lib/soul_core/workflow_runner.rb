@@ -3,7 +3,6 @@
 require "json"
 require "fileutils"
 require "time"
-
 require_relative "skill_registry"
 require_relative "skill_runner"
 require_relative "task_log"
@@ -26,6 +25,8 @@ module SoulCore
         run_downloads_cleanup(parameters: parameters, original_text: original_text)
       when "downloads.restore_last_cleanup"
         run_downloads_restore_last_cleanup(parameters: parameters, original_text: original_text)
+      when "weather.report"
+        run_weather_report(parameters: parameters, original_text: original_text)
       else
         raise ArgumentError, "unsupported workflow intent: #{intent}"
       end
@@ -57,18 +58,102 @@ module SoulCore
 
     private
 
+    def run_weather_report(parameters:, original_text:)
+      location = parameters["location"].to_s.strip
+      units = parameters.fetch("units", ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit"))
+
+      if location.empty?
+        state = {
+          "workflow" => "weather.report",
+          "status" => "needs_location",
+          "generated_at" => Time.now.iso8601,
+          "updated_at" => Time.now.iso8601,
+          "original_text" => original_text,
+          "parameters" => {
+            "location" => nil,
+            "units" => units
+          },
+          "skill_runs" => [],
+          "next_expected" => "new_request_with_location",
+          "verification" => {
+            "location_present" => false,
+            "weather_fetch_ok" => false,
+            "air_quality_fetch_ok" => false,
+            "complete" => false
+          }
+        }
+
+        workflow_path = write_workflow_state(state, suffix: "weather.report")
+        state["workflow_path"] = workflow_path
+        save_session(state)
+
+        return {
+          ok: false,
+          workflow_path: workflow_path,
+          state: state,
+          user_message: @renderer.render_weather_needs_location(state)
+        }
+      end
+
+      registry = SkillRegistry.new
+      runner = SkillRunner.new(registry: registry)
+      args = ["--location", location, "--units", units]
+
+      result = runner.run("weather.report", args: args)
+      task_log_path = @task_log.write(kind: "skill.weather.report", payload: result)
+      report = result[:json] || {}
+
+      state = {
+        "workflow" => "weather.report",
+        "status" => result[:ok] ? "waiting_for_weather_detail_decision" : "failed",
+        "generated_at" => Time.now.iso8601,
+        "updated_at" => Time.now.iso8601,
+        "original_text" => original_text,
+        "parameters" => {
+          "location" => location,
+          "units" => units
+        },
+        "skill_runs" => [
+          {
+            "skill" => "weather.report",
+            "args" => args,
+            "ok" => result[:ok],
+            "task_log" => task_log_path
+          }
+        ],
+        "brief_report" => report,
+        "next_expected" => result[:ok] ? "weather_detail_decision" : "none",
+        "verification" => {
+          "brief_report_generated" => result[:ok],
+          "brief_report_log" => task_log_path,
+          "location_present" => !location.empty?,
+          "weather_fetch_ok" => report.dig("verification", "weather_fetch_ok"),
+          "air_quality_fetch_ok" => report.dig("verification", "air_quality_fetch_ok"),
+          "complete" => false
+        }
+      }
+
+      workflow_path = write_workflow_state(state, suffix: "weather.report")
+      state["workflow_path"] = workflow_path
+      save_session(state)
+
+      {
+        ok: result[:ok],
+        workflow_path: workflow_path,
+        task_log_path: task_log_path,
+        report: report,
+        state: state,
+        user_message: @renderer.render_weather_brief(state, report)
+      }
+    end
+
     def run_downloads_cleanup(parameters:, original_text:)
       older_than_days = parameters.fetch("older_than_days", 30)
       target_path = parameters.fetch("target_path", File.join(Dir.home, "Downloads"))
 
       registry = SkillRegistry.new
       runner = SkillRunner.new(registry: registry)
-
-      skill_args = [
-        "--path", target_path,
-        "--older-than-days", older_than_days.to_s
-      ]
-
+      skill_args = ["--path", target_path, "--older-than-days", older_than_days.to_s]
       plan_result = runner.run("downloads.cleanup_plan", args: skill_args)
       task_log_path = @task_log.write(kind: "skill.downloads.cleanup_plan", payload: plan_result)
 
@@ -131,7 +216,6 @@ module SoulCore
     def run_downloads_restore_last_cleanup(parameters:, original_text:)
       registry = SkillRegistry.new
       runner = SkillRunner.new(registry: registry)
-
       restore_result = runner.run("downloads.restore_last_cleanup", args: [])
       task_log_path = @task_log.write(kind: "skill.downloads.restore_last_cleanup", payload: restore_result)
       payload = restore_result[:json] || {}
@@ -213,6 +297,7 @@ module SoulCore
 
     def resolve_workflow(target)
       target ||= "latest"
+
       if target == "latest" || target == "last"
         path = latest_session_path
         raise "no workflow sessions found" unless path

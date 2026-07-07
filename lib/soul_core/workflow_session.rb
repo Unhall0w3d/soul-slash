@@ -33,6 +33,8 @@ module SoulCore
         handle_restore_selection(state, text)
       when "waiting_for_restore_final_confirmation"
         handle_restore_final_confirmation(state, text)
+      when "waiting_for_weather_detail_decision"
+        handle_weather_detail_decision(state, text)
       when "complete_no_action", "complete", "cancelled"
         {
           ok: true,
@@ -49,6 +51,63 @@ module SoulCore
     end
 
     private
+
+    def handle_weather_detail_decision(state, text)
+      parsed = @confirmation_parser.parse(text)
+
+      if parsed.cancelled
+        state["status"] = "complete"
+        state["updated_at"] = Time.now.iso8601
+        state["next_expected"] = "reflection_offer"
+        state["verification"]["complete"] = true
+        state["verification"]["detailed_report_requested"] = false
+        @runner.save_session(state)
+
+        return {
+          ok: true,
+          message: @renderer.render_weather_complete_without_detail(state),
+          state: state
+        }
+      end
+
+      unless parsed.confirmed
+        return {
+          ok: false,
+          message: "Would you like the detailed weather report? Reply with `yes` or `no`.",
+          state: state
+        }
+      end
+
+      location = state.dig("parameters", "location")
+      units = state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
+      args = ["--location", location, "--units", units, "--detailed"]
+
+      result = @skill_runner.run("weather.report", args: args)
+      task_log_path = @task_log.write(kind: "skill.weather.report", payload: result)
+      report = result[:json] || {}
+
+      state["status"] = result[:ok] ? "complete" : "failed"
+      state["updated_at"] = Time.now.iso8601
+      state["next_expected"] = result[:ok] ? "reflection_offer" : "none"
+      state["skill_runs"] << {
+        "skill" => "weather.report",
+        "args" => args,
+        "ok" => result[:ok],
+        "task_log" => task_log_path
+      }
+      state["detailed_report"] = report
+      state["verification"]["detailed_report_requested"] = true
+      state["verification"]["detailed_report_generated"] = result[:ok]
+      state["verification"]["detailed_report_log"] = task_log_path
+      state["verification"]["complete"] = result[:ok]
+      @runner.save_session(state)
+
+      {
+        ok: result[:ok],
+        message: @renderer.render_weather_detailed(state, report),
+        state: state
+      }
+    end
 
     def handle_cleanup_selection(state, text)
       handle_selection(
@@ -87,6 +146,7 @@ module SoulCore
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
+
         return {
           ok: true,
           message: "Cancelled. Nothing was moved or restored.",
@@ -103,7 +163,6 @@ module SoulCore
       state["updated_at"] = Time.now.iso8601
       state["next_expected"] = selected.empty? ? "none" : "final_confirmation"
       state["selection_message"] = parsed.message
-
       @runner.save_session(state)
 
       if selected.empty?
@@ -145,12 +204,7 @@ module SoulCore
         }
       end
 
-      args = [
-        "--workflow-state", state.fetch("workflow_path"),
-        "--execute",
-        "--confirm", "MOVE_TO_TRASH"
-      ]
-
+      args = ["--workflow-state", state.fetch("workflow_path"), "--execute", "--confirm", "MOVE_TO_TRASH"]
       result = @skill_runner.run("downloads.move_to_trash", args: args)
       task_log_path = @task_log.write(kind: "skill.downloads.move_to_trash", payload: result)
 
@@ -168,7 +222,6 @@ module SoulCore
       state["verification"]["moved_directories"] = result.dig(:json, "verification", "moved_directories") || 0
       state["verification"]["deleted_files"] = result.dig(:json, "verification", "deleted_files") || 0
       state["verification"]["job_complete"] = result.dig(:json, "verification", "job_complete") || false
-
       @runner.save_session(state)
 
       {
@@ -202,12 +255,7 @@ module SoulCore
         }
       end
 
-      args = [
-        "--workflow-state", state.fetch("workflow_path"),
-        "--execute",
-        "--confirm", "RESTORE_FROM_TRASH"
-      ]
-
+      args = ["--workflow-state", state.fetch("workflow_path"), "--execute", "--confirm", "RESTORE_FROM_TRASH"]
       result = @skill_runner.run("downloads.restore_last_cleanup", args: args)
       task_log_path = @task_log.write(kind: "skill.downloads.restore_last_cleanup", payload: result)
 
@@ -225,7 +273,6 @@ module SoulCore
       state["verification"]["restored_directories"] = result.dig(:json, "verification", "restored_directories") || 0
       state["verification"]["deleted_files"] = result.dig(:json, "verification", "deleted_files") || 0
       state["verification"]["job_complete"] = result.dig(:json, "verification", "job_complete") || false
-
       @runner.save_session(state)
 
       {

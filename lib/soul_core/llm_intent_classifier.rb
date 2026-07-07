@@ -7,7 +7,8 @@ module SoulCore
   class LlmIntentClassifier
     ALLOWED_INTENTS = [
       "downloads.cleanup",
-      "downloads.restore_last_cleanup"
+      "downloads.restore_last_cleanup",
+      "weather.report"
     ].freeze
 
     def initialize(model_client: ModelClient.new)
@@ -17,10 +18,8 @@ module SoulCore
     def classify(text)
       prompt = build_prompt(text)
       result = @model_client.chat(prompt, mode: :fast, max_tokens: 512, temperature: 0.1)
-
       content = result[:content].to_s.strip
       parsed = parse_json(content)
-
       validate(parsed, raw_content: content)
     rescue StandardError => e
       {
@@ -39,7 +38,6 @@ module SoulCore
     def build_prompt(text)
       <<~PROMPT
         You classify user requests into Soul/ workflow intents.
-
         Return ONLY valid compact JSON. Do not use markdown.
 
         Registered workflows:
@@ -50,11 +48,8 @@ module SoulCore
             "examples": [
               "cleanup files in my downloads folder older than 30 days",
               "run a file cleanup in my downloads folder",
-              "run a file cleanup in Downloads",
               "clear old junk out of Downloads",
-              "trash stale downloads",
-              "clean up old files from downloads",
-              "delete old files in my download folder"
+              "trash stale downloads"
             ],
             "allowed_target_paths": ["~/Downloads"],
             "default_slots": {
@@ -70,28 +65,39 @@ module SoulCore
             "examples": [
               "restore the last downloads cleanup",
               "undo the last downloads cleanup",
-              "restore files from the last cleanup",
-              "roll back the last downloads cleanup",
-              "put back the files from the cleanup"
+              "roll back the last downloads cleanup"
             ],
             "default_slots": {
               "restore_scope": "latest_successful_downloads_cleanup"
+            }
+          },
+          {
+            "intent": "weather.report",
+            "description": "Get today's weather for a location, including temperature, humidity, and air quality. The workflow can optionally provide a 3-day outlook.",
+            "examples": [
+              "what is the weather today in Syracuse, NY",
+              "what's the weather like today",
+              "current weather for Buffalo, New York",
+              "how is the air quality today in Albany",
+              "weather forecast near Rochester"
+            ],
+            "default_slots": {
+              "location": null,
+              "units": "fahrenheit"
             }
           }
         ]
 
         Rules:
         - Match only a registered workflow.
-        - If no age threshold is specified for Downloads cleanup, use 30 days.
-        - If the target is not Downloads or is unclear, set matched=false unless the wording clearly implies Downloads.
-        - If the request is about undoing/restoring a prior Downloads cleanup, use downloads.restore_last_cleanup.
+        - For Downloads cleanup, if no age threshold is specified, use 30 days.
+        - For Downloads cleanup, do not invent paths outside ~/Downloads.
+        - For weather, extract a location if the user provided one after words like in, for, or near.
+        - For weather, if no location is present, set location to null. Do not invent one.
         - Do not invent workflows.
-        - Do not invent paths outside ~/Downloads.
-        - Return JSON with exactly these keys:
-          matched, intent, confidence, slots, needs_clarification, clarifying_question, reason
+        - Return JSON with exactly these keys: matched, intent, confidence, slots, needs_clarification, clarifying_question, reason
 
-        User request:
-        #{text}
+        User request: #{text}
       PROMPT
     end
 
@@ -159,6 +165,8 @@ module SoulCore
           sanitize_downloads_cleanup_slots(slots)
         when "downloads.restore_last_cleanup"
           { "restore_scope" => "latest_successful_downloads_cleanup" }
+        when "weather.report"
+          sanitize_weather_slots(slots)
         else
           {}
         end
@@ -195,6 +203,16 @@ module SoulCore
         "older_than_days" => days,
         "include_directories" => true,
         "recursive" => false
+      }
+    end
+
+    def sanitize_weather_slots(slots)
+      location = slots["location"]
+      location = nil if location.nil? || location.to_s.strip.empty?
+
+      {
+        "location" => location&.to_s&.strip,
+        "units" => ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
       }
     end
   end

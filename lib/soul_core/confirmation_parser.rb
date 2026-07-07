@@ -9,6 +9,10 @@ module SoulCore
       /\byeah\b/,
       /\byep\b/,
       /\byup\b/,
+      /\bsure\b/,
+      /\bdetailed\b/,
+      /\bdetail\b/,
+      /\bfull report\b/,
       /\bdo it\b/,
       /\bgo ahead\b/,
       /\bconfirm\b/,
@@ -22,6 +26,9 @@ module SoulCore
     NO_PATTERNS = [
       /\bno\b/,
       /\bnope\b/,
+      /\bnot now\b/,
+      /\bbrief is fine\b/,
+      /\bthat'?s enough\b/,
       /\bcancel\b/,
       /\bstop\b/,
       /\bnever mind\b/,
@@ -50,7 +57,7 @@ module SoulCore
       Result.new(
         confirmed: false,
         cancelled: false,
-        message: "I could not tell whether that was confirmation. Please say yes, do it, confirm, restore them, or cancel."
+        message: "I could not tell whether that was confirmation. Please say yes, do it, confirm, or cancel."
       )
     end
   end

@@ -81,13 +81,12 @@ module SoulCore
       prompt = @argv.join(" ").strip
 
       if prompt.empty?
-        warn "Usage: ruby bin/soul ask fast|think \"your prompt\""
+        warn 'Usage: ruby bin/soul ask fast|think "your prompt"'
         exit 1
       end
 
       client = ModelClient.new
       result = client.chat(prompt, mode: mode)
-
       puts(result[:content].to_s.strip.empty? ? result[:reasoning_content] : result[:content])
       path = @log.write(kind: "ask.#{mode}", payload: result)
       warn "logged: #{path}"
@@ -97,7 +96,7 @@ module SoulCore
       text = @argv.join(" ").strip
 
       if text.empty?
-        warn 'Usage: ruby bin/soul intent "run a file cleanup in Downloads"'
+        warn 'Usage: ruby bin/soul intent "what is the weather today in Syracuse, NY"'
         exit 1
       end
 
@@ -123,7 +122,7 @@ module SoulCore
       text = @argv.join(" ").strip
 
       if text.empty?
-        warn 'Usage: ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
+        warn 'Usage: ruby bin/soul do "what is the weather today in Syracuse, NY"'
         exit 1
       end
 
@@ -138,6 +137,7 @@ module SoulCore
         warn '  ruby bin/soul do "cleanup files in my downloads folder older than 30 days"'
         warn '  ruby bin/soul do "run a file cleanup in Downloads"'
         warn '  ruby bin/soul do "restore the last downloads cleanup"'
+        warn '  ruby bin/soul do "what is the weather today in Syracuse, NY"'
         exit 1
       end
 
@@ -161,7 +161,7 @@ module SoulCore
       text = @argv.join(" ").strip
 
       if text.empty?
-        warn 'Usage: ruby bin/soul respond "move all except F1"'
+        warn 'Usage: ruby bin/soul respond "yes"'
         exit 1
       end
 
@@ -205,8 +205,9 @@ module SoulCore
 
     def skill
       name = @argv.shift
+
       unless name
-        warn "Usage: ruby bin/soul skill system.status"
+        warn "Usage: ruby bin/soul skill weather.report -- --location 'Syracuse, NY'"
         exit 1
       end
 
@@ -312,13 +313,17 @@ module SoulCore
           ruby bin/soul doctor
           ruby bin/soul skills
 
+          ruby bin/soul intent "what is the weather today in Syracuse, NY"
+          ruby bin/soul do "what is the weather today in Syracuse, NY"
+          ruby bin/soul respond "yes"
+          ruby bin/soul respond "no"
+
           ruby bin/soul intent "run a file cleanup in Downloads"
           ruby bin/soul intent "restore the last downloads cleanup"
 
           ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
           ruby bin/soul do "run a file cleanup in Downloads"
           ruby bin/soul do "restore the last downloads cleanup"
-
           ruby bin/soul respond "move all"
           ruby bin/soul respond "move all except F1"
           ruby bin/soul respond "only move F1 and D1"
@@ -332,6 +337,8 @@ module SoulCore
           ruby bin/soul workflow show latest
 
           ruby bin/soul skill system.status
+          ruby bin/soul skill weather.report -- --location "Syracuse, NY"
+          ruby bin/soul skill weather.report -- --location "Syracuse, NY" --detailed
           ruby bin/soul skill downloads.inspect
           ruby bin/soul skill downloads.cleanup_plan
           ruby bin/soul skill downloads.move_to_trash -- --latest-plan
@@ -351,6 +358,8 @@ module SoulCore
         Environment:
           SOUL_OPENAI_BASE_URL=http://127.0.0.1:8082/v1
           SOUL_MODEL_ALIAS=soul-qwen3-8b-q4
+          SOUL_WEATHER_LOCATION=Syracuse, NY
+          SOUL_WEATHER_UNITS=fahrenheit
       HELP
     end
   end
