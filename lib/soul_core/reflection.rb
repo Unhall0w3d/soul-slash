@@ -19,6 +19,7 @@ module SoulCore
 
     def reflect(target = "last")
       source_path = target == "last" ? latest_log_path : target
+
       raise "no task logs found in #{@log_root}" unless source_path
       raise "task log not found: #{source_path}" unless File.exist?(source_path)
 
@@ -72,6 +73,8 @@ module SoulCore
       case task_kind
       when "skill.downloads.move_to_trash"
         reflect_downloads_move_to_trash(base, payload)
+      when "skill.downloads.restore_last_cleanup"
+        reflect_downloads_restore_last_cleanup(base, payload)
       when "skill.downloads.cleanup_plan"
         reflect_downloads_cleanup_plan(base, payload)
       when "skill.downloads.inspect"
@@ -125,6 +128,53 @@ module SoulCore
       base[:verification_summary] = verification
     end
 
+    def reflect_downloads_restore_last_cleanup(base, payload)
+      data = payload["json"] || payload
+      verification = data["verification"] || {}
+
+      restored = data["restored"] || []
+      failed = data["failed"] || []
+
+      restored_files = verification["restored_files"] || restored.count { |item| item["type"] == "file" }
+      restored_directories = verification["restored_directories"] || restored.count { |item| item["type"] == "directory" }
+      planned_total = verification["planned_total"] || data["planned_restore_count"] || data["planned_candidate_count"] || restored.length + failed.length
+      restored_total = verification["restored_total"] || restored.length
+      job_complete = verification.key?("job_complete") ? verification["job_complete"] : (data["outcome"] == "complete" && failed.empty? && restored_total.to_i == planned_total.to_i)
+
+      base[:observations] << "downloads.restore_last_cleanup completed with status #{data['status']} in #{data['mode']} mode."
+      base[:observations] << "Outcome: #{data['outcome']}." if data["outcome"]
+      base[:observations] << "Recommendation: #{data['recommendation']}." if data["recommendation"]
+      base[:observations] << "Source move log: #{data['source_move_log']}." if data["source_move_log"]
+      base[:observations] << "Planned restore candidates: #{planned_total}."
+      base[:observations] << "Restored files: #{restored_files}."
+      base[:observations] << "Restored directories: #{restored_directories}."
+      base[:observations] << "Permanent deletions: #{verification['deleted_files'] || 0}."
+      base[:observations] << "Restore job complete: #{job_complete}."
+
+      if job_complete == true
+        base[:candidate_lessons] << "A Downloads restore job is complete when all approved restore candidates are returned from Trash to their original paths."
+        base[:candidate_lessons] << "The restore-last-cleanup workflow provides the rollback path for approved Downloads cleanup actions."
+      end
+
+      base[:candidate_rules] << "downloads.restore_last_cleanup must consume a successful downloads.move_to_trash log."
+      base[:candidate_rules] << "downloads.restore_last_cleanup must restore only items that Soul/ previously moved to Trash."
+      base[:candidate_rules] << "downloads.restore_last_cleanup must require --execute and --confirm RESTORE_FROM_TRASH before restoring anything."
+      base[:candidate_rules] << "downloads.restore_last_cleanup must refuse to overwrite an existing original path."
+      base[:candidate_rules] << "downloads.restore_last_cleanup must not permanently delete files or empty Trash."
+
+      base[:verification_summary] = verification.merge(
+        "planned_total" => planned_total,
+        "restored_total" => restored_total,
+        "restored_files" => restored_files,
+        "restored_directories" => restored_directories,
+        "job_complete" => job_complete
+      )
+
+      unless failed.empty?
+        base[:warnings] << "Some restore candidates failed and should be reviewed before approving broad restore rules."
+      end
+    end
+
     def reflect_downloads_cleanup_plan(base, payload)
       data = payload["json"] || payload
       summary = data["summary"] || {}
@@ -139,7 +189,7 @@ module SoulCore
       base[:observations] << "Manual review entries: #{summary['uncertain_count'] || proposed.fetch('manual_review_required', []).length}."
       base[:observations] << "Recommendation: #{data['recommendation']}." if data["recommendation"]
 
-      if (summary["cleanup_candidate_count"].to_i).zero?
+      if summary["cleanup_candidate_count"].to_i.zero?
         base[:candidate_lessons] << "Current Downloads scan produced no move-to-trash candidates at the configured age threshold."
       else
         base[:candidate_lessons] << "Downloads cleanup planning can identify top-level files and folders without moving them."
@@ -173,6 +223,7 @@ module SoulCore
       base[:observations] << "Candidate directories: #{summary['cleanup_candidate_directory_count'] || 0}."
 
       base[:candidate_lessons] << "downloads.inspect provides a safe read-only file and top-level folder classification layer for later planning."
+
       base[:candidate_rules] << "downloads.inspect should never move, rename, or delete files."
       base[:candidate_rules] << "Protected project terms must be checked before any entry is considered a cleanup candidate."
 
@@ -198,6 +249,7 @@ module SoulCore
       base[:observations] << "Model endpoint reachable: #{verification['model_endpoint_reachable']}."
 
       base[:candidate_lessons] << "system.status is a verified read-only baseline skill for checking Soul/ runtime health."
+
       base[:candidate_rules] << "Runtime status should distinguish host process memory from GPU VRAM usage in future output."
 
       base[:verification_summary] = verification
@@ -233,6 +285,7 @@ module SoulCore
 
     def render_markdown(candidate)
       lines = []
+
       lines << "# Soul/ Reflection Candidate"
       lines << ""
       lines << "- Type: `#{candidate[:type]}`"
@@ -251,6 +304,7 @@ module SoulCore
 
       lines << "## Verification Summary"
       lines << ""
+
       if candidate[:verification_summary].empty?
         lines << "- None captured."
       else
@@ -258,20 +312,24 @@ module SoulCore
           lines << "- `#{key}`: `#{value}`"
         end
       end
+
       lines << ""
 
       markdown_section(lines, "Warnings", candidate[:warnings])
+
       lines.join("\n")
     end
 
     def markdown_section(lines, title, values)
       lines << "## #{title}"
       lines << ""
+
       if values.empty?
         lines << "- None."
       else
         values.each { |value| lines << "- #{value}" }
       end
+
       lines << ""
     end
   end
