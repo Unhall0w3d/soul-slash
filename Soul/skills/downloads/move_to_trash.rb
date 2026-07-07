@@ -10,12 +10,13 @@ require "time"
 options = {
   plan_log: nil,
   latest_plan: false,
+  workflow_state: nil,
   execute: false,
   confirm: nil
 }
 
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: move_to_trash.rb --latest-plan [--execute --confirm MOVE_TO_TRASH]"
+  opts.banner = "Usage: move_to_trash.rb (--latest-plan|--plan-log PATH|--workflow-state PATH) [--execute --confirm MOVE_TO_TRASH]"
 
   opts.on("--plan-log PATH", "Path to a downloads.cleanup_plan task log JSON.") do |value|
     options[:plan_log] = value
@@ -23,6 +24,10 @@ parser = OptionParser.new do |opts|
 
   opts.on("--latest-plan", "Use latest downloads.cleanup_plan task log.") do
     options[:latest_plan] = true
+  end
+
+  opts.on("--workflow-state PATH", "Use selected candidates from a workflow session JSON.") do |value|
+    options[:workflow_state] = value
   end
 
   opts.on("--execute", "Actually move approved cleanup candidates to Trash.") do
@@ -39,9 +44,19 @@ begin
 rescue OptionParser::InvalidOption, OptionParser::MissingArgument => e
   puts JSON.pretty_generate({
     skill: "downloads.move_to_trash",
+    generated_at: Time.now.iso8601,
     status: "error",
+    outcome: "not_complete",
     error: "#{e.class}: #{e.message}",
-    usage: parser.to_s
+    usage: parser.to_s,
+    verification: {
+      moved_files: 0,
+      moved_directories: 0,
+      deleted_files: 0,
+      permanent_delete_supported: false,
+      trash_is_terminal_cleanup_action: true,
+      job_complete: false
+    }
   })
   exit 2
 end
@@ -51,12 +66,15 @@ def latest_plan_log
   logs.last
 end
 
-def load_plan(path)
-  wrapper = JSON.parse(File.read(path))
-  if wrapper.is_a?(Hash) && wrapper["json"].is_a?(Hash)
-    wrapper["json"]
+def load_json(path)
+  JSON.parse(File.read(path))
+end
+
+def payload_json(wrapper_or_payload)
+  if wrapper_or_payload.is_a?(Hash) && wrapper_or_payload["json"].is_a?(Hash)
+    wrapper_or_payload["json"]
   else
-    wrapper
+    wrapper_or_payload
   end
 end
 
@@ -78,6 +96,7 @@ end
 
 def run_cmd(cmd)
   stdout, stderr, status = Open3.capture3(*cmd)
+
   {
     ok: status.success?,
     stdout: stdout.strip,
@@ -93,12 +112,38 @@ rescue StandardError => e
   }
 end
 
-plan_log =
-  if options[:latest_plan]
-    latest_plan_log
-  else
-    options[:plan_log]
+workflow_state = nil
+
+if options[:workflow_state]
+  unless File.exist?(options[:workflow_state])
+    puts JSON.pretty_generate({
+      skill: "downloads.move_to_trash",
+      generated_at: Time.now.iso8601,
+      status: "error",
+      outcome: "not_complete",
+      error: "workflow state not found: #{options[:workflow_state]}",
+      verification: {
+        moved_files: 0,
+        moved_directories: 0,
+        deleted_files: 0,
+        permanent_delete_supported: false,
+        trash_is_terminal_cleanup_action: true,
+        job_complete: false
+      }
+    })
+    exit 1
   end
+
+  workflow_state = load_json(options[:workflow_state])
+  plan_log = workflow_state.dig("verification", "plan_log")
+else
+  plan_log =
+    if options[:latest_plan]
+      latest_plan_log
+    else
+      options[:plan_log]
+    end
+end
 
 unless plan_log && File.exist?(plan_log)
   puts JSON.pretty_generate({
@@ -106,7 +151,7 @@ unless plan_log && File.exist?(plan_log)
     generated_at: Time.now.iso8601,
     status: "error",
     outcome: "not_complete",
-    error: "missing cleanup plan log; provide --latest-plan or --plan-log PATH",
+    error: "missing cleanup plan log; provide --latest-plan, --plan-log PATH, or --workflow-state PATH",
     verification: {
       moved_files: 0,
       moved_directories: 0,
@@ -119,11 +164,17 @@ unless plan_log && File.exist?(plan_log)
   exit 1
 end
 
-plan = load_plan(plan_log)
-actions = plan.dig("proposed_actions", "would_move_to_trash_after_approval") || []
+plan = payload_json(load_json(plan_log))
 target_path = plan["target_path"]
 verification = plan["verification"] || {}
 protected_paths = (plan.dig("proposed_actions", "keep_protected") || []).map { |item| item["path"] }
+
+actions =
+  if workflow_state
+    workflow_state.fetch("selected_candidates", [])
+  else
+    plan.dig("proposed_actions", "would_move_to_trash_after_approval") || []
+  end
 
 errors = []
 warnings = []
@@ -134,6 +185,11 @@ errors << "cleanup plan does not require approval before execution" unless verif
 errors << "cleanup plan target_path missing" if target_path.to_s.strip.empty?
 errors << "no Trash command found; install gio/glib2 or trash-cli" unless trash
 errors << "execution requires --confirm MOVE_TO_TRASH" if options[:execute] && options[:confirm] != "MOVE_TO_TRASH"
+
+if workflow_state
+  errors << "workflow is not waiting_for_final_confirmation" unless workflow_state["status"] == "waiting_for_final_confirmation"
+  errors << "workflow state has no selected candidates" if actions.empty?
+end
 
 validated_actions = actions.map do |item|
   path = item["path"]
@@ -176,14 +232,17 @@ if errors.empty? && options[:execute]
   validated_actions.each do |validated|
     path = validated.dig(:action, "path")
     result = run_cmd(trash + [path])
+
     if result[:ok]
       moved << {
+        id: validated.dig(:action, "id"),
         path: path,
         type: validated.dig(:action, "type"),
         result: result
       }
     else
       failed << {
+        id: validated.dig(:action, "id"),
         path: path,
         type: validated.dig(:action, "type"),
         result: result
@@ -191,14 +250,19 @@ if errors.empty? && options[:execute]
     end
   end
 elsif !options[:execute]
-  warnings << "dry-run only; no files or folders were moved"
+  if actions.empty?
+    warnings << "no cleanup candidates were selected"
+  else
+    warnings << "dry-run only; no files or folders were moved"
+  end
 end
 
 job_complete =
   options[:execute] &&
   errors.empty? &&
   failed.empty? &&
-  moved.length == actions.length
+  moved.length == actions.length &&
+  !actions.empty?
 
 outcome =
   if job_complete
@@ -212,6 +276,8 @@ outcome =
 recommendation =
   if job_complete
     "Cleanup job complete. Approved items were moved to Trash. Trash emptying is left to the operating system or the user."
+  elsif !options[:execute] && actions.empty?
+    "No cleanup candidates are selected. Nothing to move."
   elsif !options[:execute]
     "Dry run complete. Review the listed actions, then rerun with --execute --confirm MOVE_TO_TRASH if approved."
   elsif !failed.empty?
@@ -237,6 +303,7 @@ result = {
   recommendation: recommendation,
   mode: options[:execute] ? "execute" : "dry_run",
   plan_log: plan_log,
+  workflow_state: options[:workflow_state],
   target_path: target_path,
   trash_command: trash,
   planned_candidate_count: actions.length,
@@ -251,6 +318,7 @@ result = {
     explicit_execute_flag: options[:execute],
     explicit_confirm_text_matched: options[:confirm] == "MOVE_TO_TRASH",
     consumed_plan_log: true,
+    consumed_workflow_state: !workflow_state.nil?,
     consumed_verified_cleanup_plan: verification["read_only"] == true && verification["approval_required_before_execution"] == true,
     moved_files: moved.count { |item| item[:type] == "file" },
     moved_directories: moved.count { |item| item[:type] == "directory" },
