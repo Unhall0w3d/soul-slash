@@ -6,7 +6,6 @@ require "time"
 require "fileutils"
 require "uri"
 require "open3"
-require "shellwords"
 
 ROOT = File.expand_path("../../..", __dir__)
 
@@ -27,15 +26,21 @@ module SoulSkills
           return 0
         end
 
-        query = normalize_query(option_value("--query") || option_value("--song") || positional_query)
+        raw_url = option_value("--url")
+        raw_query = option_value("--query") || option_value("--song") || positional_query
 
         result =
-          if query.empty?
-            blocked_for_input("Missing song/search query. Provide --query \"Song Name\".")
-          elsif query.length > MAX_QUERY_LENGTH
-            blocked_for_input("Query is too long. Maximum supported length is #{MAX_QUERY_LENGTH} characters.", query: query)
+          if raw_url && !raw_url.to_s.strip.empty?
+            process_direct_url(raw_url)
           else
-            process_query(query)
+            query = normalize_query(raw_query)
+            if query.empty?
+              blocked_for_input("Missing song/search query or YouTube URL. Provide --query \"Song Name\" or --url \"https://www.youtube.com/watch?v=...\".")
+            elsif query.length > MAX_QUERY_LENGTH
+              blocked_for_input("Query is too long. Maximum supported length is #{MAX_QUERY_LENGTH} characters.", query: query)
+            else
+              process_query(query)
+            end
           end
 
         log_path = write_log(result)
@@ -58,7 +63,8 @@ module SoulSkills
             browser_launch_attempted: false,
             complete: false,
             final_state: "failed",
-            dry_run: dry_run?
+            dry_run: dry_run?,
+            input_type: "unknown"
           )
         }
         log_path = write_log(result)
@@ -71,35 +77,48 @@ module SoulSkills
 
       def process_query(query)
         url = youtube_search_url(query)
-
-        if confirm?
-          launch(query, url)
-        else
-          plan(query, url)
-        end
+        confirm? ? launch(input_type: "search_query", query: query, url: url) : plan(input_type: "search_query", query: query, url: url)
       end
 
-      def plan(query, url)
-        {
+      def process_direct_url(raw_url)
+        normalized = normalize_youtube_url(raw_url)
+
+        unless normalized["ok"]
+          return blocked_for_input(
+            normalized["error"],
+            input_type: "youtube_url",
+            raw_url: raw_url.to_s.strip
+          )
+        end
+
+        url = normalized["url"]
+        confirm? ? launch(input_type: "youtube_url", query: nil, url: url) : plan(input_type: "youtube_url", query: nil, url: url)
+      end
+
+      def plan(input_type:, query:, url:)
+        out = {
           "skill" => "youtube.song_search",
           "generated_at" => Time.now.iso8601,
           "status" => "ok",
           "outcome" => "awaiting_confirmation",
-          "query" => query,
+          "input_type" => input_type,
           "url" => url,
           "launcher" => launcher_name,
-          "recommendation" => "Review the YouTube search URL and confirm before opening the browser.",
+          "recommendation" => confirmation_recommendation(input_type),
           "verification" => verification(
             read_only: true,
             browser_launch_attempted: false,
             complete: false,
             final_state: "awaiting_confirmation",
-            dry_run: dry_run?
+            dry_run: dry_run?,
+            input_type: input_type
           )
         }
+        out["query"] = query if query
+        out
       end
 
-      def launch(query, url)
+      def launch(input_type:, query:, url:)
         launcher = launcher_name
 
         unless launcher_available?(launcher)
@@ -108,6 +127,7 @@ module SoulSkills
             "generated_at" => Time.now.iso8601,
             "status" => "error",
             "outcome" => "failed",
+            "input_type" => input_type,
             "query" => query,
             "url" => url,
             "launcher" => launcher,
@@ -117,9 +137,10 @@ module SoulSkills
               browser_launch_attempted: false,
               complete: false,
               final_state: "failed",
-              dry_run: dry_run?
+              dry_run: dry_run?,
+              input_type: input_type
             )
-          }
+          }.compact
         end
 
         if dry_run?
@@ -128,6 +149,7 @@ module SoulSkills
             "generated_at" => Time.now.iso8601,
             "status" => "ok",
             "outcome" => "complete",
+            "input_type" => input_type,
             "query" => query,
             "url" => url,
             "launcher" => launcher,
@@ -137,9 +159,10 @@ module SoulSkills
               browser_launch_attempted: false,
               complete: true,
               final_state: "complete",
-              dry_run: true
+              dry_run: true,
+              input_type: input_type
             )
-          }
+          }.compact
         end
 
         stdout, stderr, status = Open3.capture3(launcher, url)
@@ -150,25 +173,28 @@ module SoulSkills
             "generated_at" => Time.now.iso8601,
             "status" => "ok",
             "outcome" => "complete",
+            "input_type" => input_type,
             "query" => query,
             "url" => url,
             "launcher" => launcher,
             "launcher_exit_status" => status.exitstatus,
-            "recommendation" => "YouTube search opened in the default browser.",
+            "recommendation" => launch_recommendation(input_type),
             "verification" => verification(
               read_only: false,
               browser_launch_attempted: true,
               complete: true,
               final_state: "complete",
-              dry_run: false
+              dry_run: false,
+              input_type: input_type
             )
-          }
+          }.compact
         else
           {
             "skill" => "youtube.song_search",
             "generated_at" => Time.now.iso8601,
             "status" => "error",
             "outcome" => "failed",
+            "input_type" => input_type,
             "query" => query,
             "url" => url,
             "launcher" => launcher,
@@ -181,13 +207,14 @@ module SoulSkills
               browser_launch_attempted: true,
               complete: false,
               final_state: "failed",
-              dry_run: false
+              dry_run: false,
+              input_type: input_type
             )
-          }
+          }.compact
         end
       end
 
-      def blocked_for_input(message, query: nil)
+      def blocked_for_input(message, query: nil, input_type: nil, raw_url: nil)
         out = {
           "skill" => "youtube.song_search",
           "generated_at" => Time.now.iso8601,
@@ -199,16 +226,84 @@ module SoulSkills
             browser_launch_attempted: false,
             complete: false,
             final_state: "blocked_for_input",
-            dry_run: dry_run?
+            dry_run: dry_run?,
+            input_type: input_type || "unknown"
           )
         }
         out["query"] = query if query
+        out["input_type"] = input_type if input_type
+        out["raw_url"] = raw_url if raw_url
         out
       end
 
       def youtube_search_url(query)
         encoded = URI.encode_www_form_component(query)
         "https://www.youtube.com/results?search_query=#{encoded}"
+      end
+
+      def normalize_youtube_url(raw_url)
+        value = raw_url.to_s.strip
+        return { "ok" => false, "error" => "Missing YouTube URL." } if value.empty?
+
+        uri = parse_uri(value)
+        return { "ok" => false, "error" => "Invalid URL. Provide a YouTube watch URL or youtu.be share URL." } unless uri
+
+        host = uri.host.to_s.downcase.sub(/\Awww\./, "")
+        case host
+        when "youtube.com", "m.youtube.com", "music.youtube.com"
+          normalize_youtube_dot_com(uri)
+        when "youtu.be"
+          normalize_youtu_be(uri)
+        else
+          { "ok" => false, "error" => "Unsupported URL host. Only youtube.com, music.youtube.com, m.youtube.com, and youtu.be are accepted." }
+        end
+      end
+
+      def normalize_youtube_dot_com(uri)
+        if uri.path == "/watch"
+          video_id = query_params(uri)["v"].to_s.strip
+          return invalid_video_id unless valid_video_id?(video_id)
+
+          { "ok" => true, "url" => "https://www.youtube.com/watch?v=#{video_id}" }
+        elsif uri.path.start_with?("/shorts/")
+          video_id = uri.path.split("/")[2].to_s.strip
+          return invalid_video_id unless valid_video_id?(video_id)
+
+          { "ok" => true, "url" => "https://www.youtube.com/watch?v=#{video_id}" }
+        else
+          { "ok" => false, "error" => "Unsupported YouTube URL path. Use /watch?v=<video_id>, /shorts/<video_id>, or youtu.be/<video_id>." }
+        end
+      end
+
+      def normalize_youtu_be(uri)
+        video_id = uri.path.to_s.sub(%r{\A/}, "").split("/").first.to_s.strip
+        return invalid_video_id unless valid_video_id?(video_id)
+
+        { "ok" => true, "url" => "https://www.youtube.com/watch?v=#{video_id}" }
+      end
+
+      def invalid_video_id
+        { "ok" => false, "error" => "Invalid or missing YouTube video ID." }
+      end
+
+      def valid_video_id?(video_id)
+        video_id.match?(/\A[A-Za-z0-9_-]{6,20}\z/)
+      end
+
+      def parse_uri(value)
+        uri = URI.parse(value)
+        return nil unless uri.is_a?(URI::HTTP) || uri.is_a?(URI::HTTPS)
+        return nil unless %w[http https].include?(uri.scheme)
+
+        uri
+      rescue URI::InvalidURIError
+        nil
+      end
+
+      def query_params(uri)
+        URI.decode_www_form(uri.query.to_s).to_h
+      rescue ArgumentError
+        {}
       end
 
       def normalize_query(value)
@@ -233,7 +328,7 @@ module SoulSkills
           end
 
           if arg.start_with?("--")
-            skip = %w[--query --song].include?(arg) && @argv[idx + 1]
+            skip = %w[--query --song --url].include?(arg) && @argv[idx + 1]
             next
           end
 
@@ -263,7 +358,23 @@ module SoulSkills
         end
       end
 
-      def verification(read_only:, browser_launch_attempted:, complete:, final_state:, dry_run:)
+      def confirmation_recommendation(input_type)
+        if input_type == "youtube_url"
+          "Review the normalized YouTube watch URL and confirm before opening the browser."
+        else
+          "Review the YouTube search URL and confirm before opening the browser. Song-name queries open search results unless a resolver is added later."
+        end
+      end
+
+      def launch_recommendation(input_type)
+        if input_type == "youtube_url"
+          "YouTube watch URL opened in the default browser."
+        else
+          "YouTube search opened in the default browser."
+        end
+      end
+
+      def verification(read_only:, browser_launch_attempted:, complete:, final_state:, dry_run:, input_type:)
         {
           "read_only" => read_only,
           "network_used" => false,
@@ -274,6 +385,9 @@ module SoulSkills
           "persistent_process_started" => false,
           "secrets_printed" => false,
           "api_key_values_printed" => false,
+          "direct_video_url_supported" => true,
+          "search_query_resolves_video" => false,
+          "input_type" => input_type,
           "dry_run" => dry_run,
           "complete" => complete,
           "final_state" => final_state
@@ -309,17 +423,24 @@ module SoulSkills
         <<~TEXT
           youtube.song_search
 
-          Opens a YouTube search URL for a requested song/query in the default Linux browser.
+          Opens either:
+            - a YouTube search URL for a requested song/query, or
+            - a normalized direct YouTube watch URL when --url is provided.
+
+          Supported platform:
+            Linux only.
 
           Usage:
             ruby Soul/skills/youtube/song_search.rb --query "Bohemian Rhapsody" --plan-only
             ruby Soul/skills/youtube/song_search.rb --query "Bohemian Rhapsody" --confirm
-            ruby Soul/skills/youtube/song_search.rb --song "Miles Davis So What" --confirm
+            ruby Soul/skills/youtube/song_search.rb --url "https://youtu.be/dQw4w9WgXcQ" --plan-only
+            ruby Soul/skills/youtube/song_search.rb --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" --confirm
             ruby Soul/skills/youtube/song_search.rb --query "Test Song" --confirm --dry-run
 
           Options:
             --query TEXT      Song/search query.
             --song TEXT       Alias for --query.
+            --url URL         YouTube watch/share/shorts URL. Normalized to a watch URL.
             --plan-only       Return an awaiting_confirmation plan. This is the default unless --confirm is provided.
             --confirm         Open the constructed URL using xdg-open or SOUL_YOUTUBE_LAUNCHER.
             --dry-run         Do not launch the browser even when --confirm is provided.
@@ -330,6 +451,7 @@ module SoulSkills
             - Uses xdg-open by default.
             - Does not download media.
             - Does not scrape YouTube.
+            - Does not resolve song-name searches to video IDs.
             - Does not bypass ads or access controls.
             - Does not start a persistent process inside Soul/.
         TEXT
