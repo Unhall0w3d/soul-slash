@@ -1,0 +1,19 @@
+Soul Codex Overlay v0.1.0
+
+Files:
+- AGENTS.md
+- README_SOUL_CODEX_OVERLAY.md
+- docs/soul/SOUL_DESIGN_ETHOS.md
+- docs/soul/SKILL_LIFECYCLE.md
+- docs/soul/MEMORY_POLICY.md
+- docs/soul/RISK_CLASSES.md
+- docs/soul/EVAL_LOOP.md
+- docs/soul/SKILL_BRIEF_TEMPLATE.md
+- docs/soul/CODEX_TASK_PROMPT_TEMPLATE.md
+- docs/soul/HUMAN_REVIEW_GATE.md
+- skills/_template/README.md
+- skills/_template/REVIEW.md
+- skills/_template/evals/README.md
+- skills/_template/fixtures/README.md
+
+No executable files are included.
