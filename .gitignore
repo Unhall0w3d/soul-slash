@@ -1,9 +1,24 @@
+# Soul/ local-only configuration
+.env
+.env.*
+!.env.example
+.envrc
+*.local
+*.local.*
+*.local.yaml
+*.secret
+*.secret.*
+secrets/
+
 # Local runtime artifacts
 run/
 tmp/
+cache/
+.cache/
+logs/
 *.log
 
-# Soul local data/logs/state
+# Soul/ generated logs, state, workflow sessions, and reflection drafts
 Soul/logs/tasks/*.json
 Soul/logs/tool_runs/*.json
 Soul/workflows/pending/*.json
@@ -24,24 +39,46 @@ Soul/reflection/rejected/*.md
 !Soul/reflection/approved/.keep
 !Soul/reflection/rejected/.keep
 
-# Local secrets/config
-.env
-*.local.yaml
-*.secret*
-secrets/
-.envrc
-
-# Model files
+# Local model files and model directories
+models/
 *.gguf
 *.safetensors
 *.bin
+*.pth
+*.pt
+*.onnx
+*.tflite
+
+# Generated overlay/package artifacts
+*.zip
+*_overlay/
+*_overlay.zip
+soul_*_overlay/
+soul_*_overlay.zip
+
+# Temporary backup files
+*.bak
+*.backup
+*.backup-*
+*.orig
+*.rej
+
+# Ruby/local dependency artifacts
+.bundle/
+vendor/bundle/
+coverage/
+
+# Python/local helper artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
 
 # Editor/OS cruft
 .DS_Store
+Thumbs.db
 *.swp
 *.swo
 .idea/
 .vscode/
-
-# Root-level local logs
-logs/

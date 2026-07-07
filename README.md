@@ -33,7 +33,7 @@ Current working pieces include:
 - early conversational `respond` command
 - deterministic-first, LLM-assisted intent routing
 
-This is not a finished assistant. It is a project being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable. Reckless wizardry is available elsewhere on the internet.
+This is not a finished assistant. It is a project being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable.
 
 ## What Soul/ is becoming
 
@@ -42,7 +42,7 @@ Soul/ is intended to grow into a local assistant environment with:
 - **Local model runtime support** for small local LLMs exposed through an OpenAI-compatible endpoint.
 - **Human-accessible interaction** through natural-language CLI now, with future voice, TTS, and UI layers.
 - **Deterministic skills** for real actions that should not be left to improvisation.
-- **Workflow orchestration** that turns messy human requests into known, validated skill sequences.
+- **Workflow orchestration** that turns human requests into known, validated skill sequences.
 - **Safety gates** that separate planning, selection, confirmation, execution, and verification.
 - **Recoverable operations** where cleanup actions move to Trash first and can be restored.
 - **Human-approved memory** where durable lessons and operating rules are staged, reviewed, and approved before promotion.
@@ -134,7 +134,7 @@ Example Ollama model:
 qwen3:8b
 ```
 
-Soul/ does not package or host llama.cpp, Ollama, or model files. You bring the runtime. Soul/ brings the structure around it, because apparently even robots need boundaries.
+Soul/ does not package or host llama.cpp, Ollama, or model files.
 
 See:
 
@@ -365,36 +365,12 @@ make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew 
 
 Soul/ uses overlay-based development.
 
-An overlay is a zip containing a focused set of files to apply to the existing project tree. This keeps changes reviewable and avoids giant unexplained rewrites.
+An overlay is a zip containing a focused set of files to apply to the existing project tree. This keeps changes reviewable and avoids large unexplained rewrites.
 
 See:
 
 ```text
 docs/OVERLAY_SYSTEM.md
-```
-
-## Branding
-
-The current visual direction is **techno-grimoire**: arcane diagrams, spectral light, grimoire/codex imagery, circuit traces, and local AI orchestration motifs.
-
-Brand assets live in:
-
-```text
-assets/brand/
-```
-
-Primary assets:
-
-- `assets/brand/soul-slash-repo-header.png`
-- `assets/brand/soul-slash-brand-board.png`
-- `assets/brand/soul-slash-primary-mark.png`
-- `assets/brand/soul-slash-repo-icon.png`
-- `assets/brand/soul-slash-supporting-scene.png`
-
-Branding notes live in:
-
-```text
-docs/branding/BRANDING.md
 ```
 
 ## Roadmap direction
