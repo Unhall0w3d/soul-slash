@@ -25,6 +25,10 @@ module SoulCore
       state = @runner.load_session("latest")
 
       case state.fetch("status")
+      when "waiting_for_weather_location_choice"
+        handle_weather_location_choice(state, text)
+      when "waiting_for_weather_override_location"
+        handle_weather_override_location(state, text)
       when "needs_location"
         handle_weather_location_response(state, text)
       when "waiting_for_selection"
@@ -54,9 +58,157 @@ module SoulCore
 
     private
 
+    def handle_weather_location_choice(state, text)
+      normalized = text.to_s.downcase.strip
+      home_location = state.dig("parameters", "home_location").to_s.strip
+      units = state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
+
+      if cancel_text?(normalized)
+        state["status"] = "cancelled"
+        state["updated_at"] = Time.now.iso8601
+        state["next_expected"] = "none"
+        @runner.save_session(state)
+
+        return {
+          ok: true,
+          message: "Weather workflow cancelled. No weather report was run.",
+          state: state
+        }
+      end
+
+      if home_choice?(normalized)
+        result = @runner.run(
+          intent: "weather.report",
+          parameters: {
+            "location" => home_location,
+            "location_source" => "home_confirmed",
+            "home_location" => home_location,
+            "units" => units
+          },
+          original_text: state.fetch("original_text")
+        )
+
+        return {
+          ok: result[:ok],
+          message: result[:user_message],
+          state: result[:state]
+        }
+      end
+
+      if elsewhere_choice?(normalized)
+        state["status"] = "waiting_for_weather_override_location"
+        state["updated_at"] = Time.now.iso8601
+        state["next_expected"] = "weather_override_location"
+        @runner.save_session(state)
+
+        return {
+          ok: true,
+          message: @renderer.render_weather_ask_override_location(state),
+          state: state
+        }
+      end
+
+      location = extract_location_from_text(text)
+      if plausible_location?(location)
+        result = @runner.run(
+          intent: "weather.report",
+          parameters: {
+            "location" => location,
+            "location_source" => "override",
+            "home_location" => home_location,
+            "units" => units
+          },
+          original_text: state.fetch("original_text")
+        )
+
+        return {
+          ok: result[:ok],
+          message: result[:user_message],
+          state: result[:state]
+        }
+      end
+
+      {
+        ok: false,
+        message: @renderer.render_weather_location_choice(state),
+        state: state
+      }
+    end
+
+    def handle_weather_override_location(state, text)
+      normalized = text.to_s.downcase.strip
+      if cancel_text?(normalized)
+        state["status"] = "cancelled"
+        state["updated_at"] = Time.now.iso8601
+        state["next_expected"] = "none"
+        @runner.save_session(state)
+
+        return {
+          ok: true,
+          message: "Weather workflow cancelled. No weather report was run.",
+          state: state
+        }
+      end
+
+      location = extract_location_from_text(text)
+      unless plausible_location?(location)
+        return {
+          ok: false,
+          message: "Please provide a location, for example: `London, UK`, `Toronto, Canada`, or `Syracuse, NY`. Or reply `cancel`.",
+          state: state
+        }
+      end
+
+      result = @runner.run(
+        intent: "weather.report",
+        parameters: {
+          "location" => location,
+          "location_source" => "override",
+          "home_location" => state.dig("parameters", "home_location"),
+          "units" => state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
+        },
+        original_text: state.fetch("original_text")
+      )
+
+      {
+        ok: result[:ok],
+        message: result[:user_message],
+        state: result[:state]
+      }
+    end
+
+    def home_choice?(normalized)
+      normalized.match?(/\bhome\b/) ||
+        normalized.match?(/\bdefault\b/) ||
+        normalized.match?(/\bhere\b/) ||
+        normalized.match?(/\byes\b/) ||
+        normalized.match?(/\byeah\b/) ||
+        normalized.match?(/\byep\b/) ||
+        normalized.match?(/\buse home\b/) ||
+        normalized.match?(/\buse default\b/)
+    end
+
+    def elsewhere_choice?(normalized)
+      normalized.match?(/\bsomewhere else\b/) ||
+        normalized.match?(/\bsomeplace else\b/) ||
+        normalized.match?(/\bother\b/) ||
+        normalized.match?(/\belsewhere\b/) ||
+        normalized.match?(/\bdifferent\b/) ||
+        normalized.match?(/\bnot home\b/) ||
+        normalized.match?(/\bno\b/)
+    end
+
+    def cancel_text?(normalized)
+      normalized.match?(/\bcancel\b/) ||
+        normalized.match?(/\bstop\b/) ||
+        normalized.match?(/\bnever mind\b/) ||
+        normalized.match?(/\bnevermind\b/) ||
+        normalized.match?(/\bquit\b/)
+    end
+
     def handle_weather_location_response(state, text)
-      parsed = @confirmation_parser.parse(text)
-      if parsed.cancelled
+      normalized = text.to_s.downcase.strip
+      if cancel_text?(normalized) || normalized == "no" || normalized == "nope"
         state["status"] = "cancelled"
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
@@ -83,6 +235,7 @@ module SoulCore
         intent: "weather.report",
         parameters: {
           "location" => location,
+          "location_source" => "provided_after_prompt",
           "units" => state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
         },
         original_text: state.fetch("original_text")
@@ -98,8 +251,17 @@ module SoulCore
     def extract_location_from_text(text)
       value = text.to_s.strip
       value = value.sub(/\A(?:in|for|near)\s+/i, "")
+      value = value.sub(/\A(?:weather\s+)?(?:for|in|near)\s+/i, "")
       value = value.sub(/[?.!]\z/, "")
       value.strip
+    end
+
+    def plausible_location?(location)
+      value = location.to_s.strip
+      return false if value.empty?
+      return false if value.length < 2
+
+      !home_choice?(value.downcase) && !elsewhere_choice?(value.downcase) && !cancel_text?(value.downcase)
     end
 
     def handle_weather_detail_decision(state, text)
@@ -158,6 +320,8 @@ module SoulCore
         state: state
       }
     end
+
+    # Existing cleanup/restore handlers below
 
     def handle_cleanup_selection(state, text)
       handle_selection(

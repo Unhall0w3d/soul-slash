@@ -2,13 +2,45 @@
 
 module SoulCore
   class ResponseRenderer
+    def render_weather_location_choice(state)
+      home = state.dig("parameters", "home_location") || state.dig("parameters", "location")
+      lines = []
+      lines << "Do you want the weather for Home or somewhere else?"
+      lines << ""
+      lines << "- Home: `#{home}`"
+      lines << "- Somewhere else: provide a city/location, like `London, UK`, `Toronto, Canada`, or `Syracuse, NY`."
+      lines << ""
+      lines << "Reply with:"
+      lines << ""
+      lines << '- `ruby bin/soul respond "home"`'
+      lines << '- `ruby bin/soul respond "somewhere else"`'
+      lines << '- `ruby bin/soul respond "London, UK"`'
+      lines << '- `ruby bin/soul respond "cancel"`'
+      lines.join("\n")
+    end
+
+    def render_weather_ask_override_location(state)
+      lines = []
+      lines << "What location should I use for the weather report?"
+      lines << ""
+      lines << "Examples:"
+      lines << ""
+      lines << '- `ruby bin/soul respond "London, UK"`'
+      lines << '- `ruby bin/soul respond "Toronto, Canada"`'
+      lines << '- `ruby bin/soul respond "Syracuse, NY"`'
+      lines << ""
+      lines << "Coverage is global where Open-Meteo geocoding, weather, and air-quality providers return data. If air quality is unavailable, I will report that as a warning instead of inventing it, because we are trying not to build a confident liar with a barometer."
+      lines.join("\n")
+    end
+
     def render_weather_needs_location(state)
       lines = []
       lines << "I can run the weather report, but I need a location."
       lines << ""
       lines << "Try:"
       lines << ""
-      lines << '- `ruby bin/soul do "what is the weather today in Syracuse, NY"`'
+      lines << '- `ruby bin/soul respond "Syracuse, NY"`'
+      lines << '- `ruby bin/soul do "what is the weather today in London, UK"`'
       lines << ""
       lines << "Or set a default in `.env`:"
       lines << ""
@@ -29,6 +61,7 @@ module SoulCore
       lines << "# Weather Today"
       lines << ""
       lines << "- Location: #{current['location'] || report.dig('resolved_location', 'name')}"
+      lines << "- Source: #{weather_location_source_label(state.dig('parameters', 'location_source'))}"
       lines << "- Condition: #{current['condition'] || 'unavailable'}"
       lines << "- Temperature: #{format_temperature(current)}"
       lines << "- Humidity: #{current['humidity_percent'] || 'unavailable'}%"
@@ -66,6 +99,7 @@ module SoulCore
       lines << "# Current Conditions"
       lines << ""
       lines << "- Location: #{current['location'] || report.dig('resolved_location', 'name')}"
+      lines << "- Source: #{weather_location_source_label(state.dig('parameters', 'location_source'))}"
       lines << "- Condition: #{current['condition'] || 'unavailable'}"
       lines << "- Temperature: #{format_temperature(current)}"
       lines << "- Humidity: #{current['humidity_percent'] || 'unavailable'}%"
@@ -316,6 +350,23 @@ module SoulCore
     end
 
     private
+
+    def weather_location_source_label(source)
+      case source
+      when "home_confirmed"
+        "Home default"
+      when "default_home"
+        "Home default"
+      when "override"
+        "User-provided override"
+      when "explicit"
+        "Explicit request"
+      when "provided_after_prompt"
+        "Provided after prompt"
+      else
+        source || "unknown"
+      end
+    end
 
     def format_temperature(current)
       temp = current["temperature"]

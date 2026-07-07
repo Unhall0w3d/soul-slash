@@ -23,6 +23,32 @@ US_STATES = {
   "WI" => "Wisconsin", "WY" => "Wyoming", "DC" => "District of Columbia"
 }.freeze
 
+COUNTRY_ALIASES = {
+  "US" => ["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"],
+  "GB" => ["GB", "UK", "U.K.", "UNITED KINGDOM", "GREAT BRITAIN", "ENGLAND", "SCOTLAND", "WALES", "NORTHERN IRELAND"],
+  "CA" => ["CA", "CANADA"],
+  "FR" => ["FR", "FRANCE"],
+  "DE" => ["DE", "GERMANY", "DEUTSCHLAND"],
+  "IT" => ["IT", "ITALY", "ITALIA"],
+  "ES" => ["ES", "SPAIN", "ESPAÑA"],
+  "IE" => ["IE", "IRELAND"],
+  "NL" => ["NL", "NETHERLANDS", "THE NETHERLANDS", "HOLLAND"],
+  "BE" => ["BE", "BELGIUM"],
+  "CH" => ["CH", "SWITZERLAND"],
+  "AT" => ["AT", "AUSTRIA"],
+  "AU" => ["AU", "AUSTRALIA"],
+  "NZ" => ["NZ", "NEW ZEALAND"],
+  "JP" => ["JP", "JAPAN"],
+  "KR" => ["KR", "SOUTH KOREA", "KOREA"],
+  "MX" => ["MX", "MEXICO"],
+  "BR" => ["BR", "BRAZIL"],
+  "IN" => ["IN", "INDIA"]
+}.freeze
+
+COUNTRY_LOOKUP = COUNTRY_ALIASES.each_with_object({}) do |(code, aliases), memo|
+  aliases.each { |name| memo[name.upcase] = code }
+end.freeze
+
 options = {
   location: ENV.fetch("SOUL_WEATHER_LOCATION", nil),
   units: ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit"),
@@ -33,21 +59,10 @@ options = {
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: report.rb --location LOCATION [--detailed]"
 
-  opts.on("--location LOCATION", "Location name, e.g. 'Syracuse, NY'.") do |value|
-    options[:location] = value
-  end
-
-  opts.on("--detailed", "Include a 3-day outlook and notable forecast signals.") do
-    options[:detailed] = true
-  end
-
-  opts.on("--forecast-days N", Integer, "Forecast days for detailed output. Defaults to 3.") do |value|
-    options[:forecast_days] = [[value, 1].max, 7].min
-  end
-
-  opts.on("--units UNITS", "fahrenheit or celsius. Defaults to fahrenheit.") do |value|
-    options[:units] = value
-  end
+  opts.on("--location LOCATION", "Location name, e.g. 'Syracuse, NY' or 'London, UK'.") { |value| options[:location] = value }
+  opts.on("--detailed", "Include a 3-day outlook and notable forecast signals.") { options[:detailed] = true }
+  opts.on("--forecast-days N", Integer, "Forecast days for detailed output. Defaults to 3.") { |value| options[:forecast_days] = [[value, 1].max, 7].min }
+  opts.on("--units UNITS", "fahrenheit or celsius. Defaults to fahrenheit.") { |value| options[:units] = value }
 end
 
 begin
@@ -58,90 +73,44 @@ rescue OptionParser::InvalidOption, OptionParser::MissingArgument => e
     status: "error",
     error: "#{e.class}: #{e.message}",
     usage: parser.to_s,
-    verification: {
-      read_only: true,
-      network_only: true,
-      wrote_files: false
-    }
+    verification: { read_only: true, network_only: true, wrote_files: false }
   })
   exit 2
 end
 
 def http_json(url)
   uri = URI(url)
-  res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 5, read_timeout: 20) do |http|
-    http.get(uri.request_uri)
-  end
-
-  body = res.body.to_s
-  parsed = JSON.parse(body)
-  {
-    ok: res.is_a?(Net::HTTPSuccess),
-    code: res.code.to_i,
-    body: parsed,
-    url: url
-  }
+  res = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", open_timeout: 5, read_timeout: 20) { |http| http.get(uri.request_uri) }
+  { ok: res.is_a?(Net::HTTPSuccess), code: res.code.to_i, body: JSON.parse(res.body.to_s), url: url }
 rescue StandardError => e
-  {
-    ok: false,
-    code: nil,
-    body: nil,
-    url: url,
-    error: "#{e.class}: #{e.message}"
-  }
+  { ok: false, code: nil, body: nil, url: url, error: "#{e.class}: #{e.message}" }
 end
 
 def weather_description(code)
-  table = {
-    0 => "Clear sky",
-    1 => "Mainly clear",
-    2 => "Partly cloudy",
-    3 => "Overcast",
-    45 => "Fog",
-    48 => "Depositing rime fog",
-    51 => "Light drizzle",
-    53 => "Moderate drizzle",
-    55 => "Dense drizzle",
-    56 => "Light freezing drizzle",
-    57 => "Dense freezing drizzle",
-    61 => "Slight rain",
-    63 => "Moderate rain",
-    65 => "Heavy rain",
-    66 => "Light freezing rain",
-    67 => "Heavy freezing rain",
-    71 => "Slight snow",
-    73 => "Moderate snow",
-    75 => "Heavy snow",
-    77 => "Snow grains",
-    80 => "Slight rain showers",
-    81 => "Moderate rain showers",
-    82 => "Violent rain showers",
-    85 => "Slight snow showers",
-    86 => "Heavy snow showers",
-    95 => "Thunderstorm",
-    96 => "Thunderstorm with slight hail",
-    99 => "Thunderstorm with heavy hail"
-  }
-  table.fetch(code.to_i, "Unknown weather code #{code}")
+  {
+    0 => "Clear sky", 1 => "Mainly clear", 2 => "Partly cloudy", 3 => "Overcast",
+    45 => "Fog", 48 => "Depositing rime fog",
+    51 => "Light drizzle", 53 => "Moderate drizzle", 55 => "Dense drizzle",
+    56 => "Light freezing drizzle", 57 => "Dense freezing drizzle",
+    61 => "Slight rain", 63 => "Moderate rain", 65 => "Heavy rain",
+    66 => "Light freezing rain", 67 => "Heavy freezing rain",
+    71 => "Slight snow", 73 => "Moderate snow", 75 => "Heavy snow", 77 => "Snow grains",
+    80 => "Slight rain showers", 81 => "Moderate rain showers", 82 => "Violent rain showers",
+    85 => "Slight snow showers", 86 => "Heavy snow showers",
+    95 => "Thunderstorm", 96 => "Thunderstorm with slight hail", 99 => "Thunderstorm with heavy hail"
+  }.fetch(code.to_i, "Unknown weather code #{code}")
 end
 
 def us_aqi_category(value)
   return "Unavailable" if value.nil?
 
-  aqi = value.to_f
-  case aqi
-  when 0..50
-    "Good"
-  when 51..100
-    "Moderate"
-  when 101..150
-    "Unhealthy for Sensitive Groups"
-  when 151..200
-    "Unhealthy"
-  when 201..300
-    "Very Unhealthy"
-  else
-    "Hazardous"
+  case value.to_f
+  when 0..50 then "Good"
+  when 51..100 then "Moderate"
+  when 101..150 then "Unhealthy for Sensitive Groups"
+  when 151..200 then "Unhealthy"
+  when 201..300 then "Very Unhealthy"
+  else "Hazardous"
   end
 end
 
@@ -153,13 +122,10 @@ def nearest_hourly_value(hourly, key)
   now = Time.now
   pairs = times.each_with_index.map do |stamp, index|
     parsed = Time.parse(stamp) rescue nil
-    next nil unless parsed
-
-    [parsed, values[index]]
+    parsed ? [parsed, values[index]] : nil
   end.compact
 
-  nearest = pairs.min_by { |time, _value| (time - now).abs }
-  nearest&.last
+  pairs.min_by { |time, _value| (time - now).abs }&.last
 end
 
 def format_temp(value, unit)
@@ -167,6 +133,13 @@ def format_temp(value, unit)
 
   suffix = unit == "celsius" ? "°C" : "°F"
   "#{value.round}#{suffix}"
+end
+
+def country_code_for(value)
+  cleaned = value.to_s.strip.upcase
+  return nil if cleaned.empty?
+
+  COUNTRY_LOOKUP[cleaned] || (cleaned.match?(/\A[A-Z]{2}\z/) ? cleaned : nil)
 end
 
 def parse_location_hint(location)
@@ -195,8 +168,8 @@ def parse_location_hint(location)
   elsif US_STATES.value.any? { |name| name.casecmp?(region) }
     hint[:region_name] = region
     hint[:country_code] = "US"
-  elsif region_up == "US" || region_up == "USA" || region.casecmp?("United States")
-    hint[:country_code] = "US"
+  else
+    hint[:country_code] = country_code_for(region)
   end
 
   hint
@@ -204,7 +177,6 @@ end
 
 def geocoding_attempts(location)
   hint = parse_location_hint(location)
-
   candidates = []
   original = hint[:original]
   city = hint[:city]
@@ -214,7 +186,6 @@ def geocoding_attempts(location)
   candidates << { name: city, country_code: country, reason: "city_with_country_hint" } if country && city != original
   candidates << { name: city, country_code: nil, reason: "city_only" } if city && !city.empty?
   candidates << { name: original, country_code: nil, reason: "original" } if original && !original.empty?
-
   candidates.uniq { |item| [item[:name], item[:country_code]] }
 end
 
@@ -237,7 +208,6 @@ def score_geocoding_result(place, hint)
   score += 40 if !country_code.empty? && country == country_code
   score += 15 if original.include?(name)
   score += [population / 100_000, 30].min if population.positive?
-
   score
 end
 
@@ -247,12 +217,7 @@ def resolve_location(location)
   all_results = []
 
   geocoding_attempts(location).each do |attempt|
-    params = {
-      name: attempt[:name],
-      count: 10,
-      language: "en",
-      format: "json"
-    }
+    params = { name: attempt[:name], count: 10, language: "en", format: "json" }
     params[:countryCode] = attempt[:country_code] if attempt[:country_code]
 
     url = "https://geocoding-api.open-meteo.com/v1/search?#{URI.encode_www_form(params)}"
@@ -269,28 +234,18 @@ def resolve_location(location)
     }
 
     next unless response[:ok]
-
-    Array(response.dig(:body, "results")).each do |place|
-      all_results << place
-    end
+    Array(response.dig(:body, "results")).each { |place| all_results << place }
   end
 
   unique_results = all_results.uniq { |place| place["id"] || [place["name"], place["latitude"], place["longitude"]] }
   best = unique_results.max_by { |place| score_geocoding_result(place, hint) }
 
-  {
-    ok: !best.nil?,
-    place: best,
-    attempts: attempts,
-    hint: hint,
-    result_count: unique_results.length
-  }
+  { ok: !best.nil?, place: best, attempts: attempts, hint: hint, result_count: unique_results.length }
 end
 
 def notable_forecast_events(weather_daily, air_hourly)
   daily = weather_daily || {}
   events = []
-
   times = daily["time"] || []
   codes = daily["weather_code"] || []
   precip_probs = daily["precipitation_probability_max"] || []
@@ -364,13 +319,7 @@ if location.empty?
     status: "needs_input",
     outcome: "location_required",
     recommendation: "Please provide a location, for example: ruby bin/soul do \"what is the weather in Syracuse, NY\". You can also set SOUL_WEATHER_LOCATION in .env.",
-    verification: {
-      read_only: true,
-      network_only: true,
-      wrote_files: false,
-      location_present: false,
-      complete: false
-    }
+    verification: { read_only: true, network_only: true, wrote_files: false, location_present: false, complete: false }
   })
   exit 1
 end
@@ -379,8 +328,8 @@ units = options[:units].to_s.downcase == "celsius" ? "celsius" : "fahrenheit"
 temperature_unit = units == "celsius" ? "celsius" : "fahrenheit"
 wind_unit = units == "celsius" ? "kmh" : "mph"
 precip_unit = units == "celsius" ? "mm" : "inch"
-
 now = Time.now
+
 resolved = resolve_location(location)
 
 unless resolved[:ok]
@@ -393,13 +342,7 @@ unless resolved[:ok]
     parsed_location_hint: resolved[:hint],
     geocoding_attempts: resolved[:attempts],
     error: "No matching location found after retrying normalized query variants.",
-    verification: {
-      read_only: true,
-      network_only: true,
-      wrote_files: false,
-      geocoding_ok: false,
-      complete: false
-    }
+    verification: { read_only: true, network_only: true, wrote_files: false, geocoding_ok: false, complete: false }
   })
   exit 1
 end
@@ -419,18 +362,10 @@ weather_params = {
   wind_speed_unit: wind_unit,
   precipitation_unit: precip_unit
 }
-
 weather_url = "https://api.open-meteo.com/v1/forecast?#{URI.encode_www_form(weather_params)}"
 weather = http_json(weather_url)
 
-air_params = {
-  latitude: lat,
-  longitude: lon,
-  hourly: "us_aqi,pm2_5,pm10",
-  forecast_days: options[:forecast_days],
-  timezone: "auto"
-}
-
+air_params = { latitude: lat, longitude: lon, hourly: "us_aqi,pm2_5,pm10", forecast_days: options[:forecast_days], timezone: "auto" }
 air_url = "https://air-quality-api.open-meteo.com/v1/air-quality?#{URI.encode_www_form(air_params)}"
 air = http_json(air_url)
 
@@ -444,30 +379,18 @@ unless weather[:ok]
     resolved_location: place,
     geocoding_attempts: resolved[:attempts],
     error: weather[:error] || "Weather API returned HTTP #{weather[:code]}",
-    verification: {
-      read_only: true,
-      network_only: true,
-      wrote_files: false,
-      geocoding_ok: true,
-      weather_fetch_ok: false,
-      complete: false
-    }
+    verification: { read_only: true, network_only: true, wrote_files: false, geocoding_ok: true, weather_fetch_ok: false, complete: false }
   })
   exit 1
 end
 
 current = weather.dig(:body, "current") || {}
 air_hourly = air[:ok] ? air.dig(:body, "hourly") : {}
-
 aqi = nearest_hourly_value(air_hourly || {}, "us_aqi")
 pm25 = nearest_hourly_value(air_hourly || {}, "pm2_5")
 pm10 = nearest_hourly_value(air_hourly || {}, "pm10")
 
-resolved_name = [
-  place["name"],
-  place["admin1"],
-  place["country_code"]
-].compact.reject(&:empty?).join(", ")
+resolved_name = [place["name"], place["admin1"], place["country_code"]].compact.reject(&:empty?).join(", ")
 
 brief = {
   location: resolved_name,
@@ -498,13 +421,6 @@ else
   summary_lines << "Air quality is unavailable from the provider right now."
 end
 
-recommendation =
-  if options[:detailed]
-    "Detailed weather report complete."
-  else
-    "Brief weather report complete. Ask for the detailed report to include a 3-day outlook and notable forecast signals."
-  end
-
 result = {
   skill: "weather.report",
   generated_at: now.iso8601,
@@ -528,7 +444,7 @@ result = {
     outlook_days: outlook,
     notable_forecast_signals: events.empty? ? ["No notable forecast signals detected in the 3-day outlook."] : events
   } : nil,
-  recommendation: recommendation,
+  recommendation: options[:detailed] ? "Detailed weather report complete." : "Brief weather report complete. Ask for the detailed report to include a 3-day outlook and notable forecast signals.",
   verification: {
     read_only: true,
     network_only: true,
@@ -543,8 +459,6 @@ result = {
   warnings: []
 }
 
-unless air[:ok]
-  result[:warnings] << "Air quality fetch failed: #{air[:error] || "HTTP #{air[:code]}"}"
-end
+result[:warnings] << "Air quality fetch failed: #{air[:error] || "HTTP #{air[:code]}"}" unless air[:ok]
 
 puts JSON.pretty_generate(result)

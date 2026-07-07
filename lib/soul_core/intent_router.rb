@@ -38,16 +38,52 @@ module SoulCore
 
     def route_deterministic(input, normalized)
       if weather_report?(normalized)
-        location = extract_weather_location(input) || ENV.fetch("SOUL_WEATHER_LOCATION", nil)
+        explicit_location = extract_weather_location(input)
+        default_location = ENV.fetch("SOUL_WEATHER_LOCATION", nil).to_s.strip
+        location =
+          if explicit_location && !explicit_location.empty?
+            explicit_location
+          elsif !default_location.empty?
+            default_location
+          end
+
+        location_source =
+          if explicit_location && !explicit_location.empty?
+            "explicit"
+          elsif !default_location.empty?
+            "default_home"
+          else
+            "missing"
+          end
+
+        confidence =
+          case location_source
+          when "explicit" then 0.93
+          when "default_home" then 0.88
+          else 0.74
+          end
+
+        reason =
+          case location_source
+          when "explicit"
+            "Matched weather phrasing and extracted explicit location."
+          when "default_home"
+            "Matched weather phrasing and found default Home location in environment."
+          else
+            "Matched weather phrasing but no location was found."
+          end
+
         return Result.new(
           ok: true,
           intent: "weather.report",
           parameters: {
             "location" => location,
+            "location_source" => location_source,
+            "home_location" => default_location.empty? ? nil : default_location,
             "units" => ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
           },
-          confidence: location.to_s.strip.empty? ? 0.74 : 0.93,
-          reason: location.to_s.strip.empty? ? "Matched weather phrasing but no location was found." : "Matched weather phrasing and extracted location.",
+          confidence: confidence,
+          reason: reason,
           source: "deterministic"
         )
       end
@@ -105,6 +141,8 @@ module SoulCore
       patterns = [
         /\bweather\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
         /\bforecast\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
+        /\bair quality\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
+        /\btemperature\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
         /\b(?:in|for|near)\s+([A-Za-z][A-Za-z0-9\s,.'-]+)\??$/i
       ]
 

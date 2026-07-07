@@ -61,6 +61,43 @@ module SoulCore
     def run_weather_report(parameters:, original_text:)
       location = parameters["location"].to_s.strip
       units = parameters.fetch("units", ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit"))
+      location_source = parameters.fetch("location_source", location.empty? ? "missing" : "explicit")
+      home_location = parameters["home_location"].to_s.strip
+      home_location = ENV.fetch("SOUL_WEATHER_LOCATION", "").to_s.strip if home_location.empty?
+
+      if location_source == "default_home" && !home_location.empty?
+        state = {
+          "workflow" => "weather.report",
+          "status" => "waiting_for_weather_location_choice",
+          "generated_at" => Time.now.iso8601,
+          "updated_at" => Time.now.iso8601,
+          "original_text" => original_text,
+          "parameters" => {
+            "location" => home_location,
+            "location_source" => "default_home",
+            "home_location" => home_location,
+            "units" => units
+          },
+          "skill_runs" => [],
+          "next_expected" => "weather_location_choice",
+          "verification" => {
+            "home_location_present" => true,
+            "brief_report_generated" => false,
+            "complete" => false
+          }
+        }
+
+        workflow_path = write_workflow_state(state, suffix: "weather.report")
+        state["workflow_path"] = workflow_path
+        save_session(state)
+
+        return {
+          ok: true,
+          workflow_path: workflow_path,
+          state: state,
+          user_message: @renderer.render_weather_location_choice(state)
+        }
+      end
 
       if location.empty?
         state = {
@@ -71,6 +108,8 @@ module SoulCore
           "original_text" => original_text,
           "parameters" => {
             "location" => nil,
+            "location_source" => "missing",
+            "home_location" => home_location.empty? ? nil : home_location,
             "units" => units
           },
           "skill_runs" => [],
@@ -95,6 +134,16 @@ module SoulCore
         }
       end
 
+      run_weather_report_now(
+        location: location,
+        units: units,
+        original_text: original_text,
+        location_source: location_source,
+        home_location: home_location
+      )
+    end
+
+    def run_weather_report_now(location:, units:, original_text:, location_source:, home_location:)
       registry = SkillRegistry.new
       runner = SkillRunner.new(registry: registry)
       args = ["--location", location, "--units", units]
@@ -111,6 +160,8 @@ module SoulCore
         "original_text" => original_text,
         "parameters" => {
           "location" => location,
+          "location_source" => location_source,
+          "home_location" => home_location.empty? ? nil : home_location,
           "units" => units
         },
         "skill_runs" => [
@@ -127,6 +178,7 @@ module SoulCore
           "brief_report_generated" => result[:ok],
           "brief_report_log" => task_log_path,
           "location_present" => !location.empty?,
+          "location_source" => location_source,
           "weather_fetch_ok" => report.dig("verification", "weather_fetch_ok"),
           "air_quality_fetch_ok" => report.dig("verification", "air_quality_fetch_ok"),
           "complete" => false
