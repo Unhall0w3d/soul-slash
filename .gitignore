@@ -82,3 +82,8 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+
+# Soul/ local cloud provider configuration.
+# Keep the example tracked, keep real provider enablement local.
+Soul/config/cloud_providers.yaml
+!Soul/config/cloud_providers.example.yaml
