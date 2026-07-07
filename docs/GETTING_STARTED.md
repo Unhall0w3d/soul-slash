@@ -1,8 +1,8 @@
 # Getting Started
 
-This guide describes the intended public setup path for Soul/.
+This guide walks through setting up Soul/ from a fresh clone.
 
-The current repository is still evolving. Some automation is not implemented yet. This document defines the setup contract that the public Makefile and setup scripts will follow.
+Soul/ is early experimental local assistant software. The project is Linux-first right now because active cleanup/restore workflows assume Linux-style filesystem and Trash behavior.
 
 ## 1. Clone the repository
 
@@ -11,102 +11,178 @@ git clone https://github.com/Unhall0w3d/soul-slash.git
 cd soul-slash
 ```
 
-## 2. Install requirements
+## 2. Check local tools
 
-Required:
+```bash
+make check
+```
+
+Required tools:
 
 - Ruby
 - Git
 - Make
 - curl
 - unzip
-- either llama.cpp server or Ollama
 
-Recommended:
+Recommended tools:
 
 - jq
 - zip
+- Python 3
 
 ## 3. Choose a runtime provider
 
-Soul/ supports two local runtime providers at the API layer:
+Soul/ uses a local model runtime through an OpenAI-compatible API.
+
+Supported providers:
 
 - llama.cpp server
 - Ollama
 
-### Choose llama.cpp if
+Use llama.cpp if you want direct GGUF control and explicit runtime flags.
 
-You want direct GGUF control, Hugging Face GGUF downloads, and explicit runtime flags.
+Use Ollama if you want simpler local model management with `ollama pull`.
 
-### Choose Ollama if
-
-You want a simpler local model manager and are comfortable using Ollama model names.
-
-## 4. Create local configuration
-
-Copy the example environment file:
+## 4. Detect what is already available
 
 ```bash
-cp .env.example .env
+make detect
 ```
 
-Edit `.env`.
+This checks:
 
-### llama.cpp example
+- runtime binaries
+- common `/v1` endpoints
+- Ollama native `/api/tags`
+- current `.env`
+- local GGUF model files in `./models` and `~/Downloads`
 
-```env
-SOUL_RUNTIME_PROVIDER=llamacpp
-SOUL_OPENAI_BASE_URL=http://127.0.0.1:8082/v1
-SOUL_MODEL_ALIAS=soul-qwen3-8b-q4
-SOUL_MODEL_DIR=./models
-SOUL_MODEL_FILE=Qwen3-8B-Q4_K_M.gguf
-SOUL_MODEL_URL=https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf?download=true
-```
-
-### Ollama example
-
-```env
-SOUL_RUNTIME_PROVIDER=ollama
-SOUL_OPENAI_BASE_URL=http://127.0.0.1:11434/v1
-SOUL_MODEL_ALIAS=qwen3:8b
-SOUL_OLLAMA_MODEL=qwen3:8b
-```
-
-## 5. Start your runtime
-
-### llama.cpp
-
-Install or build llama.cpp so `llama-server` is available.
-
-A future setup script will automate this, but the public contract is:
-
-```text
-llama-server must expose an OpenAI-compatible endpoint.
-```
-
-Tested default endpoint:
-
-```text
-http://127.0.0.1:8082/v1
-```
-
-### Ollama
-
-Install Ollama, then pull a model:
+## 5. Run guided setup
 
 ```bash
-ollama pull qwen3:8b
+make setup
 ```
 
-Ollama's OpenAI-compatible endpoint is normally:
+If both llama.cpp and Ollama are detected, setup will ask which provider to configure.
+
+If `.env` already points to a reachable runtime, setup will ask before reconfiguring it. Amazing, a setup script that does not immediately stomp on working config. Nature is healing.
+
+## 6. llama.cpp setup
+
+```bash
+make setup-llamacpp
+```
+
+The setup script will:
+
+1. detect or ask for `llama-server`
+2. ask for host, port, and OpenAI-compatible base URL
+3. ask for the model alias
+4. search for GGUF files in `./models` and `~/Downloads`
+5. offer to use a detected GGUF file
+6. otherwise ask for a Hugging Face GGUF URL
+7. download the model if needed
+8. validate the model file starts with `GGUF`
+9. write `.env`
+
+Default tested llama.cpp model:
 
 ```text
-http://127.0.0.1:11434/v1
+Qwen3-8B-Q4_K_M.gguf
 ```
 
-## 6. Validate Soul/
+Default tested alias:
 
-Run:
+```text
+soul-qwen3-8b-q4
+```
+
+Start llama.cpp in the foreground:
+
+```bash
+make start-llamacpp
+```
+
+Then open another terminal and test:
+
+```bash
+make test-runtime
+```
+
+## 7. Ollama setup
+
+```bash
+make setup-ollama
+```
+
+The setup script will:
+
+1. detect `ollama`
+2. ask for the OpenAI-compatible base URL
+3. ask for the Ollama model name
+4. check whether the model is already installed
+5. run `ollama pull` only if needed
+6. check the `/v1/models` endpoint
+7. write `.env`
+
+Example model:
+
+```text
+qwen3:8b
+```
+
+Test:
+
+```bash
+make test-runtime
+```
+
+## 8. Show local configuration
+
+```bash
+make env-show
+```
+
+Local settings are stored in:
+
+```text
+.env
+```
+
+`.env` should not be committed.
+
+## 9. Runtime tests
+
+Run all runtime tests:
+
+```bash
+make test-runtime
+```
+
+Run only FAST mode:
+
+```bash
+make test-fast
+```
+
+Run only THINK mode:
+
+```bash
+make test-think
+```
+
+FAST mode uses `/no_think` for models that support it.
+
+THINK mode allows the model to use a larger token budget.
+
+## 10. Soul/ CLI tests
+
+```bash
+make test-soul
+```
+
+This runs:
 
 ```bash
 ruby bin/soul doctor
@@ -114,16 +190,16 @@ ruby bin/soul skills
 ruby bin/soul skill system.status
 ```
 
-Then test intent routing:
+## 11. Try intent routing
 
 ```bash
 ruby bin/soul intent "run a file cleanup in Downloads"
 ruby bin/soul intent "restore the last downloads cleanup"
 ```
 
-## 7. Try the cleanup workflow
+## 12. Try the cleanup workflow
 
-Create a harmless fixture that does not include protected project terms such as `soul` or `Aletheia`:
+Create harmless test fixtures. Avoid protected terms like `soul` or `Aletheia` in the filenames.
 
 ```bash
 mkdir -p ~/Downloads/restore-fixture-folder
@@ -160,7 +236,7 @@ Clean up:
 rm -rf ~/Downloads/restore-fixture-file.tmp ~/Downloads/restore-fixture-folder
 ```
 
-## 8. Reflection
+## 13. Reflection
 
 After a successful workflow:
 
@@ -181,13 +257,32 @@ Reject weak or generic candidates:
 ruby bin/soul reflection reject latest --reason "Not useful"
 ```
 
-## Current public setup status
+## 14. Common Make targets
 
-This document is step 1.
+```text
+make help             Show available targets
+make check            Check required/recommended local tools only
+make detect           Detect runtimes, endpoints, config, and local GGUF models
+make setup            Guided runtime setup
+make setup-llamacpp   Configure llama.cpp provider
+make setup-ollama     Configure Ollama provider
+make test-runtime     Test configured runtime
+make test-fast        Test FAST/no_think request mode
+make test-think       Test THINK request mode
+make test-soul        Run basic Soul/ CLI checks
+make doctor           Run Soul/ doctor
+make env-show         Show local runtime config
+make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew warnings
+```
 
-Next public setup work:
+## 15. Clock-skew warning after applying overlays
 
-1. Replace the machine-specific Makefile with public runtime setup targets.
-2. Add provider detection scripts.
-3. Add runtime validation scripts.
-4. Update README quick start to call the new Make targets.
+If `make` complains that files have modification times in the future, run:
+
+```bash
+make fix-mtimes
+```
+
+This touches working-tree files to your current local system time.
+
+It is not elegant. It is a broom. Sometimes a broom is exactly the tool.
