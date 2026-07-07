@@ -23,3 +23,20 @@ Source: `Soul/logs/tasks/20260707T051214Z-skill.weather.report.json`
 - weather.report is a read-only network skill that can complete without any write approval.
 - The brief weather workflow should ask whether the user wants a detailed 3-day outlook before closing as complete.
 - Detailed weather reports should close with final_state complete rather than success language.
+
+## 2026-07-07T12:22:50-04:00 - skill.weather.report
+
+Source: `Soul/logs/tasks/20260707T162022Z-skill.weather.report.json`
+
+
+- The weather workflow supports a user-provided location override after the Home-or-somewhere-else prompt.
+- weather.report can support international locations when provider geocoding resolves the location to coordinates.
+- Common country aliases such as UK should resolve to provider country codes such as GB before geocoding.
+
+## 2026-07-07T12:23:02-04:00 - skill.weather.report
+
+Source: `Soul/logs/tasks/20260707T161943Z-skill.weather.report.json`
+
+
+- weather.report can support international locations when provider geocoding resolves the location to coordinates.
+- Forecast notable-event classification should distinguish rain showers from snow showers.

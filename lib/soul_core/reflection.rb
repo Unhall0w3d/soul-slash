@@ -100,32 +100,109 @@ module SoulCore
       end
     end
 
-    def reflect_weather_report(base, payload)
-      data = payload["json"] || payload
-      verification = data["verification"] || {}
-      current = data["current"] || {}
-      detailed = data["detailed_report"] || {}
 
-      base[:observations] << "weather.report completed with status #{data['status']}."
-      base[:observations] << "Mode: #{data['mode']}."
-      base[:observations] << "Outcome: #{data['outcome']}."
-      base[:observations] << "Resolved location: #{data.dig('resolved_location', 'name')}." if data.dig("resolved_location", "name")
-      base[:observations] << "Current condition: #{current['condition']}." if current["condition"]
-      base[:observations] << "Air quality fetch OK: #{verification['air_quality_fetch_ok']}."
-      base[:observations] << "Workflow complete: #{verification['complete']}."
-      base[:observations] << "Detailed outlook days: #{Array(detailed['outlook_days']).length}." if detailed
+def reflect_weather_report(base, payload)
+  data = payload["json"] || payload
+  verification = data["verification"] || {}
+  hint = data["parsed_location_hint"] || {}
+  resolved = data["resolved_location"] || {}
+  detailed = data["detailed_report"] || {}
+  outlook = detailed["outlook_days"] || []
+  signals = detailed["notable_forecast_signals"] || []
+  warnings = data["warnings"] || []
 
-      base[:candidate_lessons] << "weather.report is a read-only network skill that can complete without any write approval."
-      base[:candidate_lessons] << "The brief weather workflow should ask whether the user wants a detailed 3-day outlook before closing as complete."
-      base[:candidate_lessons] << "Detailed weather reports should close with final_state complete rather than success language."
+  workflow_context = weather_workflow_context_for(base[:source_log])
+  workflow_parameters = workflow_context.fetch("parameters", {})
+  location_source = workflow_parameters["location_source"]
+  home_location = workflow_parameters["home_location"]
 
-      base[:candidate_rules] << "weather.report must remain read-only and must not write local files from the skill itself."
-      base[:candidate_rules] << "weather.report should distinguish brief completion from detailed workflow completion."
-      base[:candidate_rules] << "Weather workflows should use deterministic API data for temperature, humidity, and air quality rather than model guessing."
+  parsed_country_code = (hint["country_code"] || hint[:country_code]).to_s
+  resolved_name = resolved["name"].to_s
+  location_query = data["location_query"].to_s
 
-      base[:verification_summary] = verification
-      base[:warnings].concat(Array(data["warnings"]))
-    end
+  base[:observations] << "weather.report completed with status #{data['status']}." if data["status"]
+  base[:observations] << "Mode: #{data['mode']}." if data["mode"]
+  base[:observations] << "Outcome: #{data['outcome']}." if data["outcome"]
+  base[:observations] << "Location query: #{location_query}." unless location_query.empty?
+  base[:observations] << "Parsed location: city=#{hint['city'] || hint[:city]}, region=#{hint['region_raw'] || hint[:region_raw]}, country_code=#{parsed_country_code.empty? ? 'none' : parsed_country_code}."
+  base[:observations] << "Resolved location: #{resolved_name}." unless resolved_name.empty?
+  base[:observations] << "Workflow location source: #{location_source}." if location_source
+  base[:observations] << "Home/default location: #{home_location}." if home_location
+  base[:observations] << "Geocoding result count: #{verification['geocoding_result_count']}." if verification.key?("geocoding_result_count")
+  base[:observations] << "Air quality fetch OK: #{verification['air_quality_fetch_ok']}." if verification.key?("air_quality_fetch_ok")
+  base[:observations] << "Weather fetch OK: #{verification['weather_fetch_ok']}." if verification.key?("weather_fetch_ok")
+  base[:observations] << "Workflow complete: #{verification['complete']}." if verification.key?("complete")
+  base[:observations] << "Final state: #{verification['final_state']}." if verification["final_state"]
+  base[:observations] << "Detailed outlook days: #{outlook.length}." unless outlook.empty?
+  base[:observations] << "Notable forecast signals: #{signals.length}." unless signals.empty?
+
+  non_us_location = !parsed_country_code.empty? && parsed_country_code != "US"
+
+  if location_source == "home_confirmed" || location_source == "default_home"
+    base[:candidate_lessons] << "Weather requests without an explicit location can use the configured Home/default location after conversational confirmation."
+    base[:candidate_rules] << "When SOUL_WEATHER_LOCATION is configured and the user asks for weather without an explicit place, Soul/ should ask whether to use Home or somewhere else before running the report."
+  end
+
+  if location_source == "override"
+    base[:candidate_lessons] << "The weather workflow supports a user-provided location override after the Home-or-somewhere-else prompt."
+    base[:candidate_rules] << "A weather override location should be collected from the user and then resolved through the same deterministic geocoding path as direct weather requests."
+  end
+
+  if non_us_location
+    base[:candidate_lessons] << "weather.report can support international locations when provider geocoding resolves the location to coordinates."
+    base[:candidate_rules] << "International weather locations should retain geocoding evidence, including parsed country code, geocoding attempts, and resolved location."
+  end
+
+  if location_query.match?(/,\s*(UK|U\.K\.|United Kingdom)\b/i) || parsed_country_code == "GB"
+    base[:candidate_lessons] << "Common country aliases such as UK should resolve to provider country codes such as GB before geocoding."
+    base[:candidate_rules] << "Weather geocoding should normalize common country aliases while still keeping an unfiltered city-only fallback."
+  end
+
+  if signals.any? { |signal| signal.to_s.match?(/rain showers|precipitation looks notable/i) } ||
+     outlook.any? { |day| day["condition"].to_s.match?(/rain showers/i) }
+    base[:candidate_lessons] << "Forecast notable-event classification should distinguish rain showers from snow showers."
+    base[:candidate_rules] << "Weather event classification must not label Open-Meteo rain-shower codes 80..82 as snow; snow should remain limited to snow codes 71..77 and 85..86."
+  end
+
+  if data["status"] == "error" || data["outcome"].to_s.end_with?("_failed") || verification["complete"] == false
+    base[:candidate_lessons] << "Failed weather reports should stop cleanly and preserve provider/runtime evidence."
+    base[:candidate_rules] << "Failed weather workflows must not offer a detailed weather follow-up when the brief report did not complete."
+  end
+
+  base[:candidate_rules] << "weather.report must remain read-only and must not write local files from the skill itself."
+  base[:candidate_rules] << "Weather workflows should use deterministic API data for temperature, humidity, air quality, and forecast signals rather than model guessing."
+
+  base[:candidate_lessons].uniq!
+  base[:candidate_rules].uniq!
+
+  base[:verification_summary] = verification.merge(
+    "location_query" => data["location_query"],
+    "parsed_country_code" => parsed_country_code.empty? ? nil : parsed_country_code,
+    "resolved_location" => resolved_name.empty? ? nil : resolved_name,
+    "workflow_location_source" => location_source,
+    "home_location_present" => !home_location.to_s.empty?,
+    "geocoding_attempt_count" => Array(data["geocoding_attempts"]).length,
+    "notable_forecast_signal_count" => signals.length
+  )
+
+  warnings.each { |warning| base[:warnings] << warning }
+end
+
+def weather_workflow_context_for(task_log_path)
+  return {} unless task_log_path
+
+  session_paths = Dir.glob("Soul/workflows/sessions/*.json").sort.reverse
+  session_paths.each do |session_path|
+    session = JSON.parse(File.read(session_path))
+    skill_runs = session["skill_runs"] || []
+    matched = skill_runs.any? { |run| run["task_log"] == task_log_path }
+    return session if matched
+  rescue JSON::ParserError
+    next
+  end
+
+  {}
+end
 
     def reflect_downloads_move_to_trash(base, payload)
       data = payload["json"] || payload
