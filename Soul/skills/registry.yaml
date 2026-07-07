@@ -1,64 +1,78 @@
 ---
 skills:
   system.status:
-    path: "Soul/skills/system/status.rb"
-    language: "ruby"
-    description: "Read-only local system and Soul runtime status check."
-    risk: "read_only"
+    path: Soul/skills/system/status.rb
+    language: ruby
+    description: Read-only local system and Soul runtime status check.
+    risk: read_only
     requires_approval: false
     writes_files: false
-    expected_output: "json"
-    verifier: "schema_basic"
-
+    expected_output: json
+    verifier: schema_basic
   downloads.inspect:
-    path: "Soul/skills/downloads/inspect.rb"
-    language: "ruby"
-    description: "Read-only Downloads inspection and cleanup-candidate planning."
-    risk: "read_only"
+    path: Soul/skills/downloads/inspect.rb
+    language: ruby
+    description: Read-only Downloads inspection and cleanup-candidate planning.
+    risk: read_only
     requires_approval: false
     writes_files: false
-    expected_output: "json"
-    verifier: "schema_basic"
-
+    expected_output: json
+    verifier: schema_basic
   downloads.cleanup_plan:
-    path: "Soul/skills/downloads/plan.rb"
-    language: "ruby"
-    description: "Read-only human-oriented cleanup plan based on downloads.inspect."
-    risk: "read_only"
+    path: Soul/skills/downloads/plan.rb
+    language: ruby
+    description: Read-only human-oriented cleanup plan based on downloads.inspect.
+    risk: read_only
     requires_approval: false
     writes_files: false
-    expected_output: "json"
-    verifier: "schema_basic"
-
+    expected_output: json
+    verifier: schema_basic
   downloads.move_to_trash:
-    path: "Soul/skills/downloads/move_to_trash.rb"
-    language: "ruby"
-    description: "Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan."
-    risk: "write_trash"
+    path: Soul/skills/downloads/move_to_trash.rb
+    language: ruby
+    description: Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan.
+    risk: write_trash
     requires_approval: true
-    confirmation_phrase: "MOVE_TO_TRASH"
+    confirmation_phrase: MOVE_TO_TRASH
     writes_files: true
-    expected_output: "json"
-    verifier: "schema_basic"
-
+    expected_output: json
+    verifier: schema_basic
   downloads.restore_last_cleanup:
-    path: "Soul/skills/downloads/restore_last_cleanup.rb"
-    language: "ruby"
-    description: "Approval-gated restore of the latest successful Downloads cleanup from Trash."
-    risk: "write_file"
+    path: Soul/skills/downloads/restore_last_cleanup.rb
+    language: ruby
+    description: Approval-gated restore of the latest successful Downloads cleanup
+      from Trash.
+    risk: write_file
     requires_approval: true
-    confirmation_phrase: "RESTORE_FROM_TRASH"
+    confirmation_phrase: RESTORE_FROM_TRASH
     writes_files: true
-    expected_output: "json"
-    verifier: "schema_basic"
-
+    expected_output: json
+    verifier: schema_basic
   weather.report:
-    path: "Soul/skills/weather/report.rb"
-    language: "ruby"
-    description: "Read-only weather report with temperature, humidity, air quality, and optional 3-day outlook."
-    risk: "read_only"
+    path: Soul/skills/weather/report.rb
+    language: ruby
+    description: Read-only weather report with temperature, humidity, air quality,
+      and optional 3-day outlook.
+    risk: read_only
     requires_approval: false
     writes_files: false
     network_access: true
-    expected_output: "json"
-    verifier: "schema_basic"
+    expected_output: json
+    verifier: schema_basic
+  cloud.providers.list:
+    path: Soul/skills/cloud/providers/list.rb
+    description: List configured cloud LLM providers without making network calls.
+    risk: read_only
+  cloud.providers.test:
+    path: Soul/skills/cloud/providers/test.rb
+    description: Run bounded smoke tests for configured cloud LLM providers.
+    risk: read_only
+  skill.brief.draft:
+    path: Soul/skills/skill/brief/draft.rb
+    description: Draft a review-only Soul/ skill proposal using a configured cloud
+      provider.
+    risk: read_only
+  skill.brief.review:
+    path: Soul/skills/skill/brief/review.rb
+    description: Review a Soul/ skill proposal and write a review-only artifact.
+    risk: read_only
