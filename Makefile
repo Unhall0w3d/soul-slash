@@ -1,293 +1,94 @@
 .RECIPEPREFIX := >
 SHELL := /usr/bin/env bash
 
-# Soul/ local model runtime v0.1
-# Runtime target:
-#   /usr/local/bin/llama-server
-#   user systemd service: llama-server.service
-#   model: Qwen3 8B Q4_K_M
-#   GPU: GTX 1070 via NVIDIA/CUDA llama.cpp
+# Soul/ public runtime Makefile
+#
+# Generic public dispatcher. Local runtime values belong in .env.
 
-USER_HOME := $(HOME)
+PROJECT_ROOT := $(CURDIR)
+ENV_FILE ?= $(PROJECT_ROOT)/.env
 
-PROJECT_ROOT ?= $(USER_HOME)/Projects/soul
-MODEL_DIR ?= $(USER_HOME)/ai_models
-MODEL_FILE ?= Qwen3-8B-Q4_K_M.gguf
-MODEL_PATH ?= $(MODEL_DIR)/$(MODEL_FILE)
-MODEL_URL ?= https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf?download=true
-
-LLAMA_SERVER ?= /usr/local/bin/llama-server
-SERVICE_NAME ?= llama-server.service
-SYSTEMD_USER_DIR ?= $(USER_HOME)/.config/systemd/user
-SERVICE_FILE ?= $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)
-DROPIN_DIR ?= $(SYSTEMD_USER_DIR)/$(SERVICE_NAME).d
-OVERRIDE_FILE ?= $(DROPIN_DIR)/override.conf
-
-RUN_DIR ?= $(PROJECT_ROOT)/run
-LOG_DIR ?= $(PROJECT_ROOT)/logs
-
-MODEL_ALIAS ?= soul-qwen3-8b-q4
-HOST ?= 127.0.0.1
-PORT ?= 8082
-BASE_URL ?= http://$(HOST):$(PORT)
-OPENAI_BASE_URL ?= $(BASE_URL)/v1
-
-# GTX 1070 / Pascal-safe defaults.
-CTX_SIZE ?= 4096
-N_PREDICT ?= 2048
-GPU_LAYERS ?= 999
-THREADS ?= 8
-PARALLEL ?= 1
-BATCH_SIZE ?= 1024
-UBATCH_SIZE ?= 256
-
-# Pascal-safe KV cache defaults.
-# Quantized V cache requires Flash Attention in current llama.cpp builds,
-# and Flash Attention is disabled on this GTX 1070 path.
-CACHE_TYPE_K ?= f16
-CACHE_TYPE_V ?= f16
-FLASH_ATTN ?= off
-
-TEMP ?= 0.6
-TOP_K ?= 20
-TOP_P ?= 0.95
-MIN_P ?= 0.0
-PRESENCE_PENALTY ?= 0.5
-REPEAT_PENALTY ?= 1.05
-
-# Soul/ request-mode defaults.
-FAST_MAX_TOKENS ?= 768
-THINK_MAX_TOKENS ?= 2048
-FAST_TEMP ?= 0.2
-THINK_TEMP ?= 0.4
-
-.PHONY: help check init download-model show-service service-update start stop restart enable disable status health wait test-chat test-fast test-think test-modes logs gpu service-cat service-edit foreground clean-runtime
+.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp clean-runtime chmod-scripts fix-mtimes
 
 help:
-> @echo "Soul/ llama.cpp runtime Makefile"
+> @echo "Soul/ public setup Makefile"
 > @echo
 > @echo "Common targets:"
-> @echo "  make check             Validate binary, service, GPU, and model path assumptions"
-> @echo "  make download-model    Download Qwen3 8B Q4_K_M to $(MODEL_PATH)"
-> @echo "  make service-update    Write user systemd override for Soul/ Qwen3 runtime"
-> @echo "  make restart           Restart llama-server user service and run fast smoke test"
-> @echo "  make start             Start llama-server user service"
-> @echo "  make stop              Stop llama-server user service"
-> @echo "  make status            Show systemd status"
-> @echo "  make health            Check /health"
-> @echo "  make test-fast         Test fast /no_think mode"
-> @echo "  make test-think        Test thinking mode"
-> @echo "  make test-modes        Test both fast and think modes"
-> @echo "  make logs              Follow user journal logs"
-> @echo "  make gpu               Show nvidia-smi"
-> @echo "  make foreground        Run llama-server directly in foreground for debugging"
+> @echo "  make check             Check required/recommended local tools only"
+> @echo "  make detect            Detect runtime binaries, endpoints, .env, and local models"
+> @echo "  make setup             Detect providers and guide setup"
+> @echo "  make setup-llamacpp    Configure llama.cpp server provider"
+> @echo "  make setup-ollama      Configure Ollama provider"
+> @echo "  make test-runtime      Test configured OpenAI-compatible runtime"
+> @echo "  make test-fast         Test FAST/no_think request mode"
+> @echo "  make test-think        Test THINK request mode"
+> @echo "  make doctor            Run Soul/ doctor"
+> @echo "  make test-soul         Run basic Soul/ CLI checks"
 > @echo
-> @echo "Override examples:"
-> @echo "  make service-update CTX_SIZE=6144"
-> @echo "  make service-update CTX_SIZE=4096 CACHE_TYPE_K=f16 CACHE_TYPE_V=f16 FLASH_ATTN=off"
-> @echo "  make test-think THINK_MAX_TOKENS=3072"
-> @echo "  make foreground CTX_SIZE=4096"
-
-check:
-> @echo "Checking Soul/ llama.cpp runtime..."
-> @command -v curl >/dev/null || { echo "Missing curl"; exit 1; }
-> @command -v python >/dev/null || { echo "Missing python"; exit 1; }
-> @command -v systemctl >/dev/null || { echo "Missing systemctl"; exit 1; }
-> @command -v nvidia-smi >/dev/null || { echo "Missing nvidia-smi"; exit 1; }
-> @test -x "$(LLAMA_SERVER)" || { echo "Missing executable llama-server at $(LLAMA_SERVER)"; exit 1; }
-> @echo "OK: llama-server: $(LLAMA_SERVER)"
-> @"$(LLAMA_SERVER)" --version || true
+> @echo "llama.cpp helper targets:"
+> @echo "  make download-model    Download/validate configured GGUF model"
+> @echo "  make start-llamacpp    Start llama.cpp using .env settings"
+> @echo "  make foreground-llamacpp  Alias for start-llamacpp"
 > @echo
-> @echo "Service file:"
-> @if [ -f "$(SERVICE_FILE)" ]; then \
->   echo "OK: $(SERVICE_FILE)"; \
-> else \
->   echo "WARNING: $(SERVICE_FILE) does not exist yet."; \
->   echo "         make service-update will create a user service."; \
-> fi
+> @echo "Maintenance:"
+> @echo "  make env-show          Show local Soul/ runtime config"
+> @echo "  make fix-mtimes        Touch repo files if ZIP timestamps caused Make clock-skew warnings"
 > @echo
-> @echo "Model path:"
-> @if [ -f "$(MODEL_PATH)" ]; then \
->   if [ "$$(head -c 4 "$(MODEL_PATH)")" = "GGUF" ]; then \
->     echo "OK: $(MODEL_PATH)"; \
->     du -h "$(MODEL_PATH)"; \
->   else \
->     echo "BAD: $(MODEL_PATH) exists but is not a GGUF file."; \
->     echo "First bytes:"; \
->     head -c 120 "$(MODEL_PATH)" || true; \
->     echo; \
->   fi; \
-> else \
->   echo "Missing model: $(MODEL_PATH)"; \
->   echo "Run: make download-model"; \
-> fi
-> @echo
-> @echo "NVIDIA GPU:"
-> @nvidia-smi --query-gpu=name,memory.total,memory.used,power.draw --format=csv,noheader
+> @echo "Docs:"
+> @echo "  docs/GETTING_STARTED.md"
+> @echo "  docs/RUNTIME_PROVIDERS.md"
+> @echo "  docs/REQUIREMENTS.md"
 
-init:
-> @mkdir -p "$(PROJECT_ROOT)" "$(MODEL_DIR)" "$(RUN_DIR)" "$(LOG_DIR)" "$(SYSTEMD_USER_DIR)" "$(DROPIN_DIR)"
+chmod-scripts:
+> @chmod +x scripts/soul-*.sh
 
-download-model: init
-> @if [ -f "$(MODEL_PATH)" ]; then \
->   if [ "$$(head -c 4 "$(MODEL_PATH)")" = "GGUF" ]; then \
->     echo "Model already exists and looks valid: $(MODEL_PATH)"; \
->     du -h "$(MODEL_PATH)"; \
->     exit 0; \
->   else \
->     echo "Existing model file is not GGUF. Removing bad file: $(MODEL_PATH)"; \
->     head -c 120 "$(MODEL_PATH)" || true; \
->     echo; \
->     rm -f "$(MODEL_PATH)"; \
->   fi; \
-> fi
-> @echo "Downloading Qwen3 8B Q4_K_M GGUF to $(MODEL_PATH)..."
-> @curl -fL --retry 5 --retry-delay 3 -C - -o "$(MODEL_PATH)" "$(MODEL_URL)"
-> @if [ "$$(head -c 4 "$(MODEL_PATH)")" != "GGUF" ]; then \
->   echo "Downloaded file is not a GGUF model. First bytes:"; \
->   head -c 200 "$(MODEL_PATH)" || true; \
->   echo; \
->   rm -f "$(MODEL_PATH)"; \
->   exit 1; \
-> fi
-> @du -h "$(MODEL_PATH)"
+fix-mtimes:
+> @find . -path ./.git -prune -o -type f -exec touch {} +
+> @echo "Touched repository files. If Make warned about future timestamps, it should stop whining now."
 
-service-update: init
-> @test -x "$(LLAMA_SERVER)" || { echo "Missing executable llama-server at $(LLAMA_SERVER)"; exit 1; }
-> @test -f "$(MODEL_PATH)" || { echo "Missing model at $(MODEL_PATH). Run: make download-model"; exit 1; }
-> @if [ "$$(head -c 4 "$(MODEL_PATH)")" != "GGUF" ]; then \
->   echo "Model file is not valid GGUF: $(MODEL_PATH)"; \
->   head -c 120 "$(MODEL_PATH)" || true; \
->   echo; \
->   exit 1; \
-> fi
-> @if [ ! -f "$(SERVICE_FILE)" ]; then \
->   echo "Creating base user service: $(SERVICE_FILE)"; \
->   printf '%s\n' \
->     '[Unit]' \
->     'Description=llama.cpp Local AI Server' \
->     'After=network-online.target' \
->     '' \
->     '[Service]' \
->     'Type=simple' \
->     'ExecStart=/usr/local/bin/llama-server --version' \
->     'Restart=on-failure' \
->     'RestartSec=3' \
->     '' \
->     '[Install]' \
->     'WantedBy=default.target' \
->     > "$(SERVICE_FILE)"; \
-> fi
-> @echo "Writing override: $(OVERRIDE_FILE)"
-> @printf '%s\n' \
->   '[Service]' \
->   'ExecStart=' \
->   'ExecStart=$(LLAMA_SERVER) --model $(MODEL_PATH) --alias $(MODEL_ALIAS) --host $(HOST) --port $(PORT) --jinja --reasoning-format deepseek --n-gpu-layers $(GPU_LAYERS) --split-mode none --main-gpu 0 --ctx-size $(CTX_SIZE) --predict $(N_PREDICT) --threads $(THREADS) --parallel $(PARALLEL) --batch-size $(BATCH_SIZE) --ubatch-size $(UBATCH_SIZE) --cache-type-k $(CACHE_TYPE_K) --cache-type-v $(CACHE_TYPE_V) --flash-attn $(FLASH_ATTN) --temp $(TEMP) --top-k $(TOP_K) --top-p $(TOP_P) --min-p $(MIN_P) --presence-penalty $(PRESENCE_PENALTY) --repeat-penalty $(REPEAT_PENALTY) --no-context-shift' \
->   'Environment=CUDA_VISIBLE_DEVICES=0' \
->   'Restart=on-failure' \
->   'RestartSec=3' \
->   > "$(OVERRIDE_FILE)"
-> @systemctl --user daemon-reload
-> @echo "Updated $(SERVICE_NAME). Run: make restart"
+check: chmod-scripts
+> @scripts/soul-runtime-check.sh
 
-start:
-> @systemctl --user start "$(SERVICE_NAME)"
+detect: chmod-scripts
+> @scripts/soul-runtime-detect.sh
 
-stop:
-> @systemctl --user stop "$(SERVICE_NAME)" || true
+setup: chmod-scripts
+> @scripts/soul-runtime-detect.sh --setup
 
-restart:
-> @systemctl --user restart "$(SERVICE_NAME)"
-> @$(MAKE) wait
-> @$(MAKE) test-fast
+setup-llamacpp: chmod-scripts
+> @scripts/soul-setup-llamacpp.sh
 
-enable:
-> @systemctl --user enable "$(SERVICE_NAME)"
+setup-ollama: chmod-scripts
+> @scripts/soul-setup-ollama.sh
 
-disable:
-> @systemctl --user disable "$(SERVICE_NAME)"
+test-runtime: chmod-scripts
+> @scripts/soul-runtime-test.sh
 
-status:
-> @systemctl --user status "$(SERVICE_NAME)" --no-pager || true
+test-fast: chmod-scripts
+> @scripts/soul-runtime-test.sh --fast
 
-service-cat:
-> @systemctl --user cat "$(SERVICE_NAME)" || true
+test-think: chmod-scripts
+> @scripts/soul-runtime-test.sh --think
 
-service-edit:
-> @systemctl --user edit "$(SERVICE_NAME)"
+test-soul:
+> @ruby bin/soul doctor
+> @ruby bin/soul skills
+> @ruby bin/soul skill system.status
 
-health:
-> @curl -fsS "$(BASE_URL)/health" || true
-> @echo
+doctor:
+> @ruby bin/soul doctor
 
-wait:
-> @echo "Waiting for llama-server health at $(BASE_URL)/health ..."
-> @for i in $$(seq 1 120); do \
->   if curl -fsS "$(BASE_URL)/health" 2>/dev/null | grep -q '"ok"'; then \
->     echo "llama-server is healthy."; \
->     exit 0; \
->   fi; \
->   sleep 2; \
-> done; \
-> echo "Timed out waiting for llama-server."; \
-> echo "Recent logs:"; \
-> journalctl --user -u "$(SERVICE_NAME)" -n 120 --no-pager || true; \
-> exit 1
+env-show: chmod-scripts
+> @scripts/soul-env-show.sh
 
-test-chat: test-fast
+download-model: chmod-scripts
+> @scripts/soul-setup-llamacpp.sh --download-only
 
-test-fast:
-> @echo "Testing FAST mode at $(OPENAI_BASE_URL) ..."
-> @curl -sS "$(OPENAI_BASE_URL)/chat/completions" \
->   -H "Content-Type: application/json" \
->   -d '{"model":"$(MODEL_ALIAS)","messages":[{"role":"system","content":"You are the local Soul/ runtime. Answer plainly and briefly. Do not explain your reasoning."},{"role":"user","content":"/no_think\nSay exactly: Soul FAST mode is online."}],"max_tokens":$(FAST_MAX_TOKENS),"temperature":$(FAST_TEMP)}' \
->   | python -c 'import sys,json; data=json.load(sys.stdin); msg=data.get("choices",[{}])[0].get("message",{}); usage=data.get("usage",{}); content=(msg.get("content") or "").strip(); reasoning=(msg.get("reasoning_content") or "").strip(); print(content if content else "[no final content]"); print("completion_tokens=%s total_tokens=%s" % (usage.get("completion_tokens"), usage.get("total_tokens")))'
+start-llamacpp: chmod-scripts
+> @scripts/soul-start-llamacpp.sh
 
-test-think:
-> @echo "Testing THINK mode at $(OPENAI_BASE_URL) ..."
-> @curl -sS "$(OPENAI_BASE_URL)/chat/completions" \
->   -H "Content-Type: application/json" \
->   -d '{"model":"$(MODEL_ALIAS)","messages":[{"role":"system","content":"You are the local Soul/ runtime. You may reason internally, but your final answer must be concise."},{"role":"user","content":"Think through this briefly, then answer in one sentence: why should Soul/ do a dry run before moving files to Trash?"}],"max_tokens":$(THINK_MAX_TOKENS),"temperature":$(THINK_TEMP)}' \
->   | python -c 'import sys,json; data=json.load(sys.stdin); msg=data.get("choices",[{}])[0].get("message",{}); usage=data.get("usage",{}); content=(msg.get("content") or "").strip(); reasoning=(msg.get("reasoning_content") or "").strip(); print(content if content else "[no final content; reasoning preview follows]\n" + reasoning[-1200:]); print("completion_tokens=%s total_tokens=%s" % (usage.get("completion_tokens"), usage.get("total_tokens")))'
-
-test-modes: test-fast test-think
-
-logs:
-> @journalctl --user -u "$(SERVICE_NAME)" -f
-
-gpu:
-> @nvidia-smi
-
-foreground:
-> @test -x "$(LLAMA_SERVER)" || { echo "Missing executable llama-server at $(LLAMA_SERVER)"; exit 1; }
-> @test -f "$(MODEL_PATH)" || { echo "Missing model at $(MODEL_PATH). Run: make download-model"; exit 1; }
-> @CUDA_VISIBLE_DEVICES=0 "$(LLAMA_SERVER)" \
->   --model "$(MODEL_PATH)" \
->   --alias "$(MODEL_ALIAS)" \
->   --host "$(HOST)" \
->   --port "$(PORT)" \
->   --jinja \
->   --reasoning-format deepseek \
->   --n-gpu-layers "$(GPU_LAYERS)" \
->   --split-mode none \
->   --main-gpu 0 \
->   --ctx-size "$(CTX_SIZE)" \
->   --predict "$(N_PREDICT)" \
->   --threads "$(THREADS)" \
->   --parallel "$(PARALLEL)" \
->   --batch-size "$(BATCH_SIZE)" \
->   --ubatch-size "$(UBATCH_SIZE)" \
->   --cache-type-k "$(CACHE_TYPE_K)" \
->   --cache-type-v "$(CACHE_TYPE_V)" \
->   --flash-attn "$(FLASH_ATTN)" \
->   --temp "$(TEMP)" \
->   --top-k "$(TOP_K)" \
->   --top-p "$(TOP_P)" \
->   --min-p "$(MIN_P)" \
->   --presence-penalty "$(PRESENCE_PENALTY)" \
->   --repeat-penalty "$(REPEAT_PENALTY)" \
->   --no-context-shift
+foreground-llamacpp: start-llamacpp
 
 clean-runtime:
-> @rm -rf "$(RUN_DIR)"
-> @echo "Removed runtime directory: $(RUN_DIR)"
+> @rm -rf run tmp
+> @echo "Removed local runtime directories: run tmp"
