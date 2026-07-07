@@ -98,3 +98,7 @@ Soul/proposals/skills/*
 
 # Root overlay instruction files should be archived under docs/overlays/archive/.
 /README_*.md
+
+# One-time overlay patch scripts should not be committed after application.
+scripts/patch-*.rb
+scripts/repair-*.rb
