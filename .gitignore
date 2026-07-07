@@ -87,3 +87,11 @@ Thumbs.db
 # Keep the example tracked, keep real provider enablement local.
 Soul/config/cloud_providers.yaml
 !Soul/config/cloud_providers.example.yaml
+
+# Soul/ cloud-assisted generated artifacts and skill proposals.
+# Generated artifacts are local/review-only unless manually promoted.
+Soul/artifacts/cloud_assist/*
+!Soul/artifacts/cloud_assist/.keep
+
+Soul/proposals/skills/*
+!Soul/proposals/skills/.keep
