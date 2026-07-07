@@ -1,56 +1,97 @@
 # youtube.video_resolve
 
-Planned skill.
+Implemented skill.
 
 ## Purpose
 
-Resolve a song/search query to a YouTube video candidate using an official API-backed resolver.
+Resolve a song/search query to a YouTube video candidate using the official YouTube Data API v3.
 
-## Proposed provider
+The resolver returns candidate metadata and a direct YouTube watch URL.
 
-```text
-YouTube Data API v3
-```
+It does not open the browser.
 
-Required config for live mode:
-
-```text
-YOUTUBE_DATA_API_KEY
-```
-
-## Current status
-
-```text
-planned
-```
-
-This document does not implement the resolver.
-
-See:
-
-```text
-docs/implementation/YOUTUBE_VIDEO_RESOLVER_PLAN.md
-```
-
-## Intended behavior
-
-```text
-user provides song/search query
-Soul/ calls official YouTube Data API
-Soul/ returns candidate title/channel/video ID/watch URL
-Soul/ does not open browser
-Soul/ asks for confirmation in a later workflow before opening
-```
-
-Opening the browser remains the job of:
+Opening remains the job of:
 
 ```text
 youtube.song_search --url <watch_url>
 ```
 
+## Required config for live mode
+
+```text
+YOUTUBE_DATA_API_KEY
+```
+
+The key may be supplied through `.env` or the shell environment.
+
+The key must not be hardcoded, printed, or written to task logs.
+
+## Dry-run mode
+
+Dry-run mode does not require an API key and does not make a network call:
+
+```bash
+ruby Soul/skills/youtube/video_resolve.rb --query "Bohemian Rhapsody" --dry-run
+```
+
+## Direct usage
+
+Live mode:
+
+```bash
+ruby Soul/skills/youtube/video_resolve.rb --query "Bohemian Rhapsody"
+```
+
+Alias:
+
+```bash
+ruby Soul/skills/youtube/video_resolve.rb --song "Miles Davis So What"
+```
+
+Limit candidates:
+
+```bash
+ruby Soul/skills/youtube/video_resolve.rb --query "Bohemian Rhapsody" --max-results 3
+```
+
+`--max-results` is clamped to a conservative range of 1..5.
+
+## Registry usage
+
+```bash
+ruby bin/soul skill youtube.video_resolve -- --query "Bohemian Rhapsody" --dry-run
+```
+
+Live mode:
+
+```bash
+ruby bin/soul skill youtube.video_resolve -- --query "Bohemian Rhapsody"
+```
+
+## Output
+
+Success includes:
+
+```text
+candidate.title
+candidate.channel_title
+candidate.video_id
+candidate.watch_url
+candidates[]
+```
+
+The resolver returns:
+
+```text
+complete
+blocked_for_input
+no_match
+failed
+```
+
 ## Boundary
 
-The resolver must not:
+The resolver does not:
 
 ```text
 scrape YouTube
@@ -64,32 +105,40 @@ run persistently
 store durable song history
 ```
 
-## Planned direct usage
+The resolver is read-only from Soul/'s perspective. It makes a network request only in live API mode.
 
-```bash
-ruby Soul/skills/youtube/video_resolve.rb --query "Bohemian Rhapsody"
-```
-
-Dry-run fixture mode:
-
-```bash
-ruby Soul/skills/youtube/video_resolve.rb --query "Bohemian Rhapsody" --dry-run
-```
-
-Registry usage after implementation:
-
-```bash
-ruby bin/soul skill youtube.video_resolve -- --query "Bohemian Rhapsody" --dry-run
-```
-
-## Relationship to youtube.song_search
+## Suggested chain
 
 ```text
-youtube.video_resolve
-  query -> watch URL candidate
-
-youtube.song_search
-  watch URL -> browser launch after confirmation
+youtube.video_resolve --query "Bohemian Rhapsody"
+review candidate title/channel/watch URL
+youtube.song_search --url <watch_url> --confirm
 ```
 
-The resolver exists because `youtube.song_search --query` intentionally opens search results and does not scrape YouTube to find a video ID.
+Future workflow integration should automate that chain while preserving the user confirmation step before browser launch.
+
+## Verification
+
+```bash
+ruby scripts/verify-youtube-video-resolve.rb
+```
+
+The verifier uses dry-run mode and missing-key checks. It does not call the live YouTube API by default, because quota goblins must be starved whenever possible.
+
+## Provider error diagnostics
+
+Live API failures include a sanitized `provider_error` object when Google returns structured error details.
+
+Possible fields:
+
+```text
+provider_error.message
+provider_error.reason
+provider_error.domain
+provider_error.location
+provider_error.location_type
+```
+
+These diagnostics are intended to make failures such as invalid API keys, disabled APIs, quota issues, or bad request parameters easier to understand.
+
+The resolver must not print or log the API key. Provider diagnostics are sanitized before being returned or written to task logs.
