@@ -11,6 +11,7 @@ require_relative "reflection_review"
 require_relative "intent_router"
 require_relative "workflow_runner"
 require_relative "workflow_session"
+require_relative "youtube_play_workflow"
 
 module SoulCore
   class App
