@@ -1,0 +1,106 @@
+# Soul/ cloud provider example configuration.
+#
+# This file is an example only. Copy or adapt later when provider config loading exists.
+# Do not put API keys in this file.
+#
+# Mistral setup/account/API-key documentation is intentionally deferred until
+# the cloud.providers.test overlay.
+
+cloud_llm:
+  enabled: false
+  default_policy:
+    output_mode: review_artifact_only
+    send_secrets: false
+    send_private_repo_content: false
+    send_user_memory: false
+    allow_direct_repo_mutation: false
+    prefer_no_key_for_experiments: true
+    allow_manual_no_credit_card_keys: true
+    forbid_unofficial_key_acquisition: true
+
+  providers:
+    mistral:
+      enabled: false
+      auth_mode: manual_api_key
+      api_key_env: MISTRAL_API_KEY
+      base_url: https://api.mistral.ai/v1
+      default_model: mistral-small-latest
+      requires_credit_card: false
+      credit_card_policy: "Current official docs state Free mode API access is enabled by default with no credit card required."
+      programmatic_key_acquisition: unsupported
+      trust_level: serious_manual_key_provider
+      roles:
+        - documentation_draft
+        - skill_brief_draft
+        - skill_design_review
+        - prototype_review
+        - research_synthesis_from_sources
+      notes:
+        - "Manual account/API-key setup only."
+        - "Do not add setup instructions until cloud.providers.test overlay."
+
+    ovhcloud_anonymous:
+      enabled: false
+      auth_mode: none
+      api_key_env:
+      base_url:
+      default_model:
+      requires_credit_card: false
+      credit_card_policy: "No-key path requires smoke testing before use."
+      programmatic_key_acquisition: not_applicable
+      trust_level: experimental_no_key_probe
+      roles:
+        - rough_draft_probe
+        - cloud_smoke_test
+      notes:
+        - "Experimental. Do not send private content or user memory."
+
+    pollinations:
+      enabled: false
+      auth_mode: none
+      api_key_env:
+      base_url:
+      default_model:
+      requires_credit_card: false
+      credit_card_policy: "No-key public API behavior requires smoke testing before use."
+      programmatic_key_acquisition: not_applicable
+      trust_level: experimental_no_key_probe
+      roles:
+        - rough_draft_probe
+        - cloud_smoke_test
+      notes:
+        - "Experimental. Do not use for authoritative research or safety review."
+
+    gemini:
+      enabled: false
+      auth_mode: manual_api_key
+      api_key_env: GEMINI_API_KEY
+      base_url:
+      default_model:
+      requires_credit_card: unknown_or_user_verified
+      credit_card_policy: "Manual verification required before enabling."
+      programmatic_key_acquisition: unsupported
+      trust_level: optional_manual_key_provider
+      roles:
+        - long_context_synthesis
+        - documentation_draft
+        - skill_design_review
+      notes:
+        - "Not a default provider under the no-credit-card preference until user verifies account setup."
+
+    groq:
+      enabled: false
+      auth_mode: manual_api_key
+      api_key_env: GROQ_API_KEY
+      base_url: https://api.groq.com/openai/v1
+      default_model:
+      requires_credit_card: unknown_or_user_verified
+      credit_card_policy: "Manual verification required before enabling."
+      programmatic_key_acquisition: unsupported
+      trust_level: optional_manual_key_provider
+      roles:
+        - fast_eval_generation
+        - structured_output
+        - prototype_review
+      notes:
+        - "Do not enable by assumption."

@@ -1,85 +1,73 @@
-# Soul Human Review Gate
+# Human Review Gate
+
+Human review is the authority boundary for Soul/.
 
 Candidate-complete work is not approved work.
 
-Codex may produce candidate-complete skills by implementing, testing, evaluating, and repairing against the written brief. Human review decides whether the work may be merged, released, enabled, or trusted for repeated use.
+## Review checklist
 
-## Reviewer responsibilities
-
-The human reviewer should verify:
-
-- The skill matches the approved brief
-- No out-of-scope behavior was added
-- No persistence or background execution was introduced
-- Risk class is correct
-- Memory keys are appropriate and documented
-- Confirmation gates are intact
-- Deterministic tests are meaningful and passing
-- Local LLM evals are useful and not being used as safety proof
-- Failure behavior is predictable
-- Logs/reflection are useful
-- The user-facing behavior is acceptable
-
-## Persistence review
-
-Explicitly check for:
-
-- Services
-- Daemons
-- Watchers
-- Cron jobs
-- systemd units
-- launch agents
-- Windows services
-- Scheduled tasks
-- Long-running loops
-- Background polling
-- Network listeners
-- Hidden child processes
-
-If any appear without explicit approval, reject the candidate.
-
-## Safety review
-
-For any skill that changes files, local state, external systems, or durable memory, verify:
-
-- Planning and execution are separated when required
-- Confirmation gates are explicit
-- Dry-run/preview behavior exists where practical
-- Logs record changed paths or external targets
-- Rollback/restore visibility exists where practical
-- LLM output is not treated as authorization
-
-## Memory review
-
-Verify:
-
-- Durable memory uses shared infrastructure
-- New keys are documented
-- First-use behavior is clear
-- Update/forget behavior exists where appropriate
-- Sensitive or personal data is not stored unnecessarily
-
-## Review outcomes
-
-Choose one:
+Before accepting any cloud-assisted or Codex-assisted skill, confirm:
 
 ```text
-approved_for_merge
-requires_changes
-rejected_scope_drift
-rejected_safety_policy
-blocked_needs_design_decision
+skill matches the approved brief
+no persistent/background behavior was added
+no safety gates were weakened
+memory keys are appropriate and shared
+deterministic tests pass
+local LLM evals were run where applicable
+cloud LLM output was used only as draft/review artifact
+no secrets were exposed
+no private repo data was sent without approval
+failure behavior is predictable
+logs/review packet are adequate
 ```
 
-## Required review note
+## Codex review packet
 
-Every candidate should have a short review note:
+Codex candidate work should include:
 
 ```text
-Review outcome:
-Reviewer:
-Date:
-Decision summary:
-Required changes, if any:
+implementation summary
+files changed
+tests run
+deterministic test results
+local LLM eval prompts/results
+failures encountered
+known weaknesses
+memory keys added/used
+lifecycle states touched
+risk classification
+human review checklist
 ```
+
+## Cloud review packet
+
+Cloud-assisted artifacts should include:
+
+```text
+provider
+model
+purpose
+data class
+secrets included
+private repo content included
+source bundle used
+artifact path
+warnings
+limitations
+```
+
+## Approval boundaries
+
+Only the human may approve:
+
+```text
+merge readiness
+memory/rule promotion
+safety classification
+persistence/background architecture
+private-content sharing
+credential setup
+```
+
+Soul/ may stage candidates. It may not self-certify them.
