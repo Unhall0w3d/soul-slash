@@ -41,6 +41,12 @@ module SoulCore
         handle_restore_final_confirmation(state, text)
       when "waiting_for_weather_detail_decision"
         handle_weather_detail_decision(state, text)
+      when "failed"
+        {
+          ok: true,
+          message: "Latest workflow failed. No follow-up action is available for that workflow. Check the task log referenced in the workflow state, then start a new workflow after fixing the issue.",
+          state: state
+        }
       when "complete_no_action", "complete", "cancelled"
         {
           ok: true,
@@ -68,31 +74,12 @@ module SoulCore
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Weather workflow cancelled. No weather report was run.",
-          state: state
-        }
+        return { ok: true, message: "Weather workflow cancelled. No weather report was run.", state: state }
       end
 
       if home_choice?(normalized)
-        result = @runner.run(
-          intent: "weather.report",
-          parameters: {
-            "location" => home_location,
-            "location_source" => "home_confirmed",
-            "home_location" => home_location,
-            "units" => units
-          },
-          original_text: state.fetch("original_text")
-        )
-
-        return {
-          ok: result[:ok],
-          message: result[:user_message],
-          state: result[:state]
-        }
+        result = @runner.run(intent: "weather.report", parameters: { "location" => home_location, "location_source" => "home_confirmed", "home_location" => home_location, "units" => units }, original_text: state.fetch("original_text"))
+        return { ok: result[:ok], message: result[:user_message], state: result[:state] }
       end
 
       if elsewhere_choice?(normalized)
@@ -100,39 +87,16 @@ module SoulCore
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "weather_override_location"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: @renderer.render_weather_ask_override_location(state),
-          state: state
-        }
+        return { ok: true, message: @renderer.render_weather_ask_override_location(state), state: state }
       end
 
       location = extract_location_from_text(text)
       if plausible_location?(location)
-        result = @runner.run(
-          intent: "weather.report",
-          parameters: {
-            "location" => location,
-            "location_source" => "override",
-            "home_location" => home_location,
-            "units" => units
-          },
-          original_text: state.fetch("original_text")
-        )
-
-        return {
-          ok: result[:ok],
-          message: result[:user_message],
-          state: result[:state]
-        }
+        result = @runner.run(intent: "weather.report", parameters: { "location" => location, "location_source" => "override", "home_location" => home_location, "units" => units }, original_text: state.fetch("original_text"))
+        return { ok: result[:ok], message: result[:user_message], state: result[:state] }
       end
 
-      {
-        ok: false,
-        message: @renderer.render_weather_location_choice(state),
-        state: state
-      }
+      { ok: false, message: @renderer.render_weather_location_choice(state), state: state }
     end
 
     def handle_weather_override_location(state, text)
@@ -142,21 +106,12 @@ module SoulCore
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Weather workflow cancelled. No weather report was run.",
-          state: state
-        }
+        return { ok: true, message: "Weather workflow cancelled. No weather report was run.", state: state }
       end
 
       location = extract_location_from_text(text)
       unless plausible_location?(location)
-        return {
-          ok: false,
-          message: "Please provide a location, for example: `London, UK`, `Toronto, Canada`, or `Syracuse, NY`. Or reply `cancel`.",
-          state: state
-        }
+        return { ok: false, message: "Please provide a location, for example: `London, UK`, `Toronto, Canada`, or `Syracuse, NY`. Or reply `cancel`.", state: state }
       end
 
       result = @runner.run(
@@ -170,40 +125,24 @@ module SoulCore
         original_text: state.fetch("original_text")
       )
 
-      {
-        ok: result[:ok],
-        message: result[:user_message],
-        state: result[:state]
-      }
+      { ok: result[:ok], message: result[:user_message], state: result[:state] }
     end
 
     def home_choice?(normalized)
-      normalized.match?(/\bhome\b/) ||
-        normalized.match?(/\bdefault\b/) ||
-        normalized.match?(/\bhere\b/) ||
-        normalized.match?(/\byes\b/) ||
-        normalized.match?(/\byeah\b/) ||
-        normalized.match?(/\byep\b/) ||
-        normalized.match?(/\buse home\b/) ||
-        normalized.match?(/\buse default\b/)
+      normalized.match?(/\bhome\b/) || normalized.match?(/\bdefault\b/) || normalized.match?(/\bhere\b/) ||
+        normalized.match?(/\byes\b/) || normalized.match?(/\byeah\b/) || normalized.match?(/\byep\b/) ||
+        normalized.match?(/\buse home\b/) || normalized.match?(/\buse default\b/)
     end
 
     def elsewhere_choice?(normalized)
-      normalized.match?(/\bsomewhere else\b/) ||
-        normalized.match?(/\bsomeplace else\b/) ||
-        normalized.match?(/\bother\b/) ||
-        normalized.match?(/\belsewhere\b/) ||
-        normalized.match?(/\bdifferent\b/) ||
-        normalized.match?(/\bnot home\b/) ||
-        normalized.match?(/\bno\b/)
+      normalized.match?(/\bsomewhere else\b/) || normalized.match?(/\bsomeplace else\b/) ||
+        normalized.match?(/\bother\b/) || normalized.match?(/\belsewhere\b/) ||
+        normalized.match?(/\bdifferent\b/) || normalized.match?(/\bnot home\b/) || normalized.match?(/\bno\b/)
     end
 
     def cancel_text?(normalized)
-      normalized.match?(/\bcancel\b/) ||
-        normalized.match?(/\bstop\b/) ||
-        normalized.match?(/\bnever mind\b/) ||
-        normalized.match?(/\bnevermind\b/) ||
-        normalized.match?(/\bquit\b/)
+      normalized.match?(/\bcancel\b/) || normalized.match?(/\bstop\b/) ||
+        normalized.match?(/\bnever mind\b/) || normalized.match?(/\bnevermind\b/) || normalized.match?(/\bquit\b/)
     end
 
     def handle_weather_location_response(state, text)
@@ -214,38 +153,16 @@ module SoulCore
         state["next_expected"] = "none"
         state["verification"]["complete"] = false
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Weather workflow cancelled. No location was provided, so no weather report was run.",
-          state: state
-        }
+        return { ok: true, message: "Weather workflow cancelled. No location was provided, so no weather report was run.", state: state }
       end
 
       location = extract_location_from_text(text)
       if location.empty?
-        return {
-          ok: false,
-          message: "Please provide a location, for example: `ruby bin/soul respond \"Syracuse, NY\"`, or cancel.",
-          state: state
-        }
+        return { ok: false, message: "Please provide a location, for example: `ruby bin/soul respond \"Syracuse, NY\"`, or cancel.", state: state }
       end
 
-      result = @runner.run(
-        intent: "weather.report",
-        parameters: {
-          "location" => location,
-          "location_source" => "provided_after_prompt",
-          "units" => state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
-        },
-        original_text: state.fetch("original_text")
-      )
-
-      {
-        ok: result[:ok],
-        message: result[:user_message],
-        state: result[:state]
-      }
+      result = @runner.run(intent: "weather.report", parameters: { "location" => location, "location_source" => "provided_after_prompt", "units" => state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit") }, original_text: state.fetch("original_text"))
+      { ok: result[:ok], message: result[:user_message], state: result[:state] }
     end
 
     def extract_location_from_text(text)
@@ -258,15 +175,12 @@ module SoulCore
 
     def plausible_location?(location)
       value = location.to_s.strip
-      return false if value.empty?
-      return false if value.length < 2
-
+      return false if value.empty? || value.length < 2
       !home_choice?(value.downcase) && !elsewhere_choice?(value.downcase) && !cancel_text?(value.downcase)
     end
 
     def handle_weather_detail_decision(state, text)
       parsed = @confirmation_parser.parse(text)
-
       if parsed.cancelled
         state["status"] = "complete"
         state["updated_at"] = Time.now.iso8601
@@ -274,20 +188,11 @@ module SoulCore
         state["verification"]["complete"] = true
         state["verification"]["detailed_report_requested"] = false
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: @renderer.render_weather_complete_without_detail(state),
-          state: state
-        }
+        return { ok: true, message: @renderer.render_weather_complete_without_detail(state), state: state }
       end
 
       unless parsed.confirmed
-        return {
-          ok: false,
-          message: "Would you like the detailed weather report? Reply with `yes` or `no`.",
-          state: state
-        }
+        return { ok: false, message: "Would you like the detailed weather report? Reply with `yes` or `no`.", state: state }
       end
 
       location = state.dig("parameters", "location")
@@ -301,12 +206,7 @@ module SoulCore
       state["status"] = result[:ok] ? "complete" : "failed"
       state["updated_at"] = Time.now.iso8601
       state["next_expected"] = result[:ok] ? "reflection_offer" : "none"
-      state["skill_runs"] << {
-        "skill" => "weather.report",
-        "args" => args,
-        "ok" => result[:ok],
-        "task_log" => task_log_path
-      }
+      state["skill_runs"] << { "skill" => "weather.report", "args" => args, "ok" => result[:ok], "task_log" => task_log_path }
       state["detailed_report"] = report
       state["verification"]["detailed_report_requested"] = true
       state["verification"]["detailed_report_generated"] = result[:ok]
@@ -314,58 +214,29 @@ module SoulCore
       state["verification"]["complete"] = result[:ok]
       @runner.save_session(state)
 
-      {
-        ok: result[:ok],
-        message: @renderer.render_weather_detailed(state, report),
-        state: state
-      }
+      { ok: result[:ok], message: result[:ok] ? @renderer.render_weather_detailed(state, report) : @renderer.render_weather_failed(state, report), state: state }
     end
 
-    # Existing cleanup/restore handlers below
-
+    # Existing generic cleanup/restore implementation
     def handle_cleanup_selection(state, text)
-      handle_selection(
-        state,
-        text,
-        next_status: "waiting_for_final_confirmation",
-        renderer: :render_selection,
-        empty_message: "No items selected. Workflow cancelled. Nothing was moved."
-      )
+      handle_selection(state, text, next_status: "waiting_for_final_confirmation", renderer: :render_selection, empty_message: "No items selected. Workflow cancelled. Nothing was moved.")
     end
 
     def handle_restore_selection(state, text)
-      handle_selection(
-        state,
-        text,
-        next_status: "waiting_for_restore_final_confirmation",
-        renderer: :render_restore_selection,
-        empty_message: "No items selected. Restore workflow cancelled. Nothing was restored."
-      )
+      handle_selection(state, text, next_status: "waiting_for_restore_final_confirmation", renderer: :render_restore_selection, empty_message: "No items selected. Restore workflow cancelled. Nothing was restored.")
     end
 
     def handle_selection(state, text, next_status:, renderer:, empty_message:)
       candidates = state.fetch("candidates", [])
       parsed = @selection_parser.parse(text, candidates)
-
-      unless parsed.ok
-        return {
-          ok: false,
-          message: parsed.message,
-          state: state
-        }
-      end
+      return { ok: false, message: parsed.message, state: state } unless parsed.ok
 
       if parsed.action == "cancel"
         state["status"] = "cancelled"
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Cancelled. Nothing was moved or restored.",
-          state: state
-        }
+        return { ok: true, message: "Cancelled. Nothing was moved or restored.", state: state }
       end
 
       selected = candidates.select { |candidate| parsed.selected_ids.include?(candidate.fetch("id")) }
@@ -379,44 +250,19 @@ module SoulCore
       state["selection_message"] = parsed.message
       @runner.save_session(state)
 
-      if selected.empty?
-        {
-          ok: true,
-          message: empty_message,
-          state: state
-        }
-      else
-        {
-          ok: true,
-          message: @renderer.public_send(renderer, state),
-          state: state
-        }
-      end
+      selected.empty? ? { ok: true, message: empty_message, state: state } : { ok: true, message: @renderer.public_send(renderer, state), state: state }
     end
 
     def handle_cleanup_final_confirmation(state, text)
       parsed = @confirmation_parser.parse(text)
-
       if parsed.cancelled
         state["status"] = "cancelled"
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Cancelled. Nothing was moved.",
-          state: state
-        }
+        return { ok: true, message: "Cancelled. Nothing was moved.", state: state }
       end
-
-      unless parsed.confirmed
-        return {
-          ok: false,
-          message: parsed.message,
-          state: state
-        }
-      end
+      return { ok: false, message: parsed.message, state: state } unless parsed.confirmed
 
       args = ["--workflow-state", state.fetch("workflow_path"), "--execute", "--confirm", "MOVE_TO_TRASH"]
       result = @skill_runner.run("downloads.move_to_trash", args: args)
@@ -425,49 +271,26 @@ module SoulCore
       state["status"] = result[:ok] ? "complete" : "failed"
       state["updated_at"] = Time.now.iso8601
       state["next_expected"] = "reflection_offer"
-      state["skill_runs"] << {
-        "skill" => "downloads.move_to_trash",
-        "args" => args,
-        "ok" => result[:ok],
-        "task_log" => task_log_path
-      }
+      state["skill_runs"] << { "skill" => "downloads.move_to_trash", "args" => args, "ok" => result[:ok], "task_log" => task_log_path }
       state["verification"]["move_to_trash_log"] = task_log_path
       state["verification"]["moved_files"] = result.dig(:json, "verification", "moved_files") || 0
       state["verification"]["moved_directories"] = result.dig(:json, "verification", "moved_directories") || 0
       state["verification"]["deleted_files"] = result.dig(:json, "verification", "deleted_files") || 0
       state["verification"]["job_complete"] = result.dig(:json, "verification", "job_complete") || false
       @runner.save_session(state)
-
-      {
-        ok: result[:ok],
-        message: @renderer.render_execution(result),
-        state: state
-      }
+      { ok: result[:ok], message: @renderer.render_execution(result), state: state }
     end
 
     def handle_restore_final_confirmation(state, text)
       parsed = @confirmation_parser.parse(text)
-
       if parsed.cancelled
         state["status"] = "cancelled"
         state["updated_at"] = Time.now.iso8601
         state["next_expected"] = "none"
         @runner.save_session(state)
-
-        return {
-          ok: true,
-          message: "Cancelled. Nothing was restored.",
-          state: state
-        }
+        return { ok: true, message: "Cancelled. Nothing was restored.", state: state }
       end
-
-      unless parsed.confirmed
-        return {
-          ok: false,
-          message: parsed.message,
-          state: state
-        }
-      end
+      return { ok: false, message: parsed.message, state: state } unless parsed.confirmed
 
       args = ["--workflow-state", state.fetch("workflow_path"), "--execute", "--confirm", "RESTORE_FROM_TRASH"]
       result = @skill_runner.run("downloads.restore_last_cleanup", args: args)
@@ -476,24 +299,14 @@ module SoulCore
       state["status"] = result[:ok] ? "complete" : "failed"
       state["updated_at"] = Time.now.iso8601
       state["next_expected"] = "reflection_offer"
-      state["skill_runs"] << {
-        "skill" => "downloads.restore_last_cleanup",
-        "args" => args,
-        "ok" => result[:ok],
-        "task_log" => task_log_path
-      }
+      state["skill_runs"] << { "skill" => "downloads.restore_last_cleanup", "args" => args, "ok" => result[:ok], "task_log" => task_log_path }
       state["verification"]["restore_log"] = task_log_path
       state["verification"]["restored_files"] = result.dig(:json, "verification", "restored_files") || 0
       state["verification"]["restored_directories"] = result.dig(:json, "verification", "restored_directories") || 0
       state["verification"]["deleted_files"] = result.dig(:json, "verification", "deleted_files") || 0
       state["verification"]["job_complete"] = result.dig(:json, "verification", "job_complete") || false
       @runner.save_session(state)
-
-      {
-        ok: result[:ok],
-        message: @renderer.render_restore_execution(result),
-        state: state
-      }
+      { ok: result[:ok], message: @renderer.render_restore_execution(result), state: state }
     end
   end
 end

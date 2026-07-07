@@ -58,7 +58,6 @@ options = {
 
 parser = OptionParser.new do |opts|
   opts.banner = "Usage: report.rb --location LOCATION [--detailed]"
-
   opts.on("--location LOCATION", "Location name, e.g. 'Syracuse, NY' or 'London, UK'.") { |value| options[:location] = value }
   opts.on("--detailed", "Include a 3-day outlook and notable forecast signals.") { options[:detailed] = true }
   opts.on("--forecast-days N", Integer, "Forecast days for detailed output. Defaults to 3.") { |value| options[:forecast_days] = [[value, 1].max, 7].min }
@@ -165,7 +164,7 @@ def parse_location_hint(location)
   if US_STATES.key?(region_up)
     hint[:region_name] = US_STATES[region_up]
     hint[:country_code] = "US"
-  elsif US_STATES.value.any? { |name| name.casecmp?(region) }
+  elsif US_STATES.values.any? { |name| name.casecmp?(region) }
     hint[:region_name] = region
     hint[:country_code] = "US"
   else

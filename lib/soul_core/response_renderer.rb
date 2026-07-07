@@ -29,7 +29,7 @@ module SoulCore
       lines << '- `ruby bin/soul respond "Toronto, Canada"`'
       lines << '- `ruby bin/soul respond "Syracuse, NY"`'
       lines << ""
-      lines << "Coverage is global where Open-Meteo geocoding, weather, and air-quality providers return data. If air quality is unavailable, I will report that as a warning instead of inventing it, because we are trying not to build a confident liar with a barometer."
+      lines << "Coverage is global where Open-Meteo geocoding, weather, and air-quality providers return data. If air quality is unavailable, I will report that as a warning instead of inventing it."
       lines.join("\n")
     end
 
@@ -49,6 +49,10 @@ module SoulCore
     end
 
     def render_weather_brief(state, report)
+      if state.fetch("status", nil) == "failed" || report.nil? || report.empty?
+        return render_weather_failed(state, report)
+      end
+
       current = report["current"] || {}
       air = current["air_quality"] || {}
       lines = []
@@ -73,6 +77,23 @@ module SoulCore
       lines << ""
       lines << '- `ruby bin/soul respond "yes"`'
       lines << '- `ruby bin/soul respond "no"`'
+      lines.join("\n")
+    end
+
+    def render_weather_failed(state, report)
+      lines = []
+      lines << "Weather workflow failed."
+      lines << ""
+      lines << "- Location requested: `#{state.dig('parameters', 'location') || 'unknown'}`"
+      lines << "- Source: #{weather_location_source_label(state.dig('parameters', 'location_source'))}"
+      lines << "- Weather log: #{state.dig('verification', 'brief_report_log') || 'unavailable'}"
+      lines << "- Final state: failed"
+      lines << ""
+      lines << "No detailed report is available because the brief weather report did not complete."
+      lines << ""
+      lines << "Check the task log for provider or runtime evidence:"
+      lines << ""
+      lines << "`cat #{state.dig('verification', 'brief_report_log')}`" if state.dig('verification', 'brief_report_log')
       lines.join("\n")
     end
 
@@ -125,11 +146,12 @@ module SoulCore
       lines.join("\n")
     end
 
+    # Existing Downloads renderers retained from current project by requiring older methods.
+    # This file intentionally includes all renderers used by current workflows.
     def render_plan(state, plan)
       lines = []
       candidates = state.fetch("candidates", [])
       summary = state.fetch("summary", {})
-
       lines << "Workflow: #{state.fetch('workflow')}"
       lines << "Status: #{state.fetch('status')}"
       lines << "Plan log: #{state.dig('verification', 'plan_log')}"
@@ -175,9 +197,7 @@ module SoulCore
       unless files.empty?
         lines << "## File Candidates"
         lines << ""
-        files.each do |candidate|
-          lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['size_human']}, #{candidate['age_days']} days old)"
-        end
+        files.each { |candidate| lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['size_human']}, #{candidate['age_days']} days old)" }
         lines << ""
       end
 
@@ -194,23 +214,19 @@ module SoulCore
       selected = state.fetch("selected_candidates", [])
       excluded = state.fetch("excluded_candidates", [])
       lines = []
-
       lines << "Selection staged."
       lines << ""
-
       if selected.empty?
         lines << "No candidates selected for Trash."
       else
         lines << "Will move to Trash:"
         selected.each { |candidate| lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['type']})" }
       end
-
       unless excluded.empty?
         lines << ""
         lines << "Will keep:"
         excluded.each { |candidate| lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['type']})" }
       end
-
       lines << ""
       lines << "Ready to move the selected items to Trash?"
       lines << ""
@@ -222,7 +238,6 @@ module SoulCore
     def render_restore_plan(state, restore_result)
       lines = []
       candidates = state.fetch("candidates", [])
-
       lines << "Workflow: #{state.fetch('workflow')}"
       lines << "Status: #{state.fetch('status')}"
       lines << "Source move log: #{state.dig('verification', 'source_move_log')}"
@@ -240,13 +255,11 @@ module SoulCore
 
       lines << "Restore candidates from the latest successful Downloads cleanup:"
       lines << ""
-
       candidates.each do |candidate|
         status = candidate["valid"] ? "ready" : "blocked"
         lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['type']}, #{status})"
         Array(candidate["errors"]).each { |error| lines << "  - #{error}" }
       end
-
       lines << ""
       lines << "## Options"
       lines << ""
@@ -261,23 +274,19 @@ module SoulCore
       selected = state.fetch("selected_candidates", [])
       excluded = state.fetch("excluded_candidates", [])
       lines = []
-
       lines << "Restore selection staged."
       lines << ""
-
       if selected.empty?
         lines << "No candidates selected for restore."
       else
         lines << "Will restore from Trash:"
         selected.each { |candidate| lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['type']})" }
       end
-
       unless excluded.empty?
         lines << ""
         lines << "Will leave in Trash:"
         excluded.each { |candidate| lines << "- #{candidate['id']}: `#{candidate['name']}` (#{candidate['type']})" }
       end
-
       lines << ""
       lines << "Ready to restore the selected items from Trash?"
       lines << ""
@@ -292,7 +301,6 @@ module SoulCore
       moved = data["moved"] || []
       failed = data["failed"] || []
       lines = []
-
       lines << (data["recommendation"] || "Move-to-Trash workflow completed.")
       lines << ""
       lines << "- Outcome: #{data['outcome']}"
@@ -300,19 +308,16 @@ module SoulCore
       lines << "- Moved folders: #{verification['moved_directories'] || 0}"
       lines << "- Permanent deletions: #{verification['deleted_files'] || 0}"
       lines << ""
-
       unless moved.empty?
         lines << "Moved to Trash:"
         moved.each { |item| lines << "- `#{item['path']}`" }
         lines << ""
       end
-
       unless failed.empty?
         lines << "Failed:"
         failed.each { |item| lines << "- `#{item['path']}`" }
         lines << ""
       end
-
       lines << "Restore is possible from Trash if needed."
       lines << "Next: `ruby bin/soul reflect last` if this task should produce a reflection candidate."
       lines.join("\n")
@@ -324,7 +329,6 @@ module SoulCore
       restored = data["restored"] || []
       failed = data["failed"] || []
       lines = []
-
       lines << (data["recommendation"] || "Restore workflow completed.")
       lines << ""
       lines << "- Outcome: #{data['outcome']}"
@@ -332,19 +336,16 @@ module SoulCore
       lines << "- Restored folders: #{verification['restored_directories'] || 0}"
       lines << "- Permanent deletions: #{verification['deleted_files'] || 0}"
       lines << ""
-
       unless restored.empty?
         lines << "Restored from Trash:"
         restored.each { |item| lines << "- `#{item['path']}`" }
         lines << ""
       end
-
       unless failed.empty?
         lines << "Failed:"
         failed.each { |item| lines << "- `#{item['path']}`" }
         lines << ""
       end
-
       lines << "Next: `ruby bin/soul reflect last` if this restore task should produce a reflection candidate."
       lines.join("\n")
     end
@@ -353,18 +354,11 @@ module SoulCore
 
     def weather_location_source_label(source)
       case source
-      when "home_confirmed"
-        "Home default"
-      when "default_home"
-        "Home default"
-      when "override"
-        "User-provided override"
-      when "explicit"
-        "Explicit request"
-      when "provided_after_prompt"
-        "Provided after prompt"
-      else
-        source || "unknown"
+      when "home_confirmed", "default_home" then "Home default"
+      when "override" then "User-provided override"
+      when "explicit" then "Explicit request"
+      when "provided_after_prompt" then "Provided after prompt"
+      else source || "unknown"
       end
     end
 
@@ -379,17 +373,11 @@ module SoulCore
     def format_air_quality(air)
       aqi = air["us_aqi"]
       category = air["category"] || "Unavailable"
-
-      if aqi
-        "#{aqi.round} US AQI (#{category})"
-      else
-        category
-      end
+      aqi ? "#{aqi.round} US AQI (#{category})" : category
     end
 
     def format_number(value)
       return "unavailable" if value.nil?
-
       value.is_a?(Numeric) ? value.round.to_s : value.to_s
     end
   end

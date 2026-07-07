@@ -103,6 +103,12 @@ Australia -> AU
 
 If geocoding still fails, the skill returns `geocoding_attempts` in the JSON output so the failure has evidence.
 
+## Failure handling
+
+Failed weather reports should render as failed and should not ask for detailed follow-up.
+
+If a workflow enters `failed`, responding again will not continue the workflow. Start a new workflow after correcting the issue.
+
 ## Direct skill usage
 
 Brief report:
