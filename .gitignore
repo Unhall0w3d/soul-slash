@@ -95,3 +95,6 @@ Soul/artifacts/cloud_assist/*
 
 Soul/proposals/skills/*
 !Soul/proposals/skills/.keep
+
+# Root overlay instruction files should be archived under docs/overlays/archive/.
+/README_*.md

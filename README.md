@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/brand/soul-slash-repo-header.png" alt="Soul/ repository header: local-first intelligence substrate, verified actions, recoverable workflows, and human-approved memory">
-</p>
+![Soul/ repository header: local-first intelligence substrate, verified actions, recoverable workflows, and human-approved memory](assets/brand/soul-slash-repo-header.png)
 
 # Soul/
 
@@ -8,73 +6,46 @@
 
 The model is not treated as the whole assistant. The model is the language organ. **Soul/** is the operating layer around it.
 
-Soul/ is being built as a local-first assistant substrate that can understand human requests, select known workflows, run verified skills, ask before taking write actions, recover from approved cleanup actions, and preserve useful lessons only after human review.
-
-## Current status
-
-Soul/ is early experimental software.
-
-Current working pieces include:
-
-- Ruby CLI
-- local OpenAI-compatible runtime support
-- llama.cpp server runtime setup support
-- Ollama runtime setup support
-- FAST and THINK request modes
-- read-only system status skill
-- Downloads cleanup inspection and planning
-- top-level Downloads file/folder cleanup candidates
-- approval-gated move-to-Trash execution
-- Trash treated as terminal cleanup completion
-- restore-last-cleanup rollback workflow
-- reflection candidate staging
-- reflection approval/rejection workflow
-- early natural-language `do` command
-- early conversational `respond` command
-- deterministic-first, LLM-assisted intent routing
-
-This is not a finished assistant. It is a project being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable.
+Soul/ is early experimental software. It is being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable.
 
 ## What Soul/ is becoming
 
-Soul/ is intended to grow into a local assistant environment with:
+Soul/ is intended to grow into a local-first assistant environment with:
 
-- **Local model runtime support** for small local LLMs exposed through an OpenAI-compatible endpoint.
-- **Human-accessible interaction** through natural-language CLI now, with future voice, TTS, and UI layers.
-- **Deterministic skills** for real actions that should not be left to improvisation.
-- **Workflow orchestration** that turns human requests into known, validated skill sequences.
-- **Safety gates** that separate planning, selection, confirmation, execution, and verification.
-- **Recoverable operations** where cleanup actions move to Trash first and can be restored.
-- **Human-approved memory** where durable lessons and operating rules are staged, reviewed, and approved before promotion.
-- **Overlay-based development** for small, reviewable feature increments while the project is still evolving quickly.
+- local model runtime support through an OpenAI-compatible endpoint
+- deterministic skills for actions that should not be left to model improvisation
+- workflow orchestration for turning human intent into known, validated skill sequences
+- safety gates that separate planning, selection, confirmation, execution, and verification
+- recoverable operations where cleanup actions move to Trash first and can be restored
+- human-approved memory where durable lessons and rules are staged before promotion
+- optional cloud-assisted drafting/review for skill proposals, with human approval retained
 
 ## Design principles
 
-- **No green lights without gauges.**
+- No green lights without gauges.
 - Skills are preferred over improvisation.
 - LLM output is advisory unless validated by deterministic code.
 - Read-only planning comes before write actions.
 - Write-capable workflows require explicit user confirmation.
 - Trash is the terminal cleanup action for early cleanup workflows.
 - Permanent deletion is not supported.
-- Recovery should be designed into workflows, not treated as an afterthought.
+- Cloud LLM outputs are review artifacts, not repo mutations.
 - Durable memory, rules, and skill updates are staged and human-reviewed before promotion.
-- The public interface should be human-friendly; the internal execution path should be boring, structured, and safe.
 
 ## Architecture shape
 
 ```text
 human request
-  -> intent routing
-  -> workflow selection
-  -> skill planning
-  -> human review / selection
-  -> explicit confirmation
-  -> deterministic execution
-  -> verification
-  -> optional restore
-  -> optional reflection
-  -> human-approved memory/rule promotion
+-> intent routing
+-> workflow selection
+-> skill planning
+-> human review / selection
+-> explicit confirmation
+-> deterministic execution
+-> verification
+-> optional restore
+-> optional reflection
+-> human-approved memory/rule promotion
 ```
 
 The long-term goal is not a chatbot that guesses commands. The goal is a local operating layer that can translate human intent into verified, recoverable, approval-gated workflows.
@@ -97,49 +68,12 @@ Recommended:
 - Python 3
 - a GPU-supported local model runtime, if available
 
-Soul/ is currently Linux-first. The CLI and runtime-provider model are intended to become more portable, but the active cleanup/restore workflows currently assume Linux-style filesystem and Trash behavior.
+Soul/ is currently Linux-first.
 
 See:
 
 ```text
 docs/REQUIREMENTS.md
-```
-
-## Runtime providers
-
-Soul/ can use either:
-
-- **llama.cpp server**
-- **Ollama**
-
-Both are supported at the OpenAI-compatible API layer.
-
-The setup flows are intentionally different:
-
-| Provider | Model setup | Default API |
-|---|---|---|
-| llama.cpp | GGUF file, often downloaded from Hugging Face | `http://127.0.0.1:8082/v1` |
-| Ollama | Ollama model name via `ollama pull` | `http://127.0.0.1:11434/v1` |
-
-Tested llama.cpp default:
-
-```text
-Qwen3-8B-Q4_K_M.gguf
-soul-qwen3-8b-q4
-```
-
-Example Ollama model:
-
-```text
-qwen3:8b
-```
-
-Soul/ does not package or host llama.cpp, Ollama, or model files.
-
-See:
-
-```text
-docs/RUNTIME_PROVIDERS.md
 ```
 
 ## Quick start
@@ -173,9 +107,6 @@ Or choose a provider directly:
 
 ```bash
 make setup-llamacpp
-```
-
-```bash
 make setup-ollama
 ```
 
@@ -197,64 +128,25 @@ Run basic Soul/ checks:
 make test-soul
 ```
 
-See the full getting started guide:
+See the full setup guide:
 
 ```text
 docs/GETTING_STARTED.md
 ```
 
-## llama.cpp setup path
+## Runtime providers
 
-Use llama.cpp if you want direct control over GGUF files and runtime flags.
+Soul/ currently supports:
 
-```bash
-make setup-llamacpp
-```
+- llama.cpp server
+- Ollama
 
-The setup script will:
+Both are used at the OpenAI-compatible API layer.
 
-- detect or ask for `llama-server`
-- ask for a model alias
-- search for local GGUF files in `./models` and `~/Downloads`
-- offer to use an existing detected GGUF file
-- otherwise ask for a Hugging Face GGUF URL
-- download the model into `./models` by default
-- validate GGUF magic bytes
-- write `.env`
+See:
 
-Start llama.cpp in the foreground:
-
-```bash
-make start-llamacpp
-```
-
-Then, in another terminal:
-
-```bash
-make test-runtime
-```
-
-## Ollama setup path
-
-Use Ollama if you want a simpler local model manager.
-
-```bash
-make setup-ollama
-```
-
-The setup script will:
-
-- detect `ollama`
-- ask for an Ollama model name
-- check whether the model is already installed
-- run `ollama pull` only if needed
-- check the OpenAI-compatible endpoint
-- write `.env`
-
-Then run:
-
-```bash
-make test-runtime
+```text
+docs/RUNTIME_PROVIDERS.md
 ```
 
 ## Common commands
@@ -272,26 +164,17 @@ ruby bin/soul doctor
 ruby bin/soul skill system.status
 ```
 
-Classify a natural-language request:
+Classify a request:
 
 ```bash
 ruby bin/soul intent "run a file cleanup in Downloads"
-ruby bin/soul intent "restore the last downloads cleanup"
 ```
 
-Run a Downloads cleanup workflow:
+Run a workflow:
 
 ```bash
 ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
 ruby bin/soul respond "move all"
-ruby bin/soul respond "yeah, do it"
-```
-
-Restore the last successful Downloads cleanup:
-
-```bash
-ruby bin/soul do "restore the last downloads cleanup"
-ruby bin/soul respond "restore all"
 ruby bin/soul respond "yeah, do it"
 ```
 
@@ -301,76 +184,57 @@ Stage and review reflection:
 ruby bin/soul reflect last
 ruby bin/soul reflection show latest
 ruby bin/soul reflection approve latest --note "Approved after review"
-ruby bin/soul reflection reject latest --reason "Not useful"
 ```
 
-## Cleanup workflow example
-
-Create harmless test fixtures:
-
-```bash
-mkdir -p ~/Downloads/restore-fixture-folder
-touch ~/Downloads/restore-fixture-file.tmp
-touch -d "10 days ago" ~/Downloads/restore-fixture-file.tmp
-touch -d "10 days ago" ~/Downloads/restore-fixture-folder
-```
-
-Run cleanup:
-
-```bash
-ruby bin/soul do "cleanup files in my downloads folder older than 3 days"
-ruby bin/soul respond "move all"
-ruby bin/soul respond "yeah, do it"
-```
-
-Run restore:
-
-```bash
-ruby bin/soul do "restore the last downloads cleanup"
-ruby bin/soul respond "restore all"
-ruby bin/soul respond "yeah, do it"
-```
-
-Verify:
-
-```bash
-ls -la ~/Downloads | grep restore-fixture
-```
-
-Clean up the fixtures:
-
-```bash
-rm -rf ~/Downloads/restore-fixture-file.tmp ~/Downloads/restore-fixture-folder
-```
-
-## Make targets
+For skill-specific commands, see:
 
 ```text
-make help             Show available targets
-make check            Check required/recommended local tools only
-make detect           Detect runtimes, endpoints, config, and local GGUF models
-make setup            Guided runtime setup
-make setup-llamacpp   Configure llama.cpp provider
-make setup-ollama     Configure Ollama provider
-make test-runtime     Test configured runtime
-make test-fast        Test FAST/no_think request mode
-make test-think       Test THINK request mode
-make test-soul        Run basic Soul/ CLI checks
-make doctor           Run Soul/ doctor
-make env-show         Show local runtime config
-make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew warnings
+docs/SKILLS.md
+```
+
+## Skills
+
+Skill usage has been moved out of the main README.
+
+Start here:
+
+```text
+docs/SKILLS.md
+```
+
+Detailed skill docs live under:
+
+```text
+docs/skills/
+```
+
+## Cloud-assisted skill proposal flow
+
+Soul/ can use configured cloud providers, currently with Mistral as the first serious manual-key provider, to draft and review skill proposal artifacts.
+
+Cloud output remains review-only.
+
+See:
+
+```text
+docs/skills/SKILL_BRIEF_DRAFT.md
+docs/skills/SKILL_BRIEF_REVIEW.md
+docs/soul/CLOUD_LLM_POLICY.md
+docs/soul/SKILL_PROPOSAL_FORMAT.md
 ```
 
 ## Development pattern
 
 Soul/ uses overlay-based development.
 
-An overlay is a zip containing a focused set of files to apply to the existing project tree. This keeps changes reviewable and avoids large unexplained rewrites.
+An overlay is a focused zip containing a small set of files to apply to the existing project tree. This keeps changes reviewable and avoids giant unexplained rewrites.
 
 See:
 
 ```text
 docs/OVERLAY_SYSTEM.md
+docs/overlays/
+docs/overlays/archive/
 ```
 
 ## Roadmap direction
