@@ -264,7 +264,7 @@ def notable_forecast_events(weather_daily, air_hourly)
 
     if code.to_i >= 95
       events << "#{day}: thunderstorm signal in the forecast."
-    elsif code.to_i.between?(71, 86)
+    elsif code.to_i.between?(71, 77) || code.to_i.between?(85, 86)
       events << "#{day}: snow or snow showers possible."
     elsif code.to_i.between?(61, 82) || (precip_prob && precip_prob >= 60) || (precip_sum && precip_sum >= 0.25)
       events << "#{day}: #{desc.downcase}; precipitation looks notable."
