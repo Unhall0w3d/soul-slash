@@ -76,3 +76,8 @@ skills:
     path: Soul/skills/skill/brief/review.rb
     description: Review a Soul/ skill proposal and write a review-only artifact.
     risk: read_only
+  youtube.song_search:
+    description: Open a YouTube search for a requested song in the default Linux browser
+      after confirmation.
+    path: Soul/skills/youtube/song_search.rb
+    risk: low
