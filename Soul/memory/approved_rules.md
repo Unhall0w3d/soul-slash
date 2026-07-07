@@ -28,3 +28,12 @@ Source: `Soul/logs/tasks/20260707T000409Z-skill.downloads.restore_last_cleanup.j
 - downloads.restore_last_cleanup must require --execute and --confirm RESTORE_FROM_TRASH before restoring anything.
 - downloads.restore_last_cleanup must refuse to overwrite an existing original path.
 - downloads.restore_last_cleanup must not permanently delete files or empty Trash.
+
+## 2026-07-07T01:14:30-04:00 - skill.weather.report
+
+Source: `Soul/logs/tasks/20260707T051214Z-skill.weather.report.json`
+
+
+- weather.report must remain read-only and must not write local files from the skill itself.
+- weather.report should distinguish brief completion from detailed workflow completion.
+- Weather workflows should use deterministic API data for temperature, humidity, and air quality rather than model guessing.

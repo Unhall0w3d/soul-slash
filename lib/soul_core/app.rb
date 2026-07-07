@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "env_loader"
 require_relative "model_client"
 require_relative "skill_registry"
 require_relative "skill_runner"
@@ -14,6 +15,7 @@ require_relative "workflow_session"
 module SoulCore
   class App
     def initialize(argv)
+      EnvLoader.load
       @argv = argv
       @log = TaskLog.new
     end
@@ -64,6 +66,7 @@ module SoulCore
       puts "Soul/ doctor"
       puts "base_url: #{client.base_url}"
       puts "model: #{client.model}"
+      puts "weather_location: #{ENV.fetch('SOUL_WEATHER_LOCATION', 'unset')}"
       puts "skills: #{registry.list.keys.join(', ')}"
 
       begin
@@ -315,6 +318,7 @@ module SoulCore
 
           ruby bin/soul intent "what is the weather today in Syracuse, NY"
           ruby bin/soul do "what is the weather today in Syracuse, NY"
+          ruby bin/soul do "what is the weather like today"
           ruby bin/soul respond "yes"
           ruby bin/soul respond "no"
 

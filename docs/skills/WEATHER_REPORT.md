@@ -10,6 +10,27 @@ It uses Open-Meteo endpoints:
 
 No API key is required for the default Open-Meteo flow.
 
+## Environment loading
+
+The Soul/ Ruby CLI loads `.env` automatically at startup.
+
+This means values such as:
+
+```env
+SOUL_WEATHER_LOCATION=Syracuse, NY
+SOUL_WEATHER_UNITS=fahrenheit
+```
+
+are available to:
+
+```bash
+ruby bin/soul do "what is the weather like today"
+```
+
+without needing to manually `source .env`.
+
+Existing shell environment variables still win over `.env` values.
+
 ## Geocoding behavior
 
 The skill accepts human-style locations such as:
@@ -22,8 +43,6 @@ Albany, NY
 ```
 
 For US city/state inputs, the skill normalizes the query, maps state abbreviations to full state names, retries city-only lookup, and filters with `countryCode=US` when appropriate.
-
-This is necessary because provider geocoding APIs do not always treat `"City, ST"` as a useful raw search string. Naturally, computers remain deeply offended by commas.
 
 If geocoding still fails, the skill returns `geocoding_attempts` in the JSON output so the failure has evidence.
 
@@ -43,10 +62,16 @@ ruby bin/soul skill weather.report -- --location "Syracuse, NY" --detailed
 
 ## Workflow usage
 
-Start the workflow:
+Start the workflow with an explicit location:
 
 ```bash
 ruby bin/soul do "what is the weather today in Syracuse, NY"
+```
+
+Or use `.env` default location:
+
+```bash
+ruby bin/soul do "what is the weather like today"
 ```
 
 Soul/ will return:
@@ -70,19 +95,16 @@ Close without detail:
 ruby bin/soul respond "no"
 ```
 
-## Default location
-
-After confirming the direct skill works for your location, you can set a default location in `.env`:
-
-```env
-SOUL_WEATHER_LOCATION=Syracuse, NY
-SOUL_WEATHER_UNITS=fahrenheit
-```
-
-Then this works without naming the city every time:
+If no default location is configured, Soul/ asks for a location. You can then reply:
 
 ```bash
-ruby bin/soul do "what is the weather like today"
+ruby bin/soul respond "Syracuse, NY"
+```
+
+or cancel:
+
+```bash
+ruby bin/soul respond "no"
 ```
 
 ## Completion language

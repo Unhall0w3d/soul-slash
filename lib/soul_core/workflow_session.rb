@@ -25,6 +25,8 @@ module SoulCore
       state = @runner.load_session("latest")
 
       case state.fetch("status")
+      when "needs_location"
+        handle_weather_location_response(state, text)
       when "waiting_for_selection"
         handle_cleanup_selection(state, text)
       when "waiting_for_final_confirmation"
@@ -51,6 +53,54 @@ module SoulCore
     end
 
     private
+
+    def handle_weather_location_response(state, text)
+      parsed = @confirmation_parser.parse(text)
+      if parsed.cancelled
+        state["status"] = "cancelled"
+        state["updated_at"] = Time.now.iso8601
+        state["next_expected"] = "none"
+        state["verification"]["complete"] = false
+        @runner.save_session(state)
+
+        return {
+          ok: true,
+          message: "Weather workflow cancelled. No location was provided, so no weather report was run.",
+          state: state
+        }
+      end
+
+      location = extract_location_from_text(text)
+      if location.empty?
+        return {
+          ok: false,
+          message: "Please provide a location, for example: `ruby bin/soul respond \"Syracuse, NY\"`, or cancel.",
+          state: state
+        }
+      end
+
+      result = @runner.run(
+        intent: "weather.report",
+        parameters: {
+          "location" => location,
+          "units" => state.dig("parameters", "units") || ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
+        },
+        original_text: state.fetch("original_text")
+      )
+
+      {
+        ok: result[:ok],
+        message: result[:user_message],
+        state: result[:state]
+      }
+    end
+
+    def extract_location_from_text(text)
+      value = text.to_s.strip
+      value = value.sub(/\A(?:in|for|near)\s+/i, "")
+      value = value.sub(/[?.!]\z/, "")
+      value.strip
+    end
 
     def handle_weather_detail_decision(state, text)
       parsed = @confirmation_parser.parse(text)
