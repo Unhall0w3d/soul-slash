@@ -10,6 +10,7 @@ require_relative "reflection"
 require_relative "reflection_review"
 require_relative "intent_router"
 require_relative "workflow_runner"
+require_relative "workflow_registry"
 require_relative "workflow_tools"
 require_relative "workflow_session"
 require_relative "youtube_play_workflow"
@@ -217,15 +218,17 @@ rescue StandardError => e
 end 
 
     def workflows
-      runner = WorkflowRunner.new
-      pending = runner.list_pending
+  registry = WorkflowRegistry.new
 
-      if pending.empty?
-        puts "No workflow sessions."
-      else
-        pending.each { |path| puts path }
-      end
-    end
+  if @argv.include?("--json")
+    puts JSON.pretty_generate(registry.to_h)
+  else
+    puts registry.render_list
+  end
+rescue StandardError => e
+  warn "workflows failed: #{e.class}: #{e.message}"
+  exit 1
+end 
 
     def skill
       name = @argv.shift
@@ -359,6 +362,7 @@ end
           ruby bin/soul respond "cancel"
 
           ruby bin/soul workflows
+ruby bin/soul workflows --json
           ruby bin/soul workflow show latest
 ruby bin/soul workflow status latest
 ruby bin/soul workflow list
