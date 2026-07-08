@@ -13,6 +13,10 @@ module SoulCore
         definition.intent
       end
 
+      def match_intent(_text, result_class:)
+        nil
+      end
+
       def responds_to_status?(_status)
         false
       end

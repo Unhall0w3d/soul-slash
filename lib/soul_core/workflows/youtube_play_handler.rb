@@ -22,6 +22,26 @@ module SoulCore
         "waiting_for_youtube_search_confirmation"
       ].freeze
 
+      def match_intent(text, result_class:)
+        input = text.to_s.strip
+        normalized = input.downcase
+        return nil unless youtube_play_request?(normalized)
+
+        query = extract_youtube_query(input)
+
+        result_class.new(
+          ok: true,
+          intent: intent,
+          parameters: {
+            "query" => query,
+            "query_source" => query.empty? ? "missing" : "extracted"
+          },
+          confidence: query.empty? ? 0.72 : 0.91,
+          reason: query.empty? ? "Matched YouTube playback phrasing, but no song/query was found." : "Matched YouTube playback phrasing and extracted a song/search query.",
+          source: "workflow_handler"
+        )
+      end
+
       def responds_to_status?(status)
         HANDLED_STATUSES.include?(status.to_s)
       end
@@ -163,6 +183,47 @@ module SoulCore
       end
 
       private
+
+      def youtube_play_request?(normalized)
+        mentions_youtube = normalized.match?(/\byoutube\b/) || normalized.match?(/\byt\b/)
+        action =
+          normalized.match?(/\bplay\b/) ||
+          normalized.match?(/\bopen\b/) ||
+          normalized.match?(/\bsearch\b/) ||
+          normalized.match?(/\bfind\b/)
+
+        mentions_youtube && action
+      end
+
+      def extract_youtube_query(input)
+        value = input.to_s.strip
+        value = value.sub(/[?.!]\z/, "").strip
+
+        patterns = [
+          /\A(?:please\s+)?(?:can you\s+)?(?:search|find)\s+(?:youtube|yt)\s+(?:for\s+)?(.+)\z/i,
+          /\A(?:please\s+)?(?:can you\s+)?(?:search|find)\s+(.+?)\s+(?:on|in)\s+(?:youtube|yt)\z/i,
+          /\A(?:please\s+)?(?:can you\s+)?(?:play|open)\s+(.+?)\s+(?:on|in)\s+(?:youtube|yt)\z/i,
+          /\A(?:please\s+)?(?:can you\s+)?(?:play|open)\s+(?:youtube|yt)\s+(.+)\z/i
+        ]
+
+        patterns.each do |pattern|
+          match = value.match(pattern)
+          next unless match
+
+          return clean_youtube_query(match[1])
+        end
+
+        cleaned = value.dup
+        cleaned.gsub!(/\A(?:please\s+)?(?:can you\s+)?/, "")
+        cleaned.gsub!(/\b(?:play|open|search|find)\b/i, "")
+        cleaned.gsub!(/\b(?:on|in)\s+(?:youtube|yt)\b/i, "")
+        cleaned.gsub!(/\b(?:youtube|yt)\b/i, "")
+        clean_youtube_query(cleaned)
+      end
+
+      def clean_youtube_query(value)
+        value.to_s.strip.gsub(/\s+/, " ").sub(/\A["']/, "").sub(/["']\z/, "").strip
+      end
 
       def handle_query_response(state, text)
         normalized = text.to_s.downcase.strip

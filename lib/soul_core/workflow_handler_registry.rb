@@ -29,22 +29,39 @@ module SoulCore
       handler_class.new(definition: @registry.get(key))
     end
 
+    def handlers
+      @handlers.keys.sort.map { |intent| handler_for(intent) }
+    end
+
+    def match_intent(text, result_class:)
+      handlers.each do |handler|
+        result = handler.match_intent(text, result_class: result_class)
+        return result if result
+      end
+
+      nil
+    end
+
     def to_h
       {
         "status" => "ok",
         "outcome" => "complete",
         "handler_count" => @handlers.length,
         "handlers" => @handlers.keys.sort.map do |intent|
+          handler_class = @handlers.fetch(intent)
+          handler = handler_class.new(definition: @registry.get(intent))
           {
             "intent" => intent,
-            "handler" => @handlers.fetch(intent).name,
-            "registered_workflow" => @registry.include?(intent)
+            "handler" => handler_class.name,
+            "registered_workflow" => @registry.include?(intent),
+            "handler_owned_intent_matching" => handler.respond_to?(:match_intent)
           }
         end,
         "verification" => {
           "read_only" => true,
           "handler_registry_present" => true,
-          "registered_handler_intents" => @handlers.keys.sort
+          "registered_handler_intents" => @handlers.keys.sort,
+          "handler_owned_intent_matching" => true
         }
       }
     end
