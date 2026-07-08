@@ -56,3 +56,5 @@ module SoulCore
     end
   end
 end
+
+require_relative "workflow_session_handler_dispatch"

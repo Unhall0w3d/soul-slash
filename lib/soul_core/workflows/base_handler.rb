@@ -13,12 +13,16 @@ module SoulCore
         definition.intent
       end
 
+      def responds_to_status?(_status)
+        false
+      end
+
       def run(parameters:, original_text:)
         raise NotImplementedError, "#{self.class} must implement #run"
       end
 
-      def respond(_state:, _text:)
-        raise NotImplementedError, "#{self.class} does not implement #respond yet"
+      def respond(state:, text:)
+        raise NotImplementedError, "#{self.class} does not implement #respond for #{state['status']}"
       end
     end
   end
