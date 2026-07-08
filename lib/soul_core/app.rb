@@ -14,6 +14,7 @@ require_relative "workflow_registry"
 require_relative "workflow_tools"
 require_relative "workflow_session"
 require_relative "youtube_play_workflow"
+require_relative "workflow_handler_registry"
 require_relative "workflow_registry_execution"
 
 module SoulCore

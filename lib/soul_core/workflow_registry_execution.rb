@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
+require "json"
+
 require "time"
 require_relative "workflow_registry"
+require_relative "workflow_handler_registry"
 
 module SoulCore
   class WorkflowRegistryExecution
@@ -59,39 +62,63 @@ module SoulCore
   end
 
   module WorkflowRegistryExecutionRunnerPatch
-    def run(intent:, parameters:, original_text:)
-      registry_execution = WorkflowRegistryExecution.new
+  def persist_registry_execution_state(state)
+    return unless state.is_a?(Hash)
 
-      unless registry_execution.registered?(intent)
-        return registry_execution.blocked_result(
-          intent: intent,
+    path = state["workflow_path"].to_s
+    return if path.empty?
+    return unless File.exist?(path)
+
+    File.write(path, JSON.pretty_generate(state))
+  rescue StandardError
+    nil
+  end
+
+  def run(intent:, parameters:, original_text:)
+    registry_execution = WorkflowRegistryExecution.new
+
+    unless registry_execution.registered?(intent)
+      return registry_execution.blocked_result(
+        intent: intent,
+        parameters: parameters,
+        original_text: original_text
+      )
+    end
+
+    handler_registry = WorkflowHandlerRegistry.new
+
+    result =
+      if handler_registry.include?(intent)
+        handler_registry.handler_for(intent).run(
           parameters: parameters,
           original_text: original_text
         )
+      else
+        super
       end
 
-      result = super
+    if result.is_a?(Hash)
+      metadata = registry_execution.metadata(intent)
+      result[:registry] = metadata
 
-      if result.is_a?(Hash)
-        metadata = registry_execution.metadata(intent)
-        result[:registry] = metadata
+      state = result[:state]
+      if state.is_a?(Hash)
+        state["registry_execution"] = {
+          "checked" => true,
+          "registered" => true,
+          "intent" => metadata.fetch("intent"),
+          "runner" => metadata.fetch("runner"),
+          "requires_confirmation" => metadata.fetch("requires_confirmation"),
+          "write_capable" => metadata.fetch("write_capable")
+        }
 
-        state = result[:state]
-        if state.is_a?(Hash)
-          state["registry_execution"] = {
-            "checked" => true,
-            "registered" => true,
-            "intent" => metadata.fetch("intent"),
-            "runner" => metadata.fetch("runner"),
-            "requires_confirmation" => metadata.fetch("requires_confirmation"),
-            "write_capable" => metadata.fetch("write_capable")
-          }
-        end
+        persist_registry_execution_state(state)
       end
-
-      result
     end
+
+    result
   end
+end
 end
 
 SoulCore::WorkflowRunner.prepend(SoulCore::WorkflowRegistryExecutionRunnerPatch)
