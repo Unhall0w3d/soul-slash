@@ -359,7 +359,15 @@ end
           ruby bin/soul respond "cancel"
 
           ruby bin/soul workflows
-          ruby bin/soul workflow show latest ruby bin/soul workflow status latest ruby bin/soul workflow list ruby bin/soul workflow clear-complete
+          ruby bin/soul workflow show latest
+ruby bin/soul workflow status latest
+ruby bin/soul workflow list
+ruby bin/soul workflow list --active
+ruby bin/soul workflow clear-complete
+ruby bin/soul workflow clear-complete --confirm CLEAR_COMPLETE
+
+ruby bin/soul do "play Folsom Prison Blues on YouTube"
+ruby bin/soul respond "yes"
 
           ruby bin/soul skill system.status
           ruby bin/soul skill weather.report -- --location "Syracuse, NY"
