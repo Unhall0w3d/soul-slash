@@ -10,6 +10,7 @@ require_relative "reflection"
 require_relative "reflection_review"
 require_relative "intent_router"
 require_relative "workflow_runner"
+require_relative "workflow_tools"
 require_relative "workflow_session"
 require_relative "youtube_play_workflow"
 
@@ -179,22 +180,41 @@ module SoulCore
     end
 
     def workflow
-      subcommand = @argv.shift || "show"
-      runner = WorkflowRunner.new
+  subcommand = @argv.shift || "show"
+  runner = WorkflowRunner.new
+  tools = WorkflowTools.new
 
-      case subcommand
-      when "show"
-        target = @argv.shift || "latest"
-        puts runner.show(target)
-      else
-        warn "Unknown workflow subcommand: #{subcommand}"
-        warn "Usage: ruby bin/soul workflow show latest"
-        exit 1
-      end
-    rescue StandardError => e
-      warn "workflow #{subcommand} failed: #{e.class}: #{e.message}"
-      exit 1
+  case subcommand
+  when "show"
+    target = @argv.shift || "latest"
+    puts runner.show(target)
+  when "status"
+    target = @argv.shift || "latest"
+    payload = tools.status(target)
+    puts tools.render_status(payload)
+  when "list"
+    include_all = !@argv.include?("--active")
+    payload = tools.list(include_all: include_all)
+    puts tools.render_list(payload)
+  when "clear-complete"
+    confirm = false
+    if @argv.include?("--confirm")
+      index = @argv.index("--confirm")
+      confirm = @argv[index + 1] == "CLEAR_COMPLETE"
     end
+
+    payload = tools.clear_complete(confirm: confirm)
+    puts tools.render_clear_complete(payload)
+    exit 1 if payload["outcome"] == "awaiting_confirmation" && payload.fetch("candidate_count", 0).positive?
+  else
+    warn "Unknown workflow subcommand: #{subcommand}"
+    warn "Usage: ruby bin/soul workflow show|status|list|clear-complete [latest|path]"
+    exit 1
+  end
+rescue StandardError => e
+  warn "workflow #{subcommand} failed: #{e.class}: #{e.message}"
+  exit 1
+end 
 
     def workflows
       runner = WorkflowRunner.new
@@ -339,7 +359,7 @@ module SoulCore
           ruby bin/soul respond "cancel"
 
           ruby bin/soul workflows
-          ruby bin/soul workflow show latest
+          ruby bin/soul workflow show latest ruby bin/soul workflow status latest ruby bin/soul workflow list ruby bin/soul workflow clear-complete
 
           ruby bin/soul skill system.status
           ruby bin/soul skill weather.report -- --location "Syracuse, NY"
