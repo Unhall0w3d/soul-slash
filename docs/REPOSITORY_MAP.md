@@ -35,9 +35,10 @@ docs/assessments/
 docs/workflows/
 docs/skills/
 docs/soul/
+docs/maintenance/
 ```
 
-These describe current behavior, architecture, safety rules, and implemented phases.
+These describe current behavior, architecture, safety rules, maintenance policy, and implemented phases.
 
 ## Curated overlay docs
 
@@ -58,6 +59,23 @@ overlay_files/
 ```
 
 These are local/generated/review-only unless explicitly promoted through a future workflow.
+
+## Curation status
+
+The phase 20-22 hygiene and curation pass established a clean baseline:
+
+```text
+tracked_overlay_notes: 0
+untracked_review_candidates: 0
+untracked_generated_local: 0
+```
+
+See:
+
+```text
+docs/maintenance/CURATION_STATUS.md
+docs/maintenance/CURATION_DECISIONS.md
+```
 
 ## Rule
 
