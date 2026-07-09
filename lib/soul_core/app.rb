@@ -19,6 +19,7 @@ require_relative "model_runtime_assessor"
 require_relative "model_suitability_assessor"
 require_relative "model_suitability_policy_assessor"
 require_relative "codex_handoff_contract_assessor"
+require_relative "codex_dry_run_review"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -199,6 +200,20 @@ module SoulCore
         report = assessor.assess(write_files: write_files, task: task)
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "codex-dry-run-review", "codex-review", "handoff-review"
+        json = @argv.include?("--json")
+        contract = option_value("--contract")
+        response = option_value("--response")
+        unless contract && response
+          puts "Missing required --contract and/or --response path."
+          puts "Example:"
+          puts "  ruby bin/soul assess codex-dry-run-review --contract Soul/codex/handoffs/example.json --response Soul/codex/responses/example.json"
+          return 1
+        end
+        reviewer = CodexDryRunReview.new(root: Dir.pwd)
+        report = reviewer.review(contract_path: contract, response_path: response)
+        puts(json ? JSON.pretty_generate(report) : reviewer.render(report))
+        report["ok"] ? 0 : 1
       when "capabilities", "capability-matrix"
         json = @argv.include?("--json")
         persist = @argv.include?("--persist")
@@ -315,6 +330,7 @@ module SoulCore
       puts "  ruby bin/soul assess model-suitability"
       puts "  ruby bin/soul assess model-policy"
       puts "  ruby bin/soul assess codex-handoff"
+      puts "  ruby bin/soul assess codex-dry-run-review --contract <path> --response <path>"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
