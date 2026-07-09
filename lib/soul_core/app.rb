@@ -1,3 +1,4 @@
+
 # frozen_string_literal: true
 
 require "json"
@@ -19,7 +20,9 @@ require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
 require_relative "alpha_skill_plan_generator"
+require_relative "alpha_behavior_scaffold"
 require_relative "alpha_skill_generator"
+require_relative "alpha_review"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -88,6 +91,23 @@ module SoulCore
         report = generator.generate(proposal_path: proposal_path)
         puts(json ? JSON.pretty_generate(report) : generator.render(report))
         report["ok"] ? 0 : 1
+      when "alpha-review", "review-alpha"
+        json = @argv.include?("--json")
+        proposal_path = resolve_alpha_review_proposal_path
+        unless proposal_path
+          puts "Missing reviewable alpha proposal path."
+          puts
+          puts "Examples:"
+          puts "  ruby bin/soul improve alpha-review --latest"
+          puts "  ruby bin/soul improve alpha-review --proposal-rank 1"
+          puts "  ruby bin/soul improve alpha-review --proposal Soul/improvement/proposals/<proposal-folder>"
+          return 1
+        end
+
+        reviewer = AlphaReview.new(root: Dir.pwd)
+        report = reviewer.review(proposal_path: proposal_path)
+        puts(json ? JSON.pretty_generate(report) : reviewer.render(report))
+        report["ok"] ? 0 : 1
       else
         puts "Unknown improve command."
         puts
@@ -96,7 +116,8 @@ module SoulCore
         puts "  ruby bin/soul improve proposals --write"
         puts "  ruby bin/soul improve alpha --latest"
         puts "  ruby bin/soul improve alpha --proposal-rank 1"
-        puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
+        puts "  ruby bin/soul improve alpha-review --latest"
+        puts "  ruby bin/soul improve alpha-review --proposal-rank 1"
         1
       end
     end
@@ -110,6 +131,19 @@ module SoulCore
       return locator.by_rank(rank.to_i) if rank
 
       return locator.latest if @argv.include?("--latest")
+
+      @argv.find { |arg| !arg.start_with?("--") }
+    end
+
+    def resolve_alpha_review_proposal_path
+      locator = ProposalLocator.new(root: Dir.pwd)
+      explicit = option_value("--proposal")
+      return explicit if explicit
+
+      rank = option_value("--proposal-rank")
+      return locator.by_rank(rank.to_i) if rank
+
+      return locator.latest_with_alpha if @argv.include?("--latest")
 
       @argv.find { |arg| !arg.start_with?("--") }
     end
@@ -240,7 +274,8 @@ module SoulCore
       puts "  ruby bin/soul improve proposals --write"
       puts "  ruby bin/soul improve alpha --latest"
       puts "  ruby bin/soul improve alpha --proposal-rank 1"
-      puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
+      puts "  ruby bin/soul improve alpha-review --latest"
+      puts "  ruby bin/soul improve alpha-review --proposal-rank 1"
     end
   end
 end

@@ -1,3 +1,4 @@
+
 # frozen_string_literal: true
 
 require "json"
@@ -13,6 +14,10 @@ module SoulCore
 
     def latest
       proposal_dirs.first
+    end
+
+    def latest_with_alpha
+      proposal_dirs.find { |dir| Dir.exist?(File.join(dir, "alpha")) }
     end
 
     def by_rank(rank)
