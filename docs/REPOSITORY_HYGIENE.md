@@ -1,71 +1,141 @@
+
 # Public Repository Hygiene
 
-This document describes public-facing cleanup expectations for Soul/.
+This document defines what belongs in the public Soul/ repository and what should remain local.
 
 ## Goals
 
-- Keep local runtime state out of git.
-- Keep local model files out of git.
-- Keep generated logs and workflow sessions out of git.
-- Keep root-level repository docs focused and uncluttered.
-- Keep internal overlay notes under `docs/overlays/` when they are worth preserving.
-- Avoid exposing local paths, personal environment assumptions, secrets, tokens, model files, or generated state.
+- Keep runtime state, model files, local secrets, and generated proposal artifacts out of git.
+- Keep public-facing documentation focused on current behavior, architecture, and safety boundaries.
+- Keep overlay application notes out of normal history unless they are deliberately curated.
+- Keep durable regression verifiers committed so future changes can be checked without reconstructing old overlay context.
+- Avoid exposing local paths, personal environment assumptions, secrets, tokens, model files, generated state, or temporary alpha artifacts.
 
-## Files that should not be committed
+## Commit by default
 
-Examples:
+These files are normally appropriate to commit:
+
+```text
+lib/soul_core/*.rb
+bin/*
+scripts/verify-*.rb
+docs/assessments/*.md
+docs/workflows/*.md
+docs/skills/*.md
+docs/soul/*.md
+docs/REPOSITORY_HYGIENE.md
+docs/OVERLAY_SYSTEM.md
+docs/SECURITY_MODEL.md
+docs/SKILLS.md
+```
+
+`verify-*` scripts are durable regression verifiers. They should stay unless replaced by a newer consolidated verifier.
+
+## Do not commit by default
+
+These files are normally local, generated, temporary, or review-only:
 
 ```text
 .env
 .env.*
-logs/
-run/
-tmp/
-models/
-*.gguf
-*.safetensors
-*.bin
-Soul/logs/tasks/*.json
-Soul/logs/tool_runs/*.json
-Soul/workflows/pending/*.json
-Soul/workflows/sessions/*.json
-Soul/reflection/pending/*.json
-Soul/reflection/approved/*.json
-Soul/reflection/rejected/*.json
+Soul/runtime/*.json
+Soul/runtime/*.tmp
+Soul/runtime/*.log
+Soul/improvement/proposals/*
+Soul/artifacts/cloud_assist/*
+Soul/proposals/skills/*
+overlay_files/
+README_*PHASE*.md
+README_*REPAIR*.md
+docs/overlays/README_*PHASE*.md
+docs/overlays/README_*REPAIR*.md
+scripts/patch-*.rb
+scripts/repair-*.rb
+*.zip
 ```
 
-## Root-level overlay readmes
+Generated improvement proposals and alpha artifacts are intentionally local. They are review material, not source code, until a future explicit promotion workflow copies reviewed artifacts into production paths.
 
-Generated overlay README files should not accumulate in the repository root.
+## Documentation classes
 
-Preferred locations:
+Soul documentation is divided into three working categories.
+
+### Public product docs
+
+Public product docs describe current user-visible behavior, safety boundaries, setup, or capabilities.
+
+Examples:
 
 ```text
-docs/overlays/
-docs/overlays/archive/
+README.md
+docs/SKILLS.md
+docs/SECURITY_MODEL.md
+docs/ROADMAP.md
+docs/skills/*.md
 ```
 
-## Branding notes
+These should be readable without knowing the overlay history.
 
-Branding assets may remain in `assets/brand/` if they are used by the README or repository presentation.
+### Engineering docs
 
-Internal branding notes do not need to be linked from the README. If the repo is meant to present the project rather than the design process, keep that material out of the public landing page.
+Engineering docs describe implemented architecture, phase outcomes, and verification assumptions.
+
+Examples:
+
+```text
+docs/assessments/*.md
+docs/workflows/*.md
+docs/soul/*.md
+```
+
+These may be public, but they do not all need to be linked from the main README.
+
+### Overlay notes
+
+Overlay notes describe how to apply a generated overlay.
+
+Examples:
+
+```text
+README_*PHASE*.md
+docs/overlays/README_*PHASE*.md
+README_*REPAIR*.md
+docs/overlays/README_*REPAIR*.md
+```
+
+Overlay notes are temporary by default. Curated historical notes may be moved to an archive only when they explain an architectural decision that is still useful.
 
 ## Local verification
 
 Run:
 
 ```bash
+ruby scripts/verify-repo-hygiene-phase20.rb
+```
+
+Useful manual checks:
+
+```bash
 git status --short
 git ls-files | grep -E '(^\.env|\.gguf$|\.safetensors$|\.bin$|^logs/|^run/|^tmp/|^models/)'
 git check-ignore -v .env models/example.gguf logs/example.log run/example.tmp tmp/example.tmp
-git check-ignore -v Soul/logs/tasks/example.json Soul/workflows/sessions/example.json Soul/reflection/pending/example.json
+git check-ignore -v Soul/improvement/proposals/example/metadata.json
+git check-ignore -v Soul/runtime/capability_matrix.json
+git check-ignore -v overlay_files/example.txt
+git check-ignore -v README_EXAMPLE_PHASE20.md
+git check-ignore -v docs/overlays/README_EXAMPLE_PHASE20.md
 ```
 
 The `git ls-files` command should return nothing for ignored local artifacts.
 
-If ignored files were already committed, `.gitignore` will not untrack them automatically. Remove them from the index with:
+## If ignored files were already committed
+
+`.gitignore` does not untrack files that were already committed.
+
+Remove generated files from the index without deleting local copies:
 
 ```bash
 git rm --cached <path>
 ```
+
+Use this only after deciding the file is generated/local and should not remain tracked.

@@ -1,3 +1,4 @@
+
 # Soul/ local-only configuration
 .env
 .env.*
@@ -39,6 +40,14 @@ Soul/reflection/rejected/*.md
 !Soul/reflection/approved/.keep
 !Soul/reflection/rejected/.keep
 
+# Soul/ generated improvement, alpha, and runtime assessment state
+Soul/improvement/proposals/*
+!Soul/improvement/proposals/.keep
+Soul/runtime/*.json
+Soul/runtime/*.tmp
+Soul/runtime/*.log
+!Soul/runtime/.keep
+
 # Local model files and model directories
 models/
 *.gguf
@@ -55,13 +64,14 @@ models/
 *_overlay.zip
 soul_*_overlay/
 soul_*_overlay.zip
-docs/overlays/README_*PHASE*.md
-docs/overlays/README_*REPAIR*.md
 overlay_files/
+
+# Overlay instruction notes are temporary unless deliberately curated
 README_*PHASE*.md
 README_*REPAIR*.md
-Soul/improvement/proposals
-Soul/runtime/*.json
+/README_*.md
+docs/overlays/README_*PHASE*.md
+docs/overlays/README_*REPAIR*.md
 
 # Temporary backup files
 *.bak
@@ -99,12 +109,8 @@ Soul/config/cloud_providers.yaml
 # Generated artifacts are local/review-only unless manually promoted.
 Soul/artifacts/cloud_assist/*
 !Soul/artifacts/cloud_assist/.keep
-
 Soul/proposals/skills/*
 !Soul/proposals/skills/.keep
-
-# Root overlay instruction files should be archived under docs/overlays/archive/.
-/README_*.md
 
 # One-time overlay patch scripts should not be committed after application.
 scripts/patch-*.rb
