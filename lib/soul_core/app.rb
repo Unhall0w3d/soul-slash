@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 require_relative "confirmation_parser"
 require_relative "env_loader"
 require_relative "intent_router"
@@ -11,6 +13,7 @@ require_relative "workflow_registry"
 require_relative "workflow_intent_handler_dispatch"
 require_relative "workflow_registry_execution"
 require_relative "workflow_handler_registry"
+require_relative "workflow_contract_validator"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -19,6 +22,7 @@ module SoulCore
     def initialize(positional_argv = nil, argv: nil)
       @argv = (argv || positional_argv || []).dup
       EnvLoader.load
+      validate_workflow_contracts!
     end
 
     def run
@@ -42,6 +46,8 @@ module SoulCore
         run_workflow_command
       when "workflows"
         run_workflows_command
+      when "doctor"
+        run_doctor
       else
         print_help
         command ? 1 : 0
@@ -53,16 +59,28 @@ module SoulCore
 
     private
 
+    def validate_workflow_contracts!
+      return if ENV["SOUL_SKIP_WORKFLOW_CONTRACT_VALIDATION"] == "1"
+
+      WorkflowContractValidator.new.validate_registry!(WorkflowHandlerRegistry.new)
+    end
+
+    def run_doctor
+      report = WorkflowContractValidator.new.health_report(WorkflowHandlerRegistry.new)
+
+      if @argv.include?("--json")
+        puts JSON.pretty_generate(report)
+      else
+        puts report.fetch("message")
+      end
+
+      report.fetch("valid") ? 0 : 1
+    end
+
     def run_skill
       name = @argv.shift
       separator_index = @argv.index("--")
-      args =
-        if separator_index
-          @argv[(separator_index + 1)..] || []
-        else
-          @argv
-        end
-
+      args = separator_index ? (@argv[(separator_index + 1)..] || []) : @argv
       result = SkillRunner.new(registry: SkillRegistry.new).run(name, args: args)
       puts JSON.pretty_generate(result[:json])
       result[:ok] ? 0 : 1
@@ -104,7 +122,6 @@ module SoulCore
       puts "Workflow file: #{result[:workflow_path]}" if result[:workflow_path]
       puts
       puts result[:user_message]
-
       result[:ok] ? 0 : 1
     end
 
@@ -179,6 +196,8 @@ module SoulCore
       puts "  ruby bin/soul intent \"play Folsom Prison Blues on YouTube\""
       puts "  ruby bin/soul do \"play Folsom Prison Blues on YouTube\""
       puts "  ruby bin/soul respond \"yes\""
+      puts "  ruby bin/soul doctor"
+      puts "  ruby bin/soul doctor --json"
       puts "  ruby bin/soul workflows"
       puts "  ruby bin/soul workflows --json"
       puts "  ruby bin/soul workflow status latest"
