@@ -21,6 +21,7 @@ require_relative "model_suitability_policy_assessor"
 require_relative "codex_handoff_contract_assessor"
 require_relative "codex_dry_run_review"
 require_relative "codex_dry_run_fixture_pack"
+require_relative "first_bounded_codex_task"
 require_relative "alpha_implementation_task_pack_generator"
 require_relative "alpha_implementation_review_gate"
 require_relative "skill_loop_completion_assessor"
@@ -107,6 +108,12 @@ module SoulCore
         report = generator.generate
         puts(json ? JSON.pretty_generate(report) : generator.render(report))
         report["ok"] ? 0 : 1
+      when "bounded-codex-task", "first-codex-task", "codex-task"
+        json = @argv.include?("--json")
+        generator = FirstBoundedCodexTask.new(root: Dir.pwd)
+        report = generator.generate
+        puts(json ? JSON.pretty_generate(report) : generator.render(report))
+        report["ok"] ? 0 : 1
       when "implementation-pack", "task-pack", "alpha-task-pack"
         json = @argv.include?("--json")
         proposal_path = resolve_alpha_review_proposal_path
@@ -172,6 +179,7 @@ module SoulCore
         puts "  ruby bin/soul improve proposals --write"
         puts "  ruby bin/soul improve alpha --latest"
         puts "  ruby bin/soul improve codex-fixtures"
+        puts "  ruby bin/soul improve bounded-codex-task"
         puts "  ruby bin/soul improve implementation-pack --latest"
         puts "  ruby bin/soul improve implementation-review --latest"
         puts "  ruby bin/soul improve alpha-review --latest"
@@ -388,6 +396,7 @@ module SoulCore
       puts "  ruby bin/soul improve proposals --write"
       puts "  ruby bin/soul improve alpha --latest"
       puts "  ruby bin/soul improve codex-fixtures"
+      puts "  ruby bin/soul improve bounded-codex-task"
       puts "  ruby bin/soul improve implementation-pack --latest"
       puts "  ruby bin/soul improve implementation-review --latest"
       puts "  ruby bin/soul improve alpha-review --latest"
