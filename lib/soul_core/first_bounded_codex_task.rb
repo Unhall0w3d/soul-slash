@@ -86,7 +86,7 @@ module SoulCore
         "task" => {
           "id" => "phase33_fixture_doc_review",
           "title" => "Phase 33 Fixture Documentation Review",
-          "summary" => "Review the Codex dry-run fixture documentation and propose a bounded documentation-only improvement.",
+          "summary" => "Review the Codex dry-run fixture documentation and propose a bounded documentation-only improvement with concrete proposed wording.",
           "model_recommendation" => "gpt-5.5 medium",
           "status" => "first_bounded_codex_task_package",
           "generated_at" => generated_at
@@ -104,10 +104,14 @@ module SoulCore
             "The controlled advisory skill loop is complete.",
             "Codex must only receive bounded task packages.",
             "This first task is documentation-only.",
-            "The output must be saved locally and reviewed with the dry-run review gate before any human considers applying it."
+            "The output must be saved locally and reviewed with the dry-run review gate before any human considers applying it.",
+            "The response must include concrete proposed documentation text, not just a summary."
           ]
         },
         "allowed_files" => [
+          "docs/CODEX_DRY_RUN_FIXTURE_PACK.md",
+          "docs/fixtures/codex_dry_run/README.md",
+          "docs/CODEX_DRY_RUN_REVIEW.md",
           "docs/fixtures/codex_dry_run/<FEATURE_DOC>.md",
           "docs/maintenance/<PHASE_DOC>.md"
         ],
@@ -129,7 +133,9 @@ module SoulCore
           "Response must be documentation-only.",
           "Response must not modify Ruby source, scripts, runtime state, secrets, generated proposal-local files, or Codex task package files.",
           "Response must include the required dry-run response sections.",
-          "Response must list only allowed file paths in files_changed.",
+          "Response must include proposed_documentation_change with exact proposed wording or a precise replacement section.",
+          "Response must list only allowed documentation file paths in files_changed.",
+          "files_changed means files the proposal would change if later applied by a human; it does not mean Codex has changed those files.",
           "Response must include concrete verification commands.",
           "Response must include risks and rollback notes.",
           "Response must clearly state that no patches should be applied automatically."
@@ -137,6 +143,7 @@ module SoulCore
         "verifier_expectations" => [
           "Dry-run review should pass for a compliant response.",
           "Dry-run review should block if source, scripts, secrets, runtime, or Soul/codex task files are listed as changed.",
+          "Dry-run review should block if required response fields are missing.",
           "No network access is required for local review.",
           "No Codex invocation occurs from Soul."
         ],
@@ -153,12 +160,17 @@ module SoulCore
           "required_sections" => [
             "summary",
             "files_changed",
+            "proposed_documentation_change",
             "commands_to_verify",
             "risks",
             "rollback",
             "human_review_notes"
           ],
-          "no_direct_commit" => true
+          "no_direct_commit" => true,
+          "field_notes" => {
+            "files_changed" => "Files the proposal would change if later applied by a human. Codex must not edit or apply patches.",
+            "proposed_documentation_change" => "Exact proposed wording, replacement section, or clearly scoped documentation delta for human review."
+          }
         },
         "rollback_notes" => [
           "Do not apply Codex output automatically.",
@@ -172,8 +184,14 @@ module SoulCore
       {
         "summary" => "String. Briefly summarize the proposed documentation-only improvement.",
         "files_changed" => [
-          "Array of allowed documentation file paths only."
+          "Array of allowed documentation file paths the proposal would change if later applied by a human. Codex must not edit files."
         ],
+        "proposed_documentation_change" => {
+          "target_file" => "One allowed documentation path.",
+          "change_type" => "add_section | replace_section | revise_paragraph",
+          "proposed_text" => "Exact proposed wording for the human to inspect.",
+          "placement_notes" => "Where the proposed text should go."
+        },
         "commands_to_verify" => [
           "ruby bin/soul assess codex-dry-run-review --contract Soul/codex/tasks/phase33_first_bounded_task/contract.json --response <response.json> --json"
         ],
@@ -207,6 +225,16 @@ module SoulCore
         Do not apply patches.
         Do not commit anything.
 
+        ## Important wording
+
+        In your JSON response, `files_changed` means:
+
+        ```text
+        files this proposal would change if a human later applied it
+        ```
+
+        It does not mean you changed files. You must not change files.
+
         ## Task
 
         Review these files only:
@@ -218,6 +246,8 @@ module SoulCore
         ```
 
         Propose a documentation-only improvement that clarifies how the dry-run fixture pack should be used before a real Codex task.
+
+        Your response must include concrete proposed documentation text in `proposed_documentation_change`. A structural response with only a summary is not sufficient.
 
         ## Contract
 
@@ -236,6 +266,8 @@ module SoulCore
         ## Important
 
         `files_changed` must list only paths allowed by the contract.
+
+        `proposed_documentation_change.proposed_text` must contain exact wording or a precise replacement section that a human can inspect.
 
         This is a proposal only. The output will be reviewed locally by Soul's dry-run review gate before any human applies anything.
       PROMPT
@@ -277,11 +309,22 @@ module SoulCore
         ruby bin/soul assess codex-dry-run-review --contract #{File.join(TASK_ROOT, "contract.json")} --response Soul/codex/tasks/phase33_first_bounded_task/codex_response.json --json
         ```
 
-        ## Step 4: Do not apply automatically
+        ## Step 4: Inspect usefulness
 
         A passing dry-run review means the response stayed inside the contract.
 
         It does not mean the proposal is correct, useful, or approved for application.
+
+        Specifically inspect:
+
+        ```text
+        proposed_documentation_change.target_file
+        proposed_documentation_change.change_type
+        proposed_documentation_change.proposed_text
+        proposed_documentation_change.placement_notes
+        ```
+
+        If `proposed_text` is vague, missing, or not directly usable, reject the response and revise the prompt.
       MD
     end
 
@@ -311,7 +354,8 @@ module SoulCore
         1. Paste codex_prompt.md into Codex using gpt-5.5 medium.
         2. Save the returned JSON locally.
         3. Run codex-dry-run-review against contract.json and the saved response.
-        4. Apply nothing automatically.
+        4. Inspect proposed_documentation_change for concrete proposed wording.
+        5. Apply nothing automatically.
         ```
 
         ## Cleanup
