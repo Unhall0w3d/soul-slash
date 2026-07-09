@@ -28,6 +28,7 @@ require_relative "skill_loop_completion_assessor"
 require_relative "codex_loop_completion_assessor"
 require_relative "ruby_runtime_compatibility_assessor"
 require_relative "doctor_surface_assessor"
+require_relative "documentation_registry_refresh_assessor"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -111,7 +112,12 @@ module SoulCore
         report = generator.generate
         puts(json ? JSON.pretty_generate(report) : generator.render(report))
         report["ok"] ? 0 : 1
-      when "bounded-codex-task", "first-codex-task", "codex-task"
+  when "documentation-registry-refresh", "doc-registry-refresh", "docs-registry-refresh"
+  assessor = DocumentationRegistryRefreshAssessor.new(root: Dir.pwd)
+  ok, message = assessor.generate_snapshot
+  puts message
+  ok ? 0 : 1
+    when "bounded-codex-task", "first-codex-task", "codex-task"
         json = @argv.include?("--json")
         generator = FirstBoundedCodexTask.new(root: Dir.pwd)
         report = generator.generate
@@ -183,6 +189,7 @@ module SoulCore
         puts "  ruby bin/soul improve alpha --latest"
         puts "  ruby bin/soul improve codex-fixtures"
         puts "  ruby bin/soul improve bounded-codex-task"
+      puts "  ruby bin/soul improve documentation-registry-refresh"
         puts "  ruby bin/soul improve implementation-pack --latest"
         puts "  ruby bin/soul improve implementation-review --latest"
         puts "  ruby bin/soul improve alpha-review --latest"
@@ -291,6 +298,12 @@ when "ruby-runtime", "runtime-compatibility", "ruby-compatibility"
 when "doctor-surface", "doctor-coverage", "surface-doctor"
   json = @argv.include?("--json")
   assessor = DoctorSurfaceAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
+when "documentation-registry", "doc-registry", "docs-registry"
+  json = @argv.include?("--json")
+  assessor = DocumentationRegistryRefreshAssessor.new(root: Dir.pwd)
   report = assessor.assess
   puts(json ? JSON.pretty_generate(report) : assessor.render(report))
   report["ok"] ? 0 : 1
@@ -415,6 +428,7 @@ when "doctor-surface", "doctor-coverage", "surface-doctor"
       puts "  ruby bin/soul assess codex-loop"
       puts "  ruby bin/soul assess ruby-runtime"
       puts "  ruby bin/soul assess doctor-surface"
+      puts "  ruby bin/soul assess documentation-registry"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
