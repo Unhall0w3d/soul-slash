@@ -25,6 +25,7 @@ require_relative "alpha_skill_generator"
 require_relative "alpha_review"
 require_relative "alpha_promotion_gate"
 require_relative "repo_curation_assessor"
+require_relative "feature_direction_assessor"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -186,6 +187,12 @@ module SoulCore
         report = assessor.assess
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "feature-direction", "features", "next-feature"
+        json = @argv.include?("--json")
+        assessor = FeatureDirectionAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        0
       else
         puts "Unknown assessment target."
         1
@@ -280,6 +287,7 @@ module SoulCore
       puts "  ruby bin/soul skills"
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul assess repo-curation"
+      puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
       puts "  ruby bin/soul improve alpha --latest"
       puts "  ruby bin/soul improve alpha-review --latest"
