@@ -17,6 +17,7 @@ require_relative "workflow_contract_validator"
 require_relative "environment_assessor"
 require_relative "model_runtime_assessor"
 require_relative "model_suitability_assessor"
+require_relative "model_suitability_policy_assessor"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -182,6 +183,13 @@ module SoulCore
         report = assessor.assess(task: task)
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "model-policy", "model-suitability-policy", "suitability-policy"
+        json = @argv.include?("--json")
+        task = option_value("--task")
+        assessor = ModelSuitabilityPolicyAssessor.new(root: Dir.pwd)
+        report = assessor.assess(task: task)
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        0
       when "capabilities", "capability-matrix"
         json = @argv.include?("--json")
         persist = @argv.include?("--persist")
@@ -296,6 +304,7 @@ module SoulCore
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess model-suitability"
+      puts "  ruby bin/soul assess model-policy"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
