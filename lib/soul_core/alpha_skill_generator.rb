@@ -4,6 +4,8 @@ require "fileutils"
 require "json"
 require "time"
 
+require_relative "alpha_skill_plan_generator"
+
 module SoulCore
   class AlphaSkillGenerator
     def initialize(root: Dir.pwd)
@@ -13,22 +15,22 @@ module SoulCore
     def generate(proposal_path:)
       proposal_dir = normalize_proposal_path(proposal_path)
       metadata_path = File.join(proposal_dir, "metadata.json")
-      proposal_md_path = File.join(proposal_dir, "proposal.md")
 
-      unless Dir.exist?(proposal_dir)
-        return error("proposal folder not found", proposal_dir)
-      end
-
-      unless File.exist?(metadata_path)
-        return error("metadata.json not found", proposal_dir)
-      end
+      return error("proposal folder not found", proposal_dir) unless Dir.exist?(proposal_dir)
+      return error("metadata.json not found", proposal_dir) unless File.exist?(metadata_path)
 
       metadata = JSON.parse(File.read(metadata_path))
       alpha_dir = File.join(proposal_dir, "alpha")
       FileUtils.mkdir_p(alpha_dir)
 
+      capability = metadata.fetch("capability", "unknown")
+      title = metadata.fetch("title", "Alpha Skill")
+      slug = metadata.fetch("id", slug(title))
+      class_name = classify(slug)
+
       artifacts = {
         "readme" => File.join(alpha_dir, "README.md"),
+        "implementation_plan" => File.join(alpha_dir, "implementation_plan.md"),
         "skill" => File.join(alpha_dir, "skill.rb"),
         "verifier" => File.join(alpha_dir, "verify-alpha.rb"),
         "test_cases" => File.join(alpha_dir, "test_cases.json"),
@@ -36,18 +38,13 @@ module SoulCore
         "manifest" => File.join(alpha_dir, "alpha_manifest.json")
       }
 
-      capability = metadata.fetch("capability", "unknown")
-      title = metadata.fetch("title", "Alpha Skill")
-      slug = metadata.fetch("id", slug(title))
-      class_name = classify(slug)
-
+      File.write(artifacts["implementation_plan"], AlphaSkillPlanGenerator.new.generate(metadata))
       File.write(artifacts["readme"], readme(metadata, capability, title, slug))
       File.write(artifacts["skill"], skill_rb(metadata, capability, class_name))
       File.write(artifacts["verifier"], verifier_rb(capability, class_name))
       File.write(artifacts["test_cases"], JSON.pretty_generate(test_cases(metadata, capability)))
       File.write(artifacts["promotion_checklist"], promotion_checklist(metadata))
       File.write(artifacts["manifest"], JSON.pretty_generate(manifest(metadata, artifacts, proposal_dir)))
-
       FileUtils.chmod("+x", artifacts["verifier"])
 
       {
@@ -62,6 +59,7 @@ module SoulCore
         "registered" => false,
         "production_modified" => false,
         "requires_human_review" => true,
+        "implementation_plan_generated" => true,
         "verification" => {
           "no_production_skills_modified" => true,
           "no_registry_modified" => true,
@@ -84,10 +82,9 @@ module SoulCore
       lines << "Alpha path: #{report['alpha_path']}"
       lines << ""
       lines << "Artifacts"
-      report.fetch("artifacts").each do |name, path|
-        lines << "- #{name}: #{path}"
-      end
+      report.fetch("artifacts").each { |name, path| lines << "- #{name}: #{path}" }
       lines << ""
+      lines << "Implementation plan generated: #{report['implementation_plan_generated']}"
       lines << "Registered: #{report['registered']}"
       lines << "Production modified: #{report['production_modified']}"
       lines << "Requires human review: #{report['requires_human_review']}"
@@ -102,18 +99,10 @@ module SoulCore
     end
 
     def error(message, path)
-      {
-        "ok" => false,
-        "assessment" => "alpha_skill_generation",
-        "generated_at" => Time.now.iso8601,
-        "proposal_path" => path,
-        "error" => message,
-        "registered" => false,
-        "production_modified" => false
-      }
+      {"ok" => false, "assessment" => "alpha_skill_generation", "generated_at" => Time.now.iso8601, "proposal_path" => path, "error" => message, "registered" => false, "production_modified" => false}
     end
 
-    def readme(metadata, capability, title, slug)
+    def readme(_metadata, capability, title, slug)
       <<~MD
         # Alpha Skill: #{title}
 
@@ -129,6 +118,14 @@ module SoulCore
 
         It is intentionally proposal-local and is not registered with Soul.
 
+        ## Implementation plan
+
+        See:
+
+        ```text
+        implementation_plan.md
+        ```
+
         ## Boundaries
 
         This alpha must not:
@@ -140,17 +137,6 @@ module SoulCore
         - download models
         - bypass human review
 
-        ## Generated files
-
-        ```text
-        README.md
-        skill.rb
-        verify-alpha.rb
-        test_cases.json
-        promotion_checklist.md
-        alpha_manifest.json
-        ```
-
         ## Verify
 
         ```bash
@@ -160,8 +146,6 @@ module SoulCore
         ## Promotion
 
         Promotion requires manual review and a future promotion workflow.
-
-        Do not copy this skill into production paths unless the promotion checklist passes.
       MD
     end
 
@@ -225,12 +209,13 @@ module SoulCore
         manifest_path = File.join(root, "alpha_manifest.json")
         test_cases_path = File.join(root, "test_cases.json")
         checklist_path = File.join(root, "promotion_checklist.md")
+        plan_path = File.join(root, "implementation_plan.md")
 
         errors = []
 
         puts "alpha skill verification: #{capability}"
 
-        [skill_path, manifest_path, test_cases_path, checklist_path].each do |path|
+        [skill_path, manifest_path, test_cases_path, checklist_path, plan_path].each do |path|
           ok = File.exist?(path)
           puts "- \#{File.basename(path)} exists: \#{ok ? 'ok' : 'missing'}"
           errors << "\#{path} missing" unless ok
@@ -240,34 +225,26 @@ module SoulCore
         puts "- skill.rb syntax: \#{syntax_ok ? 'ok' : 'missing'}"
         errors << "skill.rb syntax invalid" unless syntax_ok
 
+        plan_ok = File.read(plan_path).include?("Implementation Plan") && File.read(plan_path).include?("Prohibited behavior")
+        puts "- implementation plan shape: \#{plan_ok ? 'ok' : 'missing'}"
+        errors << "implementation plan invalid" unless plan_ok
+
         require skill_path
 
         klass = SoulCore::Alpha::#{class_name}
         metadata = klass.metadata
         result = klass.run(args: ["--alpha-verify"])
 
-        metadata_ok =
-          metadata["status"] == "alpha" &&
-          metadata["registered"] == false &&
-          metadata["production_ready"] == false &&
-          metadata["requires_human_review"] == true
+        metadata_ok = metadata["status"] == "alpha" && metadata["registered"] == false && metadata["production_ready"] == false && metadata["requires_human_review"] == true
         puts "- alpha metadata boundaries: \#{metadata_ok ? 'ok' : 'missing'}"
         errors << "alpha metadata boundaries failed" unless metadata_ok
 
-        result_ok =
-          result["ok"] == true &&
-          result["status"] == "alpha_placeholder" &&
-          result.dig("verification", "production_modified") == false &&
-          result.dig("verification", "registered") == false
+        result_ok = result["ok"] == true && result["status"] == "alpha_placeholder" && result.dig("verification", "production_modified") == false && result.dig("verification", "registered") == false
         puts "- alpha run boundaries: \#{result_ok ? 'ok' : 'missing'}"
         errors << "alpha run boundaries failed" unless result_ok
 
         manifest = JSON.parse(File.read(manifest_path)) rescue nil
-        manifest_ok =
-          manifest &&
-          manifest["registered"] == false &&
-          manifest["production_modified"] == false &&
-          manifest["requires_human_review"] == true
+        manifest_ok = manifest && manifest["registered"] == false && manifest["production_modified"] == false && manifest["requires_human_review"] == true && manifest.dig("artifacts", "implementation_plan")
         puts "- manifest boundaries: \#{manifest_ok ? 'ok' : 'missing'}"
         errors << "manifest boundaries failed" unless manifest_ok
 
@@ -283,28 +260,7 @@ module SoulCore
     end
 
     def test_cases(metadata, capability)
-      {
-        "status" => "alpha",
-        "capability" => capability,
-        "proposal_title" => metadata["title"],
-        "cases" => [
-          {
-            "name" => "alpha metadata",
-            "expected" => {
-              "registered" => false,
-              "production_ready" => false,
-              "requires_human_review" => true
-            }
-          },
-          {
-            "name" => "alpha placeholder run",
-            "expected" => {
-              "production_modified" => false,
-              "registered" => false
-            }
-          }
-        ]
-      }
+      {"status" => "alpha", "capability" => capability, "proposal_title" => metadata["title"], "cases" => [{"name" => "alpha metadata", "expected" => {"registered" => false, "production_ready" => false, "requires_human_review" => true}}, {"name" => "implementation plan exists", "expected" => {"file" => "implementation_plan.md"}}, {"name" => "alpha placeholder run", "expected" => {"production_modified" => false, "registered" => false}}]}
     end
 
     def promotion_checklist(metadata)
@@ -319,6 +275,7 @@ module SoulCore
 
         - [ ] Human reviewed proposal.
         - [ ] Human approved implementation direction.
+        - [ ] Implementation plan reviewed.
         - [ ] Alpha verifier passes.
         - [ ] Behavior is implemented, not placeholder-only.
         - [ ] Boundaries are documented.
@@ -339,17 +296,7 @@ module SoulCore
     end
 
     def manifest(metadata, artifacts, proposal_dir)
-      {
-        "status" => "alpha",
-        "generated_at" => Time.now.iso8601,
-        "proposal_path" => proposal_dir,
-        "proposal_title" => metadata["title"],
-        "capability" => metadata["capability"],
-        "artifacts" => artifacts.transform_values { |path| path.sub(@root + "/", "") },
-        "registered" => false,
-        "production_modified" => false,
-        "requires_human_review" => true
-      }
+      {"status" => "alpha", "generated_at" => Time.now.iso8601, "proposal_path" => proposal_dir, "proposal_title" => metadata["title"], "capability" => metadata["capability"], "artifacts" => artifacts.transform_values { |path| path.sub(@root + "/", "") }, "registered" => false, "production_modified" => false, "requires_human_review" => true, "implementation_plan_generated" => true}
     end
 
     def slug(value)

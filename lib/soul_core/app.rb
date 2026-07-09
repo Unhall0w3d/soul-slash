@@ -17,6 +17,8 @@ require_relative "environment_assessor"
 require_relative "model_runtime_assessor"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
+require_relative "proposal_locator"
+require_relative "alpha_skill_plan_generator"
 require_relative "alpha_skill_generator"
 require_relative "response_renderer"
 require_relative "workflow_session"
@@ -71,11 +73,13 @@ module SoulCore
         report["ok"] ? 0 : 1
       when "alpha"
         json = @argv.include?("--json")
-        proposal_path = option_value("--proposal") || @argv.find { |arg| !arg.start_with?("--") }
+        proposal_path = resolve_alpha_proposal_path
         unless proposal_path
           puts "Missing proposal path."
           puts
-          puts "Example:"
+          puts "Examples:"
+          puts "  ruby bin/soul improve alpha --latest"
+          puts "  ruby bin/soul improve alpha --proposal-rank 1"
           puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
           return 1
         end
@@ -90,10 +94,24 @@ module SoulCore
         puts "Examples:"
         puts "  ruby bin/soul improve proposals"
         puts "  ruby bin/soul improve proposals --write"
+        puts "  ruby bin/soul improve alpha --latest"
+        puts "  ruby bin/soul improve alpha --proposal-rank 1"
         puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
-        puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder> --json"
         1
       end
+    end
+
+    def resolve_alpha_proposal_path
+      locator = ProposalLocator.new(root: Dir.pwd)
+      explicit = option_value("--proposal")
+      return explicit if explicit
+
+      rank = option_value("--proposal-rank")
+      return locator.by_rank(rank.to_i) if rank
+
+      return locator.latest if @argv.include?("--latest")
+
+      @argv.find { |arg| !arg.start_with?("--") }
     end
 
     def option_value(name)
@@ -220,6 +238,8 @@ module SoulCore
       puts "  ruby bin/soul skills"
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul improve proposals --write"
+      puts "  ruby bin/soul improve alpha --latest"
+      puts "  ruby bin/soul improve alpha --proposal-rank 1"
       puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
     end
   end
