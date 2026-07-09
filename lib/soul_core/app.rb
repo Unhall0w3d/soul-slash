@@ -14,6 +14,7 @@ require_relative "workflow_registry_execution"
 require_relative "workflow_handler_registry"
 require_relative "workflow_contract_validator"
 require_relative "environment_assessor"
+require_relative "model_runtime_assessor"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -64,6 +65,13 @@ module SoulCore
         report = assessor.assess(include_updates: include_updates)
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "models", "model-runtime"
+        json = @argv.include?("--json")
+        include_processes = @argv.include?("--processes")
+        assessor = ModelRuntimeAssessor.new(root: Dir.pwd)
+        report = assessor.assess(include_processes: include_processes)
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        0
       else
         puts "Unknown assessment target."
         puts
@@ -71,7 +79,9 @@ module SoulCore
         puts "  ruby bin/soul assess environment"
         puts "  ruby bin/soul assess environment --json"
         puts "  ruby bin/soul assess environment --updates"
-        puts "  ruby bin/soul assess environment --updates --json"
+        puts "  ruby bin/soul assess models"
+        puts "  ruby bin/soul assess models --json"
+        puts "  ruby bin/soul assess models --processes --json"
         1
       end
     end
@@ -166,6 +176,8 @@ module SoulCore
       puts "  ruby bin/soul doctor"
       puts "  ruby bin/soul assess environment"
       puts "  ruby bin/soul assess environment --updates --json"
+      puts "  ruby bin/soul assess models"
+      puts "  ruby bin/soul assess models --json"
     end
   end
 end
