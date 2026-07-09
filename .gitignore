@@ -55,6 +55,7 @@ models/
 *_overlay.zip
 soul_*_overlay/
 soul_*_overlay.zip
+docs/overlays/
 
 # Temporary backup files
 *.bak
