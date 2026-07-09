@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "json"
-
 require_relative "confirmation_parser"
 require_relative "env_loader"
 require_relative "intent_router"
@@ -14,6 +13,7 @@ require_relative "workflow_intent_handler_dispatch"
 require_relative "workflow_registry_execution"
 require_relative "workflow_handler_registry"
 require_relative "workflow_contract_validator"
+require_relative "environment_assessor"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -27,27 +27,17 @@ module SoulCore
 
     def run
       command = @argv.shift
-
       case command
-      when "skills"
-        puts JSON.pretty_generate(SkillRegistry.new.to_h)
-        0
-      when "skill"
-        run_skill
-      when "intent"
-        run_intent
-      when "do"
-        run_do
-      when "respond"
-        run_respond
-      when "reflect"
-        run_reflect
-      when "workflow"
-        run_workflow_command
-      when "workflows"
-        run_workflows_command
-      when "doctor"
-        run_doctor
+      when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
+      when "skill" then run_skill
+      when "intent" then run_intent
+      when "do" then run_do
+      when "respond" then run_respond
+      when "reflect" then run_reflect
+      when "workflow" then run_workflow_command
+      when "workflows" then run_workflows_command
+      when "doctor" then run_doctor
+      when "assess" then run_assess
       else
         print_help
         command ? 1 : 0
@@ -61,19 +51,34 @@ module SoulCore
 
     def validate_workflow_contracts!
       return if ENV["SOUL_SKIP_WORKFLOW_CONTRACT_VALIDATION"] == "1"
-
       WorkflowContractValidator.new.validate_registry!(WorkflowHandlerRegistry.new)
+    end
+
+    def run_assess
+      target = @argv.shift
+      case target
+      when "environment"
+        include_updates = @argv.include?("--updates")
+        json = @argv.include?("--json")
+        assessor = EnvironmentAssessor.new(root: Dir.pwd)
+        report = assessor.assess(include_updates: include_updates)
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        0
+      else
+        puts "Unknown assessment target."
+        puts
+        puts "Examples:"
+        puts "  ruby bin/soul assess environment"
+        puts "  ruby bin/soul assess environment --json"
+        puts "  ruby bin/soul assess environment --updates"
+        puts "  ruby bin/soul assess environment --updates --json"
+        1
+      end
     end
 
     def run_doctor
       report = WorkflowContractValidator.new.health_report(WorkflowHandlerRegistry.new)
-
-      if @argv.include?("--json")
-        puts JSON.pretty_generate(report)
-      else
-        puts report.fetch("message")
-      end
-
+      puts(@argv.include?("--json") ? JSON.pretty_generate(report) : report.fetch("message"))
       report.fetch("valid") ? 0 : 1
     end
 
@@ -89,34 +94,20 @@ module SoulCore
     def run_intent
       text = @argv.join(" ").strip
       result = IntentRouter.new.route(text)
-      puts JSON.pretty_generate({
-        "ok" => result.ok,
-        "intent" => result.intent,
-        "parameters" => result.parameters,
-        "confidence" => result.confidence,
-        "reason" => result.reason,
-        "source" => result.source
-      })
+      puts JSON.pretty_generate({"ok"=>result.ok,"intent"=>result.intent,"parameters"=>result.parameters,"confidence"=>result.confidence,"reason"=>result.reason,"source"=>result.source})
       result.ok ? 0 : 1
     end
 
     def run_do
       text = @argv.join(" ").strip
       intent = IntentRouter.new.route(text)
-
       unless intent.ok
         puts "I could not map that request to a supported workflow."
         puts
         puts "Reason: #{intent.reason}"
         return 1
       end
-
-      result = WorkflowRunner.new.run(
-        intent: intent.intent,
-        parameters: intent.parameters,
-        original_text: text
-      )
-
+      result = WorkflowRunner.new.run(intent: intent.intent, parameters: intent.parameters, original_text: text)
       puts "Intent: #{intent.intent}"
       puts "Workflow state: #{result.dig(:state, 'status') || 'unknown'}"
       puts "Workflow file: #{result[:workflow_path]}" if result[:workflow_path]
@@ -141,68 +132,40 @@ module SoulCore
 
     def run_workflow_command
       subcommand = @argv.shift
-
       case subcommand
       when "show"
-        target = @argv.shift || "latest"
-        puts JSON.pretty_generate(WorkflowTools.new.show(target))
-        0
+        puts JSON.pretty_generate(WorkflowTools.new.show(@argv.shift || "latest")); 0
       when "status"
-        target = @argv.shift || "latest"
-        result = WorkflowTools.new.status(target)
-        puts result.fetch("message")
-        result.fetch("ok") ? 0 : 1
+        result = WorkflowTools.new.status(@argv.shift || "latest"); puts result.fetch("message"); result.fetch("ok") ? 0 : 1
       when "list"
-        active_only = @argv.include?("--active")
-        puts JSON.pretty_generate(WorkflowTools.new.list(active_only: active_only))
-        0
+        puts JSON.pretty_generate(WorkflowTools.new.list(active_only: @argv.include?("--active"))); 0
       when "clear-complete"
-        confirmed = @argv.include?("--confirm") && @argv.include?("CLEAR_COMPLETE")
-        result = WorkflowTools.new.clear_complete(confirm: confirmed)
-        puts JSON.pretty_generate(result)
-        result.fetch("ok") ? 0 : 1
+        result = WorkflowTools.new.clear_complete(confirm: @argv.include?("--confirm") && @argv.include?("CLEAR_COMPLETE")); puts JSON.pretty_generate(result); result.fetch("ok") ? 0 : 1
       else
         puts "Unknown workflow command."
-        puts
-        puts "Examples:"
-        puts "  ruby bin/soul workflow show latest"
-        puts "  ruby bin/soul workflow status latest"
-        puts "  ruby bin/soul workflow list"
-        puts "  ruby bin/soul workflow list --active"
-        puts "  ruby bin/soul workflow clear-complete"
-        puts "  ruby bin/soul workflow clear-complete --confirm CLEAR_COMPLETE"
         1
       end
     end
 
     def run_workflows_command
       registry = WorkflowRegistry.new
-
       if @argv.include?("--json")
         puts JSON.pretty_generate(registry.to_h)
       else
-        registry.definitions.each do |definition|
-          puts "#{definition.intent} - #{definition.description}"
-        end
+        registry.definitions.each { |definition| puts "#{definition.intent} - #{definition.description}" }
       end
-
       0
     end
 
     def print_help
       puts "Soul command examples:"
       puts "  ruby bin/soul skills"
-      puts "  ruby bin/soul skill youtube.video_resolve -- --query \"Bohemian Rhapsody\""
       puts "  ruby bin/soul intent \"play Folsom Prison Blues on YouTube\""
       puts "  ruby bin/soul do \"play Folsom Prison Blues on YouTube\""
       puts "  ruby bin/soul respond \"yes\""
       puts "  ruby bin/soul doctor"
-      puts "  ruby bin/soul doctor --json"
-      puts "  ruby bin/soul workflows"
-      puts "  ruby bin/soul workflows --json"
-      puts "  ruby bin/soul workflow status latest"
-      puts "  ruby bin/soul workflow list"
-      puts "  ruby bin/soul workflow clear-complete --confirm CLEAR_COMPLETE"
+      puts "  ruby bin/soul assess environment"
+      puts "  ruby bin/soul assess environment --updates --json"
     end
   end
 end
