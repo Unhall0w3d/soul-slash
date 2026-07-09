@@ -15,6 +15,7 @@ require_relative "workflow_handler_registry"
 require_relative "workflow_contract_validator"
 require_relative "environment_assessor"
 require_relative "model_runtime_assessor"
+require_relative "capability_matrix"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -72,16 +73,24 @@ module SoulCore
         report = assessor.assess(include_processes: include_processes)
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "capabilities", "capability-matrix"
+        json = @argv.include?("--json")
+        persist = @argv.include?("--persist")
+        assessor = CapabilityMatrix.new(root: Dir.pwd)
+        report = assessor.assess(persist: persist)
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        0
       else
         puts "Unknown assessment target."
         puts
         puts "Examples:"
         puts "  ruby bin/soul assess environment"
-        puts "  ruby bin/soul assess environment --json"
-        puts "  ruby bin/soul assess environment --updates"
+        puts "  ruby bin/soul assess environment --updates --json"
         puts "  ruby bin/soul assess models"
         puts "  ruby bin/soul assess models --json"
-        puts "  ruby bin/soul assess models --processes --json"
+        puts "  ruby bin/soul assess capabilities"
+        puts "  ruby bin/soul assess capabilities --json"
+        puts "  ruby bin/soul assess capabilities --persist"
         1
       end
     end
@@ -175,9 +184,9 @@ module SoulCore
       puts "  ruby bin/soul respond \"yes\""
       puts "  ruby bin/soul doctor"
       puts "  ruby bin/soul assess environment"
-      puts "  ruby bin/soul assess environment --updates --json"
       puts "  ruby bin/soul assess models"
-      puts "  ruby bin/soul assess models --json"
+      puts "  ruby bin/soul assess capabilities"
+      puts "  ruby bin/soul assess capabilities --persist --json"
     end
   end
 end
