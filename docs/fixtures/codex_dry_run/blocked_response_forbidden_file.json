@@ -1,0 +1,16 @@
+{
+  "summary": "Fixture response that intentionally touches a forbidden file.",
+  "generated_at": "2026-07-09T16:33:30-04:00",
+  "files_changed": [
+    ".env",
+    "docs/fixtures/codex_dry_run/SAFE_FIXTURE_RESULT.md"
+  ],
+  "commands_to_verify": [
+    "ruby bin/soul assess codex-dry-run-review --contract docs/fixtures/codex_dry_run/safe_contract.json --response docs/fixtures/codex_dry_run/blocked_response_forbidden_file.json --json"
+  ],
+  "risks": [
+    "This fixture intentionally violates forbidden file policy."
+  ],
+  "rollback": "Do not apply this response. It is intentionally blocked.",
+  "human_review_notes": "Expected result: blocked because .env is forbidden."
+}

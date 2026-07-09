@@ -1,0 +1,19 @@
+{
+  "summary": "Fixture response that proposes a bounded documentation-only update.",
+  "generated_at": "2026-07-09T16:33:30-04:00",
+  "files_changed": [
+    "docs/fixtures/codex_dry_run/SAFE_FIXTURE_RESULT.md",
+    "docs/maintenance/PHASE32_CODEX_DRY_RUN_FIXTURE_PACK.md",
+    "scripts/verify-codex-dry-run-fixture-pack-phase32.rb"
+  ],
+  "commands_to_verify": [
+    "ruby scripts/verify-codex-dry-run-fixture-pack-phase32.rb",
+    "ruby bin/soul assess codex-dry-run-review --contract docs/fixtures/codex_dry_run/safe_contract.json --response docs/fixtures/codex_dry_run/safe_response.json --json"
+  ],
+  "risks": [
+    "Fixture files could be mistaken for real Codex output.",
+    "Allowed file patterns must remain narrow."
+  ],
+  "rollback": "Remove docs/fixtures/codex_dry_run fixture files and the phase 32 verifier/doc if abandoning this fixture pack.",
+  "human_review_notes": "Confirm this is fixture-only and contains no private context, secrets, provider activation, or production implementation changes."
+}

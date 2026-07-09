@@ -1,0 +1,7 @@
+{
+  "summary": "Fixture response that intentionally omits required sections.",
+  "generated_at": "2026-07-09T16:33:30-04:00",
+  "files_changed": [
+    "docs/fixtures/codex_dry_run/SAFE_FIXTURE_RESULT.md"
+  ]
+}

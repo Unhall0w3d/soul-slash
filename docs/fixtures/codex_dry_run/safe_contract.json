@@ -1,0 +1,76 @@
+{
+  "task": {
+    "id": "fixture_bounded_documentation_update",
+    "title": "Fixture Bounded Documentation Update",
+    "summary": "Produce a bounded documentation-only update for dry-run review fixture testing.",
+    "model_recommendation": "gpt-5.5 medium",
+    "status": "fixture_contract_only",
+    "generated_at": "2026-07-09T16:33:30-04:00"
+  },
+  "repo_context": {
+    "project": "Soul",
+    "language": "Ruby",
+    "scope": "fixture-only Codex dry-run review validation",
+    "current_boundaries": [
+      "This fixture must not be used as a production implementation task.",
+      "This fixture must not include private repo context.",
+      "This fixture must not invoke Codex.",
+      "This fixture must not apply patches."
+    ]
+  },
+  "allowed_files": [
+    "docs/fixtures/codex_dry_run/<FEATURE_DOC>.md",
+    "docs/maintenance/<PHASE_DOC>.md",
+    "scripts/verify-<feature>.rb"
+  ],
+  "forbidden_files": [
+    ".env",
+    ".env.*",
+    "Soul/runtime/*",
+    "Soul/improvement/proposals/*",
+    "Soul/artifacts/cloud_assist/*",
+    "Soul/proposals/skills/*",
+    "lib/soul_core/*",
+    "bin/*",
+    "models/*",
+    "config/secrets/*"
+  ],
+  "acceptance_criteria": [
+    "Response remains fixture-only.",
+    "Response changes only allowed fixture or documentation paths.",
+    "Response includes verification commands.",
+    "Response includes risks and rollback notes.",
+    "Response does not touch source, runtime, secrets, or proposal-local artifacts."
+  ],
+  "verifier_expectations": [
+    "Dry-run review of safe_response.json should pass.",
+    "Dry-run review of blocked_response_forbidden_file.json should block.",
+    "Dry-run review of blocked_response_missing_sections.json should block.",
+    "No network access is required.",
+    "No patches are applied."
+  ],
+  "security_boundaries": [
+    "Do not read secrets.",
+    "Do not include private file contents.",
+    "Do not invoke Codex.",
+    "Do not apply patches.",
+    "Do not change runtime configuration."
+  ],
+  "output_format": {
+    "preferred": "fixture_response",
+    "required_sections": [
+      "summary",
+      "files_changed",
+      "commands_to_verify",
+      "risks",
+      "rollback",
+      "human_review_notes"
+    ],
+    "no_direct_commit": true
+  },
+  "rollback_notes": [
+    "Delete fixture files if abandoning the fixture pack.",
+    "Do not revert unrelated production files.",
+    "No runtime state should be created."
+  ]
+}
