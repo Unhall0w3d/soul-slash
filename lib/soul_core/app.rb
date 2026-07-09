@@ -25,6 +25,7 @@ require_relative "first_bounded_codex_task"
 require_relative "alpha_implementation_task_pack_generator"
 require_relative "alpha_implementation_review_gate"
 require_relative "skill_loop_completion_assessor"
+require_relative "codex_loop_completion_assessor"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -273,7 +274,13 @@ module SoulCore
         report = assessor.assess
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         report["ok"] ? 0 : 1
-      when "capabilities", "capability-matrix"
+  when "codex-loop", "codex-loop-completion", "bounded-codex-loop"
+  json = @argv.include?("--json")
+  assessor = CodexLoopCompletionAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
+    when "capabilities", "capability-matrix"
         json = @argv.include?("--json")
         persist = @argv.include?("--persist")
         assessor = CapabilityMatrix.new(root: Dir.pwd)
@@ -391,6 +398,7 @@ module SoulCore
       puts "  ruby bin/soul assess codex-handoff"
       puts "  ruby bin/soul assess codex-dry-run-review --contract <path> --response <path>"
       puts "  ruby bin/soul assess skill-loop"
+      puts "  ruby bin/soul assess codex-loop"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
