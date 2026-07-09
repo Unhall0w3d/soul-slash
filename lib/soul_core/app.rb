@@ -16,6 +16,7 @@ require_relative "workflow_contract_validator"
 require_relative "environment_assessor"
 require_relative "model_runtime_assessor"
 require_relative "capability_matrix"
+require_relative "improvement_proposal_generator"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -40,6 +41,7 @@ module SoulCore
       when "workflows" then run_workflows_command
       when "doctor" then run_doctor
       when "assess" then run_assess
+      when "improve" then run_improve
       else
         print_help
         command ? 1 : 0
@@ -54,6 +56,28 @@ module SoulCore
     def validate_workflow_contracts!
       return if ENV["SOUL_SKIP_WORKFLOW_CONTRACT_VALIDATION"] == "1"
       WorkflowContractValidator.new.validate_registry!(WorkflowHandlerRegistry.new)
+    end
+
+    def run_improve
+      subcommand = @argv.shift
+      case subcommand
+      when "proposals"
+        write_files = @argv.include?("--write")
+        json = @argv.include?("--json")
+        generator = ImprovementProposalGenerator.new(root: Dir.pwd)
+        report = generator.generate(write_files: write_files)
+        puts(json ? JSON.pretty_generate(report) : generator.render(report))
+        report["ok"] ? 0 : 1
+      else
+        puts "Unknown improve command."
+        puts
+        puts "Examples:"
+        puts "  ruby bin/soul improve proposals"
+        puts "  ruby bin/soul improve proposals --json"
+        puts "  ruby bin/soul improve proposals --write"
+        puts "  ruby bin/soul improve proposals --write --json"
+        1
+      end
     end
 
     def run_assess
@@ -87,10 +111,7 @@ module SoulCore
         puts "  ruby bin/soul assess environment"
         puts "  ruby bin/soul assess environment --updates --json"
         puts "  ruby bin/soul assess models"
-        puts "  ruby bin/soul assess models --json"
         puts "  ruby bin/soul assess capabilities"
-        puts "  ruby bin/soul assess capabilities --json"
-        puts "  ruby bin/soul assess capabilities --persist"
         1
       end
     end
@@ -169,9 +190,11 @@ module SoulCore
     def run_workflows_command
       registry = WorkflowRegistry.new
       if @argv.include?("--json")
-        puts JSON.pretty_generate(registry.to_h)
-      else
+        puts JSON.pretty_generate(registry.respond_to?(:to_h) ? registry.to_h : {"workflows" => []})
+      elsif registry.respond_to?(:definitions)
         registry.definitions.each { |definition| puts "#{definition.intent} - #{definition.description}" }
+      else
+        puts JSON.pretty_generate({"status" => "unavailable", "reason" => "workflow registry listing API not exposed"})
       end
       0
     end
@@ -186,7 +209,8 @@ module SoulCore
       puts "  ruby bin/soul assess environment"
       puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess capabilities"
-      puts "  ruby bin/soul assess capabilities --persist --json"
+      puts "  ruby bin/soul improve proposals"
+      puts "  ruby bin/soul improve proposals --write --json"
     end
   end
 end

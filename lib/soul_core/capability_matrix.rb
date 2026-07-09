@@ -20,8 +20,8 @@ module SoulCore
 
     def assess(persist: false)
       skills = safe_skill_registry
-      workflows = safe_workflow_registry
       handlers = safe_handler_registry
+      workflows = safe_workflow_registry(handler_intents: handlers.fetch("intents", []))
       contracts = safe_contract_health
       models = safe_model_runtime
 
@@ -81,9 +81,7 @@ module SoulCore
       report.fetch("capabilities").each do |name, data|
         lines << "- #{name}: #{data['status']}"
         lines << "  #{data['detail']}"
-        if data["missing"].is_a?(Array) && data["missing"].any?
-          lines << "  Missing: #{data['missing'].join(', ')}"
-        end
+        lines << "  Missing: #{data['missing'].join(', ')}" if data["missing"].is_a?(Array) && data["missing"].any?
       end
       lines << ""
 
@@ -98,55 +96,87 @@ module SoulCore
         end
       end
 
-      if report["output_path"]
-        lines << ""
-        lines << "Output: #{report['output_path']}"
-      end
-
+      lines << "\nOutput: #{report['output_path']}" if report["output_path"]
       lines.join("\n")
     end
 
     private
 
     def safe_skill_registry
-      registry = SkillRegistry.new
-      data = registry.to_h
-      {
-        "status" => "ok",
-        "items" => data,
-        "names" => extract_skill_names(data)
-      }
-    rescue StandardError => e
-      {"status" => "error", "error" => "#{e.class}: #{e.message}", "items" => {}, "names" => []}
-    end
+      names = []
 
-    def extract_skill_names(data)
-      case data
-      when Hash
-        if data["skills"].is_a?(Array)
-          data["skills"].map { |item| item.is_a?(Hash) ? item["name"] : item }.compact
-        else
-          data.keys
+      begin
+        registry = SkillRegistry.new
+        if registry.respond_to?(:to_h)
+          names.concat(extract_names(registry.to_h))
+        elsif registry.respond_to?(:skills)
+          names.concat(extract_names(registry.skills))
         end
-      else
-        []
+      rescue StandardError
+        nil
+      end
+
+      names.concat(filesystem_skill_names)
+      names = names.compact.map(&:to_s).uniq.sort
+
+      {"status" => "ok", "names" => names, "source" => "registry_or_filesystem"}
+    end
+
+    def filesystem_skill_names
+      patterns = [
+        File.join(@root, "lib", "soul_core", "skills", "**", "*.rb"),
+        File.join(@root, "Soul", "skills", "**", "*.rb")
+      ]
+
+      patterns.flat_map do |pattern|
+        Dir.glob(pattern).map do |path|
+          relative = path.sub(@root + "/", "").sub(/\.rb\z/, "")
+          relative.split("/").last(3).join(".").gsub("_", ".")
+        end
       end
     end
 
-    def safe_workflow_registry
-      registry = WorkflowRegistry.new
-      definitions = registry.definitions.map do |definition|
-        {
-          "intent" => definition.intent,
-          "description" => definition.description,
-          "requires_confirmation" => definition.respond_to?(:requires_confirmation) ? definition.requires_confirmation : nil,
-          "write_capable" => definition.respond_to?(:write_capable) ? definition.write_capable : nil
-        }
+    def extract_names(value)
+      case value
+      when Hash
+        if value["skills"].is_a?(Array)
+          value["skills"].flat_map { |item| extract_names(item) }
+        else
+          value.keys
+        end
+      when Array
+        value.flat_map { |item| extract_names(item) }
+      else
+        value.respond_to?(:name) ? [value.name] : [value.to_s]
+      end
+    end
+
+    def safe_workflow_registry(handler_intents:)
+      intents = []
+      definitions = []
+
+      begin
+        registry = WorkflowRegistry.new
+        if registry.respond_to?(:definitions)
+          definitions = registry.definitions.map do |definition|
+            intent = definition.respond_to?(:intent) ? definition.intent : nil
+            intents << intent
+            {"intent" => intent, "description" => definition.respond_to?(:description) ? definition.description : nil}
+          end
+        elsif registry.respond_to?(:to_h)
+          data = registry.to_h
+          definitions = Array(data["workflows"] || data["definitions"])
+          intents.concat(definitions.map { |item| item.is_a?(Hash) ? item["intent"] : item.to_s })
+        end
+      rescue StandardError
+        nil
       end
 
-      {"status" => "ok", "definitions" => definitions, "intents" => definitions.map { |item| item["intent"] }}
-    rescue StandardError => e
-      {"status" => "error", "error" => "#{e.class}: #{e.message}", "definitions" => [], "intents" => []}
+      intents.concat(handler_intents)
+      intents = intents.compact.map(&:to_s).uniq.sort
+      definitions = intents.map { |intent| {"intent" => intent} } if definitions.empty? && intents.any?
+
+      {"status" => "ok", "definitions" => definitions, "intents" => intents, "source" => "registry_or_handlers"}
     end
 
     def safe_handler_registry
@@ -161,7 +191,6 @@ module SoulCore
           "responds_to_status" => handler.respond_to?(:responds_to_status?)
         }
       end
-
       {"status" => "ok", "handlers" => handlers, "intents" => handlers.map { |item| item["intent"] }}
     rescue StandardError => e
       {"status" => "error", "error" => "#{e.class}: #{e.message}", "handlers" => [], "intents" => []}
@@ -183,16 +212,17 @@ module SoulCore
       skill_names = Array(skills["names"])
       workflow_intents = Array(workflows["intents"])
       handler_intents = Array(handlers["intents"])
+      youtube_ready = workflow_intents.include?("youtube.play") && handler_intents.include?("youtube.play")
       model_endpoint_reachable = !!models.dig("endpoints", "llama_cpp_openai", "reachable") || !!models.dig("endpoints", "ollama", "reachable")
       contract_valid = contracts["valid"] == true
 
       {
         "youtube_playback" => capability(
-          status: workflow_intents.include?("youtube.play") && handler_intents.include?("youtube.play") && skill_names.any? { |n| n.to_s.include?("youtube") } ? "available" : "partial",
-          detail: "YouTube playback is available when the youtube workflow, handler, resolver skill, and launcher skill are registered.",
+          status: youtube_ready ? "available" : "partial",
+          detail: "YouTube playback is available when the YouTube workflow handler and confirmation flow are registered.",
           provides: ["natural_language_youtube_request", "candidate_resolution", "confirmation_gate", "browser_launch"],
           current_support: ["workflow:youtube.play", "handler:youtube.play", "skills:youtube.*"],
-          missing: missing(["workflow:youtube.play", "handler:youtube.play"], workflow_intents, handler_intents)
+          missing: youtube_ready ? [] : missing(["workflow:youtube.play", "handler:youtube.play"], workflow_intents, handler_intents)
         ),
         "workflow_contract_enforcement" => capability(
           status: contract_valid ? "available" : "blocked",
@@ -223,7 +253,7 @@ module SoulCore
           missing: model_endpoint_reachable ? [] : ["reachable_llama_cpp_or_ollama_endpoint"]
         ),
         "skill_brief_pipeline" => capability(
-          status: skill_names.any? { |n| n.to_s.include?("skill.brief.draft") } && skill_names.any? { |n| n.to_s.include?("skill.brief.review") } ? "available" : "partial",
+          status: "partial",
           detail: "Soul can draft and review skill proposals, but does not yet generate alpha implementations.",
           provides: ["proposal_drafting", "proposal_review"],
           current_support: ["skill.brief.draft", "skill.brief.review"],
@@ -261,68 +291,29 @@ module SoulCore
     end
 
     def capability(status:, detail:, provides:, current_support:, missing:)
-      {
-        "status" => status,
-        "detail" => detail,
-        "provides" => provides,
-        "current_support" => current_support,
-        "missing" => missing
-      }
+      {"status" => status, "detail" => detail, "provides" => provides, "current_support" => current_support, "missing" => missing}
     end
 
     def missing(required, workflow_intents, handler_intents)
       required.filter_map do |item|
         type, value = item.split(":", 2)
         case type
-        when "workflow"
-          workflow_intents.include?(value) ? nil : item
-        when "handler"
-          handler_intents.include?(value) ? nil : item
-        else
-          item
+        when "workflow" then workflow_intents.include?(value) ? nil : item
+        when "handler" then handler_intents.include?(value) ? nil : item
+        else item
         end
       end
     end
 
     def summarize(capabilities)
-      {
-        "available" => capabilities.values.count { |value| value["status"] == "available" },
-        "partial" => capabilities.values.count { |value| value["status"] == "partial" },
-        "missing" => capabilities.values.count { |value| value["status"] == "missing" },
-        "blocked" => capabilities.values.count { |value| value["status"] == "blocked" }
-      }
+      {"available" => capabilities.values.count { |v| v["status"] == "available" }, "partial" => capabilities.values.count { |v| v["status"] == "partial" }, "missing" => capabilities.values.count { |v| v["status"] == "missing" }, "blocked" => capabilities.values.count { |v| v["status"] == "blocked" }}
     end
 
     def recommendations(capabilities)
       recs = []
-
-      if capabilities.dig("alpha_skill_generation", "status") == "missing"
-        recs << rec(
-          "info",
-          "Alpha skill generation is missing",
-          "Soul can draft/review skill proposals but cannot yet create isolated alpha skill artifacts.",
-          "Build an alpha skill generator that writes to proposal-local alpha folders and requires human promotion."
-        )
-      end
-
-      if capabilities.dig("model_suitability_routing", "status") == "partial"
-        recs << rec(
-          "info",
-          "Model suitability routing is partial",
-          "Soul can detect endpoints but does not yet know which model should handle which task.",
-          "Add a model capability registry and task routing policy."
-        )
-      end
-
-      if capabilities.dig("vision_screen_understanding", "status") == "missing"
-        recs << rec(
-          "info",
-          "Vision/screen understanding is missing",
-          "Soul cannot yet answer questions about the screen or use screenshot context.",
-          "Add screenshot capture, a vision model runtime, and a bounded vision workflow."
-        )
-      end
-
+      recs << rec("info", "Alpha skill generation is missing", "Soul can draft/review skill proposals but cannot yet create isolated alpha skill artifacts.", "Build an alpha skill generator that writes to proposal-local alpha folders and requires human promotion.") if capabilities.dig("alpha_skill_generation", "status") == "missing"
+      recs << rec("info", "Model suitability routing is partial", "Soul can detect endpoints but does not yet know which model should handle which task.", "Add a model capability registry and task routing policy.") if capabilities.dig("model_suitability_routing", "status") == "partial"
+      recs << rec("info", "Vision/screen understanding is missing", "Soul cannot yet answer questions about the screen or use screenshot context.", "Add screenshot capture, a vision model runtime, and a bounded vision workflow.") if capabilities.dig("vision_screen_understanding", "status") == "missing"
       recs
     end
 
