@@ -17,6 +17,7 @@ require_relative "environment_assessor"
 require_relative "model_runtime_assessor"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
+require_relative "alpha_skill_generator"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -68,16 +69,37 @@ module SoulCore
         report = generator.generate(write_files: write_files)
         puts(json ? JSON.pretty_generate(report) : generator.render(report))
         report["ok"] ? 0 : 1
+      when "alpha"
+        json = @argv.include?("--json")
+        proposal_path = option_value("--proposal") || @argv.find { |arg| !arg.start_with?("--") }
+        unless proposal_path
+          puts "Missing proposal path."
+          puts
+          puts "Example:"
+          puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
+          return 1
+        end
+
+        generator = AlphaSkillGenerator.new(root: Dir.pwd)
+        report = generator.generate(proposal_path: proposal_path)
+        puts(json ? JSON.pretty_generate(report) : generator.render(report))
+        report["ok"] ? 0 : 1
       else
         puts "Unknown improve command."
         puts
         puts "Examples:"
         puts "  ruby bin/soul improve proposals"
-        puts "  ruby bin/soul improve proposals --json"
         puts "  ruby bin/soul improve proposals --write"
-        puts "  ruby bin/soul improve proposals --write --json"
+        puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
+        puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder> --json"
         1
       end
+    end
+
+    def option_value(name)
+      index = @argv.index(name)
+      return nil unless index
+      @argv[index + 1]
     end
 
     def run_assess
@@ -106,12 +128,6 @@ module SoulCore
         0
       else
         puts "Unknown assessment target."
-        puts
-        puts "Examples:"
-        puts "  ruby bin/soul assess environment"
-        puts "  ruby bin/soul assess environment --updates --json"
-        puts "  ruby bin/soul assess models"
-        puts "  ruby bin/soul assess capabilities"
         1
       end
     end
@@ -202,15 +218,9 @@ module SoulCore
     def print_help
       puts "Soul command examples:"
       puts "  ruby bin/soul skills"
-      puts "  ruby bin/soul intent \"play Folsom Prison Blues on YouTube\""
-      puts "  ruby bin/soul do \"play Folsom Prison Blues on YouTube\""
-      puts "  ruby bin/soul respond \"yes\""
-      puts "  ruby bin/soul doctor"
-      puts "  ruby bin/soul assess environment"
-      puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess capabilities"
-      puts "  ruby bin/soul improve proposals"
-      puts "  ruby bin/soul improve proposals --write --json"
+      puts "  ruby bin/soul improve proposals --write"
+      puts "  ruby bin/soul improve alpha --proposal Soul/improvement/proposals/<proposal-folder>"
     end
   end
 end
