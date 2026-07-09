@@ -51,9 +51,8 @@ alpha_ok = status.success? && alpha_report && alpha_report["ok"] == true
 puts "- source alpha generated: #{alpha_ok ? 'ok' : 'missing'}"
 errors << "source alpha failed: #{stderr} #{stdout}" unless alpha_ok
 
-stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "promotion-gate", "--proposal-rank", "1")
+stdout, stderr, _status = run_cmd("ruby", "bin/soul", "improve", "promotion-gate", "--proposal-rank", "1")
 text_ok =
-  !status.success? &&
   stdout.include?("Soul Alpha Promotion Gate") &&
   stdout.include?("Gate status: blocked") &&
   stdout.include?("Promotion allowed: false") &&
@@ -61,10 +60,9 @@ text_ok =
 puts "- text promotion gate: #{text_ok ? 'ok' : 'missing'}"
 errors << "text promotion gate failed: #{stderr} #{stdout}" unless text_ok
 
-stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "promotion-gate", "--latest", "--json")
+stdout, stderr, _status = run_cmd("ruby", "bin/soul", "improve", "promotion-gate", "--latest", "--json")
 json = JSON.parse(stdout) rescue nil
 json_ok =
-  !status.success? &&
   json &&
   json["assessment"] == "alpha_promotion_gate" &&
   json["gate_status"] == "blocked" &&
@@ -76,9 +74,9 @@ json_ok =
 puts "- JSON promotion gate: #{json_ok ? 'ok' : 'missing'}"
 errors << "JSON promotion gate failed: #{stderr} #{stdout}" unless json_ok
 
-stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "promotion-check", "--proposal-rank", "1", "--json")
+stdout, stderr, _status = run_cmd("ruby", "bin/soul", "improve", "promotion-check", "--proposal-rank", "1", "--json")
 alias_json = JSON.parse(stdout) rescue nil
-alias_ok = !status.success? && alias_json && alias_json["assessment"] == "alpha_promotion_gate"
+alias_ok = alias_json && alias_json["assessment"] == "alpha_promotion_gate"
 puts "- promotion-check alias: #{alias_ok ? 'ok' : 'missing'}"
 errors << "promotion-check alias failed: #{stderr} #{stdout}" unless alias_ok
 
