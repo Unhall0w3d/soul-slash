@@ -55,7 +55,13 @@ models/
 *_overlay.zip
 soul_*_overlay/
 soul_*_overlay.zip
-docs/overlays/
+docs/overlays/README_*PHASE*.md
+docs/overlays/README_*REPAIR*.md
+overlay_files/
+README_*PHASE*.md
+README_*REPAIR*.md
+Soul/improvement/proposals
+Soul/runtime/*.json
 
 # Temporary backup files
 *.bak
