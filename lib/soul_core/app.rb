@@ -20,6 +20,7 @@ require_relative "model_suitability_assessor"
 require_relative "model_suitability_policy_assessor"
 require_relative "codex_handoff_contract_assessor"
 require_relative "codex_dry_run_review"
+require_relative "alpha_implementation_task_pack_generator"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -97,6 +98,22 @@ module SoulCore
         report = generator.generate(proposal_path: proposal_path)
         puts(json ? JSON.pretty_generate(report) : generator.render(report))
         report["ok"] ? 0 : 1
+      when "implementation-pack", "task-pack", "alpha-task-pack"
+        json = @argv.include?("--json")
+        proposal_path = resolve_alpha_review_proposal_path
+        unless proposal_path
+          puts "Missing alpha proposal path."
+          puts
+          puts "Examples:"
+          puts "  ruby bin/soul improve implementation-pack --latest"
+          puts "  ruby bin/soul improve implementation-pack --proposal-rank 1"
+          puts "  ruby bin/soul improve implementation-pack --proposal Soul/improvement/proposals/<proposal-folder>"
+          return 1
+        end
+        generator = AlphaImplementationTaskPackGenerator.new(root: Dir.pwd)
+        report = generator.generate(proposal_path: proposal_path)
+        puts(json ? JSON.pretty_generate(report) : generator.render(report))
+        report["ok"] ? 0 : 1
       when "alpha-review", "review-alpha"
         json = @argv.include?("--json")
         proposal_path = resolve_alpha_review_proposal_path
@@ -129,6 +146,7 @@ module SoulCore
         puts "Examples:"
         puts "  ruby bin/soul improve proposals --write"
         puts "  ruby bin/soul improve alpha --latest"
+        puts "  ruby bin/soul improve implementation-pack --latest"
         puts "  ruby bin/soul improve alpha-review --latest"
         puts "  ruby bin/soul improve promotion-gate --latest"
         1
@@ -335,6 +353,7 @@ module SoulCore
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
       puts "  ruby bin/soul improve alpha --latest"
+      puts "  ruby bin/soul improve implementation-pack --latest"
       puts "  ruby bin/soul improve alpha-review --latest"
       puts "  ruby bin/soul improve promotion-gate --latest"
     end
