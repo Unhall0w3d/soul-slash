@@ -41,6 +41,27 @@ blocked_response_missing_sections.json: blocked
 
 These fixtures give the repo a deterministic way to test the Codex review rails before spending Codex budget on a real bounded task.
 
+## Before a real Codex task
+
+Run the fixture pack checks before sending any real bounded task package to Codex.
+
+Use the safe fixture first to confirm the dry-run review path can return `review_ready`:
+
+```bash
+ruby bin/soul assess codex-dry-run-review --contract docs/fixtures/codex_dry_run/safe_contract.json --response docs/fixtures/codex_dry_run/safe_response.json --json
+```
+
+Then run the blocked fixtures to confirm the review gate rejects unsafe or incomplete responses:
+
+```bash
+ruby bin/soul assess codex-dry-run-review --contract docs/fixtures/codex_dry_run/safe_contract.json --response docs/fixtures/codex_dry_run/blocked_response_forbidden_file.json --json
+ruby bin/soul assess codex-dry-run-review --contract docs/fixtures/codex_dry_run/safe_contract.json --response docs/fixtures/codex_dry_run/blocked_response_missing_sections.json --json
+```
+
+Only proceed to a real Codex prompt after the safe fixture is `review_ready` and both blocked fixtures are `blocked`.
+
+Do not apply Codex output automatically. Save the returned JSON locally and review it with `codex-dry-run-review` against the task contract first.
+
 ## Boundaries
 
 Fixtures must not:
