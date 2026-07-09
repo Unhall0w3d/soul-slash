@@ -19,5 +19,11 @@ module SoulCore
 
       skill
     end
+def to_h
+  skills = list
+  return skills if skills.is_a?(Hash)
+
+  {"skills" => skills}
+end
   end
 end
