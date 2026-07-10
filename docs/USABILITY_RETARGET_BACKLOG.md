@@ -24,22 +24,19 @@ approval token chat controls
 
 ```text
 approval-gated downloads move dry-run
-reports would-move counts and bytes
-no mutation
-token remains pending
 ```
-
-## Remaining
 
 ### Phase 62
 
 ```text
-downloads.move_to_trash real executor behind approval token
+approval-gated downloads move-to-trash executor
 trash only
 token consumption
 execution history
 post-execution report
 ```
+
+## Remaining
 
 ### Phase 63
 
@@ -61,6 +58,6 @@ The clear stopping point is Phase 63.
 Foundation: complete
 Chat and planning: complete
 Usability foundation: complete
-Safe local action: dry-run complete, real trash action pending
+Safe local action: functionally complete, closeout pending
 Broader assistant capability: not started
 ```

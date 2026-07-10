@@ -8,6 +8,7 @@ require_relative "chat_execution_history"
 require_relative "execution_adapter_registry"
 require_relative "approval_token_chat_controls"
 require_relative "downloads_move_dry_run_executor"
+require_relative "downloads_move_to_trash_executor"
 
 module SoulCore
   class ChatResponder
@@ -20,6 +21,7 @@ module SoulCore
       @gate = ReadOnlySkillExecutionGate.new(root: @root, planner: @planner, history: @history, registry: @registry)
       @approval_controls = ApprovalTokenChatControls.new(root: @root, gate: @gate)
       @dry_run_executor = DownloadsMoveDryRunExecutor.new(root: @root, gate: @gate, store: @approval_controls.store)
+      @trash_executor = DownloadsMoveToTrashExecutor.new(root: @root, store: @approval_controls.store, history: @history)
     end
 
     def respond(message)
@@ -32,10 +34,10 @@ module SoulCore
       return list_pending_approvals if lower.match?(/\b(pending approvals|show approvals|list approvals)\b/)
       return revoke_approval(lower) if lower.match?(/\brevoke approval\b/)
       return dry_run_downloads_move(lower) if lower.match?(/\b(dry run downloads move|dry run move approved downloads|preview approved downloads move)\b/)
+      return execute_downloads_move(lower) if lower.match?(/\bmove approved downloads to trash\b/)
       return @registry.render if lower.match?(/\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/)
       return execute_downloads_inspect(intent, text) if intent.id == "downloads_inspect"
       return execute_downloads_cleanup_plan(intent, text) if intent.id == "downloads_cleanup_plan"
-      return gated_skill(intent, text) if intent.id == "downloads_move_to_trash"
 
       case intent.id
       when "identity"
@@ -69,13 +71,13 @@ module SoulCore
         "Expires: #{token['expires_at']}",
         "Candidates: #{preview['candidate_count']}",
         "Candidate bytes: #{preview['candidate_bytes']}",
-        "Mutation enabled: false"
+        "Mutation enabled: true, but only with the token and the literal confirm keyword."
       ].join("\n")
     end
 
     def list_pending_approvals
       result = @approval_controls.pending
-      lines = ["Pending approvals", "Count: #{result['count']}", "Mutation enabled: false", ""]
+      lines = ["Pending approvals", "Count: #{result['count']}", ""]
       if result["tokens"].empty?
         lines << "- none"
       else
@@ -94,12 +96,7 @@ module SoulCore
       return "Provide the full approval token ID: revoke approval <token>" unless token_id
 
       result = @approval_controls.revoke(token_id)
-      [
-        "Approval revoke result",
-        "Token: #{token_id}",
-        "Status: #{result['status']}",
-        "Mutation enabled: false"
-      ].join("\n")
+      ["Approval revoke result", "Token: #{token_id}", "Status: #{result['status']}"].join("\n")
     end
 
     def dry_run_downloads_move(lower)
@@ -107,25 +104,49 @@ module SoulCore
       return "Provide the approval token: dry run downloads move <token>" unless token_id
 
       result = @dry_run_executor.execute(token_id: token_id)
-      unless result["ok"]
-        return [
-          "Downloads move dry-run blocked.",
-          "Reason: #{result['reason']}",
-          "Mutation: none",
-          "Token consumed: false"
-        ].join("\n")
-      end
+      return ["Downloads move dry-run blocked.", "Reason: #{result['reason']}", "Mutation: none"].join("\n") unless result["ok"]
 
       [
         "Downloads move dry-run complete.",
-        "Status: #{result['status']}",
-        "Token: #{result['token_id']}",
         "Would move files: #{result['would_move_count']}",
         "Would move bytes: #{result['would_move_bytes']}",
         "Mutation: #{result['mutation']}",
-        "Token consumed: #{result['token_consumed']}",
-        "No files were moved. The machine merely stared at them judgmentally."
+        "Token consumed: #{result['token_consumed']}"
       ].join("\n")
+    end
+
+    def execute_downloads_move(lower)
+      token_id = lower[/\b([a-f0-9]{32})\b/, 1]
+      confirmed = lower.match?(/\bconfirm\b/)
+
+      return "Provide the approval token: move approved downloads to trash <token> confirm" unless token_id
+
+      result = @trash_executor.execute(token_id: token_id, confirm: confirmed)
+      unless result.executed
+        return [
+          "Downloads move-to-trash blocked.",
+          "Blocked by: #{result.blocked_by.join(', ')}",
+          "Confirmation required: true",
+          "Executed: false",
+          result.message
+        ].join("\n")
+      end
+
+      payload = JSON.parse(result.stdout)
+      [
+        "Downloads move-to-trash completed.",
+        "Status: #{payload['status']}",
+        "Attempted: #{payload['attempted_count']}",
+        "Moved: #{payload['moved_count']}",
+        "Failed: #{payload['failed_count']}",
+        "Moved bytes: #{payload['moved_bytes']}",
+        "Token status: #{payload['token_status']}",
+        "Permanent delete: #{payload['permanent_delete']}",
+        "Filenames omitted: #{payload['filenames_omitted']}",
+        "Executed: true"
+      ].join("\n")
+    rescue JSON::ParserError
+      "Downloads were processed, but the execution report could not be parsed."
     end
 
     def execute_downloads_inspect(intent, message)
@@ -167,12 +188,7 @@ module SoulCore
       result = @gate.evaluate(message, execute: true, record_history: true)
       return gate_blocked_message(label, result) unless result.executed && result.ok
 
-      [
-        "I executed the read-only #{label}.",
-        "Executed: true",
-        "Skill: #{intent.skill_id}",
-        "History recorded: true"
-      ].join("\n")
+      ["I executed the read-only #{label}.", "Executed: true", "Skill: #{intent.skill_id}", "History recorded: true"].join("\n")
     end
 
     def gate_blocked_message(label, result)
@@ -181,21 +197,6 @@ module SoulCore
         "Gate status: #{result.status}",
         "Blocked by: #{result.blocked_by.join(', ')}",
         "Executed: false",
-        result.message
-      ].join("\n")
-    end
-
-    def gated_skill(intent, message)
-      result = @gate.evaluate(message, execute: false, record_history: true)
-      [
-        "I can map this request to the execution gate.",
-        "Intent: #{intent.label}",
-        "Skill candidate: #{intent.skill_id || 'none'}",
-        "Risk: #{intent.risk}",
-        "Confirmation required: #{intent.confirmation_required}",
-        "Executed: false",
-        "Gate status: #{result.status}",
-        "Blocked by: #{result.blocked_by.join(', ')}",
         result.message
       ].join("\n")
     end
