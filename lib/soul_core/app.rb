@@ -7,6 +7,8 @@ require_relative "env_loader"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
 require_relative "read_only_skill_execution_gate"
+require_relative "execution_adapter_registry"
+require_relative "execution_adapter_registry_assessor"
 require_relative "chat_execution_history"
 require_relative "chat_execution_history_assessor"
 require_relative "read_only_skill_execution_gate_assessor"
@@ -244,6 +246,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "execution-adapter-registry", "adapter-registry", "adapters"
+  json = @argv.include?("--json")
+  assessor = ExecutionAdapterRegistryAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "chat-execution-history", "execution-history", "chat-history"
   json = @argv.include?("--json")
   assessor = ChatExecutionHistoryAssessor.new(root: Dir.pwd)
@@ -481,6 +489,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess intent-router"
       puts "  ruby bin/soul assess skill-invocation-planner"
       puts "  ruby bin/soul assess read-only-skill-gate"
+      puts "  ruby bin/soul assess execution-adapter-registry"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
