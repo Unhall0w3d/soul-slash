@@ -47,7 +47,7 @@ Soul/runtime/*.json
 Soul/runtime/*.tmp
 Soul/runtime/*.log
 !Soul/runtime/.keep
-
+Soul/runtime/
 # Local model files and model directories
 models/
 *.gguf
