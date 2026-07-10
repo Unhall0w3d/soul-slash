@@ -4,6 +4,7 @@
 require "json"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
+require_relative "read_only_skill_execution_gate"
 
 module SoulCore
   class ChatResponder
@@ -11,6 +12,7 @@ module SoulCore
       @root = File.expand_path(root)
       @router = IntentRouter.new
       @planner = SkillInvocationPlanner.new(router: @router)
+      @gate = ReadOnlySkillExecutionGate.new(root: @root, planner: @planner)
     end
 
     def respond(message)
@@ -30,6 +32,10 @@ module SoulCore
         return @planner.explain(text)
       end
 
+      if lower.match?(/\b(execute|run|invoke)\b/) && lower.match?(/\b(skill|this|it|request)\b/)
+        return @gate.explain(text)
+      end
+
       case intent.id
       when "identity"
         identity
@@ -39,16 +45,9 @@ module SoulCore
         pending_work
       when "repo_status"
         status_guidance
-      when "weather_request"
-        planned_skill(intent)
-      when "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash"
-        planned_skill(intent)
-      when "cloud_providers"
-        planned_skill(intent)
-      when "youtube_request"
-        planned_skill(intent)
-      when "skill_brief"
-        planned_skill(intent)
+      when "weather_request", "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash",
+           "cloud_providers", "youtube_request", "skill_brief"
+        gated_skill(intent)
       else
         fallback(intent)
       end
@@ -60,21 +59,22 @@ module SoulCore
       "I classified that as:\n#{@router.explain(text)}"
     end
 
-    def planned_skill(intent)
-      plan = @planner.plan(intent.skill_id || intent.label.to_s)
-      # Use original intent if planning by skill string falls back oddly.
-      plan = @planner.send(:build_plan, intent) if plan.skill_id.nil? && intent.skill_id
+    def gated_skill(intent)
+      result = @gate.evaluate(intent.skill_id || intent.label.to_s)
+      result = @gate.evaluate_plan(@planner.send(:build_plan, intent)) if result.skill_id.nil? && intent.skill_id
 
       [
-        "I can map this request to a skill invocation plan.",
+        "I can map this request to the read-only execution gate.",
         "",
         "Intent: #{intent.label}",
         "Skill candidate: #{intent.skill_id || 'none'}",
         "Risk: #{intent.risk}",
         "Confirmation required: #{intent.confirmation_required}",
-        "Executable now: false",
+        "Executed: false",
+        "Gate status: #{result.status}",
+        "Blocked by: #{result.blocked_by.join(', ')}",
         "",
-        "Phase 46 prepares plans only. I will not run the skill from chat yet, because apparently we are avoiding haunted automation incidents."
+        result.message
       ].join("\n")
     end
 
@@ -89,46 +89,23 @@ module SoulCore
     def skill_summary
       catalog_path = File.join(@root, "docs/ASSISTANT_SKILL_CATALOG.md")
       if File.exist?(catalog_path)
-        return "I have an assistant-facing skill catalog at `docs/ASSISTANT_SKILL_CATALOG.md`. I can use it for explanations, intent routing, and skill invocation planning. Direct skill execution from chat is still intentionally blocked."
+        return "I have an assistant-facing skill catalog at `docs/ASSISTANT_SKILL_CATALOG.md`. I can use it for explanations, intent routing, and skill invocation planning. Phase 47 adds a read-only execution gate, but still defaults to dry-run behavior."
       end
 
-      registry_path = File.join(@root, "Soul/skills/registry.yaml")
-      unless File.exist?(registry_path)
-        return "I cannot find my skill registry yet. That means I should not invent skills just to look impressive. Revolutionary restraint."
-      end
-
-      begin
-        require "yaml"
-        registry = YAML.load_file(registry_path) || {}
-        skills = registry.is_a?(Hash) ? (registry["skills"] || registry[:skills] || registry) : registry
-        ids =
-          case skills
-          when Array
-            skills.map { |entry| entry.is_a?(Hash) ? (entry["id"] || entry[:id]) : nil }.compact
-          when Hash
-            skills.keys
-          else
-            []
-          end
-        return "I found my skill registry, but no skill IDs were readable yet." if ids.empty?
-
-        "I currently know #{ids.length} registered skill(s): #{ids.sort.join(', ')}. I can explain them more cleanly once the assistant-facing skill catalog is expanded."
-      rescue StandardError => error
-        "I found the skill registry, but could not read it cleanly: #{error.class}: #{error.message}"
-      end
+      "I can look for my skill registry, but the assistant-facing catalog should be generated first. A tool shelf without labels is just a medieval injury generator."
     end
 
     def pending_work
-      "The next planned implementation thread is approval-gated skill invocation: taking these plans, requiring owner confirmation where needed, and only then calling safe skill adapters. The baby dragon can now point at tools and draft a handling plan. It still does not get to swing them."
+      "The next planned implementation thread is real read-only execution adapters: choose one safe skill, run it through the gate, capture output, and keep approval-required skills blocked. The baby dragon has reached the locked cabinet stage."
     end
 
     def status_guidance
-      "For current health, run the existing assessments: `ruby bin/soul assess doctor-surface`, `ruby bin/soul assess ruby-runtime`, `ruby bin/soul assess repo-curation`, `ruby bin/soul assess documentation-registry`, `ruby bin/soul assess assistant-skill-catalog`, and `ruby bin/soul assess skill-invocation-planner`. I can plan this request now, but direct assessment execution from chat waits for the approval-gated invocation layer."
+      "For current health, run: `ruby bin/soul assess read-only-skill-gate`, `ruby bin/soul assess skill-invocation-planner`, `ruby bin/soul assess intent-router`, and the existing doctor/runtime/curation assessments. Chat can model the gate now, but Phase 47 does not execute skills."
     end
 
     def fallback(intent)
       [
-        "I heard you. The chat layer is awake, and I can now attempt deterministic intent routing and skill invocation planning, but this did not match a known skill-backed Phase 46 path.",
+        "I heard you. I can now route intents, build invocation plans, and pass them through a read-only execution gate, but this request did not match a known skill-backed path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",
