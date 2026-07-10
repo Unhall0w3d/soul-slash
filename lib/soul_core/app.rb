@@ -5,6 +5,8 @@ require "json"
 require_relative "confirmation_parser"
 require_relative "env_loader"
 require_relative "intent_router"
+require_relative "skill_invocation_planner"
+require_relative "skill_invocation_planner_assessor"
 require_relative "intent_router_assessor"
 require_relative "skill_registry"
 require_relative "skill_runner"
@@ -238,6 +240,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "skill-invocation-planner", "invocation-planner", "skill-planner"
+  json = @argv.include?("--json")
+  assessor = SkillInvocationPlannerAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "intent-router", "intent-router-mvp", "chat-intents"
   json = @argv.include?("--json")
   assessor = IntentRouterAssessor.new(root: Dir.pwd)
@@ -455,6 +463,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess documentation-registry"
       puts "  ruby bin/soul assess assistant-skill-catalog"
       puts "  ruby bin/soul assess intent-router"
+      puts "  ruby bin/soul assess skill-invocation-planner"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"

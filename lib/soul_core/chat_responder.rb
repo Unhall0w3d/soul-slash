@@ -3,12 +3,14 @@
 
 require "json"
 require_relative "intent_router"
+require_relative "skill_invocation_planner"
 
 module SoulCore
   class ChatResponder
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
       @router = IntentRouter.new
+      @planner = SkillInvocationPlanner.new(router: @router)
     end
 
     def respond(message)
@@ -24,6 +26,10 @@ module SoulCore
         return route_explanation(text)
       end
 
+      if lower.match?(/\b(plan|prepare)\b/) && lower.match?(/\b(skill|invocation|execution|run)\b/)
+        return @planner.explain(text)
+      end
+
       case intent.id
       when "identity"
         identity
@@ -34,15 +40,15 @@ module SoulCore
       when "repo_status"
         status_guidance
       when "weather_request"
-        mapped_skill(intent, "That sounds like a weather request. I can map it to `weather.report`, but Phase 45 does not execute skills from chat yet.")
+        planned_skill(intent)
       when "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash"
-        downloads_guidance(intent)
+        planned_skill(intent)
       when "cloud_providers"
-        mapped_skill(intent, "That sounds provider-related. I can map it toward cloud provider skills, but chat-side skill execution is still gated for a later phase.")
+        planned_skill(intent)
       when "youtube_request"
-        mapped_skill(intent, "That sounds like a YouTube lookup. I can map it toward the YouTube skills, but I will not invoke them from chat yet.")
+        planned_skill(intent)
       when "skill_brief"
-        mapped_skill(intent, "That sounds like skill design or review work. I can map it toward skill brief tooling, but Phase 45 stops at routing.")
+        planned_skill(intent)
       else
         fallback(intent)
       end
@@ -54,24 +60,22 @@ module SoulCore
       "I classified that as:\n#{@router.explain(text)}"
     end
 
-    def mapped_skill(intent, intro)
+    def planned_skill(intent)
+      plan = @planner.plan(intent.skill_id || intent.label.to_s)
+      # Use original intent if planning by skill string falls back oddly.
+      plan = @planner.send(:build_plan, intent) if plan.skill_id.nil? && intent.skill_id
+
       [
-        intro,
+        "I can map this request to a skill invocation plan.",
         "",
         "Intent: #{intent.label}",
         "Skill candidate: #{intent.skill_id || 'none'}",
         "Risk: #{intent.risk}",
         "Confirmation required: #{intent.confirmation_required}",
-        "Next step: #{intent.next_step}"
+        "Executable now: false",
+        "",
+        "Phase 46 prepares plans only. I will not run the skill from chat yet, because apparently we are avoiding haunted automation incidents."
       ].join("\n")
-    end
-
-    def downloads_guidance(intent)
-      if intent.confirmation_required
-        mapped_skill(intent, "That sounds like a local filesystem change. I can recognize the intent, but I will not move or delete anything without an approval-gated skill invocation planner.")
-      else
-        mapped_skill(intent, "That sounds like Downloads-related work. I can recognize the likely skill path, but Phase 45 does not execute it from chat yet.")
-      end
     end
 
     def identity
@@ -85,7 +89,7 @@ module SoulCore
     def skill_summary
       catalog_path = File.join(@root, "docs/ASSISTANT_SKILL_CATALOG.md")
       if File.exist?(catalog_path)
-        return "I have an assistant-facing skill catalog at `docs/ASSISTANT_SKILL_CATALOG.md`. I can use it for explanations and routing hints. Direct skill execution from chat is still intentionally blocked until the invocation planner exists."
+        return "I have an assistant-facing skill catalog at `docs/ASSISTANT_SKILL_CATALOG.md`. I can use it for explanations, intent routing, and skill invocation planning. Direct skill execution from chat is still intentionally blocked."
       end
 
       registry_path = File.join(@root, "Soul/skills/registry.yaml")
@@ -115,16 +119,16 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is skill invocation planning: use the intent router, identify a candidate skill, describe the risk, and ask for confirmation before anything with side effects. The baby dragon has learned to point at tools. It still does not get to swing them."
+      "The next planned implementation thread is approval-gated skill invocation: taking these plans, requiring owner confirmation where needed, and only then calling safe skill adapters. The baby dragon can now point at tools and draft a handling plan. It still does not get to swing them."
     end
 
     def status_guidance
-      "For current health, run the existing assessments: `ruby bin/soul assess doctor-surface`, `ruby bin/soul assess ruby-runtime`, `ruby bin/soul assess repo-curation`, `ruby bin/soul assess documentation-registry`, and `ruby bin/soul assess assistant-skill-catalog`. I can route this request now, but direct assessment execution from chat waits for the skill invocation planner."
+      "For current health, run the existing assessments: `ruby bin/soul assess doctor-surface`, `ruby bin/soul assess ruby-runtime`, `ruby bin/soul assess repo-curation`, `ruby bin/soul assess documentation-registry`, `ruby bin/soul assess assistant-skill-catalog`, and `ruby bin/soul assess skill-invocation-planner`. I can plan this request now, but direct assessment execution from chat waits for the approval-gated invocation layer."
     end
 
     def fallback(intent)
       [
-        "I heard you. The chat layer is awake, and I can now attempt deterministic intent routing, but this did not match a known Phase 45 intent.",
+        "I heard you. The chat layer is awake, and I can now attempt deterministic intent routing and skill invocation planning, but this did not match a known skill-backed Phase 46 path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",
