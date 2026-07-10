@@ -26,6 +26,7 @@ module SoulCore
       return prune_history(lower) if lower.match?(/\b(prune execution history|prune history)\b/)
       return export_history(lower) if lower.match?(/\b(export execution history|export history)\b/)
       return clear_history(lower) if lower.match?(/\b(clear execution history|clear history)\b/)
+      return execute_history_summary(intent, text) if intent.id == "execution_history_summary"
       return render_history(lower) if lower.match?(/\b(execution history|recent executions|show executions)\b/) || lower == "history"
       return route_explanation(text) if lower.match?(/\b(intent|route|classify)\b/) && lower.match?(/\b(this|message|request|utterance)\b/)
       return @planner.explain(text) if lower.match?(/\b(plan|prepare)\b/) && lower.match?(/\b(skill|invocation|execution|run)\b/)
@@ -45,11 +46,35 @@ module SoulCore
 
     private
 
+    def execute_history_summary(intent, message)
+      result = @gate.evaluate(message, execute: true, record_history: true)
+      return gate_blocked_message("execution history summary", result) unless result.executed && result.ok
+
+      data = JSON.parse(result.stdout)
+      counts_by_status = data["counts_by_status"] || {}
+      counts_by_skill = data["counts_by_skill"] || {}
+      [
+        "I executed the read-only execution history summary.",
+        "",
+        "Total entries: #{data['total_entries'] || 0}",
+        "Shown entries: #{data['shown_entries'] || 0}",
+        "Counts by status: #{counts_by_status.empty? ? 'none' : counts_by_status.map { |key, value| "#{key}=#{value}" }.join(', ')}",
+        "Counts by skill: #{counts_by_skill.empty? ? 'none' : counts_by_skill.map { |key, value| "#{key}=#{value}" }.join(', ')}",
+        "",
+        "Executed: true",
+        "Skill: #{intent.skill_id}",
+        "Risk: #{intent.risk}",
+        "History recorded: true",
+        "The logbook can now summarize itself. Bureaucracy has achieved recursion."
+      ].join("\n")
+    rescue JSON::ParserError
+      "I executed the read-only execution history summary, but could not parse the output as JSON.\nHistory recorded: true\n\n#{result.stdout.to_s[0, 1200]}"
+    end
+
     def prune_history(lower)
       keep = ChatExecutionHistory.keep_count_from_text(lower, default: 10)
       confirmed = lower.include?("confirm") || lower.include?("--confirm")
       result = @history.prune(keep: keep, confirm: confirmed)
-
       lines = []
       lines << (confirmed ? "Execution history pruned." : "Execution history prune preview.")
       lines << "Status: #{result['status']}"
@@ -176,12 +201,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is likely a third read-only adapter or date-based history pruning. The logbook can now be trimmed without immediately throwing evidence into the river."
+      "The next planned implementation thread is likely date-based history pruning or a third external read-only adapter. The logbook can now summarize itself, because apparently bureaucracy has achieved recursion."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, filter history, and prune history with confirmation, but this request did not match an executable path.",
+        "I heard you. I can route intents, build invocation plans, execute three read-only chat skill paths, record history, filter history, prune history, and summarize history, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",

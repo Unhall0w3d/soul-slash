@@ -12,6 +12,7 @@ module SoulCore
     SAFE_SKILL_COMMANDS = {
       "assistant-skill-catalog" => ["ruby", "bin/soul", "assess", "assistant-skill-catalog", "--json"],
       "system.status" => ["ruby", "bin/soul", "assess", "doctor-surface", "--json"],
+      "execution.history.summary" => :internal_execution_history_summary,
       "weather.report" => nil,
       "downloads.inspect" => nil,
       "cloud.providers.list" => nil,
@@ -20,7 +21,8 @@ module SoulCore
 
     EXECUTION_ENABLED_SKILLS = [
       "assistant-skill-catalog",
-      "system.status"
+      "system.status",
+      "execution.history.summary"
     ].freeze
 
     Execution = Struct.new(
@@ -76,9 +78,7 @@ module SoulCore
       risk = plan.risk || "unknown"
       confirmation_required = plan.confirmation_required || risk == "approval_required"
 
-      unless skill_id
-        return blocked(plan, "No candidate skill was mapped.", ["no_candidate_skill"])
-      end
+      return blocked(plan, "No candidate skill was mapped.", ["no_candidate_skill"]) unless skill_id
 
       if confirmation_required || risk == "approval_required"
         return blocked(plan, "This skill requires explicit owner confirmation before execution.", ["owner_confirmation_required"])
@@ -89,15 +89,17 @@ module SoulCore
       end
 
       command = SAFE_SKILL_COMMANDS.fetch(skill_id)
-      unless command
-        return blocked(plan, "This read-only skill is recognized but does not have a chat execution adapter yet.", ["adapter_not_implemented"])
-      end
+      return blocked(plan, "This read-only skill is recognized but does not have a chat execution adapter yet.", ["adapter_not_implemented"]) unless command
 
       unless EXECUTION_ENABLED_SKILLS.include?(skill_id)
-        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 50 execution yet.", ["phase50_not_enabled_for_actual_execution"])
+        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 54 execution yet.", ["phase54_not_enabled_for_actual_execution"])
       end
 
       return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but execution was not requested.", ["dry_run_not_execute_requested"]) unless execute
+
+      if command == :internal_execution_history_summary
+        return internal_history_summary(plan)
+      end
 
       stdout, stderr, status = Open3.capture3(*command, chdir: @root)
       ok = status.success?
@@ -141,6 +143,45 @@ module SoulCore
     end
 
     private
+
+    def internal_history_summary(plan)
+      summary = @history.summary(limit: 10)
+      entries = Array(summary["entries"])
+      counts_by_status = Hash.new(0)
+      counts_by_skill = Hash.new(0)
+
+      @history.entries.each do |entry|
+        counts_by_status[entry["status"] || "unknown"] += 1
+        counts_by_skill[entry["skill_id"] || "none"] += 1
+      end
+
+      payload = {
+        "ok" => true,
+        "skill_id" => plan.skill_id,
+        "path" => summary["path"],
+        "total_entries" => summary["count"],
+        "shown_entries" => entries.length,
+        "counts_by_status" => counts_by_status.sort.to_h,
+        "counts_by_skill" => counts_by_skill.sort.to_h,
+        "latest" => entries.last
+      }
+
+      Execution.new(
+        ok: true,
+        status: "executed",
+        message: "Executed read-only skill #{plan.skill_id}.",
+        skill_id: plan.skill_id,
+        risk: plan.risk,
+        confirmation_required: false,
+        executed: true,
+        stdout: JSON.pretty_generate(payload) + "\n",
+        stderr: "",
+        exit_status: 0,
+        blocked_by: [],
+        generated_at: Time.now.iso8601,
+        history_entry: nil
+      )
+    end
 
     def record(message, result)
       result.history_entry = @history.record(result, message: message)

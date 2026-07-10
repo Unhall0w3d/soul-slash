@@ -47,10 +47,10 @@ module SoulCore
 
     Intent = Result
 
-    # More specific rules must appear before broader rules.
     RULES = [
       ["identity", "Soul identity", /\b(who are you|what are you|what is soul|explain yourself|your personality)\b/i, nil, "none", false, 0.95, "The request asks Soul to explain itself."],
       ["skill_catalog", "Skill catalog", /\b(what skills|list skills|skills do you have|what can you do|capabilities)\b/i, "assistant-skill-catalog", "read_only", false, 0.93, "The request asks for available skills or capabilities."],
+      ["execution_history_summary", "Execution history summary", /\b(execution history summary|history summary|summarize execution history|summarize history)\b/i, "execution.history.summary", "read_only", false, 0.9, "The request asks for a summary of local chat execution history."],
       ["repo_status", "Repository/runtime status", /\b(repo|repository|doctor|runtime|health|status|curation|ruby runtime)\b/i, "system.status", "read_only", false, 0.78, "The request appears to ask about project or runtime condition."],
       ["pending_work", "Pending work / next build step", /\b(next|pending|todo|to do|build next|what should we build|roadmap|phase)\b/i, nil, "planning", false, 0.82, "The request asks about upcoming work or planning."],
       ["weather_request", "Weather request", /\b(weather|forecast|temperature|rain|snow|storm)\b/i, "weather.report", "read_only", false, 0.86, "The request appears to ask for weather information."],
@@ -78,7 +78,7 @@ module SoulCore
       return unknown("The message is empty.") if text.empty?
 
       rule = RULES.find { |candidate| text.match?(candidate.fetch(:regex)) }
-      rule ? from_rule(rule) : unknown("No deterministic Phase 45 rule matched this message.")
+      rule ? from_rule(rule) : unknown("No deterministic Phase 45+ rule matched this message.")
     end
 
     def explain(message)
@@ -114,7 +114,7 @@ module SoulCore
       if rule.fetch(:confirmation_required)
         "Prepare a plan and require explicit owner confirmation before execution."
       elsif rule.fetch(:skill_id)
-        "Explain the mapped skill and wait for a future skill invocation planner."
+        "Explain the mapped skill and wait for a safe invocation gate."
       else
         "Respond directly using deterministic chat behavior."
       end
