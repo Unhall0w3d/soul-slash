@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+require "json"
+require "open3"
+errors=[]
+def run_cmd(*cmd)=Open3.capture3(*cmd)
+puts "Downloads inspect adapter phase 56 verification:"
+paths=%w[lib/soul_core/execution_adapter_registry.rb lib/soul_core/execution_adapter_registry_assessor.rb lib/soul_core/read_only_skill_execution_gate.rb lib/soul_core/read_only_skill_execution_gate_assessor.rb scripts/verify-downloads-inspect-adapter-phase56.rb docs/maintenance/PHASE56_DOWNLOADS_INSPECT_ADAPTER.md docs/DOWNLOADS_INSPECT_ADAPTER.md]
+paths.each{|path|ok=File.exist?(path); ok&&=system("ruby","-c",path,out:File::NULL,err:File::NULL) if path.end_with?(".rb"); puts "- #{path}: #{ok ? 'ok':'missing'}"; errors << "#{path} missing or invalid" unless ok}
+stdout,stderr,status=run_cmd("ruby","bin/soul","assess","execution-adapter-registry","--json"); registry=JSON.parse(stdout) rescue nil; ok=status.success?&&registry&&registry["phase"]==56&&registry.dig("verification","downloads_inspect_enabled")==true&&registry.dig("verification","has_four_enabled_adapters")==true; puts "- registry enables downloads.inspect: #{ok ? 'ok':'missing'}"; errors << "registry check failed: #{stderr} #{stdout}" unless ok
+stdout,stderr,status=run_cmd("ruby","bin/soul","assess","read-only-skill-gate","--json"); gate=JSON.parse(stdout) rescue nil; ok=status.success?&&gate&&gate["phase"]==56&&gate.dig("verification","downloads_inspect_executes")==true&&gate.dig("verification","downloads_filenames_omitted")==true&&gate.dig("verification","approval_required_blocked")==true; puts "- gate executes downloads.inspect safely: #{ok ? 'ok':'missing'}"; errors << "gate check failed: #{stderr} #{stdout}" unless ok
+stdout,stderr,status=run_cmd("ruby","bin/soul","chat","inspect my downloads"); ok=status.success?&&stdout.include?("Downloads")&&stdout.include?("Executed: true"); puts "- chat executes downloads inspection: #{ok ? 'ok':'missing'}"; errors << "chat downloads inspect failed: #{stderr} #{stdout}" unless ok
+stdout,stderr,status=run_cmd("ruby","bin/soul","chat","move approved downloads to trash"); ok=status.success?&&stdout.include?("Executed: false")&&stdout.include?("owner_confirmation_required"); puts "- downloads move/delete remains blocked: #{ok ? 'ok':'missing'}"; errors << "trash block failed: #{stderr} #{stdout}" unless ok
+doc_ok=File.read("docs/DOWNLOADS_INSPECT_ADAPTER.md").include?("downloads.inspect")&&File.read("docs/maintenance/PHASE56_DOWNLOADS_INSPECT_ADAPTER.md").include?("Phase 56"); puts "- phase 56 docs: #{doc_ok ? 'ok':'missing'}"; errors << "phase 56 docs missing expected content" unless doc_ok
+stdout,stderr,status=run_cmd("ruby","bin/soul","assess","repo-curation","--json"); curation=JSON.parse(stdout) rescue nil; allowed=["scripts/verify-downloads-inspect-adapter-phase56.rb"]; untracked=curation&&curation["untracked_review_candidates"].is_a?(Array) ? curation["untracked_review_candidates"] : []; ok=status.success?&&curation&&curation.dig("counts","tracked_overlay_notes").to_i==0&&(untracked-allowed).empty?; puts "- repo curation remains clean apart from current phase verifier: #{ok ? 'ok':'missing'}"; errors << "repo curation unexpected candidates: #{stderr} #{stdout}" unless ok
+if errors.empty?; puts "Verification complete."; else; warn "Verification failed:"; errors.each{|e|warn "- #{e}"}; exit 1; end
