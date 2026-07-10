@@ -30,6 +30,7 @@ require_relative "ruby_runtime_compatibility_assessor"
 require_relative "doctor_surface_assessor"
 require_relative "documentation_registry_refresh_assessor"
 require_relative "chat_command"
+require_relative "assistant_skill_catalog"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -86,6 +87,11 @@ module SoulCore
     def run_improve
       subcommand = @argv.shift
       case subcommand
+when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog-refresh"
+  catalog = AssistantSkillCatalog.new(root: Dir.pwd)
+  ok, message = catalog.generate
+  puts message
+  ok ? 0 : 1
       when "proposals"
         write_files = @argv.include?("--write")
         json = @argv.include?("--json")
@@ -193,6 +199,7 @@ module SoulCore
         puts "  ruby bin/soul improve codex-fixtures"
         puts "  ruby bin/soul improve bounded-codex-task"
       puts "  ruby bin/soul improve documentation-registry-refresh"
+      puts "  ruby bin/soul improve assistant-skill-catalog-refresh"
         puts "  ruby bin/soul improve implementation-pack --latest"
         puts "  ruby bin/soul improve implementation-review --latest"
         puts "  ruby bin/soul improve alpha-review --latest"
@@ -230,6 +237,12 @@ module SoulCore
     def run_assess
       target = @argv.shift
       case target
+when "assistant-skill-catalog", "skill-catalog", "skills-catalog"
+  json = @argv.include?("--json")
+  catalog = AssistantSkillCatalog.new(root: Dir.pwd)
+  report = catalog.assess
+  puts(json ? JSON.pretty_generate(report) : catalog.render(report))
+  report["ok"] ? 0 : 1
       when "environment"
         include_updates = @argv.include?("--updates")
         json = @argv.include?("--json")
@@ -433,6 +446,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess ruby-runtime"
       puts "  ruby bin/soul assess doctor-surface"
       puts "  ruby bin/soul assess documentation-registry"
+      puts "  ruby bin/soul assess assistant-skill-catalog"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
       puts "  ruby bin/soul improve proposals --write"
