@@ -5,6 +5,7 @@ require "json"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
 require_relative "read_only_skill_execution_gate"
+require_relative "chat_execution_history"
 
 module SoulCore
   class ChatResponder
@@ -12,7 +13,8 @@ module SoulCore
       @root = File.expand_path(root)
       @router = IntentRouter.new
       @planner = SkillInvocationPlanner.new(router: @router)
-      @gate = ReadOnlySkillExecutionGate.new(root: @root, planner: @planner)
+      @history = ChatExecutionHistory.new(root: @root)
+      @gate = ReadOnlySkillExecutionGate.new(root: @root, planner: @planner, history: @history)
     end
 
     def respond(message)
@@ -24,6 +26,10 @@ module SoulCore
         return "I am here. Give me a thread to pull."
       end
 
+      if lower.match?(/\b(execution history|history|recent executions|show executions)\b/)
+        return @history.render(limit: 10)
+      end
+
       if lower.match?(/\b(intent|route|classify)\b/) && lower.match?(/\b(this|message|request|utterance)\b/)
         return route_explanation(text)
       end
@@ -33,21 +39,21 @@ module SoulCore
       end
 
       if lower.match?(/\b(execute|run|invoke)\b/) && lower.match?(/\b(skill|this|it|request)\b/)
-        return @gate.explain(text, execute: false)
+        return @gate.explain(text, execute: false, record_history: false)
       end
 
       case intent.id
       when "identity"
         identity
       when "skill_catalog"
-        execute_skill_catalog(intent)
+        execute_skill_catalog(intent, text)
       when "repo_status"
-        execute_system_status(intent)
+        execute_system_status(intent, text)
       when "pending_work"
         pending_work
       when "weather_request", "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash",
            "cloud_providers", "youtube_request", "skill_brief"
-        gated_skill(intent)
+        gated_skill(intent, text)
       else
         fallback(intent)
       end
@@ -59,8 +65,8 @@ module SoulCore
       "I classified that as:\n#{@router.explain(text)}"
     end
 
-    def execute_skill_catalog(intent)
-      result = @gate.evaluate("what skills do you have?", execute: true)
+    def execute_skill_catalog(intent, message)
+      result = @gate.evaluate(message, execute: true, record_history: true)
 
       unless result.executed && result.ok
         return gate_blocked_message("assistant skill catalog", result)
@@ -79,19 +85,21 @@ module SoulCore
           "Executed: true",
           "Skill: #{intent.skill_id}",
           "Risk: #{intent.risk}",
-          "No local state was changed. Humanity survives another request."
+          "History recorded: true",
+          "No local state was changed except the local execution history. Finally, a logbook instead of vibes."
         ].join("\n")
       rescue JSON::ParserError
         [
           "I executed the read-only assistant skill catalog check, but could not parse the output as JSON.",
+          "History recorded: true",
           "",
           result.stdout.to_s[0, 1200]
         ].join("\n")
       end
     end
 
-    def execute_system_status(intent)
-      result = @gate.evaluate("check repo health", execute: true)
+    def execute_system_status(intent, message)
+      result = @gate.evaluate(message, execute: true, record_history: true)
 
       unless result.executed && result.ok
         return gate_blocked_message("system status", result)
@@ -112,11 +120,13 @@ module SoulCore
           "Executed: true",
           "Skill: #{intent.skill_id}",
           "Risk: #{intent.risk}",
-          "This was read-only. No levers pulled, no altar lit."
+          "History recorded: true",
+          "This was read-only. No levers pulled, no altar lit, one log entry created."
         ].join("\n")
       rescue JSON::ParserError
         [
           "I executed the read-only system status check, but could not parse the output as JSON.",
+          "History recorded: true",
           "",
           result.stdout.to_s[0, 1200]
         ].join("\n")
@@ -128,13 +138,13 @@ module SoulCore
         "I mapped this to #{label}, but the execution gate did not allow it.",
         "Gate status: #{result.status}",
         "Blocked by: #{result.blocked_by.join(', ')}",
+        "History recorded: #{!result.history_entry.nil?}",
         result.message
       ].join("\n")
     end
 
-    def gated_skill(intent)
-      result = @gate.evaluate(intent.skill_id || intent.label.to_s, execute: false)
-      result = @gate.evaluate_plan(@planner.send(:build_plan, intent), execute: false) if result.skill_id.nil? && intent.skill_id
+    def gated_skill(intent, message)
+      result = @gate.evaluate(message, execute: false, record_history: true)
 
       [
         "I can map this request to the read-only execution gate.",
@@ -146,6 +156,7 @@ module SoulCore
         "Executed: false",
         "Gate status: #{result.status}",
         "Blocked by: #{result.blocked_by.join(', ')}",
+        "History recorded: true",
         "",
         result.message
       ].join("\n")
@@ -160,12 +171,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is either one more read-only adapter with useful local output, or a proper execution-history record so every gated action leaves an audit trail. The baby dragon now opens two drawers. That is enough drawers for one afternoon."
+      "The next planned implementation thread is execution history review and pruning controls, or another read-only adapter if we want more useful live behavior. The important part is that actions now leave footprints instead of vanishing into the swamp."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can now route intents, build invocation plans, and execute two read-only chat skill paths, but this request did not match an executable path.",
+        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, and record execution history, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",

@@ -5,6 +5,7 @@ require "json"
 require "open3"
 require "time"
 require_relative "skill_invocation_planner"
+require_relative "chat_execution_history"
 
 module SoulCore
   class ReadOnlySkillExecutionGate
@@ -35,6 +36,7 @@ module SoulCore
       :exit_status,
       :blocked_by,
       :generated_at,
+      :history_entry,
       keyword_init: true
     ) do
       def to_h
@@ -50,19 +52,23 @@ module SoulCore
           "stderr" => stderr,
           "exit_status" => exit_status,
           "blocked_by" => blocked_by,
-          "generated_at" => generated_at
+          "generated_at" => generated_at,
+          "history_entry" => history_entry
         }
       end
     end
 
-    def initialize(root: Dir.pwd, planner: SkillInvocationPlanner.new)
+    def initialize(root: Dir.pwd, planner: SkillInvocationPlanner.new, history: nil)
       @root = File.expand_path(root)
       @planner = planner
+      @history = history || ChatExecutionHistory.new(root: @root)
     end
 
-    def evaluate(message, execute: false)
+    def evaluate(message, execute: false, record_history: false)
       plan = @planner.plan(message)
-      evaluate_plan(plan, execute: execute)
+      result = evaluate_plan(plan, execute: execute)
+      record(message, result) if record_history
+      result
     end
 
     def evaluate_plan(plan, execute: false)
@@ -88,7 +94,7 @@ module SoulCore
       end
 
       unless EXECUTION_ENABLED_SKILLS.include?(skill_id)
-        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 49 execution yet.", ["phase49_not_enabled_for_actual_execution"])
+        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 50 execution yet.", ["phase50_not_enabled_for_actual_execution"])
       end
 
       return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but execution was not requested.", ["dry_run_not_execute_requested"]) unless execute
@@ -108,12 +114,13 @@ module SoulCore
         stderr: stderr,
         exit_status: status.exitstatus,
         blocked_by: [],
-        generated_at: Time.now.iso8601
+        generated_at: Time.now.iso8601,
+        history_entry: nil
       )
     end
 
-    def explain(message, execute: false)
-      result = evaluate(message, execute: execute)
+    def explain(message, execute: false, record_history: false)
+      result = evaluate(message, execute: execute, record_history: record_history)
       lines = []
       lines << "Read-only skill execution gate"
       lines << "skill_id: #{result.skill_id || 'none'}"
@@ -122,6 +129,7 @@ module SoulCore
       lines << "executed: #{result.executed}"
       lines << "status: #{result.status}"
       lines << "message: #{result.message}"
+      lines << "history_recorded: #{!result.history_entry.nil?}"
       lines << "blocked_by:"
       if result.blocked_by.empty?
         lines << "- none"
@@ -133,6 +141,10 @@ module SoulCore
     end
 
     private
+
+    def record(message, result)
+      result.history_entry = @history.record(result, message: message)
+    end
 
     def safe_read_only?(skill_id, risk)
       risk == "read_only" && SAFE_SKILL_COMMANDS.key?(skill_id)
@@ -151,7 +163,8 @@ module SoulCore
         stderr: "",
         exit_status: nil,
         blocked_by: blocked_by,
-        generated_at: Time.now.iso8601
+        generated_at: Time.now.iso8601,
+        history_entry: nil
       )
     end
 
@@ -168,7 +181,8 @@ module SoulCore
         stderr: "",
         exit_status: nil,
         blocked_by: blocked_by,
-        generated_at: Time.now.iso8601
+        generated_at: Time.now.iso8601,
+        history_entry: nil
       )
     end
   end
