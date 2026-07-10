@@ -22,37 +22,20 @@ module SoulCore
       lower = text.downcase
       intent = @router.route(text)
 
-      if lower.empty?
-        return "I am here. Give me a thread to pull."
-      end
-
-      if lower.match?(/\b(execution history|history|recent executions|show executions)\b/)
-        return @history.render(limit: 10)
-      end
-
-      if lower.match?(/\b(intent|route|classify)\b/) && lower.match?(/\b(this|message|request|utterance)\b/)
-        return route_explanation(text)
-      end
-
-      if lower.match?(/\b(plan|prepare)\b/) && lower.match?(/\b(skill|invocation|execution|run)\b/)
-        return @planner.explain(text)
-      end
-
-      if lower.match?(/\b(execute|run|invoke)\b/) && lower.match?(/\b(skill|this|it|request)\b/)
-        return @gate.explain(text, execute: false, record_history: false)
-      end
+      return "I am here. Give me a thread to pull." if lower.empty?
+      return export_history(lower) if lower.match?(/\b(export execution history|export history)\b/)
+      return clear_history(lower) if lower.match?(/\b(clear execution history|clear history)\b/)
+      return @history.render(limit: 10) if lower.match?(/\b(execution history|recent executions|show executions)\b/) || lower == "history"
+      return route_explanation(text) if lower.match?(/\b(intent|route|classify)\b/) && lower.match?(/\b(this|message|request|utterance)\b/)
+      return @planner.explain(text) if lower.match?(/\b(plan|prepare)\b/) && lower.match?(/\b(skill|invocation|execution|run)\b/)
+      return @gate.explain(text, execute: false, record_history: false) if lower.match?(/\b(execute|run|invoke)\b/) && lower.match?(/\b(skill|this|it|request)\b/)
 
       case intent.id
-      when "identity"
-        identity
-      when "skill_catalog"
-        execute_skill_catalog(intent, text)
-      when "repo_status"
-        execute_system_status(intent, text)
-      when "pending_work"
-        pending_work
-      when "weather_request", "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash",
-           "cloud_providers", "youtube_request", "skill_brief"
+      when "identity" then identity
+      when "skill_catalog" then execute_skill_catalog(intent, text)
+      when "repo_status" then execute_system_status(intent, text)
+      when "pending_work" then pending_work
+      when "weather_request", "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash", "cloud_providers", "youtube_request", "skill_brief"
         gated_skill(intent, text)
       else
         fallback(intent)
@@ -61,76 +44,81 @@ module SoulCore
 
     private
 
+    def export_history(lower)
+      format = lower.include?("jsonl") ? "jsonl" : "json"
+      result = @history.export(format: format)
+      [
+        "Execution history exported.",
+        "Format: #{result['format']}",
+        "Entries: #{result['count']}",
+        "Path: #{result['path']}",
+        "This is still runtime/private data. Do not commit it, unless you enjoy turning audit logs into public confetti."
+      ].join("\n")
+    rescue StandardError => error
+      "Execution history export failed: #{error.class}: #{error.message}"
+    end
+
+    def clear_history(lower)
+      confirmed = lower.include?("confirm") || lower.include?("--confirm")
+      result = @history.clear(confirm: confirmed)
+      [
+        result["message"],
+        "Status: #{result['status']}",
+        "Deleted: #{result['deleted']}",
+        "Path: #{result['path']}"
+      ].join("\n")
+    end
+
     def route_explanation(text)
       "I classified that as:\n#{@router.explain(text)}"
     end
 
     def execute_skill_catalog(intent, message)
       result = @gate.evaluate(message, execute: true, record_history: true)
+      return gate_blocked_message("assistant skill catalog", result) unless result.executed && result.ok
 
-      unless result.executed && result.ok
-        return gate_blocked_message("assistant skill catalog", result)
-      end
-
-      begin
-        data = JSON.parse(result.stdout)
-        count = data.dig("registry", "skill_count")
-        ids = Array(data.dig("registry", "skill_ids"))
-        [
-          "I executed the read-only assistant skill catalog check.",
-          "",
-          "Skill count: #{count || ids.length}",
-          "Skills: #{ids.empty? ? 'none reported' : ids.join(', ')}",
-          "",
-          "Executed: true",
-          "Skill: #{intent.skill_id}",
-          "Risk: #{intent.risk}",
-          "History recorded: true",
-          "No local state was changed except the local execution history. Finally, a logbook instead of vibes."
-        ].join("\n")
-      rescue JSON::ParserError
-        [
-          "I executed the read-only assistant skill catalog check, but could not parse the output as JSON.",
-          "History recorded: true",
-          "",
-          result.stdout.to_s[0, 1200]
-        ].join("\n")
-      end
+      data = JSON.parse(result.stdout)
+      count = data.dig("registry", "skill_count")
+      ids = Array(data.dig("registry", "skill_ids"))
+      [
+        "I executed the read-only assistant skill catalog check.",
+        "",
+        "Skill count: #{count || ids.length}",
+        "Skills: #{ids.empty? ? 'none reported' : ids.join(', ')}",
+        "",
+        "Executed: true",
+        "Skill: #{intent.skill_id}",
+        "Risk: #{intent.risk}",
+        "History recorded: true",
+        "No local state was changed except the local execution history."
+      ].join("\n")
+    rescue JSON::ParserError
+      "I executed the read-only assistant skill catalog check, but could not parse the output as JSON.\nHistory recorded: true\n\n#{result.stdout.to_s[0, 1200]}"
     end
 
     def execute_system_status(intent, message)
       result = @gate.evaluate(message, execute: true, record_history: true)
+      return gate_blocked_message("system status", result) unless result.executed && result.ok
 
-      unless result.executed && result.ok
-        return gate_blocked_message("system status", result)
-      end
-
-      begin
-        data = JSON.parse(result.stdout)
-        status = data["status"] || (data["ok"] == true ? "ready" : "unknown")
-        blockers = Array(data["blockers"])
-        warnings = Array(data["warnings"])
-        [
-          "I executed the read-only system status check.",
-          "",
-          "Status: #{status}",
-          "Blockers: #{blockers.empty? ? 'none' : blockers.length}",
-          "Warnings: #{warnings.empty? ? 'none' : warnings.length}",
-          "",
-          "Executed: true",
-          "Skill: #{intent.skill_id}",
-          "Risk: #{intent.risk}",
-          "History recorded: true",
-          "This was read-only. No levers pulled, no altar lit, one log entry created."
-        ].join("\n")
-      rescue JSON::ParserError
-        [
-          "I executed the read-only system status check, but could not parse the output as JSON.",
-          "History recorded: true",
-          "",
-          result.stdout.to_s[0, 1200]
-        ].join("\n")
-      end
+      data = JSON.parse(result.stdout)
+      status = data["status"] || (data["ok"] == true ? "ready" : "unknown")
+      blockers = Array(data["blockers"])
+      warnings = Array(data["warnings"])
+      [
+        "I executed the read-only system status check.",
+        "",
+        "Status: #{status}",
+        "Blockers: #{blockers.empty? ? 'none' : blockers.length}",
+        "Warnings: #{warnings.empty? ? 'none' : warnings.length}",
+        "",
+        "Executed: true",
+        "Skill: #{intent.skill_id}",
+        "Risk: #{intent.risk}",
+        "History recorded: true",
+        "This was read-only. No levers pulled, no altar lit, one log entry created."
+      ].join("\n")
+    rescue JSON::ParserError
+      "I executed the read-only system status check, but could not parse the output as JSON.\nHistory recorded: true\n\n#{result.stdout.to_s[0, 1200]}"
     end
 
     def gate_blocked_message(label, result)
@@ -145,7 +133,6 @@ module SoulCore
 
     def gated_skill(intent, message)
       result = @gate.evaluate(message, execute: false, record_history: true)
-
       [
         "I can map this request to the read-only execution gate.",
         "",
@@ -171,12 +158,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is execution history review and pruning controls, or another read-only adapter if we want more useful live behavior. The important part is that actions now leave footprints instead of vanishing into the swamp."
+      "The next planned implementation thread is probably another read-only adapter or execution history filtering. We now have records, export, and an explicit clear path. Civilization has discovered paperwork again."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, and record execution history, but this request did not match an executable path.",
+        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, and manage history controls, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",

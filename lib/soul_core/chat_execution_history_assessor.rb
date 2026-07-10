@@ -14,44 +14,55 @@ module SoulCore
     end
 
     def assess
-      Dir.mktmpdir("soul-history-assessment-") do |dir|
+      Dir.mktmpdir("soul-history-controls-assessment-") do |dir|
         history = ChatExecutionHistory.new(root: @root, path: File.join(dir, "chat_executions.jsonl"))
         gate = ReadOnlySkillExecutionGate.new(root: @root, history: history)
 
-        executed = gate.evaluate("what skills do you have?", execute: true, record_history: true)
-        blocked = gate.evaluate("move approved downloads to trash", execute: true, record_history: true)
-        adapter_missing = gate.evaluate("inspect my downloads", execute: false, record_history: true)
+        gate.evaluate("what skills do you have?", execute: true, record_history: true)
+        gate.evaluate("move approved downloads to trash", execute: true, record_history: true)
+        gate.evaluate("inspect my downloads", execute: false, record_history: true)
 
-        entries = history.entries
+        before = history.entries
+        json_export = history.export(format: "json", export_dir: File.join(dir, "exports"))
+        jsonl_export = history.export(format: "jsonl", export_dir: File.join(dir, "exports"))
+        blocked_clear = history.clear(confirm: false)
+        clear = history.clear(confirm: true)
+        after = history.entries
 
         blockers = []
-        blockers << "Expected exactly three history entries" unless entries.length == 3
-        blockers << "Expected one executed history entry" unless entries.count { |entry| entry["executed"] == true } == 1
-        blockers << "Expected owner confirmation block to be recorded" unless entries.any? { |entry| Array(entry["blocked_by"]).include?("owner_confirmation_required") }
-        blockers << "Expected adapter-not-implemented block to be recorded" unless entries.any? { |entry| Array(entry["blocked_by"]).include?("adapter_not_implemented") }
-        blockers << "Expected executed result to have a history entry" unless executed.history_entry
-        blockers << "Expected blocked result to have a history entry" unless blocked.history_entry
-        blockers << "Expected adapter-missing result to have a history entry" unless adapter_missing.history_entry
+        blockers << "Expected exactly three history entries before clear" unless before.length == 3
+        blockers << "Expected JSON export to include three entries" unless json_export["count"] == 3
+        blockers << "Expected JSONL export to include three entries" unless jsonl_export["count"] == 3
+        blockers << "Expected unconfirmed clear to be blocked" unless blocked_clear["ok"] == false && blocked_clear["deleted"] == false
+        blockers << "Expected confirmed clear to succeed" unless clear["ok"] == true
+        blockers << "Expected no entries after confirmed clear" unless after.empty?
 
         {
           "ok" => blockers.empty?,
           "assessment" => "chat_execution_history",
-          "phase" => 50,
+          "phase" => 51,
           "generated_at" => Time.now.iso8601,
           "root" => @root,
           "status" => blockers.empty? ? "ready" : "blocked",
-          "history_path" => history.path,
-          "entries" => entries,
+          "entries_before_clear" => before,
+          "entries_after_clear" => after,
+          "exports" => [json_export, jsonl_export],
+          "blocked_clear" => blocked_clear,
+          "confirmed_clear" => clear,
           "blockers" => blockers,
           "warnings" => [
             "Assessment writes to a temporary directory.",
             "Real chat history is stored locally under Soul/runtime/.",
-            "Runtime history must remain gitignored."
+            "Clear and export are explicit controls.",
+            "Runtime history and exports must remain gitignored."
           ],
           "verification" => {
-            "records_executed_results" => entries.any? { |entry| entry["executed"] == true },
-            "records_blocked_results" => entries.any? { |entry| entry["status"] == "blocked" },
-            "records_exit_status" => entries.any? { |entry| !entry["exit_status"].nil? },
+            "records_executed_results" => before.any? { |entry| entry["executed"] == true },
+            "records_blocked_results" => before.any? { |entry| entry["status"] == "blocked" },
+            "exports_json" => json_export["ok"] == true,
+            "exports_jsonl" => jsonl_export["ok"] == true,
+            "blocks_unconfirmed_clear" => blocked_clear["ok"] == false,
+            "clears_with_confirmation" => clear["ok"] == true,
             "uses_runtime_path_by_default" => ChatExecutionHistory::DEFAULT_PATH.start_with?(File.join("Soul", "runtime")),
             "assessment_uses_tempdir" => true
           }
@@ -61,26 +72,21 @@ module SoulCore
 
     def render(report)
       lines = []
-      lines << "Soul Chat Execution History Assessment"
+      lines << "Soul Chat Execution History Controls Assessment"
       lines << "Generated: #{report['generated_at']}"
       lines << "Status: #{report['status']}"
-      lines << "Entries: #{report['entries'].length}"
+      lines << "Entries before clear: #{report['entries_before_clear'].length}"
+      lines << "Entries after clear: #{report['entries_after_clear'].length}"
       lines << ""
-      lines << "Recorded entries"
-      report.fetch("entries").each do |entry|
-        lines << "- #{entry['timestamp']} #{entry['skill_id'] || 'none'}"
-        lines << "  status: #{entry['status']}"
-        lines << "  executed: #{entry['executed']}"
-        lines << "  exit_status: #{entry['exit_status'] || 'none'}"
-        lines << "  blocked_by: #{Array(entry['blocked_by']).empty? ? 'none' : Array(entry['blocked_by']).join(', ')}"
-      end
+      lines << "Exports"
+      report.fetch("exports").each { |export| lines << "- #{export['format']}: #{export['path']} (#{export['count']} entries)" }
+      lines << ""
+      lines << "Clear controls"
+      lines << "- unconfirmed clear: #{report.dig('blocked_clear', 'status')}"
+      lines << "- confirmed clear: #{report.dig('confirmed_clear', 'status')}"
       lines << ""
       lines << "Blockers"
-      if report.fetch("blockers").empty?
-        lines << "- None"
-      else
-        report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
-      end
+      report.fetch("blockers").empty? ? lines << "- None" : report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
       lines.join("\n")
     end
   end
