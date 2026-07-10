@@ -25,7 +25,7 @@ module SoulCore
       return "I am here. Give me a thread to pull." if lower.empty?
       return export_history(lower) if lower.match?(/\b(export execution history|export history)\b/)
       return clear_history(lower) if lower.match?(/\b(clear execution history|clear history)\b/)
-      return @history.render(limit: 10) if lower.match?(/\b(execution history|recent executions|show executions)\b/) || lower == "history"
+      return render_history(lower) if lower.match?(/\b(execution history|recent executions|show executions)\b/) || lower == "history"
       return route_explanation(text) if lower.match?(/\b(intent|route|classify)\b/) && lower.match?(/\b(this|message|request|utterance)\b/)
       return @planner.explain(text) if lower.match?(/\b(plan|prepare)\b/) && lower.match?(/\b(skill|invocation|execution|run)\b/)
       return @gate.explain(text, execute: false, record_history: false) if lower.match?(/\b(execute|run|invoke)\b/) && lower.match?(/\b(skill|this|it|request)\b/)
@@ -44,13 +44,20 @@ module SoulCore
 
     private
 
+    def render_history(lower)
+      filters = ChatExecutionHistory.filters_from_text(lower)
+      @history.render(limit: 10, filters: filters)
+    end
+
     def export_history(lower)
       format = lower.include?("jsonl") ? "jsonl" : "json"
-      result = @history.export(format: format)
+      filters = ChatExecutionHistory.filters_from_text(lower)
+      result = @history.export(format: format, filters: filters)
       [
         "Execution history exported.",
         "Format: #{result['format']}",
         "Entries: #{result['count']}",
+        "Filters: #{result['filters'].empty? ? 'none' : result['filters'].map { |key, value| "#{key}=#{value}" }.join(', ')}",
         "Path: #{result['path']}",
         "This is still runtime/private data. Do not commit it, unless you enjoy turning audit logs into public confetti."
       ].join("\n")
@@ -61,12 +68,7 @@ module SoulCore
     def clear_history(lower)
       confirmed = lower.include?("confirm") || lower.include?("--confirm")
       result = @history.clear(confirm: confirmed)
-      [
-        result["message"],
-        "Status: #{result['status']}",
-        "Deleted: #{result['deleted']}",
-        "Path: #{result['path']}"
-      ].join("\n")
+      [result["message"], "Status: #{result['status']}", "Deleted: #{result['deleted']}", "Path: #{result['path']}"].join("\n")
     end
 
     def route_explanation(text)
@@ -122,13 +124,7 @@ module SoulCore
     end
 
     def gate_blocked_message(label, result)
-      [
-        "I mapped this to #{label}, but the execution gate did not allow it.",
-        "Gate status: #{result.status}",
-        "Blocked by: #{result.blocked_by.join(', ')}",
-        "History recorded: #{!result.history_entry.nil?}",
-        result.message
-      ].join("\n")
+      ["I mapped this to #{label}, but the execution gate did not allow it.", "Gate status: #{result.status}", "Blocked by: #{result.blocked_by.join(', ')}", "History recorded: #{!result.history_entry.nil?}", result.message].join("\n")
     end
 
     def gated_skill(intent, message)
@@ -158,12 +154,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is probably another read-only adapter or execution history filtering. We now have records, export, and an explicit clear path. Civilization has discovered paperwork again."
+      "The next planned implementation thread is likely history pruning or a third read-only adapter. The logbook can now be searched instead of merely admired like a dusty museum placard."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, and manage history controls, but this request did not match an executable path.",
+        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, and filter history, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",

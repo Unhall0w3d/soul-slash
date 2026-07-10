@@ -14,55 +14,61 @@ module SoulCore
     end
 
     def assess
-      Dir.mktmpdir("soul-history-controls-assessment-") do |dir|
+      Dir.mktmpdir("soul-history-filters-assessment-") do |dir|
         history = ChatExecutionHistory.new(root: @root, path: File.join(dir, "chat_executions.jsonl"))
         gate = ReadOnlySkillExecutionGate.new(root: @root, history: history)
 
         gate.evaluate("what skills do you have?", execute: true, record_history: true)
+        gate.evaluate("check repo health", execute: true, record_history: true)
         gate.evaluate("move approved downloads to trash", execute: true, record_history: true)
         gate.evaluate("inspect my downloads", execute: false, record_history: true)
 
-        before = history.entries
-        json_export = history.export(format: "json", export_dir: File.join(dir, "exports"))
-        jsonl_export = history.export(format: "jsonl", export_dir: File.join(dir, "exports"))
-        blocked_clear = history.clear(confirm: false)
-        clear = history.clear(confirm: true)
-        after = history.entries
+        all = history.entries
+        system_status = history.entries(filters: { "skill_id" => "system.status" })
+        blocked = history.entries(filters: { "status" => "blocked" })
+        executed = history.entries(filters: { "executed" => true })
+        parsed = ChatExecutionHistory.filters_from_text("show execution history skill system.status executed only")
+        parsed_rows = history.entries(filters: parsed)
+        filtered_export = history.export(format: "json", filters: { "status" => "blocked" }, export_dir: File.join(dir, "exports"))
 
         blockers = []
-        blockers << "Expected exactly three history entries before clear" unless before.length == 3
-        blockers << "Expected JSON export to include three entries" unless json_export["count"] == 3
-        blockers << "Expected JSONL export to include three entries" unless jsonl_export["count"] == 3
-        blockers << "Expected unconfirmed clear to be blocked" unless blocked_clear["ok"] == false && blocked_clear["deleted"] == false
-        blockers << "Expected confirmed clear to succeed" unless clear["ok"] == true
-        blockers << "Expected no entries after confirmed clear" unless after.empty?
+        blockers << "Expected four history entries" unless all.length == 4
+        blockers << "Expected one system.status entry" unless system_status.length == 1
+        blockers << "Expected two blocked entries" unless blocked.length == 2
+        blockers << "Expected two executed entries" unless executed.length == 2
+        blockers << "Expected parsed filters to include skill_id and executed" unless parsed["skill_id"] == "system.status" && parsed["executed"] == true
+        blockers << "Expected parsed filter to return one row" unless parsed_rows.length == 1
+        blockers << "Expected filtered export to include two rows" unless filtered_export["count"] == 2
 
         {
           "ok" => blockers.empty?,
           "assessment" => "chat_execution_history",
-          "phase" => 51,
+          "phase" => 52,
           "generated_at" => Time.now.iso8601,
           "root" => @root,
           "status" => blockers.empty? ? "ready" : "blocked",
-          "entries_before_clear" => before,
-          "entries_after_clear" => after,
-          "exports" => [json_export, jsonl_export],
-          "blocked_clear" => blocked_clear,
-          "confirmed_clear" => clear,
+          "counts" => {
+            "all" => all.length,
+            "system_status" => system_status.length,
+            "blocked" => blocked.length,
+            "executed" => executed.length,
+            "parsed_rows" => parsed_rows.length
+          },
+          "parsed_filters" => parsed,
+          "filtered_export" => filtered_export,
           "blockers" => blockers,
           "warnings" => [
             "Assessment writes to a temporary directory.",
             "Real chat history is stored locally under Soul/runtime/.",
-            "Clear and export are explicit controls.",
+            "Filters only apply to local execution metadata.",
             "Runtime history and exports must remain gitignored."
           ],
           "verification" => {
-            "records_executed_results" => before.any? { |entry| entry["executed"] == true },
-            "records_blocked_results" => before.any? { |entry| entry["status"] == "blocked" },
-            "exports_json" => json_export["ok"] == true,
-            "exports_jsonl" => jsonl_export["ok"] == true,
-            "blocks_unconfirmed_clear" => blocked_clear["ok"] == false,
-            "clears_with_confirmation" => clear["ok"] == true,
+            "filters_by_skill_id" => system_status.length == 1,
+            "filters_by_status" => blocked.length == 2,
+            "filters_by_executed" => executed.length == 2,
+            "parses_chat_filters" => parsed_rows.length == 1,
+            "exports_filtered_history" => filtered_export["count"] == 2,
             "uses_runtime_path_by_default" => ChatExecutionHistory::DEFAULT_PATH.start_with?(File.join("Soul", "runtime")),
             "assessment_uses_tempdir" => true
           }
@@ -72,18 +78,15 @@ module SoulCore
 
     def render(report)
       lines = []
-      lines << "Soul Chat Execution History Controls Assessment"
+      lines << "Soul Execution History Filters Assessment"
       lines << "Generated: #{report['generated_at']}"
       lines << "Status: #{report['status']}"
-      lines << "Entries before clear: #{report['entries_before_clear'].length}"
-      lines << "Entries after clear: #{report['entries_after_clear'].length}"
       lines << ""
-      lines << "Exports"
-      report.fetch("exports").each { |export| lines << "- #{export['format']}: #{export['path']} (#{export['count']} entries)" }
+      lines << "Counts"
+      report.fetch("counts").each { |key, value| lines << "- #{key}: #{value}" }
       lines << ""
-      lines << "Clear controls"
-      lines << "- unconfirmed clear: #{report.dig('blocked_clear', 'status')}"
-      lines << "- confirmed clear: #{report.dig('confirmed_clear', 'status')}"
+      lines << "Parsed filters"
+      report.fetch("parsed_filters").each { |key, value| lines << "- #{key}: #{value}" }
       lines << ""
       lines << "Blockers"
       report.fetch("blockers").empty? ? lines << "- None" : report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
