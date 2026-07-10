@@ -1,236 +1,135 @@
-# frozen_string_literal: true
 
-require_relative "llm_intent_classifier"
+# frozen_string_literal: true
 
 module SoulCore
   class IntentRouter
-    Result = Struct.new(:ok, :intent, :parameters, :confidence, :reason, :source, keyword_init: true)
+    class Result
+      ATTRIBUTES = [
+        :id,
+        :label,
+        :confidence,
+        :skill_id,
+        :risk,
+        :confirmation_required,
+        :reason,
+        :next_step,
+        :ok,
+        :intent,
+        :parameters,
+        :source
+      ].freeze
 
-    def route(text)
-      input = text.to_s.strip
-      normalized = input.downcase
-      return no_match("empty request", source: "deterministic") if normalized.empty?
+      attr_accessor(*ATTRIBUTES)
 
-      deterministic = route_deterministic(input, normalized)
-      return deterministic if deterministic.ok
-
-      llm_result = LlmIntentClassifier.new.classify(input)
-
-      if llm_result[:ok]
-        return Result.new(
-          ok: true,
-          intent: llm_result[:intent],
-          parameters: llm_result[:parameters],
-          confidence: llm_result[:confidence],
-          reason: llm_result[:reason],
-          source: llm_result[:source]
-        )
+      def initialize(**kwargs)
+        kwargs.each do |key, value|
+          public_send("#{key}=", value) if ATTRIBUTES.include?(key)
+        end
       end
 
-      no_match(llm_result[:reason] || deterministic.reason, source: "hybrid")
+      def to_h
+        {
+          "id" => id,
+          "label" => label,
+          "confidence" => confidence,
+          "skill_id" => skill_id,
+          "risk" => risk,
+          "confirmation_required" => confirmation_required,
+          "reason" => reason,
+          "next_step" => next_step,
+          "ok" => ok,
+          "intent" => intent,
+          "parameters" => parameters,
+          "source" => source
+        }.reject { |_key, value| value.nil? }
+      end
     end
 
-    def inspect_route(text)
-      route(text)
+    Intent = Result
+
+    # More specific rules must appear before broader rules.
+    RULES = [
+      ["identity", "Soul identity", /\b(who are you|what are you|what is soul|explain yourself|your personality)\b/i, nil, "none", false, 0.95, "The request asks Soul to explain itself."],
+      ["skill_catalog", "Skill catalog", /\b(what skills|list skills|skills do you have|what can you do|capabilities)\b/i, "assistant-skill-catalog", "read_only", false, 0.93, "The request asks for available skills or capabilities."],
+      ["repo_status", "Repository/runtime status", /\b(repo|repository|doctor|runtime|health|status|curation|ruby runtime)\b/i, "system.status", "read_only", false, 0.78, "The request appears to ask about project or runtime condition."],
+      ["pending_work", "Pending work / next build step", /\b(next|pending|todo|to do|build next|what should we build|roadmap|phase)\b/i, nil, "planning", false, 0.82, "The request asks about upcoming work or planning."],
+      ["weather_request", "Weather request", /\b(weather|forecast|temperature|rain|snow|storm)\b/i, "weather.report", "read_only", false, 0.86, "The request appears to ask for weather information."],
+      ["downloads_move_to_trash", "Downloads move to trash", /\b(move.*downloads.*trash|move.*trash|delete downloads|trash downloads|execute cleanup|remove downloads)\b/i, "downloads.move_to_trash", "approval_required", true, 0.89, "The request may change local filesystem state."],
+      ["downloads_cleanup_plan", "Downloads cleanup planning", /\b(clean up downloads|cleanup downloads|downloads cleanup|plan.*downloads|safe cleanup)\b/i, "downloads.cleanup_plan", "review_only", false, 0.86, "The request asks for cleanup planning, not immediate deletion."],
+      ["downloads_inspect", "Downloads inspection", /\b(downloads|download folder|inspect downloads|what is in downloads)\b/i, "downloads.inspect", "read_only", false, 0.86, "The request appears to ask about the local Downloads folder."],
+      ["cloud_providers", "Cloud provider check", /\b(cloud provider|providers|provider connectivity|test providers|openai|gemini|codex)\b/i, "cloud.providers.list", "network_or_provider_check", false, 0.74, "The request appears related to configured cloud/model providers."],
+      ["youtube_request", "YouTube lookup", /\b(youtube|song search|video resolve|find.*video|find.*song)\b/i, "youtube.song_search", "read_only", false, 0.78, "The request appears to ask for YouTube lookup/resolution."],
+      ["skill_brief", "Skill brief drafting or review", /\b(skill brief|draft.*skill|review.*skill|new skill|skill proposal)\b/i, "skill.brief.draft", "review_only", false, 0.8, "The request appears to ask for skill design or review."]
+    ].map do |id, label, regex, skill_id, risk, confirmation_required, confidence, reason|
+      {
+        id: id,
+        label: label,
+        regex: regex,
+        skill_id: skill_id,
+        risk: risk,
+        confirmation_required: confirmation_required,
+        confidence: confidence,
+        reason: reason
+      }
+    end.freeze
+
+    def route(message)
+      text = message.to_s.strip
+      return unknown("The message is empty.") if text.empty?
+
+      rule = RULES.find { |candidate| text.match?(candidate.fetch(:regex)) }
+      rule ? from_rule(rule) : unknown("No deterministic Phase 45 rule matched this message.")
+    end
+
+    def explain(message)
+      intent = route(message)
+      [
+        "Intent: #{intent.label || intent.intent || intent.id}",
+        "id: #{intent.id || intent.intent || 'unknown'}",
+        "confidence: #{format('%.2f', intent.confidence || 0.0)}",
+        "skill_id: #{intent.skill_id || 'none'}",
+        "risk: #{intent.risk || 'unknown'}",
+        "confirmation_required: #{intent.confirmation_required || false}",
+        "reason: #{intent.reason}",
+        "next_step: #{intent.next_step}"
+      ].join("\n")
     end
 
     private
 
-    def route_deterministic(input, normalized)
-      if weather_report?(normalized)
-        explicit_location = extract_weather_location(input)
-        default_location = ENV.fetch("SOUL_WEATHER_LOCATION", nil).to_s.strip
-        location =
-          if explicit_location && !explicit_location.empty?
-            explicit_location
-          elsif !default_location.empty?
-            default_location
-          end
-
-        location_source =
-          if explicit_location && !explicit_location.empty?
-            "explicit"
-          elsif !default_location.empty?
-            "default_home"
-          else
-            "missing"
-          end
-
-        confidence =
-          case location_source
-          when "explicit" then 0.93
-          when "default_home" then 0.88
-          else 0.74
-          end
-
-        reason =
-          case location_source
-          when "explicit"
-            "Matched weather phrasing and extracted explicit location."
-          when "default_home"
-            "Matched weather phrasing and found default Home location in environment."
-          else
-            "Matched weather phrasing but no location was found."
-          end
-
-        return Result.new(
-          ok: true,
-          intent: "weather.report",
-          parameters: {
-            "location" => location,
-            "location_source" => location_source,
-            "home_location" => default_location.empty? ? nil : default_location,
-            "units" => ENV.fetch("SOUL_WEATHER_UNITS", "fahrenheit")
-          },
-          confidence: confidence,
-          reason: reason,
-          source: "deterministic"
-        )
-      end
-
-      if downloads_restore_last_cleanup?(normalized)
-        return Result.new(
-          ok: true,
-          intent: "downloads.restore_last_cleanup",
-          parameters: { "target_path" => File.join(Dir.home, "Downloads") },
-          confidence: 0.91,
-          reason: "Matched restore/undo phrasing for the last Downloads cleanup.",
-          source: "deterministic"
-        )
-      end
-
-      if downloads_cleanup?(normalized)
-        days = extract_days(normalized) || 30
-        return Result.new(
-          ok: true,
-          intent: "downloads.cleanup",
-          parameters: {
-            "target_path" => File.join(Dir.home, "Downloads"),
-            "older_than_days" => days,
-            "include_directories" => true,
-            "recursive" => false
-          },
-          confidence: deterministic_confidence(normalized),
-          reason: deterministic_reason(normalized, days),
-          source: "deterministic"
-        )
-      end
-
-      no_match("no deterministic workflow matched", source: "deterministic")
-    end
-
-    def weather_report?(normalized)
-      weather_terms = normalized.match?(/\bweather\b/) ||
-                      normalized.match?(/\bforecast\b/) ||
-                      normalized.match?(/\btemperature\b/) ||
-                      normalized.match?(/\bhumidity\b/) ||
-                      normalized.match?(/\bair quality\b/) ||
-                      normalized.match?(/\baqi\b/)
-
-      today_context = normalized.match?(/\btoday\b/) ||
-                      normalized.match?(/\bnow\b/) ||
-                      normalized.match?(/\bcurrent\b/) ||
-                      normalized.match?(/\bwhat'?s it like\b/) ||
-                      normalized.match?(/\boutside\b/) ||
-                      normalized.match?(/\bforecast\b/)
-
-      weather_terms && today_context
-    end
-
-    def extract_weather_location(input)
-      patterns = [
-        /\bweather\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
-        /\bforecast\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
-        /\bair quality\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
-        /\btemperature\s+(?:today\s+)?(?:in|for|near)\s+(.+)$/i,
-        /\b(?:in|for|near)\s+([A-Za-z][A-Za-z0-9\s,.'-]+)\??$/i
-      ]
-
-      patterns.each do |pattern|
-        match = input.match(pattern)
-        next unless match
-
-        location = match[1].to_s.strip
-        location = location.sub(/[?.!]\z/, "").strip
-        return location unless location.empty?
-      end
-
-      nil
-    end
-
-    def downloads_restore_last_cleanup?(normalized)
-      restore_action = normalized.match?(/\brestore\b/) ||
-                       normalized.match?(/\bundo\b/) ||
-                       normalized.match?(/\brollback\b/) ||
-                       normalized.match?(/\broll back\b/) ||
-                       normalized.match?(/\bput back\b/)
-
-      cleanup_context = normalized.include?("downloads") ||
-                        normalized.include?("download folder") ||
-                        normalized.include?("cleanup") ||
-                        normalized.include?("clean up") ||
-                        normalized.include?("trash")
-
-      last_context = normalized.include?("last") ||
-                     normalized.include?("latest") ||
-                     normalized.include?("previous") ||
-                     normalized.include?("what soul moved")
-
-      restore_action && cleanup_context && last_context
-    end
-
-    def downloads_cleanup?(normalized)
-      mentions_downloads = normalized.include?("downloads") ||
-                           normalized.include?("download folder") ||
-                           normalized.include?("downloads folder") ||
-                           normalized.include?("download directory") ||
-                           normalized.include?("downloads directory")
-
-      cleanup_action = normalized.match?(/\bclean ?up\b/) ||
-                       normalized.match?(/\bcleanup\b/) ||
-                       normalized.match?(/\bclear\b/) ||
-                       normalized.match?(/\bremove\b/) ||
-                       normalized.match?(/\btrash\b/) ||
-                       normalized.match?(/\bdelete\b/) ||
-                       normalized.match?(/\bget rid of\b/) ||
-                       normalized.match?(/\bfile cleanup\b/)
-
-      mentions_downloads && cleanup_action
-    end
-
-    def extract_days(normalized)
-      match = normalized.match(/older than\s+(\d+)\s+days?/)
-      return match[1].to_i if match
-
-      match = normalized.match(/\b(\d+)\s+days?\s+old\b/)
-      return match[1].to_i if match
-
-      match = normalized.match(/\b(\d+)\s+day\b/)
-      return match[1].to_i if match
-
-      nil
-    end
-
-    def deterministic_confidence(normalized)
-      extract_days(normalized) ? 0.95 : 0.86
-    end
-
-    def deterministic_reason(normalized, days)
-      if extract_days(normalized)
-        "Matched Downloads cleanup phrasing and extracted age threshold of #{days} days."
-      else
-        "Matched Downloads cleanup phrasing. No age threshold was specified, so defaulted to #{days} days."
-      end
-    end
-
-    def no_match(reason, source:)
+    def from_rule(rule)
       Result.new(
-        ok: false,
-        intent: nil,
-        parameters: {},
-        confidence: 0.0,
+        id: rule.fetch(:id),
+        label: rule.fetch(:label),
+        confidence: rule.fetch(:confidence),
+        skill_id: rule.fetch(:skill_id),
+        risk: rule.fetch(:risk),
+        confirmation_required: rule.fetch(:confirmation_required),
+        reason: rule.fetch(:reason),
+        next_step: next_step_for(rule)
+      )
+    end
+
+    def next_step_for(rule)
+      if rule.fetch(:confirmation_required)
+        "Prepare a plan and require explicit owner confirmation before execution."
+      elsif rule.fetch(:skill_id)
+        "Explain the mapped skill and wait for a future skill invocation planner."
+      else
+        "Respond directly using deterministic chat behavior."
+      end
+    end
+
+    def unknown(reason)
+      Result.new(
+        id: "unknown",
+        label: "Unknown / conversational",
+        confidence: 0.2,
+        skill_id: nil,
+        risk: "unknown",
+        confirmation_required: false,
         reason: reason,
-        source: source
+        next_step: "Respond with the current deterministic fallback until LLM-backed conversation or richer routing exists."
       )
     end
   end
