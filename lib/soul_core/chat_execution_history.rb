@@ -97,6 +97,51 @@ module SoulCore
       }
     end
 
+    def prune(keep:, confirm: false, export_before_delete: true, export_dir: DEFAULT_EXPORT_DIR)
+      keep_count = Integer(keep)
+      raise ArgumentError, "keep must be zero or greater" if keep_count.negative?
+
+      rows = all_entries
+      remove_count = [rows.length - keep_count, 0].max
+      kept = keep_count.zero? ? [] : rows.last(keep_count)
+      removed = remove_count.zero? ? [] : rows.first(remove_count)
+
+      preview = {
+        "ok" => true,
+        "status" => "preview",
+        "path" => relative_path(@path),
+        "total_before" => rows.length,
+        "keep" => keep_count,
+        "would_remove" => remove_count,
+        "would_keep" => kept.length,
+        "confirm_required" => true,
+        "export_before_delete" => export_before_delete,
+        "export" => nil,
+        "pruned" => false
+      }
+
+      return preview unless confirm
+
+      export_result = nil
+      if export_before_delete && removed.any?
+        export_result = export_rows(removed, format: "json", export_dir: export_dir, prefix: "chat_executions_pruned")
+      end
+
+      FileUtils.mkdir_p(File.dirname(@path))
+      if kept.empty?
+        FileUtils.rm_f(@path)
+      else
+        File.open(@path, "w") { |file| kept.each { |entry| file.puts(JSON.generate(entry)) } }
+      end
+
+      preview.merge(
+        "status" => "pruned",
+        "total_after" => kept.length,
+        "export" => export_result,
+        "pruned" => true
+      )
+    end
+
     def render(limit: 10, filters: {})
       data = summary(limit: limit, filters: filters)
       lines = []
@@ -151,6 +196,16 @@ module SoulCore
       filters
     end
 
+    def self.keep_count_from_text(text, default: 10)
+      lower = text.to_s.downcase
+      return Regexp.last_match(1).to_i if lower =~ /\bkeep[:= ]+(\d+)\b/
+      return Regexp.last_match(1).to_i if lower =~ /\blast[:= ]+(\d+)\b/
+      return Regexp.last_match(1).to_i if lower =~ /\bkeep\s+last\s+(\d+)\b/
+      return Regexp.last_match(1).to_i if lower =~ /\blast\s+(\d+)\b/
+
+      default
+    end
+
     private
 
     def all_entries
@@ -161,6 +216,24 @@ module SoulCore
       rescue JSON::ParserError
         nil
       end
+    end
+
+    def export_rows(rows, format:, export_dir:, prefix:)
+      dir = File.expand_path(export_dir, @root)
+      FileUtils.mkdir_p(dir)
+      timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
+      target = File.join(dir, "#{prefix}_#{timestamp}.#{format}")
+
+      case format.to_s
+      when "json"
+        File.write(target, JSON.pretty_generate({ "exported_at" => Time.now.iso8601, "entries" => rows }) + "\n")
+      when "jsonl"
+        File.open(target, "w") { |file| rows.each { |entry| file.puts(JSON.generate(entry)) } }
+      else
+        raise ArgumentError, "Unsupported export format: #{format}"
+      end
+
+      { "ok" => true, "path" => relative_path(target), "format" => format.to_s, "count" => rows.length }
     end
 
     def filter_entries(rows, filters)

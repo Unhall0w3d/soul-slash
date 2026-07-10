@@ -23,6 +23,7 @@ module SoulCore
       intent = @router.route(text)
 
       return "I am here. Give me a thread to pull." if lower.empty?
+      return prune_history(lower) if lower.match?(/\b(prune execution history|prune history)\b/)
       return export_history(lower) if lower.match?(/\b(export execution history|export history)\b/)
       return clear_history(lower) if lower.match?(/\b(clear execution history|clear history)\b/)
       return render_history(lower) if lower.match?(/\b(execution history|recent executions|show executions)\b/) || lower == "history"
@@ -43,6 +44,27 @@ module SoulCore
     end
 
     private
+
+    def prune_history(lower)
+      keep = ChatExecutionHistory.keep_count_from_text(lower, default: 10)
+      confirmed = lower.include?("confirm") || lower.include?("--confirm")
+      result = @history.prune(keep: keep, confirm: confirmed)
+
+      lines = []
+      lines << (confirmed ? "Execution history pruned." : "Execution history prune preview.")
+      lines << "Status: #{result['status']}"
+      lines << "Total before: #{result['total_before']}"
+      lines << "Keep: #{result['keep']}"
+      lines << "Would remove: #{result['would_remove']}"
+      lines << "Would keep: #{result['would_keep']}"
+      lines << "Pruned: #{result['pruned']}"
+      lines << "Exported removed entries: #{result.dig('export', 'count') || 0}"
+      lines << "Export path: #{result.dig('export', 'path') || 'none'}"
+      lines << "Add `confirm` to actually prune. This is not negotiable, because logs are cheaper than regret." unless confirmed
+      lines.join("\n")
+    rescue StandardError => error
+      "Execution history prune failed: #{error.class}: #{error.message}"
+    end
 
     def render_history(lower)
       filters = ChatExecutionHistory.filters_from_text(lower)
@@ -154,12 +176,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is likely history pruning or a third read-only adapter. The logbook can now be searched instead of merely admired like a dusty museum placard."
+      "The next planned implementation thread is likely a third read-only adapter or date-based history pruning. The logbook can now be trimmed without immediately throwing evidence into the river."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, and filter history, but this request did not match an executable path.",
+        "I heard you. I can route intents, build invocation plans, execute two read-only chat skill paths, record history, filter history, and prune history with confirmation, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",
