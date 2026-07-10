@@ -29,6 +29,13 @@ module SoulCore
         "execute" => true,
         "expected_executed" => true
       },
+      "check repo health" => {
+        "expected_status" => "executed",
+        "expected_skill" => "system.status",
+        "expected_blocker" => nil,
+        "execute" => true,
+        "expected_executed" => true
+      },
       "move approved downloads to trash" => {
         "expected_status" => "blocked",
         "expected_skill" => "downloads.move_to_trash",
@@ -80,7 +87,7 @@ module SoulCore
       {
         "ok" => blockers.empty?,
         "assessment" => "read_only_skill_execution_gate",
-        "phase" => 48,
+        "phase" => 49,
         "generated_at" => Time.now.iso8601,
         "root" => @root,
         "status" => blockers.empty? ? "ready" : "blocked",
@@ -88,13 +95,14 @@ module SoulCore
         "samples" => samples,
         "blockers" => blockers,
         "warnings" => [
-          "Phase 48 enables exactly one actual read-only execution path.",
-          "The first executable skill is assistant-skill-catalog.",
+          "Phase 49 enables a second actual read-only execution path.",
+          "Executable read-only skills: assistant-skill-catalog and system.status.",
           "Approval-required skills remain blocked.",
           "Most read-only skills still require adapters."
         ],
         "verification" => {
-          "one_read_only_skill_executed" => samples.any? { |sample| sample.dig("actual", "executed") == true },
+          "read_only_skills_executed" => samples.count { |sample| sample.dig("actual", "executed") == true },
+          "system_status_executed" => samples.any? { |sample| sample.dig("actual", "skill_id") == "system.status" && sample.dig("actual", "executed") == true },
           "approval_required_blocked" => samples.any? { |sample| sample.dig("actual", "blocked_by").include?("owner_confirmation_required") },
           "no_approval_required_execution" => samples.none? { |sample| sample.dig("actual", "executed") == true && sample.dig("actual", "skill_id") == "downloads.move_to_trash" },
           "no_filesystem_mutation_beyond_chat_transcripts" => true
@@ -104,7 +112,7 @@ module SoulCore
 
     def render(report)
       lines = []
-      lines << "Soul First Read-Only Chat Execution Assessment"
+      lines << "Soul Second Read-Only Execution Adapter Assessment"
       lines << "Generated: #{report['generated_at']}"
       lines << "Status: #{report['status']}"
       lines << ""

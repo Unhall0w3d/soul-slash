@@ -41,10 +41,10 @@ module SoulCore
         identity
       when "skill_catalog"
         execute_skill_catalog(intent)
+      when "repo_status"
+        execute_system_status(intent)
       when "pending_work"
         pending_work
-      when "repo_status"
-        status_guidance
       when "weather_request", "downloads_inspect", "downloads_cleanup_plan", "downloads_move_to_trash",
            "cloud_providers", "youtube_request", "skill_brief"
         gated_skill(intent)
@@ -63,12 +63,7 @@ module SoulCore
       result = @gate.evaluate("what skills do you have?", execute: true)
 
       unless result.executed && result.ok
-        return [
-          "I mapped this to the assistant skill catalog, but the execution gate did not allow it.",
-          "Gate status: #{result.status}",
-          "Blocked by: #{result.blocked_by.join(', ')}",
-          result.message
-        ].join("\n")
+        return gate_blocked_message("assistant skill catalog", result)
       end
 
       begin
@@ -84,7 +79,7 @@ module SoulCore
           "Executed: true",
           "Skill: #{intent.skill_id}",
           "Risk: #{intent.risk}",
-          "No local state was changed. A rare outbreak of responsible behavior."
+          "No local state was changed. Humanity survives another request."
         ].join("\n")
       rescue JSON::ParserError
         [
@@ -93,6 +88,48 @@ module SoulCore
           result.stdout.to_s[0, 1200]
         ].join("\n")
       end
+    end
+
+    def execute_system_status(intent)
+      result = @gate.evaluate("check repo health", execute: true)
+
+      unless result.executed && result.ok
+        return gate_blocked_message("system status", result)
+      end
+
+      begin
+        data = JSON.parse(result.stdout)
+        status = data["status"] || (data["ok"] == true ? "ready" : "unknown")
+        blockers = Array(data["blockers"])
+        warnings = Array(data["warnings"])
+        [
+          "I executed the read-only system status check.",
+          "",
+          "Status: #{status}",
+          "Blockers: #{blockers.empty? ? 'none' : blockers.length}",
+          "Warnings: #{warnings.empty? ? 'none' : warnings.length}",
+          "",
+          "Executed: true",
+          "Skill: #{intent.skill_id}",
+          "Risk: #{intent.risk}",
+          "This was read-only. No levers pulled, no altar lit."
+        ].join("\n")
+      rescue JSON::ParserError
+        [
+          "I executed the read-only system status check, but could not parse the output as JSON.",
+          "",
+          result.stdout.to_s[0, 1200]
+        ].join("\n")
+      end
+    end
+
+    def gate_blocked_message(label, result)
+      [
+        "I mapped this to #{label}, but the execution gate did not allow it.",
+        "Gate status: #{result.status}",
+        "Blocked by: #{result.blocked_by.join(', ')}",
+        result.message
+      ].join("\n")
     end
 
     def gated_skill(intent)
@@ -123,16 +160,12 @@ module SoulCore
     end
 
     def pending_work
-      "The next planned implementation thread is adding another real read-only adapter, likely one with useful local output and low blast radius. The first gate opened. We are not, despite centuries of human tradition, immediately sprinting through every door."
-    end
-
-    def status_guidance
-      "For current health, run: `ruby bin/soul assess read-only-skill-gate`, `ruby bin/soul assess skill-invocation-planner`, `ruby bin/soul assess intent-router`, and the existing doctor/runtime/curation assessments. Phase 48 can execute the assistant skill catalog from chat, but other skills remain gated."
+      "The next planned implementation thread is either one more read-only adapter with useful local output, or a proper execution-history record so every gated action leaves an audit trail. The baby dragon now opens two drawers. That is enough drawers for one afternoon."
     end
 
     def fallback(intent)
       [
-        "I heard you. I can now route intents, build invocation plans, and execute exactly one read-only chat skill path, but this request did not match that executable path.",
+        "I heard you. I can now route intents, build invocation plans, and execute two read-only chat skill paths, but this request did not match an executable path.",
         "",
         "Intent: #{intent.label}",
         "Reason: #{intent.reason}",

@@ -17,8 +17,9 @@ module SoulCore
       "youtube.song_search" => nil
     }.freeze
 
-    FIRST_EXECUTION_SKILLS = [
-      "assistant-skill-catalog"
+    EXECUTION_ENABLED_SKILLS = [
+      "assistant-skill-catalog",
+      "system.status"
     ].freeze
 
     Execution = Struct.new(
@@ -86,8 +87,8 @@ module SoulCore
         return blocked(plan, "This read-only skill is recognized but does not have a chat execution adapter yet.", ["adapter_not_implemented"])
       end
 
-      unless FIRST_EXECUTION_SKILLS.include?(skill_id)
-        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 48 execution yet.", ["phase48_not_enabled_for_actual_execution"])
+      unless EXECUTION_ENABLED_SKILLS.include?(skill_id)
+        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 49 execution yet.", ["phase49_not_enabled_for_actual_execution"])
       end
 
       return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but execution was not requested.", ["dry_run_not_execute_requested"]) unless execute
