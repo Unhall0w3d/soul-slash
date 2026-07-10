@@ -17,29 +17,26 @@ runtime-only approval token store
 ### Phase 60
 
 ```text
-approval token chat flow
-approve preview command
-show pending approvals
-revoke approvals
-no mutation
+approval token chat controls
 ```
-
-## Remaining
 
 ### Phase 61
 
 ```text
-downloads.move_to_trash dry-run executor
-requires approval token
-reports would-move counts
-still no mutation by default
+approval-gated downloads move dry-run
+reports would-move counts and bytes
+no mutation
+token remains pending
 ```
+
+## Remaining
 
 ### Phase 62
 
 ```text
 downloads.move_to_trash real executor behind approval token
 trash only
+token consumption
 execution history
 post-execution report
 ```
@@ -64,6 +61,6 @@ The clear stopping point is Phase 63.
 Foundation: complete
 Chat and planning: complete
 Usability foundation: complete
-Safe local action: in progress
+Safe local action: dry-run complete, real trash action pending
 Broader assistant capability: not started
 ```
