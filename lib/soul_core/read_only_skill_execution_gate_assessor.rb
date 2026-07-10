@@ -11,27 +11,37 @@ module SoulCore
       "inspect my downloads" => {
         "expected_status" => "blocked",
         "expected_skill" => "downloads.inspect",
-        "expected_blocker" => "adapter_not_implemented"
+        "expected_blocker" => "adapter_not_implemented",
+        "execute" => false,
+        "expected_executed" => false
       },
       "what is the weather?" => {
         "expected_status" => "blocked",
         "expected_skill" => "weather.report",
-        "expected_blocker" => "adapter_not_implemented"
+        "expected_blocker" => "adapter_not_implemented",
+        "execute" => false,
+        "expected_executed" => false
       },
       "what skills do you have?" => {
-        "expected_status" => "ready",
+        "expected_status" => "executed",
         "expected_skill" => "assistant-skill-catalog",
-        "expected_blocker" => "phase47_dry_run_default"
+        "expected_blocker" => nil,
+        "execute" => true,
+        "expected_executed" => true
       },
       "move approved downloads to trash" => {
         "expected_status" => "blocked",
         "expected_skill" => "downloads.move_to_trash",
-        "expected_blocker" => "owner_confirmation_required"
+        "expected_blocker" => "owner_confirmation_required",
+        "execute" => true,
+        "expected_executed" => false
       },
       "tell me about the moonlit gears" => {
         "expected_status" => "blocked",
         "expected_skill" => nil,
-        "expected_blocker" => "no_candidate_skill"
+        "expected_blocker" => "no_candidate_skill",
+        "execute" => true,
+        "expected_executed" => false
       }
     }.freeze
 
@@ -42,12 +52,12 @@ module SoulCore
 
     def assess
       samples = SAMPLE_MESSAGES.map do |message, expected|
-        result = @gate.evaluate(message)
+        result = @gate.evaluate(message, execute: expected["execute"])
         matched =
           result.status == expected["expected_status"] &&
           result.skill_id == expected["expected_skill"] &&
-          result.executed == false &&
-          result.blocked_by.include?(expected["expected_blocker"])
+          result.executed == expected["expected_executed"] &&
+          (expected["expected_blocker"].nil? || result.blocked_by.include?(expected["expected_blocker"]))
 
         {
           "message" => message,
@@ -56,10 +66,11 @@ module SoulCore
             "status" => result.status,
             "skill_id" => result.skill_id,
             "executed" => result.executed,
-            "blocked_by" => result.blocked_by
+            "blocked_by" => result.blocked_by,
+            "exit_status" => result.exit_status
           },
           "matched" => matched,
-          "result" => result.to_h
+          "result" => scrubbed_result(result)
         }
       end
 
@@ -69,6 +80,7 @@ module SoulCore
       {
         "ok" => blockers.empty?,
         "assessment" => "read_only_skill_execution_gate",
+        "phase" => 48,
         "generated_at" => Time.now.iso8601,
         "root" => @root,
         "status" => blockers.empty? ? "ready" : "blocked",
@@ -76,15 +88,15 @@ module SoulCore
         "samples" => samples,
         "blockers" => blockers,
         "warnings" => [
-          "Phase 47 models the read-only execution gate.",
-          "Phase 47 still defaults to dry-run behavior.",
+          "Phase 48 enables exactly one actual read-only execution path.",
+          "The first executable skill is assistant-skill-catalog.",
           "Approval-required skills remain blocked.",
-          "Adapters for some read-only skills are intentionally not implemented yet."
+          "Most read-only skills still require adapters."
         ],
         "verification" => {
-          "no_skill_execution" => true,
-          "dry_run_default" => true,
-          "approval_required_blocked" => true,
+          "one_read_only_skill_executed" => samples.any? { |sample| sample.dig("actual", "executed") == true },
+          "approval_required_blocked" => samples.any? { |sample| sample.dig("actual", "blocked_by").include?("owner_confirmation_required") },
+          "no_approval_required_execution" => samples.none? { |sample| sample.dig("actual", "executed") == true && sample.dig("actual", "skill_id") == "downloads.move_to_trash" },
           "no_filesystem_mutation_beyond_chat_transcripts" => true
         }
       }
@@ -92,7 +104,7 @@ module SoulCore
 
     def render(report)
       lines = []
-      lines << "Soul Read-Only Skill Execution Gate Assessment"
+      lines << "Soul First Read-Only Chat Execution Assessment"
       lines << "Generated: #{report['generated_at']}"
       lines << "Status: #{report['status']}"
       lines << ""
@@ -117,6 +129,15 @@ module SoulCore
         report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
       end
       lines.join("\n")
+    end
+
+    private
+
+    def scrubbed_result(result)
+      data = result.to_h
+      data["stdout"] = data["stdout"].to_s[0, 1000]
+      data["stderr"] = data["stderr"].to_s[0, 1000]
+      data
     end
   end
 end

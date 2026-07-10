@@ -2,19 +2,24 @@
 # frozen_string_literal: true
 
 require "json"
+require "open3"
 require "time"
 require_relative "skill_invocation_planner"
 
 module SoulCore
   class ReadOnlySkillExecutionGate
     SAFE_SKILL_COMMANDS = {
+      "assistant-skill-catalog" => ["ruby", "bin/soul", "assess", "assistant-skill-catalog", "--json"],
       "system.status" => ["ruby", "bin/soul", "assess", "doctor-surface", "--json"],
       "weather.report" => nil,
       "downloads.inspect" => nil,
-      "cloud.providers.list" => ["ruby", "bin/soul", "assess", "cloud-providers", "--json"],
-      "youtube.song_search" => nil,
-      "assistant-skill-catalog" => ["ruby", "bin/soul", "assess", "assistant-skill-catalog", "--json"]
+      "cloud.providers.list" => nil,
+      "youtube.song_search" => nil
     }.freeze
+
+    FIRST_EXECUTION_SKILLS = [
+      "assistant-skill-catalog"
+    ].freeze
 
     Execution = Struct.new(
       :ok,
@@ -54,12 +59,12 @@ module SoulCore
       @planner = planner
     end
 
-    def evaluate(message)
+    def evaluate(message, execute: false)
       plan = @planner.plan(message)
-      evaluate_plan(plan)
+      evaluate_plan(plan, execute: execute)
     end
 
-    def evaluate_plan(plan)
+    def evaluate_plan(plan, execute: false)
       skill_id = plan.skill_id
       risk = plan.risk || "unknown"
       confirmation_required = plan.confirmation_required || risk == "approval_required"
@@ -81,24 +86,33 @@ module SoulCore
         return blocked(plan, "This read-only skill is recognized but does not have a chat execution adapter yet.", ["adapter_not_implemented"])
       end
 
+      unless FIRST_EXECUTION_SKILLS.include?(skill_id)
+        return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but this skill is not enabled for Phase 48 execution yet.", ["phase48_not_enabled_for_actual_execution"])
+      end
+
+      return dry_run(plan, "Read-only execution is allowed for #{skill_id}, but execution was not requested.", ["dry_run_not_execute_requested"]) unless execute
+
+      stdout, stderr, status = Open3.capture3(*command, chdir: @root)
+      ok = status.success?
+
       Execution.new(
-        ok: true,
-        status: "ready",
-        message: "Read-only execution is allowed for #{skill_id}, but Phase 47 defaults to dry-run planning only.",
+        ok: ok,
+        status: ok ? "executed" : "failed",
+        message: ok ? "Executed read-only skill #{skill_id}." : "Read-only skill #{skill_id} failed.",
         skill_id: skill_id,
         risk: risk,
         confirmation_required: false,
-        executed: false,
-        stdout: "",
-        stderr: "",
-        exit_status: nil,
-        blocked_by: ["phase47_dry_run_default"],
+        executed: true,
+        stdout: stdout,
+        stderr: stderr,
+        exit_status: status.exitstatus,
+        blocked_by: [],
         generated_at: Time.now.iso8601
       )
     end
 
-    def explain(message)
-      result = evaluate(message)
+    def explain(message, execute: false)
+      result = evaluate(message, execute: execute)
       lines = []
       lines << "Read-only skill execution gate"
       lines << "skill_id: #{result.skill_id || 'none'}"
@@ -113,6 +127,7 @@ module SoulCore
       else
         result.blocked_by.each { |item| lines << "- #{item}" }
       end
+      lines << "exit_status: #{result.exit_status}" if result.exit_status
       lines.join("\n")
     end
 
@@ -120,6 +135,23 @@ module SoulCore
 
     def safe_read_only?(skill_id, risk)
       risk == "read_only" && SAFE_SKILL_COMMANDS.key?(skill_id)
+    end
+
+    def dry_run(plan, message, blocked_by)
+      Execution.new(
+        ok: true,
+        status: "ready",
+        message: message,
+        skill_id: plan.skill_id,
+        risk: plan.risk,
+        confirmation_required: false,
+        executed: false,
+        stdout: "",
+        stderr: "",
+        exit_status: nil,
+        blocked_by: blocked_by,
+        generated_at: Time.now.iso8601
+      )
     end
 
     def blocked(plan, message, blocked_by)
