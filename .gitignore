@@ -115,3 +115,12 @@ Soul/proposals/skills/*
 # One-time overlay patch scripts should not be committed after application.
 scripts/patch-*.rb
 scripts/repair-*.rb
+
+# Soul local runtime data
+# These files may contain private chats, local memory, credentials-adjacent metadata,
+# runtime databases, generated task state, and machine-specific artifacts.
+Soul/runtime/
+Soul/codex/tasks/
+Soul/codex/responses/
+Soul/codex/reviews/
+*.soul.local
