@@ -29,6 +29,7 @@ require_relative "codex_loop_completion_assessor"
 require_relative "ruby_runtime_compatibility_assessor"
 require_relative "doctor_surface_assessor"
 require_relative "documentation_registry_refresh_assessor"
+require_relative "chat_command"
 require_relative "capability_matrix"
 require_relative "improvement_proposal_generator"
 require_relative "proposal_locator"
@@ -53,7 +54,9 @@ module SoulCore
     def run
       command = @argv.shift
       case command
-      when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
+  when "chat", "chats"
+  ChatCommand.new(argv: @argv, root: Dir.pwd).run
+    when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
       when "skill" then run_skill
       when "intent" then run_intent
       when "do" then run_do
@@ -418,6 +421,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
     def print_help
       puts "Soul command examples:"
       puts "  ruby bin/soul skills"
+      puts "  ruby bin/soul chat [message]"
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess model-suitability"
