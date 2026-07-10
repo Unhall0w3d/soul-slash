@@ -10,6 +10,10 @@ require_relative "read_only_skill_execution_gate"
 require_relative "execution_adapter_registry"
 require_relative "execution_adapter_registry_assessor"
 require_relative "downloads_cleanup_approval_design_assessor"
+require_relative "approval_token_store"
+require_relative "approval_token_chat_controls"
+require_relative "approval_token_store_assessor"
+require_relative "approval_token_chat_controls_assessor"
 require_relative "chat_execution_history"
 require_relative "chat_execution_history_assessor"
 require_relative "read_only_skill_execution_gate_assessor"
@@ -247,6 +251,18 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "approval-token-chat-controls", "approval-chat-controls", "approval-controls"
+  json = @argv.include?("--json")
+  assessor = ApprovalTokenChatControlsAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
+when "approval-token-store", "approval-tokens", "downloads-approval-token"
+  json = @argv.include?("--json")
+  assessor = ApprovalTokenStoreAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "downloads-cleanup-approval-design", "cleanup-approval-design", "downloads-approval-design"
   json = @argv.include?("--json")
   assessor = DownloadsCleanupApprovalDesignAssessor.new(root: Dir.pwd)
@@ -498,6 +514,8 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess read-only-skill-gate"
       puts "  ruby bin/soul assess execution-adapter-registry"
       puts "  ruby bin/soul assess downloads-cleanup-approval-design"
+      puts "  ruby bin/soul assess approval-token-store"
+      puts "  ruby bin/soul assess approval-token-chat-controls"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
