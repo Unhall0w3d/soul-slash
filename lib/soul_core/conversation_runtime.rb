@@ -11,6 +11,7 @@ require_relative "conversation_provider_client"
 require_relative "conversation_provider_contract"
 require_relative "conversation_provider_registry"
 require_relative "conversation_state_store"
+require_relative "host_system_status_collector"
 
 module SoulCore
   class ConversationRuntime
@@ -47,7 +48,8 @@ module SoulCore
       state_store: nil,
       evidence_store: nil,
       grounding_policy: nil,
-      orchestrator: nil
+      orchestrator: nil,
+      host_status_collector: nil
     )
       @root = File.expand_path(root)
       @store = store
@@ -57,6 +59,7 @@ module SoulCore
       @deterministic_responder = deterministic_responder || ChatResponder.new(root: @root)
       @evidence_store = evidence_store || ConversationEvidenceStore.new(root: @root)
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
+      @host_status_collector = host_status_collector || HostSystemStatusCollector.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
         evidence_store: @evidence_store,
@@ -319,13 +322,19 @@ module SoulCore
     end
 
     def capability_gap(chat_id, text, decision)
-      content = [
-        "I do not currently have a registered host-environment assessment skill.",
-        "I can check Soul's own runtime status, but that does not inspect the host's CPU, memory, disks, filesystems, RAID, SMART data, network, firewall, services, authentication logs, or scheduled jobs.",
-        "Those facts are unknown until a bounded host.system_status skill collects them."
-      ].join("\n")
-      context = safe_context(chat_id)
+      requested = decision.flags["requested_capability"].to_s
+      content =
+        if requested == "host.system_status.extended"
+          [
+            "The bounded host assessment does not collect that deeper host category.",
+            "It currently omits SMART health, temperatures, hardware RAID controllers, ZFS pool health, firewall policy, authentication logs, and scheduled jobs.",
+            "Those checks need separately declared read-only capabilities rather than model inference."
+          ].join("\n")
+        else
+          "The requested capability is not registered."
+        end
 
+      context = safe_context(chat_id)
       record_state(
         chat_id: chat_id,
         user_message: text,
@@ -427,7 +436,7 @@ module SoulCore
         max_output_tokens: integer_env("SOUL_CONVERSATION_MAX_OUTPUT_TOKENS", 1_024),
         privacy_requirement: privacy_requirement(provider),
         metadata: {
-          "runtime" => "conversational_soul_phase5",
+          "runtime" => "conversational_soul_phase6",
           "orchestration" => orchestration.to_h,
           "evidence_ids" => evidence_ids(evidence),
           "context" => context_stats(context)
@@ -437,6 +446,16 @@ module SoulCore
 
     def execute_tools(tools, chat_id)
       tools.map do |tool|
+        if tool.id == "host.system_status"
+          result = @host_status_collector.collect
+          evidence = EvidenceContract.build_structured(
+            tool: tool,
+            chat_id: chat_id,
+            result: result
+          )
+          next @evidence_store.append(evidence)
+        end
+
         begin
           output = @deterministic_responder.respond(tool.canonical_message)
           evidence = EvidenceContract.build(

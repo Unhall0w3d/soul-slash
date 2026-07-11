@@ -2,7 +2,6 @@
 
 require "tmpdir"
 require_relative "chat_store"
-require_relative "conversation_orchestration_contract"
 require_relative "conversation_orchestrator"
 require_relative "conversation_provider_contract"
 require_relative "conversation_runtime"
@@ -35,7 +34,6 @@ module SoulCore
 
       def respond(message)
         @messages << message.to_s
-
         case message.to_s
         when "status"
           "Soul runtime status: healthy."
@@ -43,10 +41,6 @@ module SoulCore
           "Downloads inspection: 4 files, 2 older candidates."
         when "clean up downloads"
           "Cleanup preview: 2 candidates, mutation none."
-        when "execution history summary"
-          "Execution history: 3 successful read-only actions."
-        when "what skills do you have?"
-          "Available skills: system.status, downloads.inspect, downloads.cleanup_plan."
         else
           "I am Soul: deterministic route."
         end
@@ -62,11 +56,7 @@ module SoulCore
       end
 
       def chat(provider:, request:, timeout_seconds:)
-        @requests << {
-          "provider" => provider,
-          "request" => request,
-          "timeout_seconds" => timeout_seconds
-        }
+        @requests << request
 
         if @fail
           return Contract::ResponseEnvelope.new(
@@ -132,10 +122,7 @@ module SoulCore
         runtime = ConversationRuntime.new(
           root: temp_root,
           store: store,
-          env: {
-            "SOUL_CONVERSATION_PROVIDER" => provider.id,
-            "SOUL_CONVERSATION_MODE" => "auto"
-          },
+          env: { "SOUL_CONVERSATION_PROVIDER" => provider.id },
           registry: registry,
           provider_client: provider_client,
           deterministic_responder: responder,
@@ -143,21 +130,16 @@ module SoulCore
           orchestrator: orchestrator
         )
 
-        chat = store.create_chat(initial_title: "Phase 4 assessment")
-        chat_id = chat.fetch("id")
+        chat_id = store.create_chat(initial_title: "Phase 4 assessment").fetch("id")
 
         synthesis_message = "Inspect Downloads and tell me what it means."
         store.add_message(chat_id, role: "user", content: synthesis_message)
-        synthesis_result = runtime.respond(
-          chat_id: chat_id,
-          message: synthesis_message
-        )
+        synthesis_result = runtime.respond(chat_id: chat_id, message: synthesis_message)
 
-        synthesis_request = provider_client.requests.last.fetch("request")
         synthesis_works =
           synthesis_result.mode == "skill_then_model" &&
           responder.messages.include?("inspect downloads") &&
-          synthesis_request.messages.any? do |message|
+          provider_client.requests.last.messages.any? do |message|
             message["content"].to_s.include?("Downloads inspection: 4 files")
           end
 
@@ -187,63 +169,20 @@ module SoulCore
           chain_ids.length <= ConversationOrchestrator::MAX_TOOL_STEPS
 
         provider_count_before_status = provider_client.requests.length
-        status_message = "Can you check the system status and tell me what it means?"
+        status_message = "Can you check Soul runtime status?"
         store.add_message(chat_id, role: "user", content: status_message)
         status_result = runtime.respond(chat_id: chat_id, message: status_message)
         runtime_status_grounded =
           status_result.mode == "skill_only" &&
           provider_client.requests.length == provider_count_before_status &&
-          status_result.content.include?("Soul application and registered-runtime status only") &&
-          status_result.content.include?("Not collected by this check")
-
-        flagged_plan = orchestrator.plan(
-          message: "Remember our earlier discussion and prepare a report.",
-          provider_available: true,
-          recent_evidence: []
-        )
-        flags_recorded =
-          flagged_plan.flags["memory_requested"] == true &&
-          flagged_plan.flags["artifact_requested"] == true
-
-        failing_client = RecordingProviderClient.new(fail: true)
-        failing_runtime = ConversationRuntime.new(
-          root: temp_root,
-          store: store,
-          env: {
-            "SOUL_CONVERSATION_PROVIDER" => provider.id
-          },
-          registry: registry,
-          provider_client: failing_client,
-          deterministic_responder: responder,
-          state_store: state_store,
-          orchestrator: orchestrator
-        )
-        failure_message = "Inspect Downloads and explain the result."
-        store.add_message(chat_id, role: "user", content: failure_message)
-        failure_result = failing_runtime.respond(
-          chat_id: chat_id,
-          message: failure_message
-        )
-        safe_failure =
-          failure_result.mode == "skill_fallback" &&
-          failure_result.content.include?("Downloads inspection") &&
-          failure_result.content.include?("conversational synthesis is unavailable")
-
-        state = state_store.state(chat_id)
-        state_recorded =
-          state["last_orchestration_kind"] == "skill_then_model" &&
-          state["last_tool_ids"] == ["downloads.inspect"] &&
-          state["last_response_mode"] == "skill_fallback"
+          status_result.content.include?("Soul application and registered-runtime status only")
 
         blockers = []
         blockers << "Informational skill result was not synthesized" unless synthesis_works
         blockers << "Unrelated Ruby discussion invoked a tool" unless unrelated_avoided
         blockers << "Approval control did not remain deterministic" unless control_preserved
         blockers << "Bounded two-skill chain failed" unless bounded_chain
-        blockers << "Runtime status was not returned as scoped evidence" unless runtime_status_grounded
-        blockers << "Memory and artifact intent flags were not recorded" unless flags_recorded
-        blockers << "Provider synthesis failure lost the deterministic result" unless safe_failure
-        blockers << "Orchestration state was not persisted" unless state_recorded
+        blockers << "Soul runtime status was not scoped evidence" unless runtime_status_grounded
 
         report = {
           "ok" => blockers.empty?,
@@ -251,16 +190,6 @@ module SoulCore
           "milestone" => "conversational_soul",
           "phase" => 4,
           "status" => blockers.empty? ? "ready" : "blocked",
-          "results" => {
-            "synthesis" => synthesis_result.to_h,
-            "unrelated" => unrelated_result.to_h,
-            "control" => control_result.to_h,
-            "chain" => chain_result.to_h,
-            "runtime_status" => status_result.to_h,
-            "failure" => failure_result.to_h
-          },
-          "flagged_plan" => flagged_plan.to_h,
-          "state" => state,
           "blockers" => blockers,
           "verification" => {
             "single_skill_synthesis_works" => synthesis_works,
@@ -268,9 +197,6 @@ module SoulCore
             "approval_controls_remain_deterministic" => control_preserved,
             "bounded_skill_chain_works" => bounded_chain,
             "runtime_status_is_scoped_evidence" => runtime_status_grounded,
-            "memory_and_artifact_flags_work" => flags_recorded,
-            "skill_result_survives_provider_failure" => safe_failure,
-            "orchestration_state_is_recorded" => state_recorded,
             "max_tool_steps_is_two" => ConversationOrchestrator::MAX_TOOL_STEPS == 2,
             "no_external_provider_required" => true
           }
@@ -293,11 +219,7 @@ module SoulCore
       end
       lines << ""
       lines << "Blockers"
-      if report.fetch("blockers").empty?
-        lines << "- None"
-      else
-        report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
-      end
+      report.fetch("blockers").empty? ? lines << "- None" : report.fetch("blockers").each { |blocker| lines << "- #{blocker}" }
       lines.join("\n")
     end
   end

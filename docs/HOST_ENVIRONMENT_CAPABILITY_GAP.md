@@ -1,58 +1,42 @@
-# Host Environment Capability Gap
+# Host Environment Capability Boundaries
 
-Soul does not yet have a registered host-environment assessment skill.
-
-## Current capability
-
-```text
-system.status
-```
-
-Scope:
-
-```text
-Soul application and registered-runtime status only
-```
-
-## Missing capability
-
-Planned:
+Phase 6 implements:
 
 ```text
 host.system_status
 ```
 
-A bounded host assessment should deliberately collect:
+## Collected categories
 
 ```text
-kernel and operating system
-uptime and load
-CPU summary
-memory summary
+operating system
+kernel
+uptime
+load
+memory
 mounted filesystems
-filesystem type and usage
-block-device layout
-network-interface state
-selected service state
+block-device inventory
+network-interface link state
+systemd summary
+Linux MD RAID arrays visible in /proc/mdstat
 ```
 
-Optional checks such as SMART, firewall policy, RAID, temperatures, and logs must be individually declared and permission-bounded.
-
-## Current response
-
-Requests such as:
+## Still not collected
 
 ```text
-assess your environment
-check my hardware
-what disks do I have
-inspect RAID health
+SMART health
+storage temperatures
+hardware RAID controllers
+ZFS pool health
+firewall policy
+authentication logs
+scheduled jobs
+package update state
+external reachability
 ```
 
-return an explicit capability-gap response.
+Requests for those deeper categories return an explicit capability boundary.
 
-They do not go to the general conversation model for improvisation.
+They are not routed to the general conversation model for invention.
 
-## Next phase
-
-Conversational Soul Phase 6 will implement the bounded `host.system_status` read-only capability before the milestone proceeds to durable layered memory.
+Future extensions should add each category as a separately declared read-only capability with its own collector, provenance, timeout, and regression tests.

@@ -21,10 +21,14 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
-    HOST_ASSESSMENT_PATTERNS = [
-      /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
-      /\b(?:disk|drive|filesystem|raid|smart|host memory|host cpu|hardware health)\b.{0,40}\b(?:status|health|assessment|check|inspect)\b/i,
-      /\bwhat (?:disk|drives|filesystems|hardware|raid arrays) do i have\b/i
+    UNSUPPORTED_DEEP_HOST_PATTERNS = [
+      /\bsmart health\b/i,
+      /\bhardware raid\b/i,
+      /\bzfs pool health\b/i,
+      /\bfirewall policy\b/i,
+      /\bauthentication logs?\b/i,
+      /\bscheduled jobs?\b/i,
+      /\bdrive temperatures?\b/i
     ].freeze
 
     MEMORY_PATTERNS = [
@@ -82,11 +86,11 @@ module SoulCore
         )
       end
 
-      if HOST_ASSESSMENT_PATTERNS.any? { |pattern| text.match?(pattern) }
+      if UNSUPPORTED_DEEP_HOST_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "capability_gap",
-          reason: "no registered host environment assessment skill exists",
-          flags: flags.merge("requested_capability" => "host.system_status")
+          reason: "the bounded host assessment does not collect the requested deep host category",
+          flags: flags.merge("requested_capability" => "host.system_status.extended")
         )
       end
 
@@ -142,6 +146,9 @@ module SoulCore
 
     def matched_tools(text, intent)
       matches = @tool_catalog.match(text)
+      host = matches.find { |tool| tool.id == "host.system_status" }
+      return [host] if host
+
       mapped_id = INTENT_TOOL_MAP[intent]
       mapped = mapped_id && @tool_catalog.find(mapped_id)
       matches << mapped if mapped && !matches.include?(mapped)

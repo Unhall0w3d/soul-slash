@@ -32,6 +32,20 @@ module SoulCore
 
     DEFINITIONS = [
       ToolDefinition.new(
+        id: "host.system_status",
+        label: "Host system status",
+        risk_class: "read_only",
+        canonical_message: "assess host system",
+        synthesis_allowed: false,
+        scope: "Bounded read-only Linux host environment assessment",
+        evidence_profile: "host_system_status",
+        patterns: [
+          /\b(system status|host status|computer status|machine status)\b/i,
+          /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
+          /\bwhat (?:disk|drives|filesystems|hardware|linux md raid arrays) do i have\b/i
+        ]
+      ),
+      ToolDefinition.new(
         id: "system.status",
         label: "Soul runtime status",
         risk_class: "read_only",
@@ -41,7 +55,7 @@ module SoulCore
         evidence_profile: "soul_runtime_status",
         patterns: [
           /\Astatus\z/i,
-          /\b(system status|soul status|runtime status|status of (?:the )?system|check (?:the )?system|how is (?:the )?system)\b/i
+          /\b(soul status|runtime status|soul runtime status|status of soul)\b/i
         ]
       ),
       ToolDefinition.new(

@@ -4,21 +4,17 @@
 
 ### Conversational Soul
 
-- Completed Phases 1 through 4.
-- Began Phase 5 grounded evidence lifecycle.
-- Added persistent per-chat deterministic evidence records.
-- Added explicit tool scope and evidence-profile metadata.
-- Added collected versus not-collected evidence boundaries.
-- Added evidence-aware conversation context.
-- Added deterministic resolution of referential tool-result follow-ups.
-- Changed `system.status` to evidence-only conversational rendering.
-- Added an explicit host-environment capability-gap response.
-- Added rejection of unsupported environmental claims and metrics in synthesized tool explanations.
-- Added grounding and evidence IDs to runtime conversation state.
-- Updated the Phase 4 assessor to preserve its synthesis coverage while testing grounded runtime status separately.
-- Extended the Conversational Soul milestone to Phase 11.
-- Reserved Phase 6 for a bounded `host.system_status` skill.
+- Completed Phases 1 through 5.
+- Began Phase 6 bounded host environment assessment.
+- Added the read-only `host.system_status` capability.
+- Added bounded collection of OS, kernel, uptime, load, memory, filesystems, block devices, network-interface link state, systemd state, and Linux MD RAID visibility.
+- Added structured host evidence with command provenance and explicit uncollected categories.
+- Reserved `system.status` for explicit Soul runtime status.
+- Routed generic system and environment assessment requests to `host.system_status`.
+- Kept host result rendering deterministic in Phase 6.
+- Added fixture regression coverage for Btrfs, 12% utilization, and no active Linux MD RAID arrays.
+- Preserved Phase 4 and Phase 5 assessor compatibility.
 
 ### Development direction
 
-Phase 5 prevents conversational prose from outrunning collected evidence. Phase 6 will add an actual read-only host assessment rather than permitting the language model to populate an imaginary server room.
+Phase 6 gives Soul real host facts. Phase 7 begins layered memory, now that the assistant has a safer distinction between remembered statements and collected evidence.

@@ -24,6 +24,7 @@ require_relative "conversation_provider_foundation_assessor"
 require_relative "multiturn_conversation_runtime_assessor"
 require_relative "conversational_orchestrator_assessor"
 require_relative "grounded_evidence_lifecycle_assessor"
+require_relative "bounded_host_system_status_assessor"
 require_relative "downloads_move_dry_run_assessor"
 require_relative "approval_token_store_assessor"
 require_relative "approval_token_chat_controls_assessor"
@@ -264,6 +265,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "bounded-host-system-status", "host-system-status", "host-status"
+  json = @argv.include?("--json")
+  assessor = BoundedHostSystemStatusAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "grounded-evidence-lifecycle", "conversation-evidence", "grounding-runtime"
   json = @argv.include?("--json")
   assessor = GroundedEvidenceLifecycleAssessor.new(root: Dir.pwd)
@@ -585,6 +592,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess multiturn-conversation-runtime"
       puts "  ruby bin/soul assess conversational-orchestrator"
       puts "  ruby bin/soul assess grounded-evidence-lifecycle"
+      puts "  ruby bin/soul assess bounded-host-system-status"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"

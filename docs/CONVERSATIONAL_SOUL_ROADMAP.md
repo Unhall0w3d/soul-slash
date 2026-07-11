@@ -43,23 +43,16 @@ complete
 Status:
 
 ```text
-in progress
-```
-
-Deliver:
-
-```text
-persisted deterministic evidence
-tool scope metadata
-collected and not_collected separation
-evidence-aware conversation context
-referential follow-up resolution
-unsupported-claim rejection
-explicit host capability gap
-runtime grounding history
+complete
 ```
 
 ### Phase 6: Bounded host environment assessment
+
+Status:
+
+```text
+in progress
+```
 
 Deliver:
 
@@ -67,7 +60,8 @@ Deliver:
 host.system_status skill
 declared read-only command set
 structured host evidence
-filesystem and disk provenance
+filesystem and block-device provenance
+bounded memory, load, network, and systemd summaries
 explicit uncollected categories
 conversation integration
 host-assessment regression tests

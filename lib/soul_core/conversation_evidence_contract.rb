@@ -57,31 +57,9 @@ module SoulCore
     end
 
     def self.build(tool:, chat_id:, output:, status: "ok", error: nil)
-      profile = tool.evidence_profile.to_s
       output_text = output.to_s
-      collected =
-        if status == "ok"
-          {
-            "deterministic_output" => output_text
-          }
-        else
-          {}
-        end
-
-      claims =
-        if status == "ok"
-          output_text.lines.map(&:strip).reject(&:empty?).first(100)
-        else
-          []
-        end
-
       not_collected =
-        case profile
-        when "soul_runtime_status"
-          RUNTIME_NOT_COLLECTED
-        else
-          []
-        end
+        tool.evidence_profile.to_s == "soul_runtime_status" ? RUNTIME_NOT_COLLECTED : []
 
       source = {
         "kind" => "deterministic_chat_route",
@@ -90,20 +68,70 @@ module SoulCore
       source["error"] = error if error
 
       Evidence.new(
-        evidence_id: "ev_#{Time.now.utc.strftime('%Y%m%d%H%M%S')}_#{SecureRandom.hex(4)}",
+        evidence_id: evidence_id,
         chat_id: chat_id.to_s,
         tool_id: tool.id.to_s,
         label: tool.label.to_s,
         scope: tool.scope.to_s,
-        evidence_profile: profile,
+        evidence_profile: tool.evidence_profile.to_s,
         risk_class: tool.risk_class.to_s,
         status: status.to_s,
-        collected: collected,
-        claims: claims,
+        collected: status == "ok" ? { "deterministic_output" => output_text } : {},
+        claims: status == "ok" ? output_text.lines.map(&:strip).reject(&:empty?).first(100) : [],
         not_collected: not_collected,
         source: source,
         created_at: Time.now.iso8601
       )
+    end
+
+    def self.build_structured(tool:, chat_id:, result:)
+      data = stringify_keys(result)
+      status =
+        if data["ok"] == true
+          "ok"
+        elsif Array(data["claims"]).empty?
+          "failed"
+        else
+          "partial"
+        end
+
+      Evidence.new(
+        evidence_id: evidence_id,
+        chat_id: chat_id.to_s,
+        tool_id: tool.id.to_s,
+        label: tool.label.to_s,
+        scope: data["scope"].to_s.empty? ? tool.scope.to_s : data["scope"].to_s,
+        evidence_profile: tool.evidence_profile.to_s,
+        risk_class: tool.risk_class.to_s,
+        status: status,
+        collected: data["collected"] || {},
+        claims: Array(data["claims"]),
+        not_collected: Array(data["not_collected"]),
+        source: {
+          "kind" => "bounded_host_collector",
+          "assessment" => data["assessment"],
+          "commands" => Array(data["commands"]),
+          "verification" => data["verification"] || {}
+        },
+        created_at: data["collected_at"] || Time.now.iso8601
+      )
+    end
+
+    def self.evidence_id
+      "ev_#{Time.now.utc.strftime('%Y%m%d%H%M%S')}_#{SecureRandom.hex(4)}"
+    end
+
+    def self.stringify_keys(value)
+      case value
+      when Hash
+        value.each_with_object({}) do |(key, nested), output|
+          output[key.to_s] = stringify_keys(nested)
+        end
+      when Array
+        value.map { |nested| stringify_keys(nested) }
+      else
+        value
+      end
     end
   end
 end
