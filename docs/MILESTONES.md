@@ -91,19 +91,20 @@ in progress
 Current phase:
 
 ```text
-Phase 2
+Phase 3
 ```
 
 Completed:
 
 ```text
 Phase 1: architecture and acceptance contract
+Phase 2: provider and model capability foundation
 ```
 
 Current work:
 
 ```text
-provider and model capability foundation
+multi-turn conversation runtime
 ```
 
 Planned stopping point:
@@ -120,6 +121,7 @@ docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md
 docs/CONVERSATIONAL_SOUL_ROADMAP.md
 docs/CONVERSATION_PROVIDER_CONTRACT.md
 docs/CONVERSATION_PROVIDER_CONFIGURATION.md
+docs/MULTITURN_CONVERSATION_RUNTIME.md
 ```
 
 ## Later milestone candidates

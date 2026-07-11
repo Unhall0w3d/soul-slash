@@ -1,18 +1,28 @@
-
 # frozen_string_literal: true
 
 require_relative "chat_store"
-require_relative "chat_responder"
+require_relative "conversation_runtime"
 
 module SoulCore
   class ChatCommand
-    def initialize(argv:, root: Dir.pwd, input: $stdin, output: $stdout)
+    def initialize(
+      argv:,
+      root: Dir.pwd,
+      input: $stdin,
+      output: $stdout,
+      env: ENV,
+      runtime: nil
+    )
       @argv = argv.dup
       @root = File.expand_path(root)
       @input = input
       @output = output
       @store = ChatStore.new(root: @root)
-      @responder = ChatResponder.new(root: @root)
+      @runtime = runtime || ConversationRuntime.new(
+        root: @root,
+        store: @store,
+        env: env
+      )
     end
 
     def run
@@ -25,6 +35,8 @@ module SoulCore
       resume_id = value_after("--resume")
       message = remaining_message
       chat = resume_id ? @store.chat(resume_id) : nil
+      raise ArgumentError, "Unknown chat id: #{resume_id}" if resume_id && !chat
+
       chat ||= @store.create_chat(initial_title: message.empty? ? nil : message[0, 60])
 
       if message.empty?
@@ -41,7 +53,8 @@ module SoulCore
 
     def interactive(chat_id)
       @output.puts "Soul chat started: #{chat_id}"
-      @output.puts "Type /exit to leave. Type /skills, /status, or /who for deterministic early responses."
+      @output.puts "Type /exit to leave. Type /skills, /status, or /who for deterministic routes."
+
       loop do
         @output.print "You> "
         line = @input.gets
@@ -57,15 +70,29 @@ module SoulCore
 
         exchange(chat_id, message)
       end
+
       @output.puts "Soul chat closed: #{chat_id}"
       0
     end
 
     def exchange(chat_id, message)
       @store.add_message(chat_id, role: "user", content: message)
-      response = @responder.respond(message)
-      @store.add_message(chat_id, role: "assistant", content: response, metadata: { "responder" => "phase41_deterministic" })
-      @output.puts "Soul> #{response}"
+      result = @runtime.respond(chat_id: chat_id, message: message)
+
+      @store.add_message(
+        chat_id,
+        role: "assistant",
+        content: result.content,
+        metadata: {
+          "responder" => "conversational_soul_phase3",
+          "mode" => result.mode,
+          "provider_id" => result.provider_id,
+          "fallback_reason" => result.fallback_reason,
+          "runtime" => result.metadata
+        }.reject { |_key, value| value.nil? }
+      )
+
+      @output.puts "Soul> #{result.content}"
       0
     end
 
@@ -78,7 +105,7 @@ module SoulCore
 
       chats.each do |chat|
         pin = chat["pinned"] ? "*" : " "
-        @output.puts "#{pin} #{chat['id']}  #{chat['updated_at']}  #{chat['title']}"
+        @output.puts "#{pin} #{chat['id']} #{chat['updated_at']} #{chat['title']}"
       end
       0
     end
@@ -95,7 +122,9 @@ module SoulCore
         return 0
       end
 
-      results.each { |chat| @output.puts "#{chat['id']}  #{chat['updated_at']}  #{chat['title']}" }
+      results.each do |chat|
+        @output.puts "#{chat['id']} #{chat['updated_at']} #{chat['title']}"
+      end
       0
     end
 
@@ -116,6 +145,7 @@ module SoulCore
       @output.puts "created_at: #{chat['created_at']}"
       @output.puts "updated_at: #{chat['updated_at']}"
       @output.puts
+
       @store.messages(chat_id).each do |message|
         @output.puts "#{message['role']}> #{message['content']}"
       end
@@ -148,22 +178,24 @@ module SoulCore
     def remaining_message
       skip_next = false
       parts = []
-      @argv.each_with_index do |arg, index|
+
+      @argv.each_with_index do |argument, index|
         if skip_next
           skip_next = false
           next
         end
 
-        if ["--resume", "--search", "--show", "--pin", "--unpin"].include?(arg)
+        if ["--resume", "--search", "--show", "--pin", "--unpin"].include?(argument)
           skip_next = true
           next
         end
 
-        next if arg.start_with?("--")
-        next if index.zero? && ["chat"].include?(arg)
+        next if argument.start_with?("--")
+        next if index.zero? && argument == "chat"
 
-        parts << arg
+        parts << argument
       end
+
       parts.join(" ").strip
     end
   end

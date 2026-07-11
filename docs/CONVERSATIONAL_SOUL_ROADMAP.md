@@ -14,22 +14,27 @@ Status:
 complete
 ```
 
+### Phase 2: Provider and model capability foundation
+
+Status:
+
+```text
+complete
+```
+
 Delivered:
 
 ```text
-interaction-loop architecture
-conversation-state contract
-orchestration decision model
-skill-in-conversation contract
-layered-memory model
-artifact behavior
-personality and variation principles
-safety boundary
-interface direction
-integrated acceptance scenarios
+provider-neutral request and response envelopes
+provider capability and privacy metadata
+local OpenAI-compatible provider shape
+local Ollama provider shape
+disabled cloud-compatible shape
+bounded health checks
+timeout and failure normalization
 ```
 
-### Phase 2: Provider and model capability foundation
+### Phase 3: Multi-turn conversation runtime
 
 Status:
 
@@ -40,28 +45,13 @@ in progress
 Deliver:
 
 ```text
-provider-neutral chat interface
-local provider capability declaration
-availability and health checks
-timeout and failure behavior
-privacy classification
-model metadata
-structured request and response envelopes
-```
-
-One local provider path is sufficient initially.
-
-### Phase 3: Multi-turn conversation runtime
-
-Deliver:
-
-```text
 model-backed session loop
 recent-turn context
-active subject and task tracking
-conversation summaries
-clarification behavior
-deterministic fallback
+active subject and task hints
+bounded context digest
+provider fallback
+deterministic action preservation
+runtime conversation state
 session persistence
 ```
 
@@ -142,8 +132,6 @@ Settings
 System status
 ```
 
-The milestone does not require a complete polished web UI, but the conversational core must expose stable interfaces suitable for one.
-
 ### Phase 9: Integrated acceptance and closeout
 
 Deliver:
@@ -161,8 +149,6 @@ documentation and curation closeout
 ```
 
 Phase 9 is the clear stopping point.
-
-At Phase 9, Soul must feel like a coherent conversational entity that can use tools and artifacts without becoming a command parser with decorative prose.
 
 ## Work deferred beyond this milestone
 

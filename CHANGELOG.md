@@ -5,13 +5,15 @@
 ### Conversational Soul
 
 - Completed Phase 1 architecture and acceptance contracts.
-- Began Phase 2 provider and model capability foundation.
-- Added provider-neutral request and response envelopes.
-- Added local OpenAI-compatible and Ollama provider definitions.
-- Added a disabled cloud OpenAI-compatible provider shape.
-- Added normalized provider capability and privacy metadata.
-- Added bounded provider health checks with available, unavailable, and timeout results.
-- Added the `conversation-provider-foundation` assessment.
+- Completed Phase 2 provider and model capability foundation.
+- Began Phase 3 multi-turn conversation runtime.
+- Added bounded recent-turn context construction.
+- Added provider-backed OpenAI-compatible and Ollama chat execution.
+- Added per-chat runtime conversation state.
+- Preserved deterministic skill and approval routes inside chat.
+- Added truthful fallback behavior for missing or failed providers.
+- Updated ChatCommand to store model, deterministic, and fallback response metadata.
+- Added the `multiturn-conversation-runtime` assessment.
 
 ### Milestones completed
 
@@ -32,6 +34,7 @@
 - approval-token controls
 - terminal `chat`
 - persistent chat sessions
+- provider-backed multi-turn chat when a local provider is configured
 - `reflect`
 - reflection approve and reject
 - legacy `do`
@@ -39,4 +42,4 @@
 
 ### Development direction
 
-The active milestone is Conversational Soul. Phase 2 establishes the model-provider boundary required before model-backed multi-turn chat is introduced.
+The active milestone is Conversational Soul. Phase 3 provides the first real multi-turn model conversation loop. Phase 4 will add conversation-aware skill orchestration rather than granting the model direct execution authority.
