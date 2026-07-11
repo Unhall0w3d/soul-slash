@@ -75,7 +75,7 @@ Phase 7 moves evidence follow-up detection, evidence-record selection, claim foc
 
 ## Phase 8 — Declared Capability Boundaries
 
-Status: in progress
+Status: complete
 
 Deliver:
 
@@ -87,22 +87,32 @@ Deliver:
     Linux MD RAID and hardware RAID distinction
     regression coverage for host capability declarations
 
+## Phase 9 — Layered Memory Foundation
+
 ### Phase 9: Layered memory
 
-Deliver:
+Status: in progress
 
-```text
-working memory
-project memory
-preference memory
-episodic memory
-semantic memory
-provenance
-confidence
-candidate promotion
-supersession
-inspection and deletion
-```
+This implementation slice establishes the durable memory contract before conversational mutation controls are exposed.
+
+Delivered in this slice:
+
+    working memory remains bounded chat context and digest
+    durable project, preference, episodic, and semantic layers
+    append-only event ledger
+    candidate and explicit approval states
+    provenance and confidence
+    bounded approved-only retrieval
+    supersession and logical deletion
+    conversation context integration
+    no automatic model promotion
+
+Remaining Phase 9 work:
+
+    user-facing proposal and review controls
+    reflection candidate import
+    memory inspection and mutation approval surfaces
+    export, backup, and physical purge policy
 
 ### Phase 10: Identity, interests, and variation
 

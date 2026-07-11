@@ -25,6 +25,7 @@ require_relative "multiturn_conversation_runtime_assessor"
 require_relative "conversational_orchestrator_assessor"
 require_relative "grounded_evidence_lifecycle_assessor"
 require_relative "bounded_host_system_status_assessor"
+require_relative "phase9_layered_memory_foundation_assessor"
 require_relative "phase8_declared_capability_boundaries_assessor"
 require_relative "phase7_evidence_followup_router_assessor"
 require_relative "phase6_host_routing_repair_assessor"
@@ -268,6 +269,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+    when "phase9-layered-memory-foundation", "layered-memory-foundation"
+      json = @argv.include?("--json")
+      assessor = Phase9LayeredMemoryFoundationAssessor.new(root: Dir.pwd)
+      report = assessor.assess
+      puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+      report["ok"] ? 0 : 1
     when "phase8-declared-capability-boundaries", "declared-capabilities"
       json = @argv.include?("--json")
       assessor = Phase8DeclaredCapabilityBoundariesAssessor.new(root: Dir.pwd)

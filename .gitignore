@@ -30,6 +30,7 @@ Soul/reflection/approved/*.json
 Soul/reflection/approved/*.md
 Soul/reflection/rejected/*.json
 Soul/reflection/rejected/*.md
+Soul/memory/conversation_memory.jsonl
 
 # Keep directory sentinels
 !Soul/logs/tasks/.keep

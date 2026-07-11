@@ -4,6 +4,8 @@
 
 ### Conversational Soul
 
+- Added an append-only layered conversation memory foundation with explicit candidate approval, provenance, confidence, supersession, logical deletion, and approved-only context retrieval.
+
 - Added a declared conversation capability registry with specific deterministic boundaries for available, conditional, and unavailable host checks.
 
 - Added a generic deterministic evidence follow-up router with evidence-record selection and claim-level focus.

@@ -1,4 +1,3 @@
-
 # frozen_string_literal: true
 
 require "fileutils"
@@ -10,7 +9,7 @@ module SoulCore
   class ChatStore
     DEFAULT_ROOT = "Soul/runtime/chats"
 
-    attr_reader :root
+    attr_reader :project_root, :root
 
     def initialize(root: Dir.pwd, chat_root: DEFAULT_ROOT)
       @project_root = File.expand_path(root)
@@ -30,11 +29,8 @@ module SoulCore
         "pin_order" => nil,
         "archived" => false,
         "summary" => "",
-        "metadata" => {
-          "schema" => "phase41_jsonl"
-        }
+        "metadata" => { "schema" => "phase41_jsonl" }
       }
-
       File.write(metadata_path(id), "#{JSON.pretty_generate(record)}\n")
       File.write(messages_path(id), "")
       record
@@ -51,10 +47,10 @@ module SoulCore
 
     def list_chats
       Dir.glob(File.join(@root, "*.json"))
-         .map { |path| JSON.parse(File.read(path)) rescue nil }
-         .compact
-         .sort_by { |item| item["updated_at"].to_s }
-         .reverse
+        .map { |path| JSON.parse(File.read(path)) rescue nil }
+        .compact
+        .sort_by { |item| item["updated_at"].to_s }
+        .reverse
     end
 
     def add_message(chat_id, role:, content:, metadata: {})
@@ -70,7 +66,6 @@ module SoulCore
         "created_at" => now,
         "metadata" => metadata || {}
       }
-
       File.open(messages_path(chat_id), "a") { |file| file.puts(JSON.generate(message)) }
 
       chat_record["updated_at"] = now
@@ -78,7 +73,6 @@ module SoulCore
         chat_record["title"] = title_from(content)
       end
       File.write(metadata_path(chat_id), "#{JSON.pretty_generate(chat_record)}\n")
-
       message
     end
 

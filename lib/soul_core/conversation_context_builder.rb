@@ -1,20 +1,19 @@
 # frozen_string_literal: true
 
-require "json"
+require_relative "conversation_memory_store"
 
 module SoulCore
   class ConversationContextBuilder
     DEFAULT_MAX_MESSAGES = 20
     DEFAULT_MAX_CHARACTERS = 16_000
     DEFAULT_DIGEST_CHARACTERS = 2_400
-    DEFAULT_EVIDENCE_LIMIT = 5
+    DEFAULT_MEMORY_RECORDS = 8
 
     SYSTEM_PROMPT = <<~PROMPT.freeze
       You are Soul, a local-first assistant being developed with the user.
-
       Hold a natural multi-turn conversation. Respond to the substance first.
-      Use prior turns when they are relevant. Do not pretend to remember
-      information that is not present in the supplied context.
+      Use prior turns when they are relevant. Do not pretend to remember information
+      that is not present in the supplied context.
 
       Stable interaction principles:
       - Be direct, curious, technically serious, and quietly loyal to the user's goals.
@@ -23,9 +22,6 @@ module SoulCore
       - Do not dump long code, raw logs, or link collections unless requested.
       - Do not claim that a skill, file operation, command, search, or external action ran.
       - Explicit deterministic skills and approvals are handled outside this model call.
-      - Environment facts must come from supplied deterministic evidence.
-      - Never invent CPU, memory, storage, filesystem, RAID, SMART, network, service, security, or scheduled-task details.
-      - A not_collected field means the fact is unknown, not healthy.
       - Ask one focused clarification only when the missing information blocks a useful answer.
       - For this project, shell examples must be compatible with zsh.
       - Never reveal hidden reasoning. Give conclusions and useful explanations.
@@ -33,18 +29,18 @@ module SoulCore
 
     def initialize(
       store:,
-      evidence_store: nil,
+      memory_store: nil,
       max_messages: DEFAULT_MAX_MESSAGES,
       max_characters: DEFAULT_MAX_CHARACTERS,
       digest_characters: DEFAULT_DIGEST_CHARACTERS,
-      evidence_limit: DEFAULT_EVIDENCE_LIMIT
+      max_memory_records: DEFAULT_MEMORY_RECORDS
     )
       @store = store
-      @evidence_store = evidence_store
+      @memory_store = memory_store || default_memory_store(store)
       @max_messages = positive_integer(max_messages, DEFAULT_MAX_MESSAGES)
       @max_characters = positive_integer(max_characters, DEFAULT_MAX_CHARACTERS)
       @digest_characters = positive_integer(digest_characters, DEFAULT_DIGEST_CHARACTERS)
-      @evidence_limit = positive_integer(evidence_limit, DEFAULT_EVIDENCE_LIMIT)
+      @max_memory_records = positive_integer(max_memory_records, DEFAULT_MEMORY_RECORDS)
     end
 
     def build(chat_id:)
@@ -55,11 +51,15 @@ module SoulCore
         %w[user assistant].include?(message["role"].to_s) &&
           !message["content"].to_s.strip.empty?
       end
-
       recent = all_messages.last(@max_messages)
       older = all_messages.first([all_messages.length - recent.length, 0].max)
       digest = build_digest(older)
-      evidence = recent_evidence(chat_id)
+      current_query = all_messages.reverse.find { |message| message["role"] == "user" }
+      memory = @memory_store.context_for(
+        query: current_query&.fetch("content", "").to_s,
+        chat_id: chat_id,
+        limit: @max_memory_records
+      )
 
       system_content = SYSTEM_PROMPT.dup
       stored_summary = chat["summary"].to_s.strip
@@ -69,10 +69,13 @@ module SoulCore
       unless digest.empty?
         system_content << "\nEarlier-turn digest:\n#{digest}\n"
       end
-      unless evidence.empty?
-        system_content << "\nRecent deterministic evidence:\n"
-        system_content << "#{bounded_evidence_json(evidence)}\n"
-        system_content << "Only collected values and claims support positive factual assertions.\n"
+      unless memory.fetch("records", []).empty?
+        system_content << "\nApproved memory context:\n#{memory.fetch('rendered')}\n"
+        system_content << <<~GUIDANCE
+          Use approved memory only when it is relevant to the current request.
+          Preserve its provenance and confidence. Candidate, superseded, and deleted
+          memory records are not supplied as conversational facts.
+        GUIDANCE
       end
 
       messages = [{ "role" => "system", "content" => system_content }]
@@ -84,36 +87,31 @@ module SoulCore
           }
         end
       )
-
       trimmed = trim_to_character_budget(messages)
 
       {
         "messages" => trimmed,
         "context_digest" => digest,
+        "memory" => {
+          "record_ids" => memory.fetch("record_ids", []),
+          "layers" => memory.fetch("layers", []),
+          "count" => memory.fetch("count", 0)
+        },
         "total_message_count" => all_messages.length,
         "included_message_count" => trimmed.count { |message| message["role"] != "system" },
         "truncated_message_count" => all_messages.length - trimmed.count { |message| message["role"] != "system" },
-        "character_count" => trimmed.sum { |message| message["content"].to_s.length },
-        "evidence_count" => evidence.length,
-        "evidence_ids" => evidence.map { |record| record["evidence_id"] }
+        "character_count" => trimmed.sum { |message| message["content"].to_s.length }
       }
     end
 
     private
 
-    def recent_evidence(chat_id)
-      return [] unless @evidence_store
-
-      @evidence_store.recent(chat_id, limit: @evidence_limit)
-    rescue StandardError
-      []
-    end
-
-    def bounded_evidence_json(evidence)
-      text = JSON.pretty_generate(evidence)
-      return text if text.length <= 6_000
-
-      "#{text[0, 6_000]}\n[truncated evidence context]"
+    def default_memory_store(store)
+      if store.respond_to?(:project_root)
+        ConversationMemoryStore.new(root: store.project_root)
+      else
+        NullConversationMemoryStore.new
+      end
     end
 
     def build_digest(messages)
@@ -125,7 +123,6 @@ module SoulCore
         content = "#{content[0, 237]}..." if content.length > 240
         "#{role}: #{content}"
       end
-
       digest = lines.join("\n")
       digest.length > @digest_characters ? digest[-@digest_characters, @digest_characters] : digest
     end
@@ -135,7 +132,6 @@ module SoulCore
       conversational = messages.drop(1)
       budget = @max_characters - system["content"].to_s.length
       budget = 1_000 if budget < 1_000
-
       selected = []
       used = 0
 
