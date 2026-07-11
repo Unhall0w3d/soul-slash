@@ -85,10 +85,10 @@ Established:
 Status:
 
 ```text
-planned
+in progress
 ```
 
-Phase numbering resets at:
+Current phase:
 
 ```text
 Phase 1
@@ -114,7 +114,13 @@ Planned stopping point:
 Phase 9
 ```
 
-The detailed architecture and acceptance contract will be created in Conversational Soul Phase 1.
+See:
+
+```text
+docs/CONVERSATIONAL_SOUL_ARCHITECTURE.md
+docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md
+docs/CONVERSATIONAL_SOUL_ROADMAP.md
+```
 
 ## Later milestone candidates
 

@@ -16,6 +16,7 @@ require_relative "downloads_move_dry_run_executor"
 require_relative "downloads_move_to_trash_executor"
 require_relative "downloads_move_to_trash_assessor"
 require_relative "usability_milestone_closeout_assessor"
+require_relative "conversational_architecture_assessor"
 require_relative "downloads_move_dry_run_assessor"
 require_relative "approval_token_store_assessor"
 require_relative "approval_token_chat_controls_assessor"
@@ -256,6 +257,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "conversational-architecture", "conversational-soul", "conversation-architecture"
+  json = @argv.include?("--json")
+  assessor = ConversationalArchitectureAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "usability-milestone-closeout", "usability-closeout", "safe-local-action-closeout"
   json = @argv.include?("--json")
   assessor = UsabilityMilestoneCloseoutAssessor.new(root: Dir.pwd)
@@ -542,6 +549,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess downloads-move-dry-run"
       puts "  ruby bin/soul assess downloads-move-to-trash"
       puts "  ruby bin/soul assess usability-milestone-closeout"
+      puts "  ruby bin/soul assess conversational-architecture"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
