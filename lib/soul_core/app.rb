@@ -25,6 +25,8 @@ require_relative "multiturn_conversation_runtime_assessor"
 require_relative "conversational_orchestrator_assessor"
 require_relative "grounded_evidence_lifecycle_assessor"
 require_relative "bounded_host_system_status_assessor"
+require_relative "phase7_evidence_followup_router_assessor"
+require_relative "phase6_host_routing_repair_assessor"
 require_relative "downloads_move_dry_run_assessor"
 require_relative "approval_token_store_assessor"
 require_relative "approval_token_chat_controls_assessor"
@@ -265,6 +267,18 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+    when "phase7-evidence-followup-router", "evidence-followup-router"
+      json = @argv.include?("--json")
+      assessor = Phase7EvidenceFollowupRouterAssessor.new(root: Dir.pwd)
+      report = assessor.assess
+      puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+      report["ok"] ? 0 : 1
+    when "phase6-host-routing-repair", "host-routing-repair"
+      json = @argv.include?("--json")
+      assessor = Phase6HostRoutingRepairAssessor.new(root: Dir.pwd)
+      report = assessor.assess
+      puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+      report["ok"] ? 0 : 1
 when "bounded-host-system-status", "host-system-status", "host-status"
   json = @argv.include?("--json")
   assessor = BoundedHostSystemStatusAssessor.new(root: Dir.pwd)

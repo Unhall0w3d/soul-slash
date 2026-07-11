@@ -42,7 +42,9 @@ module SoulCore
         patterns: [
           /\b(system status|host status|computer status|machine status)\b/i,
           /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
-          /\bwhat (?:disk|drives|filesystems|hardware|linux md raid arrays) do i have\b/i
+          /\bwhat\b.{0,45}\b(?:filesystems?|disks?|drives?|storage devices?|block devices?|hardware)\b.{0,45}\b(?:do i have|are present|are attached|are mounted)\b/i,
+          /\b(?:show|list|inspect|check)\b.{0,35}\b(?:my )?(?:filesystems?|disks?|drives?|storage devices?|block devices?)\b/i,
+          /\b(?:filesystems?|disks?|drives?)\b.{0,25}\b(?:do i have|are mounted|are attached)\b/i
         ]
       ),
       ToolDefinition.new(

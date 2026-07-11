@@ -1,114 +1,55 @@
 # Bounded Host System Status
 
-Phase 6 adds the first real host-environment assessment capability.
+Phase 6 provides the read-only `host.system_status` capability.
 
-Skill ID:
+## Natural-language routing
 
-```text
-host.system_status
-```
-
-## Scope
-
-The collector performs a bounded read-only Linux assessment.
-
-It may collect:
-
-```text
-hostname
-operating-system identity
-kernel summary
-uptime
-load averages
-memory totals and availability
-mounted filesystem type and utilization
-block-device inventory
-network-interface link state
-systemd runtime summary
-active Linux MD RAID arrays listed in /proc/mdstat
-```
-
-## Commands
-
-Commands are executed as argument arrays, never through an interpolated shell:
-
-```text
-uname -srmo
-findmnt --json --bytes ...
-df -B1 -T ...
-lsblk --json --bytes ...
-ip -j link show
-systemctl is-system-running
-systemctl --failed --no-legend --plain
-```
-
-Each command has a bounded timeout.
-
-## Files
-
-Read-only files:
-
-```text
-/etc/os-release
-/proc/uptime
-/proc/loadavg
-/proc/meminfo
-/proc/mdstat
-```
-
-## Privacy boundaries
-
-The collector does not collect:
-
-```text
-MAC addresses
-IP addresses
-serial numbers
-secrets
-authentication logs
-firewall rules
-scheduled jobs
-process command lines
-```
-
-## Explicitly not collected
-
-```text
-SMART health
-device temperatures
-hardware RAID controller state
-ZFS pool health
-firewall policy
-authentication logs
-scheduled jobs
-package update state
-external reachability
-```
-
-These remain unknown.
-
-## RAID wording
-
-An empty `/proc/mdstat` supports only this claim:
-
-```text
-No active Linux MD RAID arrays are listed in /proc/mdstat.
-```
-
-It does not prove that no hardware RAID controller, firmware RAID, ZFS pool, or other storage aggregation exists.
-
-## Conversation behavior
-
-Requests such as:
+The host assessment recognizes singular, plural, and compound requests such as:
 
 ```text
 Can you perform an assessment of your environment?
-Can you check the system status and tell me what it means?
+Can you check the system status?
 What filesystems and disks do I have?
+List my block devices.
 ```
 
-invoke `host.system_status`.
+Explicit Soul-runtime requests remain separate:
 
-Phase 6 returns deterministic evidence without model synthesis. This keeps host facts exact while later personality work remains free to be more expressive around safer material.
+```text
+Check Soul runtime status.
+```
 
-Follow-up questions reuse persisted evidence from Phase 5.
+## Focused follow-ups
+
+Referential follow-ups reuse the latest persisted host evidence:
+
+```text
+Which disks were you referring to?
+Which filesystems did you mention?
+Tell me more about those drives.
+```
+
+Storage follow-ups return storage facts rather than repeating memory, network, and service sections.
+
+## Storage presentation
+
+The collector retains structured mount data while human-facing claims:
+
+```text
+filter pseudo filesystems
+omit zram from physical-disk summaries
+group Btrfs subvolume mounts by underlying source
+preserve filesystem type, utilization, and mountpoint provenance
+```
+
+Example:
+
+```text
+Filesystem /dev/nvme0n1p2: btrfs, 1.82 TiB total, 12.0% used; mounted at /, /home, /root.
+```
+
+## Provider errors
+
+A request that genuinely reaches the model provider now reports both the error type and message, including the HTTP status when available.
+
+This does not substitute for correct deterministic routing. It merely prevents an opaque `http_error` from masquerading as useful diagnostics.

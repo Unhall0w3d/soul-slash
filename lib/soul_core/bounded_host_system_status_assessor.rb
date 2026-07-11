@@ -160,11 +160,19 @@ module SoulCore
         actual["claims"].is_a?(Array) &&
         actual["not_collected"].is_a?(Array)
 
+      evidence_root = Array(evidence.dig("collected", "filesystems")).find do |filesystem|
+        filesystem["target"] == "/"
+      end
+
       evidence_ok =
         evidence["tool_id"] == "host.system_status" &&
         evidence["evidence_profile"] == "host_system_status" &&
-        evidence.dig("collected", "filesystems").is_a?(Array) &&
-        evidence["claims"].any? { |claim| claim.include?("Filesystem /:") }
+        evidence_root.is_a?(Hash) &&
+        evidence_root["source"] == "/dev/nvme0n1p2" &&
+        evidence["claims"].any? do |claim|
+          claim.include?("Filesystem /dev/nvme0n1p2:") &&
+            claim.include?("mounted at /.")
+        end
 
       blockers = []
       blockers << "Fixture parsing failed" unless fixture_ok

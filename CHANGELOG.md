@@ -4,6 +4,10 @@
 
 ### Conversational Soul
 
+- Added a generic deterministic evidence follow-up router with evidence-record selection and claim-level focus.
+
+- Hardened Phase 6 host routing, focused evidence follow-ups, storage claim filtering, and provider error detail.
+
 - Completed Phases 1 through 5.
 - Began Phase 6 bounded host environment assessment.
 - Added the read-only `host.system_status` capability.

@@ -4,6 +4,7 @@ require "json"
 require_relative "chat_responder"
 require_relative "conversation_context_builder"
 require_relative "conversation_evidence_contract"
+require_relative "conversation_evidence_followup_router"
 require_relative "conversation_evidence_store"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestrator"
@@ -47,6 +48,7 @@ module SoulCore
       context_builder: nil,
       state_store: nil,
       evidence_store: nil,
+      evidence_followup_router: nil,
       grounding_policy: nil,
       orchestrator: nil,
       host_status_collector: nil
@@ -59,6 +61,7 @@ module SoulCore
       @deterministic_responder = deterministic_responder || ChatResponder.new(root: @root)
       @evidence_store = evidence_store || ConversationEvidenceStore.new(root: @root)
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
+      @evidence_followup_router = evidence_followup_router || ConversationEvidenceFollowupRouter.new
       @host_status_collector = host_status_collector || HostSystemStatusCollector.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
@@ -69,6 +72,7 @@ module SoulCore
       @state_store = state_store || ConversationStateStore.new(root: @root)
       @orchestrator = orchestrator || ConversationOrchestrator.new(
         grounding_policy: @grounding_policy,
+        followup_router: @evidence_followup_router,
         max_tool_steps: env.fetch("SOUL_CONVERSATION_MAX_TOOL_STEPS", ConversationOrchestrator::MAX_TOOL_STEPS)
       )
     end
@@ -291,10 +295,15 @@ module SoulCore
     end
 
     def evidence_followup(chat_id, text, decision, recent_evidence)
-      content = @grounding_policy.render_evidence(
-        recent_evidence,
+      selection = @evidence_followup_router.route(
+        message: text,
+        evidence_records: recent_evidence
+      )
+      content = @evidence_followup_router.render(
+        selection: selection,
         heading: "Details from the most recent deterministic check"
       )
+      selected_evidence = selection.record ? [selection.record] : recent_evidence
       context = safe_context(chat_id)
 
       record_state(
@@ -304,9 +313,9 @@ module SoulCore
         mode: "evidence_followup",
         context: context,
         decision: decision,
-        tool_ids: recent_evidence.map { |record| record["tool_id"] },
-        evidence_ids: evidence_ids(recent_evidence),
-        grounding: { "valid" => true, "mode" => "persisted_evidence" }
+        tool_ids: selected_evidence.map { |record| record["tool_id"] },
+        evidence_ids: evidence_ids(selected_evidence),
+        grounding: { "valid" => true, "mode" => "persisted_evidence_router" }
       )
 
       Result.new(
@@ -314,8 +323,9 @@ module SoulCore
         mode: "evidence_followup",
         metadata: {
           "orchestration" => decision.to_h,
-          "evidence" => evidence_metadata(recent_evidence),
-          "grounding" => { "valid" => true, "mode" => "persisted_evidence" },
+          "evidence" => evidence_metadata(selected_evidence),
+          "followup" => selection.to_h,
+          "grounding" => { "valid" => true, "mode" => "persisted_evidence_router" },
           "context" => context_stats(context)
         }
       )
@@ -618,10 +628,10 @@ module SoulCore
       type = error["type"].to_s
       message = error["message"].to_s
       return "provider returned an empty response" if type.empty? && message.empty?
-      return type unless type.empty? && !message.empty?
-      return message if type.empty?
+      return "#{type}: #{message}" unless type.empty? || message.empty?
+      return type unless type.empty?
 
-      "#{type}: #{message}"
+      message
     end
 
     def privacy_requirement(provider)

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "conversation_evidence_followup_router"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
 require_relative "conversation_tool_catalog"
@@ -51,12 +52,14 @@ module SoulCore
     def initialize(
       tool_catalog: nil,
       router: nil,
+      followup_router: nil,
       grounding_policy: nil,
       max_tool_steps: MAX_TOOL_STEPS
     )
       @tool_catalog = tool_catalog || ConversationToolCatalog.new
       @router = router || IntentRouter.new
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
+      @followup_router = followup_router || ConversationEvidenceFollowupRouter.new
       @max_tool_steps = normalize_limit(max_tool_steps)
     end
 
@@ -78,11 +81,15 @@ module SoulCore
         )
       end
 
-      if !recent_evidence.empty? && @grounding_policy.followup?(text)
+      followup = @followup_router.route(
+        message: text,
+        evidence_records: recent_evidence
+      )
+      if followup.matched?
         return decision(
           kind: "evidence_followup",
-          reason: "the message refers to recently persisted deterministic evidence",
-          flags: flags
+          reason: followup.reason,
+          flags: flags.merge("evidence_followup" => followup.to_h)
         )
       end
 

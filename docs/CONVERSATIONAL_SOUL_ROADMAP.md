@@ -146,3 +146,9 @@ documentation and curation closeout
 ```
 
 Phase 11 is the clear stopping point.
+
+## Phase 7 — Generic Evidence Follow-up Router
+
+Status: in progress
+
+Phase 7 moves evidence follow-up detection, evidence-record selection, claim focus, and deterministic rendering into a reusable router. New evidence-producing skills should gain conversational follow-ups from their evidence records without adding skill-specific branches to the orchestrator.

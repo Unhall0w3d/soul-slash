@@ -25,6 +25,7 @@ module SoulCore
 
     PSEUDO_FILESYSTEMS = %w[
       autofs
+      binfmt_misc
       bpf
       cgroup
       cgroup2
@@ -33,6 +34,9 @@ module SoulCore
       devpts
       devtmpfs
       efivarfs
+      fuse.fuse-overlayfs
+      fuse.gvfsd-fuse
+      fuse.portal
       fusectl
       hugetlbfs
       mqueue
@@ -427,29 +431,8 @@ module SoulCore
         claims << "Memory: #{format_bytes(memory['used_bytes'])} used of #{format_bytes(memory['total_bytes'])} (#{memory['used_percent']}% used), #{format_bytes(memory['available_bytes'])} available."
       end
 
-      Array(collected["filesystems"]).each do |filesystem|
-        claim = [
-          "Filesystem #{filesystem['target']}:",
-          filesystem["filesystem_type"],
-          "on #{filesystem['source']},",
-          "#{format_bytes(filesystem['size_bytes'])} total,",
-          "#{filesystem['used_percent']}% used."
-        ].compact.join(" ")
-        claims << claim
-      end
-
-      Array(collected["block_devices"]).each do |device|
-        next unless %w[disk raid rom].include?(device["type"].to_s)
-
-        details = [
-          "Block device #{device['name']}:",
-          device["type"],
-          format_bytes(device["size_bytes"]),
-          device["model"],
-          device["transport"]
-        ].compact.reject(&:empty?)
-        claims << "#{details.join(', ')}."
-      end
+      claims.concat(filesystem_claims(Array(collected["filesystems"])))
+      claims.concat(block_device_claims(Array(collected["block_devices"])))
 
       Array(collected["network_interfaces"]).each do |interface|
         next if interface["name"] == "lo"
@@ -475,6 +458,69 @@ module SoulCore
       claims
     end
 
+    def filesystem_claims(filesystems)
+      groups = {}
+
+      filesystems.each do |filesystem|
+        source = base_filesystem_source(filesystem["source"])
+        key = [
+          source,
+          filesystem["filesystem_type"],
+          filesystem["size_bytes"],
+          filesystem["used_percent"]
+        ]
+
+        group = groups[key] ||= {
+          "source" => source,
+          "filesystem_type" => filesystem["filesystem_type"],
+          "size_bytes" => filesystem["size_bytes"],
+          "used_percent" => filesystem["used_percent"],
+          "targets" => []
+        }
+
+        target = filesystem["target"].to_s
+        group["targets"] << target unless target.empty? || group["targets"].include?(target)
+      end
+
+      groups.values.map do |group|
+        source = group["source"].to_s
+        source = group["targets"].first.to_s if source.empty?
+
+        details = [group["filesystem_type"].to_s]
+        if group["size_bytes"].to_i.positive?
+          details << "#{format_bytes(group['size_bytes'])} total"
+        end
+        unless group["used_percent"].nil?
+          details << "#{group['used_percent']}% used"
+        end
+
+        claim = "Filesystem #{source}: #{details.reject(&:empty?).join(', ')}"
+        targets = group["targets"]
+        claim << "; mounted at #{targets.join(', ')}" unless targets.empty?
+        "#{claim}."
+      end
+    end
+
+    def block_device_claims(devices)
+      devices.filter_map do |device|
+        next unless %w[disk raid rom].include?(device["type"].to_s)
+
+        name = device["name"].to_s
+        next if name.empty? || name.start_with?("zram")
+
+        details = [device["type"].to_s]
+        details << format_bytes(device["size_bytes"]) if device["size_bytes"].to_i.positive?
+        details << device["model"].to_s unless device["model"].to_s.empty?
+        details << device["transport"].to_s unless device["transport"].to_s.empty?
+
+        "Block device #{name}: #{details.join(', ')}."
+      end
+    end
+
+    def base_filesystem_source(source)
+      source.to_s.sub(/\[.*\]\z/, "")
+    end
+
     def normalize_filesystems(entries)
       entries.filter_map do |entry|
         filesystem_type = entry["fstype"].to_s
@@ -485,6 +531,7 @@ module SoulCore
         available = integer_or_nil(entry["avail"])
         used_percent = numeric_percent(entry["use%"])
         used_percent ||= size.to_i.positive? && used ? ((used.to_f / size) * 100).round(1) : nil
+        next if size.nil? && used.nil? && available.nil? && used_percent.nil?
 
         {
           "target" => entry["target"],
