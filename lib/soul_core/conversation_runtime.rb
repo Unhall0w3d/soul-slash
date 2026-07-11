@@ -3,6 +3,7 @@
 require "json"
 require_relative "chat_responder"
 require_relative "conversation_context_builder"
+require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_contract"
 require_relative "conversation_evidence_followup_router"
 require_relative "conversation_evidence_store"
@@ -48,6 +49,7 @@ module SoulCore
       context_builder: nil,
       state_store: nil,
       evidence_store: nil,
+      capability_registry: nil,
       evidence_followup_router: nil,
       grounding_policy: nil,
       orchestrator: nil,
@@ -62,6 +64,7 @@ module SoulCore
       @evidence_store = evidence_store || ConversationEvidenceStore.new(root: @root)
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
       @evidence_followup_router = evidence_followup_router || ConversationEvidenceFollowupRouter.new
+      @capability_registry = capability_registry || ConversationCapabilityRegistry.new
       @host_status_collector = host_status_collector || HostSystemStatusCollector.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
@@ -73,6 +76,7 @@ module SoulCore
       @orchestrator = orchestrator || ConversationOrchestrator.new(
         grounding_policy: @grounding_policy,
         followup_router: @evidence_followup_router,
+        capability_registry: @capability_registry,
         max_tool_steps: env.fetch("SOUL_CONVERSATION_MAX_TOOL_STEPS", ConversationOrchestrator::MAX_TOOL_STEPS)
       )
     end
@@ -98,6 +102,10 @@ module SoulCore
         informational_skill_then_model(chat_id, text, decision, provider)
       when "evidence_followup"
         evidence_followup(chat_id, text, decision, recent_evidence)
+      when "capability_catalog"
+        capability_catalog(chat_id, text, decision)
+      when "capability_info"
+        capability_info(chat_id, text, decision)
       when "capability_gap"
         capability_gap(chat_id, text, decision)
       when "direct_model"
@@ -331,36 +339,51 @@ module SoulCore
       )
     end
 
-    def capability_gap(chat_id, text, decision)
-      requested = decision.flags["requested_capability"].to_s
-      content =
-        if requested == "host.system_status.extended"
-          [
-            "The bounded host assessment does not collect that deeper host category.",
-            "It currently omits SMART health, temperatures, hardware RAID controllers, ZFS pool health, firewall policy, authentication logs, and scheduled jobs.",
-            "Those checks need separately declared read-only capabilities rather than model inference."
-          ].join("\n")
-        else
-          "The requested capability is not registered."
-        end
+    def capability_catalog(chat_id, text, decision)
+      capability_response(chat_id, text, decision, mode: "capability_catalog")
+    end
 
+    def capability_info(chat_id, text, decision)
+      capability_response(chat_id, text, decision, mode: "capability_info")
+    end
+
+    def capability_gap(chat_id, text, decision)
+      capability_response(chat_id, text, decision, mode: "capability_gap")
+    end
+
+    def capability_response(chat_id, text, decision, mode:)
+      requested = decision.flags["requested_capability"].to_s
+      resolution = if mode == "capability_catalog"
+                     @capability_registry.resolve(text)
+                   elsif requested.empty?
+                     @capability_registry.resolve(text)
+                   else
+                     @capability_registry.resolve_id(requested, kind: mode)
+                   end
+      content = if mode == "capability_catalog"
+                  @capability_registry.render_catalog
+                else
+                  @capability_registry.render(resolution)
+                end
       context = safe_context(chat_id)
+
       record_state(
         chat_id: chat_id,
         user_message: text,
         assistant_message: content,
-        mode: "capability_gap",
+        mode: mode,
         context: context,
         decision: decision,
-        grounding: { "valid" => true, "mode" => "explicit_capability_boundary" }
+        grounding: { "valid" => true, "mode" => "declared_capability_registry" }
       )
 
       Result.new(
         content: content,
-        mode: "capability_gap",
+        mode: mode,
         metadata: {
           "orchestration" => decision.to_h,
-          "grounding" => { "valid" => true, "mode" => "explicit_capability_boundary" },
+          "capability" => resolution.to_h,
+          "grounding" => { "valid" => true, "mode" => "declared_capability_registry" },
           "context" => context_stats(context)
         }
       )

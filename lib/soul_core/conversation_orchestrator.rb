@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_followup_router"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
@@ -22,16 +23,6 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
-    UNSUPPORTED_DEEP_HOST_PATTERNS = [
-      /\bsmart health\b/i,
-      /\bhardware raid\b/i,
-      /\bzfs pool health\b/i,
-      /\bfirewall policy\b/i,
-      /\bauthentication logs?\b/i,
-      /\bscheduled jobs?\b/i,
-      /\bdrive temperatures?\b/i
-    ].freeze
-
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
@@ -52,6 +43,7 @@ module SoulCore
     def initialize(
       tool_catalog: nil,
       router: nil,
+      capability_registry: nil,
       followup_router: nil,
       grounding_policy: nil,
       max_tool_steps: MAX_TOOL_STEPS
@@ -60,6 +52,7 @@ module SoulCore
       @router = router || IntentRouter.new
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
       @followup_router = followup_router || ConversationEvidenceFollowupRouter.new
+      @capability_registry = capability_registry || ConversationCapabilityRegistry.new
       @max_tool_steps = normalize_limit(max_tool_steps)
     end
 
@@ -93,11 +86,34 @@ module SoulCore
         )
       end
 
-      if UNSUPPORTED_DEEP_HOST_PATTERNS.any? { |pattern| text.match?(pattern) }
+      capability = @capability_registry.resolve(text)
+      if capability.catalog?
+        return decision(
+          kind: "capability_catalog",
+          reason: capability.reason,
+          flags: flags.merge("capability" => capability.to_h)
+        )
+      end
+
+      if capability.gap?
         return decision(
           kind: "capability_gap",
-          reason: "the bounded host assessment does not collect the requested deep host category",
-          flags: flags.merge("requested_capability" => "host.system_status.extended")
+          reason: capability.reason,
+          flags: flags.merge(
+            "requested_capability" => capability.capability.id,
+            "capability" => capability.to_h
+          )
+        )
+      end
+
+      if capability.info?
+        return decision(
+          kind: "capability_info",
+          reason: capability.reason,
+          flags: flags.merge(
+            "requested_capability" => capability.capability.id,
+            "capability" => capability.to_h
+          )
         )
       end
 

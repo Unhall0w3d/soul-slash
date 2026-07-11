@@ -40,6 +40,7 @@ module SoulCore
         scope: "Bounded read-only Linux host environment assessment",
         evidence_profile: "host_system_status",
         patterns: [
+          /\b(?:check|inspect|show|assess)\b.{0,50}\b(?:linux md(?: raid)?|mdraid|\/proc\/mdstat)\b/i,
           /\b(system status|host status|computer status|machine status)\b/i,
           /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
           /\bwhat\b.{0,45}\b(?:filesystems?|disks?|drives?|storage devices?|block devices?|hardware)\b.{0,45}\b(?:do i have|are present|are attached|are mounted)\b/i,

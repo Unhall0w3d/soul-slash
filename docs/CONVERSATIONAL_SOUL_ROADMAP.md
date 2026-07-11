@@ -67,7 +67,27 @@ conversation integration
 host-assessment regression tests
 ```
 
-### Phase 7: Layered memory
+## Phase 7 — Generic Evidence Follow-up Router
+
+Status: complete
+
+Phase 7 moves evidence follow-up detection, evidence-record selection, claim focus, and deterministic rendering into a reusable router. New evidence-producing skills gain conversational follow-ups from their evidence records without adding skill-specific branches to the orchestrator.
+
+## Phase 8 — Declared Capability Boundaries
+
+Status: in progress
+
+Deliver:
+
+    inspectable capability identities
+    available, conditional, and unavailable states
+    capability-specific conversational routing
+    deterministic capability catalog rendering
+    explicit no-model-substitute boundaries
+    Linux MD RAID and hardware RAID distinction
+    regression coverage for host capability declarations
+
+### Phase 9: Layered memory
 
 Deliver:
 
@@ -84,7 +104,7 @@ supersession
 inspection and deletion
 ```
 
-### Phase 8: Identity, interests, and variation
+### Phase 10: Identity, interests, and variation
 
 Deliver:
 
@@ -98,7 +118,7 @@ no joke quotas
 no fabricated biography or embodiment
 ```
 
-### Phase 9: Artifact-aware conversation
+### Phase 11: Artifact-aware conversation
 
 Deliver:
 
@@ -112,7 +132,7 @@ file lifecycle
 provider and source provenance
 ```
 
-### Phase 10: Interface contract
+### Phase 12: Interface contract
 
 Deliver designs and core API contracts for:
 
@@ -128,7 +148,7 @@ Settings
 System status
 ```
 
-### Phase 11: Integrated acceptance and closeout
+### Phase 13: Integrated acceptance and closeout
 
 Deliver:
 
@@ -145,10 +165,4 @@ approval-gated mutation regression
 documentation and curation closeout
 ```
 
-Phase 11 is the clear stopping point.
-
-## Phase 7 — Generic Evidence Follow-up Router
-
-Status: in progress
-
-Phase 7 moves evidence follow-up detection, evidence-record selection, claim focus, and deterministic rendering into a reusable router. New evidence-producing skills should gain conversational follow-ups from their evidence records without adding skill-specific branches to the orchestrator.
+Phase 13 is the clear stopping point.

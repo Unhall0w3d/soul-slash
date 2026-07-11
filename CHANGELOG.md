@@ -4,6 +4,8 @@
 
 ### Conversational Soul
 
+- Added a declared conversation capability registry with specific deterministic boundaries for available, conditional, and unavailable host checks.
+
 - Added a generic deterministic evidence follow-up router with evidence-record selection and claim-level focus.
 
 - Hardened Phase 6 host routing, focused evidence follow-ups, storage claim filtering, and provider error detail.
