@@ -2,53 +2,109 @@
 
 # Soul/
 
-**Soul/**, also tracked as **soul-slash** or **Soul Slash**, is a local intelligence project for building a trustworthy assistant layer around small local models, deterministic skills, safety gates, recoverable workflows, and human-approved memory.
+**Soul/**, also tracked as **soul-slash** or **Soul Slash**, is a local-first intelligence project for building a trustworthy assistant around local models, deterministic skills, safety gates, recoverable workflows, artifacts, and human-approved memory.
 
-The model is not treated as the whole assistant. The model is the language organ. **Soul/** is the operating layer around it.
+The model is not treated as the whole assistant. The model is the language organ. Soul/ is the operating layer around it.
 
 Soul/ is early experimental software. It is being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable.
 
+## Current state
+
+Soul/ currently has:
+
+- terminal chat and persistent chat sessions
+- deterministic intent routing and skill planning
+- an execution adapter registry
+- read-only and review-only execution gates
+- local execution history and history controls
+- runtime-only approval tokens
+- explicit approve, revoke, dry-run, and confirmation flows
+- an approval-gated Downloads move-to-trash workflow
+- reflection and human-reviewed memory promotion
+- bounded cloud-assisted skill proposal tooling
+- a controlled Codex handoff and review path that does not mutate production automatically
+
+The completed milestone chain is:
+
+```text
+Foundation: complete
+Chat and planning: complete
+Usability foundation: complete
+Safe local action: complete
+```
+
+The next milestone is:
+
+```text
+Conversational Soul
+```
+
+That milestone will turn the current command-oriented chat foundation into a coherent multi-turn conversational runtime that can retain context, invoke skills during discussion, interpret results, create artifacts, and return naturally to the conversation.
+
 ## What Soul/ is becoming
 
-Soul/ is intended to grow into a local-first assistant environment with:
+Soul/ is intended to grow into a local assistant environment with:
 
+- natural multi-turn conversation
 - local model runtime support through an OpenAI-compatible endpoint
 - deterministic skills for actions that should not be left to model improvisation
-- workflow orchestration for turning human intent into known, validated skill sequences
-- safety gates that separate planning, selection, confirmation, execution, and verification
-- recoverable operations where cleanup actions move to Trash first and can be restored
-- human-approved memory where durable lessons and rules are staged before promotion
-- optional cloud-assisted drafting/review for skill proposals, with human approval retained
+- orchestration that can mix discussion, clarification, tool use, and artifact creation
+- layered working, project, semantic, episodic, and preference memory
+- safety gates separating planning, approval, execution, and verification
+- recoverable operations where early destructive-looking actions use Trash instead
+- human-approved durable memory, rules, and skill changes
+- optional cloud-assisted research and drafting with explicit privacy boundaries
+- future chat, inbox, file-space, dashboard, and voice surfaces using the same assistant core
 
 ## Design principles
 
 - No green lights without gauges.
-- Skills are preferred over improvisation.
+- Conversation is not a decorative wrapper around a command parser.
+- Skills are preferred over improvisation when accuracy, state, privacy, or auditability matters.
 - LLM output is advisory unless validated by deterministic code.
 - Read-only planning comes before write actions.
 - Write-capable workflows require explicit user confirmation.
 - Trash is the terminal cleanup action for early cleanup workflows.
 - Permanent deletion is not supported.
-- Cloud LLM outputs are review artifacts, not repo mutations.
+- Cloud output is a review artifact unless a bounded workflow says otherwise.
 - Durable memory, rules, and skill updates are staged and human-reviewed before promotion.
+- The assistant should explain useful results rather than dumping raw tool output into conversation.
+- Humor and personality should arise from context, not quotas or canned phrase rotation.
 
 ## Architecture shape
 
 ```text
-human request
--> intent routing
--> workflow selection
--> skill planning
--> human review / selection
--> explicit confirmation
--> deterministic execution
--> verification
--> optional restore
--> optional reflection
--> human-approved memory/rule promotion
+human utterance
+-> conversation/session context
+-> relevant memory retrieval
+-> intent and task interpretation
+-> response and tool-use planning
+-> direct response, clarification, skill execution, or artifact generation
+-> skill-result interpretation
+-> conversational response
+-> session and candidate-memory update
+-> optional human-approved durable promotion
 ```
 
-The long-term goal is not a chatbot that guesses commands. The goal is a local operating layer that can translate human intent into verified, recoverable, approval-gated workflows.
+Deterministic action workflows retain their stricter boundary:
+
+```text
+plan
+-> review
+-> explicit approval
+-> execute
+-> verify
+-> record
+```
+
+See:
+
+```text
+docs/ARCHITECTURE.md
+docs/INTERACTION_ARCHITECTURE.md
+docs/MILESTONES.md
+docs/USABILITY_MILESTONE_CLOSEOUT.md
+```
 
 ## Requirements
 
@@ -128,28 +184,26 @@ Run basic Soul/ checks:
 make test-soul
 ```
 
-See the full setup guide:
-
-```text
-docs/GETTING_STARTED.md
-```
-
-## Runtime providers
-
-Soul/ currently supports:
-
-- llama.cpp server
-- Ollama
-
-Both are used at the OpenAI-compatible API layer.
-
 See:
 
 ```text
+docs/GETTING_STARTED.md
 docs/RUNTIME_PROVIDERS.md
 ```
 
 ## Common commands
+
+Start terminal chat:
+
+```bash
+ruby bin/soul chat
+```
+
+Send a single chat message:
+
+```bash
+ruby bin/soul chat "clean up downloads"
+```
 
 List available skills:
 
@@ -170,7 +224,7 @@ Classify a request:
 ruby bin/soul intent "run a file cleanup in Downloads"
 ```
 
-Run a workflow:
+Run a legacy workflow:
 
 ```bash
 ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
@@ -190,29 +244,14 @@ For skill-specific commands, see:
 
 ```text
 docs/SKILLS.md
-```
-
-## Skills
-
-Skill usage has been moved out of the main README.
-
-Start here:
-
-```text
-docs/SKILLS.md
-```
-
-Detailed skill docs live under:
-
-```text
 docs/skills/
 ```
 
 ## Cloud-assisted skill proposal flow
 
-Soul/ can use configured cloud providers, currently with Mistral as the first serious manual-key provider, to draft and review skill proposal artifacts.
+Soul/ can use configured cloud providers to draft and review bounded skill proposal artifacts.
 
-Cloud output remains review-only.
+Cloud output remains review-only by default. Codex remains outside automatic production mutation while the project is undergoing broad architectural development.
 
 See:
 
@@ -221,13 +260,14 @@ docs/skills/SKILL_BRIEF_DRAFT.md
 docs/skills/SKILL_BRIEF_REVIEW.md
 docs/soul/CLOUD_LLM_POLICY.md
 docs/soul/SKILL_PROPOSAL_FORMAT.md
+docs/CODEX_HANDOFF_CONTRACT.md
 ```
 
 ## Development pattern
 
 Soul/ uses overlay-based development.
 
-An overlay is a focused zip containing a small set of files to apply to the existing project tree. This keeps changes reviewable and avoids giant unexplained rewrites.
+An overlay is a focused ZIP containing a small set of files to apply to the existing project tree. This keeps changes reviewable and avoids giant unexplained rewrites.
 
 See:
 
@@ -239,24 +279,36 @@ docs/overlays/archive/
 
 ## Roadmap direction
 
-Near-term:
+Current milestone:
 
-- strengthen Downloads cleanup and restore regression testing
-- improve workflow/session listing and pruning
-- improve voice-friendly response rendering
-- load approved memory/rules into prompts safely
-- expand skill registry validation
-- continue packaging changes as focused overlays
+```text
+Conversational Soul
+```
 
-Later:
+Planned focus:
 
-- web UI shell
-- voice input and TTS output
-- wake-word integration
-- project-aware skills
-- local document search
-- optional vector memory
-- broader workflow domains beyond Downloads cleanup
+- conversational architecture and acceptance contract
+- model-backed multi-turn conversation
+- conversation-aware tool orchestration
+- layered memory and project continuity
+- context-sensitive personality and variation
+- artifact-aware conversation
+- chat, inbox, file-space, and dashboard design
+- integrated conversational acceptance testing
+
+Later milestones may cover:
+
+- broader skills and providers
+- HTTP API and optional web UI
+- voice input, TTS, and wake-word interaction
+- deployment, backup, and restore
+- broader project-aware and document-aware skills
+
+See:
+
+```text
+docs/MILESTONES.md
+```
 
 ## Repository status
 

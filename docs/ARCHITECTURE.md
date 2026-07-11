@@ -1,48 +1,136 @@
 # Architecture
 
-Soul/ is split into layers.
+Soul/ is split into layers. The layers are deliberately separated so conversation can remain flexible while actions remain inspectable and bounded.
 
 ## Interface layer
 
 Human-facing inputs and outputs:
 
-- CLI
-- future web UI
+- CLI chat
+- single-shot CLI messages
+- future HTTP API
+- future integrated web chat
+- future inbox and file space
 - future voice input
 - future TTS output
 
-The interface should be human-accessible and forgiving.
+Every interface should use the same assistant runtime. Voice and web clients must not grow separate brains.
+
+## Conversation layer
+
+The conversation layer manages:
+
+- current dialogue
+- active subject
+- active task
+- unresolved questions
+- recent skill results
+- artifacts produced
+- pending approvals
+- conversational response composition
+
+The current repository contains a deterministic chat foundation. The Conversational Soul milestone will add model-backed multi-turn interpretation and response generation without discarding deterministic safety boundaries.
 
 ## Orchestration layer
 
-The orchestration layer turns human requests into structured workflow execution.
+The orchestration layer decides whether a message should:
 
-Current pieces:
+- receive a direct conversational response
+- continue an existing discussion
+- retrieve relevant memory
+- ask for clarification
+- invoke one skill
+- invoke a bounded sequence of skills
+- create an artifact
+- request approval
+- stop because the request is unsafe or unsupported
 
-- intent routing
+Current pieces include:
+
+- deterministic intent routing
 - workflow sessions
-- selection parsing
-- confirmation parsing
+- skill invocation planning
+- execution adapter registry
+- approval token controls
+- selection and confirmation parsing
 - response rendering
 
-The LLM may assist with intent classification, but all results must be validated against known workflows.
+The future conversational orchestrator will use model reasoning for interpretation and synthesis while validating all proposed tool use against registered capabilities and risk policy.
+
+## Model and provider layer
+
+Models handle language-heavy, low-risk work such as:
+
+- conversation
+- summarization
+- rewriting
+- intent interpretation
+- planning
+- result explanation
+- draft generation
+
+Models do not receive automatic authority to mutate files, execute shell commands, promote memory, or alter configuration.
+
+Provider selection must preserve:
+
+- capability declaration
+- privacy classification
+- timeout and failure handling
+- local versus cloud visibility
+- audit metadata
+- graceful fallback
 
 ## Execution layer
 
-The execution layer contains deterministic skills.
+The execution layer contains deterministic skills and adapters.
 
-Current skills:
+Current bounded capabilities include:
 
 - `system.status`
 - `downloads.inspect`
 - `downloads.cleanup_plan`
 - `downloads.move_to_trash`
+- execution-history inspection and controls
+- approval-token management
 
-Execution skills should produce structured JSON and explicit verification fields.
+Execution skills should produce structured results and explicit verification fields.
+
+Write-capable execution must preserve:
+
+```text
+plan
+-> approval
+-> execute
+-> verify
+-> history
+```
+
+## Artifact layer
+
+Artifacts are durable or reviewable outputs that should not be dumped wholesale into conversation.
+
+Examples:
+
+- reports
+- code
+- overlays
+- CSV or spreadsheet output
+- research notes
+- implementation plans
+- review packages
+
+Artifacts should retain:
+
+- source conversation or task
+- creator skill or provider
+- creation time
+- privacy classification
+- lifecycle state
+- file path or attachment identity
 
 ## Reflection layer
 
-The reflection layer turns task logs into candidate lessons/rules.
+The reflection layer turns task logs into candidate lessons and rules.
 
 Reflection does not automatically promote durable changes.
 
@@ -50,23 +138,50 @@ Current flow:
 
 ```text
 task log
-  -> reflection candidate
-  -> human review
-  -> approve/reject
-  -> approved rules/lessons
+-> reflection candidate
+-> human review
+-> approve or reject
+-> approved rules and lessons
 ```
 
 ## Memory layer
 
-Human-readable memory and rule files live under:
+Soul requires several memory classes:
+
+- working memory for the current conversation
+- episodic memory for prior events and completed work
+- semantic memory for stable learned facts
+- preference memory for user and workflow preferences
+- project memory for milestones, decisions, constraints, and current state
+
+Current human-readable memory and rule files live under:
 
 ```text
 Soul/memory/
 ```
 
-Current approved rule files:
+Current approved rule files include:
 
 ```text
 Soul/memory/approved_rules.md
 Soul/memory/approved_lessons.md
 ```
+
+Future durable memory must retain provenance, confidence, editability, and promotion status.
+
+## Policy and audit layer
+
+Policy applies across conversation, providers, memory, artifacts, and execution.
+
+It includes:
+
+- risk classification
+- privacy boundaries
+- provider restrictions
+- approval requirements
+- token scope and expiry
+- runtime-only data rules
+- execution history
+- human review gates
+
+The policy layer exists so personality and reasoning can be flexible without making state changes mysterious.

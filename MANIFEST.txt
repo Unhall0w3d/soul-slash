@@ -1,19 +1,51 @@
-Soul Codex Overlay v0.1.0
+Soul/ Repository Manifest
+Version: 0.1.0-dev
+Status: experimental
 
-Files:
-- AGENTS.md
-- README_SOUL_CODEX_OVERLAY.md
+Purpose:
+- Local-first assistant runtime
+- Conversational and project-aware orchestration
+- Deterministic, approval-gated skills
+- Recoverable workflows
+- Human-reviewed memory and code-development boundaries
+
+Primary entry points:
+- bin/soul
+- lib/soul_core/app.rb
+- Soul/skills/registry.yaml
+- README.md
+
+Primary documentation:
+- docs/ARCHITECTURE.md
+- docs/INTERACTION_ARCHITECTURE.md
+- docs/MILESTONES.md
+- docs/SKILLS.md
+- docs/OVERLAY_SYSTEM.md
+- docs/USABILITY_MILESTONE_CLOSEOUT.md
 - docs/soul/SOUL_DESIGN_ETHOS.md
-- docs/soul/SKILL_LIFECYCLE.md
 - docs/soul/MEMORY_POLICY.md
 - docs/soul/RISK_CLASSES.md
-- docs/soul/EVAL_LOOP.md
-- docs/soul/SKILL_BRIEF_TEMPLATE.md
-- docs/soul/CODEX_TASK_PROMPT_TEMPLATE.md
-- docs/soul/HUMAN_REVIEW_GATE.md
-- skills/_template/README.md
-- skills/_template/REVIEW.md
-- skills/_template/evals/README.md
-- skills/_template/fixtures/README.md
 
-No executable files are included.
+Primary source areas:
+- lib/soul_core/
+- lib/soul_core/workflows/
+- Soul/
+- skills/
+- templates/
+- scripts/
+
+Generated/private runtime data:
+- Soul/runtime/
+- task logs
+- workflow sessions
+- local approvals
+- generated proposals and review artifacts where ignored by policy
+
+Development posture:
+- Overlay-based changes
+- Human-reviewed production promotion
+- No automatic Codex application
+- No permanent-delete workflow
+- No executable authority granted to model output by default
+
+This manifest is an orientation document, not an exhaustive package file list.

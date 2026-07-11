@@ -1,7 +1,6 @@
-
 # Soul Interaction Architecture
 
-Soul will build its own required interaction layer instead of depending on a third-party chat frontend.
+Soul will own its required interaction layer instead of depending on a third-party chat frontend.
 
 Existing open-source frontends can inform design and may become optional clients later, but Soul's assistant runtime must remain owned by Soul.
 
@@ -12,17 +11,26 @@ Soul is not only a model chat frontend.
 Soul is a local-first assistant runtime with:
 
 ```text
-conversation memory
-project memory
+multi-turn conversation
+working and project memory
 skill registry awareness
-natural-language intent routing
-approval-gated skill execution
-Codex/cloud/local model handoff controls
+natural-language interpretation
+approval-gated execution
+artifact creation
+provider controls
 repo-aware development workflows
-future voice input/output
+future voice input and output
 ```
 
-A third-party UI can display messages. It should not define Soul's brain, skill policy, memory model, or action rules.
+A third-party UI may display messages. It must not define Soul's memory model, orchestration policy, identity, skill safety, or action rules.
+
+## Current limitation
+
+The existing terminal chat foundation is primarily deterministic.
+
+It recognizes known phrases, routes them to known paths, and formats known results. That foundation is useful, but it is not yet the natural conversational behavior intended for Soul.
+
+The Conversational Soul milestone will add a model-backed conversation loop that can discuss, invoke tools, interpret results, and return to the discussion without treating tool execution as the end of the interaction.
 
 ## Core pipeline
 
@@ -30,69 +38,72 @@ Every interface should feed the same internal pipeline:
 
 ```text
 human utterance
-→ chat/session context
-→ intent router
-→ capability and skill lookup
-→ plan or clarification
-→ safe response, skill execution, or handoff package
-→ response rendering
-→ memory/session update
+-> conversation and session context
+-> relevant memory retrieval
+-> intent, subject, and task interpretation
+-> response and tool-use plan
+-> direct response, clarification, skill execution, or artifact generation
+-> tool-result interpretation
+-> conversational response
+-> session update
+-> candidate-memory update
 ```
 
-This applies to terminal chat, single-shot CLI messages, future web UI, future OpenAI-compatible endpoints, and future voice input/output.
-
-Voice should not have a separate brain. It is an input/output surface for the same chat pipeline.
-
-## Interface order
+Deterministic actions remain inside their own stricter flow:
 
 ```text
-1. CLI chat
-2. local persistent chat/session store
-3. natural-language intent router
-4. assistant-facing skill catalog
-5. skill invocation planner
-6. local HTTP API
-7. optional web UI
-8. optional OpenAI-compatible endpoint
-9. voice input/output layer
+registered capability
+-> risk check
+-> plan
+-> approval when required
+-> execution
+-> verification
+-> history
 ```
 
-## Near-term CLI targets
+Voice should not have a separate brain. It is an input and output surface for the same conversational pipeline.
 
-```bash
-soul
-soul "check if we have pending skills to build"
-soul chat
-soul chat "what skills do you have?"
-soul chats
-soul chat --new
-soul chat --resume <chat_id>
-soul chat --pin <chat_id>
-soul chat --search "skill registry"
-```
+## Conversational behavior
 
-During early phases, implementation may remain under:
+Soul should be able to:
 
-```bash
-ruby bin/soul chat
-ruby bin/soul chat "message"
-```
+- continue a topic across multiple turns
+- identify when a message mixes commentary and a task
+- acknowledge relevant humor without forcing a joke
+- use known project context without asking the user to repeat it
+- invoke tools during conversation
+- synthesize tool results instead of dumping them
+- return to the prior topic after tool use
+- create an artifact when detailed output belongs in a file
+- leave an inbox message when work completes outside the active chat
+- ask a focused clarification only when necessary
+
+Soul should not:
+
+- treat every sentence as a command
+- suggest unrelated skills because they happen to exist
+- use a fixed quota of jokes or metaphors
+- rotate through a canned list of personality phrases
+- invent memories, capabilities, sources, or tool results
+- expose raw secrets or private runtime state
+- autonomously promote memory or production code
 
 ## Local LLM versus skills
 
-The local LLM should handle language-heavy, low-risk work:
+The model should handle language-heavy, low-risk work:
 
 ```text
+conversation
 summarization
 rewriting
-conversation
-intent classification
+subject tracking
+intent interpretation
 drafting plans
 explaining structured results
 human-readable response generation
 ```
 
-Skills should handle deterministic or risky work:
+Skills should handle deterministic, external, or risky work:
 
 ```text
 reading local state
@@ -101,8 +112,7 @@ changing system state
 calling APIs
 testing providers
 querying registries
-generating handoff packages
-reviewing structured JSON
+generating artifacts
 moving files
 anything requiring exact auditability
 ```
@@ -110,35 +120,98 @@ anything requiring exact auditability
 Rule:
 
 ```text
-If being wrong is merely annoying, the LLM can probably help.
-If being wrong changes state, hides facts, breaks files, leaks secrets, or misreports system condition, use a skill.
+If being wrong is merely conversationally awkward, the model may handle it.
+If being wrong changes state, hides facts, leaks data, or misreports a system, use a validated skill.
 ```
+
+## Personality and variation
+
+Soul's personality should be principle-driven rather than quota-driven.
+
+Stable traits may guide:
+
+- directness
+- curiosity
+- guarded warmth
+- technical seriousness
+- occasional context-sensitive humor
+- willingness to challenge poor assumptions
+
+Variation should consider recent language and analogy use so the assistant can notice repetition without maintaining a simplistic banned-word list.
+
+Humor is optional. Serious, quiet, technical, curious, and enthusiastic responses are all valid.
+
+Interests may develop as inspectable memory based on repeated substantial engagement. Soul must not fabricate biological experience, childhood, embodiment, or emotions it cannot support.
+
+## Artifact-aware conversation
+
+Conversation should contain the useful summary.
+
+Detailed material should become an artifact when appropriate:
+
+- code
+- reports
+- overlays
+- long research notes
+- CSV or spreadsheet output
+- implementation packages
+
+The artifact should remain attached to the task or conversation with provenance and lifecycle metadata.
+
+For voice, Soul should summarize the artifact rather than reading long code or links aloud.
+
+## Interface direction
+
+Planned user-facing areas:
+
+```text
+Chat
+Inbox
+Files
+Activities
+Approvals
+Skills
+Memory
+Settings
+System status
+```
+
+The dashboard should expose only meaningful, safe configuration.
+
+Every setting should explain:
+
+- current value
+- accepted values or range
+- behavioral effect
+- privacy or risk impact
+- restart requirement
+- recommended default
+
+## Milestone acceptance direction
+
+Conversational Soul should eventually demonstrate:
+
+- sustained multi-turn topic continuity
+- project-context recall
+- mixed commentary and task interpretation
+- skill invocation inside conversation
+- return to the prior discussion after a skill
+- artifact creation without chat dumping
+- safe failure recovery
+- provider and tool transparency
+- natural variation without personality drift
+- avoidance of unrelated skill suggestions
 
 ## Third-party frontend posture
 
 Third-party frontends may become optional clients. Soul should not require them.
 
-Optional integration points:
+Optional integration points may include:
 
 ```text
-OpenAI-compatible /v1/chat/completions endpoint
+OpenAI-compatible chat endpoint
 native Soul HTTP API
 read-only skill catalog endpoint
-approval-gated skill planning/execution endpoint
+approval-gated planning and execution endpoint
+artifact and inbox endpoints
 ```
-
-## Non-goals for the first implementation
-
-```text
-web UI
-voice
-multi-user auth
-vector database
-always-on daemon
-skill auto-execution
-Codex auto-application
-provider activation
-background workers
-```
-
-Build the skeleton first. The floating sword can wait outside until it stops whispering.
