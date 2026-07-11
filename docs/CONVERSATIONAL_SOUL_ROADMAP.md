@@ -22,19 +22,27 @@ Status:
 complete
 ```
 
+### Phase 3: Multi-turn conversation runtime
+
+Status:
+
+```text
+complete
+```
+
 Delivered:
 
 ```text
-provider-neutral request and response envelopes
-provider capability and privacy metadata
-local OpenAI-compatible provider shape
-local Ollama provider shape
-disabled cloud-compatible shape
-bounded health checks
-timeout and failure normalization
+model-backed session loop
+bounded recent-turn context
+active subject and task hints
+provider fallback
+deterministic action preservation
+runtime conversation state
+session persistence
 ```
 
-### Phase 3: Multi-turn conversation runtime
+### Phase 4: Conversational orchestrator
 
 Status:
 
@@ -45,30 +53,15 @@ in progress
 Deliver:
 
 ```text
-model-backed session loop
-recent-turn context
-active subject and task hints
-bounded context digest
-provider fallback
-deterministic action preservation
-runtime conversation state
-session persistence
-```
-
-### Phase 4: Conversational orchestrator
-
-Deliver:
-
-```text
 direct-answer decision
-memory-retrieval decision
-single-skill decision
-bounded skill-chain decision
-artifact decision
-approval decision
+single informational skill decision
+bounded informational skill chain
+deterministic approval decision
 tool relevance validation
-loop and stop limits
-result synthesis
+two-step stop limit
+skill-result synthesis
+safe synthesis failure
+memory and artifact intent flags
 ```
 
 ### Phase 5: Layered memory
@@ -149,15 +142,3 @@ documentation and curation closeout
 ```
 
 Phase 9 is the clear stopping point.
-
-## Work deferred beyond this milestone
-
-```text
-polished dashboard implementation
-full voice implementation
-broad cloud-provider catalog
-large skill library
-Proxmox deployment profile
-backup and restore automation
-mobile clients
-```

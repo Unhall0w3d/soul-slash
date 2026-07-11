@@ -12,14 +12,6 @@ Status:
 complete
 ```
 
-Established:
-
-- repository structure
-- documentation and overlay conventions
-- runtime assessment surfaces
-- deterministic skills and workflows
-- reflection and human-review boundaries
-
 ### Controlled Advisory Skill Loop
 
 Status:
@@ -28,15 +20,6 @@ Status:
 complete
 ```
 
-Established:
-
-- capability assessment
-- proposal generation
-- alpha artifact generation
-- review and promotion gates
-- Codex handoff and dry-run review packages
-- no automatic production promotion
-
 ### Chat and Planning
 
 Status:
@@ -44,14 +27,6 @@ Status:
 ```text
 complete
 ```
-
-Established:
-
-- terminal chat
-- persistent sessions
-- deterministic intent routing
-- skill invocation planning
-- assistant-facing skill catalog
 
 ### Usability Foundation and Safe Local Action
 
@@ -68,16 +43,6 @@ legacy sequence Phase 63
 commit 2132b36
 ```
 
-Established:
-
-- execution adapter registry
-- read-only and review-only execution
-- execution history controls
-- approval tokens
-- approve, list, revoke, and dry-run chat controls
-- approval-gated Downloads move-to-trash
-- milestone closeout and manual acceptance
-
 ## Current milestone
 
 ### Conversational Soul
@@ -91,7 +56,7 @@ in progress
 Current phase:
 
 ```text
-Phase 3
+Phase 4
 ```
 
 Completed:
@@ -99,12 +64,13 @@ Completed:
 ```text
 Phase 1: architecture and acceptance contract
 Phase 2: provider and model capability foundation
+Phase 3: multi-turn conversation runtime
 ```
 
 Current work:
 
 ```text
-multi-turn conversation runtime
+conversational orchestrator
 ```
 
 Planned stopping point:
@@ -122,6 +88,7 @@ docs/CONVERSATIONAL_SOUL_ROADMAP.md
 docs/CONVERSATION_PROVIDER_CONTRACT.md
 docs/CONVERSATION_PROVIDER_CONFIGURATION.md
 docs/MULTITURN_CONVERSATION_RUNTIME.md
+docs/CONVERSATIONAL_ORCHESTRATOR.md
 ```
 
 ## Later milestone candidates

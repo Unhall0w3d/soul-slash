@@ -22,6 +22,7 @@ require_relative "conversation_provider_registry"
 require_relative "conversation_provider_probe"
 require_relative "conversation_provider_foundation_assessor"
 require_relative "multiturn_conversation_runtime_assessor"
+require_relative "conversational_orchestrator_assessor"
 require_relative "downloads_move_dry_run_assessor"
 require_relative "approval_token_store_assessor"
 require_relative "approval_token_chat_controls_assessor"
@@ -262,6 +263,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+when "conversational-orchestrator", "conversation-orchestrator", "orchestration-runtime"
+  json = @argv.include?("--json")
+  assessor = ConversationalOrchestratorAssessor.new(root: Dir.pwd)
+  report = assessor.assess
+  puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+  report["ok"] ? 0 : 1
 when "multiturn-conversation-runtime", "conversation-runtime", "multiturn-chat"
   json = @argv.include?("--json")
   assessor = MultiturnConversationRuntimeAssessor.new(root: Dir.pwd)
@@ -569,6 +576,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess conversational-architecture"
       puts "  ruby bin/soul assess conversation-provider-foundation"
       puts "  ruby bin/soul assess multiturn-conversation-runtime"
+      puts "  ruby bin/soul assess conversational-orchestrator"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"

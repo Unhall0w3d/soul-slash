@@ -31,12 +31,14 @@ module SoulCore
       mode:,
       provider_id: nil,
       fallback_reason: nil,
-      context: {}
+      context: {},
+      orchestration: nil,
+      tool_ids: []
     )
       current = state(chat_id)
       now = Time.now.iso8601
 
-      current["schema"] = "conversational_soul_phase3"
+      current["schema"] = "conversational_soul_phase4"
       current["chat_id"] = chat_id.to_s
       current["updated_at"] = now
       current["turn_count"] = current.fetch("turn_count", 0).to_i + 1
@@ -47,6 +49,9 @@ module SoulCore
       current["last_response_mode"] = mode.to_s
       current["last_provider_id"] = provider_id
       current["last_fallback_reason"] = fallback_reason
+      current["last_orchestration_kind"] = orchestration&.fetch("kind", nil)
+      current["last_orchestration_reason"] = orchestration&.fetch("reason", nil)
+      current["last_tool_ids"] = Array(tool_ids).map(&:to_s)
       current["context_digest"] = context.fetch("context_digest", "").to_s
       current["context_stats"] = {
         "total_message_count" => context.fetch("total_message_count", 0).to_i,
@@ -63,7 +68,7 @@ module SoulCore
 
     def default_state(chat_id)
       {
-        "schema" => "conversational_soul_phase3",
+        "schema" => "conversational_soul_phase4",
         "chat_id" => chat_id.to_s,
         "created_at" => Time.now.iso8601,
         "updated_at" => nil,
@@ -75,6 +80,9 @@ module SoulCore
         "last_response_mode" => nil,
         "last_provider_id" => nil,
         "last_fallback_reason" => nil,
+        "last_orchestration_kind" => nil,
+        "last_orchestration_reason" => nil,
+        "last_tool_ids" => [],
         "context_digest" => "",
         "context_stats" => {}
       }
