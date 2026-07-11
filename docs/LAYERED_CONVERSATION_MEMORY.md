@@ -50,3 +50,16 @@ Soul/memory/conversation_memory.jsonl
 ```
 
 The runtime directory remains local and should not be committed.
+## Reviewed conversation controls
+
+The next Phase 9 slice exposes deterministic controls for explicit user-directed mutation:
+
+- `remember that <content>` creates a candidate;
+- `approve memory <id>` promotes a reviewed candidate;
+- `list memory` and `show memory <id>` inspect records;
+- supersession and forgetting require exact IDs and literal confirmation;
+- all transitions remain append-only and preserve audit history.
+
+Questions that merely ask about an earlier conversation are not interpreted as memory writes.
+See `docs/REVIEWED_CONVERSATION_MEMORY_CONTROLS.md` for the complete command contract.
+

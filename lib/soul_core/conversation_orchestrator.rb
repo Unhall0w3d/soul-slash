@@ -23,6 +23,15 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    MEMORY_CONTROL_PATTERNS = [
+      /\A\s*(?:memory help|help memory)\s*[?.!]*\z/i,
+      /\A\s*(?:what do you remember|show memories|show memory|list memories|list memory)(?:\s|\z)/i,
+      /\A\s*(?:show|inspect|approve|forget|delete|supersede)\s+(?:latest\s+)?memory\b/i,
+      /\A\s*(?:please\s+)?remember\s+(?:this|that)\b/i,
+      /\A\s*(?:please\s+)?remember\s+(?:as\s+)?(?:project|preference|episodic|semantic)\s*[:\-]/i,
+      /\A\s*propose\s+memory(?:\s+as)?\s+(?:project|preference|episodic|semantic)\s*[:\-]/i
+    ].freeze
+
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
@@ -65,6 +74,14 @@ module SoulCore
         "artifact_requested" => ARTIFACT_PATTERNS.any? { |pattern| text.match?(pattern) },
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if MEMORY_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "durable memory controls require deterministic review and explicit approval",
+          flags: flags.merge("memory_control" => true)
+        )
+      end
 
       if CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(

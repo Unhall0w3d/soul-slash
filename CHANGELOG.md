@@ -4,6 +4,8 @@
 
 ### Conversational Soul
 
+- Added reviewed deterministic conversation memory controls for candidate proposal, inspection, explicit approval, confirmation-gated supersession, and logical forgetting.
+
 - Added an append-only layered conversation memory foundation with explicit candidate approval, provenance, confidence, supersession, logical deletion, and approved-only context retrieval.
 
 - Added a declared conversation capability registry with specific deterministic boundaries for available, conditional, and unavailable host checks.

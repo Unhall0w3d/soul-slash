@@ -107,11 +107,17 @@ Delivered in this slice:
     conversation context integration
     no automatic model promotion
 
+Reviewed controls delivered in the next slice:
+
+    reviewed conversational proposal, inspection, approval, supersession, and forgetting controls
+    exact conversation provenance and chat identity
+    candidate-only remember commands
+    confirmation-gated supersession and logical forgetting
+    deterministic no-model mutation routing
+
 Remaining Phase 9 work:
 
-    user-facing proposal and review controls
     reflection candidate import
-    memory inspection and mutation approval surfaces
     export, backup, and physical purge policy
 
 ### Phase 10: Identity, interests, and variation

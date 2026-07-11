@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "conversation_memory_controls"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
 require_relative "read_only_skill_execution_gate"
@@ -14,6 +15,7 @@ module SoulCore
   class ChatResponder
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
+      @memory_controls = ConversationMemoryControls.new(root: @root)
       @router = IntentRouter.new
       @planner = SkillInvocationPlanner.new(router: @router)
       @history = ChatExecutionHistory.new(root: @root)
@@ -24,12 +26,13 @@ module SoulCore
       @trash_executor = DownloadsMoveToTrashExecutor.new(root: @root, store: @approval_controls.store, history: @history)
     end
 
-    def respond(message)
+    def respond(message, chat_id: nil)
       text = message.to_s.strip
       lower = text.downcase
       intent = @router.route(text)
 
       return "I am here. Give me a thread to pull." if lower.empty?
+      return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
       return approve_downloads_cleanup if lower.match?(/\b(approve downloads cleanup preview|approve cleanup preview)\b/)
       return list_pending_approvals if lower.match?(/\b(pending approvals|show approvals|list approvals)\b/)
       return revoke_approval(lower) if lower.match?(/\brevoke approval\b/)

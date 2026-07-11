@@ -123,7 +123,7 @@ module SoulCore
     private
 
     def deterministic_passthrough(chat_id, text, decision)
-      content = @deterministic_responder.respond(text)
+      content = deterministic_response(text, chat_id)
       context = safe_context(chat_id)
       record_state(
         chat_id: chat_id,
@@ -528,6 +528,18 @@ module SoulCore
 
     def evidence_ids(records)
       Array(records).map { |record| record["evidence_id"] }.compact
+    end
+
+    def deterministic_response(text, chat_id)
+      parameters = @deterministic_responder.method(:respond).parameters
+      accepts_chat_id = parameters.any? do |kind, name|
+        ([:key, :keyreq].include?(kind) && name == :chat_id) || kind == :keyrest
+      end
+      if accepts_chat_id
+        @deterministic_responder.respond(text, chat_id: chat_id)
+      else
+        @deterministic_responder.respond(text)
+      end
     end
 
     def provider_response(provider, request)
