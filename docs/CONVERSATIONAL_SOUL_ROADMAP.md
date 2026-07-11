@@ -8,7 +8,13 @@ Transform Soul from a deterministic command-oriented chat foundation into a cohe
 
 ### Phase 1: Architecture and acceptance contract
 
-Deliver:
+Status:
+
+```text
+complete
+```
+
+Delivered:
 
 ```text
 interaction-loop architecture
@@ -23,9 +29,13 @@ interface direction
 integrated acceptance scenarios
 ```
 
-No production conversation behavior changes are required in Phase 1.
-
 ### Phase 2: Provider and model capability foundation
+
+Status:
+
+```text
+in progress
+```
 
 Deliver:
 

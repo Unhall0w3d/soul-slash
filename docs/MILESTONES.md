@@ -91,22 +91,20 @@ in progress
 Current phase:
 
 ```text
-Phase 1
+Phase 2
 ```
 
-Purpose:
+Completed:
 
-Turn the deterministic chat and action foundation into a coherent multi-turn assistant runtime that can:
+```text
+Phase 1: architecture and acceptance contract
+```
 
-- understand discussion and tasks in the same message
-- preserve conversational and project context
-- invoke skills during conversation
-- interpret skill results
-- resume the conversation naturally
-- create and manage artifacts
-- develop inspectable interests and memory
-- vary style without canned quip rotation
-- support future chat, inbox, file-space, dashboard, and voice surfaces
+Current work:
+
+```text
+provider and model capability foundation
+```
 
 Planned stopping point:
 
@@ -120,6 +118,8 @@ See:
 docs/CONVERSATIONAL_SOUL_ARCHITECTURE.md
 docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md
 docs/CONVERSATIONAL_SOUL_ROADMAP.md
+docs/CONVERSATION_PROVIDER_CONTRACT.md
+docs/CONVERSATION_PROVIDER_CONFIGURATION.md
 ```
 
 ## Later milestone candidates

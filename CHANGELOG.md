@@ -4,12 +4,14 @@
 
 ### Conversational Soul
 
-- Began the new Conversational Soul milestone at Phase 1.
-- Added the conversational interaction-loop architecture.
-- Added multi-turn, orchestration, memory, artifact, personality, interface, and safety contracts.
-- Added integrated milestone acceptance scenarios.
-- Added the nine-phase Conversational Soul roadmap.
-- Added the `conversational-architecture` assessment.
+- Completed Phase 1 architecture and acceptance contracts.
+- Began Phase 2 provider and model capability foundation.
+- Added provider-neutral request and response envelopes.
+- Added local OpenAI-compatible and Ollama provider definitions.
+- Added a disabled cloud OpenAI-compatible provider shape.
+- Added normalized provider capability and privacy metadata.
+- Added bounded provider health checks with available, unavailable, and timeout results.
+- Added the `conversation-provider-foundation` assessment.
 
 ### Milestones completed
 
@@ -37,4 +39,4 @@
 
 ### Development direction
 
-The active milestone is Conversational Soul. Its purpose is to add natural multi-turn conversation, conversational tool orchestration, layered memory, artifact-aware interaction, and context-sensitive personality while preserving deterministic action safety.
+The active milestone is Conversational Soul. Phase 2 establishes the model-provider boundary required before model-backed multi-turn chat is introduced.
