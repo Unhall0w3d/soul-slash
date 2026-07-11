@@ -33,12 +33,14 @@ module SoulCore
       fallback_reason: nil,
       context: {},
       orchestration: nil,
-      tool_ids: []
+      tool_ids: [],
+      evidence_ids: [],
+      grounding: nil
     )
       current = state(chat_id)
       now = Time.now.iso8601
 
-      current["schema"] = "conversational_soul_phase4"
+      current["schema"] = "conversational_soul_phase5"
       current["chat_id"] = chat_id.to_s
       current["updated_at"] = now
       current["turn_count"] = current.fetch("turn_count", 0).to_i + 1
@@ -52,12 +54,15 @@ module SoulCore
       current["last_orchestration_kind"] = orchestration&.fetch("kind", nil)
       current["last_orchestration_reason"] = orchestration&.fetch("reason", nil)
       current["last_tool_ids"] = Array(tool_ids).map(&:to_s)
+      current["last_evidence_ids"] = Array(evidence_ids).map(&:to_s)
+      current["last_grounding"] = grounding
       current["context_digest"] = context.fetch("context_digest", "").to_s
       current["context_stats"] = {
         "total_message_count" => context.fetch("total_message_count", 0).to_i,
         "included_message_count" => context.fetch("included_message_count", 0).to_i,
         "truncated_message_count" => context.fetch("truncated_message_count", 0).to_i,
-        "character_count" => context.fetch("character_count", 0).to_i
+        "character_count" => context.fetch("character_count", 0).to_i,
+        "evidence_count" => context.fetch("evidence_count", 0).to_i
       }
 
       File.write(state_path(chat_id), "#{JSON.pretty_generate(current)}\n")
@@ -68,7 +73,7 @@ module SoulCore
 
     def default_state(chat_id)
       {
-        "schema" => "conversational_soul_phase4",
+        "schema" => "conversational_soul_phase5",
         "chat_id" => chat_id.to_s,
         "created_at" => Time.now.iso8601,
         "updated_at" => nil,
@@ -83,6 +88,8 @@ module SoulCore
         "last_orchestration_kind" => nil,
         "last_orchestration_reason" => nil,
         "last_tool_ids" => [],
+        "last_evidence_ids" => [],
+        "last_grounding" => nil,
         "context_digest" => "",
         "context_stats" => {}
       }

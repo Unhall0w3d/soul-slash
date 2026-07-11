@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
 require_relative "conversation_tool_catalog"
 require_relative "intent_router"
@@ -20,6 +21,12 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    HOST_ASSESSMENT_PATTERNS = [
+      /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
+      /\b(?:disk|drive|filesystem|raid|smart|host memory|host cpu|hardware health)\b.{0,40}\b(?:status|health|assessment|check|inspect)\b/i,
+      /\bwhat (?:disk|drives|filesystems|hardware|raid arrays) do i have\b/i
+    ].freeze
+
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
@@ -37,19 +44,26 @@ module SoulCore
       "downloads_cleanup_plan" => "downloads.cleanup_plan"
     }.freeze
 
-    def initialize(tool_catalog: nil, router: nil, max_tool_steps: MAX_TOOL_STEPS)
+    def initialize(
+      tool_catalog: nil,
+      router: nil,
+      grounding_policy: nil,
+      max_tool_steps: MAX_TOOL_STEPS
+    )
       @tool_catalog = tool_catalog || ConversationToolCatalog.new
       @router = router || IntentRouter.new
+      @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
       @max_tool_steps = normalize_limit(max_tool_steps)
     end
 
-    def plan(message:, provider_available:)
+    def plan(message:, provider_available:, recent_evidence: [])
       text = message.to_s.strip
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
       flags = {
         "memory_requested" => MEMORY_PATTERNS.any? { |pattern| text.match?(pattern) },
-        "artifact_requested" => ARTIFACT_PATTERNS.any? { |pattern| text.match?(pattern) }
+        "artifact_requested" => ARTIFACT_PATTERNS.any? { |pattern| text.match?(pattern) },
+        "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
 
       if CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
@@ -57,6 +71,22 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "approval, mutation, registry, or history control remains deterministic",
           flags: flags
+        )
+      end
+
+      if !recent_evidence.empty? && @grounding_policy.followup?(text)
+        return decision(
+          kind: "evidence_followup",
+          reason: "the message refers to recently persisted deterministic evidence",
+          flags: flags
+        )
+      end
+
+      if HOST_ASSESSMENT_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "capability_gap",
+          reason: "no registered host environment assessment skill exists",
+          flags: flags.merge("requested_capability" => "host.system_status")
         )
       end
 
@@ -74,7 +104,7 @@ module SoulCore
         if provider_available && tools.all? { |tool| tool.synthesis_allowed == true }
           return decision(
             kind: "skill_then_model",
-            reason: "bounded informational skills are relevant and model synthesis is available",
+            reason: "bounded informational skills are relevant and grounded synthesis is available",
             tools: tools,
             requires_model: true,
             synthesize: true,
@@ -85,7 +115,7 @@ module SoulCore
 
         return decision(
           kind: "skill_only",
-          reason: "bounded informational skills are relevant but model synthesis is unavailable",
+          reason: "deterministic evidence should be returned without model synthesis",
           tools: tools,
           max_steps: tools.length,
           flags: flags

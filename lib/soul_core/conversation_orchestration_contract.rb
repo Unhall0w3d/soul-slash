@@ -7,6 +7,8 @@ module SoulCore
       deterministic_passthrough
       skill_only
       skill_then_model
+      evidence_followup
+      capability_gap
       deterministic_fallback
     ].freeze
 

@@ -4,31 +4,36 @@ Phase 4 adds a bounded orchestration layer between chat input, deterministic ski
 
 ## Decisions
 
-The orchestrator chooses one of:
+The orchestrator chooses among:
 
 ```text
 direct_model
 deterministic_passthrough
 skill_only
 skill_then_model
+evidence_followup
+capability_gap
 deterministic_fallback
 ```
+
+The final two decision types were added by the Phase 5 grounding repair.
 
 ## Informational skill synthesis
 
 A conversational request such as:
 
 ```text
-Can you check the system status and tell me what it means?
+Inspect Downloads and tell me what it means.
 ```
 
-now follows:
+follows:
 
 ```text
 recognize relevant registered skill
--> execute deterministic system.status route
--> place the structured result in model context
--> ask the model to explain it naturally
+-> execute deterministic route
+-> persist evidence
+-> place evidence in model context
+-> validate synthesized claims
 -> return to the conversation
 ```
 
@@ -36,29 +41,22 @@ The model does not fabricate or directly execute the skill.
 
 ## Bounded skill chains
 
-Phase 4 permits at most two informational steps per turn:
-
-```text
-SOUL_CONVERSATION_MAX_TOOL_STEPS=2
-```
-
-The hard maximum is two even if a larger value is configured.
+At most two informational steps may run per turn.
 
 Current synthesis-capable tools:
 
 ```text
-system.status
 assistant-skill-catalog
 downloads.inspect
 downloads.cleanup_plan
 execution.history.summary
 ```
 
-These tools are read-only or review-only.
+`system.status` is intentionally evidence-only because its scope is Soul runtime health, not host health.
 
 ## Deterministic boundaries
 
-The following remain deterministic passthroughs:
+The following remain deterministic:
 
 ```text
 approval issuance
@@ -69,42 +67,28 @@ Downloads move-to-trash
 history mutation controls
 adapter registry controls
 identity responses
+Soul runtime status
+persisted-evidence follow-ups
+host capability-gap responses
 ```
-
-The model cannot convert a conversational sentence into mutation authority.
 
 ## Relevance controls
 
 Tool selection requires subject-specific patterns or a mapped deterministic intent.
 
-Example:
-
-```text
-What Ruby optimizations would improve Soul's codebase?
-```
-
-does not match Downloads cleanup merely because both subjects might use the word “cleanup.”
-
 No tool use is a valid orchestration result.
 
 ## Failure behavior
 
-If a deterministic skill succeeds but model synthesis fails:
+If a deterministic skill succeeds but synthesis fails or violates grounding:
 
 ```text
-the deterministic result is preserved
-the synthesis failure is stated
-no successful model response is invented
+the deterministic evidence is preserved
+the failure is stated
+unsupported prose is rejected
 conversation state remains available
 ```
 
 ## Future boundaries
 
-Phase 4 records memory-request and artifact-request signals, but does not implement durable memory or artifact creation.
-
-Those belong to later phases:
-
-```text
-Phase 5: layered memory
-Phase 7: artifact-aware conversation
-```
+Durable user/project memory begins after the grounded host-assessment capability is established.

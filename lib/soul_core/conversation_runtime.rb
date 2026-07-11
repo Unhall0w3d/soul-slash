@@ -3,6 +3,9 @@
 require "json"
 require_relative "chat_responder"
 require_relative "conversation_context_builder"
+require_relative "conversation_evidence_contract"
+require_relative "conversation_evidence_store"
+require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestrator"
 require_relative "conversation_provider_client"
 require_relative "conversation_provider_contract"
@@ -12,6 +15,7 @@ require_relative "conversation_state_store"
 module SoulCore
   class ConversationRuntime
     Contract = ConversationProviderContract
+    EvidenceContract = ConversationEvidenceContract
 
     Result = Struct.new(
       :content,
@@ -41,6 +45,8 @@ module SoulCore
       deterministic_responder: nil,
       context_builder: nil,
       state_store: nil,
+      evidence_store: nil,
+      grounding_policy: nil,
       orchestrator: nil
     )
       @root = File.expand_path(root)
@@ -49,13 +55,17 @@ module SoulCore
       @registry = registry || ConversationProviderRegistry.new(env: env)
       @provider_client = provider_client || ConversationProviderClient.new(env: env)
       @deterministic_responder = deterministic_responder || ChatResponder.new(root: @root)
+      @evidence_store = evidence_store || ConversationEvidenceStore.new(root: @root)
+      @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
+        evidence_store: @evidence_store,
         max_messages: env.fetch("SOUL_CONVERSATION_MAX_MESSAGES", ConversationContextBuilder::DEFAULT_MAX_MESSAGES),
         max_characters: env.fetch("SOUL_CONVERSATION_MAX_CHARACTERS", ConversationContextBuilder::DEFAULT_MAX_CHARACTERS)
       )
       @state_store = state_store || ConversationStateStore.new(root: @root)
       @orchestrator = orchestrator || ConversationOrchestrator.new(
+        grounding_policy: @grounding_policy,
         max_tool_steps: env.fetch("SOUL_CONVERSATION_MAX_TOOL_STEPS", ConversationOrchestrator::MAX_TOOL_STEPS)
       )
     end
@@ -65,9 +75,11 @@ module SoulCore
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
       provider = selected_provider
+      recent_evidence = @evidence_store.recent(chat_id, limit: 5)
       decision = @orchestrator.plan(
         message: text,
-        provider_available: !provider.nil?
+        provider_available: !provider.nil?,
+        recent_evidence: recent_evidence
       )
 
       case decision.kind
@@ -77,6 +89,10 @@ module SoulCore
         informational_skill_only(chat_id, text, decision)
       when "skill_then_model"
         informational_skill_then_model(chat_id, text, decision, provider)
+      when "evidence_followup"
+        evidence_followup(chat_id, text, decision, recent_evidence)
+      when "capability_gap"
+        capability_gap(chat_id, text, decision)
       when "direct_model"
         direct_model(chat_id, text, decision, provider)
       else
@@ -114,8 +130,11 @@ module SoulCore
     end
 
     def informational_skill_only(chat_id, text, decision)
-      tool_results = execute_tools(decision.tools)
-      content = render_tool_results(tool_results)
+      evidence = execute_tools(decision.tools, chat_id)
+      content = @grounding_policy.render_evidence(
+        evidence,
+        heading: "What Soul actually checked"
+      )
       context = safe_context(chat_id)
 
       record_state(
@@ -125,7 +144,9 @@ module SoulCore
         mode: "skill_only",
         context: context,
         decision: decision,
-        tool_ids: decision.tool_ids
+        tool_ids: decision.tool_ids,
+        evidence_ids: evidence_ids(evidence),
+        grounding: { "valid" => true, "mode" => "deterministic_evidence" }
       )
 
       Result.new(
@@ -133,48 +154,95 @@ module SoulCore
         mode: "skill_only",
         metadata: {
           "orchestration" => decision.to_h,
-          "tool_results" => tool_result_metadata(tool_results),
+          "evidence" => evidence_metadata(evidence),
+          "grounding" => { "valid" => true, "mode" => "deterministic_evidence" },
           "context" => context_stats(context)
         }
       )
     end
 
     def informational_skill_then_model(chat_id, text, decision, provider)
-      tool_results = execute_tools(decision.tools)
+      evidence = execute_tools(decision.tools, chat_id)
       context = safe_context(chat_id)
       request = build_request(
         chat_id: chat_id,
         provider: provider,
         context: context,
         orchestration: decision,
-        tool_results: tool_results
+        evidence: evidence
       )
       response = provider_response(provider, request)
 
       if response.success? && !response.content.to_s.strip.empty?
-        content = response.content.to_s.strip
+        grounding = @grounding_policy.validate(
+          response: response.content,
+          evidence_records: evidence
+        )
+
+        if grounding["valid"]
+          content = response.content.to_s.strip
+          record_state(
+            chat_id: chat_id,
+            user_message: text,
+            assistant_message: content,
+            mode: "skill_then_model",
+            provider_id: provider.id,
+            context: context,
+            decision: decision,
+            tool_ids: decision.tool_ids,
+            evidence_ids: evidence_ids(evidence),
+            grounding: grounding
+          )
+
+          return Result.new(
+            content: content,
+            mode: "skill_then_model",
+            provider_id: provider.id,
+            metadata: {
+              "orchestration" => decision.to_h,
+              "evidence" => evidence_metadata(evidence),
+              "grounding" => grounding,
+              "model" => response.model,
+              "finish_reason" => response.finish_reason,
+              "usage" => response.usage,
+              "latency_ms" => response.latency_ms,
+              "context" => context_stats(context)
+            }
+          )
+        end
+
+        content = [
+          @grounding_policy.render_evidence(
+            evidence,
+            heading: "Grounded deterministic result"
+          ),
+          "",
+          "I rejected the model-written explanation because it introduced claims not supported by the collected evidence."
+        ].join("\n")
+
         record_state(
           chat_id: chat_id,
           user_message: text,
           assistant_message: content,
-          mode: "skill_then_model",
+          mode: "grounding_fallback",
           provider_id: provider.id,
+          fallback_reason: "unsupported synthesized claims",
           context: context,
           decision: decision,
-          tool_ids: decision.tool_ids
+          tool_ids: decision.tool_ids,
+          evidence_ids: evidence_ids(evidence),
+          grounding: grounding
         )
 
         return Result.new(
           content: content,
-          mode: "skill_then_model",
+          mode: "grounding_fallback",
           provider_id: provider.id,
+          fallback_reason: "unsupported synthesized claims",
           metadata: {
             "orchestration" => decision.to_h,
-            "tool_results" => tool_result_metadata(tool_results),
-            "model" => response.model,
-            "finish_reason" => response.finish_reason,
-            "usage" => response.usage,
-            "latency_ms" => response.latency_ms,
+            "evidence" => evidence_metadata(evidence),
+            "grounding" => grounding,
             "context" => context_stats(context)
           }
         )
@@ -182,7 +250,10 @@ module SoulCore
 
       reason = provider_error_reason(response)
       content = [
-        render_tool_results(tool_results),
+        @grounding_policy.render_evidence(
+          evidence,
+          heading: "Grounded deterministic result"
+        ),
         "",
         "I gathered the deterministic result, but conversational synthesis is unavailable.",
         "Reason: #{reason}."
@@ -197,7 +268,9 @@ module SoulCore
         fallback_reason: reason,
         context: context,
         decision: decision,
-        tool_ids: decision.tool_ids
+        tool_ids: decision.tool_ids,
+        evidence_ids: evidence_ids(evidence),
+        grounding: { "valid" => true, "mode" => "deterministic_fallback" }
       )
 
       Result.new(
@@ -207,7 +280,68 @@ module SoulCore
         fallback_reason: reason,
         metadata: {
           "orchestration" => decision.to_h,
-          "tool_results" => tool_result_metadata(tool_results),
+          "evidence" => evidence_metadata(evidence),
+          "grounding" => { "valid" => true, "mode" => "deterministic_fallback" },
+          "context" => context_stats(context)
+        }
+      )
+    end
+
+    def evidence_followup(chat_id, text, decision, recent_evidence)
+      content = @grounding_policy.render_evidence(
+        recent_evidence,
+        heading: "Details from the most recent deterministic check"
+      )
+      context = safe_context(chat_id)
+
+      record_state(
+        chat_id: chat_id,
+        user_message: text,
+        assistant_message: content,
+        mode: "evidence_followup",
+        context: context,
+        decision: decision,
+        tool_ids: recent_evidence.map { |record| record["tool_id"] },
+        evidence_ids: evidence_ids(recent_evidence),
+        grounding: { "valid" => true, "mode" => "persisted_evidence" }
+      )
+
+      Result.new(
+        content: content,
+        mode: "evidence_followup",
+        metadata: {
+          "orchestration" => decision.to_h,
+          "evidence" => evidence_metadata(recent_evidence),
+          "grounding" => { "valid" => true, "mode" => "persisted_evidence" },
+          "context" => context_stats(context)
+        }
+      )
+    end
+
+    def capability_gap(chat_id, text, decision)
+      content = [
+        "I do not currently have a registered host-environment assessment skill.",
+        "I can check Soul's own runtime status, but that does not inspect the host's CPU, memory, disks, filesystems, RAID, SMART data, network, firewall, services, authentication logs, or scheduled jobs.",
+        "Those facts are unknown until a bounded host.system_status skill collects them."
+      ].join("\n")
+      context = safe_context(chat_id)
+
+      record_state(
+        chat_id: chat_id,
+        user_message: text,
+        assistant_message: content,
+        mode: "capability_gap",
+        context: context,
+        decision: decision,
+        grounding: { "valid" => true, "mode" => "explicit_capability_boundary" }
+      )
+
+      Result.new(
+        content: content,
+        mode: "capability_gap",
+        metadata: {
+          "orchestration" => decision.to_h,
+          "grounding" => { "valid" => true, "mode" => "explicit_capability_boundary" },
           "context" => context_stats(context)
         }
       )
@@ -267,18 +401,20 @@ module SoulCore
       )
     end
 
-    def build_request(chat_id:, provider:, context:, orchestration:, tool_results: [])
+    def build_request(chat_id:, provider:, context:, orchestration:, evidence: [])
       messages = context.fetch("messages").map(&:dup)
 
-      unless tool_results.empty?
+      unless evidence.empty?
         messages << {
           "role" => "system",
           "content" => [
-            "Deterministic skill results are provided below.",
-            "Use them as authoritative for this turn.",
+            "Deterministic evidence for this turn follows as JSON.",
+            "Positive factual claims may use only collected values or claims.",
+            "Items in not_collected are unknown and must never be described as healthy, present, absent, configured, or measured.",
+            "State the scope of the check.",
+            "Do not introduce CPU, memory, storage, filesystem, RAID, SMART, network, service, security, or scheduling facts unless collected evidence contains them.",
             "Explain the useful result naturally and return to the user's conversation.",
-            "Do not claim any other tool or action ran.",
-            JSON.pretty_generate(tool_results)
+            JSON.pretty_generate(evidence)
           ].join("\n")
         }
       end
@@ -291,53 +427,55 @@ module SoulCore
         max_output_tokens: integer_env("SOUL_CONVERSATION_MAX_OUTPUT_TOKENS", 1_024),
         privacy_requirement: privacy_requirement(provider),
         metadata: {
-          "runtime" => "conversational_soul_phase4",
+          "runtime" => "conversational_soul_phase5",
           "orchestration" => orchestration.to_h,
+          "evidence_ids" => evidence_ids(evidence),
           "context" => context_stats(context)
         }
       )
     end
 
-    def execute_tools(tools)
+    def execute_tools(tools, chat_id)
       tools.map do |tool|
         begin
           output = @deterministic_responder.respond(tool.canonical_message)
-          {
-            "tool_id" => tool.id,
-            "risk_class" => tool.risk_class,
-            "status" => "ok",
-            "output" => output.to_s
-          }
+          evidence = EvidenceContract.build(
+            tool: tool,
+            chat_id: chat_id,
+            output: output,
+            status: "ok"
+          )
+          @evidence_store.append(evidence)
         rescue StandardError => error
-          {
-            "tool_id" => tool.id,
-            "risk_class" => tool.risk_class,
-            "status" => "failed",
-            "error_class" => error.class.name,
-            "error_message" => error.message
-          }
+          evidence = EvidenceContract.build(
+            tool: tool,
+            chat_id: chat_id,
+            output: "",
+            status: "failed",
+            error: {
+              "class" => error.class.name,
+              "message" => error.message
+            }
+          )
+          @evidence_store.append(evidence)
         end
       end
     end
 
-    def render_tool_results(results)
-      results.map do |result|
-        if result["status"] == "ok"
-          result["output"].to_s
-        else
-          "Tool #{result['tool_id']} failed: #{result['error_message']}"
-        end
-      end.join("\n\n")
-    end
-
-    def tool_result_metadata(results)
-      results.map do |result|
+    def evidence_metadata(records)
+      Array(records).map do |record|
         {
-          "tool_id" => result["tool_id"],
-          "risk_class" => result["risk_class"],
-          "status" => result["status"]
+          "evidence_id" => record["evidence_id"],
+          "tool_id" => record["tool_id"],
+          "scope" => record["scope"],
+          "status" => record["status"],
+          "not_collected_count" => Array(record["not_collected"]).length
         }
       end
+    end
+
+    def evidence_ids(records)
+      Array(records).map { |record| record["evidence_id"] }.compact
     end
 
     def provider_response(provider, request)
@@ -412,7 +550,9 @@ module SoulCore
       decision:,
       provider_id: nil,
       fallback_reason: nil,
-      tool_ids: []
+      tool_ids: [],
+      evidence_ids: [],
+      grounding: nil
     )
       @state_store.record_turn(
         chat_id: chat_id,
@@ -423,7 +563,9 @@ module SoulCore
         fallback_reason: fallback_reason,
         context: context,
         orchestration: decision.to_h,
-        tool_ids: tool_ids
+        tool_ids: tool_ids,
+        evidence_ids: evidence_ids,
+        grounding: grounding
       )
     end
 
@@ -436,7 +578,9 @@ module SoulCore
         "total_message_count" => 0,
         "included_message_count" => 0,
         "truncated_message_count" => 0,
-        "character_count" => 0
+        "character_count" => 0,
+        "evidence_count" => 0,
+        "evidence_ids" => []
       }
     end
 
@@ -445,7 +589,8 @@ module SoulCore
         "total_message_count" => context.fetch("total_message_count", 0),
         "included_message_count" => context.fetch("included_message_count", 0),
         "truncated_message_count" => context.fetch("truncated_message_count", 0),
-        "character_count" => context.fetch("character_count", 0)
+        "character_count" => context.fetch("character_count", 0),
+        "evidence_count" => context.fetch("evidence_count", 0)
       }
     end
 

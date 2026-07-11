@@ -56,7 +56,7 @@ in progress
 Current phase:
 
 ```text
-Phase 4
+Phase 5
 ```
 
 Completed:
@@ -65,18 +65,26 @@ Completed:
 Phase 1: architecture and acceptance contract
 Phase 2: provider and model capability foundation
 Phase 3: multi-turn conversation runtime
+Phase 4: conversational orchestrator
 ```
 
 Current work:
 
 ```text
-conversational orchestrator
+grounded evidence lifecycle
 ```
 
-Planned stopping point:
+Revised stopping point:
 
 ```text
-Phase 9
+Phase 11
+```
+
+The milestone expanded because manual testing exposed two required architectural layers before memory work:
+
+```text
+Phase 5: grounded evidence lifecycle
+Phase 6: bounded host environment assessment
 ```
 
 See:
@@ -85,10 +93,10 @@ See:
 docs/CONVERSATIONAL_SOUL_ARCHITECTURE.md
 docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md
 docs/CONVERSATIONAL_SOUL_ROADMAP.md
-docs/CONVERSATION_PROVIDER_CONTRACT.md
-docs/CONVERSATION_PROVIDER_CONFIGURATION.md
 docs/MULTITURN_CONVERSATION_RUNTIME.md
 docs/CONVERSATIONAL_ORCHESTRATOR.md
+docs/GROUNDED_TOOL_EVIDENCE.md
+docs/HOST_ENVIRONMENT_CAPABILITY_GAP.md
 ```
 
 ## Later milestone candidates

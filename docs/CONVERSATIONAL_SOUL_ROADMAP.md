@@ -4,7 +4,7 @@ The Conversational Soul milestone begins a new phase sequence at Phase 1.
 
 ## Milestone purpose
 
-Transform Soul from a deterministic command-oriented chat foundation into a coherent multi-turn assistant runtime with bounded tool use, layered memory, artifact-aware interaction, and a stable but non-canned identity.
+Transform Soul from a deterministic command-oriented chat foundation into a coherent multi-turn assistant runtime with bounded tool use, grounded evidence, layered memory, artifact-aware interaction, and a stable but non-canned identity.
 
 ### Phase 1: Architecture and acceptance contract
 
@@ -30,19 +30,15 @@ Status:
 complete
 ```
 
-Delivered:
+### Phase 4: Conversational orchestrator
+
+Status:
 
 ```text
-model-backed session loop
-bounded recent-turn context
-active subject and task hints
-provider fallback
-deterministic action preservation
-runtime conversation state
-session persistence
+complete
 ```
 
-### Phase 4: Conversational orchestrator
+### Phase 5: Grounded evidence lifecycle
 
 Status:
 
@@ -53,18 +49,31 @@ in progress
 Deliver:
 
 ```text
-direct-answer decision
-single informational skill decision
-bounded informational skill chain
-deterministic approval decision
-tool relevance validation
-two-step stop limit
-skill-result synthesis
-safe synthesis failure
-memory and artifact intent flags
+persisted deterministic evidence
+tool scope metadata
+collected and not_collected separation
+evidence-aware conversation context
+referential follow-up resolution
+unsupported-claim rejection
+explicit host capability gap
+runtime grounding history
 ```
 
-### Phase 5: Layered memory
+### Phase 6: Bounded host environment assessment
+
+Deliver:
+
+```text
+host.system_status skill
+declared read-only command set
+structured host evidence
+filesystem and disk provenance
+explicit uncollected categories
+conversation integration
+host-assessment regression tests
+```
+
+### Phase 7: Layered memory
 
 Deliver:
 
@@ -81,7 +90,7 @@ supersession
 inspection and deletion
 ```
 
-### Phase 6: Identity, interests, and variation
+### Phase 8: Identity, interests, and variation
 
 Deliver:
 
@@ -95,7 +104,7 @@ no joke quotas
 no fabricated biography or embodiment
 ```
 
-### Phase 7: Artifact-aware conversation
+### Phase 9: Artifact-aware conversation
 
 Deliver:
 
@@ -109,7 +118,7 @@ file lifecycle
 provider and source provenance
 ```
 
-### Phase 8: Interface contract
+### Phase 10: Interface contract
 
 Deliver designs and core API contracts for:
 
@@ -125,7 +134,7 @@ Settings
 System status
 ```
 
-### Phase 9: Integrated acceptance and closeout
+### Phase 11: Integrated acceptance and closeout
 
 Deliver:
 
@@ -133,6 +142,7 @@ Deliver:
 automated scenario suite
 manual twenty-turn conversation test
 skill invocation and return test
+grounded host-assessment test
 artifact workflow test
 memory continuity test
 safe failure test
@@ -141,4 +151,4 @@ approval-gated mutation regression
 documentation and curation closeout
 ```
 
-Phase 9 is the clear stopping point.
+Phase 11 is the clear stopping point.
