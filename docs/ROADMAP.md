@@ -35,3 +35,9 @@
 - [ ] optional vector memory
 - [ ] project-aware skills
 - [ ] local docs search
+# AletheiaUC integration note
+
+When Soul coordinates AletheiaUC assessment work, treat UCOS diagnostics as
+private, bounded evidence. CUC platform findings are conservative: diagnostic
+failures, unexpected stopped services, core files, unhealthy replication, link
+down, and duplicate IP merit review; explicitly unactivated services do not.
