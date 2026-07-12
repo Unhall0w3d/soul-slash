@@ -31,6 +31,7 @@ Soul/reflection/approved/*.md
 Soul/reflection/rejected/*.json
 Soul/reflection/rejected/*.md
 Soul/memory/conversation_memory.jsonl
+Soul/memory/exports/*.json
 
 # Keep directory sentinels
 !Soul/logs/tasks/.keep

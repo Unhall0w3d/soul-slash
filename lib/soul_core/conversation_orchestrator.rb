@@ -23,6 +23,13 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    MEMORY_MAINTENANCE_PATTERNS = [
+      /\A\s*(?:memory maintenance help|help memory maintenance)\s*[?.!]*\z/i,
+      /\A\s*list\s+approved\s+reflections?\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect|preview|import)\s+approved\s+reflection\b/i,
+      /\A\s*(?:export|verify)\s+memory\s+snapshot\b/i
+    ].freeze
+
     MEMORY_CONTROL_PATTERNS = [
       /\A\s*(?:memory help|help memory)\s*[?.!]*\z/i,
       /\A\s*(?:what do you remember|show memories|show memory|list memories|list memory)(?:\s|\z)/i,
@@ -74,6 +81,14 @@ module SoulCore
         "artifact_requested" => ARTIFACT_PATTERNS.any? { |pattern| text.match?(pattern) },
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if MEMORY_MAINTENANCE_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "memory reflection import and snapshot controls require deterministic review boundaries",
+          flags: flags.merge("memory_maintenance_control" => true)
+        )
+      end
 
       if MEMORY_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(

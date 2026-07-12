@@ -91,34 +91,21 @@ Deliver:
 
 ### Phase 9: Layered memory
 
-Status: in progress
+Status: complete
 
-This implementation slice establishes the durable memory contract before conversational mutation controls are exposed.
+Delivered:
 
-Delivered in this slice:
-
-    working memory remains bounded chat context and digest
+    bounded working memory through chat context and digest
     durable project, preference, episodic, and semantic layers
-    append-only event ledger
-    candidate and explicit approval states
-    provenance and confidence
-    bounded approved-only retrieval
-    supersession and logical deletion
-    conversation context integration
-    no automatic model promotion
+    append-only candidate, approval, supersession, and deletion events
+    provenance, confidence, tags, and approved-only retrieval
+    reviewed conversational proposal and mutation controls
+    approved-reflection import as unapproved memory candidates
+    idempotent reflection-import provenance
+    replay-verifiable memory snapshot export
+    explicit logical-deletion and no-physical-purge policy
 
-Reviewed controls delivered in the next slice:
-
-    reviewed conversational proposal, inspection, approval, supersession, and forgetting controls
-    exact conversation provenance and chat identity
-    candidate-only remember commands
-    confirmation-gated supersession and logical forgetting
-    deterministic no-model mutation routing
-
-Remaining Phase 9 work:
-
-    reflection candidate import
-    export, backup, and physical purge policy
+Phase 10 is next.
 
 ### Phase 10: Identity, interests, and variation
 

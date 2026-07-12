@@ -62,4 +62,11 @@ The next Phase 9 slice exposes deterministic controls for explicit user-directed
 
 Questions that merely ask about an earlier conversation are not interpreted as memory writes.
 See `docs/REVIEWED_CONVERSATION_MEMORY_CONTROLS.md` for the complete command contract.
+## Reflection bridge and portable snapshots
+
+Approved reflection artifacts may contribute `candidate_memory_updates`, but the bridge imports them only as layered-memory candidates. Reflection approval and memory approval remain separate human decisions. Repeated imports use stable provenance digests and do not create duplicate ledger events.
+
+Memory snapshots export both the append-only event ledger and its materialized records. Every snapshot carries a canonical SHA-256 digest and can be replay-verified. Export does not mutate the source ledger, and physical purge remains outside the supported control surface.
+
+See `docs/MEMORY_REFLECTION_BRIDGE_AND_EXPORT.md`.
 
