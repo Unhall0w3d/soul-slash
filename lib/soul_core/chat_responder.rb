@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "conversation_style_controls"
 require_relative "conversation_identity_controls"
 require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
@@ -18,6 +19,7 @@ module SoulCore
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
       @identity_controls = ConversationIdentityControls.new
+      @style_controls = ConversationStyleControls.new(root: @root)
       @memory_controls = ConversationMemoryControls.new(root: @root)
       @memory_maintenance_controls = ConversationMemoryMaintenanceControls.new(root: @root)
       @router = IntentRouter.new
@@ -37,6 +39,7 @@ module SoulCore
 
       return "I am here. Give me a thread to pull." if lower.empty?
       return @identity_controls.respond(text, chat_id: chat_id) if @identity_controls.match?(text)
+      return @style_controls.respond(text, chat_id: chat_id) if @style_controls.match?(text)
       return @memory_maintenance_controls.respond(text, chat_id: chat_id) if @memory_maintenance_controls.match?(text)
       return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
       return approve_downloads_cleanup if lower.match?(/\b(approve downloads cleanup preview|approve cleanup preview)\b/)

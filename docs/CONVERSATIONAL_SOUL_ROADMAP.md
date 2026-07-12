@@ -126,15 +126,25 @@ no fabricated biography or embodiment
 model-context integration without identity mutation
 ```
 
+Delivered in Phase 10B:
+
+```text
+bounded recent-assistant-turn style analysis
+repeated opening, closing, sentence, disclaimer, and structure detection
+ephemeral variation guidance in model context
+deterministic recent-style inspection
+no persistent style profile or automatic identity mutation
+truth, safety, evidence, approvals, and requested format remain higher priority
+```
+
 Remaining:
 
 ```text
-recent-style awareness
-overuse detection
-variation guidance
 inspectable reviewed interests
 multi-turn identity and variation closeout
-```### Phase 11: Artifact-aware conversation
+```
+
+### Phase 11: Artifact-aware conversation
 
 Deliver:
 

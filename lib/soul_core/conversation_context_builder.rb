@@ -2,6 +2,7 @@
 
 require_relative "conversation_memory_store"
 require_relative "conversation_identity_profile"
+require_relative "conversation_style_analyzer"
 
 module SoulCore
   class ConversationContextBuilder
@@ -30,6 +31,7 @@ module SoulCore
       store:,
       memory_store: nil,
       identity_profile: nil,
+      style_analyzer: nil,
       max_messages: DEFAULT_MAX_MESSAGES,
       max_characters: DEFAULT_MAX_CHARACTERS,
       digest_characters: DEFAULT_DIGEST_CHARACTERS,
@@ -38,6 +40,7 @@ module SoulCore
       @store = store
       @memory_store = memory_store || default_memory_store(store)
       @identity_profile = identity_profile || ConversationIdentityProfile.new
+      @style_analyzer = style_analyzer || ConversationStyleAnalyzer.new
       @max_messages = positive_integer(max_messages, DEFAULT_MAX_MESSAGES)
       @max_characters = positive_integer(max_characters, DEFAULT_MAX_CHARACTERS)
       @digest_characters = positive_integer(digest_characters, DEFAULT_DIGEST_CHARACTERS)
@@ -64,9 +67,12 @@ module SoulCore
       identity = @identity_profile.context_for(
         message: current_query&.fetch("content", "").to_s
       )
+      style = @style_analyzer.analyze(messages: all_messages)
 
       system_content = SYSTEM_PROMPT.dup
       system_content << "\n#{@identity_profile.render_system_guidance(message: current_query&.fetch('content', '').to_s)}\n"
+      recent_style_guidance = @style_analyzer.render_system_guidance(style)
+      system_content << "\n#{recent_style_guidance}\n" unless recent_style_guidance.empty?
       stored_summary = chat["summary"].to_s.strip
       unless stored_summary.empty?
         system_content << "\nExisting session summary:\n#{stored_summary}\n"
@@ -103,6 +109,15 @@ module SoulCore
           "tone_mode" => identity.fetch("tone_mode"),
           "tone_label" => identity.fetch("tone_label"),
           "automatic_identity_mutation" => identity.fetch("automatic_identity_mutation")
+        },
+        "style" => {
+          "window_size" => style.fetch("window_size"),
+          "assistant_sample_count" => style.fetch("assistant_sample_count"),
+          "eligible" => style.fetch("eligible"),
+          "signal_types" => style.fetch("signals").map { |signal| signal.fetch("type") }.uniq,
+          "guidance_count" => style.fetch("guidance").length,
+          "automatic_identity_mutation" => style.fetch("automatic_identity_mutation"),
+          "persistent_style_profile" => style.fetch("persistent_style_profile")
         },
         "memory" => {
           "record_ids" => memory.fetch("record_ids", []),

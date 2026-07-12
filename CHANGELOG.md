@@ -4,6 +4,8 @@
 
 ### Conversational Soul
 
+- Added Phase 10B recent-style awareness with bounded repetition detection, ephemeral variation guidance, deterministic inspection, and explicit priority boundaries.
+
 - Added the Phase 10A inspectable identity and style-policy foundation with bounded tone selection, profile-backed identity responses, explicit anti-fabrication boundaries, and hygiene-aligned documentation.
 
 - Completed the Phase 9 memory contract with approved-reflection candidate import, idempotent provenance, and replay-verifiable memory snapshots.

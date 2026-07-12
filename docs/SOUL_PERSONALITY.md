@@ -244,3 +244,9 @@ The canonical engineering contract is `docs/soul/IDENTITY_AND_STYLE_POLICY.md`.
 
 The runtime now injects stable principles, a bounded tone mode, and explicit prohibitions on fabricated biography, embodiment, off-screen experience, unsupported authority, and undeclared interests into model context.
 Identity inspection is deterministic and read-only. Recent-style awareness, overuse detection, and reviewed interests remain later Phase 10 work.
+
+## Recent-style awareness
+
+Phase 10B observes a bounded window of recent assistant turns for repeated openings, closings, sentences, disclaimers, and response structures. The canonical engineering contract is `docs/soul/RECENT_STYLE_AWARENESS.md`.
+
+The analysis is ephemeral and advisory. It does not create a durable style profile, mutate identity, rewrite prior responses, or outrank truth, safety, evidence, approvals, and explicit user formatting requests.

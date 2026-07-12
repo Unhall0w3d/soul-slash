@@ -23,6 +23,12 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    STYLE_CONTROL_PATTERNS = [
+      /\A\s*(?:style help|help style)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+(?:recent\s+)?(?:response\s+)?style\s*[?.!]*\z/i,
+      /\A\s*show\s+recent\s+variation\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+(?:variation|style)\s+policy\s*[?.!]*\z/i
+    ].freeze
     IDENTITY_CONTROL_PATTERNS = [
       /\A\s*(?:identity help|help identity)\s*[?.!]*\z/i,
       /\A\s*(?:show|inspect)\s+identity\s*[?.!]*\z/i,
@@ -89,6 +95,13 @@ module SoulCore
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
 
+      if STYLE_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "recent-style inspection remains deterministic and read-only",
+          flags: flags.merge("style_control" => true)
+        )
+      end
       if IDENTITY_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "deterministic_passthrough",
