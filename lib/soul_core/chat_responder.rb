@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "conversation_identity_controls"
 require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
 require_relative "intent_router"
@@ -16,6 +17,7 @@ module SoulCore
   class ChatResponder
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
+      @identity_controls = ConversationIdentityControls.new
       @memory_controls = ConversationMemoryControls.new(root: @root)
       @memory_maintenance_controls = ConversationMemoryMaintenanceControls.new(root: @root)
       @router = IntentRouter.new
@@ -34,6 +36,7 @@ module SoulCore
       intent = @router.route(text)
 
       return "I am here. Give me a thread to pull." if lower.empty?
+      return @identity_controls.respond(text, chat_id: chat_id) if @identity_controls.match?(text)
       return @memory_maintenance_controls.respond(text, chat_id: chat_id) if @memory_maintenance_controls.match?(text)
       return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
       return approve_downloads_cleanup if lower.match?(/\b(approve downloads cleanup preview|approve cleanup preview)\b/)
@@ -47,7 +50,7 @@ module SoulCore
 
       case intent.id
       when "identity"
-        "I am Soul: a local assistant shaped around this environment, its owner, and the skills I can safely use."
+        @identity_controls.summary
       when "skill_catalog"
         simple_execute(intent, text, "assistant skill catalog")
       when "repo_status"

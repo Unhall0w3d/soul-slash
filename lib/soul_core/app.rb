@@ -25,6 +25,7 @@ require_relative "multiturn_conversation_runtime_assessor"
 require_relative "conversational_orchestrator_assessor"
 require_relative "grounded_evidence_lifecycle_assessor"
 require_relative "bounded_host_system_status_assessor"
+require_relative "phase10_identity_style_foundation_assessor"
 require_relative "phase9_memory_reflection_and_export_closeout_assessor"
 require_relative "phase9_reviewed_memory_controls_assessor"
 require_relative "phase9_layered_memory_foundation_assessor"
@@ -271,6 +272,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+    when "phase10-identity-style-foundation", "identity-style-foundation"
+      json = @argv.include?("--json")
+      assessor = Phase10IdentityStyleFoundationAssessor.new(root: Dir.pwd)
+      report = assessor.assess
+      puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+      report["ok"] ? 0 : 1
     when "phase9-memory-closeout", "memory-closeout"
       json = @argv.include?("--json")
       assessor = Phase9MemoryReflectionAndExportCloseoutAssessor.new(root: Dir.pwd)

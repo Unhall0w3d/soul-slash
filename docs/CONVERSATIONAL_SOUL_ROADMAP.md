@@ -105,23 +105,36 @@ Delivered:
     replay-verifiable memory snapshot export
     explicit logical-deletion and no-physical-purge policy
 
-Phase 10 is next.
+Phase 10 is in progress.
 
 ### Phase 10: Identity, interests, and variation
 
-Deliver:
+Status:
 
 ```text
-stable personality principles
-context-sensitive tone
-recent-style awareness
-overuse detection
-inspectable interests
-no joke quotas
-no fabricated biography or embodiment
+in progress
 ```
 
-### Phase 11: Artifact-aware conversation
+Delivered in Phase 10A:
+
+```text
+stable inspectable identity profile
+context-sensitive bounded tone modes
+deterministic identity inspection
+no joke quotas
+no fabricated biography or embodiment
+model-context integration without identity mutation
+```
+
+Remaining:
+
+```text
+recent-style awareness
+overuse detection
+variation guidance
+inspectable reviewed interests
+multi-turn identity and variation closeout
+```### Phase 11: Artifact-aware conversation
 
 Deliver:
 

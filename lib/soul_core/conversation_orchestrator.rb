@@ -23,6 +23,13 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    IDENTITY_CONTROL_PATTERNS = [
+      /\A\s*(?:identity help|help identity)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+identity\s*[?.!]*\z/i,
+      /\A\s*show\s+(?:personality|identity)\s+policy\s*[?.!]*\z/i,
+      /\A\s*(?:show\s+tone\s+policy|inspect\s+tone\s+modes?)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+identity\s+boundaries\s*[?.!]*\z/i
+    ].freeze
     MEMORY_MAINTENANCE_PATTERNS = [
       /\A\s*(?:memory maintenance help|help memory maintenance)\s*[?.!]*\z/i,
       /\A\s*list\s+approved\s+reflections?\s*[?.!]*\z/i,
@@ -82,6 +89,13 @@ module SoulCore
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
 
+      if IDENTITY_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "identity policy inspection remains deterministic and read-only",
+          flags: flags.merge("identity_control" => true)
+        )
+      end
       if MEMORY_MAINTENANCE_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "deterministic_passthrough",

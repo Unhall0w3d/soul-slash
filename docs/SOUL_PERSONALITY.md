@@ -236,3 +236,11 @@ A machine familiar.
 A careful externalized soul.
 
 A new mind at the slash, learning the system one verified capability at a time.
+
+## Runtime identity policy
+
+Phase 10A implements this narrative guidance as the inspectable `soul.identity.v1` profile.
+The canonical engineering contract is `docs/soul/IDENTITY_AND_STYLE_POLICY.md`.
+
+The runtime now injects stable principles, a bounded tone mode, and explicit prohibitions on fabricated biography, embodiment, off-screen experience, unsupported authority, and undeclared interests into model context.
+Identity inspection is deterministic and read-only. Recent-style awareness, overuse detection, and reviewed interests remain later Phase 10 work.
