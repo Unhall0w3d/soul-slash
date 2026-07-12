@@ -23,6 +23,14 @@ module SoulCore
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
     ].freeze
 
+    INTEREST_CONTROL_PATTERNS = [
+      /\A\s*(?:interest help|help interests?)\s*[?.!]*\z/i,
+      /\A\s*(?:propose|add|remember)\s+interest\s*:\s*.+\z/i,
+      /\A\s*(?:list|show)\s+(?:(?:candidate|approved|inactive|retired)\s+interests?|interest\s+(?:candidates?|approved|inactive|retired)|interests?)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+interest\s+int_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*(?:approve|deactivate|reactivate|retire)\s+interest\s+(?:latest|int_[a-z0-9_]+)(?:\s+confirm)?\s*[?.!]*\z/i,
+      /\A\s*(?:what are you interested in|what interests do you have|show your interests)\s*[?.!]*\z/i
+    ].freeze
     STYLE_CONTROL_PATTERNS = [
       /\A\s*(?:style help|help style)\s*[?.!]*\z/i,
       /\A\s*(?:show|inspect)\s+(?:recent\s+)?(?:response\s+)?style\s*[?.!]*\z/i,
@@ -95,6 +103,13 @@ module SoulCore
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
 
+      if INTEREST_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "reviewed-interest controls remain deterministic and human-approved",
+          flags: flags.merge("interest_control" => true)
+        )
+      end
       if STYLE_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "deterministic_passthrough",

@@ -243,10 +243,14 @@ Phase 10A implements this narrative guidance as the inspectable `soul.identity.v
 The canonical engineering contract is `docs/soul/IDENTITY_AND_STYLE_POLICY.md`.
 
 The runtime now injects stable principles, a bounded tone mode, and explicit prohibitions on fabricated biography, embodiment, off-screen experience, unsupported authority, and undeclared interests into model context.
-Identity inspection is deterministic and read-only. Recent-style awareness, overuse detection, and reviewed interests remain later Phase 10 work.
+Identity inspection is deterministic and read-only. Phase 10B adds bounded recent-style awareness, and Phase 10C adds reviewed interests without fabricated experience or automatic identity mutation.
 
 ## Recent-style awareness
 
 Phase 10B observes a bounded window of recent assistant turns for repeated openings, closings, sentences, disclaimers, and response structures. The canonical engineering contract is `docs/soul/RECENT_STYLE_AWARENESS.md`.
 
 The analysis is ephemeral and advisory. It does not create a durable style profile, mutate identity, rewrite prior responses, or outrank truth, safety, evidence, approvals, and explicit user formatting requests.
+
+## Reviewed interests
+
+Phase 10C adds the reviewed registry documented in `docs/soul/REVIEWED_INTERESTS.md`. Approved interests may guide curiosity only when relevant. They do not imply personal experience, feelings, credentials, embodiment, or authority.

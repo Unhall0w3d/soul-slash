@@ -5,6 +5,7 @@ require "json"
 require "open3"
 
 ROOT = File.expand_path("..", __dir__)
+SKIP_NESTED_REGRESSIONS = ENV["SOUL_SKIP_NESTED_REGRESSIONS"] == "1"
 
 FILES = %w[
   lib/soul_core/app.rb
@@ -27,8 +28,8 @@ RUBY_FILES = FILES.select { |path| path.end_with?(".rb") }.freeze
 results = []
 failures = []
 
-def record(results, failures, label, ok, detail = nil)
-  results << [label, ok, detail]
+def record(results, failures, label, ok, detail = nil, failure_kind: "failed")
+  results << [label, ok, detail, failure_kind]
   failures << label unless ok
 end
 
@@ -36,14 +37,31 @@ def capture(*command)
   Open3.capture3(*command, chdir: ROOT)
 end
 
+def capture_regression(path)
+  Open3.capture3(
+    { "SOUL_SKIP_NESTED_REGRESSIONS" => "1" },
+    "ruby",
+    path,
+    chdir: ROOT
+  )
+end
+
+def phase_section(markdown, heading, next_heading)
+  start_index = markdown.index(heading)
+  return "" unless start_index
+
+  end_index = markdown.index(next_heading, start_index + heading.length)
+  end_index ? markdown[start_index...end_index] : markdown[start_index..]
+end
+
 FILES.each do |path|
-  record(results, failures, path, File.exist?(File.join(ROOT, path)))
+  exists = File.exist?(File.join(ROOT, path))
+  record(results, failures, path, exists, "missing required file", failure_kind: "missing")
 end
 
 RUBY_FILES.each do |path|
   stdout, stderr, status = capture("ruby", "-c", path)
-  detail = [stdout, stderr].join.strip
-  record(results, failures, "syntax #{path}", status.success?, detail)
+  record(results, failures, "syntax #{path}", status.success?, [stdout, stderr].join.strip)
 end
 
 stdout, stderr, status = capture(
@@ -98,10 +116,6 @@ source_checks = {
     "lib/soul_core/conversation_orchestrator.rb",
     "identity policy inspection remains deterministic and read-only"
   ],
-  "roadmap marks Phase 10 in progress" => [
-    "docs/CONVERSATIONAL_SOUL_ROADMAP.md",
-    "Delivered in Phase 10A"
-  ],
   "personality document points to canonical runtime policy" => [
     "docs/SOUL_PERSONALITY.md",
     "docs/soul/IDENTITY_AND_STYLE_POLICY.md"
@@ -109,9 +123,29 @@ source_checks = {
 }.freeze
 
 source_checks.each do |label, (path, token)|
-  content = File.exist?(File.join(ROOT, path)) ? File.read(File.join(ROOT, path)) : ""
+  content = File.exist?(File.join(ROOT, path)) ? File.read(File.join(ROOT, path), encoding: "UTF-8") : ""
   record(results, failures, label, content.include?(token))
 end
+
+roadmap_path = File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md")
+roadmap = File.exist?(roadmap_path) ? File.read(roadmap_path, encoding: "UTF-8") : ""
+phase10 = phase_section(
+  roadmap,
+  "### Phase 10: Identity, interests, and variation",
+  "### Phase 11: Artifact-aware conversation"
+)
+record(
+  results,
+  failures,
+  "roadmap retains the Phase 10 identity foundation",
+  phase10.include?("Delivered in Phase 10A") || phase10.include?("stable inspectable identity profile")
+)
+record(
+  results,
+  failures,
+  "roadmap records a forward-compatible Phase 10 status",
+  phase10.match?(/Status:\s*```text\s*(?:in progress|complete)\s*```/m)
+)
 
 stdout, stderr, status = capture("git", "diff", "--check")
 record(results, failures, "working-tree whitespace check", status.success?, [stdout, stderr].join.strip)
@@ -134,23 +168,33 @@ record(
   forbidden.join(", ")
 )
 
-regression = File.join(ROOT, "scripts/verify-phase9-memory-reflection-and-export-closeout.rb")
-if File.exist?(regression)
-  stdout, stderr, status = capture("ruby", "scripts/verify-phase9-memory-reflection-and-export-closeout.rb")
-  record(
-    results,
-    failures,
-    "Phase 9 memory closeout regression",
-    status.success?,
-    [stdout, stderr].join.strip
-  )
-else
-  record(results, failures, "Phase 9 memory closeout regression", false, "missing verifier")
+unless SKIP_NESTED_REGRESSIONS
+  regression = "scripts/verify-phase9-memory-reflection-and-export-closeout.rb"
+  regression_path = File.join(ROOT, regression)
+  if File.exist?(regression_path)
+    stdout, stderr, status = capture_regression(regression)
+    record(
+      results,
+      failures,
+      "Phase 9 memory closeout regression",
+      status.success?,
+      [stdout, stderr].join.strip
+    )
+  else
+    record(
+      results,
+      failures,
+      "Phase 9 memory closeout regression",
+      false,
+      "missing verifier: #{regression}",
+      failure_kind: "missing"
+    )
+  end
 end
 
 puts "Conversational Soul Phase 10A identity and style-policy verification:"
-results.each do |label, ok, detail|
-  puts "- #{label}: #{ok ? 'ok' : 'missing'}"
+results.each do |label, ok, detail, failure_kind|
+  puts "- #{label}: #{ok ? 'ok' : failure_kind}"
   next if ok || detail.to_s.empty?
 
   puts

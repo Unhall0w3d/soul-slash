@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Conversational Soul
+- Completed Phase 10 with reviewed inspectable interests, relevance-gated context, safer style inspection, combined acceptance coverage, and tracked-overlay hygiene.
 
 - Added Phase 10B recent-style awareness with bounded repetition detection, ephemeral variation guidance, deterministic inspection, and explicit priority boundaries.
 
@@ -33,4 +34,4 @@
 
 ### Development direction
 
-Phase 6 gives Soul real host facts. Phase 7 begins layered memory, now that the assistant has a safer distinction between remembered statements and collected evidence.
+Phase 10 is complete. Phase 11 begins artifact-aware conversation while retaining the existing identity, style, memory, evidence, and approval boundaries.

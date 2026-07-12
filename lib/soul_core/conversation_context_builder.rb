@@ -2,6 +2,7 @@
 
 require_relative "conversation_memory_store"
 require_relative "conversation_identity_profile"
+require_relative "conversation_interest_store"
 require_relative "conversation_style_analyzer"
 
 module SoulCore
@@ -30,6 +31,7 @@ module SoulCore
     def initialize(
       store:,
       memory_store: nil,
+      interest_store: nil,
       identity_profile: nil,
       style_analyzer: nil,
       max_messages: DEFAULT_MAX_MESSAGES,
@@ -39,6 +41,7 @@ module SoulCore
     )
       @store = store
       @memory_store = memory_store || default_memory_store(store)
+      @interest_store = interest_store || default_interest_store(store)
       @identity_profile = identity_profile || ConversationIdentityProfile.new
       @style_analyzer = style_analyzer || ConversationStyleAnalyzer.new
       @max_messages = positive_integer(max_messages, DEFAULT_MAX_MESSAGES)
@@ -64,6 +67,10 @@ module SoulCore
         chat_id: chat_id,
         limit: @max_memory_records
       )
+      interests = @interest_store.context_for(
+        query: current_query&.fetch("content", "").to_s,
+        limit: ConversationInterestStore::MAX_CONTEXT_RECORDS
+      )
       identity = @identity_profile.context_for(
         message: current_query&.fetch("content", "").to_s
       )
@@ -79,6 +86,14 @@ module SoulCore
       end
       unless digest.empty?
         system_content << "\nEarlier-turn digest:\n#{digest}\n"
+      end
+      unless interests.fetch("records", []).empty?
+        system_content << "\nReviewed Soul interests:\n#{interests.fetch('rendered')}\n"
+        system_content << <<~GUIDANCE
+          Use reviewed interests only when directly relevant to the current request.
+          They may guide curiosity and examples, but do not imply personal experience, feelings, credentials, embodiment, or authority.
+          Do not redirect unrelated requests toward an interest.
+        GUIDANCE
       end
       unless memory.fetch("records", []).empty?
         system_content << "\nApproved memory context:\n#{memory.fetch('rendered')}\n"
@@ -119,6 +134,12 @@ module SoulCore
           "automatic_identity_mutation" => style.fetch("automatic_identity_mutation"),
           "persistent_style_profile" => style.fetch("persistent_style_profile")
         },
+        "interests" => {
+          "record_ids" => interests.fetch("record_ids", []),
+          "count" => interests.fetch("count", 0),
+          "reviewed_only" => interests.fetch("reviewed_only"),
+          "automatic_inference" => interests.fetch("automatic_inference")
+        },
         "memory" => {
           "record_ids" => memory.fetch("record_ids", []),
           "layers" => memory.fetch("layers", []),
@@ -133,6 +154,13 @@ module SoulCore
 
     private
 
+    def default_interest_store(store)
+      if store.respond_to?(:project_root)
+        ConversationInterestStore.new(root: store.project_root)
+      else
+        NullConversationInterestStore.new
+      end
+    end
     def default_memory_store(store)
       if store.respond_to?(:project_root)
         ConversationMemoryStore.new(root: store.project_root)

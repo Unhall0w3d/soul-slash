@@ -126,3 +126,5 @@ Soul/codex/tasks/
 Soul/codex/responses/
 Soul/codex/reviews/
 *.soul.local
+
+Soul/identity/interests.jsonl

@@ -94,7 +94,7 @@ module SoulCore
       else
         lines << "Signals"
         analysis.fetch("signals").each do |signal|
-          lines << "- #{signal['type']}: #{signal['value']} (#{signal['count']} occurrences)"
+          lines << "- #{signal['type']}: #{signal['count']} occurrences; severity #{signal['severity']}; preview #{safe_preview(signal)}"
         end
       end
 
@@ -106,6 +106,22 @@ module SoulCore
         analysis.fetch("guidance").each { |item| lines << "- #{item}" }
       end
       lines.join("\n")
+    end
+
+    def safe_preview(signal)
+      value = signal["value"].to_s
+      return "suppressed" if value.empty? || sensitive_value?(value)
+
+      preview = value.gsub(/\s+/, " ").strip
+      preview = "#{preview[0, 37]}..." if preview.length > 40
+      preview.inspect
+    end
+
+    def sensitive_value?(value)
+      value.match?(%r{https?://|/home/|/Users/|[A-Za-z]:\\}) ||
+        value.match?(/(?:token|secret|password|api[-_ ]?key|private[-_ ]?key)/i) ||
+        value.match?(/[A-Za-z0-9+\/_=-]{24,}/) ||
+        value.include?("```")
     end
 
     def no_chat_message

@@ -5,6 +5,7 @@ require "json"
 require "open3"
 
 ROOT = File.expand_path("..", __dir__)
+SKIP_NESTED_REGRESSIONS = ENV["SOUL_SKIP_NESTED_REGRESSIONS"] == "1"
 
 FILES = %w[
   lib/soul_core/app.rb
@@ -28,8 +29,8 @@ RUBY_FILES = FILES.select { |path| path.end_with?(".rb") }.freeze
 results = []
 failures = []
 
-def record(results, failures, label, ok, detail = nil)
-  results << [label, ok, detail]
+def record(results, failures, label, ok, detail = nil, failure_kind: "failed")
+  results << [label, ok, detail, failure_kind]
   failures << label unless ok
 end
 
@@ -37,8 +38,26 @@ def capture(*command)
   Open3.capture3(*command, chdir: ROOT)
 end
 
+def capture_regression(path)
+  Open3.capture3(
+    { "SOUL_SKIP_NESTED_REGRESSIONS" => "1" },
+    "ruby",
+    path,
+    chdir: ROOT
+  )
+end
+
+def phase_section(markdown, heading, next_heading)
+  start_index = markdown.index(heading)
+  return "" unless start_index
+
+  end_index = markdown.index(next_heading, start_index + heading.length)
+  end_index ? markdown[start_index...end_index] : markdown[start_index..]
+end
+
 FILES.each do |path|
-  record(results, failures, path, File.exist?(File.join(ROOT, path)))
+  exists = File.exist?(File.join(ROOT, path))
+  record(results, failures, path, exists, "missing required file", failure_kind: "missing")
 end
 
 RUBY_FILES.each do |path|
@@ -98,14 +117,6 @@ source_checks = {
     "lib/soul_core/conversation_orchestrator.rb",
     "recent-style inspection remains deterministic and read-only"
   ],
-  "roadmap records Phase 10B" => [
-    "docs/CONVERSATIONAL_SOUL_ROADMAP.md",
-    "Delivered in Phase 10B"
-  ],
-  "roadmap restores clean Phase 11 boundary" => [
-    "docs/CONVERSATIONAL_SOUL_ROADMAP.md",
-    "\n### Phase 11: Artifact-aware conversation\n"
-  ],
   "personality doc links canonical style contract" => [
     "docs/SOUL_PERSONALITY.md",
     "docs/soul/RECENT_STYLE_AWARENESS.md"
@@ -113,17 +124,34 @@ source_checks = {
 }.freeze
 
 source_checks.each do |label, (path, token)|
-  content = File.exist?(File.join(ROOT, path)) ? File.read(File.join(ROOT, path)) : ""
+  content = File.exist?(File.join(ROOT, path)) ? File.read(File.join(ROOT, path), encoding: "UTF-8") : ""
   record(results, failures, label, content.include?(token))
 end
 
-roadmap_content = File.exist?(File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md")) ?
-  File.read(File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md")) : ""
+roadmap_path = File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md")
+roadmap = File.exist?(roadmap_path) ? File.read(roadmap_path, encoding: "UTF-8") : ""
+phase10 = phase_section(
+  roadmap,
+  "### Phase 10: Identity, interests, and variation",
+  "### Phase 11: Artifact-aware conversation"
+)
 record(
   results,
   failures,
-  "roadmap has no fused fence and Phase 11 heading",
-  !roadmap_content.include?("```### Phase 11:")
+  "roadmap retains Phase 10B recent-style awareness",
+  phase10.include?("Delivered in Phase 10B") || phase10.include?("bounded recent-assistant-turn style analysis")
+)
+record(
+  results,
+  failures,
+  "roadmap records a forward-compatible Phase 10 status",
+  phase10.match?(/Status:\s*```text\s*(?:in progress|complete)\s*```/m)
+)
+record(
+  results,
+  failures,
+  "roadmap keeps a standalone Phase 11 boundary",
+  roadmap.include?("\n### Phase 11: Artifact-aware conversation\n") && !roadmap.include?("```### Phase 11:")
 )
 
 stdout, stderr, status = capture("git", "diff", "--check")
@@ -147,23 +175,33 @@ record(
   forbidden.join(", ")
 )
 
-regression = File.join(ROOT, "scripts/verify-phase10-identity-style-foundation.rb")
-if File.exist?(regression)
-  stdout, stderr, status = capture("ruby", "scripts/verify-phase10-identity-style-foundation.rb")
-  record(
-    results,
-    failures,
-    "Phase 10A identity and style-policy regression",
-    status.success?,
-    [stdout, stderr].join.strip
-  )
-else
-  record(results, failures, "Phase 10A identity and style-policy regression", false, "missing verifier")
+unless SKIP_NESTED_REGRESSIONS
+  regression = "scripts/verify-phase10-identity-style-foundation.rb"
+  regression_path = File.join(ROOT, regression)
+  if File.exist?(regression_path)
+    stdout, stderr, status = capture_regression(regression)
+    record(
+      results,
+      failures,
+      "Phase 10A identity and style-policy regression",
+      status.success?,
+      [stdout, stderr].join.strip
+    )
+  else
+    record(
+      results,
+      failures,
+      "Phase 10A identity and style-policy regression",
+      false,
+      "missing verifier: #{regression}",
+      failure_kind: "missing"
+    )
+  end
 end
 
 puts "Conversational Soul Phase 10B recent-style awareness verification:"
-results.each do |label, ok, detail|
-  puts "- #{label}: #{ok ? 'ok' : 'missing'}"
+results.each do |label, ok, detail, failure_kind|
+  puts "- #{label}: #{ok ? 'ok' : failure_kind}"
   next if ok || detail.to_s.empty?
 
   puts

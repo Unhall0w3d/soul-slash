@@ -68,8 +68,8 @@ show recent style
 show variation policy
 ```
 
-`show recent style` reports normalized signal summaries and guidance, not complete response bodies.
+`show recent style` reports signal type, count, severity, and a short safe preview. Values resembling credentials, long identifiers, URLs, user paths, or code fragments are suppressed.
 
-## Future work
+## Phase 10 closeout
 
-Reviewed interests and longer multi-turn identity/variation closeout remain later Phase 10 work.
+Reviewed interests and combined acceptance coverage are implemented by Phase 10C. Style analysis remains ephemeral and lower priority than the identity, safety, evidence, approval, and formatting contracts.

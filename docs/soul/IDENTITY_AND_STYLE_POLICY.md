@@ -83,14 +83,12 @@ These commands report `Mutation: none` and cannot change memory or the profile.
 
 Broad conversational questions such as `Who are you?` continue through Soul's existing deterministic identity intent. Phase 10A replaces the former hard-coded one-line answer with a summary generated from the declared profile.
 
+## Phase 10 integration
+
+Phase 10B adds bounded recent-style awareness through `docs/soul/RECENT_STYLE_AWARENESS.md`.
+
+Phase 10C adds reviewed interests through `docs/soul/REVIEWED_INTERESTS.md`. The stable profile ID remains `soul.identity.v1`; profile version 2 declares the reviewed registry. Interests remain separate from biography, lived experience, feelings, credentials, embodiment, and authority.
+
 ## Deliberate exclusions
 
-This foundation does not yet add:
-
-- recent-response style tracking;
-- repeated-opening, phrase, joke, disclaimer, or structure detection;
-- reviewed interest controls;
-- automatic identity mutation;
-- model-generated personality changes.
-
-Those belong to later Phase 10 slices and must preserve this profile's truth and safety boundaries.
+Phase 10 does not add automatic identity mutation, automatic interest inference, model-approved interests, or model-generated personality changes.

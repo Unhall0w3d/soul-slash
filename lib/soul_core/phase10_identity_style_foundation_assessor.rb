@@ -36,6 +36,11 @@ module SoulCore
       profile = ConversationIdentityProfile.new
       controls = ConversationIdentityControls.new(profile: profile)
       context = build_context(profile)
+      profile_hash = profile.to_h
+      interest_status = profile_hash.fetch("interests_status")
+      interest_boundary = Array(profile_hash["boundaries"]).any? do |boundary|
+        boundary.match?(/do not invent .*interests/i)
+      end
 
       verification = {
         "stable_profile_id" => profile.profile_id == "soul.identity.v1",
@@ -49,7 +54,10 @@ module SoulCore
         "no_fabricated_biography_boundary" => context.fetch("messages").first.fetch("content").include?("Do not fabricate a human biography"),
         "no_embodiment_boundary" => context.fetch("messages").first.fetch("content").include?("Do not claim biological embodiment"),
         "no_false_action_boundary" => context.fetch("messages").first.fetch("content").include?("Never claim that an action ran"),
-        "interests_are_not_invented" => profile.to_h.fetch("interests_status") == "not_declared_in_this_phase",
+        "interests_are_not_invented" =>
+          %w[not_declared_in_this_phase reviewed_registry].include?(interest_status) &&
+          interest_boundary &&
+          profile_hash.fetch("automatic_identity_mutation") == false,
         "identity_controls_are_read_only" => controls.respond("identity help").include?("Mutation: none"),
         "identity_profile_is_inspectable" => controls.respond("show identity").include?(profile.profile_id),
         "punctuated_identity_command_is_supported" => controls.match?("Show identity?"),
@@ -69,7 +77,7 @@ module SoulCore
         "milestone" => "conversational_soul",
         "phase" => 10,
         "status" => blockers.empty? ? "ready" : "blocked",
-        "profile" => profile.to_h,
+        "profile" => profile_hash,
         "sample_context" => {
           "identity" => context.fetch("identity"),
           "system_prompt_contains_identity_policy" => context.fetch("messages").first.fetch("content").include?("Soul identity policy")

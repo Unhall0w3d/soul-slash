@@ -139,3 +139,7 @@ git rm --cached <path>
 ```
 
 Use this only after deciding the file is generated/local and should not remain tracked.
+
+## Extracted overlay directories
+
+Tracked directories ending in `_overlay/` are delivery artifacts, not canonical project structure. Before removal, verify duplicate assets against canonical paths and promote any unique durable document into canonical repository structure. The curation assessor reports any tracked extracted overlay directory.

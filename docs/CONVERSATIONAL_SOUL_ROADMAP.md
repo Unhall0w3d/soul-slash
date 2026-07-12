@@ -51,7 +51,7 @@ complete
 Status:
 
 ```text
-in progress
+complete
 ```
 
 Deliver:
@@ -112,37 +112,23 @@ Phase 10 is in progress.
 Status:
 
 ```text
-in progress
+complete
 ```
 
-Delivered in Phase 10A:
+Delivered:
 
 ```text
 stable inspectable identity profile
 context-sensitive bounded tone modes
-deterministic identity inspection
-no joke quotas
-no fabricated biography or embodiment
-model-context integration without identity mutation
-```
-
-Delivered in Phase 10B:
-
-```text
 bounded recent-assistant-turn style analysis
-repeated opening, closing, sentence, disclaimer, and structure detection
-ephemeral variation guidance in model context
-deterministic recent-style inspection
-no persistent style profile or automatic identity mutation
-truth, safety, evidence, approvals, and requested format remain higher priority
+safe deterministic style inspection
+reviewed candidate/approved/inactive/retired interest registry
+relevance-gated approved-interest context capped at three records
+explicit separation from biography, lived experience, feelings, credentials, embodiment, and authority
+combined identity, variation, interest, and hygiene acceptance coverage
 ```
 
-Remaining:
-
-```text
-inspectable reviewed interests
-multi-turn identity and variation closeout
-```
+Phase 11 is next.
 
 ### Phase 11: Artifact-aware conversation
 

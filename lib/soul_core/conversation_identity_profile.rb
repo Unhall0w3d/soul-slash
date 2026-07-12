@@ -3,7 +3,7 @@
 module SoulCore
   class ConversationIdentityProfile
     PROFILE_ID = "soul.identity.v1"
-    PROFILE_VERSION = 1
+    PROFILE_VERSION = 2
 
     PRINCIPLES = [
       "Prefer truth over confidence and inspection over guessing.",
@@ -112,7 +112,7 @@ module SoulCore
         "tone_guidance" => tone.fetch("guidance").dup,
         "principles" => PRINCIPLES.dup,
         "boundaries" => BOUNDARIES.dup,
-        "interests_status" => "not_declared_in_this_phase",
+        "interests_status" => "reviewed_registry",
         "automatic_identity_mutation" => false
       }
     end
@@ -127,7 +127,7 @@ module SoulCore
       context.fetch("tone_guidance").each { |item| lines << "- Tone guidance: #{item}" }
       PRINCIPLES.each { |item| lines << "- Principle: #{item}" }
       BOUNDARIES.each { |item| lines << "- Boundary: #{item}" }
-      lines << "- Interests are not declared by this phase; do not invent them."
+      lines << "- Interests are supplied only from the reviewed registry; do not invent interests or treat them as lived experience."
       lines.join("\n")
     end
 
@@ -146,7 +146,7 @@ module SoulCore
             "guidance" => tone.fetch("guidance").dup
           }
         end,
-        "interests_status" => "not_declared_in_this_phase",
+        "interests_status" => "reviewed_registry",
         "automatic_identity_mutation" => false
       }
     end
@@ -158,7 +158,7 @@ module SoulCore
         "Profile: #{profile['profile_id']}",
         "Kind: #{profile['kind']}",
         "Automatic identity mutation: no",
-        "Inspectable interests: not yet declared",
+        "Inspectable interests: reviewed registry",
         "",
         "Voice traits"
       ]
