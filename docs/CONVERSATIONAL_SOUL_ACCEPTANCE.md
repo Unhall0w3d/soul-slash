@@ -2,7 +2,7 @@
 
 This contract defines what must be demonstrated before the Conversational Soul milestone is considered complete.
 
-Phase-specific verifiers may test individual components. Phase 9 closes the milestone only when the integrated scenarios pass.
+Phase-specific verifiers may test individual components. Phase 13 closes the milestone only when the integrated scenarios pass.
 
 ## Scenario 1: mixed commentary and task
 
@@ -153,7 +153,7 @@ Conversation does not bypass deterministic action policy.
 
 ## Integrated milestone acceptance
 
-Phase 9 must provide an automated and manual acceptance suite covering:
+Phase 13 must provide an automated and manual acceptance suite covering:
 
 ```text
 mixed commentary and task

@@ -94,11 +94,18 @@ module SoulCore
       end.first(normalize_limit(limit))
     end
 
-    def context_for(chat_id:, limit: MAX_CONTEXT_RECORDS)
+    def context_for(chat_id:, limit: MAX_CONTEXT_RECORDS, provider_privacy_class: nil)
       selected = attached_to_chat(chat_id, limit: limit)
+      blocked = []
+      unless provider_privacy_class.to_s.empty?
+        selected, blocked = selected.partition do |record|
+          ConversationArtifactContract.provider_allowed?(record.fetch("privacy", "project"), provider_privacy_class)
+        end
+      end
       {
         "records" => selected,
         "artifact_ids" => selected.map { |record| record.fetch("artifact_id") },
+        "privacy_blocked_artifact_ids" => blocked.map { |record| record.fetch("artifact_id") },
         "count" => selected.length,
         "metadata_only" => true,
         "content_read" => false,
@@ -239,10 +246,12 @@ module SoulCore
   end
 
   class NullConversationArtifactStore
-    def context_for(chat_id:, limit: ConversationArtifactStore::MAX_CONTEXT_RECORDS)
+    def context_for(chat_id:, limit: ConversationArtifactStore::MAX_CONTEXT_RECORDS, provider_privacy_class: nil)
+      _unused = [chat_id, limit, provider_privacy_class]
       {
         "records" => [],
         "artifact_ids" => [],
+        "privacy_blocked_artifact_ids" => [],
         "count" => 0,
         "metadata_only" => true,
         "content_read" => false,

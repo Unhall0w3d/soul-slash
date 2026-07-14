@@ -29,7 +29,11 @@ module SoulCore
       /\A\s*register\s+artifact\s*:\s*.+\z/i,
       /\A\s*(?:list|show)\s+(?:all|chat|attached)\s+artifacts?\s*[?.!]*\z/i,
       /\A\s*(?:what artifacts? (?:are|is) attached|what is attached to this chat)\s*[?.!]*\z/i,
-      /\A\s*(?:show|inspect|attach|detach|archive)\s+artifact\s+art_[a-z0-9_]+(?:\s+confirm)?\s*[?.!]*\z/i
+      /\A\s*show\s+artifact\s+art_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*(?:inspect|summari[sz]e)\s+artifact\s+art_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*(?:show\s+)?artifact\s+excerpt\s+art_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*compare\s+artifacts?\s+art_[a-z0-9_]+\s+(?:and|with|to)\s+art_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*(?:attach|detach|archive)\s+artifact\s+art_[a-z0-9_]+(?:\s+confirm)?\s*[?.!]*\z/i
     ].freeze
 
     INTEREST_CONTROL_PATTERNS = [

@@ -55,7 +55,7 @@ Current pieces include:
 - selection and confirmation parsing
 - response rendering
 
-The future conversational orchestrator will use model reasoning for interpretation and synthesis while validating all proposed tool use against registered capabilities and risk policy.
+The conversational orchestrator uses model reasoning for interpretation and synthesis while validating proposed tool use against registered capabilities and risk policy.
 
 ## Model and provider layer
 
@@ -132,6 +132,8 @@ Phase 11A gives artifacts a shared metadata and conversation-attachment contract
 - attached conversation IDs
 
 Artifact attachment injects metadata only. It does not grant permission to read, rewrite, move, execute, upload, or delete the underlying file.
+
+Phase 11B adds an explicit bounded inspection path for attached text artifacts. It verifies the exact bytes read against registered size and SHA-256 metadata, applies format and size limits, redacts recognized secrets, and labels all excerpts as untrusted data. Artifact privacy deterministically restricts both metadata and content before either enters provider context. Ambiguity, integrity failure, and privacy mismatch stop before provider invocation.
 
 ## Reflection layer
 

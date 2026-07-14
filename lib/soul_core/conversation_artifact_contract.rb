@@ -40,6 +40,15 @@ module SoulCore
         candidate
       end
 
+      def provider_allowed?(artifact_privacy, provider_privacy)
+        case normalize_privacy(artifact_privacy)
+        when "local_private" then provider_privacy.to_s == "local_only"
+        when "project" then %w[local_only local_network].include?(provider_privacy.to_s)
+        when "public" then %w[local_only local_network cloud].include?(provider_privacy.to_s)
+        else false
+        end
+      end
+
       def normalize_source(source)
         data = stringify_keys(source || {})
         kind = data.fetch("kind", "manual_registration").to_s
@@ -101,6 +110,9 @@ module SoulCore
         when ".txt", ".log" then "text/plain"
         when ".json" then "application/json"
         when ".csv" then "text/csv"
+        when ".rb", ".py", ".sh", ".zsh", ".bash", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+             ".go", ".rs", ".java", ".c", ".h", ".cc", ".cpp", ".hpp", ".yaml", ".yml", ".toml",
+             ".ini", ".conf", ".sql", ".xml", ".html", ".css" then "text/plain"
         when ".zip" then "application/zip"
         when ".pdf" then "application/pdf"
         when ".docx" then "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

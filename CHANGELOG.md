@@ -4,6 +4,7 @@
 
 ### Conversational Soul
 
+- Added Phase 11B bounded text-artifact inspection with exact-byte integrity, provider privacy enforcement, deterministic redaction, explicit lifecycle failures, and no mutation authority.
 - Began Phase 11 with a shared artifact metadata, provenance, decision, and conversation-attachment foundation.
 - Completed Phase 10 with reviewed inspectable interests, relevance-gated context, safer style inspection, combined acceptance coverage, and tracked-overlay hygiene.
 

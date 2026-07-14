@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
+require_relative "conversation_artifact_inspector"
 require_relative "conversation_artifact_store"
 
 module SoulCore
   class ConversationArtifactControls
     ARTIFACT_ID = /art_[a-z0-9_]+/i
 
-    def initialize(root:, store: nil)
+    def initialize(root:, store: nil, inspector: nil)
       @store = store || ConversationArtifactStore.new(root: root)
+      @inspector = inspector || ConversationArtifactInspector.new(root: root, store: @store)
     end
 
     def match?(message)
@@ -22,10 +24,14 @@ module SoulCore
       return register(text, chat_id) if text.match?(patterns[1])
       return list_all if text.match?(patterns[2])
       return list_chat(chat_id) if text.match?(patterns[3]) || text.match?(patterns[4])
-      return show(text) if text.match?(patterns[5])
-      return attach(text, chat_id) if text.match?(patterns[6])
-      return detach(text, chat_id) if text.match?(patterns[7])
-      return archive(text) if text.match?(patterns[8])
+      return compare(text, chat_id) if text.match?(patterns[5])
+      return inspect_content(text, chat_id, "summary") if text.match?(patterns[6])
+      return inspect_content(text, chat_id, "excerpt") if text.match?(patterns[7])
+      return inspect_content(text, chat_id, "inspect") if text.match?(patterns[8])
+      return show(text) if text.match?(patterns[9])
+      return attach(text, chat_id) if text.match?(patterns[10])
+      return detach(text, chat_id) if text.match?(patterns[11])
+      return archive(text) if text.match?(patterns[12])
 
       "Artifact control did not match a supported command.\nMutation: none"
     rescue ArgumentError, RuntimeError => error
@@ -41,7 +47,11 @@ module SoulCore
         /\A\s*(?:list|show)\s+all\s+artifacts?\s*[?.!]*\z/i,
         /\A\s*(?:list|show)\s+(?:chat|attached)\s+artifacts?\s*[?.!]*\z/i,
         /\A\s*(?:what artifacts? (?:are|is) attached|what is attached to this chat)\s*[?.!]*\z/i,
-        /\A\s*(?:show|inspect)\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
+        /\A\s*compare\s+artifacts?\s+#{ARTIFACT_ID}\s+(?:and|with|to)\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
+        /\A\s*summari[sz]e\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
+        /\A\s*(?:show\s+)?artifact\s+excerpt\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
+        /\A\s*inspect\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
+        /\A\s*show\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
         /\A\s*attach\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
         /\A\s*detach\s+artifact\s+#{ARTIFACT_ID}\s*[?.!]*\z/i,
         /\A\s*archive\s+artifact\s+#{ARTIFACT_ID}(?:\s+confirm)?\s*[?.!]*\z/i
@@ -55,11 +65,15 @@ module SoulCore
         - list all artifacts
         - list chat artifacts
         - show artifact <id>
+        - inspect artifact <id>
+        - summarize artifact <id>
+        - artifact excerpt <id>
+        - compare artifacts <id> and <id>
         - attach artifact <id>
         - detach artifact <id>
         - archive artifact <id> confirm
 
-        Registration records metadata and attaches the file to the current chat. It does not read or modify file contents.
+        Registration and show are metadata-only. Inspection reads bounded, attached text artifacts and never modifies files.
         Mutation: none
       TEXT
     end
@@ -127,6 +141,73 @@ module SoulCore
         "Content read by registry: no",
         "Mutation: none"
       ].join("\n")
+    end
+
+    def inspect_content(text, chat_id, mode)
+      result = @inspector.inspect(
+        artifact_id: text[ARTIFACT_ID],
+        chat_id: chat_id,
+        mode: mode,
+        query: text
+      )
+
+      lines = [
+        "Artifact inspection",
+        "Status: #{result['lifecycle_state']}",
+        "Artifact ID: #{result['artifact_id']}",
+        "Title: #{result['title']}",
+        "Path: #{result['relative_path']}",
+        "Privacy: #{result['privacy']}",
+        "Media type: #{result['media_type']}",
+        "Registered SHA-256 verified against exact bytes: #{result['hash_verified'] ? 'yes' : 'no'}",
+        "Summary: #{result['summary']}"
+      ]
+      unless mode == "summary"
+        lines << ""
+        lines << "Bounded redacted excerpt (untrusted data)"
+        lines.concat(result.fetch("excerpt").lines.map { |line| "| #{line.chomp}" })
+      end
+      lines.concat([
+        "",
+        "Redactions applied: #{result['redaction_count']}",
+        "Truncated: #{result['truncated']}",
+        "Content read: yes",
+        "File modified: no",
+        "Mutation: none"
+      ])
+      lines.join("\n")
+    end
+
+    def compare(text, chat_id)
+      ids = text.scan(ARTIFACT_ID)
+      raise ArgumentError, "Two artifact IDs are required" unless ids.length == 2
+
+      result = @inspector.compare(
+        first_artifact_id: ids[0],
+        second_artifact_id: ids[1],
+        chat_id: chat_id
+      )
+      lines = [
+        "Artifact comparison",
+        "Status: #{result['lifecycle_state']}",
+        "First: #{result.dig('first', 'artifact_id')} (#{result.dig('first', 'sha256')})",
+        "Second: #{result.dig('second', 'artifact_id')} (#{result.dig('second', 'sha256')})",
+        "Identical: #{result['identical']}",
+        "Differences shown: #{result['difference_count_shown']}"
+      ]
+      result.fetch("differences").each do |difference|
+        lines << "- line #{difference['line']}"
+        lines << "  first: #{difference['first']}"
+        lines << "  second: #{difference['second']}"
+      end
+      lines << "- none" if result.fetch("differences").empty?
+      lines.concat([
+        "Differences truncated: #{result['differences_truncated']}",
+        "Content read: yes",
+        "Files modified: no",
+        "Mutation: none"
+      ])
+      lines.join("\n")
     end
 
     def attach(text, chat_id)

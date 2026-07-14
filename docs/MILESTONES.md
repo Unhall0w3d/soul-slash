@@ -56,7 +56,7 @@ in progress
 Current phase:
 
 ```text
-Phase 6
+Phase 11
 ```
 
 Completed:
@@ -67,18 +67,23 @@ Phase 2: provider and model capability foundation
 Phase 3: multi-turn conversation runtime
 Phase 4: conversational orchestrator
 Phase 5: grounded evidence lifecycle
+Phase 6: bounded host environment assessment
+Phase 7: generic evidence follow-up routing
+Phase 8: declared capability boundaries
+Phase 9: layered memory
+Phase 10: identity, interests, and variation
 ```
 
 Current work:
 
 ```text
-bounded host environment assessment
+artifact-aware conversation
 ```
 
-Revised stopping point:
+Milestone stopping point:
 
 ```text
-Phase 11
+Phase 13
 ```
 
 See:
@@ -90,6 +95,8 @@ docs/CONVERSATIONAL_SOUL_ROADMAP.md
 docs/GROUNDED_TOOL_EVIDENCE.md
 docs/BOUNDED_HOST_SYSTEM_STATUS.md
 docs/HOST_ENVIRONMENT_CAPABILITY_GAP.md
+docs/soul/ARTIFACT_METADATA_AND_ATTACHMENT.md
+docs/soul/BOUNDED_ARTIFACT_INSPECTION.md
 ```
 
 ## Later milestone candidates
