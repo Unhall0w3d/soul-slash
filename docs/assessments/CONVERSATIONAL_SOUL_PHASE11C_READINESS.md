@@ -10,7 +10,7 @@ It does not implement artifact creation or revision.
 
 ```text
 candidate_complete
-phase11c_implementation: awaiting_human_brief_approval
+phase11c_implementation: authorized
 ```
 
 ## Implementation summary
@@ -135,24 +135,24 @@ Artifact revision implemented: no
 ## Human review checklist
 
 ```text
-[ ] Ruby 4.0.5 is the intended project runtime
-[ ] CI should consume .ruby-version
-[ ] Shared improvement proposals remain untouched by verifiers
-[ ] Verification output restriction is sufficiently narrow
-[ ] Phase 11C risk class is correct
-[ ] Phase 11C no-overwrite revision model is acceptable
-[ ] Phase 11C supported formats and artifacts/ root are acceptable
-[ ] Local-only/local-network provider boundary is acceptable
-[ ] Approval-token and literal-confirm flow is acceptable
-[ ] Implementation may begin under the candidate brief
+[x] Ruby 4.0.5 is the intended project runtime
+[x] CI should consume .ruby-version
+[x] Shared improvement proposals remain untouched by verifiers
+[x] Verification output restriction is sufficiently narrow
+[x] Phase 11C risk class is correct
+[x] Phase 11C no-overwrite revision model is acceptable
+[x] Phase 11C supported formats and artifacts/ root are acceptable
+[x] Local-only/local-network provider boundary is acceptable
+[x] Approval-token and literal-confirm flow is acceptable
+[x] Implementation may begin under the candidate brief
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-14
+Decision summary: The human owner approved the Phase 11C brief as written and instructed Codex to proceed.
+Required changes: none
 ```

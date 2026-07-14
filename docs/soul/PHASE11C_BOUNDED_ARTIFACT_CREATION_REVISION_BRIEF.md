@@ -3,11 +3,11 @@
 ## Brief status
 
 ```text
-candidate_for_human_review
-implementation_authorized: no
+approved
+implementation_authorized: yes
 ```
 
-This is a Codex-drafted candidate brief. It does not authorize implementation. The human owner must approve or revise it before Phase 11C code work begins.
+This Codex-drafted brief was reviewed and approved by the human owner before Phase 11C implementation began.
 
 ## Skill name
 
@@ -250,10 +250,10 @@ Local LLM evals validate routing, phrasing, ambiguity, and usefulness only. Dete
 ## Human brief approval
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: human owner
-Date:
-Approved changes:
-Required changes:
-Implementation authorized: no
+Date: 2026-07-14
+Approved changes: brief approved as written
+Required changes: none
+Implementation authorized: yes
 ```
