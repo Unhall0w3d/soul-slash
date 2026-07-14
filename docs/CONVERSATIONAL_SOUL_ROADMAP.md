@@ -128,7 +128,7 @@ explicit separation from biography, lived experience, feelings, credentials, emb
 combined identity, variation, interest, and hygiene acceptance coverage
 ```
 
-Phase 11 is next.
+Phase 11 is in progress.
 
 ### Phase 11: Artifact-aware conversation
 

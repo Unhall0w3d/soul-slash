@@ -2,14 +2,20 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "improvement_proposal_paths"
 
 module SoulCore
   class ProposalLocator
-    DEFAULT_ROOT = "Soul/improvement/proposals"
+    DEFAULT_ROOT = ImprovementProposalPaths::DEFAULT_ROOT
 
-    def initialize(root: Dir.pwd, proposals_root: DEFAULT_ROOT)
+    def initialize(root: Dir.pwd, proposals_root: nil, env: ENV)
       @root = File.expand_path(root)
-      @proposals_root = File.expand_path(File.join(@root, proposals_root))
+      relative_root = ImprovementProposalPaths.relative_root(
+        root: @root,
+        env: env,
+        configured: proposals_root
+      )
+      @proposals_root = File.expand_path(File.join(@root, relative_root))
     end
 
     def latest

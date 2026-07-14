@@ -5,13 +5,19 @@ require "json"
 require "time"
 
 require_relative "capability_matrix"
+require_relative "improvement_proposal_paths"
 
 module SoulCore
   class ImprovementProposalGenerator
-    OUTPUT_ROOT = "Soul/improvement/proposals"
+    OUTPUT_ROOT = ImprovementProposalPaths::DEFAULT_ROOT
 
-    def initialize(root: Dir.pwd)
+    def initialize(root: Dir.pwd, proposals_root: nil, env: ENV)
       @root = File.expand_path(root)
+      @output_root = ImprovementProposalPaths.relative_root(
+        root: @root,
+        env: env,
+        configured: proposals_root
+      )
     end
 
     def generate(write_files: false)
@@ -24,7 +30,7 @@ module SoulCore
         "generated_at" => Time.now.iso8601,
         "read_only" => !write_files,
         "write_requested" => write_files,
-        "proposal_root" => File.join(@root, OUTPUT_ROOT),
+        "proposal_root" => File.join(@root, @output_root),
         "source_summary" => matrix.fetch("summary"),
         "proposal_count" => proposals.length,
         "proposals" => proposals,
@@ -212,7 +218,7 @@ module SoulCore
     end
 
     def write_proposals(report, matrix)
-      root = File.join(@root, OUTPUT_ROOT)
+      root = File.join(@root, @output_root)
       FileUtils.mkdir_p(root)
       timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
 
