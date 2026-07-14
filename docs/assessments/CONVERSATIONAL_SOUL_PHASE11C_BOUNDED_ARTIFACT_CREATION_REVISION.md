@@ -154,27 +154,27 @@ Delete, move, rename, upload, share, or export added: no
 ## Human review checklist
 
 ```text
-[ ] Matches the approved Phase 11C brief and documented privacy clarification
-[ ] No overwrite or in-place revision path exists
-[ ] Token scope and literal confirmation are adequate
-[ ] Exclusive no-follow and exact-byte verification are adequate
-[ ] Target and source race handling is acceptable
-[ ] Local provider and artifact privacy boundaries are correct
-[ ] Pending draft runtime storage is acceptable
-[ ] Registry-failure recovery behavior is acceptable
-[ ] Deterministic tests are meaningful
-[ ] Local LLM eval is behavioral only
-[ ] Phase 11A, 11B, and readiness regressions pass
-[ ] Known weaknesses are acceptable
-[ ] Candidate is approved for merge
+[x] Matches the approved Phase 11C brief and documented privacy clarification
+[x] No overwrite or in-place revision path exists
+[x] Token scope and literal confirmation are adequate
+[x] Exclusive no-follow and exact-byte verification are adequate
+[x] Target and source race handling is acceptable
+[x] Local provider and artifact privacy boundaries are correct
+[x] Pending draft runtime storage is acceptable
+[x] Registry-failure recovery behavior is acceptable
+[x] Deterministic tests are meaningful
+[x] Local LLM eval is behavioral only
+[x] Phase 11A, 11B, and readiness regressions pass
+[x] Known weaknesses are acceptable
+[x] Candidate is approved for merge
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved for merge
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-14
+Decision summary: Human owner explicitly instructed Codex to merge PR #4 after reviewing the candidate summary and passing validation results.
+Required changes: none
 ```
