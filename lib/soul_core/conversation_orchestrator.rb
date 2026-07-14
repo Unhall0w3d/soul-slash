@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "conversation_artifact_decision_policy"
 require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_followup_router"
 require_relative "conversation_grounding_policy"
@@ -21,6 +22,14 @@ module SoulCore
       /\bmove approved downloads to trash\b/i,
       /\b(clear history|prune history|export history)\b/i,
       /\b(adapter registry|execution adapters|list adapters|enabled adapters|blocked adapters)\b/i
+    ].freeze
+
+    ARTIFACT_CONTROL_PATTERNS = [
+      /\A\s*(?:artifact help|help artifacts?)\s*[?.!]*\z/i,
+      /\A\s*register\s+artifact\s*:\s*.+\z/i,
+      /\A\s*(?:list|show)\s+(?:all|chat|attached)\s+artifacts?\s*[?.!]*\z/i,
+      /\A\s*(?:what artifacts? (?:are|is) attached|what is attached to this chat)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect|attach|detach|archive)\s+artifact\s+art_[a-z0-9_]+(?:\s+confirm)?\s*[?.!]*\z/i
     ].freeze
 
     INTEREST_CONTROL_PATTERNS = [
@@ -64,10 +73,6 @@ module SoulCore
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
 
-    ARTIFACT_PATTERNS = [
-      /\b(report|overlay|zip|csv|spreadsheet|workbook|document|file|package|presentation)\b/i
-    ].freeze
-
     DETERMINISTIC_INTENTS = %w[identity].freeze
 
     INTENT_TOOL_MAP = {
@@ -83,11 +88,13 @@ module SoulCore
       capability_registry: nil,
       followup_router: nil,
       grounding_policy: nil,
+      artifact_policy: nil,
       max_tool_steps: MAX_TOOL_STEPS
     )
       @tool_catalog = tool_catalog || ConversationToolCatalog.new
       @router = router || IntentRouter.new
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
+      @artifact_policy = artifact_policy || ConversationArtifactDecisionPolicy.new
       @followup_router = followup_router || ConversationEvidenceFollowupRouter.new
       @capability_registry = capability_registry || ConversationCapabilityRegistry.new
       @max_tool_steps = normalize_limit(max_tool_steps)
@@ -97,11 +104,21 @@ module SoulCore
       text = message.to_s.strip
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
+      artifact_decision = @artifact_policy.classify(text)
       flags = {
         "memory_requested" => MEMORY_PATTERNS.any? { |pattern| text.match?(pattern) },
-        "artifact_requested" => ARTIFACT_PATTERNS.any? { |pattern| text.match?(pattern) },
+        "artifact_requested" => artifact_decision.artifact?,
+        "artifact_decision" => artifact_decision.to_h,
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if ARTIFACT_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "artifact registration and attachment controls remain deterministic and explicit",
+          flags: flags.merge("artifact_control" => true)
+        )
+      end
 
       if INTEREST_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(

@@ -132,16 +132,31 @@ Phase 11 is next.
 
 ### Phase 11: Artifact-aware conversation
 
-Deliver:
+Status:
 
 ```text
-artifact decision rules
-artifact metadata
-conversation attachment
-inbox delivery
-voice-friendly summaries
-file lifecycle
-provider and source provenance
+in progress
+```
+
+Delivered in Phase 11A:
+
+```text
+artifact decision policy for explicit deliverables
+append-only artifact metadata and lifecycle registry
+project-local path and sensitive-state boundaries
+source, chat, privacy, media type, size, and SHA-256 provenance
+deterministic registration, inspection, attachment, detachment, and archival controls
+metadata-only conversation context capped at five attached artifacts
+no implied file read, mutation, execution, upload, or deletion authority
+```
+
+Remaining:
+
+```text
+bounded artifact creation and revision
+attachment inbox and delivery
+voice-friendly completion summaries
+richer lifecycle and provider export integration
 ```
 
 ### Phase 12: Interface contract

@@ -2,6 +2,7 @@
 
 require_relative "conversation_memory_store"
 require_relative "conversation_identity_profile"
+require_relative "conversation_artifact_store"
 require_relative "conversation_interest_store"
 require_relative "conversation_style_analyzer"
 
@@ -31,6 +32,7 @@ module SoulCore
     def initialize(
       store:,
       memory_store: nil,
+      artifact_store: nil,
       interest_store: nil,
       identity_profile: nil,
       style_analyzer: nil,
@@ -41,6 +43,7 @@ module SoulCore
     )
       @store = store
       @memory_store = memory_store || default_memory_store(store)
+      @artifact_store = artifact_store || default_artifact_store(store)
       @interest_store = interest_store || default_interest_store(store)
       @identity_profile = identity_profile || ConversationIdentityProfile.new
       @style_analyzer = style_analyzer || ConversationStyleAnalyzer.new
@@ -62,6 +65,10 @@ module SoulCore
       older = all_messages.first([all_messages.length - recent.length, 0].max)
       digest = build_digest(older)
       current_query = all_messages.reverse.find { |message| message["role"] == "user" }
+      artifacts = @artifact_store.context_for(
+        chat_id: chat_id,
+        limit: ConversationArtifactStore::MAX_CONTEXT_RECORDS
+      )
       memory = @memory_store.context_for(
         query: current_query&.fetch("content", "").to_s,
         chat_id: chat_id,
@@ -87,6 +94,14 @@ module SoulCore
       unless digest.empty?
         system_content << "\nEarlier-turn digest:\n#{digest}\n"
       end
+      unless artifacts.fetch("records", []).empty?
+        system_content << "\nAttached conversation artifacts (metadata only):\n#{artifacts.fetch('rendered')}\n"
+        system_content << <<~GUIDANCE
+          Attached artifact metadata may be used to refer to the deliverable by ID, title, kind, path, privacy, and digest.
+          Attachment does not mean the file contents were read and does not grant permission to read, rewrite, move, execute, upload, or delete the file.
+        GUIDANCE
+      end
+
       unless interests.fetch("records", []).empty?
         system_content << "\nReviewed Soul interests:\n#{interests.fetch('rendered')}\n"
         system_content << <<~GUIDANCE
@@ -134,6 +149,12 @@ module SoulCore
           "automatic_identity_mutation" => style.fetch("automatic_identity_mutation"),
           "persistent_style_profile" => style.fetch("persistent_style_profile")
         },
+        "artifacts" => {
+          "artifact_ids" => artifacts.fetch("artifact_ids", []),
+          "count" => artifacts.fetch("count", 0),
+          "metadata_only" => artifacts.fetch("metadata_only"),
+          "content_read" => artifacts.fetch("content_read")
+        },
         "interests" => {
           "record_ids" => interests.fetch("record_ids", []),
           "count" => interests.fetch("count", 0),
@@ -153,6 +174,14 @@ module SoulCore
     end
 
     private
+
+    def default_artifact_store(store)
+      if store.respond_to?(:project_root)
+        ConversationArtifactStore.new(root: store.project_root)
+      else
+        NullConversationArtifactStore.new
+      end
+    end
 
     def default_interest_store(store)
       if store.respond_to?(:project_root)

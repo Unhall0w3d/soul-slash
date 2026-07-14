@@ -43,6 +43,7 @@ Soul/runtime/*.tmp
 Soul/runtime/*.log
 Soul/improvement/proposals/*
 Soul/artifacts/cloud_assist/*
+Soul/artifacts/conversation_artifacts.jsonl
 Soul/proposals/skills/*
 overlay_files/
 README_*PHASE*.md

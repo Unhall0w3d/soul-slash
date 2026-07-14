@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Conversational Soul
+
+- Began Phase 11 with a shared artifact metadata, provenance, decision, and conversation-attachment foundation.
 - Completed Phase 10 with reviewed inspectable interests, relevance-gated context, safer style inspection, combined acceptance coverage, and tracked-overlay hygiene.
 
 - Added Phase 10B recent-style awareness with bounded repetition detection, ephemeral variation guidance, deterministic inspection, and explicit priority boundaries.

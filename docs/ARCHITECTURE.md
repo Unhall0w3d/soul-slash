@@ -119,14 +119,19 @@ Examples:
 - implementation plans
 - review packages
 
-Artifacts should retain:
+Phase 11A gives artifacts a shared metadata and conversation-attachment contract. Registered artifacts retain:
 
-- source conversation or task
-- creator skill or provider
-- creation time
+- stable artifact identity
+- source conversation and source kind
+- creator provider or skill when known
+- creation and update times
 - privacy classification
 - lifecycle state
-- file path or attachment identity
+- project-relative file path
+- media type, byte size, and SHA-256 digest
+- attached conversation IDs
+
+Artifact attachment injects metadata only. It does not grant permission to read, rewrite, move, execute, upload, or delete the underlying file.
 
 ## Reflection layer
 
