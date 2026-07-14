@@ -145,9 +145,7 @@ Interests may develop as inspectable memory based on repeated substantial engage
 
 ## Artifact-aware conversation
 
-Conversation should contain the useful summary.
-
-Detailed material should become an artifact when appropriate:
+Conversation should contain the useful summary. Detailed material should become an artifact when appropriate:
 
 - code
 - reports
@@ -156,9 +154,13 @@ Detailed material should become an artifact when appropriate:
 - CSV or spreadsheet output
 - implementation packages
 
-The artifact should remain attached to the task or conversation with provenance and lifecycle metadata.
+Phase 11A introduces explicit artifact decision rules and a metadata-only attachment registry. A request is considered an explicit artifact request only when it combines a creation or delivery action with a recognized deliverable. Merely mentioning a file or asking to review a path remains ordinary conversation.
 
-For voice, Soul should summarize the artifact rather than reading long code or links aloud.
+Registered artifacts remain attached to the task or conversation through stable IDs, source and provider provenance, privacy classification, lifecycle state, project-relative path, media type, size, and SHA-256 metadata.
+
+Attachment is not mutation authority. It does not mean Soul has read the file, and it does not permit rewriting, moving, executing, uploading, or deleting it.
+
+For voice, Soul should summarize artifact metadata and completion status rather than reading long code or links aloud.
 
 ## Interface direction
 

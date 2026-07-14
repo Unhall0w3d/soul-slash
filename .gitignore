@@ -128,3 +128,4 @@ Soul/codex/reviews/
 *.soul.local
 
 Soul/identity/interests.jsonl
+Soul/artifacts/conversation_artifacts.jsonl
