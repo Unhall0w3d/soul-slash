@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "chat_responder"
+require_relative "conversation_artifact_creation_service"
 require_relative "conversation_context_builder"
 require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_contract"
@@ -53,13 +54,19 @@ module SoulCore
       evidence_followup_router: nil,
       grounding_policy: nil,
       orchestrator: nil,
-      host_status_collector: nil
+      host_status_collector: nil,
+      artifact_creation_service: nil
     )
       @root = File.expand_path(root)
       @store = store
       @env = env
       @registry = registry || ConversationProviderRegistry.new(env: env)
       @provider_client = provider_client || ConversationProviderClient.new(env: env)
+      @artifact_creation_service = artifact_creation_service || ConversationArtifactCreationService.new(
+        root: @root,
+        env: env,
+        provider_client: @provider_client
+      )
       @deterministic_responder = deterministic_responder || ChatResponder.new(root: @root)
       @evidence_store = evidence_store || ConversationEvidenceStore.new(root: @root)
       @grounding_policy = grounding_policy || ConversationGroundingPolicy.new
@@ -102,6 +109,10 @@ module SoulCore
         informational_skill_then_model(chat_id, text, decision, provider)
       when "evidence_followup"
         evidence_followup(chat_id, text, decision, recent_evidence)
+      when "artifact_creation_preview"
+        artifact_creation_preview(chat_id, text, decision)
+      when "artifact_creation_control"
+        artifact_creation_control(chat_id, text, decision)
       when "capability_catalog"
         capability_catalog(chat_id, text, decision)
       when "capability_info"
@@ -121,6 +132,145 @@ module SoulCore
     end
 
     private
+
+    def artifact_creation_preview(chat_id, text, decision)
+      provider = selected_artifact_provider
+      outcome = @artifact_creation_service.preview(
+        chat_id: chat_id,
+        message: text,
+        provider: provider
+      )
+      content = render_artifact_creation_outcome(outcome)
+      context = safe_context(chat_id)
+      record_state(
+        chat_id: chat_id,
+        user_message: text,
+        assistant_message: content,
+        mode: "artifact_creation_#{outcome.fetch('lifecycle_state')}",
+        provider_id: provider&.id,
+        fallback_reason: outcome["reason"],
+        context: context,
+        decision: decision
+      )
+      Result.new(
+        content: content,
+        mode: "artifact_creation_#{outcome.fetch('lifecycle_state')}",
+        provider_id: provider&.id,
+        fallback_reason: outcome["reason"],
+        metadata: {
+          "orchestration" => decision.to_h,
+          "artifact_creation" => safe_artifact_creation_metadata(outcome),
+          "context" => context_stats(context)
+        }
+      )
+    end
+
+    def artifact_creation_control(chat_id, text, decision)
+      token_id = @artifact_creation_service.parse_token(text)
+      outcome = if text.match?(/\A\s*cancel\b/i)
+                  @artifact_creation_service.cancel(token_id: token_id, chat_id: chat_id)
+                else
+                  @artifact_creation_service.execute(
+                    token_id: token_id,
+                    confirm: text.match?(/\bconfirm\b/i),
+                    chat_id: chat_id
+                  )
+                end
+      content = render_artifact_creation_outcome(outcome)
+      context = safe_context(chat_id)
+      record_state(
+        chat_id: chat_id,
+        user_message: text,
+        assistant_message: content,
+        mode: "artifact_creation_#{outcome.fetch('lifecycle_state')}",
+        fallback_reason: outcome["reason"],
+        context: context,
+        decision: decision
+      )
+      Result.new(
+        content: content,
+        mode: "artifact_creation_#{outcome.fetch('lifecycle_state')}",
+        fallback_reason: outcome["reason"],
+        metadata: {
+          "orchestration" => decision.to_h,
+          "artifact_creation" => safe_artifact_creation_metadata(outcome),
+          "context" => context_stats(context)
+        }
+      )
+    end
+
+    def render_artifact_creation_outcome(outcome)
+      lifecycle = outcome.fetch("lifecycle_state")
+      case lifecycle
+      when "awaiting_input"
+        if outcome["token_id"]
+          lines = [
+            "Artifact creation preview",
+            "Lifecycle: awaiting_input",
+            "Operation: #{outcome['operation']}",
+            "Target: #{outcome['target_path']}",
+            "Privacy: #{outcome['privacy']}",
+            "Provider: #{outcome['provider_id']}",
+            "Size: #{outcome['size_bytes']} bytes / #{outcome['line_count']} lines",
+            "SHA-256: #{outcome['sha256']}"
+          ]
+          lines << "Source artifact: #{outcome['source_artifact_id']}" if outcome["source_artifact_id"]
+          lines.concat([
+            "Redactions in preview: #{outcome['redaction_count']}",
+            "",
+            "Bounded redacted preview",
+            outcome.fetch("excerpt", "").lines.map { |line| "| #{line.chomp}" }.join("\n"),
+            "",
+            "Approval token: #{outcome['token_id']}",
+            "Expires: #{outcome['expires_at']}",
+            "To create: create artifact #{outcome['token_id']} confirm",
+            "To cancel: cancel artifact operation #{outcome['token_id']}",
+            "Mutation: none"
+          ])
+          lines.join("\n")
+        else
+          [
+            "Artifact creation needs more information.",
+            "Reason: #{outcome['reason']}",
+            "Lifecycle: awaiting_input",
+            "Mutation: none"
+          ].join("\n")
+        end
+      when "complete"
+        [
+          "Artifact created and attached.",
+          "Lifecycle: complete",
+          "Artifact ID: #{outcome['artifact_id']}",
+          "Path: #{outcome['target_path']}",
+          "Privacy: #{outcome['privacy']}",
+          "Size: #{outcome['size_bytes']} bytes",
+          "SHA-256 verified: #{outcome['hash_verified'] ? 'yes' : 'no'}",
+          ("Revision of: #{outcome['source_artifact_id']}" if outcome["source_artifact_id"]),
+          "Review the artifact before relying on or publishing it.",
+          "Mutation: artifact_created"
+        ].compact.join("\n")
+      when "canceled"
+        ["Artifact operation canceled.", "Lifecycle: canceled", "Mutation: none"].join("\n")
+      when "blocked_for_human_review"
+        [
+          "Artifact operation is blocked for human review.",
+          "Reason: #{outcome['reason']}",
+          "Lifecycle: blocked_for_human_review",
+          "Mutation: #{outcome['file_created'] ? 'verified_file_preserved' : 'none'}"
+        ].join("\n")
+      else
+        [
+          "Artifact operation failed safely.",
+          "Reason: #{outcome['reason']}",
+          "Lifecycle: failed",
+          "Mutation: none"
+        ].join("\n")
+      end
+    end
+
+    def safe_artifact_creation_metadata(outcome)
+      outcome.reject { |key, _value| %w[excerpt token_id].include?(key) }
+    end
 
     def deterministic_passthrough(chat_id, text, decision)
       content = deterministic_response(text, chat_id)
@@ -584,6 +734,20 @@ module SoulCore
       candidates.find { |item| item.privacy_class == "local_only" } ||
         candidates.find { |item| item.privacy_class == "local_network" } ||
         candidates.first
+    end
+
+    def selected_artifact_provider
+      preferred_id = @env["SOUL_CONVERSATION_PROVIDER"].to_s.strip
+      preferred = preferred_id.empty? ? nil : @registry.find(preferred_id)
+      if preferred&.configured? && %w[local_only local_network].include?(preferred.privacy_class)
+        return preferred
+      end
+
+      candidates = @registry.configured.select do |item|
+        %w[local_only local_network].include?(item.privacy_class)
+      end
+      candidates.find { |item| item.privacy_class == "local_only" } ||
+        candidates.find { |item| item.privacy_class == "local_network" }
     end
 
     def deterministic_fallback(

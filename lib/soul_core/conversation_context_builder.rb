@@ -13,6 +13,10 @@ module SoulCore
     DEFAULT_MAX_CHARACTERS = 16_000
     DEFAULT_DIGEST_CHARACTERS = 2_400
     DEFAULT_MEMORY_RECORDS = 8
+    APPROVAL_TOKEN_PATTERN = /\b[a-f0-9]{32}\b/i
+    APPROVAL_TOKEN_LABEL_PATTERN = /(\b(?:approval\s+)?token:\s*)#{APPROVAL_TOKEN_PATTERN}/i
+    APPROVAL_COMMAND_PATTERN = /(\b(?:create artifact|cancel artifact operation|revoke approval|move approved downloads to trash|dry run downloads move)\s+)#{APPROVAL_TOKEN_PATTERN}/i
+    REDACTED_APPROVAL_TOKEN = "[APPROVAL_TOKEN_REDACTED]"
 
     SYSTEM_PROMPT = <<~PROMPT.freeze
       You are Soul, a local-first assistant being developed with the user.
@@ -99,7 +103,7 @@ module SoulCore
       system_content << "\n#{@identity_profile.render_system_guidance(message: current_query&.fetch('content', '').to_s)}\n"
       recent_style_guidance = @style_analyzer.render_system_guidance(style)
       system_content << "\n#{recent_style_guidance}\n" unless recent_style_guidance.empty?
-      stored_summary = chat["summary"].to_s.strip
+      stored_summary = sanitize_approval_tokens(chat["summary"].to_s).strip
       unless stored_summary.empty?
         system_content << "\nExisting session summary:\n#{stored_summary}\n"
       end
@@ -146,7 +150,7 @@ module SoulCore
         recent.map do |message|
           {
             "role" => message.fetch("role").to_s,
-            "content" => message.fetch("content").to_s
+            "content" => sanitize_approval_tokens(message.fetch("content").to_s)
           }
         end
       )
@@ -251,7 +255,7 @@ module SoulCore
 
       lines = messages.map do |message|
         role = message["role"].to_s
-        content = message["content"].to_s.gsub(/\s+/, " ").strip
+        content = sanitize_approval_tokens(message["content"].to_s).gsub(/\s+/, " ").strip
         content = "#{content[0, 237]}..." if content.length > 240
         "#{role}: #{content}"
       end
@@ -276,6 +280,13 @@ module SoulCore
       end
 
       [system] + selected.reverse
+    end
+
+    def sanitize_approval_tokens(content)
+      content
+        .to_s
+        .gsub(APPROVAL_TOKEN_LABEL_PATTERN, "\\1#{REDACTED_APPROVAL_TOKEN}")
+        .gsub(APPROVAL_COMMAND_PATTERN, "\\1#{REDACTED_APPROVAL_TOKEN}")
     end
 
     def positive_integer(value, fallback)

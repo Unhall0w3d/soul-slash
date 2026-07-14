@@ -165,10 +165,23 @@ bounded structural summaries, excerpts, and two-artifact comparison
 no file or registry mutation during inspection
 ```
 
+Delivered in Phase 11C:
+
+```text
+bounded local-model-assisted Markdown, text, and JSON creation
+fixed project-local artifacts/ output boundary
+revision by new version without source overwrite
+non-mutating exact-byte preview with redacted excerpt
+scope-bound, expiring, single-use approval token and literal confirmation
+exclusive no-follow file creation with post-write size and SHA-256 verification
+verified registration, attachment, provider, chat, and revision provenance
+visible failure, cancellation, race, privacy, integrity, and registry-recovery behavior
+no cloud fallback, upload, export, deletion, move, rename, or in-place edit
+```
+
 Remaining:
 
 ```text
-bounded artifact creation and revision
 attachment inbox and delivery
 voice-friendly completion summaries
 richer lifecycle and provider export integration

@@ -72,8 +72,11 @@ module SoulCore
         - attach artifact <id>
         - detach artifact <id>
         - archive artifact <id> confirm
+        - request one .md, .txt, or .json deliverable below artifacts/ to receive a preview
+        - create artifact <approval-token> confirm
+        - cancel artifact operation <approval-token>
 
-        Registration and show are metadata-only. Inspection reads bounded, attached text artifacts and never modifies files.
+        Registration and show are metadata-only. Inspection never modifies files. Creation requires a scope-bound preview token and literal confirmation, and never overwrites an existing file.
         Mutation: none
       TEXT
     end

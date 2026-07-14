@@ -20,8 +20,24 @@ module SoulCore
       @clock = clock || -> { Time.now.utc }
     end
 
-    def register(path:, title: nil, kind: nil, privacy: "project", source: {}, chat_id: nil)
+    def register(
+      path:,
+      title: nil,
+      kind: nil,
+      privacy: "project",
+      source: {},
+      chat_id: nil,
+      revision_of_artifact_id: nil,
+      expected_size_bytes: nil,
+      expected_sha256: nil
+    )
       file = ConversationArtifactContract.resolve_project_file(root: root, path: path)
+      if expected_size_bytes && file.fetch("size_bytes") != expected_size_bytes.to_i
+        raise RuntimeError, "Artifact size changed before registration"
+      end
+      if expected_sha256 && file.fetch("sha256") != expected_sha256.to_s
+        raise RuntimeError, "Artifact digest changed before registration"
+      end
       artifact_id = artifact_id_for
       now = timestamp
       source_data = source.is_a?(Hash) ? source : {}
@@ -40,6 +56,7 @@ module SoulCore
         "size_bytes" => file.fetch("size_bytes"),
         "sha256" => file.fetch("sha256"),
         "source" => normalized_source,
+        "revision_of_artifact_id" => blank_to_nil(revision_of_artifact_id),
         "attached_chat_ids" => compact_chat_ids(chat_id),
         "created_at" => now,
         "updated_at" => now,
@@ -212,6 +229,11 @@ module SoulCore
       value = title.to_s.strip
       value = File.basename(relative_path) if value.empty?
       value[0, 160]
+    end
+
+    def blank_to_nil(value)
+      text = value.to_s.strip
+      text.empty? ? nil : text
     end
 
     def render_context(records)

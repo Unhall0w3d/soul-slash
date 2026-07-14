@@ -70,7 +70,6 @@ Required for creation:
 - explicit deliverable request
 - project-relative filename below artifacts/
 - output format: md, txt, or json
-- privacy class: local_private, project, or public
 - content requirements
 
 Required for revision:
@@ -86,6 +85,7 @@ Required for execution:
 Optional:
 - title
 - artifact kind
+- privacy class: local_private, project, or public; defaults to project
 ```
 
 Missing or ambiguous required inputs terminate as `awaiting_input` without provider invocation or file mutation.
@@ -142,7 +142,7 @@ No process remains alive while awaiting approval. A later invocation resumes fro
 
 ## First-use behavior
 
-If the request lacks a valid filename, format, privacy class, or content requirements, ask one focused question, record `awaiting_input`, and exit without calling a provider or writing a file.
+If the request lacks a valid filename, format, or content requirements, ask one focused question, record `awaiting_input`, and exit without calling a provider or writing a file. An omitted privacy class uses the existing artifact-contract default, `project`, which remains barred from cloud providers.
 
 The fixed `artifacts/` root may be created only during confirmed execution. No other missing parent directory is created automatically.
 
@@ -233,7 +233,7 @@ Local LLM evals validate routing, phrasing, ambiguity, and usefulness only. Dete
 
 - Reuse the shared approval-token store and artifact registry.
 - Record operation ID, chat, type, target, source ID, provider, privacy, preview digest, terminal state, and failure reason in shared task/history infrastructure.
-- Never log full content, token values, hidden reasoning, or secrets.
+- Never log full content, token values, hidden reasoning, or secrets outside the user-visible chat transcript required to carry the short-lived approval token. Redact approval tokens before later chat context is sent to any model.
 - Create `docs/assessments/CONVERSATIONAL_SOUL_PHASE11C_BOUNDED_ARTIFACT_CREATION_REVISION.md` as the implementation review artifact.
 
 ## Done criteria
