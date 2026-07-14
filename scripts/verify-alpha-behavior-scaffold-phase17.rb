@@ -6,9 +6,11 @@ require "open3"
 require "fileutils"
 
 errors = []
+TEST_PROPOSAL_ROOT = "Soul/runtime/verification/phase17-alpha-behavior"
+TEST_ENV = { "SOUL_IMPROVEMENT_PROPOSALS_ROOT" => TEST_PROPOSAL_ROOT }.freeze
 
 def run_cmd(*cmd)
-  Open3.capture3(*cmd)
+  Open3.capture3(TEST_ENV, *cmd)
 end
 
 puts "alpha behavior scaffold phase 17 verification:"
@@ -36,7 +38,7 @@ checks.each do |name, ok|
   errors << "#{name} missing" unless ok
 end
 
-FileUtils.rm_rf("Soul/improvement/proposals")
+FileUtils.rm_rf(TEST_PROPOSAL_ROOT)
 stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "proposals", "--write", "--json")
 proposal_report = JSON.parse(stdout) rescue nil
 proposal_ok = status.success? && proposal_report && proposal_report["proposal_count"].to_i >= 1
@@ -83,7 +85,7 @@ docs_ok = File.exist?("docs/assessments/ALPHA_BEHAVIOR_SCAFFOLD_PHASE17.md") &&
 puts "- phase 17 docs: #{docs_ok ? 'ok' : 'missing'}"
 errors << "phase 17 docs missing" unless docs_ok
 
-FileUtils.rm_rf("Soul/improvement/proposals")
+FileUtils.rm_rf(TEST_PROPOSAL_ROOT)
 
 if errors.empty?
   puts "Verification complete."

@@ -41,7 +41,7 @@ checks.each do |name, ok|
   errors << "#{name} missing" unless ok
 end
 
-fixture = "Soul/improvement/proposals/phase30-test-proposal"
+fixture = "Soul/runtime/verification/phase30-test-proposal"
 FileUtils.rm_rf(fixture)
 FileUtils.mkdir_p("#{fixture}/alpha")
 File.write("#{fixture}/proposal.md", "# Phase 30 Test Proposal\n")

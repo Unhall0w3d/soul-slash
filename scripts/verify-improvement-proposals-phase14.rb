@@ -6,9 +6,11 @@ require "open3"
 require "fileutils"
 
 errors = []
+TEST_PROPOSAL_ROOT = "Soul/runtime/verification/phase14-improvement-proposals"
+TEST_ENV = { "SOUL_IMPROVEMENT_PROPOSALS_ROOT" => TEST_PROPOSAL_ROOT }.freeze
 
 def run_cmd(*cmd)
-  Open3.capture3(*cmd)
+  Open3.capture3(TEST_ENV, *cmd)
 end
 
 puts "improvement proposals phase 14 verification:"
@@ -70,10 +72,10 @@ json_ok =
 puts "- JSON improvement proposals: #{json_ok ? 'ok' : 'missing'}"
 errors << "JSON proposals failed: #{stderr} #{stdout}" unless json_ok
 
-FileUtils.rm_rf("Soul/improvement/proposals")
+FileUtils.rm_rf(TEST_PROPOSAL_ROOT)
 stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "proposals", "--write", "--json")
 written_json = JSON.parse(stdout) rescue nil
-proposal_dirs = Dir.glob("Soul/improvement/proposals/*").select { |path| File.directory?(path) }
+proposal_dirs = Dir.glob(File.join(TEST_PROPOSAL_ROOT, "*")).select { |path| File.directory?(path) }
 write_ok =
   status.success? &&
   written_json &&
@@ -83,7 +85,7 @@ write_ok =
 puts "- write improvement proposals: #{write_ok ? 'ok' : 'missing'}"
 errors << "write proposals failed: #{stderr} #{stdout}" unless write_ok
 
-FileUtils.rm_rf("Soul/improvement/proposals")
+FileUtils.rm_rf(TEST_PROPOSAL_ROOT)
 
 docs_ok = File.exist?("docs/assessments/IMPROVEMENT_PROPOSALS_PHASE14.md") &&
           File.read("docs/assessments/IMPROVEMENT_PROPOSALS_PHASE14.md").include?("human approval")
