@@ -82,11 +82,12 @@ module SoulCore
         relative = real.relative_path_from(root_path).to_s
         raise ArgumentError, "Artifact path is reserved local state" if blocked_relative_path?(relative)
 
+        measured = measure_regular_file(real)
         {
           "absolute_path" => real.to_s,
           "relative_path" => relative,
-          "size_bytes" => File.size(real),
-          "sha256" => Digest::SHA256.file(real).hexdigest,
+          "size_bytes" => measured.fetch("size_bytes"),
+          "sha256" => measured.fetch("sha256"),
           "media_type" => media_type(relative)
         }
       end
@@ -128,6 +129,34 @@ module SoulCore
       end
 
       private
+
+      def measure_regular_file(path)
+        raise RuntimeError, "This platform cannot enforce no-follow artifact registration" unless File.const_defined?(:NOFOLLOW)
+
+        digest = Digest::SHA256.new
+        size = 0
+        File.open(path.to_s, File::RDONLY | File::NOFOLLOW) do |file|
+          stat = file.stat
+          raise ArgumentError, "Artifact path must identify a regular file" unless stat.file?
+          current = File.stat(path)
+          unless current.dev == stat.dev && current.ino == stat.ino
+            raise RuntimeError, "Artifact path changed during registration"
+          end
+
+          while (chunk = file.read(64 * 1024))
+            digest.update(chunk)
+            size += chunk.bytesize
+          end
+
+          final = File.stat(path)
+          unless final.dev == stat.dev && final.ino == stat.ino && final.size == size
+            raise RuntimeError, "Artifact path changed during registration"
+          end
+        end
+        { "size_bytes" => size, "sha256" => digest.hexdigest }
+      rescue Errno::ENOENT, Errno::ELOOP, Errno::EACCES => error
+        raise ArgumentError, "Artifact cannot be opened safely: #{error.class}"
+      end
 
       def inside_root?(candidate, root)
         candidate_string = candidate.to_s

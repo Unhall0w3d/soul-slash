@@ -36,6 +36,13 @@ module SoulCore
       /\A\s*(?:attach|detach|archive)\s+artifact\s+art_[a-z0-9_]+(?:\s+confirm)?\s*[?.!]*\z/i
     ].freeze
 
+    ARTIFACT_CREATION_CONTROL_PATTERNS = [
+      /\A\s*create\s+artifact\s+[a-f0-9]{32}(?:\s+confirm)?\s*[?.!]*\z/i,
+      /\A\s*cancel\s+artifact\s+operation\s+[a-f0-9]{32}\s*[?.!]*\z/i
+    ].freeze
+
+    ARTIFACT_REVISION_REQUEST = /\b(?:revise|revision|update)\b.{0,120}\b(?:artifact|report|document|notes?|json|text)\b/i
+
     INTEREST_CONTROL_PATTERNS = [
       /\A\s*(?:interest help|help interests?)\s*[?.!]*\z/i,
       /\A\s*(?:propose|add|remember)\s+interest\s*:\s*.+\z/i,
@@ -115,6 +122,23 @@ module SoulCore
         "artifact_decision" => artifact_decision.to_h,
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if ARTIFACT_CREATION_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "artifact_creation_control",
+          reason: "artifact creation execution and cancellation remain deterministic and approval-gated",
+          flags: flags.merge("artifact_creation_control" => true)
+        )
+      end
+
+      if artifact_decision.required? || text.match?(ARTIFACT_REVISION_REQUEST)
+        return decision(
+          kind: "artifact_creation_preview",
+          reason: "an explicit artifact deliverable requires bounded preview before any file write",
+          requires_model: true,
+          flags: flags.merge("artifact_creation_preview" => true)
+        )
+      end
 
       if ARTIFACT_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(

@@ -8,6 +8,8 @@ module SoulCore
       skill_only
       skill_then_model
       evidence_followup
+      artifact_creation_preview
+      artifact_creation_control
       capability_gap
       deterministic_fallback
     ].freeze

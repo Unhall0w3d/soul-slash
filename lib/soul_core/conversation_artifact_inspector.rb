@@ -159,6 +159,11 @@ module SoulCore
         (text.match?(ARTIFACT_REFERENCE) || text.match?(ConversationArtifactReferenceResolver::ARTIFACT_ID))
     end
 
+    def redact_text(text)
+      redacted, count = redact(text.to_s)
+      { "text" => redacted, "redaction_count" => count }
+    end
+
     private
 
     def inspect_record(record, query: nil)
