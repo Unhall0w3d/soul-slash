@@ -145,9 +145,24 @@ artifact decision policy for explicit deliverables
 append-only artifact metadata and lifecycle registry
 project-local path and sensitive-state boundaries
 source, chat, privacy, media type, size, and SHA-256 provenance
-deterministic registration, inspection, attachment, detachment, and archival controls
+deterministic registration, metadata inspection, attachment, detachment, and archival controls
 metadata-only conversation context capped at five attached artifacts
 no implied file read, mutation, execution, upload, or deletion authority
+```
+
+Delivered in Phase 11B:
+
+```text
+attached-only inspection for bounded allow-listed UTF-8 text formats
+no-follow exact-byte size and SHA-256 verification before use
+deterministic redaction including quoted JSON and assignment secrets
+artifact privacy enforcement across local-only, local-network, and cloud providers
+untrusted-content labeling before display or model context
+explicit ID, title, kind, and bounded reference resolution
+visible complete, failed, awaiting-input, and blocked-for-review lifecycle outcomes
+provider calls suppressed on ambiguity, failure, and privacy mismatch
+bounded structural summaries, excerpts, and two-artifact comparison
+no file or registry mutation during inspection
 ```
 
 Remaining:

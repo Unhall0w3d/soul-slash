@@ -49,7 +49,8 @@ module SoulCore
     def local_openai_compatible
       model = first_present(
         @env["SOUL_LOCAL_OPENAI_MODEL"],
-        @env["SOUL_LOCAL_MODEL"]
+        @env["SOUL_LOCAL_MODEL"],
+        @env["SOUL_MODEL_ALIAS"]
       )
 
       Contract::ProviderDefinition.new(
@@ -59,6 +60,7 @@ module SoulCore
         endpoint: first_present(
           @env["SOUL_LOCAL_OPENAI_BASE_URL"],
           @env["OPENAI_BASE_URL"],
+          @env["SOUL_OPENAI_BASE_URL"],
           "http://127.0.0.1:8080/v1"
         ),
         model: model.to_s,

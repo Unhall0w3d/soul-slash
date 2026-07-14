@@ -91,18 +91,14 @@ chat_command = File.read("lib/soul_core/chat_command.rb")
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 documentation = File.read("docs/MULTITURN_CONVERSATION_RUNTIME.md")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
-milestones = File.read("docs/MILESTONES.md")
-changelog = File.read("CHANGELOG.md")
 
 check("ChatCommand uses ConversationRuntime", chat_command.include?('require_relative "conversation_runtime"') && chat_command.include?("@runtime.respond"), errors)
-check("runtime preserves deterministic responder", runtime.include?('require_relative "chat_responder"') && runtime.include?("deterministic_route?"), errors)
+check("runtime preserves deterministic responder", runtime.include?('require_relative "chat_responder"') && runtime.include?("deterministic_passthrough"), errors)
 check("runtime defaults to local provider preference", runtime.include?('privacy_class == "local_only"'), errors)
 check("cloud conversation requires explicit permission", runtime.include?("SOUL_ALLOW_CLOUD_CONVERSATION"), errors)
 check("documentation declares Phase 4 boundary", documentation.include?("Full model-guided tool orchestration belongs to Phase 4"), errors)
 check("roadmap marks Phase 2 complete", roadmap.include?("### Phase 2: Provider and model capability foundation") && roadmap.include?("complete"), errors)
-check("roadmap marks Phase 3 in progress", roadmap.include?("### Phase 3: Multi-turn conversation runtime") && roadmap.include?("in progress"), errors)
-check("milestones select Phase 3", milestones.include?("Current phase:\n\n```text\nPhase 3"), errors)
-check("changelog records Phase 3", changelog.include?("Phase 3 multi-turn conversation runtime"), errors)
+check("roadmap marks Phase 3 complete", roadmap.match?(/### Phase 3: Multi-turn conversation runtime.*?Status:\s*```text\s*complete/m), errors)
 
 stdout, stderr, status = Open3.capture3(
   "ruby",

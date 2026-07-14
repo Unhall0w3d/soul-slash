@@ -119,7 +119,6 @@ end
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 catalog = File.read("lib/soul_core/conversation_tool_catalog.rb")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
-milestones = File.read("docs/MILESTONES.md")
 grounding = File.read("docs/GROUNDED_TOOL_EVIDENCE.md")
 
 check("runtime persists evidence", runtime.include?("@evidence_store.append"), errors)
@@ -127,9 +126,8 @@ check("runtime rejects unsupported synthesis", runtime.include?("grounding_fallb
 check("system status disables synthesis", catalog.include?('id: "system.status"') && catalog.include?("synthesis_allowed: false"), errors)
 check("grounding docs distinguish not_collected", grounding.include?("`not_collected` means unknown"), errors)
 check("roadmap has eleven phase headings", roadmap.scan(/^### Phase \d+:/).length == 11, errors)
-check("roadmap marks Phase 5 in progress", roadmap.include?("### Phase 5: Grounded evidence lifecycle") && roadmap.include?("in progress"), errors)
+check("roadmap marks Phase 5 complete", roadmap.match?(/### Phase 5: Grounded evidence lifecycle.*?Status:\s*```text\s*complete/m), errors)
 check("roadmap reserves Phase 6 host assessment", roadmap.include?("### Phase 6: Bounded host environment assessment"), errors)
-check("milestones select Phase 5", milestones.include?("Current phase:\n\n```text\nPhase 5"), errors)
 
 stdout, stderr, status = Open3.capture3(
   "ruby",

@@ -160,7 +160,9 @@ Registered artifacts remain attached to the task or conversation through stable 
 
 Attachment is not mutation authority. It does not mean Soul has read the file, and it does not permit rewriting, moving, executing, uploading, or deleting it.
 
-For voice, Soul should summarize artifact metadata and completion status rather than reading long code or links aloud.
+Phase 11B reads bounded content only for explicit inspection language. Reference resolution uses attached IDs, titles, kinds, or a single unambiguous attachment. Exact-byte integrity, format, UTF-8, size, redaction, and provider-privacy checks run before model synthesis. Ambiguous references await input; failed or privacy-blocked reads do not reach a provider.
+
+For voice, Soul should summarize artifact metadata, bounded findings, and completion status rather than reading long code or links aloud.
 
 ## Interface direction
 

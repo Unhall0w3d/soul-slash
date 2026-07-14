@@ -39,6 +39,7 @@ module SoulCore
       /\bwhat about\b/i,
       /\bwhich (?:one|ones|of those)\b/i,
       /\b(?:tell|show|give) me (?:more|the details|more details)\b/i,
+      /\b(?:further|more) details? (?:about|on) what (?:you )?(?:checked|found|reported|collected)\b/i,
       /\b(?:expand|elaborate) on\b/i,
       /\bwhat (?:does|did) (?:that|it|this) mean\b/i
     ].freeze
@@ -59,7 +60,7 @@ module SoulCore
       there these they this those through to too under until up very was we were what when where
       which while who whom why will with would you your yours yourself yourselves mentioned
       referring referred talking tell show give expand elaborate result check assessment evidence
-      one ones details detail mean
+      one ones details detail mean checked found reported collected
     ].freeze
 
     TOPIC_GROUPS = [
@@ -212,7 +213,10 @@ module SoulCore
     end
 
     def tokenize(text)
-      text.to_s.downcase.scan(/[a-z0-9][a-z0-9._\/-]*/).map { |token| singularize(token) }
+      text.to_s.downcase.scan(/[a-z0-9][a-z0-9._\/-]*/).filter_map do |token|
+        normalized = token.gsub(/\A[.\/-]+|[.\/-]+\z/, "")
+        singularize(normalized) unless normalized.empty?
+      end
     end
 
     def singularize(token)

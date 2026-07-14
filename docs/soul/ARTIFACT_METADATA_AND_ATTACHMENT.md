@@ -43,12 +43,22 @@ register artifact: <project-relative path> | <title> | <kind> | <privacy> confir
 list all artifacts
 list chat artifacts
 show artifact <id>
+inspect artifact <id>
+summarize artifact <id>
+artifact excerpt <id>
+compare artifacts <id> and <id>
 attach artifact <id>
 detach artifact <id>
 archive artifact <id> confirm
 ```
 
 Registration and archival require the literal `confirm` keyword. Attachment and detachment are explicit, reversible metadata operations.
+
+## Phase 11B inspection
+
+Attachment remains metadata-only by default. Explicit inspection requests may read active attached text artifacts through the bounded contract in `docs/soul/BOUNDED_ARTIFACT_INSPECTION.md`.
+
+Every read uses no-follow semantics and verifies the exact bytes against registered size and SHA-256 metadata. Artifact privacy limits eligible provider classes before content enters model context. Ambiguous, failed, and privacy-blocked inspections stop without a provider call. Inspection does not mutate the file or registry.
 
 ## Local state
 

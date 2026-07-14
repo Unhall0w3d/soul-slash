@@ -178,7 +178,17 @@ module SoulCore
 
     def informational_skill_then_model(chat_id, text, decision, provider)
       evidence = execute_tools(decision.tools, chat_id)
-      context = safe_context(chat_id)
+      context = safe_context(chat_id, provider: provider)
+      terminal = artifact_inspection_terminal_result(
+        chat_id: chat_id,
+        message: text,
+        decision: decision,
+        context: context,
+        provider_id: provider.id,
+        prefix: @grounding_policy.render_evidence(evidence, heading: "Grounded deterministic result")
+      )
+      return terminal if terminal
+
       request = build_request(
         chat_id: chat_id,
         provider: provider,
@@ -397,7 +407,16 @@ module SoulCore
         decision: decision
       ) unless provider
 
-      context = safe_context(chat_id)
+      context = safe_context(chat_id, provider: provider)
+      terminal = artifact_inspection_terminal_result(
+        chat_id: chat_id,
+        message: text,
+        decision: decision,
+        context: context,
+        provider_id: provider.id
+      )
+      return terminal if terminal
+
       request = build_request(
         chat_id: chat_id,
         provider: provider,
@@ -633,8 +652,57 @@ module SoulCore
       )
     end
 
-    def safe_context(chat_id)
-      @context_builder.build(chat_id: chat_id)
+    def artifact_inspection_terminal_result(chat_id:, message:, decision:, context:, provider_id:, prefix: nil)
+      inspection = context.fetch("artifact_inspection", {})
+      lifecycle = inspection.fetch("lifecycle_state", "complete")
+      return nil if lifecycle == "complete"
+
+      detail = case lifecycle
+               when "awaiting_input"
+                 candidates = Array(inspection["candidate_artifact_ids"])
+                 suffix = candidates.empty? ? "" : " Candidates: #{candidates.join(', ')}."
+                 "I need a more specific attached artifact reference before reading content.#{suffix}"
+               when "blocked_for_human_review"
+                 ids = Array(inspection["blocked_artifact_ids"])
+                 "Artifact inspection is blocked because #{ids.join(', ')} is not approved for the selected #{inspection['provider_privacy_class']} provider. Use a compatible local provider or complete a reviewed privacy change."
+               else
+                 failures = Array(inspection["failures"]).map do |failure|
+                   "#{failure['artifact_id']}: #{failure['reason']}"
+                 end
+                 explanation = failures.empty? ? inspection.fetch("reason", "artifact inspection failed") : failures.join("; ")
+                 "Artifact inspection failed safely. #{explanation}."
+               end
+      content = [prefix, detail, "Lifecycle: #{lifecycle}", "Content sent to provider: no", "Mutation: none"].compact.reject(&:empty?).join("\n\n")
+
+      record_state(
+        chat_id: chat_id,
+        user_message: message,
+        assistant_message: content,
+        mode: "artifact_inspection_#{lifecycle}",
+        provider_id: provider_id,
+        fallback_reason: inspection.fetch("reason", lifecycle),
+        context: context,
+        decision: decision
+      )
+
+      Result.new(
+        content: content,
+        mode: "artifact_inspection_#{lifecycle}",
+        provider_id: provider_id,
+        fallback_reason: inspection.fetch("reason", lifecycle),
+        metadata: {
+          "orchestration" => decision.to_h,
+          "artifact_inspection" => inspection,
+          "context" => context_stats(context)
+        }
+      )
+    end
+
+    def safe_context(chat_id, provider: nil)
+      @context_builder.build(
+        chat_id: chat_id,
+        provider_privacy_class: provider&.privacy_class
+      )
     rescue StandardError
       {
         "messages" => [],

@@ -114,7 +114,6 @@ collector = File.read("lib/soul_core/host_system_status_collector.rb")
 catalog = File.read("lib/soul_core/conversation_tool_catalog.rb")
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
-milestones = File.read("docs/MILESTONES.md")
 
 check("collector avoids shell interpolation", collector.include?("Open3.capture3(*command)"), errors)
 check("collector declares read-only verification", collector.include?('"read_only" => true'), errors)
@@ -122,8 +121,7 @@ check("host skill is registered", catalog.include?('id: "host.system_status"'), 
 check("host synthesis is disabled", catalog.include?('id: "host.system_status"') && catalog.include?("synthesis_allowed: false"), errors)
 check("runtime uses structured host collector", runtime.include?("@host_status_collector.collect"), errors)
 check("roadmap marks Phase 5 complete", roadmap.include?("### Phase 5: Grounded evidence lifecycle") && roadmap.include?("complete"), errors)
-check("roadmap marks Phase 6 in progress", roadmap.include?("### Phase 6: Bounded host environment assessment") && roadmap.include?("in progress"), errors)
-check("milestones select Phase 6", milestones.include?("Current phase:\n\n```text\nPhase 6"), errors)
+check("roadmap marks Phase 6 complete", roadmap.match?(/### Phase 6: Bounded host environment assessment.*?Status:\s*```text\s*complete/m), errors)
 
 stdout, stderr, status = Open3.capture3(
   "ruby",

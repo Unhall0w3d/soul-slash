@@ -74,8 +74,8 @@ errors << "approval token runtime path is not gitignored: #{stderr} #{stdout}" u
 stdout, stderr, status = run_cmd("ruby", "bin/soul", "chat", "move approved downloads to trash")
 blocked_ok =
   status.success? &&
-  stdout.include?("Executed: false") &&
-  stdout.include?("owner_confirmation_required")
+  stdout.include?("Provide the approval token:") &&
+  stdout.include?("<token> confirm")
 
 puts "- downloads move/delete remains blocked: #{blocked_ok ? 'ok' : 'missing'}"
 errors << "downloads move/delete block failed: #{stderr} #{stdout}" unless blocked_ok
