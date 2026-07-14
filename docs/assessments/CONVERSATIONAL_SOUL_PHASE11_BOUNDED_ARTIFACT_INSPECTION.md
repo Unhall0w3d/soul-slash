@@ -42,11 +42,20 @@ lib/soul_core/conversation_artifact_controls.rb
 lib/soul_core/conversation_artifact_inspector.rb
 lib/soul_core/conversation_artifact_reference_resolver.rb
 lib/soul_core/conversation_context_builder.rb
+lib/soul_core/conversation_evidence_followup_router.rb
 lib/soul_core/conversation_orchestrator.rb
 lib/soul_core/conversation_provider_registry.rb
 lib/soul_core/conversation_runtime.rb
 lib/soul_core/phase11_bounded_artifact_inspection_assessor.rb
 scripts/verify-phase11-bounded-artifact-inspection.rb
+scripts/verify-alpha-review-phase18.rb
+scripts/verify-approval-token-chat-controls-phase60.rb
+scripts/verify-approval-token-store-phase59.rb
+scripts/verify-bounded-host-system-status-phase6.rb
+scripts/verify-conversation-provider-foundation-phase2.rb
+scripts/verify-conversational-orchestrator-phase4.rb
+scripts/verify-grounded-evidence-lifecycle-phase5.rb
+scripts/verify-multiturn-conversation-runtime-phase3.rb
 ```
 
 ## Commands run
@@ -58,6 +67,11 @@ ruby scripts/verify-phase11-artifact-metadata-attachment.rb
 ruby scripts/verify-conversation-provider-foundation-phase2.rb
 ruby scripts/verify-multiturn-conversation-runtime-phase3.rb
 ruby scripts/verify-conversational-orchestrator-phase4.rb
+ruby scripts/verify-grounded-evidence-lifecycle-phase5.rb
+ruby scripts/verify-bounded-host-system-status-phase6.rb
+ruby scripts/verify-alpha-review-phase18.rb
+ruby scripts/verify-approval-token-store-phase59.rb
+ruby scripts/verify-approval-token-chat-controls-phase60.rb
 ruby -c <changed Ruby files>
 git diff --check
 ```
@@ -70,11 +84,14 @@ Phase 11B verifier: passed
 Phase 11A regression: passed
 Phase 10 closeout regression: passed through Phase 11A verifier
 Whitespace checks: passed
+Historical Phase 2 through 6 verifier regressions: passed
+Phase 18 alpha-review verifier: passed
+Phase 59 and 60 approval-token verifier regressions: passed
 ```
 
 Coverage includes exact-byte integrity, before-and-after artifact and ledger hashes, assignment and quoted-JSON redaction, provider privacy routing, zero provider calls on privacy block, untrusted-content labeling, binary and UTF-8 rejection, size and format limits, symlink substitution, integrity drift, ambiguity, anti-hijacking, and deterministic controls.
 
-Historical Phase 2, 3, and 4 verifier scripts were also audited. Their behavioral assessors pass, but the scripts exit nonzero because they assert obsolete milestone/changelog snapshots for their former current phase. The Phase 3 and 4 scripts additionally depend on source-string markers and old assessment fields that were replaced by later architecture. These failures predate Phase 11B behavior and are recorded as verifier-maintenance debt rather than treated as passing regressions.
+Historical verifier wrappers now assert stable phase-completion behavior instead of obsolete current-phase snapshots or replaced source strings. The Phase 5 regression also caught and repaired punctuation-sensitive evidence follow-up routing for natural requests such as “further details about what you checked.” Phase 59 and 60 wrappers now verify the current token-and-confirmation gate without assuming that later token-gated mutation remains globally disabled.
 
 ## Local LLM eval results
 
@@ -158,7 +175,7 @@ Artifact registry mutation during inspection: no
 - Privacy reclassification is not part of Phase 11B; an artifact must be re-registered through a reviewed flow.
 - The append-only artifact registry still has no compaction strategy.
 - Local runtime provider compatibility accepts both the existing `SOUL_MODEL_ALIAS`/`SOUL_OPENAI_BASE_URL` names and the newer conversation-specific names; configuration normalization remains future cleanup work.
-- Historical Phase 2 through 4 wrapper verifiers contain stale current-phase and source-text assertions even though their underlying runtime assessors pass.
+- Several older improvement-pipeline verifiers use repository-local generated fixture directories rather than isolated temporary roots; only the Phase 18 cleanup behavior was repaired in this maintenance pass.
 
 ## Human review checklist
 

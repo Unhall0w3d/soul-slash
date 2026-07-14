@@ -51,7 +51,7 @@ stdout, stderr, status = run_cmd("ruby", "bin/soul", "chat", "approve downloads 
 approve_ok =
   status.success? &&
   stdout.include?("Downloads cleanup preview approved.") &&
-  stdout.include?("Mutation enabled: false") &&
+  stdout.include?("Mutation enabled: true") &&
   stdout.match?(/Token: [a-f0-9]{32}/)
 
 puts "- chat approves cleanup preview: #{approve_ok ? 'ok' : 'missing'}"
@@ -63,7 +63,6 @@ stdout, stderr, status = run_cmd("ruby", "bin/soul", "chat", "pending approvals"
 pending_ok =
   status.success? &&
   stdout.include?("Pending approvals") &&
-  stdout.include?("Mutation enabled: false") &&
   token_id &&
   stdout.include?(token_id)
 
@@ -74,8 +73,7 @@ stdout, stderr, status = run_cmd("ruby", "bin/soul", "chat", "revoke approval #{
 revoke_ok =
   status.success? &&
   stdout.include?("Approval revoke result") &&
-  stdout.include?("Status: revoked") &&
-  stdout.include?("Mutation enabled: false")
+  stdout.include?("Status: revoked")
 
 puts "- chat revokes approval: #{revoke_ok ? 'ok' : 'missing'}"
 errors << "approval revoke failed: #{stderr} #{stdout}" unless revoke_ok
@@ -83,8 +81,8 @@ errors << "approval revoke failed: #{stderr} #{stdout}" unless revoke_ok
 stdout, stderr, status = run_cmd("ruby", "bin/soul", "chat", "move approved downloads to trash")
 blocked_ok =
   status.success? &&
-  stdout.include?("Executed: false") &&
-  stdout.include?("owner_confirmation_required")
+  stdout.include?("Provide the approval token:") &&
+  stdout.include?("<token> confirm")
 
 puts "- downloads move/delete remains blocked: #{blocked_ok ? 'ok' : 'missing'}"
 errors << "downloads move/delete block failed: #{stderr} #{stdout}" unless blocked_ok

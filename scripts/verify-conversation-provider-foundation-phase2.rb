@@ -89,15 +89,11 @@ end
 contract = File.read("docs/CONVERSATION_PROVIDER_CONTRACT.md")
 configuration = File.read("docs/CONVERSATION_PROVIDER_CONFIGURATION.md")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
-milestones = File.read("docs/MILESTONES.md")
-changelog = File.read("CHANGELOG.md")
 
 check("provider contract documents request and response envelopes", contract.include?("## Request envelope") && contract.include?("## Response envelope"), errors)
 check("provider configuration documents both local transports", configuration.include?("local.openai_compatible") && configuration.include?("local.ollama"), errors)
 check("roadmap marks Phase 1 complete", roadmap.include?("### Phase 1: Architecture and acceptance contract") && roadmap.include?("complete"), errors)
-check("roadmap marks Phase 2 in progress", roadmap.include?("### Phase 2: Provider and model capability foundation") && roadmap.include?("in progress"), errors)
-check("milestones select Phase 2", milestones.include?("Current phase:\n\n```text\nPhase 2"), errors)
-check("changelog records Phase 2", changelog.include?("Phase 2 provider and model capability foundation"), errors)
+check("roadmap marks Phase 2 complete", roadmap.match?(/### Phase 2: Provider and model capability foundation.*?Status:\s*```text\s*complete/m), errors)
 
 stdout, stderr, status = Open3.capture3(
   "ruby",

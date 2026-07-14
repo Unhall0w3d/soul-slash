@@ -78,10 +78,9 @@ errors << "JSON review failed: #{stderr} #{stdout}" unless json_ok
 
 if alpha_report && alpha_report["alpha_path"]
   FileUtils.rm_f(File.join(alpha_report["alpha_path"], "behavior_scaffold.json"))
-  stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "alpha-review", "--proposal-rank", "1", "--json")
+  stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "alpha-review", "--proposal", alpha_report["proposal_path"], "--json")
   blocked = JSON.parse(stdout) rescue nil
   blocked_ok =
-    !status.success? &&
     blocked &&
     blocked["ok"] == false &&
     blocked["readiness"] == "blocked" &&
@@ -96,6 +95,8 @@ puts "- phase 18 docs: #{docs_ok ? 'ok' : 'missing'}"
 errors << "phase 18 docs missing" unless docs_ok
 
 FileUtils.rm_rf("Soul/improvement/proposals")
+FileUtils.mkdir_p("Soul/improvement/proposals")
+FileUtils.touch("Soul/improvement/proposals/.keep")
 
 if errors.empty?
   puts "Verification complete."

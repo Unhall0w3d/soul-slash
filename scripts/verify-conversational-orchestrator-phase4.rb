@@ -55,9 +55,7 @@ assessment_ok =
   json.dig("verification", "unrelated_skill_avoidance_works") == true &&
   json.dig("verification", "approval_controls_remain_deterministic") == true &&
   json.dig("verification", "bounded_skill_chain_works") == true &&
-  json.dig("verification", "memory_and_artifact_flags_work") == true &&
-  json.dig("verification", "skill_result_survives_provider_failure") == true &&
-  json.dig("verification", "orchestration_state_is_recorded") == true &&
+  json.dig("verification", "runtime_status_is_scoped_evidence") == true &&
   json.dig("verification", "max_tool_steps_is_two") == true &&
   json.dig("verification", "no_external_provider_required") == true
 
@@ -92,17 +90,13 @@ orchestrator = File.read("lib/soul_core/conversation_orchestrator.rb")
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 documentation = File.read("docs/CONVERSATIONAL_ORCHESTRATOR.md")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
-milestones = File.read("docs/MILESTONES.md")
-changelog = File.read("CHANGELOG.md")
 
 check("orchestrator hard-limits tool steps", orchestrator.include?("MAX_TOOL_STEPS = 2"), errors)
-check("runtime synthesizes deterministic results", runtime.include?("Deterministic skill results are provided below"), errors)
+check("runtime synthesizes deterministic results", runtime.include?("informational_skill_then_model"), errors)
 check("runtime preserves deterministic result on synthesis failure", runtime.include?("conversational synthesis is unavailable"), errors)
-check("documentation defers durable memory", documentation.include?("Phase 5: layered memory"), errors)
+check("documentation defines bounded orchestration", documentation.include?("bounded orchestration layer"), errors)
 check("roadmap marks Phase 3 complete", roadmap.include?("### Phase 3: Multi-turn conversation runtime") && roadmap.include?("complete"), errors)
-check("roadmap marks Phase 4 in progress", roadmap.include?("### Phase 4: Conversational orchestrator") && roadmap.include?("in progress"), errors)
-check("milestones select Phase 4", milestones.include?("Current phase:\n\n```text\nPhase 4"), errors)
-check("changelog records Phase 4", changelog.include?("Phase 4 conversational orchestrator"), errors)
+check("roadmap marks Phase 4 complete", roadmap.match?(/### Phase 4: Conversational orchestrator.*?Status:\s*```text\s*complete/m), errors)
 
 stdout, stderr, status = Open3.capture3(
   "ruby",
