@@ -56,7 +56,7 @@ in progress
 Current phase:
 
 ```text
-Phase 12D.3: Self Improvement dashboard
+Protected LAN/systemd deployment review
 ```
 
 Completed:
@@ -81,12 +81,13 @@ Phase 12B: in-process application API
 Phase 12C: foreground loopback dashboard
 Phase 12D: Skill Studio Proposal/Beta lifecycle
 Phase 12D.2: capability-gap intake
+Phase 12D.3: Self Improvement dashboard
 ```
 
 Current work:
 
 ```text
-Phase 12D.3 completion and documentation alignment
+protected local HTTPS service and device trust review
 then Phase 12E unified approvals and activity views
 ```
 

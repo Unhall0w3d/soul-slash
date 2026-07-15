@@ -6,14 +6,44 @@
   <meta name="color-scheme" content="dark">
   <meta name="soul-csrf" content="__SOUL_CSRF_TOKEN__">
   <title>Soul/ — Local Intelligence Substrate</title>
+  <link rel="icon" href="/brand/micro-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/dashboard.css">
   <script src="/assets/dashboard.js" defer></script>
 </head>
-<body>
+<body class="auth-locked">
   <div class="ambient" aria-hidden="true"></div>
+  <section id="auth-gate" class="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="auth-card">
+      <div class="auth-identity">
+        <img src="/brand/micro-mark.svg" width="58" height="58" alt="">
+        <div><p class="eyebrow">Private local interface</p><h1 id="auth-title">Enter Soul/</h1></div>
+      </div>
+      <p class="auth-intro">Authenticate as the administrator to unlock conversations, skills, workspace context, and system controls.</p>
+      <form id="login-form" class="auth-form">
+        <label for="auth-username">Username</label>
+        <input id="auth-username" name="username" type="text" value="admin" maxlength="64" autocomplete="username" required>
+        <label for="auth-password">Password</label>
+        <input id="auth-password" name="password" type="password" maxlength="128" autocomplete="current-password" required>
+        <button id="login-button" class="auth-button" type="submit">Unlock dashboard</button>
+      </form>
+      <form id="password-change-form" class="auth-form" hidden>
+        <div class="first-login-note"><strong>First login protection</strong><span>Replace the public bootstrap password before Soul reveals or accepts dashboard data.</span></div>
+        <label for="current-password">Current password</label>
+        <input id="current-password" name="current-password" type="password" maxlength="128" autocomplete="current-password" required>
+        <label for="new-password">New password</label>
+        <input id="new-password" name="new-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-policy" required>
+        <small id="password-policy">Use 12–128 characters. The bootstrap password cannot be reused.</small>
+        <label for="confirm-password">Confirm new password</label>
+        <input id="confirm-password" name="confirm-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+        <button id="change-password-button" class="auth-button auth-button--gold" type="submit">Set password and enter</button>
+      </form>
+      <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
+      <div class="auth-boundary"><span><i></i> Single administrator</span><span>Host-only session</span><span>Sign-ups disabled</span></div>
+    </div>
+  </section>
   <header class="app-header">
     <a class="brand" href="#chat-panel" aria-label="Soul dashboard home">
-      <img src="/brand/primary-mark.png" width="40" height="40" alt="">
+      <img src="/brand/micro-mark.svg" width="44" height="44" alt="">
       <span class="brand-copy"><strong>Soul<span>/</span></strong><small>local intelligence substrate</small></span>
     </a>
     <nav class="primary-tabs" aria-label="Primary" role="tablist">
@@ -25,6 +55,7 @@
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
       <span class="status-chip"><span id="provider-label">Provider —</span></span>
       <span class="status-chip"><span id="config-label">Config —</span></span>
+      <button id="logout-button" class="logout-button" type="button" hidden>Logout</button>
     </div>
   </header>
 

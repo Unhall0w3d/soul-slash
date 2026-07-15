@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -12,12 +12,73 @@ function requestId() {
 async function callSoul(operation, parameters = {}, context = {}) {
   const response = await fetch("/api/v1/call", {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
     body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } })
   });
   const envelope = await response.json();
+  if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
   if (!response.ok) throw new Error(envelope.error?.reason || "Dashboard transport failed");
   return envelope;
+}
+
+async function authRequest(path, body) {
+  const options = { credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf } };
+  if (body !== undefined) { options.method = "POST"; options.body = JSON.stringify(body); }
+  const response = await fetch(path, options);
+  const envelope = await response.json();
+  if (!response.ok) throw new Error(envelope.error?.reason || "Authentication failed safely");
+  return envelope;
+}
+
+function setDashboardLocked(locked) {
+  document.body.classList.toggle("auth-locked", locked);
+  const gate = byId("auth-gate"); gate.hidden = !locked;
+  [document.querySelector(".app-header"), document.querySelector("main"), byId("clear-dialog")].forEach((element) => { if (element) element.inert = locked; });
+  if (!locked) { byId("logout-button").hidden = false; byId("auth-status").textContent = ""; }
+}
+
+function showPasswordChange(required) {
+  byId("login-form").hidden = required;
+  byId("password-change-form").hidden = !required;
+  byId("auth-status").textContent = required ? "Bootstrap credential accepted. Set a private password to continue." : "";
+  if (required) byId("current-password").focus(); else byId("auth-password").focus();
+}
+
+async function initializeAuthentication() {
+  setDashboardLocked(true);
+  try {
+    const session = await authRequest("/auth/v1/session");
+    if (!session.authenticated) { showPasswordChange(false); return; }
+    if (session.password_change_required) { showPasswordChange(true); return; }
+    state.authenticated = true; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-status").textContent = error.message; showPasswordChange(false); }
+}
+
+async function login(event) {
+  event.preventDefault(); const button = byId("login-button"); button.disabled = true; byId("auth-status").textContent = "Verifying local administrator…";
+  try {
+    const session = await authRequest("/auth/v1/login", { username: byId("auth-username").value, password: byId("auth-password").value });
+    byId("auth-password").value = "";
+    if (session.password_change_required) { showPasswordChange(true); return; }
+    state.authenticated = true; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-password").select(); byId("auth-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function changePassword(event) {
+  event.preventDefault(); const button = byId("change-password-button"); button.disabled = true; byId("auth-status").textContent = "Replacing bootstrap credential…";
+  try {
+    const session = await authRequest("/auth/v1/change-password", { current_password: byId("current-password").value, new_password: byId("new-password").value, confirmation: byId("confirm-password").value });
+    ["current-password", "new-password", "confirm-password"].forEach((id) => { byId(id).value = ""; });
+    state.authenticated = session.authenticated; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function logout() {
+  byId("logout-button").disabled = true;
+  try { await authRequest("/auth/v1/logout", {}); } finally { window.location.reload(); }
 }
 
 function announce(message) { byId("live-status").textContent = message; }
@@ -478,13 +539,18 @@ async function executeImprovementProposals() {
 }
 
 async function bootstrap() {
+  if (state.bootstrapped) return;
+  state.bootstrapped = true;
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
     byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true });
-  } catch (error) { byId("connection-label").textContent = "Disconnected"; showError(error); }
+  } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
+byId("login-form").addEventListener("submit", login);
+byId("password-change-form").addEventListener("submit", changePassword);
+byId("logout-button").addEventListener("click", logout);
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
@@ -516,4 +582,4 @@ byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
 byId("composer").addEventListener("submit", sendMessage);
 byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); byId("composer").requestSubmit(); } });
-bootstrap();
+initializeAuthentication();

@@ -2,6 +2,8 @@
 
 Soul/ is split into layers. The layers are deliberately separated so conversation can remain flexible while actions remain inspectable and bounded.
 
+The optional local deployment preserves this separation: Soul's HTTP application remains bound to loopback, while an independently configured Caddy user service terminates LAN HTTPS and forwards only to the loopback endpoint. One exact `dashboard.public_origin` expands browser Host/Origin validation without granting a LAN bind to Soul itself.
+
 ## Interface layer
 
 Human-facing inputs and outputs:

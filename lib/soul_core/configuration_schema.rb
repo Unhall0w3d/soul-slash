@@ -36,7 +36,8 @@ module SoulCore
         setting("providers.cloud_openai.credential_env", "SOUL_CLOUD_OPENAI_CREDENTIAL_ENV", :env_name, "SOUL_CLOUD_OPENAI_API_KEY", effect: "Names the environment variable containing the cloud credential.", risk: "The named secret is never returned through public configuration output."),
         setting("providers.cloud_openai.api_key", "SOUL_CLOUD_OPENAI_API_KEY", :secret, nil, effect: "Authenticates an explicitly configured cloud provider.", risk: "Secret; presence never authorizes cloud use.", secret: true),
         setting("dashboard.bind_host", "SOUL_DASHBOARD_BIND_HOST", :loopback_host, "127.0.0.1", effect: "Defines the inert bind host reserved for the future foreground dashboard.", risk: "Phase 12 accepts loopback only."),
-        setting("dashboard.port", "SOUL_DASHBOARD_PORT", :integer, 4567, range: 1..65_535, effect: "Defines the inert port reserved for the future foreground dashboard.")
+        setting("dashboard.port", "SOUL_DASHBOARD_PORT", :integer, 4567, range: 1..65_535, effect: "Defines the inert port reserved for the future foreground dashboard."),
+        setting("dashboard.public_origin", "SOUL_DASHBOARD_PUBLIC_ORIGIN", :https_origin, "", allow_empty: true, effect: "Allows one exact HTTPS reverse-proxy origin while Soul remains loopback-bound.", risk: "Enables secure remote browser authority only; does not widen the Soul listener.")
       ]
       raise "configuration schema exceeds #{MAX_SETTINGS} settings" if definitions.length > MAX_SETTINGS
 

@@ -193,10 +193,20 @@ ruby bin/soul skill system.status
 ## 11. Start the foreground dashboard
 
 ```bash
-ruby bin/soul dashboard
+make dashboard
 ```
 
 Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, Skill Studio, and Self Improvement. It binds to loopback only, runs in the foreground, and stops with Ctrl+C.
+
+First-run dashboard access uses the fixed administrator username `admin` and bootstrap password `soul123`. The bootstrap session cannot load dashboard data. Replace it with a private password of 12–128 characters when prompted. Soul stores only the salted derived credential under ignored `Soul/runtime/dashboard_auth/` storage.
+
+If the administrator password is lost, stop the dashboard and explicitly restore the bootstrap gate:
+
+```bash
+make dashboard-reset-admin
+```
+
+This revokes active sessions and again requires password replacement. It does not start the dashboard.
 
 Use an ignored local `.env` or an invocation-only override for a different port:
 
@@ -205,6 +215,40 @@ ruby bin/soul dashboard --set dashboard.port=4568
 ```
 
 Do not commit operator-specific hostnames, addresses, credentials, model aliases, or filesystem paths.
+
+The authenticated dashboard is still loopback-only. Do not widen the bind host for LAN access until the separately reviewed protected-transport phase is complete.
+
+## 12. Optional persistent LAN dashboard
+
+The reviewed Linux deployment keeps Soul on loopback and uses Caddy for HTTPS on one exact LAN address. Complete the first-login password change above before installing it.
+
+1. Install Caddy using your distribution's trusted package source. On Arch/CachyOS: `sudo pacman -S caddy`.
+2. Give this user a boot-started systemd user manager, if it does not already have one: `sudo loginctl enable-linger "$USER"`.
+3. Give the host a stable LAN IPv4 address, preferably with a DHCP reservation.
+4. Preview without writing anything:
+
+   ```bash
+   make dashboard-service-plan LAN_HOST=<assigned-lan-ip>
+   ```
+
+5. After reviewing the plan, install exactly the two approved user services:
+
+   ```bash
+   make dashboard-service-install \
+     LAN_HOST=<assigned-lan-ip> \
+     CONFIRM=INSTALL_SOUL_LAN_SERVICES
+   ```
+
+6. If UFW denies incoming traffic, add a rule limited to the trusted LAN and exact host rather than allowing the port globally:
+
+   ```bash
+   sudo ufw allow from <trusted-lan-cidr> to <assigned-lan-ip> port 8443 proto tcp comment 'Soul dashboard LAN HTTPS'
+   ```
+
+7. Copy only `~/.local/share/caddy/pki/authorities/local/root.crt` to each selected device, install it as a trusted CA, and verify the browser shows no certificate warning at `https://<assigned-lan-ip>:8443/`. Never copy Caddy's private CA key.
+8. Verify login, refresh, and logout from the client device. Check local service state with `make dashboard-service-status` and logs with `make dashboard-service-logs`.
+
+Soul does not change the firewall, router, DHCP, client trust store, or Internet exposure automatically. Full security boundaries and rollback instructions are in `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`.
 
 ## 12. Try intent routing
 

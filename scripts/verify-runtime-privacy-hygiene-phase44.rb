@@ -47,6 +47,7 @@ tracked_sensitive = (
   tracked_codex_responses.lines +
   tracked_codex_reviews.lines
 ).map(&:strip).reject(&:empty?)
+tracked_sensitive.reject! { |path| path == "Soul/runtime/.keep" }
 
 tracking_ok = tracked_sensitive.empty?
 puts "- no tracked private runtime/codex task data: #{tracking_ok ? 'ok' : 'missing'}"

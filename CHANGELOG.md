@@ -4,6 +4,8 @@
 
 ### Conversational Soul
 
+- Added an opt-in protected local deployment candidate with exact HTTPS public-origin validation, Caddy internal TLS, two bounded systemd user services, preview-first install/uninstall, and no direct Soul LAN bind.
+- Added a Phase 12C.1 personal dashboard authentication candidate with a forced-change bootstrap credential, bounded server-side sessions, protected facade access, login throttling, logout/reset controls, and a blurred locked presentation. LAN binding remains blocked pending protected transport.
 - Added Phase 12D.3 Self Improvement with bounded environment, update, model-runtime, and capability assessments plus review-gated advisory improvement proposals.
 - Added Phase 12D.2 conservative capability-gap intake from unsupported Chat requests into the local Skill Studio review queue.
 - Added Phase 12D Skill Studio with Proposal, Beta, and Production inventories, two exact-revision human gates, bounded Beta diagnostics, and no automatic promotion.
@@ -43,4 +45,4 @@
 
 ### Development direction
 
-Phase 12D.3 is the latest implemented interface slice. Phase 12E will consolidate approvals and activity views, followed by Phase 13 integrated acceptance and closeout. Persistent/LAN deployment remains a separate human-approved track.
+Phase 12D.3 is the latest implemented interface slice. Phase 12E will consolidate approvals and activity views, followed by Phase 13 integrated acceptance and closeout. The separately approved current-machine persistent/LAN deployment candidate is now under local service and device-trust review.

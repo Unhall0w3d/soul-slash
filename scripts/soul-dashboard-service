@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/dashboard_deployment"
+
+command = ARGV.shift
+options = {}
+until ARGV.empty?
+  argument = ARGV.shift
+  case argument
+  when "--lan-host" then options[:lan_host] = ARGV.shift
+  when "--https-port" then options[:https_port] = ARGV.shift
+  when "--confirmation" then options[:confirmation] = ARGV.shift
+  else
+    warn "Unknown argument: #{argument}"
+    exit 1
+  end
+end
+
+deployment = SoulCore::DashboardDeployment.new(root: File.expand_path("..", __dir__))
+result = case command
+         when "plan"
+           deployment.plan(lan_host: options[:lan_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT)
+         when "install"
+           deployment.install(lan_host: options[:lan_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT, confirmation: options[:confirmation])
+         when "status"
+           deployment.status
+         when "uninstall"
+           deployment.uninstall(confirmation: options[:confirmation])
+         else
+           warn "Usage: scripts/soul-dashboard-service plan|install|status|uninstall [--lan-host IP] [--https-port PORT] [--confirmation PHRASE]"
+           exit 1
+         end
+
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (result.lifecycle_state == "awaiting_input" || result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))

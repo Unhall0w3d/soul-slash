@@ -34,6 +34,8 @@ require_relative "phase11d_shared_workspace_inbox_assessor"
 require_relative "phase12a_portable_typed_configuration_assessor"
 require_relative "phase12b_in_process_application_api_assessor"
 require_relative "phase12c_foreground_dashboard_assessor"
+require_relative "dashboard_authentication_assessor"
+require_relative "dashboard_deployment_assessor"
 require_relative "dashboard_command"
 require_relative "conversation_clear_service_assessor"
 require_relative "phase10_inspectable_interests_closeout_assessor"
@@ -299,6 +301,18 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
       when "phase12c-foreground-dashboard", "phase12c-dashboard", "foreground-dashboard"
         json = @argv.include?("--json")
         assessor = Phase12cForegroundDashboardAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
+      when "phase12c1-dashboard-authentication", "dashboard-authentication", "dashboard-auth"
+        json = @argv.include?("--json")
+        assessor = DashboardAuthenticationAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
+      when "protected-lan-deployment", "dashboard-deployment", "systemd-deployment"
+        json = @argv.include?("--json")
+        assessor = DashboardDeploymentAssessor.new(root: Dir.pwd)
         report = assessor.assess
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         report["ok"] ? 0 : 1
@@ -704,6 +718,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul skills"
       puts "  ruby bin/soul chat [message]"
       puts "  ruby bin/soul dashboard [--set dashboard.port=4568] [--max-requests N]"
+      puts "  ruby bin/soul dashboard --reset-admin-password"
       puts "  ruby bin/soul config show [--json]"
       puts "  ruby bin/soul config explain <canonical.key> [--json]"
       puts "  ruby bin/soul config validate [--json]"
@@ -736,6 +751,8 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess grounded-evidence-lifecycle"
       puts "  ruby bin/soul assess bounded-host-system-status"
       puts "  ruby bin/soul assess phase12c-foreground-dashboard"
+      puts "  ruby bin/soul assess dashboard-authentication"
+      puts "  ruby bin/soul assess dashboard-deployment"
       puts "  ruby bin/soul assess conversation-list-clearing"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"

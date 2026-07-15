@@ -70,6 +70,7 @@ providers.ollama.*
 providers.cloud_openai.*
 dashboard.bind_host
 dashboard.port
+dashboard.public_origin
 ```
 
 Each setting exposes:
@@ -143,9 +144,10 @@ Phase 12A introduced the dashboard settings later consumed by the approved Phase
 ```text
 SOUL_DASHBOARD_BIND_HOST=127.0.0.1
 SOUL_DASHBOARD_PORT=4567
+SOUL_DASHBOARD_PUBLIC_ORIGIN=
 ```
 
-The bind host accepts loopback only. Resolving or inspecting these settings does not open a listener; only an explicit `ruby bin/soul dashboard` invocation starts the foreground server.
+The bind host accepts loopback only. `dashboard.public_origin` accepts either an empty value or one exact HTTPS origin; it expands Host/Origin and secure-cookie validation for an approved reverse proxy but never widens Soul's listener. Resolving or inspecting these settings does not open a listener; only an explicit dashboard command or separately installed reviewed service starts the server.
 
 ## Migration boundary
 

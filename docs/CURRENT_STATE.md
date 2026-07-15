@@ -12,6 +12,8 @@ Self Improvement
 
 Chat provides persistent multi-turn conversations, local/model-backed responses, skill routing, artifacts, workspace metadata, inbox delivery, initial host status, and explicit refresh.
 
+The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage, while sessions are bounded and process-local. Sign-ups and additional accounts are unavailable.
+
 Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 approves an exact proposal revision for Beta implementation work. Human Gate 2 approves an exact tested Beta revision for a later promotion workflow. Neither gate implements, registers, promotes, merges, or releases automatically.
 
 Self Improvement provides one lightweight read-only environment snapshot when opened plus explicit foreground environment, package-update, model-runtime, and capability assessments. It may generate advisory improvement proposal packets only after preview, digest revalidation, and exact confirmation. It cannot apply updates or mutate the host.
@@ -38,7 +40,7 @@ The dashboard is dependency-free static HTML/CSS/JavaScript served by a sequenti
 ruby bin/soul dashboard
 ```
 
-It does not install a service, bind to the LAN, poll in the background, or continue after the process stops. Proxmox, containers, persistent services, LAN exposure, backups, and recovery remain a later separately approved deployment track.
+The default command does not install a service, bind to the LAN, poll in the background, or continue after the process stops. An owner-approved optional local deployment candidate now keeps Soul loopback-bound while two explicit user services provide persistent operation and Caddy-managed HTTPS on one exact LAN address. Installation remains preview-first and opt-in; client CA trust and local service behavior require human review. Proxmox, containers, Internet exposure, backups, and recovery remain separate deployment tracks.
 
 ## Human authority boundary
 
@@ -56,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul milestone has reached the Phase 12D.3 Self Improvement dashboard. The next planned interface slice is Phase 12E unified approvals and activity views. Phase 13 is the integrated acceptance and closeout point before a separately reviewed deployment phase.
+The Conversational Soul milestone has reached the Phase 12D.3 Self Improvement dashboard. Phase 12C.1 personal authentication passed its first-login human review, and the current-machine protected-LAN/systemd deployment candidate is under local service and device review. The next planned interface slice remains Phase 12E unified approvals and activity views. Phase 13 remains the integrated conversational acceptance and closeout point.
 
 Detailed references:
 
@@ -65,4 +67,5 @@ Detailed references:
 - `docs/ARCHITECTURE.md`
 - `docs/INTERACTION_ARCHITECTURE.md`
 - `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`
+- `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
 - `docs/soul/HUMAN_REVIEW_GATE.md`

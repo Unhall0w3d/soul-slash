@@ -8,6 +8,7 @@ Phase 12C adds Soul's first browser dashboard as a dependency-free presentation 
 ruby bin/soul dashboard
 ruby bin/soul dashboard --set dashboard.port=4568
 ruby bin/soul dashboard --max-requests 25
+ruby bin/soul dashboard --reset-admin-password
 ```
 
 The command validates the shared Phase 12A configuration, binds only to loopback, prints the exact URL, and serves requests sequentially in the foreground. Ctrl+C, TERM, a configured request cap, a bind failure, or a fatal error ends the process. It does not daemonize, restart, poll, or install persistence.
@@ -21,11 +22,26 @@ dashboard.port      → SOUL_DASHBOARD_PORT      → default 4567
 
 Operator-specific values belong in the ignored `.env` file or invocation-only `--set` overrides, not committed source.
 
+## Personal administrator authentication
+
+The dashboard is locked on first visit. The static shell remains visible as an inert blurred backdrop, but the browser does not call the application facade or load private dashboard data until authentication completes.
+
+```text
+username: admin
+bootstrap password: soul123
+```
+
+The bootstrap login can proceed only to mandatory password replacement. A valid replacement is 12–128 characters and cannot reuse the bootstrap password. Soul stores a salted PBKDF2-HMAC-SHA256 derived record with owner-only permissions under ignored `Soul/runtime/dashboard_auth/` storage. Passwords and session bearer tokens are not stored in `.env`, Git, browser storage, URLs, logs, or facade envelopes.
+
+Sessions are bounded and process-local. Logout, idle expiry, absolute expiry, password replacement, an explicit local reset, or dashboard restart revokes access. Existing destructive-action and human approval gates remain independent of dashboard authentication.
+
 ## Boundary
 
-The server exposes one HTML document, one stylesheet, one JavaScript file, three exact brand-image routes, and `POST /api/v1/call`. It never joins a URL path to the filesystem. API calls require a matching loopback Host, exact same-origin Origin, JSON content type, and an ephemeral process-local CSRF token.
+The server exposes one HTML document, one stylesheet, one JavaScript file, four exact brand-image routes, four exact authentication routes, and `POST /api/v1/call`. It never joins a URL path to the filesystem. Login and API mutations require a matching loopback Host, exact same-origin Origin, JSON content type, and an ephemeral process-local CSRF token. The application endpoint additionally requires a valid session whose bootstrap-password gate has been cleared.
 
-The browser calls only registered Phase 12B application operations. Domain stores, model providers, shared workspace records, and host status remain behind the application facade. Status is collected once during page bootstrap and may then be refreshed manually; there is no timer or polling. There is no CORS, remote asset, analytics, browser credential store, websocket, service worker, file browser, or artifact-content reader.
+The browser calls only registered Phase 12B application operations after authentication. Domain stores, model providers, shared workspace records, and host status remain behind the application facade. Status is collected once during authenticated page bootstrap and may then be refreshed manually; there is no timer or polling. There is no CORS, remote asset, analytics, browser credential store, websocket, service worker, file browser, or artifact-content reader.
+
+Authentication is necessary but not sufficient for LAN access. The current plaintext HTTP listener remains loopback-only until a separately approved HTTPS or comparably protected transport is implemented.
 
 ## Product slice
 

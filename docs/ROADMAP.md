@@ -28,6 +28,8 @@
 - [x] capability-gap intake from Chat to Skill Studio
 - [x] Self Improvement dashboard with bounded environment and capability assessment
 - [x] human visual review of the three-tab dashboard aesthetic
+- [ ] personal administrator authentication review
+- [ ] protected LAN transport, user-service, and device-trust review
 - [ ] unified approvals and activity views
 - [ ] integrated Phase 13 conversational acceptance and closeout
 - [ ] more filesystem workflows
@@ -37,8 +39,8 @@
 
 ## Later
 
-- [ ] reviewed Proxmox/LAN deployment
-- [ ] persistent service installation
+- [ ] reviewed Proxmox deployment
+- [ ] backup and disaster-recovery design
 - [ ] voice input
 - [ ] TTS output
 - [ ] wake-word integration

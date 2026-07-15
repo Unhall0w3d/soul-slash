@@ -194,10 +194,26 @@ make test-soul
 Start the local dashboard:
 
 ```bash
-ruby bin/soul dashboard
+make dashboard
 ```
 
 Then open `http://127.0.0.1:4567/`. The dashboard remains a foreground, loopback-only process and stops with Ctrl+C.
+
+On first run, sign in as `admin` with the bootstrap password `soul123`. Soul requires a private replacement password before it loads dashboard data. The derived credential is stored only under ignored local runtime storage. If the password is lost, a local operator can reset the bootstrap gate without starting the listener:
+
+```bash
+make dashboard-reset-admin
+```
+
+Authentication does not yet authorize LAN exposure. The current HTTP listener remains loopback-only until a separately reviewed HTTPS or protected-transport boundary is implemented.
+
+An opt-in protected local deployment is available for reviewed Linux hosts. Soul remains on loopback while a Caddy user service exposes one exact HTTPS LAN endpoint:
+
+```bash
+make dashboard-service-plan LAN_HOST=<assigned-lan-ip>
+```
+
+Installation requires Caddy, a completed administrator password change, an explicit Make confirmation value, a narrow trusted-LAN firewall rule, and explicit client trust of the generated local CA. Nothing installs or enables itself after clone. See `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md` for the complete operator checklist and rollback procedure.
 
 See:
 
