@@ -271,13 +271,29 @@ no HTTP transport, listener, frontend, service, watcher, scheduler, or polling
 
 Human merge review remains required before Phase 12B is accepted.
 
+Phase 12C candidate implementation now provides:
+
+```text
+dependency-free, foreground, sequential loopback HTTP transport
+exact static and same-origin JSON route allowlist over soul.application.v1
+Host, Origin, ephemeral CSRF, CSP, no-store, and bounded-request protections
+branded three-rail Chat workspace with conversation continuity and composer
+shared artifact metadata, inbox summary, one initial host-status collection, and explicit manual refresh
+visible but behaviorally inert Skill Studio preview as the second primary tab
+no daemon, service, worker, LAN bind, polling, remote asset, or persistence install
+```
+
+Phase 12C is blocked for the required human visual review. Its automated checks do not approve the design or authorize merge.
+
+An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
+
 The dashboard product shape begins with:
 
 ```text
 Tab 1: Chat
 Tab 2: Skill Studio
 shared workspace alongside Chat
-manual system-status refresh with host identity and timestamp
+initial and manually refreshed system status with host identity and timestamp
 explicit provider, privacy, approval, task, and failure state
 ```
 

@@ -1,0 +1,22 @@
+---
+name: "chats.forget"
+language: "ruby"
+entrypoint: "forget.rb"
+description: "Permanently deletes one exact local conversation and logically forgets shared memories derived from it."
+risk: "permanent_delete"
+requires_approval: true
+confirmation_phrase: "DELETE_AND_FORGET_CONVERSATION"
+inputs:
+  chat_id:
+    type: "string"
+  expected_digest:
+    type: "string"
+  execute:
+    type: "boolean"
+  confirm:
+    type: "string"
+outputs:
+  lifecycle_state:
+    type: "string"
+  data:
+    type: "object"

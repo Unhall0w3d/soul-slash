@@ -10,6 +10,8 @@ require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "conversation_provider_registry"
 require_relative "conversation_runtime"
+require_relative "conversation_clear_service"
+require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "skill_registry"
@@ -30,6 +32,8 @@ module SoulCore
       chat_store: nil,
       conversation_runtime: nil,
       chat_service: nil,
+      conversation_clear_service: nil,
+      conversation_forget_service: nil,
       workspace_service: nil,
       status_collector: nil,
       approval_store: nil,
@@ -42,6 +46,8 @@ module SoulCore
       @injected_chat_store = chat_store
       @injected_runtime = conversation_runtime
       @injected_chat_service = chat_service
+      @conversation_clear_service = conversation_clear_service
+      @conversation_forget_service = conversation_forget_service
       @workspace_service = workspace_service
       @status_collector = status_collector
       @approval_store = approval_store
@@ -84,6 +90,10 @@ module SoulCore
       when "chats.send" then domain(chats_send(parameters, context, request_id))
       when "chats.pin" then domain(chat_flag(parameters, true))
       when "chats.unpin" then domain(chat_flag(parameters, false))
+      when "chats.clear.preview" then domain(conversation_clear_service.preview(mode: required(parameters, "mode"), title: parameters["title"]))
+      when "chats.clear.execute" then domain(conversation_clear_service.execute(mode: required(parameters, "mode"), title: parameters["title"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "chats.forget.preview" then domain(conversation_forget_service.preview(chat_id: required(parameters, "chat_id")))
+      when "chats.forget.execute" then domain(conversation_forget_service.execute(chat_id: required(parameters, "chat_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "workspace.list" then domain(workspace.list(**workspace_filters(parameters)))
       when "workspace.chat" then domain(workspace.list(**workspace_filters(parameters, require_chat: true)))
       when "workspace.detail" then domain(workspace.detail(artifact_id: required(parameters, "artifact_id")))
@@ -133,7 +143,7 @@ module SoulCore
       chat = chat_store.chat(required(parameters, "chat_id"))
       return awaiting("unknown chat ID") unless chat
 
-      success("record" => chat_projection(chat))
+      success({ "record" => chat_projection(chat) })
     end
 
     def chats_messages(parameters)
@@ -142,7 +152,7 @@ module SoulCore
 
       limit = bounded_limit(parameters["limit"], MESSAGE_LIMIT)
       records = chat_store.messages(chat_id, limit: limit, scan_limit: ChatStore::APPLICATION_SCAN_LIMIT)
-      success("records" => records, "count" => records.length, "limit" => limit)
+      success({ "records" => records, "count" => records.length, "limit" => limit })
     end
 
     def chats_create(parameters)
@@ -185,6 +195,14 @@ module SoulCore
         delivery_state: parameters["delivery_state"],
         limit: bounded_limit(parameters["limit"], ConversationWorkspaceService::MAX_RECORDS)
       }
+    end
+
+    def conversation_clear_service
+      @conversation_clear_service ||= ConversationClearService.new(root: @root, store: chat_store)
+    end
+
+    def conversation_forget_service
+      @conversation_forget_service ||= ConversationForgetService.new(root: @root, chat_store: chat_store)
     end
 
     def configuration_report

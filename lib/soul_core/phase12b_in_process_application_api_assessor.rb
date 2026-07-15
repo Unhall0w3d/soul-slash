@@ -139,7 +139,9 @@ module SoulCore
         chat_id = created.dig("data", "record", "id")
         checks["chat_creation_uses_canonical_store_identity"] =
           terminal_envelope?(created, "complete") && chat_id.match?(ApplicationContract::CHAT_ID) &&
-          store.messages(chat_id).empty? && created.dig("meta", "mutation") == "chat_created"
+          store.messages(chat_id).empty? && created.dig("meta", "mutation") == "chat_created" &&
+          terminal_envelope?(call(facade, "request:getchat", "chats.get", { "chat_id" => chat_id }), "complete") &&
+          terminal_envelope?(call(facade, "request:messages", "chats.messages", { "chat_id" => chat_id, "limit" => 20 }), "complete")
 
         sent = call(facade, "request:send001", "chats.send", { "chat_id" => chat_id, "message" => "Hello facade" })
         checks["chat_send_appends_exactly_one_exchange_through_existing_runtime"] =
