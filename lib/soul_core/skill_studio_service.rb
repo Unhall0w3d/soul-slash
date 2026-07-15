@@ -255,12 +255,25 @@ module SoulCore
         "human_review_required" => true,
         "beta_present" => File.file?(File.join(directory, BETA_DIR, BETA_MANIFEST))
       }
+      if metadata["purpose"] == "capability_gap_intake"
+        record["intake"] = true
+        record["intake_status"] = state.dig("intake", "status") || metadata["status"] || "awaiting_human_triage"
+        record["gap_classification"] = metadata.dig("origin", "classification")
+        record["origin_chat_id"] = metadata.dig("origin", "chat_id")
+        record["occurrence_count"] = bounded_line_count(File.join(directory, "gap_events.jsonl"), 1_000)
+      end
       if detail
         record["proposal_markdown"] = proposal_text
         record["review_checklist"] = checklist_items(File.join(directory, "review_checklist.md"))
         record["cloud_assisted"] = !metadata["provider"].to_s.empty?
         record["cloud_data_class"] = metadata["data_class"]
         record["secrets_included"] = metadata["secrets_included"] == true
+        if record["intake"]
+          record["request_summary"] = metadata["request_summary"].to_s[0, 4_096]
+          record["gap_reason"] = metadata.dig("origin", "reason").to_s[0, 500]
+          record["declared_capability_id"] = metadata.dig("origin", "capability_id")
+          record["automatic_cloud_use"] = false
+        end
       end
       record
     rescue JSON::ParserError, Errno::ENOENT
@@ -479,6 +492,13 @@ module SoulCore
         match = line.match(/^\s*-\s*\[([ xX])\]\s*(.+)$/)
         { "complete" => !match[1].casecmp("x").nonzero?, "text" => match[2].strip[0, 500] } if match
       end.first(50)
+    end
+
+    def bounded_line_count(path, limit)
+      return 0 unless File.file?(path)
+      File.foreach(path).take(limit + 1).length.clamp(0, limit)
+    rescue StandardError
+      0
     end
 
     def proposal_section(text, heading)

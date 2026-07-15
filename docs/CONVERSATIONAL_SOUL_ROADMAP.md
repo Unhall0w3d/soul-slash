@@ -238,6 +238,7 @@ Phase 12 is split into bounded vertical slices:
 12B in-process application API contracts
 12C foreground loopback dashboard and first human visual review
 12D guided Skill Studio as the second primary tab
+12D.2 bounded capability-gap intake from Chat to Skill Studio
 12E unified approvals and activity views
 ```
 
@@ -284,6 +285,20 @@ no daemon, service, worker, LAN bind, polling, remote asset, or persistence inst
 ```
 
 Phase 12C is blocked for the required human visual review. Its automated checks do not approve the design or authorize merge.
+
+Phase 12D.2 candidate implementation adds a bounded self-skilling intake bridge:
+
+```text
+declared unavailable capabilities and conservatively validated model-reported gaps
+production and runnable-Beta coverage checks before proposal creation
+deduplicated local-only proposal intake packets
+local-private current-chat artifact registration and inbox delivery
+automatic Skill Studio visibility with origin, classification, and occurrence count
+no silent Mistral call, Codex invocation, implementation, registration, or promotion
+both existing human gates preserved
+```
+
+Human review remains required before Phase 12D.2 is accepted.
 
 An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
 
