@@ -1,12 +1,12 @@
 # Phase 11D Candidate Brief: Shared Workspace and Artifact Inbox
 
 ```text
-brief_status: candidate
-implementation_authorized: no
+brief_status: approved
+implementation_authorized: yes
 human_review_required: yes
 ```
 
-This brief must be reviewed and approved by the human owner before implementation begins.
+This Codex-drafted brief was reviewed and approved by the human owner on 2026-07-14 before implementation began.
 
 ## Purpose
 
@@ -303,9 +303,9 @@ Phase 11D is candidate-complete when:
 ## Human brief review
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-14
+Decision summary: The human owner approved the Phase 11D brief as written and instructed Codex to proceed.
+Required changes: none
 ```

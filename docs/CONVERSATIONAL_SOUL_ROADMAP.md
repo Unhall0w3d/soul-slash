@@ -199,7 +199,7 @@ in-place edit, move, rename, delete, and cross-system delivery
 Status:
 
 ```text
-brief pending human approval
+implementation authorized; candidate work in progress
 ```
 
 Planned:
