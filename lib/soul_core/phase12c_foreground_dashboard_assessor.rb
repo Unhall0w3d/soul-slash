@@ -63,7 +63,11 @@ module SoulCore
       checks["dashboard_document_and_head_are_allowlisted"] = document.status == 200 && head.status == 200 && head.body.empty? && document.body.include?("Soul/") && document.body.include?("fixture-csrf-token")
 
       static_responses = DashboardHttpApplication::STATIC_ROUTES.keys.map { |route| app.call(method: "GET", target: route, headers: get_headers) }
-      checks["exact_static_allowlist_serves_only_approved_assets"] = static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } && DashboardHttpApplication::STATIC_ROUTES.length == 6
+      skill_studio_asset = DashboardHttpApplication::STATIC_ROUTES["/brand/skill-studio.png"]
+      checks["exact_static_allowlist_serves_only_approved_assets"] =
+        static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } &&
+        DashboardHttpApplication::STATIC_ROUTES.length == 7 &&
+        skill_studio_asset == ["assets/brand/soul-slash-skill-studio.png", "image/png"]
 
       rejected_targets = ["/../.env", "/%2e%2e/.env", "/assets/../.env", "/assets/dashboard.js?x=1", "/unknown.png"]
       checks["traversal_query_confusion_and_unknown_paths_fail_closed"] = rejected_targets.all? { |target| app.call(method: "GET", target: target, headers: get_headers).status == 404 }

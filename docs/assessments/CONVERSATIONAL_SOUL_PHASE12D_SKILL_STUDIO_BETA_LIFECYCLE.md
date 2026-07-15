@@ -29,6 +29,7 @@ Gate 1 does not invoke Codex or generate implementation. Gate 2 does not promote
 ## Files changed
 
 ```text
+assets/brand/soul-slash-skill-studio.png
 docs/soul/PHASE12D_SKILL_STUDIO_BETA_LIFECYCLE_BRIEF.md
 docs/assessments/CONVERSATIONAL_SOUL_PHASE12D_SKILL_STUDIO_BETA_LIFECYCLE.md
 lib/soul_core/skill_studio_service.rb

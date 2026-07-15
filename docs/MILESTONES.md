@@ -82,12 +82,13 @@ Phase 12C: foreground loopback dashboard
 Phase 12D: Skill Studio Proposal/Beta lifecycle
 Phase 12D.2: capability-gap intake
 Phase 12D.3: Self Improvement dashboard
+Phase 12D.4: proposal stage, production linkage, and production-only closeout
 ```
 
 Current work:
 
 ```text
-Phase 12E unified approvals and activity views
+Phase 12D.5 gated Beta implementation and production promotion
 ```
 
 Milestone stopping point:

@@ -27,8 +27,8 @@ module SoulCore
       "chats.send" => %w[chat_id message],
       "chats.pin" => %w[chat_id],
       "chats.unpin" => %w[chat_id],
-      "chats.clear.preview" => %w[mode title],
-      "chats.clear.execute" => %w[mode title confirmation expected_digest],
+      "chats.clear.preview" => %w[mode title chat_ids],
+      "chats.clear.execute" => %w[mode title chat_ids confirmation expected_digest],
       "chats.forget.preview" => %w[chat_id],
       "chats.forget.execute" => %w[chat_id confirmation expected_digest],
       "workspace.list" => %w[kind lifecycle privacy delivery_state limit],
@@ -47,6 +47,8 @@ module SoulCore
       "skill_studio.proposals.get" => %w[proposal_id],
       "skill_studio.proposals.approval.preview" => %w[proposal_id],
       "skill_studio.proposals.approval.execute" => %w[proposal_id confirmation expected_digest],
+      "skill_studio.proposals.close.preview" => %w[proposal_id],
+      "skill_studio.proposals.close.execute" => %w[proposal_id confirmation expected_digest],
       "skill_studio.betas.list" => %w[limit],
       "skill_studio.betas.get" => %w[beta_id],
       "skill_studio.betas.run.preview" => %w[beta_id args],
@@ -150,6 +152,8 @@ module SoulCore
       return "proposal_id is invalid" if proposal_id && !proposal_id.to_s.match?(PROPOSAL_ID)
       beta_id = parameters["beta_id"]
       return "beta_id is invalid" if beta_id && !beta_id.to_s.match?(BETA_ID)
+      chat_ids = parameters["chat_ids"]
+      return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 
       nil
     end
@@ -160,8 +164,8 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "filters"
           return "filters must be an object" unless value.is_a?(Hash) && string_keys?(value)
-        elsif key == "args"
-          return "args must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
+        elsif key == "args" || key == "chat_ids"
+          return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)
         end

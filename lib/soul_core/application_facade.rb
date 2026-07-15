@@ -96,8 +96,8 @@ module SoulCore
       when "chats.send" then domain(chats_send(parameters, context, request_id))
       when "chats.pin" then domain(chat_flag(parameters, true))
       when "chats.unpin" then domain(chat_flag(parameters, false))
-      when "chats.clear.preview" then domain(conversation_clear_service.preview(mode: required(parameters, "mode"), title: parameters["title"]))
-      when "chats.clear.execute" then domain(conversation_clear_service.execute(mode: required(parameters, "mode"), title: parameters["title"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "chats.clear.preview" then domain(conversation_clear_service.preview(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"]))
+      when "chats.clear.execute" then domain(conversation_clear_service.execute(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "chats.forget.preview" then domain(conversation_forget_service.preview(chat_id: required(parameters, "chat_id")))
       when "chats.forget.execute" then domain(conversation_forget_service.execute(chat_id: required(parameters, "chat_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "workspace.list" then domain(workspace.list(**workspace_filters(parameters)))
@@ -116,6 +116,8 @@ module SoulCore
       when "skill_studio.proposals.get" then domain(skill_studio.proposal(proposal_id: required(parameters, "proposal_id")))
       when "skill_studio.proposals.approval.preview" then domain(skill_studio.proposal_approval_preview(proposal_id: required(parameters, "proposal_id")))
       when "skill_studio.proposals.approval.execute" then domain(skill_studio.approve_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "skill_studio.proposals.close.preview" then domain(skill_studio.proposal_close_preview(proposal_id: required(parameters, "proposal_id")))
+      when "skill_studio.proposals.close.execute" then domain(skill_studio.close_production_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.list" then domain(skill_studio.betas(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
       when "skill_studio.betas.get" then domain(skill_studio.beta(beta_id: required(parameters, "beta_id")))
       when "skill_studio.betas.run.preview" then domain(skill_studio.beta_run_preview(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", [])))
@@ -164,7 +166,14 @@ module SoulCore
           "host_mutation_available" => false,
           "automatic_refresh" => false
         },
-        "unified_operations" => { "available" => false, "planned_phase" => "12E" }
+        "unified_operations" => {
+          "available" => true,
+          "surface" => "Review Center",
+          "read_only" => true,
+          "operations" => %w[approvals.pending activities.recent],
+          "approval_values_exposed" => false,
+          "private_messages_exposed" => false
+        }
       }
     end
 

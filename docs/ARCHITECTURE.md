@@ -151,6 +151,10 @@ The Self Improvement surface composes existing read-only assessors for the host 
 
 Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper checks are explicit foreground requests. Advisory proposal generation requires a preview, exact digest, and human confirmation. Package installation/removal, operating-system updates, service changes, model downloads, implementation, and promotion are not authorized by this layer.
 
+## Unified review layer
+
+Phase 12E composes the existing `ApprovalTokenStore` and `ChatExecutionHistory` through the redacted application-facade projections. Review Center is a supporting dashboard dialog over the three primary tabs. It loads on explicit open or refresh, performs no polling, exposes no authorization values or private request messages, and adds no approve, revoke, consume, replay, retry, clear, prune, or export authority.
+
 ## Reflection layer
 
 The reflection layer turns task logs into candidate lessons and rules.

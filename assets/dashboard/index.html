@@ -55,6 +55,7 @@
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
       <span class="status-chip"><span id="provider-label">Provider —</span></span>
       <span class="status-chip"><span id="config-label">Config —</span></span>
+      <button id="review-center-button" class="review-center-button" type="button" aria-haspopup="dialog" aria-controls="review-center"><span>Review</span><span id="review-pending-badge" class="review-pending-badge" hidden>0</span></button>
       <button id="logout-button" class="logout-button" type="button" hidden>Logout</button>
     </div>
   </header>
@@ -142,12 +143,13 @@
           <section><div class="studio-list-heading"><div><p class="eyebrow">Human-invoked only</p><h2>Beta Skills</h2></div><span id="beta-count" class="count-badge">0</span></div><div id="beta-list" class="studio-list"><p class="muted">Loading Beta inventory…</p></div></section>
           <section><div class="studio-list-heading"><div><p class="eyebrow">Registered</p><h2>Production Skills</h2></div><span id="production-skill-count" class="count-badge">0</span></div><div id="production-skill-list" class="studio-list studio-list--compact"><p class="muted">Loading registry…</p></div></section>
         </aside>
-        <section class="studio-detail" aria-labelledby="studio-detail-title">
-          <div id="studio-empty" class="studio-empty"><img src="/brand/supporting-scene.png" alt="A luminous book surrounded by Soul sigils"><div><p class="eyebrow">Review surface ready</p><h2 id="studio-detail-title">Select a proposal or Beta skill.</h2><p>Generated material remains a candidate until you approve the exact revision.</p></div></div>
+        <section id="studio-detail-pane" class="studio-detail is-empty" aria-labelledby="studio-detail-title">
+          <div id="studio-empty" class="studio-empty"><img src="/brand/skill-studio.png" alt="A violet capability blueprint moving through teal verification toward a gold approval gate"><div><p class="eyebrow">Review surface ready</p><h2 id="studio-detail-title">Select a proposal or Beta skill.</h2><p>Generated material remains a candidate until you approve the exact revision.</p></div></div>
           <article id="proposal-detail" hidden>
             <div class="studio-detail-heading"><div><p class="eyebrow">Proposal · Gate 1</p><h2 id="proposal-title"></h2></div><span id="proposal-gate-state" class="maturity-chip"></span></div>
             <p id="proposal-description" class="studio-description"></p>
             <dl id="proposal-meta" class="studio-meta"></dl>
+            <button id="view-linked-skill" class="linked-skill-button" type="button" hidden>Locate linked production skill</button>
             <div class="cloud-disclosure"><strong>Cloud provenance</strong><p id="proposal-cloud"></p></div>
             <h3>Proposal brief</h3><pre id="proposal-markdown" class="proposal-copy"></pre>
             <h3>Review checklist</h3><div id="proposal-checklist" class="test-list"></div>
@@ -156,6 +158,12 @@
               <button id="preview-proposal-approval" class="gate-button" type="button">Review approval boundary</button>
               <div id="proposal-approval-confirm" hidden><label for="proposal-confirmation">Type <code>APPROVE_PROPOSAL_FOR_BETA_BUILD</code></label><input id="proposal-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-proposal-approval" class="gate-button gate-button--gold" type="button" disabled>Approve exact proposal revision</button></div>
               <p id="proposal-approval-status" class="dialog-status" role="status"></p>
+            </section>
+            <section id="proposal-close-card" class="gate-card proposal-close-card" hidden>
+              <div><p class="eyebrow">Production closeout</p><h3>Close completed proposal</h3><p>The exact linked skill is registered in production. Closing permanently deletes this proposal and its superseded Beta candidate copy, while preserving the production skill and shared diagnostics.</p></div>
+              <button id="preview-proposal-close" class="gate-button" type="button">Preview production closeout</button>
+              <div id="proposal-close-confirm" hidden><label for="proposal-close-confirmation">Type <code>CLOSE_PRODUCTION_PROPOSAL</code></label><input id="proposal-close-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-proposal-close" class="gate-button proposal-close-button" type="button" disabled>Permanently close proposal</button></div>
+              <p id="proposal-close-status" class="dialog-status" role="status"></p>
             </section>
           </article>
           <article id="beta-detail" hidden>
@@ -248,6 +256,43 @@
       </aside>
     </section>
   </main>
+  <dialog id="review-center" class="review-center" aria-labelledby="review-center-title">
+    <div class="review-shell">
+      <header class="review-header">
+        <div class="review-title-lockup"><span class="review-sigil" aria-hidden="true">◇</span><div><p class="eyebrow">Unified operational review</p><h2 id="review-center-title">Review Center</h2><p>Inspect active authorization boundaries and recent bounded execution evidence.</p></div></div>
+        <div class="review-header-actions"><button id="refresh-review-center" class="refresh-button" type="button">Refresh</button><button id="close-review-center" class="icon-button" type="button" aria-label="Close Review Center">×</button></div>
+      </header>
+
+      <section class="review-metrics" aria-label="Review summary">
+        <div><span>Pending approvals</span><strong id="review-pending-count">—</strong><small>authorization values hidden</small></div>
+        <div><span>Recent activity</span><strong id="review-activity-count">—</strong><small>bounded local records</small></div>
+        <div><span>Blocked</span><strong id="review-blocked-count">—</strong><small>requires attention or input</small></div>
+        <div><span>Failed</span><strong id="review-failed-count">—</strong><small>safe terminal failures</small></div>
+      </section>
+
+      <div class="review-workspace">
+        <aside class="review-navigation" aria-label="Review Center views">
+          <div role="tablist" aria-label="Review records">
+            <button id="review-approvals-tab" class="review-nav-item is-active" type="button" role="tab" aria-selected="true" aria-controls="review-approvals-view"><span>Approvals</span><small>Pending authorization state</small></button>
+            <button id="review-activity-tab" class="review-nav-item" type="button" role="tab" aria-selected="false" aria-controls="review-activity-view"><span>Activity</span><small>Execution and blocked outcomes</small></button>
+          </div>
+          <div class="review-authority-note"><strong>Inspection is not approval</strong><p>Actions remain in Skill Studio, Chat, or the originating bounded workflow.</p></div>
+        </aside>
+
+        <section id="review-approvals-view" class="review-view" role="tabpanel" aria-labelledby="review-approvals-tab">
+          <div class="review-list-pane"><div class="review-pane-heading"><div><p class="eyebrow">Human authority</p><h3>Pending approvals</h3></div><span id="approval-list-count" class="count-badge">0</span></div><div id="approval-review-list" class="review-list"><p class="muted">Open Review Center to load approvals.</p></div></div>
+          <article id="approval-review-detail" class="review-detail" aria-live="polite"><div class="review-empty"><span aria-hidden="true">◇</span><h3>Select an approval record.</h3><p>Soul exposes a redacted reference and scope shape, never the authorization value.</p></div></article>
+        </section>
+
+        <section id="review-activity-view" class="review-view" role="tabpanel" aria-labelledby="review-activity-tab" hidden>
+          <div class="review-list-pane"><div class="review-pane-heading"><div><p class="eyebrow">Bounded evidence</p><h3>Recent activity</h3></div><span id="activity-list-count" class="count-badge">0</span></div><div class="activity-filters" aria-label="Activity filters"><button class="is-active" type="button" data-activity-filter="all">All</button><button type="button" data-activity-filter="executed">Executed</button><button type="button" data-activity-filter="blocked">Blocked</button><button type="button" data-activity-filter="failed">Failed</button></div><div id="activity-review-list" class="review-list"><p class="muted">Open Review Center to load activity.</p></div></div>
+          <article id="activity-review-detail" class="review-detail" aria-live="polite"><div class="review-empty"><span aria-hidden="true">◇</span><h3>Select an activity record.</h3><p>Private requests and export paths are intentionally omitted.</p></div></article>
+        </section>
+      </div>
+
+      <footer class="review-footer"><p id="review-center-status" role="status" aria-live="polite">Review Center loads only when opened and never polls in the background.</p><span>Read-only · local · bounded</span></footer>
+    </div>
+  </dialog>
   <dialog id="clear-dialog" class="clear-dialog" aria-labelledby="clear-dialog-title">
     <form id="clear-form" method="dialog">
       <div class="dialog-heading"><div><p class="eyebrow">Conversation lifecycle</p><h2 id="clear-dialog-title">Clear conversations</h2></div><button id="close-clear-dialog" class="icon-button" type="button" aria-label="Close clear conversations dialog">×</button></div>
@@ -255,11 +300,23 @@
       <label for="clear-mode">Clear scope</label>
       <select id="clear-mode" name="mode">
         <option value="title">Exact title</option>
+        <option value="selected">Selected conversations</option>
         <option value="all">All conversations</option>
       </select>
       <div id="clear-title-field">
         <label for="clear-title">Exact conversation title</label>
         <input id="clear-title" name="title" type="text" maxlength="120" autocomplete="off">
+      </div>
+      <div id="clear-selection-field" class="clear-selection-field" hidden>
+        <div class="clear-selection-heading">
+          <label id="clear-selection-label">Choose active conversations</label>
+          <span id="clear-selection-count">0 selected</span>
+        </div>
+        <div class="clear-selection-actions" aria-label="Conversation selection actions">
+          <button id="select-all-clear" type="button">Select all shown</button>
+          <button id="select-none-clear" type="button">Select none</button>
+        </div>
+        <div id="clear-selection-list" class="clear-selection-list" role="group" aria-labelledby="clear-selection-label"></div>
       </div>
       <button id="preview-clear" class="dialog-button" type="button">Preview matches</button>
       <section id="clear-preview" class="clear-preview" aria-live="polite" hidden>

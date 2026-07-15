@@ -33,11 +33,11 @@ bootstrap password: soul123
 
 The bootstrap login can proceed only to mandatory password replacement. A valid replacement is 12–128 characters and cannot reuse the bootstrap password. Soul stores a salted PBKDF2-HMAC-SHA256 derived record with owner-only permissions under ignored `Soul/runtime/dashboard_auth/` storage. Passwords and session bearer tokens are not stored in `.env`, Git, browser storage, URLs, logs, or facade envelopes.
 
-Sessions are bounded and process-local. Logout, idle expiry, absolute expiry, password replacement, an explicit local reset, or dashboard restart revokes access. Existing destructive-action and human approval gates remain independent of dashboard authentication.
+Sessions are bounded to seven days and survive dashboard restarts through an ignored owner-only record containing token digests and timestamps, never raw bearer tokens. Logout, idle expiry, absolute expiry, password replacement, credential rotation, or an explicit local reset revokes access. Existing destructive-action and human approval gates remain independent of dashboard authentication.
 
 ## Boundary
 
-The server exposes one HTML document, one stylesheet, one JavaScript file, four exact brand-image routes, four exact authentication routes, and `POST /api/v1/call`. It never joins a URL path to the filesystem. Login and API mutations require a matching loopback Host, exact same-origin Origin, JSON content type, and an ephemeral process-local CSRF token. The application endpoint additionally requires a valid session whose bootstrap-password gate has been cleared.
+The server exposes one HTML document, one stylesheet, one JavaScript file, five exact brand-image routes, four exact authentication routes, and `POST /api/v1/call`. It never joins a URL path to the filesystem. Login and API mutations require a matching loopback Host, exact same-origin Origin, JSON content type, and an ephemeral process-local CSRF token. The application endpoint additionally requires a valid session whose bootstrap-password gate has been cleared.
 
 The browser calls only registered Phase 12B application operations after authentication. Domain stores, model providers, shared workspace records, and host status remain behind the application facade. Status is collected once during authenticated page bootstrap and may then be refreshed manually; there is no timer or polling. There is no CORS, remote asset, analytics, browser credential store, websocket, service worker, file browser, or artifact-content reader.
 
@@ -47,7 +47,7 @@ Authentication is necessary but not sufficient for LAN access. The current plain
 
 Chat supports conversation listing, creation, selection, bounded history, send, pin/unpin, workspace metadata, inbox summary, one initial host-status collection, and manual status refresh. The UI exposes provider, configuration, privacy, lifecycle, and mutation state.
 
-The approved conversation-clearing amendment adds a preview-first `chats.clear` skill and dashboard dialog. Exact-title mode shows all duplicate-title matches; all mode shows the complete bounded active set. Execution requires `CLEAR_CONVERSATIONS` and the preview digest. Clearing archives metadata from the active list and never deletes transcript files.
+The approved conversation-clearing amendment adds a preview-first `chats.clear` skill and dashboard dialog. Exact-title mode shows all duplicate-title matches, selected mode binds the human's unique exact chat IDs, and all mode shows the complete bounded active set. The dashboard offers checkboxes plus select-all-shown and select-none controls. Execution requires `CLEAR_CONVERSATIONS` and the preview digest; a stale selected set blocks before mutation. Clearing archives metadata from the active list and never deletes transcript files.
 
 The separate delete-and-forget path targets one exact selected conversation. It requires a destructive preview, unchanged digest, and `DELETE_AND_FORGET_CONVERSATION`. It deletes the transcript and conversation state and logically forgets derived shared memories while preserving append-only safety evidence and independently managed artifacts.
 

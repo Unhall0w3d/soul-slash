@@ -12,7 +12,7 @@ Self Improvement
 
 Chat provides persistent multi-turn conversations, local/model-backed responses, skill routing, artifacts, workspace metadata, inbox delivery, initial host status, and explicit refresh.
 
-The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage, while sessions are bounded and process-local. Sign-ups and additional accounts are unavailable.
+The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage. Sessions are bounded to seven days and persist across dashboard restarts using owner-only token digests; raw bearer tokens remain in host-only browser cookies. Sign-ups and additional accounts are unavailable.
 
 Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 approves an exact proposal revision for Beta implementation work. Human Gate 2 approves an exact tested Beta revision for a later promotion workflow. Neither gate implements, registers, promotes, merges, or releases automatically.
 
@@ -26,7 +26,7 @@ Self Improvement provides one lightweight read-only environment snapshot when op
 - layered conversation memory with review, export, and forget controls;
 - identity, interests, recent-style awareness, and inspectable boundaries;
 - shared artifacts, bounded inspection, creation/revision, and inbox delivery;
-- preview-first conversation clearing and exact conversation delete-and-forget;
+- preview-first conversation clearing by exact title, selected set, or all active chats, plus exact single-conversation delete-and-forget;
 - production skill registry plus isolated Beta candidates and bounded diagnostics;
 - conservative self-skilling intake for genuinely unsupported task requests;
 - environment, model-runtime, capability, and improvement-proposal assessment;
@@ -58,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul milestone has completed and merged the Phase 12D.3 Self Improvement dashboard, Phase 12C.1 personal authentication, and the owner-approved protected local systemd/Caddy LAN deployment. Local service, certificate trust, firewall boundary, and client login/logout review passed. The next planned interface slice is Phase 12E unified approvals and activity views. Phase 13 remains the integrated conversational acceptance and closeout point.
+The Conversational Soul milestone has completed human review of the Phase 12E unified Review Center, Phase 12D.4 proposal lifecycle closeout, Phase 12C.1 seven-day personal authentication, conversation-management amendments, dedicated Skill Studio artwork, and the protected local systemd/Caddy LAN deployment. The next checkpoint is Phase 12D.5: bounded proposal-to-Beta implementation and preview-gated Beta-to-production promotion. Phase 13 remains the integrated conversational acceptance and closeout point.
 
 Detailed references:
 
@@ -68,4 +68,5 @@ Detailed references:
 - `docs/INTERACTION_ARCHITECTURE.md`
 - `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`
 - `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
+- `docs/soul/PHASE12E_UNIFIED_REVIEW_CENTER_BRIEF.md`
 - `docs/soul/HUMAN_REVIEW_GATE.md`

@@ -36,6 +36,8 @@ Phase 12D may:
 - permit an implemented Beta to run only after an explicit human preview and exact confirmation;
 - write bounded, local diagnostic JSONL records for Beta executions;
 - record Gate 2 approval of an unchanged, passing Beta revision;
+- derive and expose the proposal's current lifecycle stage and exact linked Beta/production skill ID;
+- allow preview-gated closeout only after exact production registration under the separately approved Phase 12D.4 amendment;
 - expose these operations through the existing in-process application facade and foreground dashboard;
 - add deterministic tests and a human review artifact.
 
