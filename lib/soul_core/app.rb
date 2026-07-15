@@ -33,6 +33,8 @@ require_relative "phase11c_bounded_artifact_creation_assessor"
 require_relative "phase11d_shared_workspace_inbox_assessor"
 require_relative "phase12a_portable_typed_configuration_assessor"
 require_relative "phase12b_in_process_application_api_assessor"
+require_relative "phase12c_foreground_dashboard_assessor"
+require_relative "dashboard_command"
 require_relative "phase10_inspectable_interests_closeout_assessor"
 require_relative "phase10_recent_style_awareness_assessor"
 require_relative "phase10_identity_style_foundation_assessor"
@@ -101,8 +103,10 @@ module SoulCore
     def run
       command = @argv.shift
       case command
-  when "chat", "chats"
-  run_chat
+      when "chat", "chats"
+        run_chat
+      when "dashboard"
+        DashboardCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
     when "config", "configuration"
       ConfigurationCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
     when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
@@ -285,6 +289,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+      when "phase12c-foreground-dashboard", "phase12c-dashboard", "foreground-dashboard"
+        json = @argv.include?("--json")
+        assessor = Phase12cForegroundDashboardAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
       when "phase12b-in-process-application-api", "phase12b-application-api", "application-api"
         json = @argv.include?("--json")
         assessor = Phase12bInProcessApplicationApiAssessor.new(root: Dir.pwd)
@@ -686,6 +696,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "Soul command examples:"
       puts "  ruby bin/soul skills"
       puts "  ruby bin/soul chat [message]"
+      puts "  ruby bin/soul dashboard [--set dashboard.port=4568] [--max-requests N]"
       puts "  ruby bin/soul config show [--json]"
       puts "  ruby bin/soul config explain <canonical.key> [--json]"
       puts "  ruby bin/soul config validate [--json]"
@@ -717,6 +728,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess conversational-orchestrator"
       puts "  ruby bin/soul assess grounded-evidence-lifecycle"
       puts "  ruby bin/soul assess bounded-host-system-status"
+      puts "  ruby bin/soul assess phase12c-foreground-dashboard"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"

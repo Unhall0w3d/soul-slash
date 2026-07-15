@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="soul-csrf" content="__SOUL_CSRF_TOKEN__">
+  <title>Soul/ — Local Intelligence Substrate</title>
+  <link rel="stylesheet" href="/assets/dashboard.css">
+  <script src="/assets/dashboard.js" defer></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="app-header">
+    <a class="brand" href="#chat-panel" aria-label="Soul dashboard home">
+      <img src="/brand/primary-mark.png" width="40" height="40" alt="">
+      <span class="brand-copy"><strong>Soul<span>/</span></strong><small>local intelligence substrate</small></span>
+    </a>
+    <nav class="primary-tabs" aria-label="Primary" role="tablist">
+      <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
+      <button id="studio-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="studio-panel">Skill Studio <span class="phase-tag">12D</span></button>
+    </nav>
+    <div class="header-state" aria-label="Runtime state">
+      <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
+      <span class="status-chip"><span id="provider-label">Provider —</span></span>
+      <span class="status-chip"><span id="config-label">Config —</span></span>
+    </div>
+  </header>
+
+  <main>
+    <section id="chat-panel" class="tab-panel" role="tabpanel" aria-labelledby="chat-tab">
+      <div class="chat-layout">
+        <aside class="conversation-rail" aria-labelledby="conversations-heading">
+          <div class="rail-heading">
+            <div><p class="eyebrow">Continuity</p><h1 id="conversations-heading">Conversations</h1></div>
+            <button id="new-chat" class="icon-button" type="button" aria-label="Create conversation">+</button>
+          </div>
+          <div id="chat-list" class="chat-list" aria-live="polite"></div>
+          <div class="rail-footer"><span class="local-seal" aria-hidden="true">◉</span><span>Private by default<br><small>Stored on this machine</small></span></div>
+        </aside>
+
+        <section class="conversation" aria-labelledby="active-chat-title">
+          <header class="conversation-header">
+            <div><p class="eyebrow" id="active-chat-kicker">No active thread</p><h2 id="active-chat-title">Open a conversation</h2></div>
+            <button id="pin-chat" class="quiet-button" type="button" disabled>Pin</button>
+          </header>
+          <div class="state-ribbon" aria-label="Conversation state">
+            <span><i class="state-dot"></i><strong id="lifecycle-state">ready</strong></span>
+            <span>privacy <strong>local</strong></span>
+            <span>interface <strong>dashboard</strong></span>
+            <span id="mutation-state">mutation none</span>
+          </div>
+          <div id="messages" class="messages" aria-live="polite">
+            <div class="empty-state">
+              <img src="/brand/supporting-scene.png" alt="A luminous Soul grimoire in a dark technical chamber">
+              <div><p class="eyebrow">Foreground connection ready</p><h2>Resume a thread or begin a new one.</h2><p>Soul uses the same local conversation runtime, memory boundary, and review gates as the command line.</p></div>
+            </div>
+          </div>
+          <form id="composer" class="composer">
+            <label for="message-input">Message Soul</label>
+            <div class="composer-row">
+              <textarea id="message-input" name="message" rows="2" maxlength="65536" placeholder="Choose or create a conversation to begin…" disabled required></textarea>
+              <button id="send-message" class="send-button" type="submit" disabled><span>Send</span><span aria-hidden="true">↗</span></button>
+            </div>
+            <div class="composer-meta"><span id="composer-hint">No conversation selected</span><span>Enter to send · Shift+Enter for newline</span></div>
+          </form>
+        </section>
+
+        <aside class="context-rail" aria-label="Workspace and system context">
+          <section class="context-card system-card" aria-labelledby="system-heading">
+            <div class="card-heading"><div><p class="eyebrow">Host telemetry</p><h2 id="system-heading">System status</h2></div><button id="refresh-status" class="refresh-button" type="button">Refresh</button></div>
+            <div class="system-orbit" aria-hidden="true"><span></span></div>
+            <dl id="system-details" class="details-list">
+              <div><dt>Collection</dt><dd>Not requested</dd></div>
+              <div><dt>Scope</dt><dd>Manual only</dd></div>
+              <div><dt>State</dt><dd>Unknown</dd></div>
+            </dl>
+          </section>
+          <section class="context-card" aria-labelledby="workspace-heading">
+            <div class="card-heading"><div><p class="eyebrow">Shared context</p><h2 id="workspace-heading">Workspace</h2></div><span id="workspace-count" class="count-badge">0</span></div>
+            <p class="card-note">Metadata attached to this conversation.</p>
+            <div id="workspace-list" class="artifact-list"><p class="muted">Select a conversation to inspect its workspace.</p></div>
+          </section>
+          <section class="context-card inbox-card" aria-labelledby="inbox-heading">
+            <div class="card-heading"><div><p class="eyebrow">Deliveries</p><h2 id="inbox-heading">Inbox</h2></div><span id="inbox-count" class="count-badge">0</span></div>
+            <p id="inbox-summary" class="muted">No active conversation.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section id="studio-panel" class="tab-panel studio-panel" role="tabpanel" aria-labelledby="studio-tab" hidden>
+      <div class="studio-hero">
+        <img src="/brand/supporting-scene.png" alt="A luminous book surrounded by Soul sigils">
+        <div class="studio-copy"><p class="eyebrow">Phase 12D preview · behavior inactive</p><h1>Skill Studio</h1><p>Turn an idea into a bounded, reviewable skill candidate—without confusing generation for approval.</p><div class="review-gate">Human visual review is required before this workflow is enabled.</div></div>
+      </div>
+      <ol class="workflow-stages" aria-label="Planned Skill Studio workflow">
+        <li><span>01</span><strong>Idea</strong><small>Describe the useful outcome</small></li>
+        <li><span>02</span><strong>Bounded brief</strong><small>Define scope and lifecycle</small></li>
+        <li><span>03</span><strong>Risk review</strong><small>Human edit and approval</small></li>
+        <li><span>04</span><strong>Test plan</strong><small>Deterministic requirements</small></li>
+        <li><span>05</span><strong>Candidate</strong><small>Implementation task pack</small></li>
+        <li><span>06</span><strong>Merge gate</strong><small>Human decision only</small></li>
+      </ol>
+      <div class="studio-notice"><span aria-hidden="true">◇</span><div><strong>Intentionally inert</strong><p>Phase 12C does not draft, execute, register, approve, or merge skills.</p></div></div>
+    </section>
+  </main>
+  <div id="live-status" class="sr-only" role="status" aria-live="polite"></div>
+</body>
+</html>

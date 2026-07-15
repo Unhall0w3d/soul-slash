@@ -133,7 +133,7 @@ module SoulCore
       chat = chat_store.chat(required(parameters, "chat_id"))
       return awaiting("unknown chat ID") unless chat
 
-      success("record" => chat_projection(chat))
+      success({ "record" => chat_projection(chat) })
     end
 
     def chats_messages(parameters)
@@ -142,7 +142,7 @@ module SoulCore
 
       limit = bounded_limit(parameters["limit"], MESSAGE_LIMIT)
       records = chat_store.messages(chat_id, limit: limit, scan_limit: ChatStore::APPLICATION_SCAN_LIMIT)
-      success("records" => records, "count" => records.length, "limit" => limit)
+      success({ "records" => records, "count" => records.length, "limit" => limit })
     end
 
     def chats_create(parameters)
