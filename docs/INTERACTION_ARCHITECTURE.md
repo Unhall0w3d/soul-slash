@@ -24,13 +24,13 @@ future voice input and output
 
 A third-party UI may display messages. It must not define Soul's memory model, orchestration policy, identity, skill safety, or action rules.
 
-## Current limitation
+## Current implementation posture
 
-The existing terminal chat foundation is primarily deterministic.
+The CLI and dashboard now share persistent model-backed multi-turn conversation through the same application and orchestration services. The deterministic intent router remains one bounded input to that orchestration layer rather than the whole conversation system.
 
-It recognizes known phrases, routes them to known paths, and formats known results. That foundation is useful, but it is not yet the natural conversational behavior intended for Soul.
+Deterministic routing still owns declared capabilities, evidence interpretation, skill planning, approvals, and state-changing execution. Model reasoning supplies conversation, intent interpretation, synthesis, and useful failure phrasing without becoming authorization.
 
-The Conversational Soul milestone will add a model-backed conversation loop that can discuss, invoke tools, interpret results, and return to the discussion without treating tool execution as the end of the interaction.
+The remaining milestone work is integrated acceptance, interface consolidation, and refinement—not replacing the runtime with a separate dashboard brain.
 
 ## Core pipeline
 
@@ -120,7 +120,7 @@ anything requiring exact auditability
 Rule:
 
 ```text
-If being wrong is merely conversationally awkward, the model may handle it.
+If being wrong is merely annoying or conversationally awkward, the model may handle it.
 If being wrong changes state, hides facts, leaks data, or misreports a system, use a validated skill.
 ```
 
@@ -168,7 +168,7 @@ For voice, Soul should summarize artifact metadata, bounded findings, and comple
 
 The initial dashboard product and visual contract is defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
 
-Primary navigation begins with Chat followed by Skill Studio. Shared workspace and manual system status support Chat; approvals and activities expose operational state without creating separate assistant runtimes.
+Primary navigation is Chat, Skill Studio, then Self Improvement. Shared workspace, inbox delivery, and initial/manual system status support Chat. Skill Studio exposes Proposal, Beta, and Production maturity with two human gates. Self Improvement exposes bounded environment/capability evidence and review-gated advisory proposals.
 
 Planned user-facing areas:
 
@@ -182,11 +182,12 @@ Skills
 Memory
 Settings
 System status
+Self Improvement
 ```
 
 The dashboard should expose only meaningful, safe configuration.
 
-The first dashboard is developed locally and presented for human aesthetic review before secondary interface scope expands. Existing Soul/ brand assets inspire the first attempt, but working surfaces prioritize legibility and restrained ornament.
+The dashboard is developed and reviewed locally before LAN or persistent deployment. The owner approved the current three-tab visual direction. Existing Soul/ brand assets guide the interface, while working surfaces prioritize legibility and restrained ornament.
 
 Every setting should explain:
 

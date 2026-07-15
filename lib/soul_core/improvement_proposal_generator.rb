@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
+require "set"
 require "time"
 
 require_relative "capability_matrix"
@@ -33,6 +35,7 @@ module SoulCore
         "proposal_root" => File.join(@root, @output_root),
         "source_summary" => matrix.fetch("summary"),
         "proposal_count" => proposals.length,
+        "written_count" => 0,
         "proposals" => proposals,
         "verification" => {
           "no_code_modified" => true,
@@ -43,7 +46,7 @@ module SoulCore
         }
       }
 
-      write_proposals(report, matrix) if write_files
+      report["written_count"] = write_proposals(report, matrix) if write_files
       report
     end
 
@@ -221,15 +224,38 @@ module SoulCore
       root = File.join(@root, @output_root)
       FileUtils.mkdir_p(root)
       timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
+      existing_digests = existing_proposal_digests(root)
+      written = 0
 
       report.fetch("proposals").each do |proposal|
+        digest = proposal_digest(proposal)
+        next if existing_digests.include?(digest)
+
         folder = File.join(root, "#{timestamp}-#{proposal.fetch('rank')}-#{proposal.fetch('id')}")
         FileUtils.mkdir_p(folder)
         proposal["path"] = folder
+        proposal["content_digest"] = digest
         File.write(File.join(folder, "proposal.md"), proposal_markdown(proposal))
         File.write(File.join(folder, "metadata.json"), JSON.pretty_generate(proposal))
         File.write(File.join(folder, "source_capability_matrix.json"), JSON.pretty_generate(matrix))
+        existing_digests << digest
+        written += 1
       end
+      written
+    end
+
+    def existing_proposal_digests(root)
+      Dir.glob(File.join(root, "*", "metadata.json")).sort.first(500).filter_map do |path|
+        record = JSON.parse(File.binread(path, 256 * 1024))
+        record["content_digest"] || proposal_digest(record)
+      rescue JSON::ParserError, Errno::ENOENT, ArgumentError
+        nil
+      end.to_set
+    end
+
+    def proposal_digest(proposal)
+      keys = %w[id rank status capability priority title summary rationale must_always must_not first_steps safety requires_human_approval implementation_allowed]
+      Digest::SHA256.hexdigest(JSON.generate(proposal.slice(*keys)))
     end
 
     def proposal_markdown(proposal)

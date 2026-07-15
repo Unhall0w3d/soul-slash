@@ -26,9 +26,12 @@ Soul/ uses a dark arcane-technical visual language that blends mystical symbolis
 - `assets/brand/soul-slash-supporting-scene.png`
 - `assets/brand/soul-slash-primary-mark.png`
 - `assets/brand/soul-slash-repo-icon.png`
+- `assets/brand/soul-slash-micro-mark.svg`
 
 ## Usage Guidance
 
 Keep typography and messaging project-oriented. The language should describe Soul/ as a local intelligence substrate / operating layer around models, skills, safety gates, workflows, and memory — not as a polished commercial SaaS product.
+
+Use the simplified micro mark for small interface placements such as the dashboard header, browser tabs, and bookmarks. The illustrated primary mark and repository icon are intended for larger surfaces where their detail remains legible.
 
 The dashboard-specific interpretation, initial tokens, restraint rules, accessibility expectations, and human visual review gate are defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.

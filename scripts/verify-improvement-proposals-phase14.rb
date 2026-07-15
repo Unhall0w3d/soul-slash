@@ -54,7 +54,8 @@ stdout, stderr, status = run_cmd("ruby", "bin/soul", "improve", "proposals")
 text_ok =
   status.success? &&
   stdout.include?("Soul Improvement Proposals") &&
-  stdout.include?("Add alpha skill generation pipeline") &&
+  stdout.include?("Add model capability registry and task routing policy") &&
+  !stdout.include?("Add alpha skill generation pipeline") &&
   stdout.include?("No proposal files were written")
 puts "- text improvement proposals: #{text_ok ? 'ok' : 'missing'}"
 errors << "text proposals failed: #{stderr} #{stdout}" unless text_ok

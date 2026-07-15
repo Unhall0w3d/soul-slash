@@ -162,6 +162,13 @@ module SoulCore
         uri = URI.parse(text)
         raise ArgumentError, "must be an HTTP or HTTPS URL" unless %w[http https].include?(uri.scheme) && !uri.host.to_s.empty?
         text
+      when "https_origin"
+        return "" if text.empty? && definition.fetch("allow_empty")
+        uri = URI.parse(text)
+        valid_path = uri.path.to_s.empty? || uri.path == "/"
+        raise ArgumentError, "must be an exact HTTPS origin" unless uri.scheme == "https" && !uri.host.to_s.empty? && uri.userinfo.nil? && uri.query.nil? && uri.fragment.nil? && valid_path
+        host = uri.host.include?(":") ? "[#{uri.host}]" : uri.host
+        "https://#{host}#{uri.port == 443 ? '' : ":#{uri.port}"}"
       when "env_name"
         raise ArgumentError, "must be an uppercase environment identifier" unless text.match?(DotenvReader::ENV_NAME)
         text
@@ -176,7 +183,7 @@ module SoulCore
         raise ArgumentError, "has unsupported schema type"
       end
     rescue URI::InvalidURIError
-      raise ArgumentError, "must be an HTTP or HTTPS URL"
+      raise ArgumentError, type == "https_origin" ? "must be an exact HTTPS origin" : "must be an HTTP or HTTPS URL"
     rescue ArgumentError => error
       raise error if error.message.start_with?("must ", "has ")
 

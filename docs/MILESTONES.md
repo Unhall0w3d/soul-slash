@@ -56,7 +56,7 @@ in progress
 Current phase:
 
 ```text
-Phase 11
+Protected LAN/systemd deployment review
 ```
 
 Completed:
@@ -72,12 +72,23 @@ Phase 7: generic evidence follow-up routing
 Phase 8: declared capability boundaries
 Phase 9: layered memory
 Phase 10: identity, interests, and variation
+Phase 11A: artifact metadata and conversation attachment
+Phase 11B: bounded artifact inspection
+Phase 11C: bounded artifact creation and revision
+Phase 11D: shared workspace and artifact inbox
+Phase 12A: portable typed configuration
+Phase 12B: in-process application API
+Phase 12C: foreground loopback dashboard
+Phase 12D: Skill Studio Proposal/Beta lifecycle
+Phase 12D.2: capability-gap intake
+Phase 12D.3: Self Improvement dashboard
 ```
 
 Current work:
 
 ```text
-artifact-aware conversation
+protected local HTTPS service and device trust review
+then Phase 12E unified approvals and activity views
 ```
 
 Milestone stopping point:
@@ -97,6 +108,9 @@ docs/BOUNDED_HOST_SYSTEM_STATUS.md
 docs/HOST_ENVIRONMENT_CAPABILITY_GAP.md
 docs/soul/ARTIFACT_METADATA_AND_ATTACHMENT.md
 docs/soul/BOUNDED_ARTIFACT_INSPECTION.md
+docs/CURRENT_STATE.md
+docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md
+docs/soul/PHASE12D3_SELF_IMPROVEMENT_DASHBOARD_BRIEF.md
 ```
 
 ## Later milestone candidates

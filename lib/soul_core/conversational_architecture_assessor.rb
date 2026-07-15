@@ -75,8 +75,8 @@ module SoulCore
       blockers << "Missing architecture sections: #{missing_sections.join(', ')}" unless missing_sections.empty?
       blockers << "Missing acceptance scenarios: #{missing_scenarios.join(', ')}" unless missing_scenarios.empty?
       blockers << "Missing anti-patterns: #{missing_anti_patterns.join(', ')}" unless missing_anti_patterns.empty?
-      blockers << "Roadmap must define nine phases" unless roadmap.scan(/^### Phase \d+:/).length == 9
-      blockers << "Roadmap must define Phase 9 as the stopping point" unless roadmap.include?("Phase 9 is the clear stopping point")
+      blockers << "Roadmap must define the current Phase 1 through Phase 13 sequence" unless roadmap_covers_current_sequence?(roadmap)
+      blockers << "Roadmap must define Phase 13 as the stopping point" unless roadmap.include?("Phase 13 is the clear stopping point")
       blockers << "Milestones must mark Conversational Soul in progress" unless milestones.include?("Conversational Soul") && milestones.include?("in progress")
       blockers << "Architecture must preserve deterministic action gates" unless architecture.include?("plan -> approval -> execute -> verify -> record")
       blockers << "Architecture must keep Codex outside automatic repo mutation" unless architecture.include?("Codex remains outside automatic repository mutation")
@@ -99,8 +99,8 @@ module SoulCore
           "architecture_contract_complete" => missing_sections.empty?,
           "acceptance_contract_complete" => missing_scenarios.empty?,
           "anti_patterns_documented" => missing_anti_patterns.empty?,
-          "nine_phase_roadmap" => roadmap.scan(/^### Phase \d+:/).length == 9,
-          "phase_nine_stopping_point" => roadmap.include?("Phase 9 is the clear stopping point"),
+          "current_phase_roadmap" => roadmap_covers_current_sequence?(roadmap),
+          "phase_thirteen_stopping_point" => roadmap.include?("Phase 13 is the clear stopping point"),
           "milestone_in_progress" => milestones.include?("Conversational Soul") && milestones.include?("in progress"),
           "deterministic_action_boundary_preserved" => architecture.include?("plan -> approval -> execute -> verify -> record"),
           "codex_boundary_preserved" => architecture.include?("Codex remains outside automatic repository mutation")
@@ -131,6 +131,10 @@ module SoulCore
     end
 
     private
+
+    def roadmap_covers_current_sequence?(roadmap)
+      (1..13).all? { |phase| roadmap.match?(/^\#{2,3} Phase #{phase}(?::|\s|\s—)/) }
+    end
 
     def read(path)
       full_path = File.join(@root, path)

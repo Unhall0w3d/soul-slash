@@ -1,9 +1,13 @@
 # frozen_string_literal: true
-require "open3"
+require_relative "bounded_command_runner"
 
 module SoulCore
   class PackageManagerAssessor
     SUPPORTED = %w[pacman yay paru flatpak snap nix].freeze
+    def initialize(runner: BoundedCommandRunner.new)
+      @runner = runner
+    end
+
     def assess(include_updates: false)
       managers = SUPPORTED.to_h { |n| [n, detect(n)] }
       if include_updates
@@ -41,14 +45,13 @@ module SoulCore
     end
     def pack(cmd, items); {"command"=>cmd,"count"=>items.length,"items"=>items}; end
     def lines(*cmd)
-      out, _err, st = Open3.capture3(*cmd)
-      st.success? ? out.lines.map(&:strip).reject(&:empty?) : []
+      result = @runner.run(*cmd, timeout_seconds: 12, max_output_bytes: 256 * 1024)
+      result.success? ? result.stdout.lines.map(&:strip).reject(&:empty?).first(2_000) : []
     rescue StandardError
       []
     end
     def which(name)
-      out, st = Open3.capture2("sh","-lc","command -v #{name}")
-      st.success? ? out.strip : nil
+      @runner.which(name)
     rescue StandardError
       nil
     end

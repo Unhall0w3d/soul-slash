@@ -77,6 +77,17 @@ refresh_ok =
 puts "- assistant skill catalog generation: #{refresh_ok ? 'ok' : 'missing'}"
 errors << "assistant skill catalog generation failed: #{stderr} #{stdout}" unless refresh_ok
 
+catalog_text = File.read("docs/ASSISTANT_SKILL_CATALOG.md")
+clear_section = catalog_text[/### Chats Clear\n.*?(?=\n### |\z)/m].to_s
+inspect_section = catalog_text[/### Downloads Inspect\n.*?(?=\n### |\z)/m].to_s
+risk_truthful =
+  clear_section.include?("risk: approval_required") &&
+  clear_section.include?("confirmation_required: true") &&
+  inspect_section.include?("risk: read_only") &&
+  inspect_section.include?("confirmation_required: false")
+puts "- catalog honors declared approval and read-only boundaries: #{risk_truthful ? 'ok' : 'missing'}"
+errors << "assistant skill catalog risk projection is misleading" unless risk_truthful
+
 stdout, stderr, status = run_cmd("ruby", "bin/soul", "assess", "skills-catalog", "--json")
 alias_json = JSON.parse(stdout) rescue nil
 alias_ok =

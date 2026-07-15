@@ -1,9 +1,9 @@
 # frozen_string_literal: true
-require "open3"
+require_relative "bounded_command_runner"
 
 module SoulCore
   class SoulProjectAssessor
-    def initialize(root: Dir.pwd); @root = File.expand_path(root); end
+    def initialize(root: Dir.pwd, runner: BoundedCommandRunner.new); @root = File.expand_path(root); @runner = runner; end
     def assess
       {"status"=>"ok","read_only"=>true,"root"=>@root,"git"=>git,"directories"=>dirs,"verifiers"=>verifiers,"overlay_debris"=>debris}
     end
@@ -25,10 +25,10 @@ module SoulCore
       items = pats.flat_map { |pat| Dir.glob(File.join(@root,pat)).map { |p| p.sub(@root+"/","") } }.sort
       {"count"=>items.length,"items"=>items}
     end
-    def ok?(*cmd); Open3.capture3(*cmd, chdir: @root)[2].success? rescue false; end
+    def ok?(*cmd); @runner.run(*cmd, timeout_seconds: 5, max_output_bytes: 64 * 1024, chdir: @root).success?; end
     def cap(*cmd)
-      out, _err, st = Open3.capture3(*cmd, chdir: @root)
-      st.success? ? out.strip : nil
+      result = @runner.run(*cmd, timeout_seconds: 5, max_output_bytes: 64 * 1024, chdir: @root)
+      result.success? ? result.stdout.strip : nil
     rescue StandardError
       nil
     end

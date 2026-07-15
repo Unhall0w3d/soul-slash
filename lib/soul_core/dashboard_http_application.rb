@@ -2,6 +2,8 @@
 
 require "json"
 require "securerandom"
+require "uri"
+require_relative "dashboard_authentication"
 
 module SoulCore
   class DashboardHttpApplication
@@ -10,6 +12,7 @@ module SoulCore
     STATIC_ROUTES = {
       "/assets/dashboard.css" => ["assets/dashboard/dashboard.css", "text/css; charset=utf-8"],
       "/assets/dashboard.js" => ["assets/dashboard/dashboard.js", "text/javascript; charset=utf-8"],
+      "/brand/micro-mark.svg" => ["assets/brand/soul-slash-micro-mark.svg", "image/svg+xml"],
       "/brand/primary-mark.png" => ["assets/brand/soul-slash-primary-mark.png", "image/png"],
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
       "/brand/supporting-scene.png" => ["assets/brand/soul-slash-supporting-scene.png", "image/png"]
@@ -24,14 +27,19 @@ module SoulCore
       "Connection" => "close"
     }.freeze
 
-    attr_reader :csrf_token
+    AUTH_ROUTES = %w[/auth/v1/session /auth/v1/login /auth/v1/change-password /auth/v1/logout].freeze
+    SESSION_COOKIE = "soul_session"
 
-    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32))
+    attr_reader :csrf_token, :authentication
+
+    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil)
       @root = File.expand_path(root)
       @facade = facade
       @bind_host = bind_host
       @port = Integer(port)
       @csrf_token = csrf_token
+      @authentication = authentication || DashboardAuthentication.new(root: @root)
+      @public_origin = public_origin.to_s.empty? ? nil : normalize_public_origin(public_origin)
     end
 
     def call(method:, target:, headers: {}, body: "")
@@ -55,6 +63,10 @@ module SoulCore
         return response(200, File.binread(File.join(@root, relative_path)), "Content-Type" => content_type, "Cache-Control" => "no-store")
       end
 
+      return auth_session(normalized_headers) if target == "/auth/v1/session" && method == "GET"
+      return auth_post(target, normalized_headers, body) if AUTH_ROUTES.include?(target) && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => target == "/auth/v1/session" ? "GET" : "POST") if AUTH_ROUTES.include?(target)
+
       return api_call(normalized_headers, body) if target == "/api/v1/call" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/call"
 
@@ -70,14 +82,78 @@ module SoulCore
     private
 
     def api_call(headers, body)
-      return json_response(415, error_envelope("content_type", "Content-Type must be application/json")) unless headers["content-type"].to_s.split(";", 2).first.strip.downcase == "application/json"
-      return json_response(403, error_envelope("origin", "same-origin request required")) unless valid_origin?(headers["origin"])
-      return json_response(403, error_envelope("csrf", "valid CSRF token required")) unless secure_compare(headers["x-soul-csrf"], @csrf_token)
-      return json_response(413, error_envelope("body_too_large", "request body exceeds 128 KiB")) if body.bytesize > 128 * 1024
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      if session.fetch("password_change_required")
+        return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard"))
+      end
 
       request = JSON.parse(body)
       envelope = @facade.call(request)
       json_response(200, envelope)
+    end
+
+    def auth_session(headers)
+      session = @authentication.session(session_token(headers))
+      json_response(200, auth_payload(session || { "authenticated" => false, "password_change_required" => false }))
+    end
+
+    def auth_post(target, headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+
+      request = JSON.parse(body)
+      return json_response(400, auth_error("invalid_request", "request body must be a JSON object")) unless request.is_a?(Hash)
+
+      case target
+      when "/auth/v1/login"
+        login(headers, request)
+      when "/auth/v1/change-password"
+        change_password(headers, request)
+      when "/auth/v1/logout"
+        logout(headers)
+      end
+    end
+
+    def login(headers, request)
+      result = @authentication.authenticate(username: request["username"], password: request["password"])
+      return auth_failure(result) unless result.ok
+
+      json_response(200, auth_payload(result.session), "Set-Cookie" => session_cookie(result.token, secure: secure_request?(headers)))
+    end
+
+    def change_password(headers, request)
+      result = @authentication.change_password(
+        token: session_token(headers),
+        current_password: request["current_password"],
+        new_password: request["new_password"],
+        confirmation: request["confirmation"]
+      )
+      return auth_failure(result) unless result.ok
+
+      json_response(200, auth_payload(result.session), "Set-Cookie" => session_cookie(result.token, secure: secure_request?(headers)))
+    end
+
+    def logout(headers)
+      @authentication.logout(session_token(headers))
+      json_response(200, auth_payload({ "authenticated" => false, "password_change_required" => false }), "Set-Cookie" => expired_session_cookie(secure: secure_request?(headers)))
+    end
+
+    def auth_failure(result)
+      headers = result.retry_after ? { "Retry-After" => result.retry_after.to_s } : {}
+      json_response(result.status, auth_error(result.code, result.reason), headers)
+    end
+
+    def mutation_boundary_error(headers, body)
+      return json_response(415, auth_error("content_type", "Content-Type must be application/json")) unless headers["content-type"].to_s.split(";", 2).first.strip.downcase == "application/json"
+      return json_response(403, auth_error("origin", "same-origin request required")) unless valid_origin?(headers["origin"])
+      return json_response(403, auth_error("csrf", "valid CSRF token required")) unless secure_compare(headers["x-soul-csrf"], @csrf_token)
+      return json_response(413, auth_error("body_too_large", "request body exceeds 128 KiB")) if body.bytesize > 128 * 1024
+
+      nil
     end
 
     def valid_host?(host)
@@ -85,14 +161,42 @@ module SoulCore
     end
 
     def valid_origin?(origin)
-      allowed_authorities.any? { |authority| origin.to_s.downcase == "http://#{authority}" }
+      allowed_origins.include?(origin.to_s.downcase)
     end
 
     def allowed_authorities
       @allowed_authorities ||= begin
         hosts = [@bind_host, "127.0.0.1", "localhost", "[::1]"]
-        hosts.map { |host| "#{host}:#{@port}" }.uniq.freeze
+        authorities = hosts.map { |host| "#{host}:#{@port}" }
+        authorities << public_authority if @public_origin
+        authorities.uniq.freeze
       end
+    end
+
+    def allowed_origins
+      @allowed_origins ||= begin
+        origins = [@bind_host, "127.0.0.1", "localhost", "[::1]"].map { |host| "http://#{host}:#{@port}" }
+        origins << @public_origin if @public_origin
+        origins.map(&:downcase).uniq.freeze
+      end
+    end
+
+    def normalize_public_origin(value)
+      uri = URI.parse(value.to_s)
+      valid_path = uri.path.to_s.empty? || uri.path == "/"
+      raise ArgumentError, "dashboard public origin must be exact HTTPS" unless uri.scheme == "https" && !uri.host.to_s.empty? && uri.userinfo.nil? && uri.query.nil? && uri.fragment.nil? && valid_path
+      host = uri.host.include?(":") ? "[#{uri.host}]" : uri.host
+      "https://#{host}#{uri.port == 443 ? '' : ":#{uri.port}"}".downcase
+    rescue URI::InvalidURIError
+      raise ArgumentError, "dashboard public origin must be exact HTTPS"
+    end
+
+    def public_authority
+      @public_origin.delete_prefix("https://")
+    end
+
+    def secure_request?(headers)
+      @public_origin && headers["origin"].to_s.downcase == @public_origin && headers["host"].to_s.downcase == public_authority
     end
 
     def secure_compare(left, right)
@@ -101,8 +205,46 @@ module SoulCore
       left.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
     end
 
-    def json_response(status, value)
-      response(status, JSON.generate(value), "Content-Type" => "application/json; charset=utf-8", "Cache-Control" => "no-store")
+    def session_token(headers)
+      values = headers["cookie"].to_s.split(";").filter_map do |part|
+        key, value = part.strip.split("=", 2)
+        value if key == SESSION_COOKIE
+      end
+      values.length == 1 ? values.first : nil
+    end
+
+    def session_cookie(token, secure:)
+      attributes = ["#{SESSION_COOKIE}=#{token}", "Path=/", "Max-Age=#{DashboardAuthentication::SESSION_IDLE_SECONDS}", "HttpOnly", "SameSite=Strict"]
+      attributes << "Secure" if secure
+      attributes.join("; ")
+    end
+
+    def expired_session_cookie(secure:)
+      attributes = ["#{SESSION_COOKIE}=", "Path=/", "Max-Age=0", "HttpOnly", "SameSite=Strict"]
+      attributes << "Secure" if secure
+      attributes.join("; ")
+    end
+
+    def json_response(status, value, extra_headers = {})
+      response(status, JSON.generate(value), { "Content-Type" => "application/json; charset=utf-8", "Cache-Control" => "no-store" }.merge(extra_headers))
+    end
+
+    def auth_payload(session)
+      {
+        "schema_version" => "soul.dashboard.auth.v1",
+        "ok" => true,
+        "authenticated" => session.fetch("authenticated"),
+        "username" => session["username"],
+        "password_change_required" => session.fetch("password_change_required")
+      }
+    end
+
+    def auth_error(code, reason)
+      {
+        "schema_version" => "soul.dashboard.auth.v1",
+        "ok" => false,
+        "error" => { "code" => code, "reason" => reason }
+      }
     end
 
     def error_envelope(code, reason)

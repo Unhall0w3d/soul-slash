@@ -1,21 +1,22 @@
 # frozen_string_literal: true
-require "open3"
 require "time"
+require_relative "bounded_command_runner"
 require_relative "package_manager_assessor"
 require_relative "runtime_assessor"
 require_relative "soul_project_assessor"
 
 module SoulCore
   class EnvironmentAssessor
-    def initialize(root: Dir.pwd)
+    def initialize(root: Dir.pwd, runner: BoundedCommandRunner.new)
       @root = root
+      @runner = runner
     end
 
     def assess(include_updates: false)
       system = system_inventory
-      package_managers = PackageManagerAssessor.new.assess(include_updates: include_updates)
-      runtimes = RuntimeAssessor.new.assess
-      project = SoulProjectAssessor.new(root: @root).assess
+      package_managers = PackageManagerAssessor.new(runner: @runner).assess(include_updates: include_updates)
+      runtimes = RuntimeAssessor.new(runner: @runner).assess
+      project = SoulProjectAssessor.new(root: @root, runner: @runner).assess
       {
         "status"=>"ok",
         "assessment"=>"environment",
@@ -78,7 +79,8 @@ module SoulCore
     end
 
     def cap(*cmd)
-      Open3.capture2e(*cmd).first.strip
+      result = @runner.run(*cmd, timeout_seconds: 3, max_output_bytes: 8 * 1024)
+      result.success? ? result.stdout.strip : nil
     rescue StandardError
       nil
     end

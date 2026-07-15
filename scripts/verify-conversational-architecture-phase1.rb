@@ -51,8 +51,8 @@ assessment_ok =
   json.dig("verification", "architecture_contract_complete") == true &&
   json.dig("verification", "acceptance_contract_complete") == true &&
   json.dig("verification", "anti_patterns_documented") == true &&
-  json.dig("verification", "nine_phase_roadmap") == true &&
-  json.dig("verification", "phase_nine_stopping_point") == true &&
+  json.dig("verification", "current_phase_roadmap") == true &&
+  json.dig("verification", "phase_thirteen_stopping_point") == true &&
   json.dig("verification", "deterministic_action_boundary_preserved") == true &&
   json.dig("verification", "codex_boundary_preserved") == true
 
@@ -89,7 +89,8 @@ architecture = File.read("docs/CONVERSATIONAL_SOUL_ARCHITECTURE.md")
 milestones = File.read("docs/MILESTONES.md")
 changelog = File.read("CHANGELOG.md")
 
-check("roadmap has exactly nine phase headings", roadmap.scan(/^### Phase \d+:/).length == 9, errors)
+current_sequence = (1..13).all? { |phase| roadmap.match?(/^\#{2,3} Phase #{phase}(?::|\s|\s—)/) }
+check("roadmap covers the current Phase 1 through Phase 13 sequence", current_sequence && roadmap.include?("Phase 13 is the clear stopping point"), errors)
 check("acceptance includes twenty-turn continuity", acceptance.include?("at least twenty turns"), errors)
 check("architecture preserves action safety", architecture.include?("plan -> approval -> execute -> verify -> record"), errors)
 check("milestone is in progress", milestones.include?("Status:\n\n```text\nin progress"), errors)

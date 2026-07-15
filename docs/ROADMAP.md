@@ -20,13 +20,18 @@
 
 ## v0.2-dev
 
-- [ ] shared workspace and artifact inbox foundation
-- [ ] portable typed configuration contract
-- [ ] in-process application API contract
-- [ ] foreground loopback dashboard with Chat, workspace, and system status
-- [ ] guided Skill Studio as the second primary tab
-- [ ] human visual review of the first dashboard aesthetic
+- [x] shared workspace and artifact inbox foundation
+- [x] portable typed configuration contract
+- [x] in-process application API contract
+- [x] foreground loopback dashboard with Chat, workspace, and system status
+- [x] guided Skill Studio with Proposal, Beta, and Production inventories
+- [x] capability-gap intake from Chat to Skill Studio
+- [x] Self Improvement dashboard with bounded environment and capability assessment
+- [x] human visual review of the three-tab dashboard aesthetic
+- [ ] personal administrator authentication review
+- [ ] protected LAN transport, user-service, and device-trust review
 - [ ] unified approvals and activity views
+- [ ] integrated Phase 13 conversational acceptance and closeout
 - [ ] more filesystem workflows
 - [ ] approved memory/rule loading into prompts
 - [ ] skill registry validation
@@ -34,8 +39,8 @@
 
 ## Later
 
-- [ ] reviewed Proxmox/LAN deployment
-- [ ] persistent service installation
+- [ ] reviewed Proxmox deployment
+- [ ] backup and disaster-recovery design
 - [ ] voice input
 - [ ] TTS output
 - [ ] wake-word integration

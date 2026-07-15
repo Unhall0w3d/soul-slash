@@ -39,6 +39,14 @@ module SoulCore
       end
     end
 
+    class RecordingAuthentication
+      def session(token, touch: true)
+        return nil unless token == "fixture-session"
+
+        { "authenticated" => true, "username" => "admin", "password_change_required" => false }
+      end
+    end
+
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
     end
@@ -46,16 +54,16 @@ module SoulCore
     def assess
       checks = {}
       facade = RecordingFacade.new
-      app = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: "127.0.0.1", port: 4567, csrf_token: "fixture-csrf-token")
+      app = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: "127.0.0.1", port: 4567, csrf_token: "fixture-csrf-token", authentication: RecordingAuthentication.new)
       get_headers = { "Host" => "127.0.0.1:4567" }
-      api_headers = get_headers.merge("Origin" => "http://127.0.0.1:4567", "Content-Type" => "application/json", "X-Soul-CSRF" => "fixture-csrf-token")
+      api_headers = get_headers.merge("Origin" => "http://127.0.0.1:4567", "Content-Type" => "application/json", "X-Soul-CSRF" => "fixture-csrf-token", "Cookie" => "soul_session=fixture-session")
 
       document = app.call(method: "GET", target: "/", headers: get_headers)
       head = app.call(method: "HEAD", target: "/", headers: get_headers)
       checks["dashboard_document_and_head_are_allowlisted"] = document.status == 200 && head.status == 200 && head.body.empty? && document.body.include?("Soul/") && document.body.include?("fixture-csrf-token")
 
       static_responses = DashboardHttpApplication::STATIC_ROUTES.keys.map { |route| app.call(method: "GET", target: route, headers: get_headers) }
-      checks["exact_static_allowlist_serves_only_approved_assets"] = static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } && DashboardHttpApplication::STATIC_ROUTES.length == 5
+      checks["exact_static_allowlist_serves_only_approved_assets"] = static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } && DashboardHttpApplication::STATIC_ROUTES.length == 6
 
       rejected_targets = ["/../.env", "/%2e%2e/.env", "/assets/../.env", "/assets/dashboard.js?x=1", "/unknown.png"]
       checks["traversal_query_confusion_and_unknown_paths_fail_closed"] = rejected_targets.all? { |target| app.call(method: "GET", target: target, headers: get_headers).status == 404 }
@@ -114,7 +122,7 @@ module SoulCore
       checks["semantic_accessible_reviewable_dom_is_present"] = required_dom.all? { |needle| html.include?(needle) } && review_boundary
 
       tokens = %w[#6E3DDF #00E2D6 #E6ECF1 #FFB14A #0A0D12 #151922]
-      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.include?("/brand/primary-mark.png") && html.include?("/brand/supporting-scene.png")
+      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.scan("/brand/micro-mark.svg").length >= 2 && html.include?("rel=\"icon\"") && html.include?("/brand/supporting-scene.png")
 
       checks["focus_reduced_motion_and_responsive_rules_exist"] = css.include?(":focus-visible") && css.include?("prefers-reduced-motion") && css.scan("@media").length >= 3
 

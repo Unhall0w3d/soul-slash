@@ -110,7 +110,7 @@ module SoulCore
         checks["bootstrap_is_bounded_read_only_and_does_not_collect_status"] =
           terminal_envelope?(bootstrap, "complete") &&
           bootstrap.dig("data", "system_status", "collected") == false &&
-          bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio"] &&
+          bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Improvement"] &&
           status.calls.zero? && runtime.calls.empty? &&
           !JSON.generate(bootstrap).include?("phase12b-secret-sentinel")
 

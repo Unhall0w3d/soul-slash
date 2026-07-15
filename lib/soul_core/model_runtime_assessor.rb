@@ -1,18 +1,22 @@
 # frozen_string_literal: true
 
 require "json"
+require "find"
 require "net/http"
-require "open3"
 require "time"
 require "uri"
+require_relative "bounded_command_runner"
 
 module SoulCore
   class ModelRuntimeAssessor
     DEFAULT_LLAMA_CPP_URL = "http://127.0.0.1:8082"
     DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+    MAX_MODEL_SCAN_ENTRIES = 5_000
+    MAX_MODEL_FILES = 500
 
-    def initialize(root: Dir.pwd)
+    def initialize(root: Dir.pwd, runner: BoundedCommandRunner.new)
       @root = File.expand_path(root)
+      @runner = runner
     end
 
     def assess(include_processes: false)
@@ -205,11 +209,12 @@ module SoulCore
       ].uniq
 
       paths = candidates.each_with_object({}) do |path, hash|
-        files = Dir.exist?(path) ? Dir.glob(File.join(path, "**", "*.{gguf,bin,safetensors}")) : []
+        files, scan_truncated = bounded_model_files(path)
         hash[path] = {
           "exists" => Dir.exist?(path),
           "model_file_count" => files.length,
-          "sample" => files.first(10).map { |f| f.sub(File.expand_path("~"), "~") }
+          "sample" => files.first(10).map { |f| f.sub(File.expand_path("~"), "~") },
+          "scan_truncated" => scan_truncated
         }
       end
 
@@ -241,9 +246,9 @@ module SoulCore
         },
         {
           "capability" => "skill_generation",
-          "status" => "partial",
-          "detail" => "Soul can draft and review skill briefs, but does not yet generate alpha skill prototypes.",
-          "requires" => ["alpha_skill_generator", "promotion_workflow"]
+          "status" => "available",
+          "detail" => "Soul can intake gaps, review proposals, generate isolated Alpha/Beta artifacts, and require human review before later promotion.",
+          "requires" => []
         }
       ]
     end
@@ -303,18 +308,40 @@ module SoulCore
     end
 
     def command_path(name)
-      out, status = Open3.capture2("sh", "-lc", "command -v #{name}")
-      status.success? ? out.strip : nil
+      @runner.which(name)
     rescue StandardError
       nil
     end
 
     def command_lines(*cmd)
-      out, _err, status = Open3.capture3(*cmd)
-      return [] unless status.success?
-      out.lines.map(&:strip).reject(&:empty?)
+      result = @runner.run(*cmd, timeout_seconds: 8, max_output_bytes: 128 * 1024)
+      return [] unless result.success?
+      result.stdout.lines.map(&:strip).reject(&:empty?).first(1_000)
     rescue StandardError
       []
+    end
+
+    def bounded_model_files(root)
+      return [[], false] unless Dir.exist?(root)
+
+      files = []
+      visited = 0
+      truncated = false
+      catch(:scan_complete) do
+        Find.find(root) do |path|
+          visited += 1
+          if visited > MAX_MODEL_SCAN_ENTRIES || files.length >= MAX_MODEL_FILES
+            truncated = true
+            throw :scan_complete
+          end
+          files << path if File.file?(path) && path.match?(/\.(?:gguf|bin|safetensors)\z/i)
+        rescue Errno::EACCES, Errno::ENOENT
+          Find.prune if File.directory?(path)
+        end
+      end
+      [files, truncated]
+    rescue StandardError
+      [[], true]
     end
   end
 end

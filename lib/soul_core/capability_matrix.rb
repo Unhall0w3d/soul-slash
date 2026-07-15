@@ -253,18 +253,18 @@ module SoulCore
           missing: model_endpoint_reachable ? [] : ["reachable_llama_cpp_or_ollama_endpoint"]
         ),
         "skill_brief_pipeline" => capability(
-          status: "partial",
-          detail: "Soul can draft and review skill proposals, but does not yet generate alpha implementations.",
-          provides: ["proposal_drafting", "proposal_review"],
-          current_support: ["skill.brief.draft", "skill.brief.review"],
-          missing: ["alpha_skill_generator", "promotion_workflow"]
+          status: "available",
+          detail: "Soul can create local gap intakes, review exact proposal revisions, and preserve human Gate 1 before Beta implementation.",
+          provides: ["proposal_drafting", "proposal_review", "capability_gap_intake", "human_gate_1"],
+          current_support: ["skill.brief.draft", "skill.brief.review", "CapabilityGapIntakeService", "SkillStudioService"],
+          missing: []
         ),
         "alpha_skill_generation" => capability(
-          status: "missing",
-          detail: "Soul does not yet turn approved proposals into isolated alpha skill artifacts.",
-          provides: [],
-          current_support: [],
-          missing: ["implementation_plan_generator", "alpha_skill_generator", "alpha_verifier_generator"]
+          status: "available",
+          detail: "Soul can generate isolated alpha/Beta artifacts and hold them outside the production registry for testing and human Gate 2 review.",
+          provides: ["implementation_plan_generator", "alpha_skill_generator", "alpha_verifier_generator", "beta_registry", "human_gate_2"],
+          current_support: ["AlphaSkillPlanGenerator", "AlphaSkillGenerator", "AlphaReview", "SkillStudioService", "AlphaPromotionGate"],
+          missing: []
         ),
         "model_suitability_routing" => capability(
           status: "partial",
@@ -311,7 +311,6 @@ module SoulCore
 
     def recommendations(capabilities)
       recs = []
-      recs << rec("info", "Alpha skill generation is missing", "Soul can draft/review skill proposals but cannot yet create isolated alpha skill artifacts.", "Build an alpha skill generator that writes to proposal-local alpha folders and requires human promotion.") if capabilities.dig("alpha_skill_generation", "status") == "missing"
       recs << rec("info", "Model suitability routing is partial", "Soul can detect endpoints but does not yet know which model should handle which task.", "Add a model capability registry and task routing policy.") if capabilities.dig("model_suitability_routing", "status") == "partial"
       recs << rec("info", "Vision/screen understanding is missing", "Soul cannot yet answer questions about the screen or use screenshot context.", "Add screenshot capture, a vision model runtime, and a bounded vision workflow.") if capabilities.dig("vision_screen_understanding", "status") == "missing"
       recs

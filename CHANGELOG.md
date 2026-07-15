@@ -4,6 +4,14 @@
 
 ### Conversational Soul
 
+- Added an opt-in protected local deployment candidate with exact HTTPS public-origin validation, Caddy internal TLS, two bounded systemd user services, preview-first install/uninstall, and no direct Soul LAN bind.
+- Added a Phase 12C.1 personal dashboard authentication candidate with a forced-change bootstrap credential, bounded server-side sessions, protected facade access, login throttling, logout/reset controls, and a blurred locked presentation. LAN binding remains blocked pending protected transport.
+- Added Phase 12D.3 Self Improvement with bounded environment, update, model-runtime, and capability assessments plus review-gated advisory improvement proposals.
+- Added Phase 12D.2 conservative capability-gap intake from unsupported Chat requests into the local Skill Studio review queue.
+- Added Phase 12D Skill Studio with Proposal, Beta, and Production inventories, two exact-revision human gates, bounded Beta diagnostics, and no automatic promotion.
+- Added the Phase 12C foreground loopback dashboard with persistent Chat, shared workspace/inbox context, initial and manual host status, conversation clearing, and exact delete-and-forget controls.
+- Added Phase 12A portable typed configuration and the Phase 12B versioned in-process application facade.
+- Completed Phase 11 with bounded artifact creation/revision and shared workspace/inbox delivery.
 - Added Phase 11B bounded text-artifact inspection with exact-byte integrity, provider privacy enforcement, deterministic redaction, explicit lifecycle failures, and no mutation authority.
 - Began Phase 11 with a shared artifact metadata, provenance, decision, and conversation-attachment foundation.
 - Completed Phase 10 with reviewed inspectable interests, relevance-gated context, safer style inspection, combined acceptance coverage, and tracked-overlay hygiene.
@@ -37,4 +45,4 @@
 
 ### Development direction
 
-Phase 10 is complete. Phase 11 begins artifact-aware conversation while retaining the existing identity, style, memory, evidence, and approval boundaries.
+Phase 12D.3 is the latest implemented interface slice. Phase 12E will consolidate approvals and activity views, followed by Phase 13 integrated acceptance and closeout. The separately approved current-machine persistent/LAN deployment candidate is now under local service and device-trust review.

@@ -1,6 +1,6 @@
 # In-Process Application API
 
-Phase 12B defines the transport-independent application contract consumed by the CLI and the future dashboard.
+Phase 12B defines the transport-independent application contract consumed by the CLI and foreground dashboard.
 
 ## Boundary
 
@@ -13,8 +13,10 @@ conversation runtime
 chat persistence
 workspace and inbox
 typed configuration
-manual host status
+bounded host status
 skill registry
+Skill Studio proposal and Beta lifecycle
+Self Improvement assessment and advisory proposals
 approval storage
 execution activity
 ```
@@ -77,6 +79,10 @@ chats.create
 chats.send
 chats.pin
 chats.unpin
+chats.clear.preview
+chats.clear.execute
+chats.forget.preview
+chats.forget.execute
 
 workspace.list
 workspace.chat
@@ -93,6 +99,23 @@ configuration.explain
 configuration.validate
 
 skills.list
+
+skill_studio.proposals.list
+skill_studio.proposals.get
+skill_studio.proposals.approval.preview
+skill_studio.proposals.approval.execute
+skill_studio.betas.list
+skill_studio.betas.get
+skill_studio.betas.run.preview
+skill_studio.betas.run.execute
+skill_studio.betas.promotion.preview
+skill_studio.betas.promotion.approve
+
+self_improvement.snapshot
+self_improvement.refresh
+self_improvement.proposals.preview
+self_improvement.proposals.execute
+
 approvals.pending
 activities.recent
 ```
@@ -152,8 +175,10 @@ If execution is interrupted after reservation, the receipt remains incomplete an
 - Message history is explicit and capped.
 - Workspace and inbox delegate to Phase 11D and remain metadata-only unless an existing artifact inspection is separately invoked.
 - Configuration delegates to Phase 12A and remains redacted and read-only.
-- System status is collected only by `system_status.refresh`.
+- System status is collected by `system_status.refresh`; the dashboard requests it once on page bootstrap and exposes manual refresh.
 - Skills are registry summaries and cannot execute.
+- Skill Studio preserves exact-revision proposal and Beta gates; no application operation performs automatic implementation or promotion.
+- Self Improvement snapshots and refreshes are read-only. Its sole mutation writes advisory proposal packets after preview and exact confirmation.
 - Pending approvals use non-authorizing fingerprints and omit token values and sensitive scope values.
 - Activities omit original private messages and expose only bounded classifications.
 
@@ -165,4 +190,4 @@ No model output can select an application request ID, authorize a replay conflic
 
 ## Dashboard relationship
 
-Phase 12C may translate loopback HTTP requests into this in-process envelope. It must not read JSONL stores directly or reproduce domain logic in route handlers.
+The Phase 12C foreground loopback transport translates same-origin HTTP requests into this in-process envelope. Later dashboard slices extend registered operations through the facade; route handlers still must not read domain stores directly or reproduce domain logic.

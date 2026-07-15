@@ -24,9 +24,10 @@ module SoulCore
         defaults_resolver = ConfigurationResolver.new(root: temp_root, process_env: empty_env)
         defaults = defaults_resolver.resolve
         checks["safe_defaults_are_typed_and_read_only"] =
-          defaults["ok"] && defaults["setting_count"] == 21 &&
+          defaults["ok"] && defaults["setting_count"] == 22 &&
           setting(defaults, "providers.local_openai.model")["value"] == "" &&
           setting(defaults, "dashboard.bind_host")["value"] == "127.0.0.1" &&
+          setting(defaults, "dashboard.public_origin")["value"] == "" &&
           empty_env.empty? && !File.exist?(File.join(temp_root, ".env"))
 
         File.write(
@@ -185,8 +186,11 @@ module SoulCore
 
         loopback_ok = ConfigurationResolver.new(root: temp_root, process_env: {}, overrides: ["dashboard.bind_host=::1"]).resolve
         lan_blocked = ConfigurationResolver.new(root: temp_root, process_env: {}, overrides: ["dashboard.bind_host=0.0.0.0"]).resolve
+        proxy_origin = ConfigurationResolver.new(root: temp_root, process_env: {}, overrides: ["dashboard.public_origin=https://soul.home.arpa:8443/"]).resolve
+        insecure_origin = ConfigurationResolver.new(root: temp_root, process_env: {}, overrides: ["dashboard.public_origin=http://soul.home.arpa:8443"]).resolve
         checks["dashboard_configuration_is_loopback_only_and_inert"] =
-          loopback_ok["ok"] && !lan_blocked["ok"] &&
+          loopback_ok["ok"] && !lan_blocked["ok"] && proxy_origin["ok"] && !insecure_origin["ok"] &&
+          setting(proxy_origin, "dashboard.public_origin")["value"] == "https://soul.home.arpa:8443" &&
           %w[TCPServer.new HTTPServer WEBrick .listen(].none? { |primitive| source_text.include?(primitive) }
 
         output = StringIO.new

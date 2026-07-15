@@ -47,14 +47,15 @@ implement proposals automatically
 
 Every generated proposal requires human approval before implementation.
 
-## Initial proposal types
+## Proposal types
 
 ```text
-alpha_skill_generation
 model_suitability_routing
 vision_screen_understanding
 speech_to_text
 ```
+
+`alpha_skill_generation` was an initial Phase 14 gap. It is no longer proposed because later phases added isolated Alpha/Beta generation, review, diagnostics, a separate Beta inventory, and human promotion gates.
 
 ## Related repair
 

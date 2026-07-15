@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -12,12 +12,73 @@ function requestId() {
 async function callSoul(operation, parameters = {}, context = {}) {
   const response = await fetch("/api/v1/call", {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
     body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } })
   });
   const envelope = await response.json();
+  if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
   if (!response.ok) throw new Error(envelope.error?.reason || "Dashboard transport failed");
   return envelope;
+}
+
+async function authRequest(path, body) {
+  const options = { credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf } };
+  if (body !== undefined) { options.method = "POST"; options.body = JSON.stringify(body); }
+  const response = await fetch(path, options);
+  const envelope = await response.json();
+  if (!response.ok) throw new Error(envelope.error?.reason || "Authentication failed safely");
+  return envelope;
+}
+
+function setDashboardLocked(locked) {
+  document.body.classList.toggle("auth-locked", locked);
+  const gate = byId("auth-gate"); gate.hidden = !locked;
+  [document.querySelector(".app-header"), document.querySelector("main"), byId("clear-dialog")].forEach((element) => { if (element) element.inert = locked; });
+  if (!locked) { byId("logout-button").hidden = false; byId("auth-status").textContent = ""; }
+}
+
+function showPasswordChange(required) {
+  byId("login-form").hidden = required;
+  byId("password-change-form").hidden = !required;
+  byId("auth-status").textContent = required ? "Bootstrap credential accepted. Set a private password to continue." : "";
+  if (required) byId("current-password").focus(); else byId("auth-password").focus();
+}
+
+async function initializeAuthentication() {
+  setDashboardLocked(true);
+  try {
+    const session = await authRequest("/auth/v1/session");
+    if (!session.authenticated) { showPasswordChange(false); return; }
+    if (session.password_change_required) { showPasswordChange(true); return; }
+    state.authenticated = true; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-status").textContent = error.message; showPasswordChange(false); }
+}
+
+async function login(event) {
+  event.preventDefault(); const button = byId("login-button"); button.disabled = true; byId("auth-status").textContent = "Verifying local administrator…";
+  try {
+    const session = await authRequest("/auth/v1/login", { username: byId("auth-username").value, password: byId("auth-password").value });
+    byId("auth-password").value = "";
+    if (session.password_change_required) { showPasswordChange(true); return; }
+    state.authenticated = true; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-password").select(); byId("auth-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function changePassword(event) {
+  event.preventDefault(); const button = byId("change-password-button"); button.disabled = true; byId("auth-status").textContent = "Replacing bootstrap credential…";
+  try {
+    const session = await authRequest("/auth/v1/change-password", { current_password: byId("current-password").value, new_password: byId("new-password").value, confirmation: byId("confirm-password").value });
+    ["current-password", "new-password", "confirm-password"].forEach((id) => { byId(id).value = ""; });
+    state.authenticated = session.authenticated; setDashboardLocked(false); await bootstrap();
+  } catch (error) { byId("auth-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function logout() {
+  byId("logout-button").disabled = true;
+  try { await authRequest("/auth/v1/logout", {}); } finally { window.location.reload(); }
 }
 
 function announce(message) { byId("live-status").textContent = message; }
@@ -39,13 +100,19 @@ function setBusy(busy, message = "") {
 
 function switchTab(name) {
   const chat = name === "chat";
+  const studio = name === "studio";
+  const improvement = name === "improvement";
   byId("chat-panel").hidden = !chat;
-  byId("studio-panel").hidden = chat;
+  byId("studio-panel").hidden = !studio;
+  byId("improvement-panel").hidden = !improvement;
   byId("chat-tab").classList.toggle("is-active", chat);
-  byId("studio-tab").classList.toggle("is-active", !chat);
+  byId("studio-tab").classList.toggle("is-active", studio);
+  byId("improvement-tab").classList.toggle("is-active", improvement);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
-  byId("studio-tab").setAttribute("aria-selected", String(!chat));
-  if (!chat && !state.studioLoaded) loadSkillStudio();
+  byId("studio-tab").setAttribute("aria-selected", String(studio));
+  byId("improvement-tab").setAttribute("aria-selected", String(improvement));
+  if (studio && !state.studioLoaded) loadSkillStudio();
+  if (improvement && !state.improvementLoaded) loadSelfImprovement();
 }
 
 function renderChatList() {
@@ -367,16 +434,130 @@ async function executeBetaPromotion() {
   state.studioLoaded = false; await loadSkillStudio(); await selectBeta(state.selectedBeta.beta_id); announce("Beta approved for a later explicit promotion workflow");
 }
 
+function labeledRecord(titleText, metaText, tone = "") {
+  const item = document.createElement("div"); item.className = `assessment-record ${tone}`.trim();
+  const title = document.createElement("strong"); title.textContent = titleText;
+  const meta = document.createElement("small"); meta.textContent = metaText;
+  item.append(title, meta); return item;
+}
+
+function renderImprovementEnvironment(report) {
+  if (!report) return;
+  const system = report.system || {};
+  const managers = Object.entries(report.package_managers?.managers || {}).filter(([, value]) => value.detected);
+  const updateCandidates = managers.reduce((count, [, value]) => count + (value.updates?.count || 0), 0);
+  const cleanupCandidates = managers.reduce((count, [, value]) => count + (value.orphans?.count || 0) + (value.unused?.count || 0), 0);
+  renderDefinitionList(byId("improvement-environment"), [
+    ["Operating system", system.os_pretty_name || "Unavailable"],
+    ["Kernel", system.kernel || "Unavailable"],
+    ["Architecture", system.architecture || "Unavailable"],
+    ["Host", system.hostname || "Unavailable"],
+    ["Repository", report.soul_project?.git?.dirty ? "working tree has changes" : "working tree clean"],
+    ["Package managers", managers.length ? managers.map(([name]) => name).join(", ") : "none detected"],
+    ["Update candidates", report.update_checks_requested ? String(updateCandidates) : "not checked"],
+    ["Cleanup candidates", report.update_checks_requested ? String(cleanupCandidates) : "not checked"]
+  ]);
+  const runtimes = Object.entries(report.runtimes?.runtimes || {}).filter(([, value]) => value.detected);
+  byId("runtime-count").textContent = String(runtimes.length); const list = byId("runtime-list"); list.replaceChildren();
+  runtimes.forEach(([name, value]) => list.append(labeledRecord(name, value.version || value.path || "detected", value.check_status === "timeout" ? "is-warning" : "")));
+  if (!runtimes.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No configured runtimes were detected."; list.append(empty); }
+}
+
+function renderCapabilitySummary(summary, note = "Current bounded capability assessment.") {
+  if (!summary) return;
+  const metrics = byId("capability-summary").children;
+  metrics[0].querySelector("strong").textContent = String(summary.available ?? "—");
+  metrics[1].querySelector("strong").textContent = String(summary.partial ?? "—");
+  metrics[2].querySelector("strong").textContent = String(summary.missing ?? "—");
+  byId("capability-state").textContent = summary.blocked ? `${summary.blocked} blocked` : "assessed";
+  byId("capability-note").textContent = note;
+}
+
+function renderModelSummary(report) {
+  const endpoints = Object.entries(report?.endpoints || {}); const list = byId("model-summary"); list.replaceChildren();
+  let reachable = 0;
+  endpoints.forEach(([name, value]) => { if (value.reachable) reachable += 1; list.append(labeledRecord(name.replaceAll("_", " "), `${value.reachable ? "reachable" : "not reachable"} · ${(value.models || []).length} model${(value.models || []).length === 1 ? "" : "s"}`, value.reachable ? "is-available" : "")); });
+  if (!endpoints.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No model assessment evidence."; list.append(empty); }
+  byId("model-state").textContent = `${reachable}/${endpoints.length || 0} reachable`;
+}
+
+function renderRecommendations(records) {
+  const list = byId("recommendation-list"); list.replaceChildren(); byId("recommendation-count").textContent = String(records.length);
+  records.forEach((record) => list.append(labeledRecord(record.title || "Recommendation", `${record.severity || "info"} · ${record.detail || "Review the assessed evidence."}`, record.severity === "warn" || record.severity === "blocker" ? "is-warning" : "")));
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No recommendations were produced for this assessment."; list.append(empty); }
+}
+
+function renderImprovementProposals(inventory) {
+  const records = inventory?.records || []; const list = byId("improvement-proposal-list"); list.replaceChildren(); byId("improvement-proposal-count").textContent = String(records.length);
+  records.forEach((record) => list.append(labeledRecord(record.title || record.proposal_id || "Improvement proposal", `${record.priority || "unranked"} · ${record.status || "draft"} · human review required`)));
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No generated improvement proposal packets."; list.append(empty); }
+}
+
+function renderSelfImprovement(data) {
+  const scope = data.assessment_scope || "environment"; const report = data.assessment || {};
+  byId("improvement-scope").textContent = `${scope}${data.automatic ? " · automatic" : ""}`;
+  if (scope === "environment" || scope === "updates") renderImprovementEnvironment(report);
+  if (scope === "models") renderModelSummary(report);
+  if (scope === "capabilities") { renderCapabilitySummary(report.summary); renderModelSummary(report.sources?.model_runtime); }
+  if (data.cached_capabilities?.available) renderCapabilitySummary(data.cached_capabilities.summary, `Cached assessment from ${formatTime(data.cached_capabilities.generated_at)}; run Capabilities to refresh.`);
+  renderRecommendations(report.recommendations || []); renderImprovementProposals(data.proposals);
+}
+
+function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[data-assessment-scope]").forEach((button) => { button.disabled = disabled; }); }
+
+async function loadSelfImprovement() {
+  setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); state.improvementLoaded = true; announce("Self Improvement snapshot ready"); }
+  catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
+  finally { setAssessmentButtonsDisabled(false); }
+}
+
+async function refreshSelfImprovement(scope) {
+  setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = `${scope} · running`; announce(`Running bounded ${scope} assessment`);
+  try { const envelope = await callSoul("self_improvement.refresh", { scope }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); announce(`${scope} assessment complete`); }
+  catch (error) { showError(error); }
+  finally { setAssessmentButtonsDisabled(false); }
+}
+
+async function previewImprovementProposals() {
+  const status = byId("improvement-proposal-status"); status.textContent = "Assessing current capability-derived candidates…";
+  const envelope = await callSoul("self_improvement.proposals.preview"); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete" || !data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || "Proposal preview failed safely."; return; }
+  state.improvementProposalPreview = data; const list = byId("improvement-proposal-preview-list"); list.replaceChildren();
+  (data.proposals || []).forEach((record) => list.append(labeledRecord(record.title || record.id, `${record.priority || "unranked"} · ${record.summary || "advisory candidate"}`)));
+  if (!data.proposals?.length) list.append(labeledRecord("No new capability candidates", "Generating now will not create implementation work."));
+  byId("improvement-proposal-confirm").hidden = false; byId("improvement-proposal-confirmation").value = ""; byId("execute-improvement-proposals").disabled = true;
+  status.textContent = "Review this exact candidate set. Confirmation writes proposal packets only.";
+}
+
+async function executeImprovementProposals() {
+  if (!state.improvementProposalPreview) return; const status = byId("improvement-proposal-status"); status.textContent = "Revalidating exact assessment revision…";
+  const envelope = await callSoul("self_improvement.proposals.execute", { expected_digest: state.improvementProposalPreview.expected_digest, confirmation: byId("improvement-proposal-confirmation").value }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Generation blocked; preview again."; return; }
+  renderImprovementProposals(data.proposals); status.textContent = `${data.written_count || 0} new advisory packet${data.written_count === 1 ? "" : "s"} written. Human review is still required.`;
+  state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
+}
+
 async function bootstrap() {
+  if (state.bootstrapped) return;
+  state.bootstrapped = true;
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
     byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true });
-  } catch (error) { byId("connection-label").textContent = "Disconnected"; showError(error); }
+  } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
+byId("login-form").addEventListener("submit", login);
+byId("password-change-form").addEventListener("submit", changePassword);
+byId("logout-button").addEventListener("click", logout);
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
+byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
+document.querySelectorAll("[data-assessment-scope]").forEach((button) => button.addEventListener("click", () => refreshSelfImprovement(button.dataset.assessmentScope)));
+byId("preview-improvement-proposals").addEventListener("click", previewImprovementProposals);
+byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });
+byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);
 byId("preview-proposal-approval").addEventListener("click", previewProposalApproval);
 byId("proposal-confirmation").addEventListener("input", () => { byId("execute-proposal-approval").disabled = !state.proposalApproval || byId("proposal-confirmation").value !== "APPROVE_PROPOSAL_FOR_BETA_BUILD"; });
 byId("execute-proposal-approval").addEventListener("click", executeProposalApproval);
@@ -401,4 +582,4 @@ byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
 byId("composer").addEventListener("submit", sendMessage);
 byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); byId("composer").requestSubmit(); } });
-bootstrap();
+initializeAuthentication();

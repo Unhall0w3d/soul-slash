@@ -13,9 +13,10 @@ module SoulCore
     READ_TIMEOUT = 5
 
     STATUS_TEXT = {
-      200 => "OK", 400 => "Bad Request", 403 => "Forbidden", 404 => "Not Found",
+      200 => "OK", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
       405 => "Method Not Allowed", 408 => "Request Timeout", 413 => "Payload Too Large",
-      415 => "Unsupported Media Type", 500 => "Internal Server Error"
+      415 => "Unsupported Media Type", 422 => "Unprocessable Content", 429 => "Too Many Requests",
+      500 => "Internal Server Error"
     }.freeze
 
     def initialize(host:, port:, application:, max_requests: nil, output: $stdout)
