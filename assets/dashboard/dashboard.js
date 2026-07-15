@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null };
+const state = { chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -45,6 +45,7 @@ function switchTab(name) {
   byId("studio-tab").classList.toggle("is-active", !chat);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("studio-tab").setAttribute("aria-selected", String(!chat));
+  if (!chat && !state.studioLoaded) loadSkillStudio();
 }
 
 function renderChatList() {
@@ -245,6 +246,125 @@ async function refreshStatus({ automatic = false } = {}) {
 
 function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
 
+function studioItem(titleText, metaText, active, onClick) {
+  const button = document.createElement("button"); button.type = "button"; button.className = "studio-item"; button.classList.toggle("is-active", active);
+  const title = document.createElement("strong"); title.textContent = titleText;
+  const meta = document.createElement("small"); meta.textContent = metaText;
+  button.append(title, meta); button.addEventListener("click", onClick); return button;
+}
+
+function renderStudioLists(production = null) {
+  const proposals = byId("proposal-list"); proposals.replaceChildren(); byId("proposal-count").textContent = String(state.proposals.length);
+  if (!state.proposals.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No proposal packets found."; proposals.append(empty); }
+  state.proposals.forEach((record) => proposals.append(studioItem(record.title || record.proposal_id, `${record.proposal_gate?.replaceAll("_", " ")} · ${record.provider || "local"}`, state.selectedProposal?.proposal_id === record.proposal_id, () => selectProposal(record.proposal_id))));
+
+  const betas = byId("beta-list"); betas.replaceChildren(); byId("beta-count").textContent = String(state.betas.length);
+  if (!state.betas.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No implemented Beta packages yet."; betas.append(empty); }
+  state.betas.forEach((record) => betas.append(studioItem(record.beta_id, `${record.maturity?.replaceAll("_", " ")} · ${record.runnable ? "runnable" : "not runnable"}`, state.selectedBeta?.beta_id === record.beta_id, () => selectBeta(record.beta_id))));
+
+  if (production) {
+    const skills = byId("production-skill-list"); skills.replaceChildren(); const records = production.records || []; byId("production-skill-count").textContent = String(records.length);
+    records.forEach((record) => skills.append(studioItem(record.skill_id, `${record.risk || "unknown"} · ${record.available ? "available" : "unavailable"}`, false, () => {})));
+    if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No registered production skills."; skills.append(empty); }
+  }
+}
+
+async function loadSkillStudio() {
+  try {
+    const [proposalEnvelope, betaEnvelope, skillsEnvelope] = await Promise.all([
+      callSoul("skill_studio.proposals.list", { limit: 100 }),
+      callSoul("skill_studio.betas.list", { limit: 100 }),
+      callSoul("skills.list", { limit: 100 })
+    ]);
+    state.proposals = dataOf(proposalEnvelope).records || []; state.betas = dataOf(betaEnvelope).records || []; state.studioLoaded = true;
+    renderStudioLists(dataOf(skillsEnvelope)); announce("Skill Studio inventories loaded");
+  } catch (error) { byId("studio-empty").querySelector("p:last-child").textContent = error.message || "Skill Studio failed safely."; }
+}
+
+function showStudioDetail(kind) {
+  byId("studio-empty").hidden = true;
+  byId("proposal-detail").hidden = kind !== "proposal";
+  byId("beta-detail").hidden = kind !== "beta";
+}
+
+function renderDefinitionList(target, entries) {
+  target.replaceChildren(); entries.forEach(([term, value]) => target.append(detailRow(term, value == null || value === "" ? "—" : String(value))));
+}
+
+function renderChecklist(target, items, emptyText) {
+  target.replaceChildren();
+  if (!items.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = emptyText; target.append(empty); return; }
+  items.forEach((item) => { const row = document.createElement("div"); row.className = `test-item ${item.complete || item.passed ? "is-passed" : ""}`; const mark = document.createElement("span"); mark.textContent = item.complete || item.passed ? "✓" : "○"; const copy = document.createElement("span"); const title = document.createElement("strong"); title.textContent = item.description || item.text || item.id || "Test requirement"; copy.append(title); if (item.id) { const id = document.createElement("small"); id.textContent = item.id; copy.append(id); } row.append(mark, copy); target.append(row); });
+}
+
+async function selectProposal(proposalId) {
+  try {
+    const envelope = await callSoul("skill_studio.proposals.get", { proposal_id: proposalId }); const record = dataOf(envelope).record; if (!record) return;
+    state.selectedProposal = record; state.selectedBeta = null; state.proposalApproval = null; showStudioDetail("proposal"); renderStudioLists();
+    byId("proposal-title").textContent = record.title || proposalId; byId("proposal-description").textContent = record.description || "No proposal description.";
+    byId("proposal-gate-state").textContent = record.proposal_gate?.replaceAll("_", " ") || "awaiting review";
+    renderDefinitionList(byId("proposal-meta"), [["Proposal ID", record.proposal_id], ["Created", record.created_at], ["Beta package", record.beta_present ? "present" : "not built"], ["Beta gate", record.beta_gate?.replaceAll("_", " ")]]);
+    byId("proposal-cloud").textContent = record.cloud_assisted ? `${record.provider} / ${record.model || "configured model"}; data class ${record.cloud_data_class || "unspecified"}. This output is advisory and cannot approve itself.` : "No cloud provider is recorded for this proposal.";
+    byId("proposal-markdown").textContent = record.proposal_markdown || "No proposal text available."; renderChecklist(byId("proposal-checklist"), record.review_checklist || [], "No checklist file was supplied.");
+    const approved = record.proposal_gate === "approved"; byId("preview-proposal-approval").disabled = approved; byId("proposal-approval-confirm").hidden = true; byId("proposal-confirmation").value = ""; byId("proposal-approval-status").textContent = approved ? "This exact proposal revision is approved for Beta implementation." : "Review the brief and checklist before opening Gate 1.";
+  } catch (error) { announce(error.message || "Proposal could not be loaded."); }
+}
+
+async function previewProposalApproval() {
+  if (!state.selectedProposal) return;
+  const status = byId("proposal-approval-status"); status.textContent = "Checking proposal revision…";
+  const envelope = await callSoul("skill_studio.proposals.approval.preview", { proposal_id: state.selectedProposal.proposal_id }); const data = dataOf(envelope);
+  if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Approval preview blocked."; return; }
+  state.proposalApproval = data; byId("proposal-approval-confirm").hidden = false; byId("proposal-confirmation").value = ""; byId("execute-proposal-approval").disabled = true; status.textContent = "Approval authorizes implementation work only; it does not generate, execute, register, or promote a skill.";
+}
+
+async function executeProposalApproval() {
+  if (!state.selectedProposal || !state.proposalApproval) return;
+  const envelope = await callSoul("skill_studio.proposals.approval.execute", { proposal_id: state.selectedProposal.proposal_id, expected_digest: state.proposalApproval.expected_digest, confirmation: byId("proposal-confirmation").value });
+  if (envelope.lifecycle_state !== "complete") { byId("proposal-approval-status").textContent = envelope.errors?.[0]?.message || "Approval blocked; preview again."; return; }
+  state.studioLoaded = false; await loadSkillStudio(); await selectProposal(state.selectedProposal.proposal_id); announce("Proposal approved for bounded Beta implementation");
+}
+
+async function selectBeta(betaId) {
+  try {
+    const envelope = await callSoul("skill_studio.betas.get", { beta_id: betaId }); const record = dataOf(envelope).record; if (!record) return;
+    state.selectedBeta = record; state.selectedProposal = null; state.betaRunPreview = null; state.betaPromotionPreview = null; showStudioDetail("beta"); renderStudioLists();
+    byId("beta-title").textContent = record.beta_id; byId("beta-description").textContent = record.description || "No Beta description."; byId("beta-maturity").textContent = record.maturity?.replaceAll("_", " ") || "beta";
+    renderDefinitionList(byId("beta-meta"), [["Proposal", record.proposal_id], ["Risk", record.risk], ["Runnable", record.runnable ? "human-confirmed only" : "no"], ["Tests", `${record.test_summary?.passed || 0}/${record.test_summary?.declared || 0} passing`], ["Current revision", record.test_summary?.tested_current_revision ? "tested" : "not tested"], ["Promotion", record.promotion_state?.replaceAll("_", " ")]]);
+    renderChecklist(byId("beta-tests"), record.required_tests || [], "No required tests are declared; promotion is blocked."); renderChecklist(byId("beta-weaknesses"), (record.known_weaknesses || []).map((text) => ({ text })), "No known weaknesses were declared.");
+    byId("preview-beta-run").disabled = !record.runnable; byId("beta-run-confirm").hidden = true; byId("beta-run-output").hidden = true; byId("beta-run-status").textContent = record.maturity === "legacy_alpha_scaffold" ? "Legacy alpha scaffold: visible for migration, never runnable." : (record.runnable ? "A preview and exact human confirmation are required." : "Beta package is incomplete or has an invalid entrypoint.");
+    byId("beta-promotion-confirm").hidden = true; byId("beta-promotion-status").textContent = "Gate 2 checks Gate 1, implementation, test evidence, and revision integrity.";
+  } catch (error) { announce(error.message || "Beta could not be loaded."); }
+}
+
+function betaArguments() { return byId("beta-args").value.split("\n").map((value) => value.trim()).filter(Boolean); }
+
+async function previewBetaRun() {
+  if (!state.selectedBeta) return; const status = byId("beta-run-status"); status.textContent = "Preparing bounded Beta run preview…";
+  const envelope = await callSoul("skill_studio.betas.run.preview", { beta_id: state.selectedBeta.beta_id, args: betaArguments() }); const data = dataOf(envelope);
+  if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Beta run preview blocked."; return; }
+  state.betaRunPreview = data; byId("beta-run-confirm").hidden = false; byId("beta-run-phrase").textContent = data.confirmation_phrase; byId("beta-run-confirmation").value = ""; byId("execute-beta-run").disabled = true; status.textContent = `Foreground timeout: ${data.timeout_seconds}s. A bounded local diagnostic record will be written.`;
+}
+
+async function executeBetaRun() {
+  if (!state.selectedBeta || !state.betaRunPreview) return; const status = byId("beta-run-status"); status.textContent = "Running Beta in the foreground…";
+  const envelope = await callSoul("skill_studio.betas.run.execute", { beta_id: state.selectedBeta.beta_id, args: betaArguments(), expected_digest: state.betaRunPreview.expected_digest, confirmation: byId("beta-run-confirmation").value }); const data = dataOf(envelope);
+  const output = byId("beta-run-output"); output.hidden = false; output.textContent = [data.stdout, data.stderr].filter(Boolean).join("\n") || envelope.errors?.[0]?.message || "Beta returned no output."; status.textContent = data.diagnostic_log ? `Finished ${envelope.lifecycle_state}; diagnostic record: ${data.diagnostic_log}` : `Beta run ${envelope.lifecycle_state}.`;
+}
+
+async function previewBetaPromotion() {
+  if (!state.selectedBeta) return; const status = byId("beta-promotion-status"); status.textContent = "Checking test evidence and revision integrity…";
+  const envelope = await callSoul("skill_studio.betas.promotion.preview", { beta_id: state.selectedBeta.beta_id }); const data = dataOf(envelope); if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Promotion preview blocked."; return; }
+  state.betaPromotionPreview = data; byId("beta-promotion-confirm").hidden = false; const blockers = (data.blockers || []).map((text) => ({ text, passed: false })); renderChecklist(byId("beta-promotion-blockers"), blockers, "All deterministic prerequisites are satisfied."); byId("beta-promotion-confirmation").value = ""; byId("execute-beta-promotion").disabled = true; status.textContent = data.ready ? "Ready for your Gate 2 decision. Approval will not perform promotion." : "Promotion approval is blocked until every listed requirement is satisfied.";
+}
+
+async function executeBetaPromotion() {
+  if (!state.selectedBeta || !state.betaPromotionPreview?.ready) return;
+  const envelope = await callSoul("skill_studio.betas.promotion.approve", { beta_id: state.selectedBeta.beta_id, expected_digest: state.betaPromotionPreview.expected_digest, confirmation: byId("beta-promotion-confirmation").value });
+  if (envelope.lifecycle_state !== "complete") { byId("beta-promotion-status").textContent = envelope.errors?.[0]?.message || "Gate 2 approval blocked."; return; }
+  state.studioLoaded = false; await loadSkillStudio(); await selectBeta(state.selectedBeta.beta_id); announce("Beta approved for a later explicit promotion workflow");
+}
+
 async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
@@ -255,6 +375,15 @@ async function bootstrap() {
 
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
+byId("preview-proposal-approval").addEventListener("click", previewProposalApproval);
+byId("proposal-confirmation").addEventListener("input", () => { byId("execute-proposal-approval").disabled = !state.proposalApproval || byId("proposal-confirmation").value !== "APPROVE_PROPOSAL_FOR_BETA_BUILD"; });
+byId("execute-proposal-approval").addEventListener("click", executeProposalApproval);
+byId("preview-beta-run").addEventListener("click", previewBetaRun);
+byId("beta-run-confirmation").addEventListener("input", () => { byId("execute-beta-run").disabled = !state.betaRunPreview || byId("beta-run-confirmation").value !== state.betaRunPreview.confirmation_phrase; });
+byId("execute-beta-run").addEventListener("click", executeBetaRun);
+byId("preview-beta-promotion").addEventListener("click", previewBetaPromotion);
+byId("beta-promotion-confirmation").addEventListener("input", () => { byId("execute-beta-promotion").disabled = !state.betaPromotionPreview?.ready || byId("beta-promotion-confirmation").value !== "APPROVE_BETA_FOR_PROMOTION"; });
+byId("execute-beta-promotion").addEventListener("click", executeBetaPromotion);
 byId("new-chat").addEventListener("click", createChat);
 byId("clear-chats").addEventListener("click", openClearDialog);
 byId("close-clear-dialog").addEventListener("click", () => byId("clear-dialog").close());

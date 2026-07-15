@@ -15,6 +15,7 @@ require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "skill_registry"
+require_relative "skill_studio_service"
 
 module SoulCore
   class ApplicationFacade
@@ -38,7 +39,8 @@ module SoulCore
       status_collector: nil,
       approval_store: nil,
       activity_store: nil,
-      skill_registry: nil
+      skill_registry: nil,
+      skill_studio_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -53,6 +55,7 @@ module SoulCore
       @approval_store = approval_store
       @activity_store = activity_store
       @skill_registry = skill_registry
+      @skill_studio_service = skill_studio_service
     end
 
     def call(request)
@@ -106,6 +109,16 @@ module SoulCore
       when "configuration.explain" then domain(configuration_explain(parameters))
       when "configuration.validate" then domain(configuration_validate)
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
+      when "skill_studio.proposals.list" then domain(skill_studio.proposals(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
+      when "skill_studio.proposals.get" then domain(skill_studio.proposal(proposal_id: required(parameters, "proposal_id")))
+      when "skill_studio.proposals.approval.preview" then domain(skill_studio.proposal_approval_preview(proposal_id: required(parameters, "proposal_id")))
+      when "skill_studio.proposals.approval.execute" then domain(skill_studio.approve_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "skill_studio.betas.list" then domain(skill_studio.betas(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
+      when "skill_studio.betas.get" then domain(skill_studio.beta(beta_id: required(parameters, "beta_id")))
+      when "skill_studio.betas.run.preview" then domain(skill_studio.beta_run_preview(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", [])))
+      when "skill_studio.betas.run.execute" then domain(skill_studio.run_beta(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "skill_studio.betas.promotion.preview" then domain(skill_studio.promotion_preview(beta_id: required(parameters, "beta_id")))
+      when "skill_studio.betas.promotion.approve" then domain(skill_studio.approve_beta_for_promotion(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -128,7 +141,14 @@ module SoulCore
         },
         "providers" => providers,
         "system_status" => { "collected" => false, "refresh_operation" => "system_status.refresh" },
-        "skill_studio" => { "available" => false, "planned_phase" => "12D" },
+        "skill_studio" => {
+          "available" => true,
+          "phase" => "12D",
+          "maturity_name" => "Beta",
+          "proposal_gate" => "human_exact_confirmation",
+          "beta_gate" => "human_exact_confirmation",
+          "automatic_promotion" => false
+        },
         "unified_operations" => { "available" => false, "planned_phase" => "12E" }
       }
     end
@@ -311,6 +331,10 @@ module SoulCore
 
     def skill_registry
       @skill_registry ||= SkillRegistry.new(path: File.join(@root, "Soul", "skills", "registry.yaml"))
+    end
+
+    def skill_studio
+      @skill_studio_service ||= SkillStudioService.new(root: @root, clock: @clock)
     end
 
     def chat_projection(chat)
