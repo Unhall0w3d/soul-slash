@@ -87,8 +87,7 @@ Phase 12D.3: Self Improvement dashboard
 Current work:
 
 ```text
-protected local HTTPS service and device trust review
-then Phase 12E unified approvals and activity views
+Phase 12E unified approvals and activity views
 ```
 
 Milestone stopping point:

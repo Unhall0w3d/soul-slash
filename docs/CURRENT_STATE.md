@@ -58,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul milestone has reached the Phase 12D.3 Self Improvement dashboard. Phase 12C.1 personal authentication passed its first-login human review, and the current-machine protected-LAN/systemd deployment candidate is under local service and device review. The next planned interface slice remains Phase 12E unified approvals and activity views. Phase 13 remains the integrated conversational acceptance and closeout point.
+The Conversational Soul milestone has completed and merged the Phase 12D.3 Self Improvement dashboard, Phase 12C.1 personal authentication, and the owner-approved protected local systemd/Caddy LAN deployment. Local service, certificate trust, firewall boundary, and client login/logout review passed. The next planned interface slice is Phase 12E unified approvals and activity views. Phase 13 remains the integrated conversational acceptance and closeout point.
 
 Detailed references:
 
