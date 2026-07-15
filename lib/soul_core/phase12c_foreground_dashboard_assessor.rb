@@ -99,10 +99,19 @@ module SoulCore
       required_operations = %w[application.bootstrap chats.list chats.messages chats.create chats.send chats.pin chats.unpin chats.clear.preview chats.clear.execute workspace.chat inbox.list system_status.refresh]
       checks["chat_uses_registered_phase12b_operations"] = required_operations.all? { |operation| js.include?(operation) }
 
-      checks["skill_studio_is_visible_selectable_and_inert"] = html.include?('id="studio-tab"') && html.include?("Intentionally inert") && html.include?("Phase 12D") && %w[skill.brief.draft skill.execute approve merge].none? { |operation| js.include?(operation) }
+      legacy_preview = html.include?("Intentionally inert") && html.include?("Phase 12D")
+      gated_phase12d =
+        html.include?('id="proposal-approval"') &&
+        html.include?('id="beta-promotion-card"') &&
+        html.include?("No automatic implementation, registration, or promotion") &&
+        js.include?("skill_studio.proposals.approval.preview") &&
+        js.include?("skill_studio.betas.promotion.preview") &&
+        !js.include?("skill.execute")
+      checks["skill_studio_surface_respects_current_phase"] = html.include?('id="studio-tab"') && (legacy_preview || gated_phase12d)
 
       required_dom = ['role="tablist"', 'role="tabpanel"', '<main>', '<form id="composer"', '<label for="message-input"', 'role="status"']
-      checks["semantic_accessible_reviewable_dom_is_present"] = required_dom.all? { |needle| html.include?(needle) } && html.downcase.include?("human visual review")
+      review_boundary = html.downcase.include?("human visual review") || (html.include?("Human Gate 1") && html.include?("Human Gate 2"))
+      checks["semantic_accessible_reviewable_dom_is_present"] = required_dom.all? { |needle| html.include?(needle) } && review_boundary
 
       tokens = %w[#6E3DDF #00E2D6 #E6ECF1 #FFB14A #0A0D12 #151922]
       checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.include?("/brand/primary-mark.png") && html.include?("/brand/supporting-scene.png")

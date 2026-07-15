@@ -13,6 +13,8 @@ module SoulCore
     CHAT_ID = /\Achat_[A-Za-z0-9_.-]+\z/
     ARTIFACT_ID = /\Aart_[A-Za-z0-9_.-]+\z/
     DELIVERY_ID = /\Adel_[A-Za-z0-9_.-]+\z/
+    PROPOSAL_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
+    BETA_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
     OPERATIONS = {
@@ -41,6 +43,16 @@ module SoulCore
       "configuration.explain" => %w[key],
       "configuration.validate" => [],
       "skills.list" => %w[limit],
+      "skill_studio.proposals.list" => %w[limit],
+      "skill_studio.proposals.get" => %w[proposal_id],
+      "skill_studio.proposals.approval.preview" => %w[proposal_id],
+      "skill_studio.proposals.approval.execute" => %w[proposal_id confirmation expected_digest],
+      "skill_studio.betas.list" => %w[limit],
+      "skill_studio.betas.get" => %w[beta_id],
+      "skill_studio.betas.run.preview" => %w[beta_id args],
+      "skill_studio.betas.run.execute" => %w[beta_id args confirmation expected_digest],
+      "skill_studio.betas.promotion.preview" => %w[beta_id],
+      "skill_studio.betas.promotion.approve" => %w[beta_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -130,6 +142,10 @@ module SoulCore
       return "artifact_id is invalid" if artifact_id && !artifact_id.to_s.match?(ARTIFACT_ID)
       delivery_id = parameters["delivery_id"]
       return "delivery_id is invalid" if delivery_id && !delivery_id.to_s.match?(DELIVERY_ID)
+      proposal_id = parameters["proposal_id"]
+      return "proposal_id is invalid" if proposal_id && !proposal_id.to_s.match?(PROPOSAL_ID)
+      beta_id = parameters["beta_id"]
+      return "beta_id is invalid" if beta_id && !beta_id.to_s.match?(BETA_ID)
 
       nil
     end
@@ -140,6 +156,8 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "filters"
           return "filters must be an object" unless value.is_a?(Hash) && string_keys?(value)
+        elsif key == "args"
+          return "args must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)
         end
