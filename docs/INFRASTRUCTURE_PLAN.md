@@ -71,7 +71,11 @@ GET  /api/projects
 
 This API should call the same assistant runtime used by the CLI.
 
+Before a listener is added, Soul should define and test the same application contracts in process. The first separately approved listener is foreground, loopback-only, and has no automatic startup or service installation.
+
 ## Phase 4: LAN deployment
+
+LAN deployment follows successful local dashboard acceptance. Proxmox is not required during dashboard development.
 
 For LAN access, a single VM on Proxmox is preferred at first.
 
@@ -87,7 +91,11 @@ services:
   optional local model service
 ```
 
-A single VM is easier to manage initially than many containers split across services.
+A single unprivileged Soul guest is easier to manage initially than many containers split across services. Soul, SQLite, and the shared artifact workspace should begin together in that guest. The model may remain on another explicitly configured LAN host.
+
+Do not introduce a separate database container, ChromaDB, or another vector service until a concrete requirement and acceptance suite show that the embedded store and SQLite FTS are insufficient.
+
+The deployment environment file belongs inside the Soul guest, not on the Proxmox hypervisor. Its path, permissions, loading mechanism, LAN addresses, service definitions, backups, and rollback behavior belong to a separate human-approved deployment brief.
 
 ## NUC/Proxmox posture
 

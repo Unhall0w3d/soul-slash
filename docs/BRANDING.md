@@ -30,3 +30,5 @@ Soul/ uses a dark arcane-technical visual language that blends mystical symbolis
 ## Usage Guidance
 
 Keep typography and messaging project-oriented. The language should describe Soul/ as a local intelligence substrate / operating layer around models, skills, safety gates, workflows, and memory — not as a polished commercial SaaS product.
+
+The dashboard-specific interpretation, initial tokens, restraint rules, accessibility expectations, and human visual review gate are defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.

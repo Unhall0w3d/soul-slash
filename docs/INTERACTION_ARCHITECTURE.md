@@ -166,6 +166,10 @@ For voice, Soul should summarize artifact metadata, bounded findings, and comple
 
 ## Interface direction
 
+The initial dashboard product and visual contract is defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
+
+Primary navigation begins with Chat followed by Skill Studio. Shared workspace and manual system status support Chat; approvals and activities expose operational state without creating separate assistant runtimes.
+
 Planned user-facing areas:
 
 ```text
@@ -181,6 +185,8 @@ System status
 ```
 
 The dashboard should expose only meaningful, safe configuration.
+
+The first dashboard is developed locally and presented for human aesthetic review before secondary interface scope expands. Existing Soul/ brand assets inspire the first attempt, but working surfaces prioritize legibility and restrained ornament.
 
 Every setting should explain:
 

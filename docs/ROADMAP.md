@@ -20,8 +20,13 @@
 
 ## v0.2-dev
 
-- [ ] web UI shell
-- [ ] persistent workflow dashboard
+- [ ] shared workspace and artifact inbox foundation
+- [ ] portable typed configuration contract
+- [ ] in-process application API contract
+- [ ] foreground loopback dashboard with Chat, workspace, and system status
+- [ ] guided Skill Studio as the second primary tab
+- [ ] human visual review of the first dashboard aesthetic
+- [ ] unified approvals and activity views
 - [ ] more filesystem workflows
 - [ ] approved memory/rule loading into prompts
 - [ ] skill registry validation
@@ -29,6 +34,8 @@
 
 ## Later
 
+- [ ] reviewed Proxmox/LAN deployment
+- [ ] persistent service installation
 - [ ] voice input
 - [ ] TTS output
 - [ ] wake-word integration
