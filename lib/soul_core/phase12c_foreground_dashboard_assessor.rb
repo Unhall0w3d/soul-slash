@@ -92,7 +92,7 @@ module SoulCore
 
       checks["bootstrap_does_not_collect_status_and_refresh_is_explicit"] = !js.match?(/bootstrap[\s\S]{0,1600}system_status\.refresh/) && js.include?('byId("refresh-status").addEventListener("click", refreshStatus)') && js.scan('"system_status.refresh"').length == 1
 
-      required_operations = %w[application.bootstrap chats.list chats.messages chats.create chats.send chats.pin chats.unpin workspace.chat inbox.list system_status.refresh]
+      required_operations = %w[application.bootstrap chats.list chats.messages chats.create chats.send chats.pin chats.unpin chats.clear.preview chats.clear.execute workspace.chat inbox.list system_status.refresh]
       checks["chat_uses_registered_phase12b_operations"] = required_operations.all? { |operation| js.include?(operation) }
 
       checks["skill_studio_is_visible_selectable_and_inert"] = html.include?('id="studio-tab"') && html.include?("Intentionally inert") && html.include?("Phase 12D") && %w[skill.brief.draft skill.execute approve merge].none? { |operation| js.include?(operation) }

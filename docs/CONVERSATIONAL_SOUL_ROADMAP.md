@@ -285,6 +285,8 @@ no daemon, service, worker, LAN bind, polling, remote asset, or persistence inst
 
 Phase 12C is blocked for the required human visual review. Its automated checks do not approve the design or authorize merge.
 
+An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
+
 The dashboard product shape begins with:
 
 ```text

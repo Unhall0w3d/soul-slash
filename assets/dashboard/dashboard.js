@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { chats: [], activeChat: null, busy: false };
+const state = { chats: [], activeChat: null, busy: false, clearPreview: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -74,6 +74,20 @@ async function loadChats(selectFirst = true) {
   const envelope = await callSoul("chats.list", { limit: 50 }); lifecycle(envelope);
   state.chats = dataOf(envelope).records || []; renderChatList();
   if (selectFirst && !state.activeChat && state.chats.length) await selectChat(state.chats[0]);
+  if (!state.chats.length) resetConversationView();
+}
+
+function resetConversationView() {
+  state.activeChat = null;
+  byId("active-chat-kicker").textContent = "No active thread";
+  byId("active-chat-title").textContent = "Open a conversation";
+  byId("pin-chat").disabled = true;
+  byId("pin-chat").textContent = "Pin";
+  byId("message-input").disabled = true;
+  byId("message-input").placeholder = "Create a conversation to begin…";
+  byId("send-message").disabled = true;
+  byId("composer-hint").textContent = "No conversation selected";
+  renderMessages([], true); renderWorkspace([]); renderInbox({ records: [] });
 }
 
 async function selectChat(chat) {
@@ -94,9 +108,9 @@ async function selectChat(chat) {
   } catch (error) { showError(error); } finally { setBusy(false); }
 }
 
-function renderMessages(records) {
+function renderMessages(records, noChat = false) {
   const area = byId("messages"); area.replaceChildren();
-  if (!records.length) { const empty = document.createElement("div"); empty.className = "empty-state"; const copy = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = "Fresh context"; const heading = document.createElement("h2"); heading.textContent = "This conversation is ready."; const note = document.createElement("p"); note.textContent = "Your first message will use Soul’s configured provider and shared context boundary."; copy.append(eyebrow, heading, note); empty.append(copy); area.append(empty); return; }
+  if (!records.length) { const empty = document.createElement("div"); empty.className = "empty-state"; const copy = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = noChat ? "Active list clear" : "Fresh context"; const heading = document.createElement("h2"); heading.textContent = noChat ? "Create a conversation when you’re ready." : "This conversation is ready."; const note = document.createElement("p"); note.textContent = noChat ? "Archived transcripts remain stored locally and are not deleted." : "Your first message will use Soul’s configured provider and shared context boundary."; copy.append(eyebrow, heading, note); empty.append(copy); area.append(empty); return; }
   records.forEach((record) => {
     const article = document.createElement("article"); const role = record.role === "user" ? "user" : "assistant"; article.className = `message message--${role}`;
     const label = document.createElement("div"); label.className = "message-label"; label.textContent = role === "user" ? "You" : "Soul /";
@@ -119,6 +133,55 @@ function renderInbox(data) {
 async function createChat() {
   setBusy(true, "Creating conversation");
   try { const envelope = await callSoul("chats.create"); lifecycle(envelope); const chat = dataOf(envelope).record; await loadChats(false); await selectChat(chat); } catch (error) { showError(error); } finally { setBusy(false); }
+}
+
+function openClearDialog() {
+  state.clearPreview = null;
+  byId("clear-mode").value = "title";
+  byId("clear-title").value = state.activeChat?.title || "";
+  byId("clear-title-field").hidden = false;
+  byId("clear-preview").hidden = true;
+  byId("clear-confirmation").value = "";
+  byId("clear-dialog-status").textContent = "Preview is required before archival.";
+  byId("clear-dialog").showModal();
+}
+
+function clearParameters() {
+  const mode = byId("clear-mode").value;
+  return mode === "all" ? { mode } : { mode, title: byId("clear-title").value.trim() };
+}
+
+function resetClearPreview() {
+  state.clearPreview = null;
+  byId("clear-preview").hidden = true;
+  byId("clear-confirmation").value = "";
+  byId("execute-clear").disabled = true;
+  byId("clear-dialog-status").textContent = "Scope changed; preview again.";
+}
+
+async function previewClear() {
+  const status = byId("clear-dialog-status"); status.textContent = "Checking active conversations…";
+  try {
+    const parameters = clearParameters();
+    const envelope = await callSoul("chats.clear.preview", parameters); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") { state.clearPreview = null; byId("clear-preview").hidden = true; status.textContent = envelope.errors?.[0]?.message || "No active conversations matched."; return; }
+    const data = dataOf(envelope); state.clearPreview = { parameters, digest: data.match_digest };
+    byId("clear-preview-summary").textContent = `${data.count} active conversation${data.count === 1 ? "" : "s"} will leave the list. Transcript files remain stored.`;
+    const list = byId("clear-preview-list"); list.replaceChildren();
+    (data.records || []).forEach((record) => { const item = document.createElement("div"); item.className = "clear-preview-item"; const title = document.createElement("strong"); title.textContent = record.title || "Untitled conversation"; const id = document.createElement("small"); id.textContent = record.id; item.append(title, id); list.append(item); });
+    byId("clear-confirmation").value = ""; byId("execute-clear").disabled = true; byId("clear-preview").hidden = false; status.textContent = "Review every match, then type the exact confirmation.";
+  } catch (error) { status.textContent = error.message || "Preview failed safely."; }
+}
+
+async function executeClear() {
+  if (!state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS") return;
+  const status = byId("clear-dialog-status"); byId("execute-clear").disabled = true; status.textContent = "Archiving verified conversations…";
+  try {
+    const parameters = { ...state.clearPreview.parameters, confirmation: "CLEAR_CONVERSATIONS", expected_digest: state.clearPreview.digest };
+    const envelope = await callSoul("chats.clear.execute", parameters); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Archive blocked; preview again."; resetClearPreview(); return; }
+    const count = dataOf(envelope).count || 0; state.activeChat = null; state.clearPreview = null; byId("clear-dialog").close(); await loadChats(true); announce(`${count} conversation${count === 1 ? "" : "s"} archived; transcripts retained`);
+  } catch (error) { status.textContent = error.message || "Archive failed safely."; }
 }
 
 async function sendMessage(event) {
@@ -157,6 +220,13 @@ async function bootstrap() {
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("new-chat").addEventListener("click", createChat);
+byId("clear-chats").addEventListener("click", openClearDialog);
+byId("close-clear-dialog").addEventListener("click", () => byId("clear-dialog").close());
+byId("clear-mode").addEventListener("change", () => { byId("clear-title-field").hidden = byId("clear-mode").value === "all"; resetClearPreview(); });
+byId("clear-title").addEventListener("input", resetClearPreview);
+byId("preview-clear").addEventListener("click", previewClear);
+byId("clear-confirmation").addEventListener("input", () => { byId("execute-clear").disabled = !state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS"; });
+byId("execute-clear").addEventListener("click", executeClear);
 byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
 byId("composer").addEventListener("submit", sendMessage);

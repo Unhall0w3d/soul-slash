@@ -18,6 +18,7 @@ Automated acceptance means ready for visual review, not approved for merge, rele
 - Delegates domain requests to the Phase 12B `ApplicationFacade`.
 - Adds a branded, responsive, accessible Chat workspace with conversation continuity, shared metadata, inbox state, and manual host status.
 - Presents Skill Studio as a selectable but behaviorally inert Phase 12D preview.
+- Adds an owner-requested preview-first `chats.clear` skill and dashboard dialog for exact-title or all-conversation metadata archival without transcript deletion.
 - Adds no daemon, service, worker, watcher, scheduler, polling, remote dependency, approval authority, or new memory store.
 
 ## Files changed
@@ -131,6 +132,7 @@ Skill-private memory store added: no
 - Messages are plain text and workspace entries are metadata-only; rich Markdown, content reads, approvals, and activity views remain out of scope.
 - The layout still requires human review with real operator data and varied viewport sizes.
 - Skill Studio is deliberately non-functional until Phase 12D.
+- Archived conversations do not yet have a dashboard restore/archive-management view.
 
 ## Browser visual and interaction review
 

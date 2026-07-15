@@ -25,6 +25,8 @@ module SoulCore
       "chats.send" => %w[chat_id message],
       "chats.pin" => %w[chat_id],
       "chats.unpin" => %w[chat_id],
+      "chats.clear.preview" => %w[mode title],
+      "chats.clear.execute" => %w[mode title confirmation expected_digest],
       "workspace.list" => %w[kind lifecycle privacy delivery_state limit],
       "workspace.chat" => %w[chat_id kind lifecycle privacy delivery_state limit],
       "workspace.detail" => %w[artifact_id],

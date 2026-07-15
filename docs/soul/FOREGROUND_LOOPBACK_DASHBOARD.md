@@ -31,6 +31,8 @@ The browser calls only registered Phase 12B application operations. Domain store
 
 Chat supports conversation listing, creation, selection, bounded history, send, pin/unpin, workspace metadata, inbox summary, and manual host status. The UI exposes provider, configuration, privacy, lifecycle, and mutation state.
 
+The approved conversation-clearing amendment adds a preview-first `chats.clear` skill and dashboard dialog. Exact-title mode shows all duplicate-title matches; all mode shows the complete bounded active set. Execution requires `CLEAR_CONVERSATIONS` and the preview digest. Clearing archives metadata from the active list and never deletes transcript files.
+
 Skill Studio is present as the second primary tab so the product hierarchy can be reviewed. Its workflow is intentionally inert until a separate Phase 12D implementation decision.
 
 ## Review posture

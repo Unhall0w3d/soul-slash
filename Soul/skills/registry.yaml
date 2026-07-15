@@ -9,6 +9,16 @@ skills:
     writes_files: false
     expected_output: json
     verifier: schema_basic
+  chats.clear:
+    path: Soul/skills/chats/clear.rb
+    language: ruby
+    description: Preview and archive active conversations by exact title or all conversations so they leave the active list without deleting transcripts.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: CLEAR_CONVERSATIONS
+    writes_files: true
+    expected_output: json
+    verifier: schema_basic
   downloads.inspect:
     path: Soul/skills/downloads/inspect.rb
     language: ruby

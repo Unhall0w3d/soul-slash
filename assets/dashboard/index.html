@@ -33,7 +33,10 @@
         <aside class="conversation-rail" aria-labelledby="conversations-heading">
           <div class="rail-heading">
             <div><p class="eyebrow">Continuity</p><h1 id="conversations-heading">Conversations</h1></div>
-            <button id="new-chat" class="icon-button" type="button" aria-label="Create conversation">+</button>
+            <div class="rail-actions">
+              <button id="clear-chats" class="text-icon-button" type="button">Clear</button>
+              <button id="new-chat" class="icon-button" type="button" aria-label="Create conversation">+</button>
+            </div>
           </div>
           <div id="chat-list" class="chat-list" aria-live="polite"></div>
           <div class="rail-footer"><span class="local-seal" aria-hidden="true">◉</span><span>Private by default<br><small>Stored on this machine</small></span></div>
@@ -105,6 +108,31 @@
       <div class="studio-notice"><span aria-hidden="true">◇</span><div><strong>Intentionally inert</strong><p>Phase 12C does not draft, execute, register, approve, or merge skills.</p></div></div>
     </section>
   </main>
+  <dialog id="clear-dialog" class="clear-dialog" aria-labelledby="clear-dialog-title">
+    <form id="clear-form" method="dialog">
+      <div class="dialog-heading"><div><p class="eyebrow">Conversation lifecycle</p><h2 id="clear-dialog-title">Clear conversations</h2></div><button id="close-clear-dialog" class="icon-button" type="button" aria-label="Close clear conversations dialog">×</button></div>
+      <p class="dialog-note">Clearing archives conversation metadata so it leaves the active list. Transcripts remain stored locally and are not deleted.</p>
+      <label for="clear-mode">Clear scope</label>
+      <select id="clear-mode" name="mode">
+        <option value="title">Exact title</option>
+        <option value="all">All conversations</option>
+      </select>
+      <div id="clear-title-field">
+        <label for="clear-title">Exact conversation title</label>
+        <input id="clear-title" name="title" type="text" maxlength="120" autocomplete="off">
+      </div>
+      <button id="preview-clear" class="dialog-button" type="button">Preview matches</button>
+      <section id="clear-preview" class="clear-preview" aria-live="polite" hidden>
+        <h3>Verified preview</h3>
+        <p id="clear-preview-summary"></p>
+        <div id="clear-preview-list" class="clear-preview-list"></div>
+        <label for="clear-confirmation">Type <code>CLEAR_CONVERSATIONS</code> to confirm</label>
+        <input id="clear-confirmation" name="confirmation" type="text" autocomplete="off" spellcheck="false">
+        <button id="execute-clear" class="danger-button" type="button" disabled>Archive previewed conversations</button>
+      </section>
+      <p id="clear-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
   <div id="live-status" class="sr-only" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -1,0 +1,24 @@
+---
+name: "chats.clear"
+language: "ruby"
+entrypoint: "clear.rb"
+description: "Previews and archives conversations from the active list without deleting transcripts."
+risk: "write_local_state"
+requires_approval: true
+confirmation_phrase: "CLEAR_CONVERSATIONS"
+inputs:
+  title:
+    type: "string"
+  all:
+    type: "boolean"
+  expected_digest:
+    type: "string"
+  execute:
+    type: "boolean"
+  confirm:
+    type: "string"
+outputs:
+  lifecycle_state:
+    type: "string"
+  data:
+    type: "object"

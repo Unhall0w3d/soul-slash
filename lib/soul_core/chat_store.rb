@@ -46,11 +46,12 @@ module SoulCore
       nil
     end
 
-    def list_chats
-      Dir.glob(File.join(@root, "*.json"))
+    def list_chats(include_archived: false)
+      records = Dir.glob(File.join(@root, "*.json"))
         .map { |path| JSON.parse(File.read(path)) rescue nil }
         .compact
-        .sort_by { |item| item["updated_at"].to_s }
+      records = records.reject { |item| item["archived"] == true } unless include_archived
+      records.sort_by { |item| item["updated_at"].to_s }
         .reverse
     end
 
@@ -116,6 +117,10 @@ module SoulCore
 
     def unpin(chat_id)
       update_flag(chat_id, "pinned", false)
+    end
+
+    def archive(chat_id)
+      update_flag(chat_id, "archived", true)
     end
 
     private

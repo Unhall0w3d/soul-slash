@@ -35,6 +35,7 @@ require_relative "phase12a_portable_typed_configuration_assessor"
 require_relative "phase12b_in_process_application_api_assessor"
 require_relative "phase12c_foreground_dashboard_assessor"
 require_relative "dashboard_command"
+require_relative "conversation_clear_service_assessor"
 require_relative "phase10_inspectable_interests_closeout_assessor"
 require_relative "phase10_recent_style_awareness_assessor"
 require_relative "phase10_identity_style_foundation_assessor"
@@ -289,6 +290,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+      when "conversation-list-clearing", "chats-clear", "conversation-clear"
+        json = @argv.include?("--json")
+        assessor = ConversationClearServiceAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
       when "phase12c-foreground-dashboard", "phase12c-dashboard", "foreground-dashboard"
         json = @argv.include?("--json")
         assessor = Phase12cForegroundDashboardAssessor.new(root: Dir.pwd)
@@ -729,6 +736,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess grounded-evidence-lifecycle"
       puts "  ruby bin/soul assess bounded-host-system-status"
       puts "  ruby bin/soul assess phase12c-foreground-dashboard"
+      puts "  ruby bin/soul assess conversation-list-clearing"
       puts "  ruby bin/soul assess chat-execution-history"
       puts "  ruby bin/soul assess repo-curation"
       puts "  ruby bin/soul assess feature-direction"
