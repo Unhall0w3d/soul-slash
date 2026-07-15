@@ -2,6 +2,8 @@
 
 require_relative "chat_store"
 require_relative "conversation_runtime"
+require_relative "application_chat_service"
+require "securerandom"
 
 module SoulCore
   class ChatCommand
@@ -11,7 +13,8 @@ module SoulCore
       input: $stdin,
       output: $stdout,
       env: ENV,
-      runtime: nil
+      runtime: nil,
+      chat_service: nil
     )
       @argv = argv.dup
       @root = File.expand_path(root)
@@ -22,6 +25,11 @@ module SoulCore
         root: @root,
         store: @store,
         env: env
+      )
+      @chat_service = chat_service || ApplicationChatService.new(
+        root: @root,
+        store: @store,
+        runtime: @runtime
       )
     end
 
@@ -76,23 +84,18 @@ module SoulCore
     end
 
     def exchange(chat_id, message)
-      @store.add_message(chat_id, role: "user", content: message)
-      result = @runtime.respond(chat_id: chat_id, message: message)
-
-      @store.add_message(
-        chat_id,
-        role: "assistant",
-        content: result.content,
-        metadata: {
-          "responder" => "conversational_soul_phase3",
-          "mode" => result.mode,
-          "provider_id" => result.provider_id,
-          "fallback_reason" => result.fallback_reason,
-          "runtime" => result.metadata
-        }.reject { |_key, value| value.nil? }
+      exchange = @chat_service.send(
+        chat_id: chat_id,
+        message: message,
+        request_id: "cli:#{SecureRandom.uuid}",
+        interface: "cli"
       )
+      unless exchange.fetch("ok")
+        @output.puts "Soul chat error: #{exchange['reason']}"
+        return 1
+      end
 
-      @output.puts "Soul> #{result.content}"
+      @output.puts "Soul> #{exchange.dig('assistant_message', 'content')}"
       0
     end
 

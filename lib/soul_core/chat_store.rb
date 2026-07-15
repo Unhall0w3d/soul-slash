@@ -8,6 +8,7 @@ require "time"
 module SoulCore
   class ChatStore
     DEFAULT_ROOT = "Soul/runtime/chats"
+    APPLICATION_SCAN_LIMIT = 10_000
 
     attr_reader :project_root, :root
 
@@ -76,11 +77,27 @@ module SoulCore
       message
     end
 
-    def messages(chat_id)
+    def messages(chat_id, limit: nil, scan_limit: nil)
       path = messages_path(chat_id)
       return [] unless File.exist?(path)
 
-      File.readlines(path).map { |line| JSON.parse(line) rescue nil }.compact
+      rows = []
+      scanned = 0
+      File.foreach(path) do |line|
+        scanned += 1
+        raise RuntimeError, "chat message history exceeds bounded scan limit" if scan_limit && scanned > scan_limit
+
+        record = JSON.parse(line) rescue nil
+        next unless record
+
+        rows << record
+        rows.shift while limit && rows.length > limit.to_i
+      end
+      rows
+    end
+
+    def message(chat_id, message_id, scan_limit: APPLICATION_SCAN_LIMIT)
+      messages(chat_id, scan_limit: scan_limit).find { |record| record["id"] == message_id.to_s }
     end
 
     def search(query)
