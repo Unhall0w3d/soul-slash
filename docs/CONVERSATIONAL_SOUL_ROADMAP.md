@@ -319,9 +319,11 @@ preview-first exact-confirmation generation of advisory improvement proposal pac
 no package mutation, privileged command, service change, model download, implementation, or promotion
 ```
 
-The Phase 12D.3 visual/product review is approved. Repository merge remains governed by the normal separate human gate.
+Phase 12D.3 passed visual/product review and was merged.
 
-Phase 12C.1 adds the owner-approved personal dashboard authentication boundary. A fixed `admin` account begins with the public `soul123` bootstrap credential but cannot access dashboard data until a private replacement password is set. Credentials remain in ignored owner-only runtime storage; sessions are bounded and process-local; sign-ups and multi-user roles remain unavailable. This candidate does not widen the listener: protected transport and LAN binding require a separate reviewed phase.
+Phase 12C.1 adds the owner-approved personal dashboard authentication boundary. A fixed `admin` account begins with the public `soul123` bootstrap credential but cannot access dashboard data until a private replacement password is set. Credentials remain in ignored owner-only runtime storage; sessions are bounded and process-local; sign-ups and multi-user roles remain unavailable. Authentication passed first-login review and was merged.
+
+The separately approved protected local deployment keeps Soul on `127.0.0.1:4567` and uses two bounded systemd user services to expose Caddy HTTPS on one exact LAN address and unprivileged port. The operator completed Caddy installation, narrow firewall configuration, private-CA client trust, and remote login/logout review. Internet exposure, router forwarding, wildcard binding, and automatic firewall mutation remain out of scope. The deployment passed review and was merged.
 
 An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
 
