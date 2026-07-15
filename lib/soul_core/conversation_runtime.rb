@@ -246,6 +246,9 @@ module SoulCore
           "Size: #{outcome['size_bytes']} bytes",
           "SHA-256 verified: #{outcome['hash_verified'] ? 'yes' : 'no'}",
           ("Revision of: #{outcome['source_artifact_id']}" if outcome["source_artifact_id"]),
+          "Workspace delivery: #{outcome['delivery_state'] || 'not_recorded'}",
+          ("Delivery ID: #{outcome['delivery_id']}" if outcome["delivery_id"]),
+          ("Inbox delivery failed: #{outcome['delivery_failure_reason']}. Retry with: deliver artifact #{outcome['artifact_id']} to inbox" if outcome["delivery_state"] == "failed"),
           "Review the artifact before relying on or publishing it.",
           "Mutation: artifact_created"
         ].compact.join("\n")
