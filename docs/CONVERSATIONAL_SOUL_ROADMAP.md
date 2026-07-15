@@ -105,7 +105,7 @@ Delivered:
     replay-verifiable memory snapshot export
     explicit logical-deletion and no-physical-purge policy
 
-Phase 10 is in progress.
+Phase 10 is complete.
 
 ### Phase 10: Identity, interests, and variation
 
@@ -182,14 +182,61 @@ no cloud fallback, upload, export, deletion, move, rename, or in-place edit
 Remaining:
 
 ```text
-attachment inbox and delivery
-voice-friendly completion summaries
-richer lifecycle and provider export integration
+Phase 11D shared workspace projection and artifact inbox/delivery
+```
+
+Deferred beyond the current artifact milestone:
+
+```text
+voice input/output behavior
+provider export integration
+rich document and media handling
+in-place edit, move, rename, delete, and cross-system delivery
+```
+
+### Phase 11D: Shared workspace and artifact inbox
+
+Status:
+
+```text
+brief pending human approval
+```
+
+Planned:
+
+```text
+interface-independent workspace projection over canonical artifact identities
+bounded workspace and inbox queries
+synchronous idempotent artifact delivery records
+chat, task, revision, privacy, digest, and lifecycle provenance
+seen and dismissed inbox state without artifact mutation
+concise deterministic completion and failure summaries
+no dashboard, listener, watcher, background process, upload, export, or file mutation
 ```
 
 ### Phase 12: Interface contract
 
-Deliver designs and core API contracts for:
+Phase 12 is split into bounded vertical slices:
+
+```text
+12A portable typed configuration
+12B in-process application API contracts
+12C foreground loopback dashboard and first human visual review
+12D guided Skill Studio as the second primary tab
+12E unified approvals and activity views
+```
+
+The dashboard product shape begins with:
+
+```text
+Tab 1: Chat
+Tab 2: Skill Studio
+shared workspace alongside Chat
+manual system-status refresh with host identity and timestamp
+explicit provider, privacy, approval, task, and failure state
+```
+
+Core interface contracts cover:
 
 ```text
 Chat
@@ -202,6 +249,10 @@ Memory
 Settings
 System status
 ```
+
+The first dashboard aesthetic must use the existing Soul/ imagery, colorway, typography, and arcane-technical visual language as inspiration. The locally runnable first visual slice pauses for human review before secondary interface features expand. See `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
+
+The public repository must not require the owner's IP addresses, hostnames, credentials, model alias, or filesystem paths. CLI, dashboard, tests, and later deployment share one typed configuration contract resolved from CLI overrides, process environment, ignored local `.env`, and tracked safe defaults.
 
 ### Phase 13: Integrated acceptance and closeout
 
@@ -221,3 +272,5 @@ documentation and curation closeout
 ```
 
 Phase 13 is the clear stopping point.
+
+Proxmox is not required for Phases 11D through 13. A separate human-approved deployment brief follows successful local dashboard acceptance and defines the persistent-service exception, guest topology, environment file, LAN boundary, backup, recovery, upgrade, and rollback behavior.
