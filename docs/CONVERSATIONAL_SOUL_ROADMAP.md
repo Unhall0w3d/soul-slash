@@ -128,14 +128,14 @@ explicit separation from biography, lived experience, feelings, credentials, emb
 combined identity, variation, interest, and hygiene acceptance coverage
 ```
 
-Phase 11 is in progress.
+Phase 11 is complete.
 
 ### Phase 11: Artifact-aware conversation
 
 Status:
 
 ```text
-in progress
+complete
 ```
 
 Delivered in Phase 11A:
@@ -179,12 +179,6 @@ visible failure, cancellation, race, privacy, integrity, and registry-recovery b
 no cloud fallback, upload, export, deletion, move, rename, or in-place edit
 ```
 
-Remaining:
-
-```text
-Phase 11D shared workspace projection and artifact inbox/delivery
-```
-
 Deferred beyond the current artifact milestone:
 
 ```text
@@ -199,10 +193,10 @@ in-place edit, move, rename, delete, and cross-system delivery
 Status:
 
 ```text
-implementation authorized; candidate work in progress
+complete
 ```
 
-Planned:
+Approved scope:
 
 ```text
 interface-independent workspace projection over canonical artifact identities
@@ -243,7 +237,7 @@ Phase 12 is split into bounded vertical slices:
 12E unified approvals and activity views
 ```
 
-Phase 12A candidate implementation now provides:
+Phase 12A provides:
 
 ```text
 canonical typed schema for 21 interface-relevant settings
@@ -256,24 +250,24 @@ inert loopback-only dashboard host and port reservation
 no listener, service, watcher, polling, provider probe, or configuration write
 ```
 
-Human merge review remains required before Phase 12A is accepted.
+Phase 12A was reviewed and merged.
 
-Phase 12B candidate implementation now provides:
+Phase 12B provides:
 
 ```text
 versioned soul.application.v1 request and response envelopes
-23 explicitly registered in-process operations
+41 explicitly registered in-process operations after later interface slices
 bounded Chat, workspace, inbox, configuration, status, skill, approval, and activity projections
 shared CLI/application Chat exchange service
 append-only private duplicate-send receipts without duplicated chat content
-manual-only system-status refresh
+explicit system-status refresh operation
 redacted non-authorizing approval and activity summaries
 no HTTP transport, listener, frontend, service, watcher, scheduler, or polling
 ```
 
-Human merge review remains required before Phase 12B is accepted.
+Phase 12B was reviewed and merged.
 
-Phase 12C candidate implementation now provides:
+Phase 12C provides:
 
 ```text
 dependency-free, foreground, sequential loopback HTTP transport
@@ -285,7 +279,20 @@ visible but behaviorally inert Skill Studio preview as the second primary tab
 no daemon, service, worker, LAN bind, polling, remote asset, or persistence install
 ```
 
-Phase 12C is blocked for the required human visual review. Its automated checks do not approve the design or authorize merge.
+Phase 12C's initial visual-review gate was satisfied by the owner. Its historical brief and assessment retain the original gate language; later phases made Skill Studio functional and added Self Improvement.
+
+Phase 12D provides the controlled Skill Studio lifecycle:
+
+```text
+Proposal, Beta, and Production inventories
+exact-revision human Gate 1 before Beta implementation work
+isolated unregistered Beta candidates
+bounded human-invoked Beta diagnostics and test evidence
+exact-tested-revision human Gate 2 before later promotion
+no automatic Codex invocation, implementation, registration, promotion, merge, or release
+```
+
+Phase 12D was visually reviewed and merged.
 
 Phase 12D.2 candidate implementation adds a bounded self-skilling intake bridge:
 
@@ -299,7 +306,7 @@ no silent Mistral call, Codex invocation, implementation, registration, or promo
 both existing human gates preserved
 ```
 
-Human review remains required before Phase 12D.2 is accepted.
+Phase 12D.2 was reviewed and merged with both existing human gates preserved.
 
 Phase 12D.3 candidate implementation adds a third Self Improvement tab:
 
@@ -312,11 +319,11 @@ preview-first exact-confirmation generation of advisory improvement proposal pac
 no package mutation, privileged command, service change, model download, implementation, or promotion
 ```
 
-Human visual and merge review remain required before Phase 12D.3 is accepted.
+The Phase 12D.3 visual/product review is approved. Repository merge remains governed by the normal separate human gate.
 
 An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
 
-The dashboard product shape begins with:
+The dashboard product shape is:
 
 ```text
 Tab 1: Chat
@@ -341,7 +348,7 @@ Settings
 System status
 ```
 
-The first dashboard aesthetic must use the existing Soul/ imagery, colorway, typography, and arcane-technical visual language as inspiration. The locally runnable first visual slice pauses for human review before secondary interface features expand. See `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
+The dashboard aesthetic uses the existing Soul/ imagery, colorway, typography, and restrained arcane-technical visual language. Material interface changes continue to require human review. See `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
 
 The public repository must not require the owner's IP addresses, hostnames, credentials, model alias, or filesystem paths. CLI, dashboard, tests, and later deployment share one typed configuration contract resolved from CLI overrides, process environment, ignored local `.env`, and tracked safe defaults.
 

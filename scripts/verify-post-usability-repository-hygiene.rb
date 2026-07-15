@@ -59,25 +59,27 @@ check(
 )
 
 check(
-  "interaction architecture states current limitation",
-  interaction.include?("## Current limitation") &&
-    interaction.include?("model-backed conversation loop") &&
+  "interaction architecture states current implementation posture",
+  interaction.include?("## Current implementation posture") &&
+    interaction.include?("persistent model-backed multi-turn conversation") &&
     interaction.include?("Humor is optional"),
   errors
 )
 
 check(
-  "milestones reset numbering",
-  milestones.include?("Phase numbering resets") &&
+  "milestones track the current phase sequence",
+  milestones.include?("Conversational Soul") &&
     milestones.include?("Phase 1") &&
-    milestones.include?("Phase 9"),
+    milestones.include?("Phase 12D.3") &&
+    milestones.include?("Phase 13"),
   errors
 )
 
 check(
-  "changelog reflects milestone closeout",
-  changelog.include?("Safe Local Action milestone") &&
-    changelog.include?("Conversational Soul"),
+  "changelog reflects current milestone progress",
+  changelog.include?("Conversational Soul") &&
+    changelog.include?("Phase 12D.3") &&
+    changelog.include?("Phase 12E"),
   errors
 )
 
@@ -125,7 +127,7 @@ end
 
 if errors.empty?
   puts "Verification complete."
-  puts "Repository documentation is ready for Conversational Soul Phase 1."
+  puts "Repository documentation is aligned through Conversational Soul Phase 12D.3."
 else
   warn "Verification failed:"
   errors.each { |error| warn "- #{error}" }

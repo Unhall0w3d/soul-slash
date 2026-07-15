@@ -27,25 +27,22 @@ The initial Chat composition should include:
 - a shared-workspace rail or drawer for artifacts attached to the conversation;
 - direct links from completion messages to artifacts, approvals, evidence, and review records.
 
-System status is manually refreshed in the initial dashboard. The interface must not add background polling, watchers, or monitoring services.
+System status is collected once when the dashboard opens and may be refreshed manually. The interface must not add background polling, watchers, or monitoring services.
 
 ### Skill Studio tab
 
-The initial Skill Studio workflow is:
+The implemented Skill Studio lifecycle is:
 
 ```text
-idea
-→ bounded brief draft
-→ human edit
-→ risk and scope review
-→ test and local-eval requirements
-→ explicit brief approval
-→ implementation task pack
-→ candidate review artifact
-→ human merge decision
+idea, capability gap, or bounded brief draft
+→ proposal review and exact-revision human Gate 1
+→ isolated, unregistered Beta implementation
+→ required tests and bounded human-invoked diagnostics
+→ exact-tested-revision human Gate 2
+→ separate later promotion and merge decisions
 ```
 
-Skill Studio may organize, draft, validate, and export reviewed candidate material. It must not autonomously invoke Codex, apply patches, register generated skills, promote candidates, or treat model output as approval.
+Skill Studio organizes proposals, Beta candidates, required tests, diagnostics, and production registry summaries. It must not autonomously invoke Codex, apply patches, register generated skills, promote candidates, or treat model output as approval.
 
 ### Self Improvement tab
 
@@ -128,9 +125,9 @@ The implementation must use distributable fonts or robust system fallbacks. It m
 - Maintain readable contrast, visible keyboard focus, reduced-motion behavior, and usable zoom.
 - Avoid generic commercial-SaaS gloss and avoid turning every control into fantasy decoration.
 
-## Initial visual review gate
+## Visual review posture
 
-The first locally runnable dashboard slice must pause for human review before Skill Studio behavior or secondary dashboard features expand.
+The owner approved the initial Chat/Skill Studio direction and the later Self Improvement third tab. Material changes to dashboard hierarchy, visual language, or authority boundaries still pause for human review.
 
 The review should cover:
 
@@ -145,7 +142,7 @@ The review should cover:
 - motion and interaction feel;
 - desired additions, removals, or product-direction changes.
 
-Passing automated tests does not approve the dashboard design. Human visual review is the acceptance gate for the first aesthetic direction.
+Passing automated tests does not approve dashboard design. Human visual review remains the acceptance gate for material interface changes.
 
 ## Deployment posture
 

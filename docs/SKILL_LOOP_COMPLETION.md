@@ -59,13 +59,12 @@ ruby bin/soul assess skill-loop-completion
 ruby bin/soul assess loop-completion
 ```
 
-## Next optional tracks
+## Subsequent tracks
 
-After this stop point, future work can proceed in separate tracks:
+After this stop point, later phases delivered the Codex fixture pack, first bounded Codex task, implementation task packs/review, Skill Studio Beta lifecycle, and dashboard capability-gap intake. Remaining optional capability tracks include:
 
 ```text
-Codex fixture pack
-first bounded Codex task
 local speech-to-text assessment
 bounded screen understanding assessment
+model suitability routing integration
 ```

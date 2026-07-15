@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-09T20:54:54-04:00
+Generated: 2026-07-15T13:24:20-04:00
 
 Source registry:
 
@@ -15,10 +15,46 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-12
+14
 ```
 
 ## Skills
+
+### Chats Clear
+
+```text
+id: chats.clear
+category: uncategorized
+status: unknown
+risk: approval_required
+confirmation_required: true
+```
+
+Preview and archive active conversations by exact title or all conversations so they leave the active list without deleting transcripts.
+
+Example ways the owner might ask for this:
+
+- use chats clear
+- run chats.clear
+- prepare this first and ask before changing anything
+
+### Chats Forget
+
+```text
+id: chats.forget
+category: uncategorized
+status: unknown
+risk: approval_required
+confirmation_required: true
+```
+
+Permanently delete one exact local conversation and logically forget shared memories derived from it.
+
+Example ways the owner might ask for this:
+
+- use chats forget
+- run chats.forget
+- prepare this first and ask before changing anything
 
 ### Cloud Providers List
 
@@ -26,7 +62,7 @@ It does not activate, disable, or modify any skill.
 id: cloud.providers.list
 category: uncategorized
 status: unknown
-risk: network_or_provider_check
+risk: read_only
 confirmation_required: false
 ```
 
@@ -60,8 +96,8 @@ Example ways the owner might ask for this:
 id: downloads.cleanup_plan
 category: uncategorized
 status: unknown
-risk: approval_required
-confirmation_required: true
+risk: read_only
+confirmation_required: false
 ```
 
 Read-only human-oriented cleanup plan based on downloads.inspect.
@@ -70,7 +106,6 @@ Example ways the owner might ask for this:
 
 - plan a downloads cleanup
 - what can be cleaned up safely
-- prepare this first and ask before changing anything
 
 ### Downloads Inspect
 
@@ -78,8 +113,8 @@ Example ways the owner might ask for this:
 id: downloads.inspect
 category: uncategorized
 status: unknown
-risk: approval_required
-confirmation_required: true
+risk: read_only
+confirmation_required: false
 ```
 
 Read-only Downloads inspection and cleanup-candidate planning.
@@ -88,7 +123,6 @@ Example ways the owner might ask for this:
 
 - inspect my downloads
 - show me what is in downloads
-- prepare this first and ask before changing anything
 
 ### Downloads Move To Trash
 
@@ -184,7 +218,7 @@ Example ways the owner might ask for this:
 id: weather.report
 category: uncategorized
 status: unknown
-risk: read_only
+risk: network_or_provider_check
 confirmation_required: false
 ```
 
@@ -201,7 +235,7 @@ Example ways the owner might ask for this:
 id: youtube.song_search
 category: uncategorized
 status: unknown
-risk: read_only
+risk: low
 confirmation_required: false
 ```
 
@@ -218,7 +252,7 @@ Example ways the owner might ask for this:
 id: youtube.video_resolve
 category: uncategorized
 status: unknown
-risk: network_or_provider_check
+risk: low
 confirmation_required: false
 ```
 

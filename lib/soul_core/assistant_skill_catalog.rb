@@ -163,8 +163,8 @@ module SoulCore
 
       description = (data["description"] || data[:description] || data["summary"] || data[:summary] || "").to_s.strip
       human_name = humanize(id.to_s)
-      risk = infer_risk(id.to_s, description)
-      confirmation_required = risk == "approval_required"
+      confirmation_required = explicit_confirmation_required?(data, id.to_s, description)
+      risk = catalog_risk(data, id.to_s, description, confirmation_required)
 
       {
         "id" => id.to_s,
@@ -182,6 +182,26 @@ module SoulCore
       text = "#{id} #{description}"
       match = RISK_RULES.find { |regex, _risk| text.match?(regex) }
       match ? match[1] : "unknown"
+    end
+
+    def explicit_confirmation_required?(data, id, description)
+      return data["requires_approval"] == true || data[:requires_approval] == true if data.key?("requires_approval") || data.key?(:requires_approval)
+      return true unless (data["confirmation_phrase"] || data[:confirmation_phrase]).to_s.empty?
+
+      infer_risk(id, description) == "approval_required"
+    end
+
+    def catalog_risk(data, id, description, confirmation_required)
+      return "approval_required" if confirmation_required
+
+      declared = (data["risk"] || data[:risk]).to_s
+      return "network_or_provider_check" if data["network_access"] == true || data[:network_access] == true
+      return "network_or_provider_check" if id.match?(/cloud\.providers\.test|skill\.brief\.draft/)
+      return "review_only" if id.match?(/skill\.brief\.review/)
+      return "read_only" if declared == "read_only"
+      return "low" if declared == "low"
+
+      infer_risk(id, description)
     end
 
     def humanize(id)

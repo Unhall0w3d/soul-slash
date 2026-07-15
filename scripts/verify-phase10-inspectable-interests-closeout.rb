@@ -93,7 +93,12 @@ record(
   "roadmap marks Phase 10 complete",
   roadmap.match?(/### Phase 10:.*?Status:\s*```text\s*complete\s*```/m)
 )
-record(results, failures, "roadmap selects Phase 11 next", roadmap.include?("Phase 11 is next"))
+record(
+  results,
+  failures,
+  "roadmap preserves completed Phase 11 and current interface progression",
+  roadmap.include?("Phase 11 is complete.") && roadmap.include?("Phase 12D.3") && roadmap.include?("Phase 13 is the clear stopping point")
+)
 
 stdout, stderr, status = capture("git", "ls-files")
 tracked = stdout.lines.map(&:strip)

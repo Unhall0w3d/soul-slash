@@ -60,4 +60,4 @@ These are provider classes, not configured providers.
 
 ## Recommended next phase
 
-Phase 26 should add model suitability policy tightening and a Codex-readiness boundary document.
+This historical recommendation was completed: later phases added model suitability policy tightening and a Codex-readiness boundary. Current direction is tracked in `docs/CURRENT_STATE.md`.

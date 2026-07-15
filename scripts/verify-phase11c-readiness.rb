@@ -98,7 +98,7 @@ brief = File.read("docs/soul/PHASE11C_BOUNDED_ARTIFACT_CREATION_REVISION_BRIEF.m
 
 check("Ruby version matches local runtime", ruby_version == RUBY_VERSION, errors)
 check("CI consumes .ruby-version", workflow.include?("ruby/setup-ruby@v1") && !workflow.include?("ruby-version:"), errors)
-check("roadmap says Phase 11 is in progress", roadmap.include?("Phase 11 is in progress."), errors)
+check("roadmap says Phase 11 is complete", roadmap.include?("Phase 11 is complete."), errors)
 check("human-approved brief authorizes implementation", brief.include?("implementation_authorized: yes") && brief.include?("Implementation authorized: yes"), errors)
 check("candidate brief prohibits overwrite", brief.include?("overwrite or edit an existing file"), errors)
 check("candidate brief requires approval token", brief.include?("approval token") && brief.include?("literal `confirm`"), errors)

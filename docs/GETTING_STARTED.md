@@ -190,14 +190,30 @@ ruby bin/soul skills
 ruby bin/soul skill system.status
 ```
 
-## 11. Try intent routing
+## 11. Start the foreground dashboard
+
+```bash
+ruby bin/soul dashboard
+```
+
+Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, Skill Studio, and Self Improvement. It binds to loopback only, runs in the foreground, and stops with Ctrl+C.
+
+Use an ignored local `.env` or an invocation-only override for a different port:
+
+```bash
+ruby bin/soul dashboard --set dashboard.port=4568
+```
+
+Do not commit operator-specific hostnames, addresses, credentials, model aliases, or filesystem paths.
+
+## 12. Try intent routing
 
 ```bash
 ruby bin/soul intent "run a file cleanup in Downloads"
 ruby bin/soul intent "restore the last downloads cleanup"
 ```
 
-## 12. Try the cleanup workflow
+## 13. Try the cleanup workflow
 
 Create harmless test fixtures. Avoid protected terms like `soul` or `Aletheia` in the filenames.
 
@@ -236,7 +252,7 @@ Clean up:
 rm -rf ~/Downloads/restore-fixture-file.tmp ~/Downloads/restore-fixture-folder
 ```
 
-## 13. Reflection
+## 14. Reflection
 
 After a successful workflow:
 
@@ -257,7 +273,7 @@ Reject weak or generic candidates:
 ruby bin/soul reflection reject latest --reason "Not useful"
 ```
 
-## 14. Common Make targets
+## 15. Common Make targets
 
 ```text
 make help             Show available targets
@@ -275,7 +291,7 @@ make env-show         Show local runtime config
 make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew warnings
 ```
 
-## 15. Clock-skew warning after applying overlays
+## 16. Clock-skew warning after applying overlays
 
 If `make` complains that files have modification times in the future, run:
 

@@ -1,6 +1,6 @@
 # Portable Typed Configuration
 
-Phase 12A defines the configuration contract shared by Soul's CLI, conversation runtime, future in-process application API, and future dashboard.
+Phase 12A defines the configuration contract shared by Soul's CLI, conversation runtime, in-process application API, and foreground dashboard.
 
 ## Resolution precedence
 
@@ -136,17 +136,17 @@ The typed reader:
 
 Missing `.env` is normal and resolves from process values and safe defaults.
 
-## Dashboard reservation
+## Dashboard settings
 
-Phase 12A defines inert dashboard settings:
+Phase 12A introduced the dashboard settings later consumed by the approved Phase 12C foreground command:
 
 ```text
 SOUL_DASHBOARD_BIND_HOST=127.0.0.1
 SOUL_DASHBOARD_PORT=4567
 ```
 
-The bind host accepts loopback only. These settings do not open a network listener. Foreground loopback execution belongs to the separately approved Phase 12C brief.
+The bind host accepts loopback only. Resolving or inspecting these settings does not open a listener; only an explicit `ruby bin/soul dashboard` invocation starts the foreground server.
 
 ## Migration boundary
 
-Configuration inspection and Chat consume the typed resolver now. Legacy commands retain their existing environment access during the bounded migration. Phase 12B application contracts and Phase 12C dashboard code must consume the typed contract rather than add another configuration format.
+Configuration inspection, Chat, the application facade, and the dashboard consume the typed resolver. Legacy commands may retain existing environment access during bounded migration, but new interface code must not add another configuration format.

@@ -12,8 +12,8 @@ Soul/ is early experimental software. It is being built in layers so behavior ca
 
 Soul/ currently has:
 
-- terminal chat and persistent chat sessions
-- deterministic intent routing and skill planning
+- terminal and foreground loopback dashboard chat with persistent sessions
+- model-backed multi-turn conversation with deterministic intent routing and skill planning
 - an execution adapter registry
 - read-only and review-only execution gates
 - local execution history and history controls
@@ -21,7 +21,12 @@ Soul/ currently has:
 - explicit approve, revoke, dry-run, and confirmation flows
 - an approval-gated Downloads move-to-trash workflow
 - reflection and human-reviewed memory promotion
-- bounded cloud-assisted skill proposal tooling
+- shared conversation artifacts, workspace metadata, and inbox delivery
+- bounded artifact inspection, creation, and revision
+- a two-gate Skill Studio with separate Proposal, Beta, and Production inventories
+- conservative capability-gap intake that can deliver a proposal to Skill Studio
+- a Self Improvement dashboard for bounded environment, runtime, model, and capability assessment
+- bounded cloud-assisted skill proposal tooling with disclosed provider boundaries
 - a controlled Codex handoff and review path that does not mutate production automatically
 
 The completed milestone chain is:
@@ -33,13 +38,15 @@ Usability foundation: complete
 Safe local action: complete
 ```
 
-The next milestone is:
+The active milestone is:
 
 ```text
 Conversational Soul
 ```
 
-That milestone will turn the current command-oriented chat foundation into a coherent multi-turn conversational runtime that can retain context, invoke skills during discussion, interpret results, create artifacts, and return naturally to the conversation.
+Phases 1 through 12D.3 have built the conversation runtime, memory controls, artifacts, foreground dashboard, Skill Studio, self-skilling intake, and Self Improvement assessment surface. The next planned interface slice is unified approvals/activity, followed by integrated Phase 13 acceptance and closeout.
+
+See [Current State](docs/CURRENT_STATE.md) for the concise implementation map and current boundaries.
 
 ## What Soul/ is becoming
 
@@ -54,7 +61,7 @@ Soul/ is intended to grow into a local assistant environment with:
 - recoverable operations where early destructive-looking actions use Trash instead
 - human-approved durable memory, rules, and skill changes
 - optional cloud-assisted research and drafting with explicit privacy boundaries
-- future chat, inbox, file-space, dashboard, and voice surfaces using the same assistant core
+- shared CLI/dashboard Chat, inbox, workspace, and skill-review surfaces, with future voice using the same assistant core
 
 ## Design principles
 
@@ -65,7 +72,7 @@ Soul/ is intended to grow into a local assistant environment with:
 - Read-only planning comes before write actions.
 - Write-capable workflows require explicit user confirmation.
 - Trash is the terminal cleanup action for early cleanup workflows.
-- Permanent deletion is not supported.
+- Permanent deletion is limited to explicitly previewed, exact-scope operations such as conversation delete-and-forget; recoverable Trash remains preferred for file cleanup.
 - Cloud output is a review artifact unless a bounded workflow says otherwise.
 - Durable memory, rules, and skill updates are staged and human-reviewed before promotion.
 - The assistant should explain useful results rather than dumping raw tool output into conversation.
@@ -184,6 +191,14 @@ Run basic Soul/ checks:
 make test-soul
 ```
 
+Start the local dashboard:
+
+```bash
+ruby bin/soul dashboard
+```
+
+Then open `http://127.0.0.1:4567/`. The dashboard remains a foreground, loopback-only process and stops with Ctrl+C.
+
 See:
 
 ```text
@@ -216,6 +231,15 @@ Check project/runtime health:
 ```bash
 ruby bin/soul doctor
 ruby bin/soul skill system.status
+```
+
+Run bounded environment and capability assessments:
+
+```bash
+ruby bin/soul assess environment
+ruby bin/soul assess environment --updates
+ruby bin/soul assess models
+ruby bin/soul assess capabilities
 ```
 
 Classify a request:
@@ -265,9 +289,9 @@ docs/CODEX_HANDOFF_CONTRACT.md
 
 ## Development pattern
 
-Soul/ uses overlay-based development.
+Soul/ retains its overlay system for focused handoffs and archived phase packages. Current repository development also uses reviewed branches and pull requests with deterministic verifiers and human review artifacts.
 
-An overlay is a focused ZIP containing a small set of files to apply to the existing project tree. This keeps changes reviewable and avoids giant unexplained rewrites.
+An overlay is a focused ZIP containing a small set of files to apply to the existing project tree. New work should still be bounded, reviewable, verifier-backed, and explicit about human approval regardless of delivery mechanism.
 
 See:
 
@@ -285,16 +309,12 @@ Current milestone:
 Conversational Soul
 ```
 
-Planned focus:
+Current focus:
 
-- conversational architecture and acceptance contract
-- model-backed multi-turn conversation
-- conversation-aware tool orchestration
-- layered memory and project continuity
-- context-sensitive personality and variation
-- artifact-aware conversation
-- chat, inbox, file-space, and dashboard design
+- unified approvals and activity views
 - integrated conversational acceptance testing
+- dashboard and Skill Studio refinement from human review
+- bounded expansion of local capabilities
 
 Later milestones may cover:
 

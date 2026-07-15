@@ -130,4 +130,4 @@ rollback_notes
 
 ## Next phase
 
-Phase 27 should add the Codex handoff contract.
+This historical next step was completed in Phase 27 with the Codex handoff contract. Current direction is tracked in `docs/CURRENT_STATE.md`.

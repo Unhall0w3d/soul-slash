@@ -41,6 +41,20 @@ ruby bin/soul respond "move all"
 ruby bin/soul respond "yeah, do it"
 ```
 
+### Conversation lifecycle skills
+
+```text
+chats.clear
+chats.forget
+```
+
+These operations are available through the dashboard's conversation lifecycle dialog. Clearing is reversible metadata archival and keeps transcripts. Delete-and-forget targets one exact conversation and is destructive. Both require a verified preview, unchanged digest, and exact human confirmation.
+
+```text
+CLEAR_CONVERSATIONS
+DELETE_AND_FORGET_CONVERSATION
+```
+
 Restore workflow:
 
 ```bash
@@ -126,6 +140,25 @@ ruby bin/soul skill skill.brief.review -- \
   --provider mistral \
   --proposal Soul/proposals/skills/<proposal-folder>
 ```
+
+### Skill Studio lifecycle
+
+Skill Studio is a dashboard application workflow over proposal packets, isolated Beta candidates, and the production skill registry; it is not itself a production skill.
+
+```text
+proposal intake or draft
+→ human Gate 1 approval of the exact proposal
+→ bounded Beta implementation outside the production registry
+→ explicit human-invoked testing and diagnostics
+→ human Gate 2 approval of the exact tested revision
+→ separate later promotion workflow
+```
+
+Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. That self-skilling intake stops at human review and does not call Mistral, invoke Codex, build a Beta, or promote code automatically.
+
+### Self Improvement assessments
+
+Self Improvement is also an application workflow rather than a production skill. The dashboard can run bounded read-only environment, update, model-runtime, and capability assessments. Generating advisory improvement proposals requires preview and exact confirmation; host/package mutation is unavailable.
 
 ## Documentation rule
 

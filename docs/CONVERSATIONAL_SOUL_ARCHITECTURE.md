@@ -323,6 +323,7 @@ Skills
 Memory
 Settings
 System status
+Self Improvement
 ```
 
 ### Chat
@@ -368,6 +369,18 @@ risk impact
 restart requirement
 recommended default
 ```
+
+### Current dashboard composition
+
+The implemented foreground dashboard currently exposes:
+
+```text
+Chat: conversations, composer, workspace, inbox, and host status
+Skill Studio: Proposal, Beta, and Production inventories with two human gates
+Self Improvement: environment, update, model-runtime, and capability assessment plus advisory proposals
+```
+
+Approvals, activities, broader files, memory, and settings remain supporting views to consolidate in later interface slices. They must continue to use the same application facade and domain services rather than reading stores directly.
 
 ## Explicit anti-patterns
 

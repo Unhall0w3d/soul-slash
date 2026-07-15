@@ -33,8 +33,12 @@ Chat supports conversation listing, creation, selection, bounded history, send, 
 
 The approved conversation-clearing amendment adds a preview-first `chats.clear` skill and dashboard dialog. Exact-title mode shows all duplicate-title matches; all mode shows the complete bounded active set. Execution requires `CLEAR_CONVERSATIONS` and the preview digest. Clearing archives metadata from the active list and never deletes transcript files.
 
-Skill Studio is present as the second primary tab so the product hierarchy can be reviewed. Its workflow is intentionally inert until a separate Phase 12D implementation decision.
+The separate delete-and-forget path targets one exact selected conversation. It requires a destructive preview, unchanged digest, and `DELETE_AND_FORGET_CONVERSATION`. It deletes the transcript and conversation state and logically forgets derived shared memories while preserving append-only safety evidence and independently managed artifacts.
+
+Skill Studio is the second primary tab. It projects local proposal packets, isolated Beta candidates, and registered production skills. Gate 1 approves an exact proposal revision for implementation work; Gate 2 approves an exact tested Beta revision for a later promotion workflow. Beta runs are explicit, bounded, foreground-only, and diagnostic. No gate implements or promotes automatically.
+
+Self Improvement is the third primary tab. It loads one lightweight read-only environment snapshot on first open and offers explicit environment, update, model-runtime, and capability assessments. Advisory improvement proposals require preview, digest revalidation, and exact confirmation. Host/package mutation remains unavailable.
 
 ## Review posture
 
-Deterministic verification covers the HTTP boundary, browser protections, facade delegation, accessibility markers, visual tokens, no-polling rule, and clean max-request termination. It does not approve the visual design. Phase 12C remains `blocked_for_human_review` until the owner reviews the running dashboard and records requested revisions or acceptance.
+Deterministic verification covers the HTTP boundary, browser protections, facade delegation, accessibility markers, visual tokens, no-polling rule, and clean max-request termination. Automated checks do not approve visual design. The owner approved the current Chat, Skill Studio, and Self Improvement visual/product direction; later visual changes still require human review.

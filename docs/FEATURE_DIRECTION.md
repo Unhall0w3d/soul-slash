@@ -1,9 +1,11 @@
 
 # Feature Direction
 
-This document records the current post-curation feature direction for Soul.
+This document records the legacy Phase 24 post-curation ranking returned by `assess feature-direction`.
 
-## Current recommendation
+The top foundational candidates from that ranking—model suitability, Alpha/Beta implementation planning, Codex handoff/review, and the dashboard skill lifecycle—were delivered in later phases. For the current program position, see `docs/CURRENT_STATE.md` and `docs/CONVERSATIONAL_SOUL_ROADMAP.md`.
+
+## Phase 24 recommendation
 
 The recommended next capability is:
 
@@ -38,7 +40,7 @@ no background services by default
 no implicit cloud routing
 ```
 
-## Current ranked candidates
+## Phase 24 ranked candidates
 
 ```text
 1. model_suitability_registry

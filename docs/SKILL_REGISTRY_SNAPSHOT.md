@@ -1,6 +1,6 @@
 # Skill Registry Snapshot
 
-Generated: 2026-07-09T18:50:12-04:00
+Generated: 2026-07-15T13:24:19-04:00
 
 Source registry:
 
@@ -13,11 +13,31 @@ This document is a generated documentation snapshot of the active skill registry
 ## Summary
 
 ```text
-skill_count: 12
+skill_count: 14
 registry_path: Soul/skills/registry.yaml
 ```
 
 ## Skills
+
+### `chats.clear`
+
+```text
+name: chats.clear
+category: uncategorized
+status: unknown
+```
+
+Preview and archive active conversations by exact title or all conversations so they leave the active list without deleting transcripts.
+
+### `chats.forget`
+
+```text
+name: chats.forget
+category: uncategorized
+status: unknown
+```
+
+Permanently delete one exact local conversation and logically forget shared memories derived from it.
 
 ### `cloud.providers.list`
 

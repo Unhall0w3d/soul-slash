@@ -106,7 +106,7 @@ if File.file?(File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md"))
   headings = roadmap.scan(/^### Phase \d+:[^\n]+$/)
   record(results, failures, "roadmap phase headings are unique", headings.uniq.length == headings.length)
   record(results, failures, "roadmap fences are balanced", roadmap.scan(/^```/).length.even?)
-  record(results, failures, "roadmap marks Phase 11 in progress", roadmap.match?(/^### Phase 11: Artifact-aware conversation\s*$.*?^in progress\s*$/m))
+  record(results, failures, "roadmap marks Phase 11 complete", roadmap.match?(/^### Phase 11: Artifact-aware conversation\s*$.*?^complete\s*$/m))
   record(results, failures, "roadmap keeps standalone Phase 12 heading", roadmap.match?(/^### Phase 12: Interface contract\s*$/))
   record(results, failures, "roadmap has no fused fence heading", !roadmap.match?(/^```### Phase /))
 end
