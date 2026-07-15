@@ -52,7 +52,7 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
 
         relative_path, content_type = STATIC_ROUTES.fetch(target)
-        return response(200, File.binread(File.join(@root, relative_path)), "Content-Type" => content_type, "Cache-Control" => "public, max-age=300")
+        return response(200, File.binread(File.join(@root, relative_path)), "Content-Type" => content_type, "Cache-Control" => "no-store")
       end
 
       return api_call(normalized_headers, body) if target == "/api/v1/call" && method == "POST"
