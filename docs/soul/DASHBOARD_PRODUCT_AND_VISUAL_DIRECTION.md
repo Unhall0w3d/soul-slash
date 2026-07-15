@@ -4,14 +4,17 @@
 
 The first Soul dashboard is a local, desktop-first interface over the same assistant runtime used by the CLI. It must not implement a second memory model, skill runner, approval system, artifact registry, or safety policy.
 
-The primary navigation begins with two tabs in this order:
+The primary navigation now has three tabs in this order:
 
 ```text
 1. Chat
 2. Skill Studio
+3. Self Improvement
 ```
 
 Chat is the daily operating surface. Skill Studio is the controlled skill-creation workflow. Shared workspace, system status, approvals, and activity are supporting views rather than separate assistant brains.
+
+Self Improvement is the evidence-and-review surface for Soul's host environment, language/tool versions, local model runtime, capability matrix, and advisory improvement proposals. It is not an autonomous package manager or privileged administration console.
 
 ### Chat tab
 
@@ -43,6 +46,12 @@ idea
 ```
 
 Skill Studio may organize, draft, validate, and export reviewed candidate material. It must not autonomously invoke Codex, apply patches, register generated skills, promote candidates, or treat model output as approval.
+
+### Self Improvement tab
+
+The tab loads one lightweight read-only environment snapshot when opened. Package update checks, local model assessment, and capability assessment remain explicit foreground actions. Generating advisory improvement proposal packets requires previewing and confirming the exact assessed revision.
+
+The initial surface must make the mutation boundary visible: it cannot install, update, downgrade, or remove packages; change services; download models; implement or promote skills; or run privileged commands. Those actions require separately reviewed executors with package-manager-specific recovery and confirmation behavior.
 
 ### Shared workspace
 
@@ -127,7 +136,7 @@ The review should cover:
 
 - overall visual tone;
 - information density;
-- navigation and two-tab hierarchy;
+- navigation and three-tab hierarchy;
 - Chat composition;
 - workspace placement;
 - system-status presentation;

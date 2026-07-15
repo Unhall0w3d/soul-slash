@@ -16,6 +16,7 @@ require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
+require_relative "self_improvement_service"
 
 module SoulCore
   class ApplicationFacade
@@ -40,7 +41,8 @@ module SoulCore
       approval_store: nil,
       activity_store: nil,
       skill_registry: nil,
-      skill_studio_service: nil
+      skill_studio_service: nil,
+      self_improvement_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -56,6 +58,7 @@ module SoulCore
       @activity_store = activity_store
       @skill_registry = skill_registry
       @skill_studio_service = skill_studio_service
+      @self_improvement_service = self_improvement_service
     end
 
     def call(request)
@@ -119,6 +122,10 @@ module SoulCore
       when "skill_studio.betas.run.execute" then domain(skill_studio.run_beta(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.promotion.preview" then domain(skill_studio.promotion_preview(beta_id: required(parameters, "beta_id")))
       when "skill_studio.betas.promotion.approve" then domain(skill_studio.approve_beta_for_promotion(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_improvement.snapshot" then domain(self_improvement.snapshot)
+      when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
+      when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
+      when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -132,7 +139,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Skill Studio"],
+        "product_tabs" => ["Chat", "Skill Studio", "Self Improvement"],
         "configuration" => {
           "ok" => report.fetch("ok"),
           "lifecycle_state" => report.fetch("lifecycle_state"),
@@ -148,6 +155,14 @@ module SoulCore
           "proposal_gate" => "human_exact_confirmation",
           "beta_gate" => "human_exact_confirmation",
           "automatic_promotion" => false
+        },
+        "self_improvement" => {
+          "available" => true,
+          "phase" => "12D.3",
+          "automatic_scope" => "read_only_environment_snapshot",
+          "proposal_gate" => "human_exact_confirmation",
+          "host_mutation_available" => false,
+          "automatic_refresh" => false
         },
         "unified_operations" => { "available" => false, "planned_phase" => "12E" }
       }
@@ -335,6 +350,10 @@ module SoulCore
 
     def skill_studio
       @skill_studio_service ||= SkillStudioService.new(root: @root, clock: @clock)
+    end
+
+    def self_improvement
+      @self_improvement_service ||= SelfImprovementService.new(root: @root, clock: @clock)
     end
 
     def chat_projection(chat)

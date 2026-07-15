@@ -19,6 +19,7 @@
     <nav class="primary-tabs" aria-label="Primary" role="tablist">
       <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
       <button id="studio-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="studio-panel">Skill Studio <span class="phase-tag">Beta</span></button>
+      <button id="improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="improvement-panel">Self Improvement</button>
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
@@ -149,6 +150,71 @@
           </article>
         </section>
       </div>
+    </section>
+
+    <section id="improvement-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="improvement-tab" hidden>
+      <header class="improvement-header">
+        <div><p class="eyebrow">Evidence before action</p><h1>Self Improvement</h1><p>Soul can inspect the environment it inhabits, identify capability gaps, and prepare bounded improvement proposals for your review.</p></div>
+        <div class="improvement-boundary"><strong>Human authority preserved</strong><span>Assess → recommend → preview → approve</span><small>No package, service, model, skill, or system change is automatic.</small></div>
+      </header>
+
+      <div class="assessment-toolbar" aria-label="Manual assessment scopes">
+        <div><p class="eyebrow">Foreground assessment</p><h2>Choose one bounded scope</h2><p>The lightweight environment snapshot loads once when this tab opens. Deeper checks run only when requested.</p></div>
+        <div class="assessment-actions">
+          <button type="button" data-assessment-scope="environment">Environment</button>
+          <button type="button" data-assessment-scope="updates">Update checks</button>
+          <button type="button" data-assessment-scope="models">Model runtime</button>
+          <button type="button" data-assessment-scope="capabilities">Capabilities</button>
+        </div>
+      </div>
+
+      <div class="improvement-grid">
+        <section class="improvement-card improvement-card--identity" aria-labelledby="environment-summary-heading">
+          <div class="card-heading"><div><p class="eyebrow">Current substrate</p><h2 id="environment-summary-heading">Environment</h2></div><span id="improvement-scope" class="maturity-chip">not assessed</span></div>
+          <dl id="improvement-environment" class="improvement-details"><div><dt>Collection</dt><dd>Open this tab to assess</dd></div></dl>
+        </section>
+        <section class="improvement-card" aria-labelledby="runtime-summary-heading">
+          <div class="card-heading"><div><p class="eyebrow">Languages &amp; tools</p><h2 id="runtime-summary-heading">Runtime inventory</h2></div><span id="runtime-count" class="count-badge">0</span></div>
+          <div id="runtime-list" class="runtime-list"><p class="muted">No runtime inventory yet.</p></div>
+        </section>
+        <section class="improvement-card" aria-labelledby="capability-summary-heading">
+          <div class="card-heading"><div><p class="eyebrow">What Soul can do</p><h2 id="capability-summary-heading">Capability health</h2></div><span id="capability-state" class="count-badge">—</span></div>
+          <div id="capability-summary" class="metric-row"><div><strong>—</strong><small>available</small></div><div><strong>—</strong><small>partial</small></div><div><strong>—</strong><small>missing</small></div></div>
+          <p id="capability-note" class="muted">Run the capability assessment for current evidence.</p>
+        </section>
+        <section class="improvement-card" aria-labelledby="model-summary-heading">
+          <div class="card-heading"><div><p class="eyebrow">Local inference</p><h2 id="model-summary-heading">Model runtime</h2></div><span id="model-state" class="count-badge">—</span></div>
+          <div id="model-summary" class="runtime-list"><p class="muted">Run the model assessment to check loopback endpoints and bounded local inventory.</p></div>
+        </section>
+      </div>
+
+      <div class="improvement-lower-grid">
+        <section class="improvement-card recommendations-card" aria-labelledby="recommendations-heading">
+          <div class="card-heading"><div><p class="eyebrow">Assessed opportunities</p><h2 id="recommendations-heading">Recommendations</h2></div><span id="recommendation-count" class="count-badge">0</span></div>
+          <div id="recommendation-list" class="recommendation-list"><p class="muted">Recommendations appear after an assessment.</p></div>
+        </section>
+        <section class="improvement-card proposals-card" aria-labelledby="improvement-proposals-heading">
+          <div class="card-heading"><div><p class="eyebrow">Human review queue</p><h2 id="improvement-proposals-heading">Improvement proposals</h2></div><span id="improvement-proposal-count" class="count-badge">0</span></div>
+          <p class="card-note">Proposal packets are advisory. They do not implement or promote anything.</p>
+          <div id="improvement-proposal-list" class="recommendation-list"><p class="muted">No proposal inventory loaded.</p></div>
+          <section class="gate-card improvement-gate">
+            <div><p class="eyebrow">Bounded local write</p><h3>Generate proposal packets</h3><p>Preview the current capability-derived candidates, then approve that exact revision.</p></div>
+            <button id="preview-improvement-proposals" class="gate-button" type="button">Preview proposal generation</button>
+            <div id="improvement-proposal-confirm" hidden>
+              <div id="improvement-proposal-preview-list" class="recommendation-list"></div>
+              <label for="improvement-proposal-confirmation">Type <code>GENERATE_SELF_IMPROVEMENT_PROPOSALS</code></label>
+              <input id="improvement-proposal-confirmation" type="text" autocomplete="off" spellcheck="false">
+              <button id="execute-improvement-proposals" class="gate-button gate-button--gold" type="button" disabled>Generate advisory packets</button>
+            </div>
+            <p id="improvement-proposal-status" class="dialog-status" role="status"></p>
+          </section>
+        </section>
+      </div>
+
+      <aside class="unavailable-boundary" aria-labelledby="unavailable-actions-heading">
+        <div><p class="eyebrow">Not authorized in this phase</p><h2 id="unavailable-actions-heading">Host mutation remains unavailable</h2></div>
+        <p>Update installation, package removal, orphan cleanup, service changes, model downloads, implementation, and promotion require separately reviewed executors. This tab only assesses and prepares candidate proposals.</p>
+      </aside>
     </section>
   </main>
   <dialog id="clear-dialog" class="clear-dialog" aria-labelledby="clear-dialog-title">

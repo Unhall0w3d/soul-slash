@@ -53,6 +53,10 @@ module SoulCore
       "skill_studio.betas.run.execute" => %w[beta_id args confirmation expected_digest],
       "skill_studio.betas.promotion.preview" => %w[beta_id],
       "skill_studio.betas.promotion.approve" => %w[beta_id confirmation expected_digest],
+      "self_improvement.snapshot" => [],
+      "self_improvement.refresh" => %w[scope],
+      "self_improvement.proposals.preview" => [],
+      "self_improvement.proposals.execute" => %w[confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze

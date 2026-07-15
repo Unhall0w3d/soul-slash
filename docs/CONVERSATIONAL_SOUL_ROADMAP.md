@@ -239,6 +239,7 @@ Phase 12 is split into bounded vertical slices:
 12C foreground loopback dashboard and first human visual review
 12D guided Skill Studio as the second primary tab
 12D.2 bounded capability-gap intake from Chat to Skill Studio
+12D.3 bounded environment and capability assessment in Self Improvement
 12E unified approvals and activity views
 ```
 
@@ -300,6 +301,19 @@ both existing human gates preserved
 
 Human review remains required before Phase 12D.2 is accepted.
 
+Phase 12D.3 candidate implementation adds a third Self Improvement tab:
+
+```text
+one automatic lightweight environment snapshot when the tab is opened
+explicit foreground update, model-runtime, and capability assessment scopes
+bounded command timeouts, output limits, and model-file inventory
+language/tool versions, package-manager evidence, capability health, and recommendations
+preview-first exact-confirmation generation of advisory improvement proposal packets
+no package mutation, privileged command, service change, model download, implementation, or promotion
+```
+
+Human visual and merge review remain required before Phase 12D.3 is accepted.
+
 An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
 
 The dashboard product shape begins with:
@@ -307,6 +321,7 @@ The dashboard product shape begins with:
 ```text
 Tab 1: Chat
 Tab 2: Skill Studio
+Tab 3: Self Improvement
 shared workspace alongside Chat
 initial and manually refreshed system status with host identity and timestamp
 explicit provider, privacy, approval, task, and failure state
