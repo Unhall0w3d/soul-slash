@@ -241,6 +241,21 @@ Phase 12 is split into bounded vertical slices:
 12E unified approvals and activity views
 ```
 
+Phase 12A candidate implementation now provides:
+
+```text
+canonical typed schema for 21 interface-relevant settings
+CLI override → process environment → ignored .env → safe-default precedence
+bounded non-interpolating .env parsing without caller-environment mutation
+redacted show, explain, and validate commands
+provider compatibility projection for Chat
+explicit source, validation, privacy/risk, and restart metadata
+inert loopback-only dashboard host and port reservation
+no listener, service, watcher, polling, provider probe, or configuration write
+```
+
+Human merge review remains required before Phase 12A is accepted.
+
 The dashboard product shape begins with:
 
 ```text

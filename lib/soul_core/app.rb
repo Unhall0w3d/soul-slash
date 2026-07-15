@@ -4,6 +4,8 @@
 require "json"
 require_relative "confirmation_parser"
 require_relative "env_loader"
+require_relative "configuration_command"
+require_relative "configuration_resolver"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
 require_relative "read_only_skill_execution_gate"
@@ -29,6 +31,7 @@ require_relative "phase11_bounded_artifact_inspection_assessor"
 require_relative "phase11_artifact_metadata_attachment_assessor"
 require_relative "phase11c_bounded_artifact_creation_assessor"
 require_relative "phase11d_shared_workspace_inbox_assessor"
+require_relative "phase12a_portable_typed_configuration_assessor"
 require_relative "phase10_inspectable_interests_closeout_assessor"
 require_relative "phase10_recent_style_awareness_assessor"
 require_relative "phase10_identity_style_foundation_assessor"
@@ -89,6 +92,7 @@ module SoulCore
   class App
     def initialize(positional_argv = nil, argv: nil)
       @argv = (argv || positional_argv || []).dup
+      @process_env = ENV.to_h
       EnvLoader.load
       validate_workflow_contracts!
     end
@@ -97,7 +101,9 @@ module SoulCore
       command = @argv.shift
       case command
   when "chat", "chats"
-  ChatCommand.new(argv: @argv, root: Dir.pwd).run
+  run_chat
+    when "config", "configuration"
+      ConfigurationCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
     when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
       when "skill" then run_skill
       when "intent" then run_intent
@@ -278,6 +284,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+      when "phase12a-portable-typed-configuration", "phase12a-configuration", "typed-configuration"
+        json = @argv.include?("--json")
+        assessor = Phase12aPortableTypedConfigurationAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
       when "phase11d-shared-workspace-inbox", "phase11d-workspace", "workspace-inbox"
         json = @argv.include?("--json")
         assessor = Phase11dSharedWorkspaceInboxAssessor.new(root: Dir.pwd)
@@ -575,6 +587,17 @@ when "documentation-registry", "doc-registry", "docs-registry"
       report.fetch("valid") ? 0 : 1
     end
 
+    def run_chat
+      resolver = ConfigurationResolver.new(root: Dir.pwd, process_env: @process_env)
+      report = resolver.resolve
+      unless report.fetch("ok")
+        puts "Chat error: configuration validation failed. Run `ruby bin/soul config validate`."
+        return 1
+      end
+
+      ChatCommand.new(argv: @argv, root: Dir.pwd, env: resolver.effective_environment).run
+    end
+
     def run_skill
       name = @argv.shift
       separator_index = @argv.index("--")
@@ -656,6 +679,9 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "Soul command examples:"
       puts "  ruby bin/soul skills"
       puts "  ruby bin/soul chat [message]"
+      puts "  ruby bin/soul config show [--json]"
+      puts "  ruby bin/soul config explain <canonical.key> [--json]"
+      puts "  ruby bin/soul config validate [--json]"
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess model-suitability"
