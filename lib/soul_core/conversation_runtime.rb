@@ -2,6 +2,8 @@
 
 require "json"
 require_relative "chat_responder"
+require_relative "capability_gap_classifier"
+require_relative "capability_gap_intake_service"
 require_relative "conversation_artifact_creation_service"
 require_relative "conversation_context_builder"
 require_relative "conversation_capability_registry"
@@ -55,7 +57,9 @@ module SoulCore
       grounding_policy: nil,
       orchestrator: nil,
       host_status_collector: nil,
-      artifact_creation_service: nil
+      artifact_creation_service: nil,
+      capability_gap_classifier: nil,
+      capability_gap_intake_service: nil
     )
       @root = File.expand_path(root)
       @store = store
@@ -73,6 +77,8 @@ module SoulCore
       @evidence_followup_router = evidence_followup_router || ConversationEvidenceFollowupRouter.new
       @capability_registry = capability_registry || ConversationCapabilityRegistry.new
       @host_status_collector = host_status_collector || HostSystemStatusCollector.new
+      @capability_gap_classifier = capability_gap_classifier || CapabilityGapClassifier.new
+      @capability_gap_intake_service = capability_gap_intake_service || CapabilityGapIntakeService.new(root: @root)
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
         evidence_store: @evidence_store,
@@ -528,6 +534,17 @@ module SoulCore
                 else
                   @capability_registry.render(resolution)
                 end
+      gap_intake = nil
+      if mode == "capability_gap" && resolution&.matched?
+        gap_intake = @capability_gap_intake_service.intake(
+          chat_id: chat_id,
+          request: text,
+          classification: "declared_unavailable_capability",
+          reason: resolution.reason,
+          capability: resolution.capability
+        )
+        content = [content, render_gap_intake(gap_intake)].reject(&:empty?).join("\n\n")
+      end
       context = safe_context(chat_id)
 
       record_state(
@@ -546,6 +563,7 @@ module SoulCore
         metadata: {
           "orchestration" => decision.to_h,
           "capability" => resolution.to_h,
+          "capability_gap_intake" => gap_intake,
           "grounding" => { "valid" => true, "mode" => "declared_capability_registry" },
           "context" => context_stats(context)
         }
@@ -580,6 +598,17 @@ module SoulCore
 
       if response.success? && !response.content.to_s.strip.empty?
         content = response.content.to_s.strip
+        gap_classification = @capability_gap_classifier.classify(user_message: text, assistant_message: content)
+        gap_intake = nil
+        if gap_classification["candidate"] == true
+          gap_intake = @capability_gap_intake_service.intake(
+            chat_id: chat_id,
+            request: text,
+            classification: gap_classification.fetch("classification"),
+            reason: gap_classification.fetch("reason")
+          )
+          content = [content, render_gap_intake(gap_intake)].reject(&:empty?).join("\n\n")
+        end
         record_state(
           chat_id: chat_id,
           user_message: text,
@@ -600,6 +629,8 @@ module SoulCore
             "finish_reason" => response.finish_reason,
             "usage" => response.usage,
             "latency_ms" => response.latency_ms,
+            "capability_gap_classification" => gap_classification,
+            "capability_gap_intake" => gap_intake,
             "context" => context_stats(context)
           }
         )
@@ -720,6 +751,36 @@ module SoulCore
         request: request,
         timeout_seconds: float_env("SOUL_CONVERSATION_TIMEOUT_SECONDS", 120.0)
       )
+    end
+
+    def render_gap_intake(result)
+      return "" unless result.is_a?(Hash)
+
+      case result["status"]
+      when "created"
+        [
+          "I created a local Skill Studio proposal intake for this missing capability.",
+          "Proposal: #{result['proposal_id']}",
+          "It is attached to this conversation and delivered to the dashboard for your review.",
+          "No cloud provider or implementation process was started. Human Gate 1 still applies."
+        ].join("\n")
+      when "deduplicated"
+        [
+          "This matches an existing Skill Studio proposal intake: #{result['proposal_id']}.",
+          "I attached and delivered the existing proposal rather than creating a duplicate.",
+          "No cloud provider or implementation process was started."
+        ].join("\n")
+      when "covered"
+        coverage = result.fetch("coverage", {})
+        if coverage["kind"] == "beta_skill"
+          "A runnable Beta may cover this request: #{coverage['skill_id']}. I will not run it unless you explicitly ask me to try that Beta."
+        else
+          "A registered production skill may cover this request: #{coverage['skill_id']}. This is a routing or execution problem, so I did not create a duplicate proposal."
+        end
+      else
+        reason = result["reason"].to_s
+        reason.empty? ? "" : "I identified a possible capability gap, but proposal intake stopped safely: #{reason}"
+      end
     end
 
     def selected_provider

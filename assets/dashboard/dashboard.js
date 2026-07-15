@@ -256,7 +256,7 @@ function studioItem(titleText, metaText, active, onClick) {
 function renderStudioLists(production = null) {
   const proposals = byId("proposal-list"); proposals.replaceChildren(); byId("proposal-count").textContent = String(state.proposals.length);
   if (!state.proposals.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No proposal packets found."; proposals.append(empty); }
-  state.proposals.forEach((record) => proposals.append(studioItem(record.title || record.proposal_id, `${record.proposal_gate?.replaceAll("_", " ")} · ${record.provider || "local"}`, state.selectedProposal?.proposal_id === record.proposal_id, () => selectProposal(record.proposal_id))));
+  state.proposals.forEach((record) => { const source = record.intake ? `gap intake · ${record.occurrence_count || 1} occurrence${record.occurrence_count === 1 ? "" : "s"}` : (record.provider || "local"); proposals.append(studioItem(record.title || record.proposal_id, `${record.proposal_gate?.replaceAll("_", " ")} · ${source}`, state.selectedProposal?.proposal_id === record.proposal_id, () => selectProposal(record.proposal_id))); });
 
   const betas = byId("beta-list"); betas.replaceChildren(); byId("beta-count").textContent = String(state.betas.length);
   if (!state.betas.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No implemented Beta packages yet."; betas.append(empty); }
@@ -303,8 +303,10 @@ async function selectProposal(proposalId) {
     state.selectedProposal = record; state.selectedBeta = null; state.proposalApproval = null; showStudioDetail("proposal"); renderStudioLists();
     byId("proposal-title").textContent = record.title || proposalId; byId("proposal-description").textContent = record.description || "No proposal description.";
     byId("proposal-gate-state").textContent = record.proposal_gate?.replaceAll("_", " ") || "awaiting review";
-    renderDefinitionList(byId("proposal-meta"), [["Proposal ID", record.proposal_id], ["Created", record.created_at], ["Beta package", record.beta_present ? "present" : "not built"], ["Beta gate", record.beta_gate?.replaceAll("_", " ")]]);
-    byId("proposal-cloud").textContent = record.cloud_assisted ? `${record.provider} / ${record.model || "configured model"}; data class ${record.cloud_data_class || "unspecified"}. This output is advisory and cannot approve itself.` : "No cloud provider is recorded for this proposal.";
+    const proposalMeta = [["Proposal ID", record.proposal_id], ["Created", record.created_at], ["Beta package", record.beta_present ? "present" : "not built"], ["Beta gate", record.beta_gate?.replaceAll("_", " ")]];
+    if (record.intake) proposalMeta.push(["Origin chat", record.origin_chat_id], ["Gap class", record.gap_classification?.replaceAll("_", " ")], ["Occurrences", record.occurrence_count], ["Intake state", record.intake_status?.replaceAll("_", " ")]);
+    renderDefinitionList(byId("proposal-meta"), proposalMeta);
+    byId("proposal-cloud").textContent = record.intake ? "Created locally from an unsatisfied chat request. No cloud provider was invoked. Optional Mistral development remains a separate disclosed human action." : (record.cloud_assisted ? `${record.provider} / ${record.model || "configured model"}; data class ${record.cloud_data_class || "unspecified"}. This output is advisory and cannot approve itself.` : "No cloud provider is recorded for this proposal.");
     byId("proposal-markdown").textContent = record.proposal_markdown || "No proposal text available."; renderChecklist(byId("proposal-checklist"), record.review_checklist || [], "No checklist file was supplied.");
     const approved = record.proposal_gate === "approved"; byId("preview-proposal-approval").disabled = approved; byId("proposal-approval-confirm").hidden = true; byId("proposal-confirmation").value = ""; byId("proposal-approval-status").textContent = approved ? "This exact proposal revision is approved for Beta implementation." : "Review the brief and checklist before opening Gate 1.";
   } catch (error) { announce(error.message || "Proposal could not be loaded."); }
