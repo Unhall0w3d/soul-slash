@@ -26,7 +26,7 @@ required.each { |path| check(path, File.file?(path), errors) }
 
 stdout, stderr, status = Open3.capture3("ruby", "bin/soul", "assess", "conversation-list-clearing", "--json")
 report = JSON.parse(stdout) rescue nil
-assessment_ok = status.success? && report && report["ok"] == true && report["assessment"] == "conversation_list_clearing_skill" && report.fetch("verification", {}).length == 14 && report.fetch("verification", {}).values.all?(true) && report["risk_class"] == "Class 3: Local user-data modification" && report["human_review_required"] == true
+assessment_ok = status.success? && report && report["ok"] == true && report["assessment"] == "conversation_list_clearing_skill" && report.fetch("verification", {}).length == 17 && report.fetch("verification", {}).values.all?(true) && report["risk_class"] == "Class 3: Local user-data modification" && report["human_review_required"] == true
 check("conversation clearing assessment JSON", assessment_ok, errors)
 unless assessment_ok
   warn stderr
@@ -41,7 +41,7 @@ service = File.read("lib/soul_core/conversation_clear_service.rb")
 dashboard = File.read("assets/dashboard/dashboard.js")
 check("skill is registered as approval-gated local write", registry.include?("chats.clear:") && registry.include?("confirmation_phrase: CLEAR_CONVERSATIONS") && registry.include?("requires_approval: true"), errors)
 check("service uses archival metadata and match digest", service.include?("@store.archive") && service.include?("expected_digest") && service.include?("MAX_MATCHES = 500") && !service.match?(/File\.(?:delete|unlink|truncate)/), errors)
-check("dashboard performs preview before execute", dashboard.index('callSoul("chats.clear.preview"') < dashboard.index('callSoul("chats.clear.execute"') && dashboard.include?("Transcript files remain stored"), errors)
+check("dashboard performs exact multi-selection preview before execute", dashboard.index('callSoul("chats.clear.preview"') < dashboard.index('callSoul("chats.clear.execute"') && dashboard.include?("Transcript files remain stored") && dashboard.include?("chat_ids: selectedClearChatIds()"), errors)
 
 review = File.read("Soul/skills/chats/REVIEW.md")
 review_sections = ["## Implementation summary", "## Files changed", "## Commands run", "## Deterministic test results", "## Local LLM eval results", "## Memory keys", "## Lifecycle states touched", "## Safety and persistence check", "## Known weaknesses", "## Human review checklist", "## Human review outcome"]

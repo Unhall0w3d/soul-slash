@@ -73,7 +73,9 @@ check.call("application contract exposes bounded Studio operations", %w[skill_st
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+stylesheet = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 check.call("dashboard exposes proposals, Beta, production, and two gates", %w[proposal-list beta-list production-skill-list proposal-approval beta-promotion-card].all? { |id| html.include?("id=\"#{id}\"") })
+check.call("Skill Studio uses its dedicated full-bleed reviewed illustration", html.include?('/brand/skill-studio.png') && html.include?('id="studio-detail-pane" class="studio-detail is-empty"') && File.file?(File.expand_path("../assets/brand/soul-slash-skill-studio.png", __dir__)) && stylesheet.include?(".studio-detail.is-empty { padding:0") && stylesheet.include?("object-fit:cover") && javascript.include?('classList.toggle("is-empty", kind === "empty")'))
 check.call("dashboard renders domain content without innerHTML", !javascript.include?("innerHTML"))
 check.call("Skill Studio adds no polling or background continuation", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource/))
 

@@ -7,6 +7,7 @@ require "open3"
 require "pathname"
 require "time"
 require "timeout"
+require_relative "skill_registry"
 
 module SoulCore
   class SkillStudioService
@@ -25,9 +26,12 @@ module SoulCore
     MAX_OUTPUT_BYTES = 32 * 1024
     MAX_TIMEOUT_SECONDS = 60
 
-    def initialize(root: Dir.pwd, clock: -> { Time.now })
+    CLOSE_CONFIRMATION = "CLOSE_PRODUCTION_PROPOSAL"
+
+    def initialize(root: Dir.pwd, clock: -> { Time.now }, production_registry: nil)
       @root = File.expand_path(root)
       @clock = clock
+      @production_registry = production_registry
     end
 
     def proposals(limit: MAX_RECORDS)
@@ -213,6 +217,50 @@ module SoulCore
       )
     end
 
+    def proposal_close_preview(proposal_id:)
+      directory = proposal_directory(proposal_id)
+      return awaiting("unknown proposal ID") unless directory
+
+      context = closeout_context(directory)
+      return blocked("proposal closeout is available only after the exact linked skill is registered in production") unless context["stage"] == "production"
+
+      success(
+        context.merge(
+          "expected_digest" => closeout_digest(directory, context),
+          "confirmation_phrase" => CLOSE_CONFIRMATION,
+          "effect" => "permanently delete this production-linked proposal and its superseded Beta candidate copy",
+          "preserves" => ["production skill", "production registry", "shared Beta diagnostics", "chats", "memories", "artifacts", "activity history"]
+        ),
+        lifecycle: "blocked_for_human_review"
+      )
+    end
+
+    def close_production_proposal(proposal_id:, expected_digest:, confirmation:)
+      directory = proposal_directory(proposal_id)
+      return awaiting("unknown proposal ID") unless directory
+      return awaiting("exact production proposal close confirmation is required") unless confirmation == CLOSE_CONFIRMATION
+
+      context = closeout_context(directory)
+      return blocked("proposal is not linked to an exact registered production skill") unless context["stage"] == "production"
+      return blocked("proposal or production linkage changed after preview; review the current revision") unless secure_equal?(expected_digest, closeout_digest(directory, context))
+      return blocked("proposal path failed the direct-child deletion boundary") unless File.dirname(directory) == full(PROPOSALS_ROOT) && !File.symlink?(directory)
+
+      FileUtils.remove_entry_secure(directory)
+      success(
+        {
+          "proposal_id" => proposal_id,
+          "linked_skill_id" => context["linked_skill_id"],
+          "stage" => "closed",
+          "proposal_deleted" => !File.exist?(directory),
+          "production_skill_preserved" => production_definition(context["linked_skill_id"]).is_a?(Hash),
+          "shared_diagnostics_preserved" => true
+        },
+        mutation: "production_proposal_permanently_deleted"
+      )
+    rescue Errno::EACCES, Errno::EPERM, Errno::ENOTEMPTY => error
+      failed("proposal closeout failed safely: #{error.class}")
+    end
+
     private
 
     def proposal_directories
@@ -241,6 +289,10 @@ module SoulCore
 
       proposal_text = read_text(File.join(directory, "proposal.md"))
       state = read_state(directory)
+      beta_manifest = read_json(File.join(directory, BETA_DIR, BETA_MANIFEST))
+      linked_skill_id = beta_manifest.is_a?(Hash) ? beta_manifest["skill_id"].to_s : ""
+      linked_skill_id = nil if linked_skill_id.empty?
+      production_registered = !linked_skill_id.nil? && production_definition(linked_skill_id).is_a?(Hash)
       title = proposal_text[/^#\s+(?:Skill Proposal:\s*)?(.+)$/, 1] || metadata["title"] || metadata["idea"] || File.basename(directory)
       record = {
         "proposal_id" => File.basename(directory),
@@ -253,7 +305,12 @@ module SoulCore
         "beta_gate" => state.dig("beta_gate", "status") || "not_ready",
         "proposal_digest" => proposal_digest(directory),
         "human_review_required" => true,
-        "beta_present" => File.file?(File.join(directory, BETA_DIR, BETA_MANIFEST))
+        "beta_present" => beta_manifest.is_a?(Hash),
+        "stage" => proposal_stage(directory, state, beta_manifest, production_registered),
+        "linked_skill_id" => linked_skill_id,
+        "linked_skill_maturity" => production_registered ? "production" : (linked_skill_id ? "beta" : "unbuilt"),
+        "production_registered" => production_registered,
+        "closable" => production_registered
       }
       if metadata["purpose"] == "capability_gap_intake"
         record["intake"] = true
@@ -334,7 +391,7 @@ module SoulCore
         "beta_digest" => digest,
         "package_path" => relative(directory),
         "diagnostic_log_available_after_run" => !legacy,
-        "production_registered" => false,
+        "production_registered" => production_definition(manifest["skill_id"].to_s).is_a?(Hash),
         "promotion_state" => read_state(proposal_directory).dig("beta_gate", "status") || "not_ready"
       }
       if detail
@@ -372,6 +429,53 @@ module SoulCore
       missing = required_ids - passing_ids
       blockers << "required tests are not passing: #{missing.join(', ')}" unless missing.empty?
       blockers
+    end
+
+    def proposal_stage(directory, state, beta_manifest, production_registered)
+      return "production" if production_registered
+      return "approved_for_promotion" if state.dig("beta_gate", "status") == "approved_for_promotion"
+      return state.dig("proposal_gate", "status") == "approved" ? "approved_for_beta_build" : "awaiting_proposal_review" unless beta_manifest.is_a?(Hash)
+
+      beta_directory = File.join(directory, BETA_DIR)
+      beta = beta_projection(beta_directory, beta_manifest, directory, detail: true)
+      return "beta_build" unless beta["implementation_complete"] && beta["runnable"]
+      return "ready_for_promotion_review" if promotion_blockers(beta, directory).empty?
+
+      "beta_testing"
+    end
+
+    def closeout_context(directory)
+      record = proposal_projection(directory)
+      {
+        "proposal_id" => File.basename(directory),
+        "title" => record["title"],
+        "stage" => record["stage"],
+        "linked_skill_id" => record["linked_skill_id"],
+        "production_registered" => record["production_registered"],
+        "proposal_path" => relative(directory)
+      }
+    end
+
+    def closeout_digest(directory, context)
+      manifest = read_json(File.join(directory, BETA_DIR, BETA_MANIFEST)) || {}
+      definition = production_definition(context["linked_skill_id"]) || {}
+      Digest::SHA256.hexdigest(JSON.generate({
+        "proposal_digest" => proposal_digest(directory),
+        "beta_digest" => manifest.empty? ? nil : beta_digest(File.join(directory, BETA_DIR), manifest),
+        "studio_state" => read_state(directory),
+        "linked_skill_id" => context["linked_skill_id"],
+        "production_definition" => definition
+      }))
+    end
+
+    def production_definition(skill_id)
+      return nil if skill_id.to_s.empty?
+      definition = production_registry.list[skill_id.to_s]
+      definition if definition.is_a?(Hash) && !definition["path"].to_s.empty?
+    end
+
+    def production_registry
+      @production_registry || SkillRegistry.new(path: full("Soul/skills/registry.yaml"))
     end
 
     def execute_beta(directory, manifest, args)

@@ -48,6 +48,34 @@ module SoulCore
 
         checks["preview_is_read_only_and_transcript_preserving"] = before == chat_files(temp_root) && preview.dig("data", "transcripts_deleted") == false
 
+        selected_root = File.join(temp_root, "selected")
+        selected_store = ChatStore.new(root: selected_root)
+        selected_one = selected_store.create_chat(initial_title: "Selected one")
+        selected_two = selected_store.create_chat(initial_title: "Leave active")
+        selected_three = selected_store.create_chat(initial_title: "Selected three")
+        selected_service = ConversationClearService.new(root: selected_root, store: selected_store)
+        selected_ids = [selected_three.fetch("id"), selected_one.fetch("id")]
+        empty_selected = selected_service.preview(mode: "selected", chat_ids: [])
+        duplicate_selected = selected_service.preview(mode: "selected", chat_ids: [selected_one.fetch("id"), selected_one.fetch("id")])
+        invalid_selected = selected_service.preview(mode: "selected", chat_ids: ["not-a-chat-id"])
+        checks["selected_mode_rejects_empty_duplicate_and_invalid_id_sets"] =
+          [empty_selected, duplicate_selected, invalid_selected].all? { |result| result["lifecycle_state"] == "awaiting_input" }
+
+        selected_preview = selected_service.preview(mode: "selected", chat_ids: selected_ids)
+        checks["selected_preview_binds_the_exact_unique_chat_ids"] =
+          selected_preview["ok"] == true && selected_preview.dig("data", "count") == 2 &&
+          selected_preview.dig("data", "chat_ids").sort == selected_ids.sort && selected_store.list_chats.length == 3
+
+        selected_store.archive(selected_one.fetch("id"))
+        selected_stale = selected_service.execute(mode: "selected", chat_ids: selected_ids, confirmation: ConversationClearService::CONFIRMATION, expected_digest: selected_preview.dig("data", "match_digest"))
+        selected_four = selected_store.create_chat(initial_title: "Selected four")
+        execution_ids = [selected_three.fetch("id"), selected_four.fetch("id")]
+        selected_fresh = selected_service.preview(mode: "selected", chat_ids: execution_ids)
+        selected_executed = selected_service.execute(mode: "selected", chat_ids: execution_ids, confirmation: ConversationClearService::CONFIRMATION, expected_digest: selected_fresh.dig("data", "match_digest"))
+        checks["selected_execution_blocks_stale_scope_then_archives_only_the_verified_set"] =
+          selected_stale["lifecycle_state"] == "blocked_for_human_review" && selected_executed["ok"] == true &&
+          selected_store.list_chats.map { |record| record.fetch("id") } == [selected_two.fetch("id")]
+
         wrong_confirmation = service.execute(mode: "title", title: "Alpha", confirmation: "clear", expected_digest: preview.dig("data", "match_digest"))
         missing_digest = service.execute(mode: "title", title: "Alpha", confirmation: ConversationClearService::CONFIRMATION, expected_digest: nil)
         checks["execution_requires_exact_confirmation_and_preview_digest"] =
@@ -77,11 +105,11 @@ module SoulCore
         checks["match_count_is_bounded_at_500"] = oversized["lifecycle_state"] == "blocked_for_human_review" && oversized["reason"].include?("500")
 
         facade_store = ChatStore.new(root: File.join(temp_root, "facade"))
-        facade_store.create_chat(initial_title: "Facade target")
+        facade_target = facade_store.create_chat(initial_title: "Facade target")
         facade_service = ConversationClearService.new(root: File.join(temp_root, "facade"), store: facade_store)
         facade = ApplicationFacade.new(root: File.join(temp_root, "facade"), process_env: {}, chat_store: facade_store, conversation_clear_service: facade_service)
-        facade_preview = facade.call(request("facade:clear:preview", "chats.clear.preview", { "mode" => "title", "title" => "Facade target" }))
-        checks["application_facade_exposes_versioned_preview_without_mutation"] = facade_preview["lifecycle_state"] == "complete" && facade_preview.dig("data", "count") == 1 && facade_preview.dig("meta", "mutation") == "none" && facade_store.list_chats.length == 1
+        facade_preview = facade.call(request("facade:clear:preview", "chats.clear.preview", { "mode" => "selected", "chat_ids" => [facade_target.fetch("id")] }))
+        checks["application_facade_exposes_versioned_selected_preview_without_mutation"] = facade_preview["lifecycle_state"] == "complete" && facade_preview.dig("data", "count") == 1 && facade_preview.dig("data", "chat_ids") == [facade_target.fetch("id")] && facade_preview.dig("meta", "mutation") == "none" && facade_store.list_chats.length == 1
 
         intent = IntentRouter.new.route("clear all conversations")
         checks["intent_routes_to_confirmation_gated_skill"] = intent.skill_id == "chats.clear" && intent.confirmation_required == true && intent.risk == "approval_required"
@@ -98,7 +126,9 @@ module SoulCore
         js = File.read(File.join(@root, "assets/dashboard/dashboard.js"))
         checks["dashboard_requires_preview_and_exact_confirmation"] =
           html.include?("Transcripts remain stored locally") && html.include?("CLEAR_CONVERSATIONS") &&
+          html.include?('option value="selected"') && html.include?('id="clear-selection-list"') &&
           js.include?('callSoul("chats.clear.preview"') && js.include?('callSoul("chats.clear.execute"') &&
+          js.include?("chat_ids: selectedClearChatIds()") &&
           js.index('callSoul("chats.clear.preview"') < js.index('callSoul("chats.clear.execute"') &&
           js.include?('value !== "CLEAR_CONVERSATIONS"') && !js.include?("innerHTML")
 

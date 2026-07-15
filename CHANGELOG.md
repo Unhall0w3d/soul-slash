@@ -4,6 +4,11 @@
 
 ### Conversational Soul
 
+- Extended personal dashboard login persistence to seven days across service restarts using ignored owner-only token-digest records, with logout, password change, reset, expiry, and credential rotation revocation.
+- Added a dedicated Soul-themed Skill Studio empty-state illustration depicting capability design, verification, and human approval.
+- Expanded preview-first conversation clearing with an exact multi-conversation selector, select-all/select-none controls, stale-selection blocking, and unchanged transcript retention.
+- Added the Phase 12E unified Review Center candidate with redacted pending approvals, bounded execution activity, manual refresh and filters, no fourth primary tab, and no new authorization or history mutation.
+- Added deterministic Skill Studio proposal stages, exact Beta/production skill linkage, and preview-gated permanent proposal closeout available only after production registration.
 - Added an opt-in protected local deployment candidate with exact HTTPS public-origin validation, Caddy internal TLS, two bounded systemd user services, preview-first install/uninstall, and no direct Soul LAN bind.
 - Added a Phase 12C.1 personal dashboard authentication candidate with a forced-change bootstrap credential, bounded server-side sessions, protected facade access, login throttling, logout/reset controls, and a blurred locked presentation. LAN binding remains blocked pending protected transport.
 - Added Phase 12D.3 Self Improvement with bounded environment, update, model-runtime, and capability assessments plus review-gated advisory improvement proposals.
@@ -45,4 +50,4 @@
 
 ### Development direction
 
-Phase 12D.3 is the latest implemented interface slice. Phase 12E will consolidate approvals and activity views, followed by Phase 13 integrated acceptance and closeout. The separately approved current-machine persistent/LAN deployment candidate is now under local service and device-trust review.
+Phase 12E is the latest candidate interface slice and awaits human visual/product review. Phase 13 remains the integrated conversational acceptance and closeout point. Personal authentication and the protected current-machine systemd/Caddy LAN deployment passed human review and were merged.

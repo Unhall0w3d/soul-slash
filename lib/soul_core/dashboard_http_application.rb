@@ -15,7 +15,8 @@ module SoulCore
       "/brand/micro-mark.svg" => ["assets/brand/soul-slash-micro-mark.svg", "image/svg+xml"],
       "/brand/primary-mark.png" => ["assets/brand/soul-slash-primary-mark.png", "image/png"],
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
-      "/brand/supporting-scene.png" => ["assets/brand/soul-slash-supporting-scene.png", "image/png"]
+      "/brand/supporting-scene.png" => ["assets/brand/soul-slash-supporting-scene.png", "image/png"],
+      "/brand/skill-studio.png" => ["assets/brand/soul-slash-skill-studio.png", "image/png"]
     }.freeze
 
     SECURITY_HEADERS = {
@@ -214,7 +215,7 @@ module SoulCore
     end
 
     def session_cookie(token, secure:)
-      attributes = ["#{SESSION_COOKIE}=#{token}", "Path=/", "Max-Age=#{DashboardAuthentication::SESSION_IDLE_SECONDS}", "HttpOnly", "SameSite=Strict"]
+      attributes = ["#{SESSION_COOKIE}=#{token}", "Path=/", "Max-Age=#{DashboardAuthentication::SESSION_ABSOLUTE_SECONDS}", "HttpOnly", "SameSite=Strict"]
       attributes << "Secure" if secure
       attributes.join("; ")
     end

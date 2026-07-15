@@ -93,7 +93,8 @@ module SoulCore
           invalid.status == 401 && JSON.parse(invalid.body).dig("error", "code") == "invalid_credentials" &&
           login.status == 200 && login_payload["authenticated"] == true && login_payload["password_change_required"] == true
         checks["session_cookie_is_host_only_http_only_and_strict"] =
-          cookie.include?("HttpOnly") && cookie.include?("SameSite=Strict") && cookie.include?("Path=/") && !cookie.include?("Domain=") && !cookie.include?("soul123")
+          cookie.include?("HttpOnly") && cookie.include?("SameSite=Strict") && cookie.include?("Path=/") &&
+          cookie.include?("Max-Age=#{DashboardAuthentication::SESSION_ABSOLUTE_SECONDS}") && !cookie.include?("Domain=") && !cookie.include?("soul123")
 
         bootstrap_headers = mutation_headers.merge("Cookie" => "soul_session=#{token}")
         gated_api = app.call(method: "POST", target: "/api/v1/call", headers: bootstrap_headers, body: application_request)
@@ -111,6 +112,14 @@ module SoulCore
           JSON.parse(File.read(credential_path))["password_change_required"] == false &&
           !File.read(credential_path).include?("A private Soul passphrase 2026")
 
+        session_path = auth.session_path
+        session_record = File.read(session_path)
+        restarted_auth = DashboardAuthentication.new(root: temporary_root, iterations: 2_000, clock: -> { clock_time }, random_bytes: random_bytes)
+        checks["session_store_is_private_digest_only_and_restart_durable"] =
+          (File.stat(session_path).mode & 0o077).zero? && session_record.include?(Digest::SHA256.hexdigest(changed_token)) &&
+          !session_record.include?(changed_token) && !session_record.include?("A private Soul passphrase 2026") &&
+          restarted_auth.session(changed_token, touch: false)&.fetch("authenticated") == true
+
         authorized_headers = mutation_headers.merge("Cookie" => "soul_session=#{changed_token}")
         authorized = app.call(method: "POST", target: "/api/v1/call", headers: authorized_headers, body: application_request)
         checks["changed_session_delegates_to_facade_once"] = authorized.status == 200 && facade.calls.length == 1
@@ -123,16 +132,17 @@ module SoulCore
         after_logout = app.call(method: "POST", target: "/api/v1/call", headers: authorized_headers, body: application_request)
         checks["logout_expires_cookie_and_revokes_session"] = logout.status == 200 && logout.headers["Set-Cookie"].include?("Max-Age=0") && after_logout.status == 401
 
-        rate_auth = DashboardAuthentication.new(root: temporary_root, credential_path: "Soul/runtime/dashboard_auth/rate.json", iterations: 1_000, clock: -> { clock_time }, random_bytes: random_bytes)
+        rate_auth = DashboardAuthentication.new(root: temporary_root, credential_path: "Soul/runtime/dashboard_auth/rate.json", session_path: "Soul/runtime/dashboard_auth/rate-sessions.json", iterations: 1_000, clock: -> { clock_time }, random_bytes: random_bytes)
         DashboardAuthentication::FAILED_ATTEMPT_LIMIT.times { rate_auth.authenticate(username: "admin", password: "wrong") }
         limited = rate_auth.authenticate(username: "admin", password: "wrong")
         checks["failed_login_rate_limit_is_bounded_and_request_driven"] = limited.status == 429 && limited.retry_after.between?(1, DashboardAuthentication::FAILED_ATTEMPT_WINDOW_SECONDS)
 
         expiry_time = Time.utc(2026, 7, 15, 12, 0, 0)
-        expiry_auth = DashboardAuthentication.new(root: temporary_root, credential_path: "Soul/runtime/dashboard_auth/expiry.json", iterations: 1_000, clock: -> { expiry_time }, random_bytes: random_bytes)
+        expiry_auth = DashboardAuthentication.new(root: temporary_root, credential_path: "Soul/runtime/dashboard_auth/expiry.json", session_path: "Soul/runtime/dashboard_auth/expiry-sessions.json", iterations: 1_000, clock: -> { expiry_time }, random_bytes: random_bytes)
         expiry_login = expiry_auth.authenticate(username: "admin", password: "soul123")
-        expiry_time += DashboardAuthentication::SESSION_IDLE_SECONDS + 1
-        checks["sessions_expire_without_a_background_cleanup_loop"] = expiry_auth.session(expiry_login.token).nil?
+        expiry_time += DashboardAuthentication::SESSION_ABSOLUTE_SECONDS + 1
+        expiry_restart = DashboardAuthentication.new(root: temporary_root, credential_path: "Soul/runtime/dashboard_auth/expiry.json", session_path: "Soul/runtime/dashboard_auth/expiry-sessions.json", iterations: 1_000, clock: -> { expiry_time }, random_bytes: random_bytes)
+        checks["sessions_expire_across_restart_without_a_background_cleanup_loop"] = expiry_restart.session(expiry_login.token).nil?
 
         resetting_operator = DashboardAuthentication.new(root: temporary_root, iterations: 2_000, clock: -> { clock_time }, random_bytes: random_bytes, reset_to_bootstrap: true)
         reset_record = JSON.parse(File.read(credential_path))
@@ -204,7 +214,7 @@ module SoulCore
         %w[/auth/v1/signup /auth/v1/register createAccount registerAccount].none? { |primitive| [html, javascript].any? { |source| source.include?(primitive) } }
       checks["authentication_does_not_weaken_existing_approval_gates"] =
         html.include?("APPROVE_PROPOSAL_FOR_BETA_BUILD") && html.include?("APPROVE_BETA_FOR_PROMOTION") && html.include?("DELETE_AND_FORGET_CONVERSATION")
-      checks["lan_and_persistence_remain_excluded"] =
+      checks["lan_and_background_persistence_remain_excluded"] =
         schema.include?(":loopback_host") && !DashboardServer.loopback?("0.0.0.0") &&
         %w[systemd daemon( Thread.new].none? { |primitive| [server, auth_source].any? { |source| source.include?(primitive) } } &&
         brief.include?("lan_binding_authorized: no") && brief.include?("persistent_service_authorized: no")

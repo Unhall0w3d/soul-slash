@@ -11,6 +11,8 @@ inputs:
     type: "string"
   all:
     type: "boolean"
+  chat_ids:
+    type: "array[string]"
   expected_digest:
     type: "string"
   execute:

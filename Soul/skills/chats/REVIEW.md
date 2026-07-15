@@ -6,9 +6,9 @@ Name: `chats.clear`
 
 Risk class: Class 3 — local user-data modification
 
-Branch/checkpoint: `codex/phase12c-dashboard`
+Branch/checkpoint: `codex/phase12e-review-center`
 
-Date: 2026-07-14
+Date: 2026-07-15
 
 ## Candidate status
 
@@ -19,9 +19,9 @@ human_review_required
 
 ## Implementation summary
 
-Adds a preview-first Soul skill and dashboard control that archives active conversations by exact title or all conversations. Clearing removes records from active lists by setting the existing `archived` metadata flag. It does not delete metadata files or message transcripts.
+Adds a preview-first Soul skill and dashboard control that archives active conversations by exact title, a human-selected set of exact chat IDs, or all conversations. Clearing removes records from active lists by setting the existing `archived` metadata flag. It does not delete metadata files or message transcripts.
 
-Execution requires the exact literal `CLEAR_CONVERSATIONS` and the SHA-256 match digest returned by preview. A changed match set blocks before mutation. Duplicate titles are shown as multiple matches, and operations above 500 matches block for human review.
+Execution requires the exact literal `CLEAR_CONVERSATIONS` and the SHA-256 match digest returned by preview. A changed match set or selected chat becoming inactive blocks before mutation. Duplicate titles are shown as multiple matches, selected IDs must be unique and exact, and operations above 500 matches block for human review.
 
 ## Files changed
 
@@ -63,7 +63,7 @@ git diff --check
 ## Deterministic test results
 
 ```text
-PASS: 14/14 conversation-clearing assessment checks.
+PASS: 17/17 conversation-clearing assessment checks, including exact selected-set preview, stale-set blocking, and selected-only execution.
 PASS: skill registry, service boundary, digest, and dashboard source checks.
 PASS: Phase 12C, Phase 12B, and earlier regressions.
 PASS: repository whitespace checks.
@@ -133,6 +133,7 @@ Skill-private memory store added: no
 
 - Archived conversations do not yet have a dashboard restore/archive-management view; their metadata can support one in a later reviewed slice.
 - Exact-title mode intentionally matches every active chat with the same title instead of guessing among duplicates.
+- The dashboard selection is bounded to the active conversations currently loaded in the list; the CLI accepts up to 500 exact IDs.
 - The 500-record cap requires the user to narrow unusually large active sets before archival.
 - Metadata writes are sequential; an unexpected failure after earlier records archive returns `blocked_for_human_review` with completed records disclosed.
 - The dashboard does not currently retain an audit view of archived conversations.
@@ -142,6 +143,8 @@ Skill-private memory store added: no
 ```text
 [ ] Clear means archive/hide, not delete
 [ ] Exact-title and all modes match the requested behavior
+[ ] Selected mode archives exactly the checked conversations and leaves unselected conversations active
+[ ] Empty, duplicate, malformed, or stale selected IDs fail safely
 [ ] Duplicate titles are disclosed clearly
 [ ] Preview is required before execution
 [ ] Confirmation phrase is appropriately explicit
@@ -159,9 +162,9 @@ Skill-private memory store added: no
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-15
+Decision summary: Exact multi-conversation archival, preview, confirmation, and transcript-retention behavior accepted in the live dashboard.
+Required changes: none
 ```

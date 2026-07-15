@@ -119,6 +119,6 @@ return to explicit ruby bin/soul dashboard loopback operation
 - Confirm cookies include `Secure`, `HttpOnly`, and `SameSite=Strict`.
 - Confirm direct LAN access to port 4567 fails while loopback access remains available locally.
 - Confirm both services restart after a deliberate process failure without exceeding rate limits.
-- Confirm logout and restart preserve the credential but revoke process-local sessions.
+- Confirm logout revokes its session, while restart preserves only unexpired owner-approved seven-day digest-backed sessions.
 - Confirm uninstall returns to foreground loopback operation without deleting private data.
 - Confirm no router or Internet exposure exists.

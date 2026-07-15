@@ -104,6 +104,8 @@ skill_studio.proposals.list
 skill_studio.proposals.get
 skill_studio.proposals.approval.preview
 skill_studio.proposals.approval.execute
+skill_studio.proposals.close.preview
+skill_studio.proposals.close.execute
 skill_studio.betas.list
 skill_studio.betas.get
 skill_studio.betas.run.preview
@@ -121,6 +123,8 @@ activities.recent
 ```
 
 Unknown operations, parameters, context fields, and value types fail closed before a domain call.
+
+Conversation clearing accepts exactly one scope: `mode: title` with a trimmed exact `title`, `mode: selected` with a non-empty array of unique exact `chat_ids`, or `mode: all` with neither selector. Preview returns the exact projected records and a SHA-256 match digest. Execute repeats the same scope and requires that digest plus `CLEAR_CONVERSATIONS`; selected chats that are no longer active cause a human-review block before mutation.
 
 ## Bounds
 
@@ -181,6 +185,8 @@ If execution is interrupted after reservation, the receipt remains incomplete an
 - Self Improvement snapshots and refreshes are read-only. Its sole mutation writes advisory proposal packets after preview and exact confirmation.
 - Pending approvals use non-authorizing fingerprints and omit token values and sensitive scope values.
 - Activities omit original private messages and expose only bounded classifications.
+
+Phase 12E composes `approvals.pending` and `activities.recent` in the dashboard Review Center. The surface is read-only, loads only when opened or manually refreshed, and retains the existing caps and redaction rules. It does not add a fourth product tab or any approval/history mutation operation.
 
 ## Safety inheritance
 

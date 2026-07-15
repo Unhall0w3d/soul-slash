@@ -88,7 +88,7 @@ Not run. Network binding, TLS, authentication, persistence, path safety, and lif
 - Each client must explicitly trust the private Caddy root CA. This is manageable for personal devices but not a substitute for a public-domain certificate architecture.
 - The installer does not alter the host firewall. A restrictive firewall may require a separate human-approved TCP `8443` rule for the trusted LAN.
 - The installer uses the current repository path. Moving or deleting the checkout breaks the Soul service until it is reinstalled from the new path.
-- Sessions remain process-local and are revoked by service restart; credentials and private Soul data persist.
+- Unexpired sessions survive service restart for at most seven days through owner-only token-digest records; credentials and private Soul data persist, while logout and credential changes revoke sessions.
 - This deployment is LAN-only. It does not provide safe Internet exposure, public DNS, router forwarding, multi-user authorization, or account recovery.
 
 ## Memory keys

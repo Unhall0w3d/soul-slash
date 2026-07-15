@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], selectedProposal: null, selectedBeta: null, proposalApproval: null, betaRunPreview: null, betaPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -34,7 +34,7 @@ async function authRequest(path, body) {
 function setDashboardLocked(locked) {
   document.body.classList.toggle("auth-locked", locked);
   const gate = byId("auth-gate"); gate.hidden = !locked;
-  [document.querySelector(".app-header"), document.querySelector("main"), byId("clear-dialog")].forEach((element) => { if (element) element.inert = locked; });
+  [document.querySelector(".app-header"), document.querySelector("main"), byId("review-center"), byId("clear-dialog")].forEach((element) => { if (element) element.inert = locked; });
   if (!locked) { byId("logout-button").hidden = false; byId("auth-status").textContent = ""; }
 }
 
@@ -206,9 +206,10 @@ async function createChat() {
 function openClearDialog() {
   state.clearPreview = null;
   state.forgetPreview = null;
-  byId("clear-mode").value = "title";
+  byId("clear-mode").value = "selected";
   byId("clear-title").value = state.activeChat?.title || "";
-  byId("clear-title-field").hidden = false;
+  renderClearSelection();
+  setClearModeFields();
   byId("clear-preview").hidden = true;
   byId("clear-confirmation").value = "";
   byId("forget-preview").hidden = true;
@@ -218,6 +219,36 @@ function openClearDialog() {
   byId("forget-dialog-status").textContent = state.activeChat ? `Selected: ${state.activeChat.title || state.activeChat.id}` : "Select one conversation before using delete & forget.";
   byId("clear-dialog-status").textContent = "Preview is required before archival.";
   byId("clear-dialog").showModal();
+}
+
+function selectedClearChatIds() {
+  return Array.from(byId("clear-selection-list").querySelectorAll('input[type="checkbox"]:checked'), (input) => input.value);
+}
+
+function updateClearSelectionCount() {
+  const count = selectedClearChatIds().length;
+  byId("clear-selection-count").textContent = `${count} selected`;
+}
+
+function renderClearSelection() {
+  const list = byId("clear-selection-list"); list.replaceChildren();
+  state.chats.forEach((chat) => {
+    const item = document.createElement("label"); item.className = "clear-selection-item";
+    const input = document.createElement("input"); input.type = "checkbox"; input.value = chat.id; input.checked = chat.id === state.activeChat?.id;
+    const copy = document.createElement("span");
+    const title = document.createElement("strong"); title.textContent = chat.title || "Untitled conversation";
+    const id = document.createElement("small"); id.textContent = chat.id;
+    copy.append(title, id); item.append(input, copy); list.append(item);
+    input.addEventListener("change", () => { updateClearSelectionCount(); resetClearPreview(); });
+  });
+  if (!state.chats.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No active conversations are available."; list.append(empty); }
+  updateClearSelectionCount();
+}
+
+function setClearModeFields() {
+  const mode = byId("clear-mode").value;
+  byId("clear-title-field").hidden = mode !== "title";
+  byId("clear-selection-field").hidden = mode !== "selected";
 }
 
 async function previewForget() {
@@ -252,7 +283,9 @@ async function executeForget() {
 
 function clearParameters() {
   const mode = byId("clear-mode").value;
-  return mode === "all" ? { mode } : { mode, title: byId("clear-title").value.trim() };
+  if (mode === "all") return { mode };
+  if (mode === "selected") return { mode, chat_ids: selectedClearChatIds() };
+  return { mode, title: byId("clear-title").value.trim() };
 }
 
 function resetClearPreview() {
@@ -321,19 +354,22 @@ function studioItem(titleText, metaText, active, onClick) {
 }
 
 function renderStudioLists(production = null) {
+  if (production) state.productionSkills = production.records || [];
   const proposals = byId("proposal-list"); proposals.replaceChildren(); byId("proposal-count").textContent = String(state.proposals.length);
   if (!state.proposals.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No proposal packets found."; proposals.append(empty); }
-  state.proposals.forEach((record) => { const source = record.intake ? `gap intake · ${record.occurrence_count || 1} occurrence${record.occurrence_count === 1 ? "" : "s"}` : (record.provider || "local"); proposals.append(studioItem(record.title || record.proposal_id, `${record.proposal_gate?.replaceAll("_", " ")} · ${source}`, state.selectedProposal?.proposal_id === record.proposal_id, () => selectProposal(record.proposal_id))); });
+  state.proposals.forEach((record) => { const source = record.intake ? `gap intake · ${record.occurrence_count || 1} occurrence${record.occurrence_count === 1 ? "" : "s"}` : (record.provider || "local"); proposals.append(studioItem(record.title || record.proposal_id, `${record.stage?.replaceAll("_", " ") || "awaiting proposal review"} · ${source}`, state.selectedProposal?.proposal_id === record.proposal_id, () => selectProposal(record.proposal_id))); });
 
   const betas = byId("beta-list"); betas.replaceChildren(); byId("beta-count").textContent = String(state.betas.length);
   if (!state.betas.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No implemented Beta packages yet."; betas.append(empty); }
   state.betas.forEach((record) => betas.append(studioItem(record.beta_id, `${record.maturity?.replaceAll("_", " ")} · ${record.runnable ? "runnable" : "not runnable"}`, state.selectedBeta?.beta_id === record.beta_id, () => selectBeta(record.beta_id))));
 
-  if (production) {
-    const skills = byId("production-skill-list"); skills.replaceChildren(); const records = production.records || []; byId("production-skill-count").textContent = String(records.length);
-    records.forEach((record) => skills.append(studioItem(record.skill_id, `${record.risk || "unknown"} · ${record.available ? "available" : "unavailable"}`, false, () => {})));
-    if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No registered production skills."; skills.append(empty); }
-  }
+  const skills = byId("production-skill-list"); skills.replaceChildren(); byId("production-skill-count").textContent = String(state.productionSkills.length);
+  state.productionSkills.forEach((record) => { const button = studioItem(record.skill_id, `${record.risk || "unknown"} · ${record.available ? "available" : "unavailable"}`, false, () => focusProductionSkill(record.skill_id)); button.dataset.skillId = record.skill_id; button.classList.toggle("is-linked", state.linkedProductionSkill === record.skill_id); skills.append(button); });
+  if (!state.productionSkills.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No registered production skills."; skills.append(empty); }
+}
+
+function focusProductionSkill(skillId) {
+  state.linkedProductionSkill = skillId; renderStudioLists(); const target = Array.from(byId("production-skill-list").querySelectorAll("button")).find((button) => button.dataset.skillId === skillId); if (target) target.focus();
 }
 
 async function loadSkillStudio() {
@@ -349,6 +385,7 @@ async function loadSkillStudio() {
 }
 
 function showStudioDetail(kind) {
+  byId("studio-detail-pane").classList.toggle("is-empty", kind === "empty");
   byId("studio-empty").hidden = true;
   byId("proposal-detail").hidden = kind !== "proposal";
   byId("beta-detail").hidden = kind !== "beta";
@@ -367,15 +404,17 @@ function renderChecklist(target, items, emptyText) {
 async function selectProposal(proposalId) {
   try {
     const envelope = await callSoul("skill_studio.proposals.get", { proposal_id: proposalId }); const record = dataOf(envelope).record; if (!record) return;
-    state.selectedProposal = record; state.selectedBeta = null; state.proposalApproval = null; showStudioDetail("proposal"); renderStudioLists();
+    state.selectedProposal = record; state.selectedBeta = null; state.proposalApproval = null; state.proposalClosePreview = null; state.linkedProductionSkill = record.production_registered ? record.linked_skill_id : null; showStudioDetail("proposal"); renderStudioLists();
     byId("proposal-title").textContent = record.title || proposalId; byId("proposal-description").textContent = record.description || "No proposal description.";
-    byId("proposal-gate-state").textContent = record.proposal_gate?.replaceAll("_", " ") || "awaiting review";
-    const proposalMeta = [["Proposal ID", record.proposal_id], ["Created", record.created_at], ["Beta package", record.beta_present ? "present" : "not built"], ["Beta gate", record.beta_gate?.replaceAll("_", " ")]];
+    byId("proposal-gate-state").textContent = record.stage?.replaceAll("_", " ") || "awaiting proposal review";
+    const proposalMeta = [["Proposal ID", record.proposal_id], ["Stage", record.stage?.replaceAll("_", " ")], ["Created", record.created_at], ["Linked skill", record.linked_skill_id || "not built"], ["Skill maturity", record.linked_skill_maturity?.replaceAll("_", " ")], ["Beta gate", record.beta_gate?.replaceAll("_", " ")]];
     if (record.intake) proposalMeta.push(["Origin chat", record.origin_chat_id], ["Gap class", record.gap_classification?.replaceAll("_", " ")], ["Occurrences", record.occurrence_count], ["Intake state", record.intake_status?.replaceAll("_", " ")]);
     renderDefinitionList(byId("proposal-meta"), proposalMeta);
+    const linkedButton = byId("view-linked-skill"); linkedButton.hidden = !record.production_registered; linkedButton.textContent = record.production_registered ? `Locate production skill · ${record.linked_skill_id}` : "Locate linked production skill";
     byId("proposal-cloud").textContent = record.intake ? "Created locally from an unsatisfied chat request. No cloud provider was invoked. Optional Mistral development remains a separate disclosed human action." : (record.cloud_assisted ? `${record.provider} / ${record.model || "configured model"}; data class ${record.cloud_data_class || "unspecified"}. This output is advisory and cannot approve itself.` : "No cloud provider is recorded for this proposal.");
     byId("proposal-markdown").textContent = record.proposal_markdown || "No proposal text available."; renderChecklist(byId("proposal-checklist"), record.review_checklist || [], "No checklist file was supplied.");
     const approved = record.proposal_gate === "approved"; byId("preview-proposal-approval").disabled = approved; byId("proposal-approval-confirm").hidden = true; byId("proposal-confirmation").value = ""; byId("proposal-approval-status").textContent = approved ? "This exact proposal revision is approved for Beta implementation." : "Review the brief and checklist before opening Gate 1.";
+    byId("proposal-close-card").hidden = !record.closable; byId("proposal-close-confirm").hidden = true; byId("proposal-close-confirmation").value = ""; byId("execute-proposal-close").disabled = true; byId("proposal-close-status").textContent = record.closable ? "Production linkage verified. Preview the exact deletion boundary before closing." : "";
   } catch (error) { announce(error.message || "Proposal could not be loaded."); }
 }
 
@@ -392,6 +431,20 @@ async function executeProposalApproval() {
   const envelope = await callSoul("skill_studio.proposals.approval.execute", { proposal_id: state.selectedProposal.proposal_id, expected_digest: state.proposalApproval.expected_digest, confirmation: byId("proposal-confirmation").value });
   if (envelope.lifecycle_state !== "complete") { byId("proposal-approval-status").textContent = envelope.errors?.[0]?.message || "Approval blocked; preview again."; return; }
   state.studioLoaded = false; await loadSkillStudio(); await selectProposal(state.selectedProposal.proposal_id); announce("Proposal approved for bounded Beta implementation");
+}
+
+async function previewProposalClose() {
+  if (!state.selectedProposal) return; const status = byId("proposal-close-status"); status.textContent = "Revalidating production linkage and closeout boundary…";
+  const envelope = await callSoul("skill_studio.proposals.close.preview", { proposal_id: state.selectedProposal.proposal_id }); const data = dataOf(envelope);
+  if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Closeout preview blocked."; return; }
+  state.proposalClosePreview = data; byId("proposal-close-confirm").hidden = false; byId("proposal-close-confirmation").value = ""; byId("execute-proposal-close").disabled = true; status.textContent = `Will delete proposal and superseded Beta for ${data.linked_skill_id}; the production skill and shared diagnostics remain.`;
+}
+
+async function executeProposalClose() {
+  if (!state.selectedProposal || !state.proposalClosePreview) return; const proposalId = state.selectedProposal.proposal_id; const status = byId("proposal-close-status"); status.textContent = "Checking unchanged closeout digest…";
+  const envelope = await callSoul("skill_studio.proposals.close.execute", { proposal_id: proposalId, expected_digest: state.proposalClosePreview.expected_digest, confirmation: byId("proposal-close-confirmation").value });
+  if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Proposal closeout blocked; preview again."; return; }
+  state.selectedProposal = null; state.proposalClosePreview = null; state.linkedProductionSkill = null; state.studioLoaded = false; showStudioDetail("empty"); byId("studio-empty").hidden = false; await loadSkillStudio(); announce(`Closed production proposal ${proposalId}`);
 }
 
 async function selectBeta(betaId) {
@@ -538,6 +591,109 @@ async function executeImprovementProposals() {
   state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
 }
 
+function reviewEmpty(target, titleText, detailText) {
+  const empty = document.createElement("div"); empty.className = "review-empty";
+  const sigil = document.createElement("span"); sigil.setAttribute("aria-hidden", "true"); sigil.textContent = "◇";
+  const title = document.createElement("h3"); title.textContent = titleText;
+  const detail = document.createElement("p"); detail.textContent = detailText;
+  empty.append(sigil, title, detail); target.replaceChildren(empty);
+}
+
+function reviewRecordButton(titleText, metaText, tone, selected, onSelect) {
+  const button = document.createElement("button"); button.type = "button"; button.className = `review-record ${tone || ""}`.trim();
+  if (selected) button.classList.add("is-active");
+  const marker = document.createElement("span"); marker.className = "review-record-marker"; marker.setAttribute("aria-hidden", "true"); marker.textContent = "◆";
+  const copy = document.createElement("span"); const title = document.createElement("strong"); title.textContent = titleText; const meta = document.createElement("small"); meta.textContent = metaText;
+  copy.append(title, meta); button.append(marker, copy); button.addEventListener("click", onSelect); return button;
+}
+
+function renderApprovalDetail(record) {
+  state.selectedApproval = record; const detail = byId("approval-review-detail"); detail.replaceChildren();
+  const heading = document.createElement("div"); heading.className = "review-detail-heading";
+  const copy = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = "Pending authorization"; const title = document.createElement("h3"); title.textContent = record.skill_id || "Unknown skill"; copy.append(eyebrow, title);
+  const chip = document.createElement("span"); chip.className = "review-state-chip review-state-chip--attention"; chip.textContent = record.status || "pending"; heading.append(copy, chip);
+  const intro = document.createElement("p"); intro.className = "review-detail-copy"; intro.textContent = "This record proves a bounded authorization exists. Review Center cannot reveal, consume, revoke, or execute it.";
+  const metadata = document.createElement("dl"); metadata.className = "review-detail-meta"; renderDefinitionList(metadata, [["Reference", record.approval_ref], ["Issued", formatTime(record.issued_at)], ["Expires", formatTime(record.expires_at)], ["Scope digest", record.scope_digest || "unavailable"]]);
+  const scopeTitle = document.createElement("h4"); scopeTitle.textContent = "Redacted scope shape"; const tags = document.createElement("div"); tags.className = "scope-key-list";
+  (record.scope_keys || []).forEach((value) => { const tag = document.createElement("span"); tag.textContent = value; tags.append(tag); });
+  if (!record.scope_keys?.length) { const none = document.createElement("span"); none.textContent = "No scope keys projected"; tags.append(none); }
+  const boundary = document.createElement("div"); boundary.className = "review-detail-boundary"; const boundaryTitle = document.createElement("strong"); boundaryTitle.textContent = "Authorization value hidden"; const boundaryCopy = document.createElement("p"); boundaryCopy.textContent = "Return to Chat or the originating bounded workflow to continue. Skill proposal and Beta gates remain in Skill Studio."; boundary.append(boundaryTitle, boundaryCopy);
+  detail.append(heading, intro, metadata, scopeTitle, tags, boundary); renderApprovalList();
+}
+
+function renderApprovalList() {
+  const list = byId("approval-review-list"); list.replaceChildren(); byId("approval-list-count").textContent = String(state.approvals.length);
+  if (!state.approvals.length) { const empty = document.createElement("p"); empty.className = "muted review-list-empty"; empty.textContent = "No pending approvals. New bounded approvals will appear here after an originating preview flow."; list.append(empty); reviewEmpty(byId("approval-review-detail"), "No active authorization records.", "Review Center is ready; nothing currently requires approval-state inspection."); return; }
+  state.approvals.forEach((record) => list.append(reviewRecordButton(record.skill_id || "Unknown skill", `${record.status || "pending"} · expires ${formatTime(record.expires_at)}`, "is-attention", state.selectedApproval?.approval_ref === record.approval_ref, () => renderApprovalDetail(record))));
+}
+
+function activityTone(record) {
+  if (record.status === "failed") return "is-failed";
+  if (record.status === "blocked" || record.blocked_count > 0) return "is-attention";
+  return record.executed ? "is-verified" : "";
+}
+
+function renderActivityDetail(record) {
+  state.selectedActivity = record; const detail = byId("activity-review-detail"); detail.replaceChildren();
+  const heading = document.createElement("div"); heading.className = "review-detail-heading";
+  const copy = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = record.source || "local activity"; const title = document.createElement("h3"); title.textContent = record.skill_id || "Unrouted activity"; copy.append(eyebrow, title);
+  const chip = document.createElement("span"); chip.className = `review-state-chip ${activityTone(record)}`.trim(); chip.textContent = record.status || "unknown"; heading.append(copy, chip);
+  const metadata = document.createElement("dl"); metadata.className = "review-detail-meta"; renderDefinitionList(metadata, [["Timestamp", formatTime(record.timestamp)], ["Executed", record.executed ? "yes" : "no"], ["Succeeded", record.ok ? "yes" : "no"], ["Risk", record.risk || "not recorded"], ["Confirmation", record.confirmation_required ? "required" : "not required"], ["Exit status", record.exit_status ?? "none"]]);
+  const blockersTitle = document.createElement("h4"); blockersTitle.textContent = "Blocked categories"; const blockers = document.createElement("div"); blockers.className = "scope-key-list";
+  (record.blocked_categories || []).forEach((value) => { const tag = document.createElement("span"); tag.textContent = value; blockers.append(tag); });
+  if (!record.blocked_categories?.length) { const none = document.createElement("span"); none.textContent = "None recorded"; blockers.append(none); }
+  const boundary = document.createElement("div"); boundary.className = "review-detail-boundary review-detail-boundary--neutral"; const boundaryTitle = document.createElement("strong"); boundaryTitle.textContent = "Private request omitted"; const boundaryCopy = document.createElement("p"); boundaryCopy.textContent = "This evidence projection cannot replay, retry, clear, prune, or export the underlying execution history."; boundary.append(boundaryTitle, boundaryCopy);
+  detail.append(heading, metadata, blockersTitle, blockers, boundary); renderActivityList();
+}
+
+function renderActivityList() {
+  const list = byId("activity-review-list"); list.replaceChildren(); byId("activity-list-count").textContent = String(state.activities.length);
+  if (!state.activities.length) { const empty = document.createElement("p"); empty.className = "muted review-list-empty"; empty.textContent = "No activity matches this bounded filter."; list.append(empty); reviewEmpty(byId("activity-review-detail"), "No matching execution evidence.", "Choose another filter or refresh after a foreground skill run."); return; }
+  state.activities.forEach((record) => list.append(reviewRecordButton(record.skill_id || "Unrouted activity", `${record.status || "unknown"} · ${formatTime(record.timestamp)}`, activityTone(record), state.selectedActivity === record, () => renderActivityDetail(record))));
+}
+
+function renderReviewSummary() {
+  const summary = state.activitySummary; const blocked = summary.filter((record) => record.status === "blocked" || record.blocked_count > 0).length; const failed = summary.filter((record) => record.status === "failed").length;
+  byId("review-pending-count").textContent = String(state.approvals.length); byId("review-activity-count").textContent = String(summary.length); byId("review-blocked-count").textContent = String(blocked); byId("review-failed-count").textContent = String(failed);
+  const badge = byId("review-pending-badge"); badge.textContent = String(state.approvals.length); badge.hidden = state.approvals.length === 0;
+}
+
+function activityFilters(filter) {
+  if (filter === "executed") return { executed: true };
+  if (filter === "blocked") return { status: "blocked" };
+  if (filter === "failed") return { status: "failed" };
+  return {};
+}
+
+async function filterReviewActivity(filter) {
+  state.activityFilter = filter; state.selectedActivity = null; document.querySelectorAll("[data-activity-filter]").forEach((button) => button.classList.toggle("is-active", button.dataset.activityFilter === filter));
+  byId("review-center-status").textContent = `Loading ${filter} activity…`;
+  try { const envelope = await callSoul("activities.recent", { limit: 100, filters: activityFilters(filter) }); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Activity filter failed safely"); state.activities = dataOf(envelope).records || []; renderActivityList(); byId("review-center-status").textContent = `${state.activities.length} ${filter} activity record${state.activities.length === 1 ? "" : "s"} shown.`; }
+  catch (error) { byId("review-center-status").textContent = error.message || "Activity filter failed safely."; }
+}
+
+async function loadReviewCenter() {
+  const refresh = byId("refresh-review-center"); refresh.disabled = true; byId("review-center-status").textContent = "Loading bounded approval and activity projections…";
+  try {
+    const [approvalEnvelope, activityEnvelope] = await Promise.all([callSoul("approvals.pending", { limit: 50 }), callSoul("activities.recent", { limit: 100, filters: {} })]);
+    if (approvalEnvelope.lifecycle_state !== "complete" || activityEnvelope.lifecycle_state !== "complete") throw new Error("Review projections failed safely");
+    state.approvals = dataOf(approvalEnvelope).records || []; state.activitySummary = dataOf(activityEnvelope).records || []; state.activities = state.activitySummary; state.activityFilter = "all"; state.selectedApproval = null; state.selectedActivity = null; state.reviewLoaded = true;
+    document.querySelectorAll("[data-activity-filter]").forEach((button) => button.classList.toggle("is-active", button.dataset.activityFilter === "all")); renderReviewSummary(); renderApprovalList(); renderActivityList(); byId("review-center-status").textContent = `Loaded ${state.approvals.length} pending approval${state.approvals.length === 1 ? "" : "s"} and ${state.activities.length} recent activity record${state.activities.length === 1 ? "" : "s"}.`;
+  } catch (error) { byId("review-center-status").textContent = error.message || "Review Center failed safely."; }
+  finally { refresh.disabled = false; }
+}
+
+function switchReviewView(name) {
+  const approvals = name === "approvals"; byId("review-approvals-view").hidden = !approvals; byId("review-activity-view").hidden = approvals;
+  byId("review-approvals-tab").classList.toggle("is-active", approvals); byId("review-activity-tab").classList.toggle("is-active", !approvals); byId("review-approvals-tab").setAttribute("aria-selected", String(approvals)); byId("review-activity-tab").setAttribute("aria-selected", String(!approvals));
+}
+
+function openReviewCenter() {
+  state.reviewOpener = document.activeElement; byId("review-center").showModal(); byId("close-review-center").focus(); if (!state.reviewLoaded) loadReviewCenter();
+}
+
+function closeReviewCenter() { byId("review-center").close(); }
+
 async function bootstrap() {
   if (state.bootstrapped) return;
   state.bootstrapped = true;
@@ -551,6 +707,14 @@ async function bootstrap() {
 byId("login-form").addEventListener("submit", login);
 byId("password-change-form").addEventListener("submit", changePassword);
 byId("logout-button").addEventListener("click", logout);
+byId("review-center-button").addEventListener("click", openReviewCenter);
+byId("close-review-center").addEventListener("click", closeReviewCenter);
+byId("refresh-review-center").addEventListener("click", loadReviewCenter);
+byId("review-approvals-tab").addEventListener("click", () => switchReviewView("approvals"));
+byId("review-activity-tab").addEventListener("click", () => switchReviewView("activity"));
+document.querySelectorAll("[data-activity-filter]").forEach((button) => button.addEventListener("click", () => filterReviewActivity(button.dataset.activityFilter)));
+byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
+byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
@@ -561,6 +725,10 @@ byId("execute-improvement-proposals").addEventListener("click", executeImproveme
 byId("preview-proposal-approval").addEventListener("click", previewProposalApproval);
 byId("proposal-confirmation").addEventListener("input", () => { byId("execute-proposal-approval").disabled = !state.proposalApproval || byId("proposal-confirmation").value !== "APPROVE_PROPOSAL_FOR_BETA_BUILD"; });
 byId("execute-proposal-approval").addEventListener("click", executeProposalApproval);
+byId("view-linked-skill").addEventListener("click", () => { if (state.selectedProposal?.linked_skill_id) focusProductionSkill(state.selectedProposal.linked_skill_id); });
+byId("preview-proposal-close").addEventListener("click", previewProposalClose);
+byId("proposal-close-confirmation").addEventListener("input", () => { byId("execute-proposal-close").disabled = !state.proposalClosePreview || byId("proposal-close-confirmation").value !== "CLOSE_PRODUCTION_PROPOSAL"; });
+byId("execute-proposal-close").addEventListener("click", executeProposalClose);
 byId("preview-beta-run").addEventListener("click", previewBetaRun);
 byId("beta-run-confirmation").addEventListener("input", () => { byId("execute-beta-run").disabled = !state.betaRunPreview || byId("beta-run-confirmation").value !== state.betaRunPreview.confirmation_phrase; });
 byId("execute-beta-run").addEventListener("click", executeBetaRun);
@@ -570,8 +738,10 @@ byId("execute-beta-promotion").addEventListener("click", executeBetaPromotion);
 byId("new-chat").addEventListener("click", createChat);
 byId("clear-chats").addEventListener("click", openClearDialog);
 byId("close-clear-dialog").addEventListener("click", () => byId("clear-dialog").close());
-byId("clear-mode").addEventListener("change", () => { byId("clear-title-field").hidden = byId("clear-mode").value === "all"; resetClearPreview(); });
+byId("clear-mode").addEventListener("change", () => { setClearModeFields(); resetClearPreview(); });
 byId("clear-title").addEventListener("input", resetClearPreview);
+byId("select-all-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = true; }); updateClearSelectionCount(); resetClearPreview(); });
+byId("select-none-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = false; }); updateClearSelectionCount(); resetClearPreview(); });
 byId("preview-clear").addEventListener("click", previewClear);
 byId("clear-confirmation").addEventListener("input", () => { byId("execute-clear").disabled = !state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS"; });
 byId("execute-clear").addEventListener("click", executeClear);

@@ -256,7 +256,7 @@ Phase 12B provides:
 
 ```text
 versioned soul.application.v1 request and response envelopes
-41 explicitly registered in-process operations after later interface slices
+43 explicitly registered in-process operations after later interface slices
 bounded Chat, workspace, inbox, configuration, status, skill, approval, and activity projections
 shared CLI/application Chat exchange service
 append-only private duplicate-send receipts without duplicated chat content
@@ -321,11 +321,13 @@ no package mutation, privileged command, service change, model download, impleme
 
 Phase 12D.3 passed visual/product review and was merged.
 
-Phase 12C.1 adds the owner-approved personal dashboard authentication boundary. A fixed `admin` account begins with the public `soul123` bootstrap credential but cannot access dashboard data until a private replacement password is set. Credentials remain in ignored owner-only runtime storage; sessions are bounded and process-local; sign-ups and multi-user roles remain unavailable. Authentication passed first-login review and was merged.
+Phase 12D.4 is an owner-requested Skill Studio lifecycle amendment. It derives one visible proposal stage from existing gates, Beta implementation and tests, and exact production registry linkage. The Beta manifest's exact `skill_id` links proposal, Beta, and production. A preview/digest/confirmation closeout may permanently delete the proposal and superseded Beta candidate only after that exact skill is registered in production; the production skill, registry, shared diagnostics, and unrelated data remain untouched. The owner approved this lifecycle presentation with Phase 12E.
+
+Phase 12C.1 adds the owner-approved personal dashboard authentication boundary. A fixed `admin` account begins with the public `soul123` bootstrap credential but cannot access dashboard data until a private replacement password is set. Credentials remain in ignored owner-only runtime storage; sessions persist across dashboard restarts for at most seven days using stored token digests rather than raw bearer tokens. Sign-ups and multi-user roles remain unavailable. Authentication passed first-login review and was merged.
 
 The separately approved protected local deployment keeps Soul on `127.0.0.1:4567` and uses two bounded systemd user services to expose Caddy HTTPS on one exact LAN address and unprivileged port. The operator completed Caddy installation, narrow firewall configuration, private-CA client trust, and remote login/logout review. Internet exposure, router forwarding, wildcard binding, and automatic firewall mutation remain out of scope. The deployment passed review and was merged.
 
-An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest.
+An owner-approved Phase 12C usability amendment adds preview-first conversation-list clearing by exact title, a human-selected set of exact active chat IDs, or all active conversations. Clear means reversible metadata archival, not transcript deletion. Execution requires an exact confirmation and the unchanged preview digest; a stale selected set blocks before mutation.
 
 The dashboard product shape is:
 
@@ -337,6 +339,8 @@ shared workspace alongside Chat
 initial and manually refreshed system status with host identity and timestamp
 explicit provider, privacy, approval, task, and failure state
 ```
+
+Phase 12E adds the owner-approved unified Review Center as a header-level supporting surface rather than a fourth primary tab. It composes the existing redacted pending-approval and recent-activity projections, provides bounded manual refresh and activity filters, and exposes no token value, private request, approval mutation, retry, replay, clear, prune, or export action.
 
 Core interface contracts cover:
 
@@ -355,6 +359,10 @@ System status
 The dashboard aesthetic uses the existing Soul/ imagery, colorway, typography, and restrained arcane-technical visual language. Material interface changes continue to require human review. See `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
 
 The public repository must not require the owner's IP addresses, hostnames, credentials, model alias, or filesystem paths. CLI, dashboard, tests, and later deployment share one typed configuration contract resolved from CLI overrides, process environment, ignored local `.env`, and tracked safe defaults.
+
+### Phase 12D.5: Gated implementation and production promotion
+
+Complete the Skill Studio lifecycle with two bounded foreground operations: build an approved exact proposal revision into an isolated Beta candidate for review, then promote an exact tested and Gate-2-approved Beta revision into the production registry through preview, digest revalidation, exact confirmation, rollback evidence, and human review. Model or cloud output remains candidate material and cannot authorize either operation.
 
 ### Phase 13: Integrated acceptance and closeout
 

@@ -44,11 +44,17 @@ idea, capability gap, or bounded brief draft
 
 Skill Studio organizes proposals, Beta candidates, required tests, diagnostics, and production registry summaries. It must not autonomously invoke Codex, apply patches, register generated skills, promote candidates, or treat model output as approval.
 
+Each proposal now shows one deterministic lifecycle stage and the exact skill ID from its Beta manifest. Once that exact ID is present in the production registry, Skill Studio may offer a separately previewed and confirmed closeout that deletes the proposal and superseded Beta copy while preserving the production skill and shared diagnostics.
+
 ### Self Improvement tab
 
 The tab loads one lightweight read-only environment snapshot when opened. Package update checks, local model assessment, and capability assessment remain explicit foreground actions. Generating advisory improvement proposal packets requires previewing and confirming the exact assessed revision.
 
 The initial surface must make the mutation boundary visible: it cannot install, update, downgrade, or remove packages; change services; download models; implement or promote skills; or run privileged commands. Those actions require separately reviewed executors with package-manager-specific recovery and confirmation behavior.
+
+### Review Center
+
+Phase 12E adds Review Center as a header-level supporting surface, not a fourth primary tab. It unifies redacted pending-approval state and bounded recent execution activity with manual refresh, filters, and record detail. Inspection is not authorization: approval values, private request text, full scope values, execution replay, approval mutation, and history mutation remain unavailable.
 
 ### Shared workspace
 

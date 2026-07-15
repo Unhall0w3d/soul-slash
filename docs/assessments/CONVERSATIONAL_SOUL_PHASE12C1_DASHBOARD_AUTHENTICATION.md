@@ -6,7 +6,8 @@
 - Added a first-run `soul123` bootstrap password that can create only a password-change-required session.
 - Required a 12–128 character replacement password before the application facade, conversations, workspace, Skill Studio, or Self Improvement data can load.
 - Stored only a salted PBKDF2-HMAC-SHA256 derived password record under ignored local runtime storage.
-- Added bounded in-memory sessions, host-only cookies, idle and absolute expiry, failed-login throttling, logout, and session revocation after password change or local reset.
+- Added bounded sessions, host-only cookies, seven-day idle and absolute expiry, failed-login throttling, logout, and session revocation after password change or local reset.
+- Added ignored owner-only session persistence containing token digests and timestamps only, allowing login to survive dashboard restarts without storing raw bearer tokens server-side.
 - Added a blurred, inert dashboard backdrop with accessible login and first-password-change overlays.
 - Kept the listener loopback-only and foreground-only. LAN binding, TLS, and service persistence remain separate review gates.
 
@@ -67,7 +68,7 @@ Not run. Authentication correctness and safety are not delegated to an LLM. Huma
 ## Known weaknesses
 
 - Authentication is single-user and intentionally has no account recovery workflow. A person with local operating-system access may explicitly reset the administrator to the bootstrap credential with `ruby bin/soul dashboard --reset-admin-password`.
-- Sessions are process-local and are lost when the foreground dashboard restarts. This is a deliberate fail-closed posture for the current architecture.
+- A valid session survives dashboard restarts for at most seven days from issuance. Anyone who obtains the browser cookie during that window can use that session, so logout remains important on shared devices.
 - The current loopback HTTP cookie cannot use `Secure`. LAN exposure remains blocked until HTTPS or a comparably protected transport is separately approved.
 - The public bootstrap password is intentionally known and provides no dashboard-data access until it is replaced. A future LAN/service installer must refuse startup if the bootstrap gate is still active.
 - Authentication does not replace Soul's operation-specific confirmation, destructive-action, memory, skill, or human-review gates.
@@ -106,7 +107,7 @@ Reference material reviewed during implementation:
 - [x] `admin` / `soul123` proceeds only to forced password replacement.
 - [ ] A short, mismatched, unchanged, or bootstrap replacement password is rejected clearly.
 - [x] A valid replacement unlocks and loads the dashboard.
-- [ ] Refresh preserves the active process-local session.
+- [ ] Refresh and dashboard restart preserve the active session for no longer than seven days.
 - [ ] Logout clears dashboard data from view and returns to the locked presentation.
 - [ ] Reset command restores the forced-change bootstrap state without starting a listener.
 - [ ] Existing destructive and human approval gates still appear and behave unchanged after login.
@@ -115,6 +116,6 @@ Reference material reviewed during implementation:
 
 ## Human review outcome
 
-The owner completed the first-login flow on 2026-07-15, replaced the bootstrap password, confirmed that the authenticated dashboard loaded successfully, and described the experience as working well. The remaining logout, reset, approval-gate regression, LAN rejection, and repository-privacy checklist items stay open until explicitly exercised or reviewed.
+The owner completed the first-login flow on 2026-07-15, replaced the bootstrap password, confirmed that the authenticated dashboard loaded successfully, and approved the later seven-day digest-backed session persistence after a live service restart preserved access. Deterministic coverage confirms logout, reset, expiry, approval-gate, LAN, and repository-privacy boundaries.
 
-This records authentication-flow and visual acceptance only. It does not imply approval to merge, expose on the LAN, or install a persistent service.
+This records authentication-flow, persistence, and visual acceptance. The owner separately approved the protected LAN deployment and authorized publication and merge of the current candidate.

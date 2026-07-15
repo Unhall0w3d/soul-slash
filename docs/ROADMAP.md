@@ -27,10 +27,12 @@
 - [x] guided Skill Studio with Proposal, Beta, and Production inventories
 - [x] capability-gap intake from Chat to Skill Studio
 - [x] Self Improvement dashboard with bounded environment and capability assessment
+- [x] proposal stage, production skill linkage, and production-only closeout
 - [x] human visual review of the three-tab dashboard aesthetic
-- [ ] personal administrator authentication review
-- [ ] protected LAN transport, user-service, and device-trust review
-- [ ] unified approvals and activity views
+- [x] personal administrator authentication review
+- [x] protected LAN transport, user-service, and device-trust review
+- [x] unified approvals and activity views
+- [ ] gated proposal-to-Beta implementation and Beta-to-production promotion
 - [ ] integrated Phase 13 conversational acceptance and closeout
 - [ ] more filesystem workflows
 - [ ] approved memory/rule loading into prompts

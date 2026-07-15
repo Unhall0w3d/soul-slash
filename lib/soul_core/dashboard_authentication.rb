@@ -16,23 +16,27 @@ module SoulCore
     USERNAME = "admin"
     BOOTSTRAP_PASSWORD = "soul123"
     CREDENTIAL_PATH = "Soul/runtime/dashboard_auth/credentials.json"
+    SESSION_PATH = "Soul/runtime/dashboard_auth/sessions.json"
     PBKDF2_ITERATIONS = 600_000
     HASH_LENGTH = 32
     SALT_LENGTH = 16
     MIN_PASSWORD_CHARACTERS = 12
     MAX_PASSWORD_CHARACTERS = 128
-    SESSION_IDLE_SECONDS = 12 * 60 * 60
-    SESSION_ABSOLUTE_SECONDS = 24 * 60 * 60
+    SESSION_IDLE_SECONDS = 7 * 24 * 60 * 60
+    SESSION_ABSOLUTE_SECONDS = 7 * 24 * 60 * 60
+    SESSION_TOUCH_INTERVAL_SECONDS = 5 * 60
     MAX_SESSIONS = 32
     FAILED_ATTEMPT_LIMIT = 5
     FAILED_ATTEMPT_WINDOW_SECONDS = 5 * 60
 
-    attr_reader :credential_path
+    attr_reader :credential_path, :session_path
 
-    def initialize(root:, credential_path: CREDENTIAL_PATH, iterations: PBKDF2_ITERATIONS,
+    def initialize(root:, credential_path: CREDENTIAL_PATH, session_path: SESSION_PATH, iterations: PBKDF2_ITERATIONS,
                    clock: -> { Time.now.utc }, random_bytes: ->(count) { SecureRandom.random_bytes(count) }, reset_to_bootstrap: false)
       @root = File.expand_path(root)
       @credential_path = expand_below_root(credential_path)
+      @session_path = expand_below_root(session_path)
+      raise ArgumentError, "credential and session paths must differ" if @session_path == @credential_path
       @iterations = Integer(iterations)
       raise ArgumentError, "PBKDF2 iterations must be positive" unless @iterations.positive?
 
@@ -43,8 +47,10 @@ module SoulCore
       if reset_to_bootstrap
         raise CredentialError, "dashboard credential path must not be a symlink" if File.symlink?(@credential_path)
         write_credential(password: BOOTSTRAP_PASSWORD, password_change_required: true)
+        clear_sessions!
       else
         ensure_credentials!
+        load_sessions!
       end
     end
 
@@ -73,14 +79,17 @@ module SoulCore
     def session(token, touch: true)
       now = now_f
       credential
-      prune_sessions(now)
+      persist_sessions! if prune_sessions(now)
       digest = token_digest(token)
       return nil unless digest
 
       record = @sessions[digest]
       return nil unless record
 
-      record["last_seen_at"] = now if touch
+      if touch && now - record.fetch("last_seen_at") >= SESSION_TOUCH_INTERVAL_SECONDS
+        record["last_seen_at"] = now
+        persist_sessions!
+      end
       public_session(record)
     end
 
@@ -98,20 +107,21 @@ module SoulCore
       return Result.new(ok: false, status: 422, code: "password_policy", reason: policy_error) if policy_error
 
       write_credential(password: replacement, password_change_required: false)
-      @sessions.clear
+      clear_sessions!
       token_value, new_session = issue_session(now_f)
       Result.new(ok: true, status: 200, token: token_value, session: public_session(new_session))
     end
 
     def logout(token)
+      credential
       digest = token_digest(token)
-      @sessions.delete(digest) if digest
+      persist_sessions! if digest && @sessions.delete(digest)
       Result.new(ok: true, status: 200)
     end
 
     def reset_to_bootstrap!
       write_credential(password: BOOTSTRAP_PASSWORD, password_change_required: true)
-      @sessions.clear
+      clear_sessions!
       @failed_attempts.clear
       true
     end
@@ -141,9 +151,10 @@ module SoulCore
     def credential
       current = credential_fingerprint
       if @credential.nil? || @credential_fingerprint != current
-        @sessions.clear if @credential
+        credential_changed = !@credential.nil?
         @failed_attempts.clear if @credential
         cache_credential(load_credential)
+        clear_sessions! if credential_changed
       end
       @credential
     end
@@ -211,6 +222,79 @@ module SoulCore
       File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
     end
 
+    def load_sessions!
+      unless File.exist?(@session_path) || File.symlink?(@session_path)
+        persist_sessions!
+        return
+      end
+
+      stat = File.lstat(@session_path)
+      raise CredentialError, "dashboard session path must be a regular file" unless stat.file? && !stat.symlink?
+      raise CredentialError, "dashboard session file permissions must be owner-only" unless (stat.mode & 0o077).zero?
+      raise CredentialError, "dashboard session file is too large" if stat.size > 64 * 1024
+
+      value = JSON.parse(File.binread(@session_path))
+      if value["schema_version"] == "soul.dashboard.sessions.v1" && value.key?("credential_updated_at")
+        clear_sessions!
+        return
+      end
+      raise CredentialError, "dashboard session record has unsupported schema" unless value["schema_version"] == "soul.dashboard.sessions.v2"
+      raise CredentialError, "dashboard session record is incomplete" unless value["credential_revision"].is_a?(String) && value["credential_revision"].match?(/\A[0-9a-f]{64}\z/) && value["sessions"].is_a?(Array)
+      raise CredentialError, "dashboard session count exceeds #{MAX_SESSIONS}" if value.fetch("sessions").length > MAX_SESSIONS
+
+      if value.fetch("credential_revision") != credential_revision
+        clear_sessions!
+        return
+      end
+
+      loaded = {}
+      value.fetch("sessions").each do |record|
+        valid = record.is_a?(Hash) && record.keys.sort == %w[issued_at last_seen_at token_digest username] &&
+                record["token_digest"].is_a?(String) && record["token_digest"].match?(/\A[0-9a-f]{64}\z/) &&
+                record["username"] == USERNAME && finite_timestamp?(record["issued_at"]) && finite_timestamp?(record["last_seen_at"])
+        raise CredentialError, "dashboard session record contains invalid data" unless valid
+        raise CredentialError, "dashboard session record contains duplicate digests" if loaded.key?(record.fetch("token_digest"))
+
+        loaded[record.fetch("token_digest")] = record.slice("username", "issued_at", "last_seen_at")
+      end
+      @sessions = loaded
+      persist_sessions! if prune_sessions(now_f)
+    rescue Errno::ENOENT, Errno::EACCES, JSON::ParserError => error
+      raise CredentialError, "dashboard session record cannot be read safely: #{error.class}"
+    end
+
+    def persist_sessions!
+      directory = File.dirname(@session_path)
+      ensure_private_directory(directory)
+      File.chmod(0o700, directory)
+      raise CredentialError, "dashboard session path must not be a symlink" if File.symlink?(@session_path)
+
+      record = {
+        "schema_version" => "soul.dashboard.sessions.v2",
+        "credential_revision" => credential_revision,
+        "sessions" => @sessions.sort.map do |digest, session|
+          { "token_digest" => digest, "username" => session.fetch("username"), "issued_at" => session.fetch("issued_at"), "last_seen_at" => session.fetch("last_seen_at") }
+        end
+      }
+      temporary = "#{@session_path}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(JSON.pretty_generate(record))
+        file.write("\n")
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @session_path)
+      File.chmod(0o600, @session_path)
+      true
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
+
+    def clear_sessions!
+      @sessions.clear
+      persist_sessions!
+    end
+
     def ensure_private_directory(directory)
       relative = directory.delete_prefix("#{@root}#{File::SEPARATOR}")
       cursor = @root
@@ -259,13 +343,16 @@ module SoulCore
       end while @sessions.key?(digest)
       record = { "username" => USERNAME, "issued_at" => now, "last_seen_at" => now }
       @sessions[digest] = record
+      persist_sessions!
       [token, record]
     end
 
     def prune_sessions(now)
+      before = @sessions.length
       @sessions.delete_if do |_digest, record|
         now - record.fetch("last_seen_at") > SESSION_IDLE_SECONDS || now - record.fetch("issued_at") > SESSION_ABSOLUTE_SECONDS
       end
+      before != @sessions.length
     end
 
     def prune_failed_attempts(now)
@@ -284,6 +371,14 @@ module SoulCore
       return nil unless token.is_a?(String) && token.match?(/\A[A-Za-z0-9_-]{43}\z/)
 
       Digest::SHA256.hexdigest(token)
+    end
+
+    def finite_timestamp?(value)
+      value.is_a?(Numeric) && value.finite? && value >= 0
+    end
+
+    def credential_revision
+      Digest::SHA256.hexdigest([@credential.fetch("username"), @credential.fetch("salt"), @credential.fetch("password_hash"), @credential.fetch("updated_at")].join("\0"))
     end
 
     def bounded_string(value, max_bytes)

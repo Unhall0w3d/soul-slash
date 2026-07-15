@@ -5,6 +5,7 @@ brief_status: approved by human owner instruction
 implementation_authorized: yes
 lan_binding_authorized: no
 persistent_service_authorized: no
+persistent_session_state_authorized: yes (2026-07-15 owner amendment)
 human_visual_review_required: yes
 human_merge_review_required: yes
 ```
@@ -30,7 +31,8 @@ Class 5: security-sensitive authentication and private-runtime credential storag
 - Password hashing with Ruby/OpenSSL PBKDF2-HMAC-SHA256, a unique random salt, and 600,000 iterations.
 - A new password policy of 12 to 128 UTF-8 characters; the bootstrap password cannot be reused.
 - One ignored local credential record under `Soul/runtime/dashboard_auth/`, written with owner-only permissions and no plaintext password.
-- Bounded in-memory server sessions with random bearer tokens, idle and absolute expiry, and a maximum session count.
+- Bounded server sessions with random bearer tokens, seven-day idle and absolute expiry, and a maximum session count.
+- Persist only SHA-256 token digests, timestamps, and the fixed username in an ignored owner-only session record so valid logins survive dashboard restarts. Raw bearer tokens remain only in host-only browser cookies.
 - Host-only session cookies with `HttpOnly`, `SameSite=Strict`, and no `Domain` attribute. `Secure` is required when a later approved HTTPS transport is active.
 - Exact same-origin and CSRF validation for login, password change, logout, and application calls.
 - A bounded failed-login window returning `429` after repeated failures. No timer, sleeper, polling loop, or background cleanup process is permitted; stale state is pruned during foreground requests.
@@ -49,7 +51,8 @@ first server start
 → current password + valid replacement submitted
 → credential atomically replaced and other sessions revoked
 → authenticated / dashboard unblurred / application bootstrap allowed
-→ logout, idle expiry, absolute expiry, password reset, or process stop
+→ dashboard process restarts / token digest and seven-day window remain valid
+→ logout, idle expiry, absolute expiry, password reset, or credential rotation
 → session invalid / dashboard locked
 ```
 
@@ -63,6 +66,7 @@ Every HTTP request terminates as a response. Authentication adds no background e
 - Persistent services, systemd units, daemonization, automatic restart, or boot startup.
 - Multiple users, family accounts, permissions, invitations, or sign-ups.
 - Storing a password, derived hash, salt, session token, or cookie in Git, `.env`, logs, HTML, JavaScript, URLs, or application-facade envelopes.
+- Persisting raw session bearer tokens server-side or extending any session beyond seven days from issuance.
 - Browser local storage or session storage for credentials or bearer tokens.
 - Treating possession of a dashboard session as approval for destructive Soul operations; all existing human gates remain intact.
 
@@ -76,6 +80,7 @@ Authentication is necessary but not sufficient for LAN exposure. Before the bind
 - Confirm the bootstrap credential never reveals dashboard data before replacement.
 - Confirm the new password is not stored or returned in plaintext.
 - Confirm refresh preserves a valid session and logout immediately locks the UI.
+- Confirm a restart preserves a valid session for no longer than seven days.
 - Confirm password change revokes prior sessions.
 - Confirm existing skill, memory, deletion, and approval gates are unchanged.
 - Confirm LAN binding and persistence remain unavailable in this slice.
