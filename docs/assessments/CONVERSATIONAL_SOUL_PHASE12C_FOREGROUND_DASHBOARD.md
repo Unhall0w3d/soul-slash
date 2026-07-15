@@ -16,7 +16,7 @@ Automated acceptance means ready for visual review, not approved for merge, rele
 - Serves seven exact allowlisted routes without dynamic filesystem path resolution.
 - Protects the API with Host, same-origin Origin, JSON content type, ephemeral CSRF, request limits, CSP, anti-framing, no-sniff, and no-store controls.
 - Delegates domain requests to the Phase 12B `ApplicationFacade`.
-- Adds a branded, responsive, accessible Chat workspace with conversation continuity, shared metadata, inbox state, and manual host status.
+- Adds a branded, responsive, accessible Chat workspace with conversation continuity, shared metadata, inbox state, one initial host-status collection, and manual refresh.
 - Presents Skill Studio as a selectable but behaviorally inert Phase 12D preview.
 - Adds an owner-requested preview-first `chats.clear` skill and dashboard dialog for exact-title or all-conversation metadata archival without transcript deletion.
 - Adds no daemon, service, worker, watcher, scheduler, polling, remote dependency, approval authority, or new memory store.
@@ -62,7 +62,7 @@ PASS: Phase 12B assessment, including Chat get/history regression coverage.
 PASS: repository Ruby syntax and dashboard JavaScript syntax.
 ```
 
-Coverage includes routes, traversal, methods, Host, Origin, CSRF, content type, malformed and oversized bodies, security headers, facade call count, lifecycle preservation, safe DOM construction, registered operations, manual status, inert Skill Studio, semantic landmarks, brand tokens, reduced motion, responsive rules, loopback binding, server limits, and foreground termination.
+Coverage includes routes, traversal, methods, Host, Origin, CSRF, content type, malformed and oversized bodies, security headers, facade call count, lifecycle preservation, safe DOM construction, registered operations, one-shot initial status plus manual refresh, inert Skill Studio, semantic landmarks, brand tokens, reduced motion, responsive rules, loopback binding, server limits, and foreground termination.
 
 ## Local LLM eval results
 
@@ -141,7 +141,9 @@ PASS: dashboard opened at the configured loopback origin.
 PASS: existing conversations loaded from the Phase 12B facade.
 PASS: empty Chat state, composer, workspace, inbox, and lifecycle state rendered.
 PASS: Skill Studio switched through its ARIA tab and exposed zero action buttons.
-PASS: manual host-status collection ran only after the Refresh click.
+PASS: one bounded host-status collection populated the card on page load.
+PASS: the Refresh button performed a later user-requested update.
+PASS: no timer, polling, retry, watcher, worker, or background continuation was added.
 PASS: local provider and valid configuration state were visible.
 PASS: browser console contained no dashboard JavaScript errors.
 PENDING: human owner aesthetic feedback and acceptance.
@@ -155,7 +157,7 @@ PENDING: human owner aesthetic feedback and acceptance.
 [ ] Chat / Skill Studio hierarchy is clear
 [ ] Conversation rail, history, and composer are useful and legible
 [ ] Workspace placement and metadata are useful
-[ ] Manual system-status presentation is useful
+[x] Initial and manually refreshed system-status presentation is useful
 [ ] Typography, palette, imagery, and motifs feel appropriate
 [ ] Keyboard focus and responsive behavior are acceptable
 [ ] Lifecycle, privacy, provider, and failure states are clear
@@ -163,15 +165,15 @@ PENDING: human owner aesthetic feedback and acceptance.
 [ ] No unapproved persistence, LAN, polling, or remote behavior exists
 [ ] HTTP and browser protections are meaningful
 [ ] Known weaknesses are acceptable
-[ ] Candidate is approved for merge
+[x] Candidate is approved for merge
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending visual review
+Outcome: approved with requested one-shot status amendment
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-15
+Decision summary: Dashboard direction accepted; conversation-list clearing appreciated. Initial system status should populate on page open and remain manually refreshable.
+Required changes: Implement and verify one initial bounded status call without polling or background behavior.
 ```

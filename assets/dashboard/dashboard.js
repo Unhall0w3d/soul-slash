@@ -238,9 +238,9 @@ async function togglePin() {
 }
 
 function detailRow(term, description) { const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = term; const dd = document.createElement("dd"); dd.textContent = description; row.append(dt, dd); return row; }
-async function refreshStatus() {
+async function refreshStatus({ automatic = false } = {}) {
   const button = byId("refresh-status"); button.disabled = true; announce("Collecting bounded host status");
-  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("Scope", data.scope || "Bounded host"), detailRow("State", envelope.lifecycle_state || "unknown")); announce("System status refreshed manually"); } catch (error) { showError(error); } finally { button.disabled = false; }
+  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("Scope", data.scope || "Bounded host"), detailRow("State", envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Host", "Unavailable"), detailRow("Collected", "Initial collection failed"), detailRow("Scope", "Bounded host"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
 }
 
 function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
@@ -249,7 +249,7 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true);
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true });
   } catch (error) { byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 

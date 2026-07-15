@@ -25,11 +25,11 @@ Operator-specific values belong in the ignored `.env` file or invocation-only `-
 
 The server exposes one HTML document, one stylesheet, one JavaScript file, three exact brand-image routes, and `POST /api/v1/call`. It never joins a URL path to the filesystem. API calls require a matching loopback Host, exact same-origin Origin, JSON content type, and an ephemeral process-local CSRF token.
 
-The browser calls only registered Phase 12B application operations. Domain stores, model providers, shared workspace records, and host status remain behind the application facade. Status collection is manual. There is no CORS, remote asset, analytics, browser credential store, polling, websocket, service worker, file browser, or artifact-content reader.
+The browser calls only registered Phase 12B application operations. Domain stores, model providers, shared workspace records, and host status remain behind the application facade. Status is collected once during page bootstrap and may then be refreshed manually; there is no timer or polling. There is no CORS, remote asset, analytics, browser credential store, websocket, service worker, file browser, or artifact-content reader.
 
 ## Product slice
 
-Chat supports conversation listing, creation, selection, bounded history, send, pin/unpin, workspace metadata, inbox summary, and manual host status. The UI exposes provider, configuration, privacy, lifecycle, and mutation state.
+Chat supports conversation listing, creation, selection, bounded history, send, pin/unpin, workspace metadata, inbox summary, one initial host-status collection, and manual status refresh. The UI exposes provider, configuration, privacy, lifecycle, and mutation state.
 
 The approved conversation-clearing amendment adds a preview-first `chats.clear` skill and dashboard dialog. Exact-title mode shows all duplicate-title matches; all mode shows the complete bounded active set. Execution requires `CLEAR_CONVERSATIONS` and the preview digest. Clearing archives metadata from the active list and never deletes transcript files.
 

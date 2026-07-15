@@ -278,7 +278,7 @@ dependency-free, foreground, sequential loopback HTTP transport
 exact static and same-origin JSON route allowlist over soul.application.v1
 Host, Origin, ephemeral CSRF, CSP, no-store, and bounded-request protections
 branded three-rail Chat workspace with conversation continuity and composer
-shared artifact metadata, inbox summary, and explicit manual host-status refresh
+shared artifact metadata, inbox summary, one initial host-status collection, and explicit manual refresh
 visible but behaviorally inert Skill Studio preview as the second primary tab
 no daemon, service, worker, LAN bind, polling, remote asset, or persistence install
 ```
@@ -293,7 +293,7 @@ The dashboard product shape begins with:
 Tab 1: Chat
 Tab 2: Skill Studio
 shared workspace alongside Chat
-manual system-status refresh with host identity and timestamp
+initial and manually refreshed system status with host identity and timestamp
 explicit provider, privacy, approval, task, and failure state
 ```
 

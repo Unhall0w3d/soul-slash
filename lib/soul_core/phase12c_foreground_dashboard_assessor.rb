@@ -90,7 +90,11 @@ module SoulCore
       forbidden_frontend = %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML eval( insertAdjacentHTML http:// https://]
       checks["frontend_has_no_polling_remote_or_unsafe_dom_primitive"] = forbidden_frontend.none? { |needle| [html, css, js].any? { |source| source.include?(needle) } } && js.include?("replaceChildren") && js.include?("textContent")
 
-      checks["bootstrap_does_not_collect_status_and_refresh_is_explicit"] = !js.match?(/bootstrap[\s\S]{0,1600}system_status\.refresh/) && js.include?('byId("refresh-status").addEventListener("click", refreshStatus)') && js.scan('"system_status.refresh"').length == 1
+      checks["bootstrap_collects_status_once_and_refresh_remains_explicit"] =
+        js.match?(/async function bootstrap\(\)[\s\S]{0,1600}await refreshStatus\(\{ automatic: true \}\)/) &&
+        js.include?('byId("refresh-status").addEventListener("click", refreshStatus)') &&
+        js.scan('"system_status.refresh"').length == 1 &&
+        %w[setInterval setTimeout WebSocket EventSource].none? { |primitive| js.include?(primitive) }
 
       required_operations = %w[application.bootstrap chats.list chats.messages chats.create chats.send chats.pin chats.unpin chats.clear.preview chats.clear.execute workspace.chat inbox.list system_status.refresh]
       checks["chat_uses_registered_phase12b_operations"] = required_operations.all? { |operation| js.include?(operation) }
