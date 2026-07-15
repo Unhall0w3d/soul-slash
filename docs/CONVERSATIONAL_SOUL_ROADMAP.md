@@ -256,6 +256,21 @@ no listener, service, watcher, polling, provider probe, or configuration write
 
 Human merge review remains required before Phase 12A is accepted.
 
+Phase 12B candidate implementation now provides:
+
+```text
+versioned soul.application.v1 request and response envelopes
+23 explicitly registered in-process operations
+bounded Chat, workspace, inbox, configuration, status, skill, approval, and activity projections
+shared CLI/application Chat exchange service
+append-only private duplicate-send receipts without duplicated chat content
+manual-only system-status refresh
+redacted non-authorizing approval and activity summaries
+no HTTP transport, listener, frontend, service, watcher, scheduler, or polling
+```
+
+Human merge review remains required before Phase 12B is accepted.
+
 The dashboard product shape begins with:
 
 ```text

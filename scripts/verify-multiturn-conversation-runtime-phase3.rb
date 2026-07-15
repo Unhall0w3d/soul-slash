@@ -15,6 +15,7 @@ puts "Conversational Soul Phase 3 verification:"
 
 required = %w[
   lib/soul_core/app.rb
+  lib/soul_core/application_chat_service.rb
   lib/soul_core/chat_command.rb
   lib/soul_core/conversation_context_builder.rb
   lib/soul_core/conversation_state_store.rb
@@ -88,11 +89,18 @@ unless text_ok
 end
 
 chat_command = File.read("lib/soul_core/chat_command.rb")
+application_chat_service = File.read("lib/soul_core/application_chat_service.rb")
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 documentation = File.read("docs/MULTITURN_CONVERSATION_RUNTIME.md")
 roadmap = File.read("docs/CONVERSATIONAL_SOUL_ROADMAP.md")
 
-check("ChatCommand uses ConversationRuntime", chat_command.include?('require_relative "conversation_runtime"') && chat_command.include?("@runtime.respond"), errors)
+check(
+  "ChatCommand uses ConversationRuntime through the shared application exchange service",
+  chat_command.include?('require_relative "conversation_runtime"') &&
+    chat_command.include?("@chat_service.send") &&
+    application_chat_service.include?("@runtime.respond"),
+  errors
+)
 check("runtime preserves deterministic responder", runtime.include?('require_relative "chat_responder"') && runtime.include?("deterministic_passthrough"), errors)
 check("runtime defaults to local provider preference", runtime.include?('privacy_class == "local_only"'), errors)
 check("cloud conversation requires explicit permission", runtime.include?("SOUL_ALLOW_CLOUD_CONVERSATION"), errors)
@@ -108,7 +116,10 @@ stdout, stderr, status = Open3.capture3(
   "--json"
 )
 curation = JSON.parse(stdout) rescue nil
-allowed = ["scripts/verify-multiturn-conversation-runtime-phase3.rb"]
+allowed = [
+  "scripts/verify-multiturn-conversation-runtime-phase3.rb",
+  "scripts/verify-phase12b-in-process-application-api.rb"
+]
 untracked =
   if curation && curation["untracked_review_candidates"].is_a?(Array)
     curation["untracked_review_candidates"]

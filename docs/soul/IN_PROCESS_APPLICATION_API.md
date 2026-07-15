@@ -1,0 +1,168 @@
+# In-Process Application API
+
+Phase 12B defines the transport-independent application contract consumed by the CLI and the future dashboard.
+
+## Boundary
+
+The facade is an in-process Ruby object. It adds no HTTP server, socket, listener, frontend, service, daemon, watcher, scheduler, polling loop, or automatic startup.
+
+It delegates to existing Soul services for:
+
+```text
+conversation runtime
+chat persistence
+workspace and inbox
+typed configuration
+manual host status
+skill registry
+approval storage
+execution activity
+```
+
+The facade does not create a second assistant runtime or storage model.
+
+## Envelope
+
+Requests use:
+
+```json
+{
+  "schema_version": "soul.application.v1",
+  "request_id": "dashboard:example-001",
+  "operation": "chats.list",
+  "parameters": {"limit": 50},
+  "context": {"interface": "dashboard"}
+}
+```
+
+Responses always include:
+
+```text
+schema_version
+request_id
+operation
+ok
+lifecycle_state
+data
+errors
+warnings
+meta.generated_at
+meta.mutation
+meta.idempotent_replay
+meta.limits
+```
+
+Terminal lifecycle states are:
+
+```text
+complete
+failed
+awaiting_input
+canceled
+blocked_for_human_review
+```
+
+## Operations
+
+The first registry includes:
+
+```text
+application.bootstrap
+application.cancel
+
+chats.list
+chats.get
+chats.messages
+chats.create
+chats.send
+chats.pin
+chats.unpin
+
+workspace.list
+workspace.chat
+workspace.detail
+inbox.list
+inbox.deliver
+inbox.mark_seen
+inbox.dismiss
+
+system_status.refresh
+
+configuration.show
+configuration.explain
+configuration.validate
+
+skills.list
+approvals.pending
+activities.recent
+```
+
+Unknown operations, parameters, context fields, and value types fail closed before a domain call.
+
+## Bounds
+
+```text
+request JSON: 128 KiB
+one string: 64 KiB
+keys: 64
+nesting depth: 8
+chats: 50
+messages: 200
+workspace/inbox: 50
+skills: 100
+pending approvals: 50
+activities: 100
+chat message scan: 10,000 records
+request receipts: 5,000 events / 2 MiB
+```
+
+IDs use explicit canonical patterns. Untrusted strings are never used for dynamic method lookup, constants, or filesystem paths.
+
+## Chat exchange and idempotency
+
+The CLI and application facade share `ApplicationChatService`.
+
+One successful send:
+
+```text
+reserve request ID and input digest
+→ append one user message
+→ call the existing ConversationRuntime
+→ append one assistant message
+→ complete the receipt
+→ return
+```
+
+The private append-only receipt file is:
+
+```text
+Soul/runtime/application/request_receipts.jsonl
+mode: 0600
+```
+
+Receipts contain request identity, input digest, chat identity, message IDs, and terminal category. They do not duplicate chat content, credentials, hidden reasoning, or configuration.
+
+Replaying the same request ID, chat, and message returns the existing exchange without another provider call or appended message. Reusing a request ID with changed scope blocks for human review.
+
+If execution is interrupted after reservation, the receipt remains incomplete and reuse blocks rather than risking a duplicate provider call or message pair. Recovery is explicit and foreground-only.
+
+## Read projections
+
+- Chat lists expose canonical chat metadata.
+- Message history is explicit and capped.
+- Workspace and inbox delegate to Phase 11D and remain metadata-only unless an existing artifact inspection is separately invoked.
+- Configuration delegates to Phase 12A and remains redacted and read-only.
+- System status is collected only by `system_status.refresh`.
+- Skills are registry summaries and cannot execute.
+- Pending approvals use non-authorizing fingerprints and omit token values and sensitive scope values.
+- Activities omit original private messages and expose only bounded classifications.
+
+## Safety inheritance
+
+The application facade does not grant new authority. Existing provider privacy, cloud opt-in, artifact approval, destructive-action confirmation, memory promotion, and human-review gates remain authoritative.
+
+No model output can select an application request ID, authorize a replay conflict, approve a token, change configuration, or bypass domain validation.
+
+## Dashboard relationship
+
+Phase 12C may translate loopback HTTP requests into this in-process envelope. It must not read JSONL stores directly or reproduce domain logic in route handlers.
