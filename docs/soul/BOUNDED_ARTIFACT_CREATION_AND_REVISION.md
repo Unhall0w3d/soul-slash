@@ -68,4 +68,6 @@ If writing or byte verification fails, Soul removes only the partial new file cr
 
 ## Deferred work
 
-Phase 11C does not add in-place edits, overwrite, delete, move, rename, archive, inbox delivery, upload, sharing, export, rich documents, code, executables, media, or multi-file packages.
+Phase 11C does not add in-place edits, overwrite, delete, move, rename, archive, upload, sharing, export, rich documents, code, executables, media, or multi-file packages.
+
+Phase 11D adds synchronous append-only inbox delivery only after verified registration and attachment. Delivery failure is reported separately and never changes a successfully created artifact from `complete` to a false failure.

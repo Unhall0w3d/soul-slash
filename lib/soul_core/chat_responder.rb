@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "conversation_artifact_controls"
+require_relative "conversation_workspace_controls"
 require_relative "conversation_interest_controls"
 require_relative "conversation_style_controls"
 require_relative "conversation_identity_controls"
@@ -21,6 +22,7 @@ module SoulCore
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
       @artifact_controls = ConversationArtifactControls.new(root: @root)
+      @workspace_controls = ConversationWorkspaceControls.new(root: @root)
       @interest_controls = ConversationInterestControls.new(root: @root)
       @identity_controls = ConversationIdentityControls.new
       @style_controls = ConversationStyleControls.new(root: @root)
@@ -42,6 +44,7 @@ module SoulCore
       intent = @router.route(text)
 
       return "I am here. Give me a thread to pull." if lower.empty?
+      return @workspace_controls.respond(text, chat_id: chat_id) if @workspace_controls.match?(text)
       return @artifact_controls.respond(text, chat_id: chat_id) if @artifact_controls.match?(text)
       return @interest_controls.respond(text, chat_id: chat_id) if @interest_controls.match?(text)
       return @identity_controls.respond(text, chat_id: chat_id) if @identity_controls.match?(text)

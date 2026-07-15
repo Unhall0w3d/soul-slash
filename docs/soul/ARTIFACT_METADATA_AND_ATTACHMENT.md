@@ -72,4 +72,8 @@ It is local runtime state and is ignored by Git.
 
 ## Deferred work
 
-Phase 11C adds bounded creation and no-overwrite revision through `docs/soul/BOUNDED_ARTIFACT_CREATION_AND_REVISION.md`. Later Phase 11 slices may add inbox delivery, attachment ingestion, provider export, and richer file lifecycle controls. Those features must reuse this metadata and provenance contract rather than inventing parallel artifact identities.
+Phase 11C adds bounded creation and no-overwrite revision through `docs/soul/BOUNDED_ARTIFACT_CREATION_AND_REVISION.md`.
+
+Phase 11D adds the shared workspace projection and append-only artifact inbox through `docs/soul/SHARED_WORKSPACE_AND_ARTIFACT_INBOX.md`. The artifact ID remains canonical; workspace and delivery records do not create parallel file identities or imply content-read authority.
+
+Later work may add attachment ingestion, provider export, and richer file lifecycle controls. Those features must reuse this metadata and provenance contract rather than inventing parallel artifact identities.

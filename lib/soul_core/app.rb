@@ -28,6 +28,7 @@ require_relative "bounded_host_system_status_assessor"
 require_relative "phase11_bounded_artifact_inspection_assessor"
 require_relative "phase11_artifact_metadata_attachment_assessor"
 require_relative "phase11c_bounded_artifact_creation_assessor"
+require_relative "phase11d_shared_workspace_inbox_assessor"
 require_relative "phase10_inspectable_interests_closeout_assessor"
 require_relative "phase10_recent_style_awareness_assessor"
 require_relative "phase10_identity_style_foundation_assessor"
@@ -277,6 +278,12 @@ when "assistant-skill-catalog-refresh", "skill-catalog-refresh", "skills-catalog
     def run_assess
       target = @argv.shift
       case target
+      when "phase11d-shared-workspace-inbox", "phase11d-workspace", "workspace-inbox"
+        json = @argv.include?("--json")
+        assessor = Phase11dSharedWorkspaceInboxAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
       when "phase11c-bounded-artifact-creation", "phase11c-artifact-creation", "artifact-creation"
         json = @argv.include?("--json")
         assessor = Phase11cBoundedArtifactCreationAssessor.new(root: Dir.pwd)

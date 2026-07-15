@@ -7,6 +7,7 @@ require "pathname"
 require_relative "approval_token_store"
 require_relative "conversation_artifact_contract"
 require_relative "conversation_artifact_inspector"
+require_relative "conversation_artifact_inbox_store"
 require_relative "conversation_artifact_operation_store"
 require_relative "conversation_artifact_store"
 require_relative "conversation_provider_contract"
@@ -32,7 +33,8 @@ module SoulCore
       artifact_store: nil,
       inspector: nil,
       approval_store: nil,
-      operation_store: nil
+      operation_store: nil,
+      inbox_store: nil
     )
       @root = File.realpath(root)
       @env = env
@@ -41,6 +43,7 @@ module SoulCore
       @inspector = inspector || ConversationArtifactInspector.new(root: @root, store: @artifact_store)
       @approval_store = approval_store || ApprovalTokenStore.new(root: @root)
       @operation_store = operation_store || ConversationArtifactOperationStore.new(root: @root)
+      @inbox_store = inbox_store || ConversationArtifactInboxStore.new(root: @root)
     end
 
     attr_reader :approval_store, :operation_store
@@ -235,11 +238,17 @@ module SoulCore
           )
         end
 
+        delivery = deliver_created_artifact(artifact, operation)
         @approval_store.mark_used(token_id)
         @operation_store.transition(
           operation_id,
           lifecycle_state: "complete",
-          attributes: { "artifact_id" => artifact.fetch("artifact_id") }
+          attributes: {
+            "artifact_id" => artifact.fetch("artifact_id"),
+            "delivery_id" => delivery["delivery_id"],
+            "delivery_state" => delivery.fetch("delivery_state"),
+            "delivery_failure_reason" => delivery["reason"]
+          }
         )
         {
           "ok" => true,
@@ -255,7 +264,10 @@ module SoulCore
           "hash_verified" => true,
           "file_created" => true,
           "registry_mutated" => true,
-          "token_status" => "used"
+          "token_status" => "used",
+          "delivery_id" => delivery["delivery_id"],
+          "delivery_state" => delivery.fetch("delivery_state"),
+          "delivery_failure_reason" => delivery["reason"]
         }
       rescue StandardError => error
         remove_created_file(write_result) if attempted && write_result
@@ -545,6 +557,24 @@ module SoulCore
         "size_bytes",
         "line_count"
       )
+    end
+
+    def deliver_created_artifact(artifact, operation)
+      delivery = @inbox_store.deliver(
+        artifact: artifact,
+        originating_chat_id: operation.fetch("chat_id"),
+        recipient_chat_id: operation.fetch("chat_id"),
+        reason: operation.fetch("operation") == "revision" ? "phase11c_revision_complete" : "phase11c_creation_complete"
+      )
+      {
+        "delivery_id" => delivery.fetch("delivery_id"),
+        "delivery_state" => delivery.fetch("latest_delivery_state")
+      }
+    rescue StandardError => error
+      {
+        "delivery_state" => "failed",
+        "reason" => "#{error.class}: #{error.message}"
+      }
     end
 
     def fail_preview_operation(operation, reason)

@@ -214,6 +214,21 @@ concise deterministic completion and failure summaries
 no dashboard, listener, watcher, background process, upload, export, or file mutation
 ```
 
+Candidate delivered in Phase 11D:
+
+```text
+canonical artifact workspace projection capped at fifty records
+append-only private inbox delivery and state events
+synchronous idempotent Phase 11C completion delivery
+explicit current-chat delivery for active attached artifacts
+seen and dismissed state without artifact lifecycle or file mutation
+revision and delivery provenance validation
+provider privacy filtering before workspace model context
+deterministic workspace controls with explicit terminal outcomes
+truthful artifact completion when inbox append fails
+no dashboard, listener, watcher, service, polling, export, or file mutation
+```
+
 ### Phase 12: Interface contract
 
 Phase 12 is split into bounded vertical slices:

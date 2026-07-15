@@ -41,6 +41,21 @@ module SoulCore
       /\A\s*cancel\s+artifact\s+operation\s+[a-f0-9]{32}\s*[?.!]*\z/i
     ].freeze
 
+    WORKSPACE_CONTROL_PATTERNS = [
+      /\A\s*(?:workspace help|help workspace|help inbox)\s*[?.!]*\z/i,
+      /\A\s*(?:(?:show|list)\s+(?:shared\s+)?workspace|what\s+is\s+in\s+my\s+workspace)\s*[?.!]*\z/i,
+      /\A\s*(?:(?:show|list)\s+workspace\s+for\s+this\s+chat|show\s+me\s+what\s+soul\s+created\s+in\s+this\s+chat)\s*[?.!]*\z/i,
+      /\A\s*(?:show|list)\s+(?:artifact\s+)?inbox\s*[?.!]*\z/i,
+      /\A\s*show\s+workspace\s+artifact\s+art_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*deliver\s+artifact\s+art_[a-z0-9_]+\s+to\s+(?:the\s+)?inbox\s*[?.!]*\z/i,
+      /\A\s*mark\s+delivery\s+del_[a-z0-9_]+\s+seen\s*[?.!]*\z/i,
+      /\A\s*dismiss\s+delivery\s+del_[a-z0-9_]+\s*[?.!]*\z/i,
+      /\A\s*cancel\s+workspace\s+request\s*[?.!]*\z/i,
+      /\A\s*(?:send|deliver)\s+that\s+to\s+(?:the\s+)?inbox\s*[?.!]*\z/i,
+      /\A\s*dismiss\s+it\s*[?.!]*\z/i,
+      /\A.*\b(?:keep watching|watch)\b.*\bworkspace\b.*\z/i
+    ].freeze
+
     ARTIFACT_REVISION_REQUEST = /\b(?:revise|revision|update)\b.{0,120}\b(?:artifact|report|document|notes?|json|text)\b/i
 
     INTEREST_CONTROL_PATTERNS = [
@@ -128,6 +143,14 @@ module SoulCore
           kind: "artifact_creation_control",
           reason: "artifact creation execution and cancellation remain deterministic and approval-gated",
           flags: flags.merge("artifact_creation_control" => true)
+        )
+      end
+
+      if WORKSPACE_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "workspace and inbox operations are bounded deterministic artifact projections",
+          flags: flags.merge("workspace_control" => true)
         )
       end
 
