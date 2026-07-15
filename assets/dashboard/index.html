@@ -130,6 +130,21 @@
         <input id="clear-confirmation" name="confirmation" type="text" autocomplete="off" spellcheck="false">
         <button id="execute-clear" class="danger-button" type="button" disabled>Archive previewed conversations</button>
       </section>
+      <section class="forget-panel" aria-labelledby="forget-heading">
+        <p class="eyebrow">Irreversible deletion</p>
+        <h3 id="forget-heading">Delete &amp; forget selected conversation</h3>
+        <p>Deletes the selected transcript, chat metadata, conversation state, and grounded evidence. Linked shared memories are logically forgotten; artifact files and append-only safety records remain.</p>
+        <button id="preview-forget" class="dialog-button" type="button">Preview selected conversation</button>
+        <section id="forget-preview" class="clear-preview" aria-live="polite" hidden>
+          <h3>Destructive-action preview</h3>
+          <p id="forget-preview-summary"></p>
+          <div id="forget-preview-list" class="clear-preview-list"></div>
+          <label for="forget-confirmation">Type <code>DELETE_AND_FORGET_CONVERSATION</code> to confirm</label>
+          <input id="forget-confirmation" name="forget-confirmation" type="text" autocomplete="off" spellcheck="false">
+          <button id="execute-forget" class="danger-button destructive-button" type="button" disabled>Permanently delete selected conversation</button>
+        </section>
+        <p id="forget-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
+      </section>
       <p id="clear-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
     </form>
   </dialog>

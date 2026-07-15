@@ -19,6 +19,16 @@ skills:
     writes_files: true
     expected_output: json
     verifier: schema_basic
+  chats.forget:
+    path: Soul/skills/chats/forget.rb
+    language: ruby
+    description: Permanently delete one exact local conversation and logically forget shared memories derived from it.
+    risk: permanent_delete
+    requires_approval: true
+    confirmation_phrase: DELETE_AND_FORGET_CONVERSATION
+    writes_files: true
+    expected_output: json
+    verifier: schema_basic
   downloads.inspect:
     path: Soul/skills/downloads/inspect.rb
     language: ruby

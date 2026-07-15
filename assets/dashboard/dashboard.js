@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { chats: [], activeChat: null, busy: false, clearPreview: null };
+const state = { chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -137,13 +137,49 @@ async function createChat() {
 
 function openClearDialog() {
   state.clearPreview = null;
+  state.forgetPreview = null;
   byId("clear-mode").value = "title";
   byId("clear-title").value = state.activeChat?.title || "";
   byId("clear-title-field").hidden = false;
   byId("clear-preview").hidden = true;
   byId("clear-confirmation").value = "";
+  byId("forget-preview").hidden = true;
+  byId("forget-confirmation").value = "";
+  byId("execute-forget").disabled = true;
+  byId("preview-forget").disabled = !state.activeChat;
+  byId("forget-dialog-status").textContent = state.activeChat ? `Selected: ${state.activeChat.title || state.activeChat.id}` : "Select one conversation before using delete & forget.";
   byId("clear-dialog-status").textContent = "Preview is required before archival.";
   byId("clear-dialog").showModal();
+}
+
+async function previewForget() {
+  const status = byId("forget-dialog-status");
+  if (!state.activeChat) { status.textContent = "Select one conversation first."; return; }
+  state.forgetPreview = null; byId("forget-preview").hidden = true; status.textContent = "Inventorying conversation-owned data…";
+  try {
+    const envelope = await callSoul("chats.forget.preview", { chat_id: state.activeChat.id }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget preview blocked."; return; }
+    const data = dataOf(envelope); state.forgetPreview = { chatId: state.activeChat.id, digest: data.inventory_digest };
+    byId("forget-preview-summary").textContent = `${data.message_count} message${data.message_count === 1 ? "" : "s"}, ${data.memory_ids.length} linked memor${data.memory_ids.length === 1 ? "y" : "ies"}, and ${data.artifact_ids.length} artifact attachment${data.artifact_ids.length === 1 ? "" : "s"} identified.`;
+    const list = byId("forget-preview-list"); list.replaceChildren();
+    [
+      `Delete permanently: ${(data.owned_files || []).filter((file) => file.exists).map((file) => file.kind).join(", ") || "no owned files"}`,
+      `Forget logically: ${data.memory_ids.length} shared memory record(s)`,
+      `Detach only: ${data.artifact_ids.length} artifact(s); artifact files remain`,
+      `Retain: ${(data.retained || []).join("; ")}`
+    ].forEach((copy) => { const item = document.createElement("div"); item.className = "clear-preview-item"; const text = document.createElement("strong"); text.textContent = copy; item.append(text); list.append(item); });
+    byId("forget-confirmation").value = ""; byId("execute-forget").disabled = true; byId("forget-preview").hidden = false; status.textContent = `Review the scope for ${state.activeChat.id}, then type the exact confirmation.`;
+  } catch (error) { status.textContent = error.message || "Delete-and-forget preview failed safely."; }
+}
+
+async function executeForget() {
+  if (!state.forgetPreview || byId("forget-confirmation").value !== "DELETE_AND_FORGET_CONVERSATION") return;
+  const status = byId("forget-dialog-status"); byId("execute-forget").disabled = true; status.textContent = "Deleting the verified conversation and forgetting linked memory…";
+  try {
+    const envelope = await callSoul("chats.forget.execute", { chat_id: state.forgetPreview.chatId, confirmation: "DELETE_AND_FORGET_CONVERSATION", expected_digest: state.forgetPreview.digest }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget blocked for human review."; state.forgetPreview = null; return; }
+    state.activeChat = null; state.forgetPreview = null; byId("clear-dialog").close(); await loadChats(true); announce("Conversation permanently deleted and linked memories forgotten");
+  } catch (error) { status.textContent = error.message || "Delete-and-forget failed safely."; }
 }
 
 function clearParameters() {
@@ -227,6 +263,9 @@ byId("clear-title").addEventListener("input", resetClearPreview);
 byId("preview-clear").addEventListener("click", previewClear);
 byId("clear-confirmation").addEventListener("input", () => { byId("execute-clear").disabled = !state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS"; });
 byId("execute-clear").addEventListener("click", executeClear);
+byId("preview-forget").addEventListener("click", previewForget);
+byId("forget-confirmation").addEventListener("input", () => { byId("execute-forget").disabled = !state.forgetPreview || byId("forget-confirmation").value !== "DELETE_AND_FORGET_CONVERSATION"; });
+byId("execute-forget").addEventListener("click", executeForget);
 byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
 byId("composer").addEventListener("submit", sendMessage);
