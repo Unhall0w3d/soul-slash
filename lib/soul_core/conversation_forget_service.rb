@@ -139,12 +139,24 @@ module SoulCore
         end
       end
 
+      deleted_chat_ids = data.fetch("conversations").map { |item| item.dig("chat", "id") }
+      remaining = data.fetch("conversations").filter_map do |item|
+        chat_id = item.dig("chat", "id")
+        file_kinds = owned_paths(chat_id).filter_map do |kind, path|
+          kind if File.exist?(path) || File.symlink?(path)
+        end
+        { "chat_id" => chat_id, "file_kinds" => file_kinds } if @chat_store.chat(chat_id) || !file_kinds.empty?
+      end
+      raise RuntimeError, "conversation deletion postcondition failed" unless remaining.empty?
+
       success(
         public_aggregate(data).merge(
           "mode" => mode,
           "memory_ids_logically_deleted" => completed.fetch("memory_ids"),
           "artifact_detachments" => completed.fetch("artifact_detachments"),
           "deleted_files" => completed.fetch("deleted_files"),
+          "deleted_chat_ids" => deleted_chat_ids,
+          "postcondition_verified" => true,
           "retained" => retained_disclosure,
           "irreversible" => true
         ),
@@ -153,7 +165,7 @@ module SoulCore
     rescue StandardError => error
       blocked(
         "bulk delete-and-forget stopped after a partial or zero mutation: #{error.class}",
-        data: { "completed" => completed || {}, "retained" => retained_disclosure }
+        data: { "completed" => completed || {}, "retained" => retained_disclosure, "postcondition_verified" => false }
       )
     end
 

@@ -43,7 +43,8 @@ module SoulCore
         fresh = service.preview_many(mode: "selected", chat_ids: ids)
         executed = service.execute_many(mode: "selected", chat_ids: ids, confirmation: "DELETE_AND_FORGET_50_CONVERSATIONS", expected_digest: fresh.dig("data", "inventory_digest"))
         checks["verified_bulk_execution_removes_all_conversation_owned_files"] =
-          executed["ok"] == true && executed.dig("data", "conversation_count") == 50 && chats.list_chats.empty? && owned_count(temp_root, ids).zero?
+          executed["ok"] == true && executed.dig("data", "conversation_count") == 50 && executed.dig("data", "postcondition_verified") == true &&
+          executed.dig("data", "deleted_chat_ids").sort == ids.sort && chats.list_chats.empty? && owned_count(temp_root, ids).zero?
         details["fifty_chat_message_count"] = fresh.dig("data", "message_count")
       end
 

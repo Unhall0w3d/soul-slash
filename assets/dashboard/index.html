@@ -50,6 +50,7 @@
       <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
       <button id="studio-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="studio-panel">Skill Studio <span class="phase-tag">Beta</span></button>
       <button id="improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="improvement-panel">Self Assessment</button>
+      <button id="augmentation-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="augmentation-panel">Self Augmentation</button>
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
@@ -279,10 +280,30 @@
         </section>
       </div>
 
+      <section class="improvement-card host-plan-card" aria-labelledby="host-plan-heading">
+        <div class="card-heading"><div><p class="eyebrow">Terminal-only host boundary</p><h2 id="host-plan-heading">Arch improvement plan</h2></div><span id="host-plan-count" class="count-badge">0</span></div>
+        <p class="card-note">Prepare a fresh, digest-bound <code>pacman -Syu</code> handoff. Soul will never run the command or collect your password.</p>
+        <div class="host-plan-actions"><button id="preview-host-plan" class="gate-button" type="button">Preview full-upgrade handoff</button><button id="verify-host-plan" class="gate-button" type="button" disabled>Verify selected plan</button></div>
+        <div id="host-plan-preview" class="gate-card" hidden><div id="host-plan-preview-details" class="recommendation-list"></div><label for="host-plan-confirmation">Type <code>CREATE_ARCH_FULL_UPGRADE_HANDOFF</code></label><input id="host-plan-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-host-plan" class="gate-button gate-button--gold" type="button" disabled>Create terminal handoff packet</button></div>
+        <div id="host-plan-list" class="recommendation-list"><p class="muted">No host handoff packets loaded.</p></div>
+        <p id="host-plan-status" class="dialog-status" role="status"></p>
+      </section>
+
       <aside class="unavailable-boundary" aria-labelledby="unavailable-actions-heading">
         <div><p class="eyebrow">Assessment boundary</p><h2 id="unavailable-actions-heading">Host changes require separate approval</h2></div>
         <p>Update installation, package removal, orphan cleanup, service changes, model downloads, implementation, and promotion require separately reviewed executors. Self Assessment only inspects and prepares candidate proposals.</p>
       </aside>
+    </section>
+
+    <section id="augmentation-panel" class="tab-panel augmentation-panel" role="tabpanel" aria-labelledby="augmentation-tab" hidden>
+      <header class="improvement-header augmentation-header"><div><p class="eyebrow">Core introspection</p><h1>Self Augmentation</h1><p>Soul can survey its tracked construction and prepare architectural candidates. Core changes remain separate human-reviewed implementation work.</p></div><div class="improvement-boundary"><strong>Observation is not modification</strong><span>Observe → propose → experiment → review</span><small>This slice enables observation and proposal only.</small></div></header>
+      <ol class="augmentation-stages" aria-label="Self augmentation lifecycle"><li class="is-available"><span>01</span><strong>Observe</strong><small>Bounded tracked-code census</small></li><li class="is-available"><span>02</span><strong>Propose</strong><small>Human-authored objective packet</small></li><li><span>03</span><strong>Experiment</strong><small>Locked · separate approval</small></li><li><span>04</span><strong>Review</strong><small>Locked · no automatic integration</small></li></ol>
+      <div class="augmentation-grid">
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Tracked construction</p><h2>Code census</h2></div><span id="augmentation-census-state" class="count-badge">idle</span></div><p class="card-note">Reads bounded Git-tracked regular files only. Runtime state, private memory, credentials, models, generated packets, and untracked files are excluded.</p><button id="run-augmentation-census" class="gate-button" type="button">Survey tracked code</button><dl id="augmentation-census" class="improvement-details"><div><dt>Collection</dt><dd>Not yet requested</dd></div></dl></section>
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Human review queue</p><h2>Augmentation proposals</h2></div><span id="augmentation-proposal-count" class="count-badge">0</span></div><div id="augmentation-proposal-list" class="recommendation-list"><p class="muted">No augmentation proposals loaded.</p></div></section>
+      </div>
+      <section class="improvement-card augmentation-draft" aria-labelledby="augmentation-draft-heading"><div><p class="eyebrow">Proposal gate</p><h2 id="augmentation-draft-heading">Describe a core-system change</h2><p class="card-note">A skill performs a bounded capability. Use this surface only when the architecture itself must change.</p></div><label for="augmentation-objective">Objective</label><textarea id="augmentation-objective" rows="4" maxlength="1000" placeholder="Describe the architectural capability or limitation to change…"></textarea><label for="augmentation-why-not-skill">Why this cannot be a bounded skill</label><textarea id="augmentation-why-not-skill" rows="4" maxlength="1000" placeholder="Explain why shared orchestration, contracts, or core infrastructure must change…"></textarea><button id="preview-augmentation-proposal" class="gate-button" type="button">Preview proposal packet</button><div id="augmentation-proposal-preview" class="gate-card" hidden><div id="augmentation-proposal-preview-details" class="recommendation-list"></div><label for="augmentation-confirmation">Type <code>CREATE_SELF_AUGMENTATION_PROPOSAL</code></label><input id="augmentation-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-augmentation-proposal" class="gate-button gate-button--gold" type="button" disabled>Create review packet</button></div><p id="augmentation-status" class="dialog-status" role="status"></p></section>
+      <aside class="unavailable-boundary"><div><p class="eyebrow">Augmentation boundary</p><h2>Experiment and integration remain locked</h2></div><p>No worktree, branch, Codex task, patch, test execution, merge, or deployment is created from this tab. A separately approved implementation brief is required.</p></aside>
     </section>
   </main>
   <dialog id="review-center" class="review-center" aria-labelledby="review-center-title">

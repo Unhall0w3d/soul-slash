@@ -1,5 +1,43 @@
 # Bulk Conversation Archive and Delete/Forget Review
 
+## 2026-07-16 live reliability amendment
+
+The operator reported that a 50-conversation deletion appeared successful while
+all selected transmissions remained readable after refresh. Inspection found
+147 active metadata/transcript pairs and no live file mutation, so no successful
+deletion is claimed for that attempt.
+
+Execution now performs a server-side postcondition over every selected chat ID
+and conversation-owned path before returning `complete`. It returns the exact
+`deleted_chat_ids` and `postcondition_verified: true` only when all are absent.
+The dashboard retains the previewed IDs, bypasses HTTP cache, reloads
+`chats.list`, and refuses to announce success if any selected ID remains. No
+live conversation was deleted during diagnosis or verification.
+
+Commands run:
+
+```text
+ruby scripts/verify-bulk-conversation-delete-forget.rb
+ruby scripts/verify-conversation-delete-and-forget-skill.rb
+node --check assets/dashboard/dashboard.js
+git diff --check
+systemctl --user restart soul-dashboard.service
+systemctl --user is-active soul-dashboard.service
+curl http://127.0.0.1:4567/
+```
+
+Both deterministic deletion suites passed, including the exact 50-conversation
+fixture. The existing dashboard service restarted successfully, reported
+`active`, and returned HTTP 200. Human confirmation is still required before
+any new live deletion attempt.
+
+The operator then successfully deleted the live conversations in confirmed
+batches of 50 and used the all-active scope for the final set. A read-only disk
+postcheck reported zero active or archived metadata records, zero chat metadata
+files, zero transcript files, zero conversation-state files, and zero grounded
+conversation-evidence files. This is the human-approved live validation of the
+amended postcondition contract.
+
 ## Skill
 
 Name: Scoped conversation archive and permanent delete/forget

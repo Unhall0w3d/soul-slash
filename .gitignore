@@ -45,6 +45,10 @@ Soul/memory/exports/*.json
 # Soul/ generated improvement, alpha, and runtime assessment state
 Soul/improvement/proposals/*
 !Soul/improvement/proposals/.keep
+Soul/host_improvement/plans/*
+!Soul/host_improvement/plans/.keep
+Soul/augmentation/proposals/*
+!Soul/augmentation/proposals/.keep
 Soul/runtime/*.json
 Soul/runtime/*.tmp
 Soul/runtime/*.log

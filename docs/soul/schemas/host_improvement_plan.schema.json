@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.host_improvement.plan.v1",
+  "title": "Soul Host Improvement Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "adapter", "risk_class", "source_digest", "commands", "execution_authorized", "human_review_required"],
+  "properties": {
+    "schema_version": {"const": "soul.host_improvement.plan.v1"},
+    "plan_id": {"type": "string", "pattern": "^hip_[a-z0-9_-]+$"},
+    "adapter": {"const": "arch.system_upgrade"},
+    "risk_class": {"const": "class_5"},
+    "source_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "commands": {"type": "array", "maxItems": 1, "items": {"type": "array", "items": {"type": "string"}}},
+    "execution_authorized": {"const": false},
+    "human_review_required": {"const": true}
+  },
+  "additionalProperties": true
+}

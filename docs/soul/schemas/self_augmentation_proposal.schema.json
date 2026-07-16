@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.self_augmentation.proposal.v1",
+  "title": "Soul Self Augmentation Proposal",
+  "type": "object",
+  "required": ["schema_version", "proposal_id", "objective", "why_not_skill", "source_digest", "implementation_authorized", "human_review_required"],
+  "properties": {
+    "schema_version": {"const": "soul.self_augmentation.proposal.v1"},
+    "proposal_id": {"type": "string", "pattern": "^aug_[a-z0-9_-]+$"},
+    "objective": {"type": "string", "minLength": 20, "maxLength": 1000},
+    "why_not_skill": {"type": "string", "minLength": 20, "maxLength": 1000},
+    "source_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "implementation_authorized": {"const": false},
+    "human_review_required": {"const": true}
+  },
+  "additionalProperties": true
+}

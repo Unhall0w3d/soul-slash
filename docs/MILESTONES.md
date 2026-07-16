@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Architecture and Stewardship A0: Self Augmentation and Host Improvement research/design
+Architecture and Stewardship A1–A3: assessment, terminal handoff, and augmentation census
 ```
 
-The model-runtime portability sequence is complete through the reviewed selected-profile startup policy. The current candidate defines separate authority for Self Assessment, Host Improvement, and Self Augmentation; uses terminal handoff before privileged execution; isolates future architectural experiments in Git worktrees; and keeps automatic Codex invocation, repository integration, and privileged brokers deferred. No host or source mutation is authorized by this design gate.
+The model-runtime portability sequence is complete through the reviewed selected-profile startup policy. A1–A3 now distinguishes fresh, empty, unavailable, and failed package evidence; prepares but never executes an Arch full-upgrade terminal handoff; records bounded postcondition receipts; and exposes tracked-code census plus proposal review in a fourth Self Augmentation tab. Worktree creation, automatic Codex invocation, source integration, and privileged brokers remain deferred. The current clean stopping point authorizes neither host nor tracked-source mutation.
 
 See:
 

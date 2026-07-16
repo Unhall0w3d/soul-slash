@@ -485,6 +485,9 @@ privilege, persistence, and destructive boundaries.
 
 ## Recommended implementation slices
 
+Implementation status: A1–A3 are candidate-complete as of 2026-07-16 and await
+human review. A4–A5 and the privileged broker remain unimplemented.
+
 ### A1 — Assessment correctness and schemas
 
 - replace pacman update reporting with `checkupdates --nocolor`;

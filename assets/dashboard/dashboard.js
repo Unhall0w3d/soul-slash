@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -15,7 +15,8 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
     body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
-    signal: requestOptions.signal
+    signal: requestOptions.signal,
+    cache: "no-store"
   });
   const envelope = await response.json();
   if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
@@ -104,17 +105,22 @@ function switchTab(name) {
   const chat = name === "chat";
   const studio = name === "studio";
   const improvement = name === "improvement";
+  const augmentation = name === "augmentation";
   byId("chat-panel").hidden = !chat;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
+  byId("augmentation-panel").hidden = !augmentation;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
+  byId("augmentation-tab").classList.toggle("is-active", augmentation);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("studio-tab").setAttribute("aria-selected", String(studio));
   byId("improvement-tab").setAttribute("aria-selected", String(improvement));
+  byId("augmentation-tab").setAttribute("aria-selected", String(augmentation));
   if (studio && !state.studioLoaded) loadSkillStudio();
   if (improvement && !state.improvementLoaded) loadSelfImprovement();
+  if (augmentation && !state.augmentationLoaded) loadSelfAugmentation();
 }
 
 function renderChatList() {
@@ -261,7 +267,7 @@ async function previewForget() {
     const parameters = clearParameters();
     const envelope = await callSoul("chats.forget_many.preview", parameters); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget preview blocked."; return; }
-    const data = dataOf(envelope); state.forgetPreview = { parameters, digest: data.inventory_digest, confirmation: data.confirmation_phrase };
+    const data = dataOf(envelope); state.forgetPreview = { parameters, digest: data.inventory_digest, confirmation: data.confirmation_phrase, chatIds: (data.records || []).map((record) => record.id) };
     byId("forget-preview-summary").textContent = `${data.conversation_count} conversation${data.conversation_count === 1 ? "" : "s"}, ${data.message_count} message${data.message_count === 1 ? "" : "s"}, ${data.memory_count} unique linked memor${data.memory_count === 1 ? "y" : "ies"}, and ${data.artifact_attachment_count} artifact attachment${data.artifact_attachment_count === 1 ? "" : "s"} identified.`;
     const list = byId("forget-preview-list"); list.replaceChildren();
     (data.records || []).forEach((record) => { const item = document.createElement("div"); item.className = "clear-preview-item"; const title = document.createElement("strong"); title.textContent = record.title || "Untitled conversation"; const detail = document.createElement("small"); detail.textContent = `${record.id} · ${record.message_count} message${record.message_count === 1 ? "" : "s"}`; item.append(title, detail); list.append(item); });
@@ -283,7 +289,12 @@ async function executeForget() {
     const parameters = { ...state.forgetPreview.parameters, confirmation: state.forgetPreview.confirmation, expected_digest: state.forgetPreview.digest };
     const envelope = await callSoul("chats.forget_many.execute", parameters); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget blocked for human review."; state.forgetPreview = null; return; }
-    const count = dataOf(envelope).conversation_count || 0; state.activeChat = null; state.forgetPreview = null; byId("clear-dialog").close(); await loadChats(true); announce(`${count} conversation${count === 1 ? "" : "s"} permanently deleted and linked memories forgotten`);
+    const data = dataOf(envelope); const count = data.conversation_count || 0; const expectedIds = state.forgetPreview.chatIds;
+    if (data.postcondition_verified !== true || data.deleted_chat_ids?.length !== expectedIds.length || expectedIds.some((id) => !data.deleted_chat_ids.includes(id))) throw new Error("Server did not verify the exact deletion postcondition.");
+    state.activeChat = null; await loadChats(true);
+    const remainingIds = new Set(state.chats.map((chat) => chat.id));
+    if (expectedIds.some((id) => remainingIds.has(id))) throw new Error("Deleted conversations remain in the active list; success was not accepted.");
+    state.forgetPreview = null; byId("clear-dialog").close(); announce(`${count} conversation${count === 1 ? "" : "s"} permanently deleted and verified absent`);
   } catch (error) { status.textContent = error.message || "Delete-and-forget failed safely."; }
 }
 
@@ -675,7 +686,7 @@ function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[da
 
 async function loadSelfImprovement() {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
-  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await loadHostPlans(); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
   catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
   finally { setAssessmentButtonsDisabled(false); }
 }
@@ -707,6 +718,83 @@ async function executeImprovementProposals() {
   if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Generation blocked; preview again."; return; }
   renderImprovementProposals(data.proposals); status.textContent = `${data.written_count || 0} new advisory packet${data.written_count === 1 ? "" : "s"} written. Human review is still required.`;
   state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
+}
+
+function renderHostPlans(records) {
+  const list = byId("host-plan-list"); list.replaceChildren(); byId("host-plan-count").textContent = String(records.length);
+  records.forEach((plan) => { const button = labeledRecord(plan.plan_id, `${plan.pending_update_count} pending · ${plan.risk_class} · terminal handoff`); button.tabIndex = 0; button.addEventListener("click", () => { state.selectedHostPlan = plan.plan_id; byId("verify-host-plan").disabled = false; byId("host-plan-status").textContent = `${plan.plan_id} selected for a foreground postcondition check.`; }); list.append(button); });
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No host handoff packets created."; list.append(empty); }
+}
+
+async function loadHostPlans() {
+  const envelope = await callSoul("host_improvement.plans.list", { limit: 100 });
+  if (envelope.lifecycle_state === "complete") renderHostPlans(dataOf(envelope).records || []);
+}
+
+async function previewHostPlan() {
+  const status = byId("host-plan-status"); status.textContent = "Running fresh Arch update discovery…"; byId("preview-host-plan").disabled = true;
+  try {
+    const envelope = await callSoul("host_improvement.arch_upgrade.preview"); const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "A fresh Arch plan could not be prepared.");
+    state.hostPlanPreview = data; const plan = data.plan; const list = byId("host-plan-preview-details"); list.replaceChildren();
+    list.append(labeledRecord(`${plan.pending_update_count} pending package records`, "Class 5 · interactive terminal only"), labeledRecord("Exact command", "sudo pacman -Syu · never executed by Soul"));
+    byId("host-plan-preview").hidden = false; byId("host-plan-confirmation").value = ""; byId("create-host-plan").disabled = true; status.textContent = "Review the exact handoff boundary, then confirm packet creation.";
+  } catch (error) { status.textContent = error.message; }
+  finally { byId("preview-host-plan").disabled = false; }
+}
+
+async function createHostPlan() {
+  if (!state.hostPlanPreview) return; const status = byId("host-plan-status"); status.textContent = "Revalidating fresh package evidence…";
+  const envelope = await callSoul("host_improvement.arch_upgrade.handoff", { confirmation: byId("host-plan-confirmation").value, expected_digest: state.hostPlanPreview.expected_digest });
+  const data = dataOf(envelope); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.packet) { status.textContent = envelope.errors?.[0]?.message || "Handoff creation was blocked safely."; return; }
+  state.selectedHostPlan = data.plan.plan_id; state.hostPlanPreview = null; byId("host-plan-preview").hidden = true; byId("verify-host-plan").disabled = false; status.textContent = `Terminal handoff created at ${data.packet}. Soul executed no host command.`; await loadHostPlans();
+}
+
+async function verifyHostPlan() {
+  if (!state.selectedHostPlan) return; const status = byId("host-plan-status"); status.textContent = "Checking current postconditions…"; byId("verify-host-plan").disabled = true;
+  try { const envelope = await callSoul("host_improvement.plans.verify", { plan_id: state.selectedHostPlan }); const receipt = dataOf(envelope).receipt; if (!receipt) throw new Error(envelope.errors?.[0]?.message || "Verification failed safely."); status.textContent = receipt.postcondition === "satisfied" ? "Postcondition satisfied: fresh discovery reports no remaining repository updates." : `Postcondition not satisfied: ${receipt.remaining_update_count} update records remain.`; }
+  catch (error) { status.textContent = error.message; }
+  finally { byId("verify-host-plan").disabled = !state.selectedHostPlan; }
+}
+
+function renderAugmentationProposals(records) {
+  const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
+  records.forEach((proposal) => list.append(labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · implementation not authorized`)));
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No augmentation proposal packets."; list.append(empty); }
+}
+
+function renderAugmentationCensus(report) {
+  byId("augmentation-census-state").textContent = "ready"; const details = byId("augmentation-census"); details.replaceChildren();
+  [["Revision", report.head?.slice(0, 12)], ["Tracked paths", report.tracked_path_count], ["Text inspected", report.text_file_count], ["Bytes read", report.content_bytes_read], ["Verifier scripts", report.verifier_count], ["Excluded", report.excluded_count]].forEach(([term, value]) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = term; dd.textContent = String(value ?? "—"); row.append(dt, dd); details.append(row); });
+}
+
+async function loadSelfAugmentation() {
+  byId("augmentation-status").textContent = "Loading local proposal inventory…";
+  try { const envelope = await callSoul("self_augmentation.proposals.list", { limit: 100 }); renderAugmentationProposals(dataOf(envelope).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
+  catch (error) { byId("augmentation-status").textContent = error.message; }
+}
+
+async function runAugmentationCensus() {
+  const button = byId("run-augmentation-census"); button.disabled = true; byId("augmentation-census-state").textContent = "running"; byId("augmentation-status").textContent = "Surveying bounded Git-tracked construction…";
+  try { const envelope = await callSoul("self_augmentation.census"); const data = dataOf(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Census failed safely."); renderAugmentationCensus(data.census); renderAugmentationProposals(data.proposals?.records || []); byId("augmentation-status").textContent = "Tracked-code census complete. No project files were changed."; }
+  catch (error) { byId("augmentation-census-state").textContent = "failed"; byId("augmentation-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function previewAugmentationProposal() {
+  const objective = byId("augmentation-objective").value; const why = byId("augmentation-why-not-skill").value; const status = byId("augmentation-status"); status.textContent = "Binding proposal to the current tracked-code census…";
+  const envelope = await callSoul("self_augmentation.proposals.preview", { objective, why_not_skill: why }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Proposal preview failed safely."; return; }
+  state.augmentationPreview = data; const proposal = data.proposal; const list = byId("augmentation-proposal-preview-details"); list.replaceChildren(); list.append(labeledRecord(proposal.objective, `${proposal.risk_class} · source ${proposal.head.slice(0, 12)}`), labeledRecord("Core-change rationale", proposal.why_not_skill));
+  byId("augmentation-proposal-preview").hidden = false; byId("augmentation-confirmation").value = ""; byId("create-augmentation-proposal").disabled = true; status.textContent = "Review this exact census-bound packet. No implementation is authorized.";
+}
+
+async function createAugmentationProposal() {
+  if (!state.augmentationPreview) return; const status = byId("augmentation-status"); status.textContent = "Rechecking tracked repository evidence…";
+  const envelope = await callSoul("self_augmentation.proposals.execute", { objective: byId("augmentation-objective").value, why_not_skill: byId("augmentation-why-not-skill").value, confirmation: byId("augmentation-confirmation").value, expected_digest: state.augmentationPreview.expected_digest }); const data = dataOf(envelope); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.packet) { status.textContent = envelope.errors?.[0]?.message || "Proposal creation was blocked safely."; return; }
+  state.augmentationPreview = null; byId("augmentation-proposal-preview").hidden = true; status.textContent = `Review packet created at ${data.packet}. Experiment and integration remain locked.`; await loadSelfAugmentation();
 }
 
 function reviewEmpty(target, titleText, detailText) {
@@ -836,10 +924,19 @@ byId("review-center").addEventListener("click", (event) => { if (event.target ==
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
+byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 document.querySelectorAll("[data-assessment-scope]").forEach((button) => button.addEventListener("click", () => refreshSelfImprovement(button.dataset.assessmentScope)));
 byId("preview-improvement-proposals").addEventListener("click", previewImprovementProposals);
 byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });
 byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);
+byId("preview-host-plan").addEventListener("click", previewHostPlan);
+byId("host-plan-confirmation").addEventListener("input", () => { byId("create-host-plan").disabled = !state.hostPlanPreview || byId("host-plan-confirmation").value !== state.hostPlanPreview.confirmation_phrase; });
+byId("create-host-plan").addEventListener("click", createHostPlan);
+byId("verify-host-plan").addEventListener("click", verifyHostPlan);
+byId("run-augmentation-census").addEventListener("click", runAugmentationCensus);
+byId("preview-augmentation-proposal").addEventListener("click", previewAugmentationProposal);
+byId("augmentation-confirmation").addEventListener("input", () => { byId("create-augmentation-proposal").disabled = !state.augmentationPreview || byId("augmentation-confirmation").value !== state.augmentationPreview.confirmation_phrase; });
+byId("create-augmentation-proposal").addEventListener("click", createAugmentationProposal);
 byId("preview-proposal-approval").addEventListener("click", previewProposalApproval);
 byId("proposal-confirmation").addEventListener("input", () => { byId("execute-proposal-approval").disabled = !state.proposalApproval || byId("proposal-confirmation").value !== "APPROVE_PROPOSAL_FOR_BETA_BUILD"; });
 byId("execute-proposal-approval").addEventListener("click", executeProposalApproval);

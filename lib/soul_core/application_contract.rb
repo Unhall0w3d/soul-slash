@@ -15,6 +15,7 @@ module SoulCore
     DELIVERY_ID = /\Adel_[A-Za-z0-9_.-]+\z/
     PROPOSAL_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     BETA_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
+    HOST_PLAN_ID = /\Ahip_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
@@ -73,6 +74,14 @@ module SoulCore
       "self_improvement.refresh" => %w[scope],
       "self_improvement.proposals.preview" => [],
       "self_improvement.proposals.execute" => %w[confirmation expected_digest],
+      "host_improvement.plans.list" => %w[limit],
+      "host_improvement.arch_upgrade.preview" => [],
+      "host_improvement.arch_upgrade.handoff" => %w[confirmation expected_digest],
+      "host_improvement.plans.verify" => %w[plan_id],
+      "self_augmentation.census" => [],
+      "self_augmentation.proposals.list" => %w[limit],
+      "self_augmentation.proposals.preview" => %w[objective why_not_skill],
+      "self_augmentation.proposals.execute" => %w[objective why_not_skill confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -166,6 +175,8 @@ module SoulCore
       return "proposal_id is invalid" if proposal_id && !proposal_id.to_s.match?(PROPOSAL_ID)
       beta_id = parameters["beta_id"]
       return "beta_id is invalid" if beta_id && !beta_id.to_s.match?(BETA_ID)
+      plan_id = parameters["plan_id"]
+      return "plan_id is invalid" if plan_id && !plan_id.to_s.match?(HOST_PLAN_ID)
       skill_id = parameters["skill_id"]
       return "skill_id is invalid" if skill_id && !skill_id.to_s.match?(SKILL_ID)
       chat_ids = parameters["chat_ids"]

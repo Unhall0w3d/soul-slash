@@ -76,8 +76,8 @@ Dir.mktmpdir("soul-phase12e-") do |root|
   facade = SoulCore::ApplicationFacade.new(root: root, approval_store: Phase12eApprovalFixture.new, activity_store: activity)
 
   bootstrap = facade.call(request("application.bootstrap"))
-  check.call("Review Center is supporting UI, not a fourth product tab",
-    bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Assessment"] &&
+  check.call("Review Center remains supporting UI rather than a product tab",
+    bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Assessment", "Self Augmentation"] &&
     bootstrap.dig("data", "unified_operations", "surface") == "Review Center" &&
     bootstrap.dig("data", "unified_operations", "read_only") == true)
 
@@ -118,7 +118,7 @@ review = File.read(File.join(root, "docs/assessments/CONVERSATIONAL_SOUL_PHASE12
 
 required_ids = %w[review-center-button review-center review-pending-count review-activity-count review-blocked-count review-failed-count review-approvals-tab review-activity-tab approval-review-list approval-review-detail activity-review-list activity-review-detail refresh-review-center close-review-center review-center-status]
 check.call("dashboard exposes the complete Review Center surface", required_ids.all? { |id| html.include?("id=\"#{id}\"") })
-check.call("primary hierarchy remains exactly three named tabs", %w[chat-tab studio-tab improvement-tab].all? { |id| html.include?("id=\"#{id}\"") } && !html.include?('id="review-tab"'))
+check.call("primary hierarchy includes four named tabs while Review remains supporting UI", %w[chat-tab studio-tab improvement-tab augmentation-tab].all? { |id| html.include?("id=\"#{id}\"") } && !html.include?('id="review-tab"'))
 check.call("frontend uses only registered read projections", javascript.include?('callSoul("approvals.pending"') && javascript.include?('callSoul("activities.recent"'))
 forbidden_operations = %w[approvals.revoke approvals.execute approvals.clear activities.replay activities.retry activities.clear activities.prune activities.export]
 check.call("Review Center adds no approval or history mutation", forbidden_operations.none? { |operation| javascript.include?(operation) })

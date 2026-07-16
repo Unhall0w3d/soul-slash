@@ -18,6 +18,8 @@ require_relative "model_runtime_control_service"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
+require_relative "host_improvement_plan_service"
+require_relative "self_augmentation_service"
 
 module SoulCore
   class ApplicationFacade
@@ -44,7 +46,9 @@ module SoulCore
       activity_store: nil,
       skill_registry: nil,
       skill_studio_service: nil,
-      self_improvement_service: nil
+      self_improvement_service: nil,
+      host_improvement_plan_service: nil,
+      self_augmentation_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -62,6 +66,8 @@ module SoulCore
       @skill_registry = skill_registry
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
+      @host_improvement_plan_service = host_improvement_plan_service
+      @self_augmentation_service = self_augmentation_service
     end
 
     def call(request)
@@ -144,6 +150,14 @@ module SoulCore
       when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
       when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
       when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "host_improvement.plans.list" then domain(host_improvement.list(limit: bounded_limit(parameters["limit"], HostImprovementPlanService::MAX_RECORDS)))
+      when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
+      when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
+      when "self_augmentation.census" then domain(self_augmentation.census)
+      when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
+      when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
+      when "self_augmentation.proposals.execute" then domain(self_augmentation.create_proposal(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -157,7 +171,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment"],
+        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
           "ok" => report.fetch("ok"),
           "lifecycle_state" => report.fetch("lifecycle_state"),
@@ -193,7 +207,15 @@ module SoulCore
           "automatic_scope" => "read_only_environment_snapshot",
           "proposal_gate" => "human_exact_confirmation",
           "host_mutation_available" => false,
+          "host_handoff_available" => true,
           "automatic_refresh" => false
+        },
+        "self_augmentation" => {
+          "available" => true,
+          "stage" => "observe_and_propose",
+          "implementation_available" => false,
+          "automatic_codex_invocation" => false,
+          "worktree_creation" => false
         },
         "unified_operations" => {
           "available" => true,
@@ -399,6 +421,14 @@ module SoulCore
 
     def self_improvement
       @self_improvement_service ||= SelfImprovementService.new(root: @root, clock: @clock)
+    end
+
+    def host_improvement
+      @host_improvement_plan_service ||= HostImprovementPlanService.new(root: @root, clock: @clock)
+    end
+
+    def self_augmentation
+      @self_augmentation_service ||= SelfAugmentationService.new(root: @root, clock: @clock)
     end
 
     def chat_projection(chat)
