@@ -256,7 +256,7 @@ Phase 12B provides:
 
 ```text
 versioned soul.application.v1 request and response envelopes
-43 explicitly registered in-process operations after later interface slices
+47 explicitly registered in-process operations after later interface slices
 bounded Chat, workspace, inbox, configuration, status, skill, approval, and activity projections
 shared CLI/application Chat exchange service
 append-only private duplicate-send receipts without duplicated chat content
@@ -362,7 +362,7 @@ The public repository must not require the owner's IP addresses, hostnames, cred
 
 ### Phase 12D.5: Gated implementation and production promotion
 
-Complete the Skill Studio lifecycle with two bounded foreground operations: build an approved exact proposal revision into an isolated Beta candidate for review, then promote an exact tested and Gate-2-approved Beta revision into the production registry through preview, digest revalidation, exact confirmation, rollback evidence, and human review. Model or cloud output remains candidate material and cannot authorize either operation.
+The candidate completes the safe Skill Studio lifecycle with two bounded foreground operations: prepare an approved exact proposal revision as an honest incomplete Beta workspace and Codex handoff, then promote an independently implemented, exact-tested, Gate-2-approved Beta revision through preview, digest revalidation, exact confirmation, atomic registry publication, byte-hash and rollback evidence, and human review. Soul invokes no implementation model and model or cloud output remains candidate material that cannot authorize either operation.
 
 ### Phase 13: Integrated acceptance and closeout
 

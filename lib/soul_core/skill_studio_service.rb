@@ -7,6 +7,7 @@ require "open3"
 require "pathname"
 require "time"
 require "timeout"
+require "yaml"
 require_relative "skill_registry"
 
 module SoulCore
@@ -27,6 +28,12 @@ module SoulCore
     MAX_TIMEOUT_SECONDS = 60
 
     CLOSE_CONFIRMATION = "CLOSE_PRODUCTION_PROPOSAL"
+    BETA_BUILD_CONFIRMATION_PREFIX = "PREPARE_BETA_BUILD"
+    PRODUCTION_CONFIRMATION_PREFIX = "PROMOTE_BETA_SKILL"
+    PRODUCTION_ROOT = "Soul/skills/generated"
+    REGISTRY_PATH = "Soul/skills/registry.yaml"
+    PRODUCTION_RECEIPT = "PROMOTION.json"
+    SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
 
     def initialize(root: Dir.pwd, clock: -> { Time.now }, production_registry: nil)
       @root = File.expand_path(root)
@@ -98,6 +105,72 @@ module SoulCore
     def betas(limit: MAX_RECORDS)
       records = beta_records.first(bounded_limit(limit))
       success({ "records" => records, "count" => records.length, "limit" => bounded_limit(limit), "production_registry_separate" => true, "read_only" => true })
+    end
+
+    def beta_build_preview(proposal_id:, skill_id:)
+      directory = proposal_directory(proposal_id)
+      return awaiting("unknown proposal ID") unless directory
+      return awaiting("canonical dotted skill_id is required") unless valid_skill_id?(skill_id)
+
+      state = read_state(directory)
+      return blocked("proposal Gate 1 approval is required before Beta preparation") unless state.dig("proposal_gate", "status") == "approved"
+      return blocked("proposal path must not be a symlink") if File.symlink?(directory)
+      return blocked("a Beta workspace already exists for this proposal") if File.exist?(File.join(directory, BETA_DIR))
+
+      digest = beta_build_digest(directory, skill_id)
+      success(
+        {
+          "proposal_id" => proposal_id,
+          "skill_id" => skill_id,
+          "expected_digest" => digest,
+          "confirmation_phrase" => "#{BETA_BUILD_CONFIRMATION_PREFIX} #{skill_id}",
+          "creates" => relative(File.join(directory, BETA_DIR)),
+          "effect" => "prepare an incomplete proposal-local Beta workspace and bounded Codex handoff",
+          "implementation_complete" => false,
+          "codex_invoked" => false,
+          "production_modified" => false
+        },
+        lifecycle: "blocked_for_human_review"
+      )
+    end
+
+    def prepare_beta_build(proposal_id:, skill_id:, expected_digest:, confirmation:)
+      directory = proposal_directory(proposal_id)
+      return awaiting("unknown proposal ID") unless directory
+      return awaiting("canonical dotted skill_id is required") unless valid_skill_id?(skill_id)
+      return awaiting("exact Beta preparation confirmation is required") unless confirmation == "#{BETA_BUILD_CONFIRMATION_PREFIX} #{skill_id}"
+
+      state = read_state(directory)
+      return blocked("proposal Gate 1 approval is required before Beta preparation") unless state.dig("proposal_gate", "status") == "approved"
+      return blocked("proposal path must not be a symlink") if File.symlink?(directory)
+      return blocked("proposal or Gate 1 approval changed after preview") unless secure_equal?(expected_digest, beta_build_digest(directory, skill_id))
+
+      beta_directory = File.join(directory, BETA_DIR)
+      return blocked("a Beta workspace already exists for this proposal") if File.exist?(beta_directory) || File.symlink?(beta_directory)
+
+      record = proposal_projection(directory)
+      Dir.mkdir(beta_directory, 0o700)
+      manifest = beta_workspace_manifest(skill_id, record)
+      write_json(File.join(beta_directory, BETA_MANIFEST), manifest)
+      File.write(File.join(beta_directory, "skill.rb"), beta_placeholder(skill_id), mode: "w", perm: 0o600)
+      File.write(File.join(beta_directory, "IMPLEMENTATION.md"), beta_implementation_pack(directory, skill_id), mode: "w", perm: 0o600)
+      File.write(File.join(beta_directory, "REVIEW.md"), beta_review_artifact(skill_id), mode: "w", perm: 0o600)
+      File.write(File.join(beta_directory, "ROLLBACK.md"), "# Beta Rollback\n\nDelete only this proposal-local `beta/` directory before promotion. No production or registry state has changed.\n", mode: "w", perm: 0o600)
+      success(
+        {
+          "proposal_id" => proposal_id,
+          "beta_id" => skill_id,
+          "package_path" => relative(beta_directory),
+          "implementation_complete" => false,
+          "codex_invoked" => false,
+          "production_modified" => false,
+          "files" => Dir.children(beta_directory).sort
+        },
+        mutation: "proposal_local_beta_workspace_prepared"
+      )
+    rescue StandardError => error
+      FileUtils.remove_entry_secure(beta_directory) if beta_directory && File.directory?(beta_directory) && File.dirname(beta_directory) == directory
+      failed("Beta workspace preparation failed safely: #{error.class}")
     end
 
     def beta(beta_id:)
@@ -217,6 +290,62 @@ module SoulCore
       )
     end
 
+    def production_promotion_preview(beta_id:)
+      context = production_promotion_context(beta_id)
+      return context if context.is_a?(Hash) && context["lifecycle_state"]
+
+      success(
+        context.merge(
+          "expected_digest" => production_promotion_digest(context),
+          "confirmation_phrase" => "#{PRODUCTION_CONFIRMATION_PREFIX} #{beta_id}",
+          "effect" => "copy the exact reviewed Beta entrypoint into production and atomically register one new skill",
+          "rollback" => ["remove the exact new registry entry", "remove only the generated production directory after registry removal"]
+        ),
+        lifecycle: "blocked_for_human_review"
+      )
+    end
+
+    def promote_beta_to_production(beta_id:, expected_digest:, confirmation:)
+      return awaiting("exact production promotion confirmation is required") unless confirmation == "#{PRODUCTION_CONFIRMATION_PREFIX} #{beta_id}"
+      context = production_promotion_context(beta_id)
+      return context if context.is_a?(Hash) && context["lifecycle_state"]
+      return blocked("Beta, approval, registry, or target state changed after preview") unless secure_equal?(expected_digest, production_promotion_digest(context))
+
+      target_directory = full(context.fetch("production_directory"))
+      source = full(context.fetch("source_entrypoint"))
+      registry_path = full(REGISTRY_PATH)
+      created = false
+      Dir.mkdir(full(PRODUCTION_ROOT), 0o755) unless Dir.exist?(full(PRODUCTION_ROOT))
+      Dir.mkdir(target_directory, 0o755)
+      created = true
+      File.open(File.join(target_directory, "skill.rb"), File::WRONLY | File::CREAT | File::EXCL, 0o644) { |file| file.write(File.binread(source)) }
+      File.write(File.join(target_directory, "skill_manifest.yaml"), YAML.dump(context.fetch("registry_definition")), mode: "w", perm: 0o644)
+      receipt = {
+        "schema_version" => "soul.skill_promotion.v1",
+        "promoted_at" => now,
+        "skill_id" => beta_id,
+        "beta_digest" => context.fetch("beta_digest"),
+        "source_sha256" => context.fetch("source_sha256"),
+        "target_sha256" => Digest::SHA256.file(File.join(target_directory, "skill.rb")).hexdigest,
+        "registry_definition" => context.fetch("registry_definition"),
+        "rollback" => ["remove registry entry #{beta_id}", "remove #{context.fetch('production_directory')} only after registry removal"]
+      }
+      write_json(File.join(target_directory, PRODUCTION_RECEIPT), receipt)
+      write_registry_with_new_skill(registry_path, beta_id, context.fetch("registry_definition"))
+      success(
+        context.merge(
+          "promotion_performed" => true,
+          "receipt" => relative(File.join(target_directory, PRODUCTION_RECEIPT)),
+          "target_sha256" => receipt.fetch("target_sha256"),
+          "registry_modified" => true
+        ),
+        mutation: "beta_promoted_to_production"
+      )
+    rescue StandardError => error
+      FileUtils.remove_entry_secure(target_directory) if created && target_directory && File.directory?(target_directory) && File.dirname(target_directory) == full(PRODUCTION_ROOT)
+      failed("production promotion failed safely and removed the unpublished target: #{error.class}")
+    end
+
     def proposal_close_preview(proposal_id:)
       directory = proposal_directory(proposal_id)
       return awaiting("unknown proposal ID") unless directory
@@ -262,6 +391,212 @@ module SoulCore
     end
 
     private
+
+    def valid_skill_id?(value)
+      value.is_a?(String) && value.bytesize <= 120 && value.match?(SKILL_ID)
+    end
+
+    def beta_build_digest(directory, skill_id)
+      Digest::SHA256.hexdigest(JSON.generate({
+        "proposal_digest" => proposal_digest(directory),
+        "proposal_gate" => read_state(directory)["proposal_gate"],
+        "skill_id" => skill_id,
+        "beta_absent" => !File.exist?(File.join(directory, BETA_DIR))
+      }))
+    end
+
+    def beta_workspace_manifest(skill_id, proposal_record)
+      {
+        "schema_version" => "soul.beta.v1",
+        "skill_id" => skill_id,
+        "description" => proposal_record["description"].to_s.empty? ? proposal_record["title"] : proposal_record["description"],
+        "risk" => "unclassified",
+        "entrypoint" => "skill.rb",
+        "implementation_complete" => false,
+        "timeout_seconds" => 30,
+        "requires_approval" => true,
+        "confirmation_phrase" => "REPLACE_WITH_REVIEWED_CONFIRMATION",
+        "writes_files" => false,
+        "expected_output" => "json",
+        "verifier" => "schema_basic",
+        "lifecycle_states" => %w[complete failed awaiting_input canceled blocked_for_human_review],
+        "required_tests" => [{ "id" => "replace-with-deterministic-test", "description" => "Replace during implementation with a deterministic behavior test", "kind" => "deterministic" }],
+        "known_weaknesses" => ["Implementation has not started."],
+        "failure_behavior" => ["Return blocked_for_human_review until implementation and review are complete."]
+      }
+    end
+
+    def beta_placeholder(skill_id)
+      <<~RUBY
+        # frozen_string_literal: true
+
+        require "json"
+
+        puts JSON.generate({
+          "ok" => false,
+          "skill" => #{skill_id.inspect},
+          "lifecycle_state" => "blocked_for_human_review",
+          "reason" => "Beta implementation has not been completed or reviewed."
+        })
+      RUBY
+    end
+
+    def beta_implementation_pack(directory, skill_id)
+      <<~MARKDOWN
+        # Beta Implementation Task Pack
+
+        Skill ID: `#{skill_id}`
+
+        Proposal: `#{relative(directory)}`
+
+        ## Allowed files
+
+        Only files below `#{relative(File.join(directory, BETA_DIR))}/`.
+
+        ## Required work
+
+        - Implement one self-contained `skill.rb` entrypoint.
+        - Replace placeholder manifest risk, confirmation, tests, weaknesses, and failure behavior.
+        - Keep `implementation_complete: false` until deterministic tests and the review artifact are complete.
+        - Write `test_results.json` bound to the current Beta digest.
+
+        ## Boundaries
+
+        - Do not modify `Soul/skills/registry.yaml` or production skill paths.
+        - Do not invoke cloud providers or read secrets unless a later human-approved skill brief explicitly allows it.
+        - Do not add services, daemons, watchers, schedules, or background continuation.
+        - Do not weaken confirmation, path, memory, or human-review gates.
+        - Codex output remains candidate material for human review.
+      MARKDOWN
+    end
+
+    def beta_review_artifact(skill_id)
+      <<~MARKDOWN
+        # Beta Skill Candidate Review: #{skill_id}
+
+        ## Implementation summary
+
+        Pending.
+
+        ## Files changed
+
+        Pending.
+
+        ## Commands run
+
+        Pending.
+
+        ## Deterministic test results
+
+        Pending.
+
+        ## Local LLM eval results
+
+        Pending or not required.
+
+        ## Known weaknesses
+
+        - Implementation has not started.
+
+        ## Memory keys
+
+        None declared.
+
+        ## Lifecycle states touched
+
+        `blocked_for_human_review`
+
+        ## Risk classification
+
+        Unclassified pending implementation.
+
+        ## Human review checklist
+
+        - [ ] Behavior is implemented rather than scaffolded.
+        - [ ] Required deterministic tests pass against the current digest.
+        - [ ] Safety, memory, path, persistence, and confirmation boundaries are reviewed.
+        - [ ] Known weaknesses and rollback are acceptable.
+      MARKDOWN
+    end
+
+    def production_promotion_context(beta_id)
+      located = locate_beta(beta_id)
+      return awaiting("unknown Beta skill ID") unless located
+      directory, manifest, proposal_directory = located
+      return blocked("canonical dotted Beta skill ID is required") unless valid_skill_id?(beta_id)
+      record = beta_projection(directory, manifest, proposal_directory, detail: true)
+      return blocked("legacy alpha scaffold cannot be promoted") if record["maturity"] == "legacy_alpha_scaffold"
+      blockers = promotion_blockers(record, proposal_directory)
+      state = read_state(proposal_directory)
+      current_digest = beta_digest(directory, manifest)
+      blockers << "Human Gate 2 is not approved for this exact Beta revision" unless state.dig("beta_gate", "status") == "approved_for_promotion" && secure_equal?(state.dig("beta_gate", "beta_digest"), current_digest)
+      entrypoint = manifest["entrypoint"].to_s
+      source = File.expand_path(entrypoint, directory)
+      blockers << "production promotion requires the self-contained skill.rb entrypoint" unless entrypoint == "skill.rb"
+      blockers << "Beta entrypoint must not be a symlink" if File.symlink?(source)
+      blockers << "Beta entrypoint exceeds #{MAX_TEXT_BYTES} bytes" if File.file?(source) && File.size(source) > MAX_TEXT_BYTES
+      blockers << "Beta risk classification is incomplete" if manifest["risk"].to_s.empty? || manifest["risk"] == "unclassified"
+      blockers << "Beta confirmation phrase is still a placeholder" if manifest["confirmation_phrase"] == "REPLACE_WITH_REVIEWED_CONFIRMATION"
+      target = File.join(full(PRODUCTION_ROOT), beta_id)
+      blockers << "generated production root must not be a symlink" if File.symlink?(full(PRODUCTION_ROOT))
+      registry_path = full(REGISTRY_PATH)
+      blockers << "production registry must be a regular non-symlink file" unless File.file?(registry_path) && !File.symlink?(registry_path)
+      blockers << "production skill ID already exists" if production_definition(beta_id)
+      blockers << "production target directory already exists" if File.exist?(target) || File.symlink?(target)
+      return blocked("Beta cannot be promoted: #{blockers.join('; ')}") unless blockers.empty?
+
+      definition = {
+        "path" => relative(File.join(target, "skill.rb")),
+        "language" => "ruby",
+        "description" => manifest["description"].to_s[0, 500],
+        "risk" => manifest["risk"].to_s,
+        "requires_approval" => manifest["requires_approval"] == true,
+        "writes_files" => manifest["writes_files"] == true,
+        "expected_output" => manifest["expected_output"].to_s.empty? ? "json" : manifest["expected_output"].to_s,
+        "verifier" => manifest["verifier"].to_s.empty? ? "schema_basic" : manifest["verifier"].to_s
+      }
+      phrase = manifest["confirmation_phrase"].to_s
+      definition["confirmation_phrase"] = phrase if definition["requires_approval"] && !phrase.empty?
+      {
+        "beta_id" => beta_id,
+        "proposal_id" => File.basename(proposal_directory),
+        "beta_digest" => current_digest,
+        "source_entrypoint" => relative(source),
+        "source_sha256" => Digest::SHA256.file(source).hexdigest,
+        "production_directory" => relative(target),
+        "production_entrypoint" => relative(File.join(target, "skill.rb")),
+        "registry_definition" => definition,
+        "registry_path" => REGISTRY_PATH
+      }
+    end
+
+    def production_promotion_digest(context)
+      registry_path = full(REGISTRY_PATH)
+      Digest::SHA256.hexdigest(JSON.generate(context.merge(
+        "registry_sha256" => Digest::SHA256.file(registry_path).hexdigest,
+        "target_absent" => !File.exist?(full(context.fetch("production_directory")))
+      )))
+    end
+
+    def write_registry_with_new_skill(path, skill_id, definition)
+      raise "production registry must not be a symlink" if File.symlink?(path)
+      mode = File.stat(path).mode & 0o777
+      data = YAML.safe_load(File.read(path), permitted_classes: [], aliases: false)
+      raise "production registry is invalid" unless data.is_a?(Hash) && data["skills"].is_a?(Hash)
+      raise "production skill ID already exists" if data.fetch("skills").key?(skill_id)
+      updated = Marshal.load(Marshal.dump(data))
+      updated.fetch("skills")[skill_id] = definition
+      temporary = "#{path}.tmp-#{Process.pid}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, mode) do |file|
+        file.write(YAML.dump(updated))
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, path)
+      File.chmod(mode, path)
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
 
     def proposal_directories
       base = full(PROPOSALS_ROOT)

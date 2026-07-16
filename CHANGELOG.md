@@ -4,6 +4,7 @@
 
 ### Conversational Soul
 
+- Added the Phase 12D.5 candidate: Gate-1-approved incomplete Beta workspaces and Codex handoffs, plus exact-tested Gate-2 production promotion with byte hashes, atomic registry publication, and rollback evidence.
 - Extended personal dashboard login persistence to seven days across service restarts using ignored owner-only token-digest records, with logout, password change, reset, expiry, and credential rotation revocation.
 - Added a dedicated Soul-themed Skill Studio empty-state illustration depicting capability design, verification, and human approval.
 - Expanded preview-first conversation clearing with an exact multi-conversation selector, select-all/select-none controls, stale-selection blocking, and unchanged transcript retention.

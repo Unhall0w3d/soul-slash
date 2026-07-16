@@ -104,6 +104,8 @@ skill_studio.proposals.list
 skill_studio.proposals.get
 skill_studio.proposals.approval.preview
 skill_studio.proposals.approval.execute
+skill_studio.proposals.beta_build.preview
+skill_studio.proposals.beta_build.execute
 skill_studio.proposals.close.preview
 skill_studio.proposals.close.execute
 skill_studio.betas.list
@@ -112,6 +114,8 @@ skill_studio.betas.run.preview
 skill_studio.betas.run.execute
 skill_studio.betas.promotion.preview
 skill_studio.betas.promotion.approve
+skill_studio.betas.production.preview
+skill_studio.betas.production.execute
 
 self_improvement.snapshot
 self_improvement.refresh

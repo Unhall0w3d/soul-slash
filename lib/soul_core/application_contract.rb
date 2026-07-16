@@ -15,6 +15,7 @@ module SoulCore
     DELIVERY_ID = /\Adel_[A-Za-z0-9_.-]+\z/
     PROPOSAL_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     BETA_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
+    SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
     OPERATIONS = {
@@ -47,6 +48,8 @@ module SoulCore
       "skill_studio.proposals.get" => %w[proposal_id],
       "skill_studio.proposals.approval.preview" => %w[proposal_id],
       "skill_studio.proposals.approval.execute" => %w[proposal_id confirmation expected_digest],
+      "skill_studio.proposals.beta_build.preview" => %w[proposal_id skill_id],
+      "skill_studio.proposals.beta_build.execute" => %w[proposal_id skill_id confirmation expected_digest],
       "skill_studio.proposals.close.preview" => %w[proposal_id],
       "skill_studio.proposals.close.execute" => %w[proposal_id confirmation expected_digest],
       "skill_studio.betas.list" => %w[limit],
@@ -55,6 +58,8 @@ module SoulCore
       "skill_studio.betas.run.execute" => %w[beta_id args confirmation expected_digest],
       "skill_studio.betas.promotion.preview" => %w[beta_id],
       "skill_studio.betas.promotion.approve" => %w[beta_id confirmation expected_digest],
+      "skill_studio.betas.production.preview" => %w[beta_id],
+      "skill_studio.betas.production.execute" => %w[beta_id confirmation expected_digest],
       "self_improvement.snapshot" => [],
       "self_improvement.refresh" => %w[scope],
       "self_improvement.proposals.preview" => [],
@@ -152,6 +157,8 @@ module SoulCore
       return "proposal_id is invalid" if proposal_id && !proposal_id.to_s.match?(PROPOSAL_ID)
       beta_id = parameters["beta_id"]
       return "beta_id is invalid" if beta_id && !beta_id.to_s.match?(BETA_ID)
+      skill_id = parameters["skill_id"]
+      return "skill_id is invalid" if skill_id && !skill_id.to_s.match?(SKILL_ID)
       chat_ids = parameters["chat_ids"]
       return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 
