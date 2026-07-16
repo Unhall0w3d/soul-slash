@@ -173,16 +173,31 @@ module SoulCore
               message["content"].include?("Which shell")
           end
 
-        requests_before_deterministic = client.requests.length
+        requests_before_identity = client.requests.length
         store.add_message(chat_id, role: "user", content: "who are you?")
-        deterministic = runtime.respond(
+        identity_conversation = runtime.respond(
           chat_id: chat_id,
           message: "who are you?"
         )
-        deterministic_bypassed_model =
-          client.requests.length == requests_before_deterministic &&
-          deterministic.mode == "deterministic" &&
-          deterministic.content.include?("I am Soul")
+        identity_used_model =
+          client.requests.length == requests_before_identity + 1 &&
+          identity_conversation.mode == "model"
+        store.add_message(
+          chat_id,
+          role: "assistant",
+          content: identity_conversation.content,
+          metadata: { "mode" => identity_conversation.mode }
+        )
+
+        requests_before_inspection = client.requests.length
+        store.add_message(chat_id, role: "user", content: "show identity")
+        identity_inspection = runtime.respond(
+          chat_id: chat_id,
+          message: "show identity"
+        )
+        inspection_bypassed_model =
+          client.requests.length == requests_before_inspection &&
+          identity_inspection.mode == "deterministic"
 
         failing_client = RecordingProviderClient.new(fail: true)
         failing_runtime = ConversationRuntime.new(
@@ -239,7 +254,8 @@ module SoulCore
         blockers << "First model-backed turn failed" unless first.mode == "model"
         blockers << "Second model-backed turn failed" unless second.mode == "model"
         blockers << "Prior turns were not supplied to the second request" unless continuity
-        blockers << "Deterministic route did not bypass the model" unless deterministic_bypassed_model
+        blockers << "Natural identity conversation did not use the configured model" unless identity_used_model
+        blockers << "Identity policy inspection did not bypass the model" unless inspection_bypassed_model
         blockers << "Provider failure did not return a safe fallback" unless fallback.mode == "fallback"
         blockers << "Context window was not bounded" unless context_bounded
         blockers << "Conversation state was not recorded" unless state_recorded
@@ -255,7 +271,8 @@ module SoulCore
           "provider_request_count" => client.requests.length,
           "first_result" => first.to_h,
           "second_result" => second.to_h,
-          "deterministic_result" => deterministic.to_h,
+          "identity_conversation_result" => identity_conversation.to_h,
+          "identity_inspection_result" => identity_inspection.to_h,
           "fallback_result" => fallback.to_h,
           "bounded_context" => bounded_context.reject { |key, _value| key == "messages" },
           "state" => state,
@@ -263,7 +280,8 @@ module SoulCore
           "verification" => {
             "model_backed_turn_works" => first.mode == "model",
             "multiturn_context_continues" => continuity,
-            "deterministic_routes_preserved" => deterministic_bypassed_model,
+            "natural_identity_conversation_uses_model" => identity_used_model,
+            "deterministic_identity_inspection_preserved" => inspection_bypassed_model,
             "provider_failure_falls_back_safely" => fallback.mode == "fallback",
             "context_window_is_bounded" => context_bounded,
             "runtime_state_is_recorded" => state_recorded,

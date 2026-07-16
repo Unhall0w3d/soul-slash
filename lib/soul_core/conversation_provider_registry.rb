@@ -65,7 +65,7 @@ module SoulCore
         ),
         model: model.to_s,
         privacy_class: "local_only",
-        capabilities: %w[chat streaming tools structured_output],
+        capabilities: %w[chat streaming tools structured_output reasoning_control],
         configured: !model.to_s.empty?,
         metadata: {
           "source" => "environment",
@@ -91,7 +91,7 @@ module SoulCore
         ),
         model: model.to_s,
         privacy_class: "local_only",
-        capabilities: %w[chat streaming structured_output],
+        capabilities: %w[chat streaming structured_output reasoning_control],
         configured: !model.to_s.empty?,
         metadata: {
           "source" => "environment",

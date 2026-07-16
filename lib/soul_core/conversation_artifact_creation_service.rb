@@ -25,6 +25,22 @@ module SoulCore
     PRIVACY_RANK = { "public" => 0, "project" => 1, "local_private" => 2 }.freeze
     TOKEN_PATTERN = /\b[a-f0-9]{32}\b/i
     ARTIFACT_ID_PATTERN = /\bart_[a-z0-9_]+\b/i
+    JSON_RESPONSE_FORMAT = {
+      "type" => "json_schema",
+      "json_schema" => {
+        "name" => "artifact_json_document",
+        "schema" => {
+          "anyOf" => [
+            { "type" => "object" },
+            { "type" => "array" },
+            { "type" => "string" },
+            { "type" => "number" },
+            { "type" => "boolean" },
+            { "type" => "null" }
+          ]
+        }
+      }
+    }.freeze
 
     def initialize(
       root:,
@@ -68,8 +84,18 @@ module SoulCore
       response = draft(provider: provider, chat_id: chat_id, request: request, source: source)
       return failure(provider_error(response)) unless response.success? && !response.content.to_s.strip.empty?
 
-      content = normalize_content(response.content, File.extname(target.fetch("relative_path")))
-      validation = validate_content(content, File.extname(target.fetch("relative_path")))
+      extension = File.extname(target.fetch("relative_path"))
+      compatibility_normalization = markdown_fence_wrapped?(response.content) ? "markdown_fence_removed" : "none"
+      structured_output_mode =
+        if extension == ".json" && provider.supports?("structured_output")
+          "schema_constrained"
+        elsif extension == ".json"
+          "prompt_only_compatibility"
+        else
+          "not_requested"
+        end
+      content = normalize_content(response.content, extension)
+      validation = validate_content(content, extension)
       digest = Digest::SHA256.hexdigest(content.b)
       redacted = @inspector.redact_text(content)
 
@@ -88,7 +114,9 @@ module SoulCore
         "sha256" => digest,
         "size_bytes" => validation.fetch("size_bytes"),
         "line_count" => validation.fetch("line_count"),
-        "redaction_count" => redacted.fetch("redaction_count")
+        "redaction_count" => redacted.fetch("redaction_count"),
+        "structured_output_mode" => structured_output_mode,
+        "compatibility_normalization" => compatibility_normalization
       )
       scope = scope_for(operation)
       token = @approval_store.issue(
@@ -119,6 +147,8 @@ module SoulCore
         "sha256" => digest,
         "excerpt" => redacted.fetch("text")[0, MAX_PREVIEW_CHARACTERS],
         "redaction_count" => redacted.fetch("redaction_count"),
+        "structured_output_mode" => structured_output_mode,
+        "compatibility_normalization" => compatibility_normalization,
         "token_id" => token.fetch("token_id"),
         "expires_at" => token.fetch("expires_at"),
         "file_mutated" => false,
@@ -405,12 +435,15 @@ module SoulCore
         }
       end
       messages << { "role" => "user", "content" => request.fetch("requirements") }
+      response_format = json_response_format(provider, request.fetch("target_path"))
       envelope = Contract::RequestEnvelope.new(
         conversation_id: chat_id,
         messages: messages,
         model: provider.model,
         temperature: 0.3,
         max_output_tokens: integer_env("SOUL_ARTIFACT_MAX_OUTPUT_TOKENS", 4_096),
+        response_format: response_format,
+        reasoning_mode: response_format ? "disabled" : "default",
         privacy_requirement: provider.privacy_class,
         metadata: { "runtime" => "conversational_soul_phase11c", "operation" => request.fetch("operation") }
       )
@@ -434,6 +467,17 @@ module SoulCore
       "#{text}\n"
     rescue JSON::ParserError => error
       raise ArgumentError, "provider returned invalid JSON: #{error.message}"
+    end
+
+    def json_response_format(provider, target_path)
+      return nil unless File.extname(target_path).downcase == ".json"
+      return nil unless provider.supports?("structured_output")
+
+      JSON_RESPONSE_FORMAT
+    end
+
+    def markdown_fence_wrapped?(raw)
+      raw.to_s.match?(/\A\s*```(?:json|markdown|text)?\s*/i)
     end
 
     def validate_content(content, extension)

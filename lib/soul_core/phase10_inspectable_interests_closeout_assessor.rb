@@ -115,7 +115,7 @@ module SoulCore
         "mutations_require_review_boundaries" => help_render.include?("Proposals remain candidates") && deactivate_preview.include?("Mutation: none") && deactivate_preview.include?("Confirmation required"),
         "ordinary_interesting_language_is_not_hijacked" => !controls.match?("What are the interesting parts of Ruby?"),
         "identity_profile_id_remains_stable" => profile["profile_id"] == "soul.identity.v1",
-        "identity_profile_declares_reviewed_registry" => profile["profile_version"] == 2 && profile["interests_status"] == "reviewed_registry",
+        "identity_profile_declares_reviewed_registry" => profile["profile_version"].to_i >= 2 && profile["interests_status"] == "reviewed_registry",
         "interests_do_not_imply_experience_or_authority" => context.fetch("messages").first.fetch("content").include?("do not imply personal experience, feelings, credentials, embodiment, or authority"),
         "style_inspection_suppresses_sensitive_values" => style_render.include?("preview suppressed") && !style_render.include?("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"),
         "canonical_interest_document_exists" => File.exist?(File.join(@root, "docs/soul/REVIEWED_INTERESTS.md")),

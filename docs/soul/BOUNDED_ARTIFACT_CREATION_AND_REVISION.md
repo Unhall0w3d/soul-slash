@@ -46,6 +46,18 @@ Phase 11C uses only configured `local_only` or `local_network` providers and nev
 
 One bounded provider request drafts the preview content. Provider output is untrusted and cannot choose the target, privacy, approval scope, or execution behavior.
 
+For `.json` output, a provider that declares `structured_output` receives an
+explicit JSON-value schema through the provider contract. Reasoning is disabled
+for that bounded request so the output budget reaches the required JSON rather
+than being consumed by a hidden reasoning channel. Object, array, string,
+number, boolean, and null documents remain supported. Soul still parses and
+normalizes the result deterministically before preview and again before write.
+
+A provider without structured-output support retains the historical prompt-only
+path. If Soul must remove one outer Markdown fence, the preview and operation
+record report `compatibility_normalization: markdown_fence_removed`; the cleanup
+is no longer silent. The approved one-request/no-retry boundary remains intact.
+
 ## Approval scope and races
 
 The approval token binds:

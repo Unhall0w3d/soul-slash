@@ -304,6 +304,52 @@ module SoulCore
           !File.exist?(File.join(temp_root, "artifacts", "invalid.json")) &&
           !File.exist?(File.join(temp_root, "artifacts", "binary.txt"))
 
+        structured_provider = Contract::ProviderDefinition.new(
+          id: "local.phase11c.structured",
+          label: "Phase 11C structured local provider",
+          transport: "openai_compatible",
+          endpoint: "http://127.0.0.1:1/v1",
+          model: "phase11c-structured-model",
+          privacy_class: "local_only",
+          capabilities: %w[chat structured_output reasoning_control],
+          configured: true
+        )
+        structured_client = FakeProviderClient.new(["{\"status\":\"ready\"}"])
+        structured_service = ConversationArtifactCreationService.new(
+          root: temp_root,
+          provider_client: structured_client,
+          artifact_store: artifact_store
+        )
+        structured_preview = structured_service.preview(
+          chat_id: chat_id,
+          message: "Create a JSON document at artifacts/structured.json with project privacy and a status field.",
+          provider: structured_provider
+        )
+        structured_request = structured_client.calls.first&.fetch("request", nil)
+        checks["json_artifacts_request_constrained_output_and_report_mode"] =
+          structured_preview["lifecycle_state"] == "awaiting_input" &&
+          structured_preview["structured_output_mode"] == "schema_constrained" &&
+          structured_preview["compatibility_normalization"] == "none" &&
+          structured_request&.response_format == ConversationArtifactCreationService::JSON_RESPONSE_FORMAT &&
+          structured_request&.reasoning_mode == "disabled"
+
+        compatibility_client = FakeProviderClient.new(["```json\n{\"status\":\"ready\"}\n```"])
+        compatibility_service = ConversationArtifactCreationService.new(
+          root: temp_root,
+          provider_client: compatibility_client,
+          artifact_store: artifact_store
+        )
+        compatibility_preview = compatibility_service.preview(
+          chat_id: chat_id,
+          message: "Create a JSON document at artifacts/compatibility.json with project privacy and a status field.",
+          provider: local_provider
+        )
+        checks["prompt_only_fence_cleanup_is_visible_compatibility_behavior"] =
+          compatibility_preview["lifecycle_state"] == "awaiting_input" &&
+          compatibility_preview["structured_output_mode"] == "prompt_only_compatibility" &&
+          compatibility_preview["compatibility_normalization"] == "markdown_fence_removed" &&
+          compatibility_client.calls.first.fetch("request").response_format.nil?
+
         limit_client = FakeProviderClient.new([
           "x" * (ConversationArtifactCreationService::MAX_FILE_BYTES + 1),
           "line\n" * (ConversationArtifactCreationService::MAX_LINES + 1)

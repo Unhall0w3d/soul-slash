@@ -28,6 +28,18 @@ module SoulCore
         model: "test-model",
         temperature: 0.4,
         max_output_tokens: 256,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "phase2_response",
+            schema: {
+              type: "object",
+              properties: { message: { type: "string" } },
+              required: ["message"],
+              additionalProperties: false
+            }
+          }
+        },
         privacy_requirement: "local_only",
         metadata: { source: "assessment" }
       )
@@ -37,6 +49,7 @@ module SoulCore
         messages: [],
         temperature: 9.0,
         max_output_tokens: 0,
+        response_format: { type: "markdown" },
         privacy_requirement: "unknown"
       )
 
@@ -66,6 +79,8 @@ module SoulCore
       blockers << "Missing disabled cloud provider shape" unless registry.find("cloud.openai_compatible")
       blockers << "Valid request envelope was rejected" unless valid_request.valid?
       blockers << "Invalid request envelope was accepted" if invalid_request.valid?
+      blockers << "Structured response format was not preserved" unless valid_request.response_format.dig("json_schema", "schema", "required") == ["message"]
+      blockers << "Invalid response format was not rejected" unless invalid_request.validation_errors.any? { |error| error.include?("response_format") }
       blockers << "Response envelope was rejected" unless response.valid? && response.success?
       blockers << "Positive health probe failed" unless positive_probe.available?
       blockers << "Unavailable provider was not reported unavailable" unless unavailable_probe.status == "unavailable"
@@ -108,6 +123,8 @@ module SoulCore
           "cloud_shape_present_but_unconfigured" => registry.find("cloud.openai_compatible")&.configured? == false,
           "request_envelope_validates" => valid_request.valid?,
           "invalid_request_rejected" => !invalid_request.valid?,
+          "structured_response_format_validates" => valid_request.response_format.dig("json_schema", "schema", "required") == ["message"],
+          "invalid_response_format_rejected" => invalid_request.validation_errors.any? { |error| error.include?("response_format") },
           "response_envelope_validates" => response.valid? && response.success?,
           "available_probe_works" => positive_probe.available?,
           "unavailable_probe_works" => unavailable_probe.status == "unavailable",

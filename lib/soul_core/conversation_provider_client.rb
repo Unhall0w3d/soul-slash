@@ -26,6 +26,24 @@ module SoulCore
         )
       end
 
+      if request.response_format && !provider.supports?("structured_output")
+        return error_response(
+          provider: provider,
+          request: request,
+          type: "unsupported_capability",
+          message: "Provider #{provider.id} does not declare structured_output support"
+        )
+      end
+
+      if request.reasoning_mode == "disabled" && !provider.supports?("reasoning_control")
+        return error_response(
+          provider: provider,
+          request: request,
+          type: "unsupported_capability",
+          message: "Provider #{provider.id} does not declare reasoning_control support"
+        )
+      end
+
       with_runtime_lease(provider, request, timeout_seconds) do
         case provider.transport
         when "openai_compatible"
@@ -89,6 +107,10 @@ module SoulCore
       }.reject { |_key, value| value.nil? }
 
       payload["tools"] = request.tools unless request.tools.empty?
+      payload["response_format"] = request.response_format if request.response_format
+      if request.reasoning_mode == "disabled"
+        payload["chat_template_kwargs"] = { "enable_thinking" => false }
+      end
 
       response, latency_ms = post_json(
         uri,
@@ -126,6 +148,11 @@ module SoulCore
           "num_predict" => request.max_output_tokens
         }.reject { |_key, value| value.nil? }
       }
+      if request.response_format
+        format = ollama_response_format(request.response_format)
+        payload["format"] = format if format
+      end
+      payload["think"] = false if request.reasoning_mode == "disabled"
 
       response, latency_ms = post_json(
         uri,
@@ -177,6 +204,17 @@ module SoulCore
       ).round(2)
 
       [response, latency_ms]
+    end
+
+    def ollama_response_format(response_format)
+      case response_format.fetch("type")
+      when "json_object"
+        response_format["schema"] || "json"
+      when "json_schema"
+        response_format.fetch("json_schema").fetch("schema")
+      when "text"
+        nil
+      end
     end
 
     def normalized_response(

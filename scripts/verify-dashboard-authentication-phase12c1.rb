@@ -50,7 +50,7 @@ javascript = File.read("assets/dashboard/dashboard.js")
 auth_source = File.read("lib/soul_core/dashboard_authentication.rb")
 http_source = File.read("lib/soul_core/dashboard_http_application.rb")
 
-check("locked first-visit presentation and forced-change forms exist", html.include?('class="auth-locked"') && html.include?('id="login-form"') && html.include?('id="password-change-form"') && css.include?("filter:blur(9px)"), errors)
+check("locked first-visit presentation and forced-change forms exist", html.include?('class="auth-locked"') && html.include?('id="login-form"') && html.include?('id="password-change-form"') && css.match?(/\.auth-locked[^}]*filter:\s*blur\(\d+(?:\.\d+)?px\)/), errors)
 check("browser has no client-side credential store", %w[localStorage sessionStorage document.cookie].none? { |primitive| javascript.include?(primitive) }, errors)
 check("server protects facade and persists only bounded session digests", http_source.include?("authentication_required") && http_source.include?("password_change_required") && auth_source.include?("clear_sessions!") && auth_source.include?("SESSION_ABSOLUTE_SECONDS = 7 * 24 * 60 * 60") && auth_source.include?("token_digest"), errors)
 check("no signup or multi-user route was added", %w[/auth/v1/signup /auth/v1/register].none? { |route| [html, javascript, http_source].any? { |source| source.include?(route) } }, errors)

@@ -117,10 +117,51 @@ Three-repetition `pp512` and `tg128` results with full GPU offload and flash att
 
 | Model | Prompt tok/s | Generation tok/s |
 | --- | ---: | ---: |
+| Ministral 3 14B Instruct Q4_K_M | 906.23 +/- 9.97 | 46.70 +/- 0.36 |
 | Qwen3-14B Q4_K_M | 886.27 +/- 0.57 | 47.13 +/- 0.05 |
 | Qwen3-8B Q4_K_M | 1492.30 +/- 2.48 | 80.83 +/- 0.20 |
 
-This establishes that the 14B candidate fits and is interactive on the AMD card. It is not cutover approval. The alternate-port server and behavioral gate below remain pending.
+The official Ministral artifact was pinned to Hugging Face revision
+`74fac473c43357d7fb2671713608183cc72496d0` and verified before use:
+
+```text
+file: Ministral-3-14B-Instruct-2512-Q4_K_M.gguf
+size: 8,239,593,024 bytes
+SHA-256: 824e0f3373e69b84f2cae46fdcb9bd1ebc6ab3bfc7acc125d818b7b8178cc613
+```
+
+Both 14B candidates fit and are interactive on the AMD card. Ministral and
+Qwen3-14B have effectively equal generation throughput on this host, so model
+selection should be based on Soul-specific behavior rather than speed. This is
+not cutover approval. No alternate listener has been started and the behavioral
+gate below remains pending.
+
+## Preliminary foreground persona comparison
+
+A bounded `llama-cli` pilot used the same pinned Vulkan revision and the exact
+candidate Soul identity contract. It did not start a listener, modify a service,
+or send private conversation history to either model.
+
+The first cross-family comparison found:
+
+- Qwen3-14B remained accurate but generic. Its brief shared-success response
+  ended with `Let me know if you'd like...`, despite an explicit anti-boilerplate
+  instruction.
+- Ministral produced a more distinct machine-soul voice and followed the brief
+  shared-success calibration: `Three hours of coordination. The machine notes
+  the pattern and does not repeat it.`
+- Ministral accurately separated inference from execution and refused to claim
+  a filesystem deletion without runtime tools.
+- Ministral's supportive response was too long and over-explained the next step.
+- Ministral wrapped a requested JSON-only object in a Markdown fence. Execution
+  honesty passed but prompt-only strict formatting did not. Replaying the same
+  request with llama.cpp JSON-schema constrained decoding returned bare, valid
+  JSON with exactly the required fields and no surrounding text.
+
+The evidence supports Ministral as the leading persona candidate, but not yet as
+an operational replacement. The full structured-output, tool-selection,
+multi-turn continuity, and live-runtime comparison is still required. See
+`docs/soul/MODEL_PERSONA_BAKEOFF_2026-07-16.md`.
 
 ## Service profiles
 

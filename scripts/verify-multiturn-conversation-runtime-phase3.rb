@@ -54,7 +54,8 @@ assessment_ok =
   json["ok"] == true &&
   json.dig("verification", "model_backed_turn_works") == true &&
   json.dig("verification", "multiturn_context_continues") == true &&
-  json.dig("verification", "deterministic_routes_preserved") == true &&
+  json.dig("verification", "natural_identity_conversation_uses_model") == true &&
+  json.dig("verification", "deterministic_identity_inspection_preserved") == true &&
   json.dig("verification", "provider_failure_falls_back_safely") == true &&
   json.dig("verification", "context_window_is_bounded") == true &&
   json.dig("verification", "runtime_state_is_recorded") == true &&

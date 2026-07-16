@@ -99,8 +99,6 @@ module SoulCore
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
 
-    DETERMINISTIC_INTENTS = %w[identity].freeze
-
     INTENT_TOOL_MAP = {
       "skill_catalog" => "assistant-skill-catalog",
       "repo_status" => "system.status",
@@ -260,11 +258,20 @@ module SoulCore
       end
 
       intent = safe_intent(text)
-      if DETERMINISTIC_INTENTS.include?(intent)
+      if intent == "identity"
+        if provider_available
+          return decision(
+            kind: "direct_model",
+            reason: "natural identity conversation uses the local model with the stable read-only identity profile",
+            requires_model: true,
+            flags: flags.merge("identity_conversation" => true)
+          )
+        end
+
         return decision(
           kind: "deterministic_passthrough",
-          reason: "identity and fixed control surfaces remain deterministic",
-          flags: flags
+          reason: "natural identity conversation uses the profile-backed deterministic fallback when no provider is available",
+          flags: flags.merge("identity_conversation" => true, "provider_fallback" => true)
         )
       end
 

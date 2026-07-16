@@ -9,7 +9,10 @@ module SoulCore
     TRANSPORTS = %w[openai_compatible ollama].freeze
     PRIVACY_CLASSES = %w[local_only local_network cloud].freeze
     MESSAGE_ROLES = %w[system user assistant tool].freeze
-    CAPABILITIES = %w[chat streaming tools structured_output embeddings].freeze
+    CAPABILITIES = %w[chat streaming tools structured_output reasoning_control embeddings].freeze
+    RESPONSE_FORMAT_TYPES = %w[text json_object json_schema].freeze
+    REASONING_MODES = %w[default disabled].freeze
+    MAX_RESPONSE_FORMAT_BYTES = 65_536
 
     class ProviderDefinition
       attr_reader :id,
@@ -99,6 +102,8 @@ module SoulCore
                   :temperature,
                   :max_output_tokens,
                   :tools,
+                  :response_format,
+                  :reasoning_mode,
                   :privacy_requirement,
                   :metadata,
                   :created_at
@@ -110,6 +115,8 @@ module SoulCore
         temperature: nil,
         max_output_tokens: nil,
         tools: [],
+        response_format: nil,
+        reasoning_mode: "default",
         privacy_requirement: "local_only",
         metadata: {},
         request_id: SecureRandom.uuid,
@@ -122,6 +129,8 @@ module SoulCore
         @temperature = temperature
         @max_output_tokens = max_output_tokens
         @tools = Array(tools).map { |tool| stringify_keys(tool) }.freeze
+        @response_format = normalize_response_format(response_format)
+        @reasoning_mode = reasoning_mode.to_s
         @privacy_requirement = privacy_requirement.to_s
         @metadata = stringify_keys(metadata).freeze
         @created_at = created_at.to_s
@@ -149,6 +158,12 @@ module SoulCore
           errors << "max_output_tokens must be a positive integer"
         end
 
+        errors.concat(response_format_validation_errors)
+        if !response_format.nil? && !tools.empty?
+          errors << "response_format cannot be combined with tools in this contract version"
+        end
+        errors << "unsupported reasoning_mode: #{reasoning_mode}" unless REASONING_MODES.include?(reasoning_mode)
+
         errors
       end
 
@@ -165,6 +180,8 @@ module SoulCore
           "temperature" => temperature,
           "max_output_tokens" => max_output_tokens,
           "tools" => tools,
+          "response_format" => response_format,
+          "reasoning_mode" => reasoning_mode,
           "privacy_requirement" => privacy_requirement,
           "metadata" => metadata,
           "created_at" => created_at
@@ -184,6 +201,55 @@ module SoulCore
       def stringify_keys(hash)
         hash.each_with_object({}) do |(key, value), output|
           output[key.to_s] = value
+        end
+      end
+
+      def normalize_response_format(value)
+        return nil if value.nil?
+        return value unless value.is_a?(Hash)
+
+        JSON.parse(JSON.generate(value)).freeze
+      rescue JSON::GeneratorError, JSON::NestingError
+        value
+      end
+
+      def response_format_validation_errors
+        return [] if response_format.nil?
+        return ["response_format must be an object"] unless response_format.is_a?(Hash)
+
+        errors = []
+        type = response_format["type"].to_s
+        errors << "unsupported response_format type: #{type}" unless RESPONSE_FORMAT_TYPES.include?(type)
+
+        case type
+        when "json_object"
+          schema = response_format["schema"]
+          errors << "response_format schema must be an object" if schema && !schema.is_a?(Hash)
+        when "json_schema"
+          wrapper = response_format["json_schema"]
+          errors << "response_format json_schema must be an object" unless wrapper.is_a?(Hash)
+          schema = wrapper.is_a?(Hash) ? wrapper["schema"] : nil
+          errors << "response_format json_schema.schema must be an object" unless schema.is_a?(Hash)
+        end
+
+        begin
+          serialized = JSON.generate(response_format)
+          errors << "response_format exceeds #{MAX_RESPONSE_FORMAT_BYTES} bytes" if serialized.bytesize > MAX_RESPONSE_FORMAT_BYTES
+        rescue JSON::GeneratorError, JSON::NestingError
+          errors << "response_format must be bounded JSON data"
+        end
+        errors << "response_format schemas must not contain $ref" if contains_schema_ref?(response_format)
+        errors
+      end
+
+      def contains_schema_ref?(value)
+        case value
+        when Hash
+          value.key?("$ref") || value.any? { |_key, child| contains_schema_ref?(child) }
+        when Array
+          value.any? { |child| contains_schema_ref?(child) }
+        else
+          false
         end
       end
     end

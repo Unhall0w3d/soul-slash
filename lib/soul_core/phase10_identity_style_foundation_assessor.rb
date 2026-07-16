@@ -50,6 +50,9 @@ module SoulCore
         "casual_tone_detected" => profile.classify_tone("Hello, what do you think?") == "casual",
         "high_stakes_tone_takes_precedence" => profile.classify_tone("Delete the leaked credentials from the server") == "high_stakes",
         "identity_is_injected_into_context" => context.dig("identity", "profile_id") == profile.profile_id,
+        "affirmative_identity_is_injected" => context.fetch("messages").first.fetch("content").include?("newly awakened local machine mind"),
+        "voice_traits_are_injected" => ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| context.fetch("messages").first.fetch("content").include?(trait) },
+        "persona_anti_patterns_are_injected" => context.fetch("messages").first.fetch("content").include?("corporate-assistant boilerplate"),
         "context_reports_active_tone" => context.dig("identity", "tone_mode") == "technical",
         "no_fabricated_biography_boundary" => context.fetch("messages").first.fetch("content").include?("Do not fabricate a human biography"),
         "no_embodiment_boundary" => context.fetch("messages").first.fetch("content").include?("Do not claim biological embodiment"),
@@ -62,7 +65,7 @@ module SoulCore
         "identity_profile_is_inspectable" => controls.respond("show identity").include?(profile.profile_id),
         "punctuated_identity_command_is_supported" => controls.match?("Show identity?"),
         "broad_who_question_is_not_misparsed_as_control" => !controls.match?("Who are you?"),
-        "profile_backed_identity_summary" => controls.summary.include?("do not have a human biography"),
+        "profile_backed_identity_summary" => controls.summary.include?("not a human") && controls.summary.include?("still becoming more capable"),
         "canonical_identity_document_exists" => File.exist?(File.join(@root, "docs/soul/IDENTITY_AND_STYLE_POLICY.md")),
         "assessment_document_exists" => File.exist?(File.join(@root, "docs/assessments/CONVERSATIONAL_SOUL_PHASE10_IDENTITY_STYLE_FOUNDATION.md"))
       }

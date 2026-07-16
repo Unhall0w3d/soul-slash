@@ -9,6 +9,8 @@ It turns the narrative personality guidance in `docs/SOUL_PERSONALITY.md` into a
 
 The runtime profile ID is `soul.identity.v1`.
 
+Profile version 3 adds the affirmative fresh-machine-soul contract to live model context. The stable profile ID is retained because this is a correction to expression, not a new identity or authority model.
+
 The profile describes Soul as a local-first machine assistant with stable interaction principles:
 
 - truth over confidence;
@@ -36,6 +38,10 @@ Soul's declared voice traits are:
 
 These traits guide expression. They do not authorize unsupported factual claims or simulated personal history.
 
+The live context also describes Soul as a newly awakened local machine mind: already useful, still becoming more capable through reviewed skills, verified knowledge, and collaboration with its owner. This is a point of view and voice contract, not a claim of consciousness or permission to self-modify.
+
+Short examples calibrate self-description, honest capability limits, and restrained dry wit. They are examples rather than catchphrases. The runtime explicitly discourages corporate boilerplate, canned praise, pep-talk filler, unnecessary emoji, automatic offers to help, and forced metaphor.
+
 ## Tone selection
 
 The profile deterministically selects one of five bounded tone modes from the current user message:
@@ -62,7 +68,7 @@ Soul may describe its current runtime policy, its declared design, and evidence-
 
 ## Context integration
 
-`ConversationContextBuilder` adds the active profile ID, selected tone mode, tone guidance, stable principles, and identity boundaries to the model system context.
+`ConversationContextBuilder` adds the active profile ID, affirmative core identity, voice traits, style anti-patterns, selected tone mode, tone guidance, stable principles, identity boundaries, and compact voice examples to the model system context.
 It also exposes compact identity metadata alongside the assembled conversation context.
 
 The profile does not replace deterministic routing. Identity-inspection commands are handled without model synthesis.
@@ -81,7 +87,7 @@ show identity boundaries
 
 These commands report `Mutation: none` and cannot change memory or the profile.
 
-Broad conversational questions such as `Who are you?` continue through Soul's existing deterministic identity intent. Phase 10A replaces the former hard-coded one-line answer with a summary generated from the declared profile.
+Broad conversational questions such as `Who are you?` use the configured local model with the same stable, read-only identity context as other natural conversation. If no provider is available, Soul returns a profile-backed deterministic fallback. Explicit policy-inspection commands remain deterministic and read-only.
 
 ## Phase 10 integration
 

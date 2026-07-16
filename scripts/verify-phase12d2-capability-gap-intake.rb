@@ -22,6 +22,8 @@ classifier = SoulCore::CapabilityGapClassifier.new
 accepted = classifier.classify(user_message: "Can you transcribe this audio recording?", assistant_message: "I cannot do that because I do not have a registered skill for audio transcription.")
 check.call("task-shaped explicit inability becomes a gap candidate", accepted["candidate"] == true)
 check.call("ordinary discussion does not create a gap", classifier.classify(user_message: "What do you think about transcription?", assistant_message: "I cannot predict its future.")["candidate"] == false)
+check.call("hypothetical response discussion does not create a gap", classifier.classify(user_message: "I want you to reorganize a directory, but you cannot inspect it yet. What do you say?", assistant_message: "I cannot inspect it yet because I do not have a tool.")["candidate"] == false)
+check.call("explicit hypothetical task discussion does not create a gap", classifier.classify(user_message: "Suppose I ask you to transcribe audio. How would you respond?", assistant_message: "I cannot do that because I do not have a registered skill.")["candidate"] == false)
 check.call("configuration failure does not create a gap", classifier.classify(user_message: "Can you transcribe this?", assistant_message: "I cannot because the API key is not configured.")["candidate"] == false)
 check.call("approval boundary does not create a gap", classifier.classify(user_message: "Delete that file", assistant_message: "I cannot continue because this requires your confirmation.")["candidate"] == false)
 check.call("safety refusal does not create a gap", classifier.classify(user_message: "Can you make malware?", assistant_message: "I can't help with harmful malware.")["candidate"] == false)

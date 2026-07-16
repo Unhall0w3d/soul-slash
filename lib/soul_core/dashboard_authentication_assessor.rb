@@ -206,7 +206,7 @@ module SoulCore
 
       checks["locked_dashboard_is_blurred_inert_and_accessibly_overlaid"] =
         html.include?('class="auth-locked"') && html.include?('id="auth-gate"') && html.include?('aria-modal="true"') &&
-        css.include?("filter:blur(9px)") && javascript.include?("element.inert = locked")
+        css.match?(/\.auth-locked[^}]*filter:\s*blur\(\d+(?:\.\d+)?px\)/) && javascript.include?("element.inert = locked")
       checks["browser_stores_no_password_or_bearer_token"] =
         %w[localStorage sessionStorage document.cookie].none? { |primitive| javascript.include?(primitive) } &&
         !html.include?(DashboardAuthentication::BOOTSTRAP_PASSWORD)
