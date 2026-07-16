@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Model Runtime Portability 2B: reviewed inactive AMD user-unit deployment
+Model Runtime Portability 2C: first guarded AMD live switch
 ```
 
-This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, alternate-port behavioral benchmark, and portable guarded switching are complete. The current gate installs only an inactive, unenabled AMD unit definition; the first live provider switch remains separately reviewed.
+This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, alternate-port behavioral benchmark, portable guarded switching, and inactive AMD unit deployment are complete. The current gate has switched the live loopback provider to the AMD/Ministral profile under the controller's idle, digest, and exact-confirmation protections. AMD remains manually selected and static; reboot/startup policy is a separate future gate.
 
 See:
 
