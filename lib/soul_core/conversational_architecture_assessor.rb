@@ -77,7 +77,8 @@ module SoulCore
       blockers << "Missing anti-patterns: #{missing_anti_patterns.join(', ')}" unless missing_anti_patterns.empty?
       blockers << "Roadmap must define the current Phase 1 through Phase 13 sequence" unless roadmap_covers_current_sequence?(roadmap)
       blockers << "Roadmap must define Phase 13 as the stopping point" unless roadmap.include?("Phase 13 is the clear stopping point")
-      blockers << "Milestones must mark Conversational Soul in progress" unless milestones.include?("Conversational Soul") && milestones.include?("in progress")
+      milestone_status_valid = milestones.include?("Conversational Soul") && (milestones.include?("in progress") || milestones.include?("complete"))
+      blockers << "Milestones must mark Conversational Soul in progress or complete" unless milestone_status_valid
       blockers << "Architecture must preserve deterministic action gates" unless architecture.include?("plan -> approval -> execute -> verify -> record")
       blockers << "Architecture must keep Codex outside automatic repo mutation" unless architecture.include?("Codex remains outside automatic repository mutation")
 
@@ -101,7 +102,7 @@ module SoulCore
           "anti_patterns_documented" => missing_anti_patterns.empty?,
           "current_phase_roadmap" => roadmap_covers_current_sequence?(roadmap),
           "phase_thirteen_stopping_point" => roadmap.include?("Phase 13 is the clear stopping point"),
-          "milestone_in_progress" => milestones.include?("Conversational Soul") && milestones.include?("in progress"),
+          "milestone_status_valid" => milestone_status_valid,
           "deterministic_action_boundary_preserved" => architecture.include?("plan -> approval -> execute -> verify -> record"),
           "codex_boundary_preserved" => architecture.include?("Codex remains outside automatic repository mutation")
         }

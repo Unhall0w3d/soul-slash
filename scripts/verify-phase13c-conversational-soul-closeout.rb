@@ -66,12 +66,12 @@ acceptance = File.read("docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md")
 changelog = File.read("CHANGELOG.md")
 review = File.read("docs/assessments/CONVERSATIONAL_SOUL_PHASE13_CLOSEOUT.md")
 
-check.call("README identifies final human review", readme.include?("Phase 13A–C") && readme.include?("final review"))
-check.call("milestone remains candidate rather than self-approved", milestones.include?("candidate complete; awaiting final human review") && milestones.include?("Owner review"))
-check.call("roadmap records the clean stopping point", roadmap.include?("Phase 13 is the clear stopping point") && roadmap.include?("no release or tag"))
+check.call("README records owner-approved completion", readme.include?("Phase 13A–C") && readme.include?("owner approved Conversational Soul"))
+check.call("milestone records owner-approved completion", milestones.match?(/### Conversational Soul.*?Status:\s*```text\s*complete/m) && milestones.include?("Owner approval recorded"))
+check.call("roadmap records the clean stopping point", roadmap.include?("Phase 13 is the clear stopping point") && roadmap.include?("No release or tag"))
 check.call("current state records deterministic and local-model evidence", current.include?("all ten deterministic integrated scenarios") && current.include?("20/20 model turns"))
-check.call("acceptance preserves human authority", acceptance.include?("Human review remains the authority"))
-check.call("changelog records Phase 13 candidate", changelog.include?("Phase 13 closeout candidate"))
+check.call("acceptance records human authority and approval", acceptance.include?("Human review remains the authority") && acceptance.include?("owner approved"))
+check.call("changelog records approved Phase 13 closeout", changelog.include?("owner-approved Phase 13 closeout"))
 check.call("review artifact contains required sections", %w[
   Implementation Files Commands Deterministic Local Memory Lifecycle Risk Safety Known Human
 ].all? { |word| review.include?(word) })

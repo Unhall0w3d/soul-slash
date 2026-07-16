@@ -93,7 +93,7 @@ current_sequence = (1..13).all? { |phase| roadmap.match?(/^\#{2,3} Phase #{phase
 check("roadmap covers the current Phase 1 through Phase 13 sequence", current_sequence && roadmap.include?("Phase 13 is the clear stopping point"), errors)
 check("acceptance includes twenty-turn continuity", acceptance.include?("at least twenty turns"), errors)
 check("architecture preserves action safety", architecture.include?("plan -> approval -> execute -> verify -> record"), errors)
-check("milestone is in progress", milestones.include?("Status:\n\n```text\nin progress"), errors)
+check("milestone has a valid lifecycle status", milestones.match?(/### Conversational Soul.*?Status:\s*```text\s*(?:in progress|complete)/m), errors)
 check("changelog records Phase 1", changelog.include?("Conversational Soul") && changelog.include?("Phase 1"), errors)
 
 stdout, stderr, status = Open3.capture3(

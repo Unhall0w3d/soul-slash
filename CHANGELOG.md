@@ -4,7 +4,7 @@
 
 ### Conversational Soul
 
-- Added the Phase 13 closeout candidate with a ten-scenario deterministic integration harness, isolated twenty-exchange application flow, bounded twenty-turn local-model evaluation, aggregate milestone verification, and explicit final human review gate.
+- Completed the owner-approved Phase 13 closeout with a ten-scenario deterministic integration harness, isolated twenty-exchange application flow, bounded twenty-turn local-model evaluation, aggregate milestone verification, and explicit human review record.
 - Completed a local-only `soul-qwen3-8b-q4` behavioral run: 20/20 model turns, 6/6 continuity probes, 20 unique response hashes, no transcript retention, and no cloud fallback. Sustained latency remains a documented weakness.
 - Merged Phase 12D.5: Gate-1-approved incomplete Beta workspaces and Codex handoffs, plus exact-tested Gate-2 production promotion with byte hashes, atomic registry publication, and rollback evidence.
 - Extended personal dashboard login persistence to seven days across service restarts using ignored owner-only token-digest records, with logout, password change, reset, expiry, and credential rotation revocation.
@@ -53,4 +53,4 @@
 
 ### Development direction
 
-Phase 13A–C are candidate-complete and form the documented stopping point for Conversational Soul. Final milestone approval remains with the owner; no release or tag has been created. Later work begins as a new milestone.
+Conversational Soul was approved complete at the Phase 13 stopping point on 2026-07-15. No release or tag has been created. Later work begins as a new milestone.

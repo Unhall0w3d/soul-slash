@@ -43,20 +43,20 @@ legacy sequence Phase 63
 commit 2132b36
 ```
 
-## Current milestone
+## Latest completed milestone
 
 ### Conversational Soul
 
 Status:
 
 ```text
-in progress — candidate complete; awaiting final human review
+complete
 ```
 
 Current phase:
 
 ```text
-Phase 13 final milestone review
+Phase 13 accepted stopping point
 ```
 
 Completed:
@@ -87,13 +87,13 @@ Phase 12D.5: gated Beta implementation workspace and production promotion
 Phase 12E: unified Review Center
 Phase 13A: deterministic integrated acceptance harness
 Phase 13B: bounded local-model and dashboard acceptance
-Phase 13C: documentation, curation, and closeout candidate
+Phase 13C: documentation, curation, and accepted closeout
 ```
 
 Current work:
 
 ```text
-Owner review of the complete Phase 13 candidate
+Owner approval recorded; observation period begins
 ```
 
 Milestone stopping point:

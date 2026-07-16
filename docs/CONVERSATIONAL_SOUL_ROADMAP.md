@@ -393,6 +393,6 @@ Candidate delivered in Phase 13:
 13C aggregate Phase 1–13 regression suite and documentation/curation closeout
 ```
 
-All implementation slices are candidate-complete. Final milestone approval remains pending the owner's review, and no release or tag is implied by passing acceptance.
+All implementation slices passed review. The owner approved Conversational Soul as complete at the Phase 13 stopping point on 2026-07-15. No release or tag is implied by milestone acceptance.
 
 Proxmox was not required for Phases 11D through 13. Any Proxmox topology, backup, recovery, upgrade, or broader deployment work belongs to a separately approved later milestone.

@@ -174,4 +174,4 @@ The milestone is not complete merely because a local model can produce pleasant 
 
 Phase 13A provides a deterministic integrated assessment for all ten scenarios using real application/runtime boundaries and isolated temporary state. Phase 13B provides a separate bounded local-model behavioral run and dashboard structural checks. Phase 13C aggregates the milestone verifier suite and documentation closeout.
 
-The candidate evidence is complete. Human review remains the authority for milestone approval, and no model output, passing test, merge, release, or tag may substitute for that decision.
+The candidate evidence is complete. Human review remains the authority for milestone approval, and no model output, passing test, merge, release, or tag may substitute for that decision. The owner approved the milestone at the Phase 13 stopping point on 2026-07-15.

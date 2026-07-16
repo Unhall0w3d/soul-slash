@@ -58,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul implementation is candidate-complete through Phase 13. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. Final milestone approval remains pending the owner's review; no release or tag has been created.
+The Conversational Soul milestone is complete at its Phase 13 stopping point following owner approval on 2026-07-15. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. No release or tag has been created; later work begins as a separately approved milestone.
 
 Detailed references:
 
