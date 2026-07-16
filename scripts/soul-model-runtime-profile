@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/model_runtime_profile_deployment"
+
+options = {
+  host: "127.0.0.1",
+  port: 8082
+}
+parser = OptionParser.new do |value|
+  value.banner = "Usage: scripts/soul-model-runtime-profile COMMAND [options]"
+  value.on("--server PATH") { |item| options[:server_path] = item }
+  value.on("--model PATH") { |item| options[:model_path] = item }
+  value.on("--server-sha256 SHA") { |item| options[:expected_server_sha256] = item }
+  value.on("--model-sha256 SHA") { |item| options[:expected_model_sha256] = item }
+  value.on("--model-alias ALIAS") { |item| options[:model_alias] = item }
+  value.on("--host HOST") { |item| options[:host] = item }
+  value.on("--port PORT", Integer) { |item| options[:port] = item }
+  value.on("--confirmation PHRASE") { |item| options[:confirmation] = item }
+end
+
+command = ARGV.shift
+parser.parse!(ARGV)
+deployment = SoulCore::ModelRuntimeProfileDeployment.new(root: File.expand_path("..", __dir__))
+result = case command
+         when "plan" then deployment.plan(**options.except(:confirmation))
+         when "install" then deployment.install(**options)
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else
+           warn parser
+           exit 1
+         end
+
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (result.lifecycle_state == "awaiting_input" || result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))

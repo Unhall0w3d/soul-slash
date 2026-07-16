@@ -65,6 +65,44 @@ service names; machine paths and model arguments remain in private systemd unit
 configuration. A listed service that is not installed appears unavailable and
 cannot be selected. Switching is always manual and separately confirmed.
 
+### Optional inactive AMD unit deployment
+
+After separately validating an AMD Vulkan llama.cpp binary and model, preview an
+inactive user-unit installation with explicit local paths and recorded digests:
+
+```bash
+make model-runtime-amd-plan \
+  AMD_SERVER=/path/to/versioned-vulkan/llama-server \
+  AMD_MODEL=/path/to/model.gguf \
+  AMD_SERVER_SHA256=<recorded-sha256> \
+  AMD_MODEL_SHA256=<recorded-sha256> \
+  AMD_MODEL_ALIAS=<same-alias-as-the-current-provider>
+```
+
+After reviewing the JSON plan:
+
+```bash
+make model-runtime-amd-install \
+  AMD_SERVER=/path/to/versioned-vulkan/llama-server \
+  AMD_MODEL=/path/to/model.gguf \
+  AMD_SERVER_SHA256=<recorded-sha256> \
+  AMD_MODEL_SHA256=<recorded-sha256> \
+  AMD_MODEL_ALIAS=<same-alias-as-the-current-provider> \
+  CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT
+```
+
+This writes only `~/.config/systemd/user/soul-model-amd.service`, reloads the
+user manager, and verifies the unit is inactive and unenabled. It never starts
+AMD or stops the current runtime. Check or remove it with:
+
+```bash
+make model-runtime-amd-status
+make model-runtime-amd-uninstall CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT
+```
+
+Removal refuses to stop an active unit. See
+`docs/soul/MODEL_RUNTIME_PORTABILITY_2B_AMD_UNIT_BRIEF.md`.
+
 The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload or switching while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.
 
 Supported providers:

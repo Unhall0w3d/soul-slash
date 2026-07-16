@@ -47,6 +47,8 @@
 - [x] alternate-port AMD server and Soul behavioral benchmark
 - [ ] reviewed AMD primary/NVIDIA fallback profile cutover
 - [x] preview-gated multi-profile switching candidate
+- [x] inactive, unenabled AMD user-unit deployment candidate
+- [ ] first reviewed live AMD switch with NVIDIA rollback
 - [ ] reviewed Proxmox deployment
 - [ ] backup and disaster-recovery design
 - [ ] voice input

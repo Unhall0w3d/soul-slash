@@ -10,8 +10,14 @@ ENV_FILE ?= $(PROJECT_ROOT)/.env
 LAN_HOST ?=
 DASHBOARD_HTTPS_PORT ?= 8443
 CONFIRM ?=
+AMD_SERVER ?=
+AMD_MODEL ?=
+AMD_SERVER_SHA256 ?=
+AMD_MODEL_SHA256 ?=
+AMD_MODEL_ALIAS ?=
+AMD_PORT ?=8082
 
-.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-model-runtime-controls clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -37,6 +43,10 @@ help:
 > @echo "  make dashboard-service-logs"
 > @echo "  make dashboard-service-uninstall CONFIRM=REMOVE_SOUL_LAN_SERVICES"
 > @echo "  make verify-model-runtime-controls  Test leases and preview-gated model controls"
+> @echo "  make model-runtime-amd-plan AMD_SERVER=... AMD_MODEL=... AMD_SERVER_SHA256=... AMD_MODEL_SHA256=... AMD_MODEL_ALIAS=..."
+> @echo "  make model-runtime-amd-install ... CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT"
+> @echo "  make model-runtime-amd-status"
+> @echo "  make model-runtime-amd-uninstall CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT"
 > @echo
 > @echo "llama.cpp helper targets:"
 > @echo "  make download-model    Download/validate configured GGUF model"
@@ -130,6 +140,22 @@ dashboard-service-uninstall:
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb
 > @ruby scripts/verify-model-runtime-profile-switching.rb
+> @ruby scripts/verify-model-runtime-profile-deployment.rb
+
+model-runtime-amd-plan:
+> @test -n "$(AMD_SERVER)" -a -n "$(AMD_MODEL)" -a -n "$(AMD_SERVER_SHA256)" -a -n "$(AMD_MODEL_SHA256)" -a -n "$(AMD_MODEL_ALIAS)" || { echo "AMD_SERVER, AMD_MODEL, AMD_SERVER_SHA256, AMD_MODEL_SHA256, and AMD_MODEL_ALIAS are required."; exit 2; }
+> @ruby scripts/soul-model-runtime-profile plan --server "$(AMD_SERVER)" --model "$(AMD_MODEL)" --server-sha256 "$(AMD_SERVER_SHA256)" --model-sha256 "$(AMD_MODEL_SHA256)" --model-alias "$(AMD_MODEL_ALIAS)" --port "$(AMD_PORT)"
+
+model-runtime-amd-install:
+> @test "$(CONFIRM)" = "INSTALL_INACTIVE_AMD_MODEL_UNIT" || { echo "Run model-runtime-amd-plan first, then set CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT."; exit 2; }
+> @ruby scripts/soul-model-runtime-profile install --server "$(AMD_SERVER)" --model "$(AMD_MODEL)" --server-sha256 "$(AMD_SERVER_SHA256)" --model-sha256 "$(AMD_MODEL_SHA256)" --model-alias "$(AMD_MODEL_ALIAS)" --port "$(AMD_PORT)" --confirmation "$(CONFIRM)"
+
+model-runtime-amd-status:
+> @ruby scripts/soul-model-runtime-profile status
+
+model-runtime-amd-uninstall:
+> @test "$(CONFIRM)" = "REMOVE_INACTIVE_AMD_MODEL_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT; active units are never stopped implicitly."; exit 2; }
+> @ruby scripts/soul-model-runtime-profile uninstall --confirmation "$(CONFIRM)"
 
 clean-runtime:
 > @rm -rf run tmp
