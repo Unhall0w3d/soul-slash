@@ -16,6 +16,7 @@ module SoulCore
     PROPOSAL_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     BETA_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     HOST_PLAN_ID = /\Ahip_[a-f0-9]{16}\z/
+    EXPERIMENT_ID = /\Aexp_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
@@ -82,6 +83,16 @@ module SoulCore
       "self_augmentation.proposals.list" => %w[limit],
       "self_augmentation.proposals.preview" => %w[objective why_not_skill],
       "self_augmentation.proposals.execute" => %w[objective why_not_skill confirmation expected_digest],
+      "self_augmentation.experiments.list" => %w[limit],
+      "self_augmentation.experiments.gate_a1.preview" => %w[proposal_id allowed_files],
+      "self_augmentation.experiments.gate_a1.execute" => %w[proposal_id allowed_files confirmation expected_digest],
+      "self_augmentation.reviews.generate" => %w[experiment_id],
+      "self_augmentation.reviews.gate_a2.preview" => %w[experiment_id],
+      "self_augmentation.reviews.gate_a2.execute" => %w[experiment_id confirmation expected_digest],
+      "self_augmentation.model_qualification.preview" => %w[experiment_id suite_id model_profile result evidence_digest],
+      "self_augmentation.model_qualification.execute" => %w[experiment_id suite_id model_profile result evidence_digest confirmation expected_digest],
+      "self_augmentation.experiments.cleanup.preview" => %w[experiment_id],
+      "self_augmentation.experiments.cleanup.execute" => %w[experiment_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -177,6 +188,8 @@ module SoulCore
       return "beta_id is invalid" if beta_id && !beta_id.to_s.match?(BETA_ID)
       plan_id = parameters["plan_id"]
       return "plan_id is invalid" if plan_id && !plan_id.to_s.match?(HOST_PLAN_ID)
+      experiment_id = parameters["experiment_id"]
+      return "experiment_id is invalid" if experiment_id && !experiment_id.to_s.match?(EXPERIMENT_ID)
       skill_id = parameters["skill_id"]
       return "skill_id is invalid" if skill_id && !skill_id.to_s.match?(SKILL_ID)
       chat_ids = parameters["chat_ids"]
@@ -191,7 +204,7 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "filters"
           return "filters must be an object" unless value.is_a?(Hash) && string_keys?(value)
-        elsif key == "args" || key == "chat_ids"
+        elsif key == "args" || key == "chat_ids" || key == "allowed_files"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)

@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -759,8 +759,8 @@ async function verifyHostPlan() {
 }
 
 function renderAugmentationProposals(records) {
-  const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
-  records.forEach((proposal) => list.append(labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · implementation not authorized`)));
+  state.augmentationProposals = records; const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
+  records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for Gate A1`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
   if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No augmentation proposal packets."; list.append(empty); }
 }
 
@@ -771,7 +771,7 @@ function renderAugmentationCensus(report) {
 
 async function loadSelfAugmentation() {
   byId("augmentation-status").textContent = "Loading local proposal inventory…";
-  try { const envelope = await callSoul("self_augmentation.proposals.list", { limit: 100 }); renderAugmentationProposals(dataOf(envelope).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
+  try { const [proposals, experiments] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
   catch (error) { byId("augmentation-status").textContent = error.message; }
 }
 
@@ -795,6 +795,90 @@ async function createAugmentationProposal() {
   const envelope = await callSoul("self_augmentation.proposals.execute", { objective: byId("augmentation-objective").value, why_not_skill: byId("augmentation-why-not-skill").value, confirmation: byId("augmentation-confirmation").value, expected_digest: state.augmentationPreview.expected_digest }); const data = dataOf(envelope); lifecycle(envelope);
   if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.packet) { status.textContent = envelope.errors?.[0]?.message || "Proposal creation was blocked safely."; return; }
   state.augmentationPreview = null; byId("augmentation-proposal-preview").hidden = true; status.textContent = `Review packet created at ${data.packet}. Experiment and integration remain locked.`; await loadSelfAugmentation();
+}
+
+function selectedAllowedFiles() { return byId("augmentation-allowed-files").value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean); }
+
+function selectAugmentationExperiment(record) {
+  state.selectedAugmentationExperiment = record; state.augmentationGateA2Preview = null; state.augmentationCleanupPreview = null;
+  byId("augmentation-selected-experiment").textContent = `${record.experiment_id} · ${record.stage} · base ${record.base_commit.slice(0, 12)}`;
+  ["generate-augmentation-dossier", "preview-augmentation-gate-a2", "preview-augmentation-cleanup"].forEach((id) => { byId(id).disabled = false; });
+  byId("augmentation-review-status").textContent = "Candidate actions run only when explicitly requested.";
+}
+
+function renderAugmentationExperiments(records) {
+  state.augmentationExperiments = records; const list = byId("augmentation-experiment-list"); list.replaceChildren(); byId("augmentation-experiment-count").textContent = String(records.length);
+  records.forEach((record) => { const item = labeledRecord(record.experiment_id, `${record.stage} · ${record.worktree}`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => selectAugmentationExperiment(record); item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No isolated experiments prepared."; list.append(empty); }
+}
+
+async function reloadAugmentationExperiments() { const envelope = await callSoul("self_augmentation.experiments.list", { limit: 100 }); renderAugmentationExperiments(dataOf(envelope).records || []); }
+
+async function previewAugmentationExperiment() {
+  if (!state.selectedAugmentationProposal) return; const status = byId("augmentation-experiment-status"); status.textContent = "Checking exact proposal, clean base, and file scope…";
+  const envelope = await callSoul("self_augmentation.experiments.gate_a1.preview", { proposal_id: state.selectedAugmentationProposal.proposal_id, allowed_files: selectedAllowedFiles() }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Gate A1 preview blocked safely."; return; }
+  state.augmentationExperimentPreview = data; const list = byId("augmentation-experiment-preview-details"); list.replaceChildren(); list.append(labeledRecord("Exact base", data.base_commit), labeledRecord("Allowed scope", `${data.allowed_files.length} exact path(s) · no globs`));
+  byId("augmentation-experiment-preview").hidden = false; byId("augmentation-experiment-confirmation").value = ""; byId("create-augmentation-experiment").disabled = true; status.textContent = "Gate A1 creates one detached worktree and handoff; it does not invoke Codex.";
+}
+
+async function createAugmentationExperiment() {
+  if (!state.augmentationExperimentPreview || !state.selectedAugmentationProposal) return; const status = byId("augmentation-experiment-status"); status.textContent = "Revalidating clean primary worktree and exact base…";
+  const envelope = await callSoul("self_augmentation.experiments.gate_a1.execute", { proposal_id: state.selectedAugmentationProposal.proposal_id, allowed_files: state.augmentationExperimentPreview.allowed_files, confirmation: byId("augmentation-experiment-confirmation").value, expected_digest: state.augmentationExperimentPreview.expected_digest }); const data = dataOf(envelope); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.experiment) { status.textContent = envelope.errors?.[0]?.message || "Experiment preparation failed safely."; return; }
+  state.augmentationExperimentPreview = null; byId("augmentation-experiment-preview").hidden = true; status.textContent = `Isolated worktree prepared at ${data.experiment.worktree}. Codex was not invoked.`; await reloadAugmentationExperiments();
+}
+
+function renderAugmentationDossier(dossier) {
+  const list = byId("augmentation-dossier-summary"); list.replaceChildren(); const blockers = dossier.blockers || [];
+  list.append(labeledRecord(`${dossier.changed_file_count} changed file(s)`, `${dossier.base_commit.slice(0, 10)} → ${dossier.candidate_commit.slice(0, 10)}`), labeledRecord("Deterministic verification", `${(dossier.deterministic_tests || []).filter((test) => test.status === "passed").length}/${(dossier.deterministic_tests || []).length} passed · no-network sandbox`), labeledRecord("Gate blockers", blockers.length ? blockers.join("; ") : "none", blockers.length ? "is-warning" : "is-available"));
+  byId("augmentation-review-state").textContent = blockers.length ? "blocked" : "ready";
+}
+
+async function generateAugmentationDossier() {
+  if (!state.selectedAugmentationExperiment) return; const status = byId("augmentation-review-status"); status.textContent = "Inspecting exact committed diff and running sandboxed checks…";
+  const envelope = await callSoul("self_augmentation.reviews.generate", { experiment_id: state.selectedAugmentationExperiment.experiment_id }); const dossier = dataOf(envelope).dossier;
+  if (!dossier) { status.textContent = envelope.errors?.[0]?.message || "Dossier generation failed safely."; return; }
+  renderAugmentationDossier(dossier); status.textContent = dossier.blockers?.length ? "Dossier written with blockers; Gate A2 remains unavailable." : "Candidate dossier is clear for Gate A2 preview. Passing checks do not authorize integration.";
+}
+
+async function previewAugmentationGateA2() {
+  if (!state.selectedAugmentationExperiment) return; const status = byId("augmentation-review-status"); status.textContent = "Revalidating candidate commit and dossier…";
+  const envelope = await callSoul("self_augmentation.reviews.gate_a2.preview", { experiment_id: state.selectedAugmentationExperiment.experiment_id }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { if (data.dossier) renderAugmentationDossier(data.dossier); status.textContent = envelope.errors?.[0]?.message || "Gate A2 remains blocked."; return; }
+  state.augmentationGateA2Preview = data; renderAugmentationDossier(data.dossier); byId("augmentation-gate-a2-preview").hidden = false; byId("augmentation-gate-a2-confirmation").value = ""; byId("execute-augmentation-gate-a2").disabled = true; status.textContent = "Review the exact candidate. Approval writes an external integration handoff only.";
+}
+
+async function executeAugmentationGateA2() {
+  if (!state.augmentationGateA2Preview || !state.selectedAugmentationExperiment) return; const status = byId("augmentation-review-status"); status.textContent = "Revalidating exact candidate revision…";
+  const envelope = await callSoul("self_augmentation.reviews.gate_a2.execute", { experiment_id: state.selectedAugmentationExperiment.experiment_id, confirmation: byId("augmentation-gate-a2-confirmation").value, expected_digest: state.augmentationGateA2Preview.expected_digest }); const data = dataOf(envelope); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.handoff) { status.textContent = envelope.errors?.[0]?.message || "Gate A2 approval blocked safely."; return; }
+  state.augmentationGateA2Preview = null; byId("augmentation-gate-a2-preview").hidden = true; status.textContent = `External integration handoff written at ${data.handoff}. Soul integrated nothing.`; await reloadAugmentationExperiments();
+}
+
+async function previewAugmentationCleanup() {
+  if (!state.selectedAugmentationExperiment) return; const status = byId("augmentation-review-status"); status.textContent = "Checking worktree cleanliness…";
+  const envelope = await callSoul("self_augmentation.experiments.cleanup.preview", { experiment_id: state.selectedAugmentationExperiment.experiment_id }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Dirty worktree removal refused."; return; }
+  state.augmentationCleanupPreview = data; byId("augmentation-cleanup-preview").hidden = false; byId("augmentation-cleanup-confirmation").value = ""; byId("execute-augmentation-cleanup").disabled = true; status.textContent = "Only this clean worktree may be removed. Review records remain.";
+}
+
+async function executeAugmentationCleanup() {
+  if (!state.augmentationCleanupPreview || !state.selectedAugmentationExperiment) return; const envelope = await callSoul("self_augmentation.experiments.cleanup.execute", { experiment_id: state.selectedAugmentationExperiment.experiment_id, confirmation: byId("augmentation-cleanup-confirmation").value, expected_digest: state.augmentationCleanupPreview.expected_digest }); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "canceled") { byId("augmentation-review-status").textContent = envelope.errors?.[0]?.message || "Cleanup failed safely."; return; }
+  state.augmentationCleanupPreview = null; state.selectedAugmentationExperiment = null; byId("augmentation-cleanup-preview").hidden = true; byId("augmentation-review-status").textContent = "Clean worktree removed; review records retained."; await reloadAugmentationExperiments();
+}
+
+function augmentationModelParameters() { return { experiment_id: state.selectedAugmentationExperiment?.experiment_id, suite_id: byId("augmentation-model-suite").value.trim(), model_profile: byId("augmentation-model-profile").value.trim(), result: byId("augmentation-model-result").value, evidence_digest: byId("augmentation-model-evidence").value.trim() }; }
+async function previewAugmentationModelResult() {
+  if (!state.selectedAugmentationExperiment) return; const envelope = await callSoul("self_augmentation.model_qualification.preview", augmentationModelParameters()); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete") { byId("augmentation-review-status").textContent = envelope.errors?.[0]?.message || "Qualification record preview failed."; return; }
+  state.augmentationModelPreview = data; byId("augmentation-model-preview").hidden = false; byId("augmentation-model-confirmation").value = ""; byId("record-augmentation-model-result").disabled = true; byId("augmentation-review-status").textContent = "This records external local-eval evidence; it authorizes nothing.";
+}
+async function recordAugmentationModelResult() {
+  if (!state.augmentationModelPreview) return; const envelope = await callSoul("self_augmentation.model_qualification.execute", { ...augmentationModelParameters(), confirmation: byId("augmentation-model-confirmation").value, expected_digest: state.augmentationModelPreview.expected_digest }); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "complete") { byId("augmentation-review-status").textContent = envelope.errors?.[0]?.message || "Qualification record failed safely."; return; }
+  state.augmentationModelPreview = null; byId("augmentation-model-preview").hidden = true; byId("augmentation-review-status").textContent = "Local-model qualification evidence recorded. Gate A2 still requires deterministic review and exact human approval.";
 }
 
 function reviewEmpty(target, titleText, detailText) {
@@ -937,6 +1021,20 @@ byId("run-augmentation-census").addEventListener("click", runAugmentationCensus)
 byId("preview-augmentation-proposal").addEventListener("click", previewAugmentationProposal);
 byId("augmentation-confirmation").addEventListener("input", () => { byId("create-augmentation-proposal").disabled = !state.augmentationPreview || byId("augmentation-confirmation").value !== state.augmentationPreview.confirmation_phrase; });
 byId("create-augmentation-proposal").addEventListener("click", createAugmentationProposal);
+byId("preview-augmentation-experiment").addEventListener("click", previewAugmentationExperiment);
+byId("augmentation-allowed-files").addEventListener("input", () => { state.augmentationExperimentPreview = null; byId("augmentation-experiment-preview").hidden = true; });
+byId("augmentation-experiment-confirmation").addEventListener("input", () => { byId("create-augmentation-experiment").disabled = !state.augmentationExperimentPreview || byId("augmentation-experiment-confirmation").value !== state.augmentationExperimentPreview.confirmation_phrase; });
+byId("create-augmentation-experiment").addEventListener("click", createAugmentationExperiment);
+byId("generate-augmentation-dossier").addEventListener("click", generateAugmentationDossier);
+byId("preview-augmentation-gate-a2").addEventListener("click", previewAugmentationGateA2);
+byId("augmentation-gate-a2-confirmation").addEventListener("input", () => { byId("execute-augmentation-gate-a2").disabled = !state.augmentationGateA2Preview || byId("augmentation-gate-a2-confirmation").value !== state.augmentationGateA2Preview.confirmation_phrase; });
+byId("execute-augmentation-gate-a2").addEventListener("click", executeAugmentationGateA2);
+byId("preview-augmentation-cleanup").addEventListener("click", previewAugmentationCleanup);
+byId("augmentation-cleanup-confirmation").addEventListener("input", () => { byId("execute-augmentation-cleanup").disabled = !state.augmentationCleanupPreview || byId("augmentation-cleanup-confirmation").value !== state.augmentationCleanupPreview.confirmation_phrase; });
+byId("execute-augmentation-cleanup").addEventListener("click", executeAugmentationCleanup);
+byId("preview-augmentation-model-result").addEventListener("click", previewAugmentationModelResult);
+byId("augmentation-model-confirmation").addEventListener("input", () => { byId("record-augmentation-model-result").disabled = !state.augmentationModelPreview || byId("augmentation-model-confirmation").value !== state.augmentationModelPreview.confirmation_phrase; });
+byId("record-augmentation-model-result").addEventListener("click", recordAugmentationModelResult);
 byId("preview-proposal-approval").addEventListener("click", previewProposalApproval);
 byId("proposal-confirmation").addEventListener("input", () => { byId("execute-proposal-approval").disabled = !state.proposalApproval || byId("proposal-confirmation").value !== "APPROVE_PROPOSAL_FOR_BETA_BUILD"; });
 byId("execute-proposal-approval").addEventListener("click", executeProposalApproval);

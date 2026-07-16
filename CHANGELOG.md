@@ -4,6 +4,7 @@
 
 ### Conversational Soul
 
+- Added the Self Augmentation A4–A5 candidate with exact proposal/file-scope Gate A1, detached linked worktrees, bounded Codex handoffs without invocation, no-network Bubblewrap candidate checks, deterministic dossiers, exact Gate A2 external integration handoffs, and non-forced clean-worktree cleanup.
 - Added the approved Architecture and Stewardship A1–A3 candidate: trustworthy `checkupdates` evidence, terminal-only Arch upgrade handoffs with bounded verification receipts, and a fourth Self Augmentation tab for tracked-code census and review-only architectural proposals.
 - Completed the owner-approved Phase 13 closeout with a ten-scenario deterministic integration harness, isolated twenty-exchange application flow, bounded twenty-turn local-model evaluation, aggregate milestone verification, and explicit human review record.
 - Completed a local-only `soul-qwen3-8b-q4` behavioral run: 20/20 model turns, 6/6 continuity probes, 20 unique response hashes, no transcript retention, and no cloud fallback. Sustained latency remains a documented weakness.

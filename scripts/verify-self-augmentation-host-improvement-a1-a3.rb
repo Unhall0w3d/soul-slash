@@ -130,7 +130,7 @@ check.call("typed API operations are allowlisted", %w[host_improvement.arch_upgr
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes four-tab augmentation and host surfaces", html.include?('id="augmentation-tab"') && html.include?('id="augmentation-panel"') && html.include?('id="preview-host-plan"'))
-check.call("deferred augmentation stages are visibly locked", html.include?("Experiment</strong><small>Locked") && html.include?("Review</strong><small>Locked"))
+check.call("A1–A3 surfaces remain present after later gate expansion", html.include?("Observe</strong>") && html.include?("Propose</strong>") && html.include?('id="augmentation-objective"'))
 check.call("new surfaces do not poll or schedule", !js.match?(/setInterval|setTimeout|requestAnimationFrame/))
 check.call("brief preserves prohibited boundaries", File.read(File.expand_path("../docs/soul/SELF_AUGMENTATION_HOST_IMPROVEMENT_A1_A3_BRIEF.md", __dir__)).include?("Invoking Codex") )
 

@@ -49,6 +49,10 @@ Soul/host_improvement/plans/*
 !Soul/host_improvement/plans/.keep
 Soul/augmentation/proposals/*
 !Soul/augmentation/proposals/.keep
+Soul/augmentation/experiments/*
+!Soul/augmentation/experiments/.keep
+Soul/augmentation/worktrees/*
+!Soul/augmentation/worktrees/.keep
 Soul/runtime/*.json
 Soul/runtime/*.tmp
 Soul/runtime/*.log

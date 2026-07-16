@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Architecture and Stewardship A1–A3: assessment, terminal handoff, and augmentation census
+Architecture and Stewardship A4–A5: isolated experiment and candidate review gates
 ```
 
-The model-runtime portability sequence is complete through the reviewed selected-profile startup policy. A1–A3 now distinguishes fresh, empty, unavailable, and failed package evidence; prepares but never executes an Arch full-upgrade terminal handoff; records bounded postcondition receipts; and exposes tracked-code census plus proposal review in a fourth Self Augmentation tab. Worktree creation, automatic Codex invocation, source integration, and privileged brokers remain deferred. The current clean stopping point authorizes neither host nor tracked-source mutation.
+The model-runtime portability sequence and A1–A3 assessment/census foundation are complete. A4–A5 now provide exact Gate A1 preparation of one detached linked worktree and Codex handoff, plus a bounded no-network candidate dossier and exact Gate A2 external integration handoff. Soul invokes no implementation agent, modifies no primary-worktree source, performs no integration, refuses dirty cleanup, and retains all review records. Privileged brokers remain deferred.
 
 See:
 

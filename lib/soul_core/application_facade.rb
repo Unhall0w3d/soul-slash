@@ -20,6 +20,7 @@ require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
 require_relative "self_augmentation_service"
+require_relative "self_augmentation_experiment_service"
 
 module SoulCore
   class ApplicationFacade
@@ -48,7 +49,8 @@ module SoulCore
       skill_studio_service: nil,
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
-      self_augmentation_service: nil
+      self_augmentation_service: nil,
+      self_augmentation_experiment_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -68,6 +70,7 @@ module SoulCore
       @self_improvement_service = self_improvement_service
       @host_improvement_plan_service = host_improvement_plan_service
       @self_augmentation_service = self_augmentation_service
+      @self_augmentation_experiment_service = self_augmentation_experiment_service
     end
 
     def call(request)
@@ -158,6 +161,16 @@ module SoulCore
       when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
       when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
       when "self_augmentation.proposals.execute" then domain(self_augmentation.create_proposal(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.experiments.list" then domain(self_augmentation_experiments.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationExperimentService::MAX_RECORDS)))
+      when "self_augmentation.experiments.gate_a1.preview" then domain(self_augmentation_experiments.gate_a1_preview(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files")))
+      when "self_augmentation.experiments.gate_a1.execute" then domain(self_augmentation_experiments.prepare_experiment(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.reviews.generate" then domain(self_augmentation_experiments.generate_dossier(experiment_id: required(parameters,"experiment_id")))
+      when "self_augmentation.reviews.gate_a2.preview" then domain(self_augmentation_experiments.gate_a2_preview(experiment_id: required(parameters,"experiment_id")))
+      when "self_augmentation.reviews.gate_a2.execute" then domain(self_augmentation_experiments.approve_for_integration(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.model_qualification.preview" then domain(self_augmentation_experiments.model_qualification_preview(experiment_id: required(parameters,"experiment_id"), suite_id: required(parameters,"suite_id"), model_profile: required(parameters,"model_profile"), result: required(parameters,"result"), evidence_digest: required(parameters,"evidence_digest")))
+      when "self_augmentation.model_qualification.execute" then domain(self_augmentation_experiments.record_model_qualification(experiment_id: required(parameters,"experiment_id"), suite_id: required(parameters,"suite_id"), model_profile: required(parameters,"model_profile"), result: required(parameters,"result"), evidence_digest: required(parameters,"evidence_digest"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.experiments.cleanup.preview" then domain(self_augmentation_experiments.cleanup_preview(experiment_id: required(parameters,"experiment_id")))
+      when "self_augmentation.experiments.cleanup.execute" then domain(self_augmentation_experiments.cleanup(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -212,10 +225,10 @@ module SoulCore
         },
         "self_augmentation" => {
           "available" => true,
-          "stage" => "observe_and_propose",
-          "implementation_available" => false,
+          "stage" => "observe_propose_experiment_review",
+          "implementation_available" => "external_handoff_only",
           "automatic_codex_invocation" => false,
-          "worktree_creation" => false
+          "worktree_creation" => "human_gate_a1_only"
         },
         "unified_operations" => {
           "available" => true,
@@ -429,6 +442,10 @@ module SoulCore
 
     def self_augmentation
       @self_augmentation_service ||= SelfAugmentationService.new(root: @root, clock: @clock)
+    end
+
+    def self_augmentation_experiments
+      @self_augmentation_experiment_service ||= SelfAugmentationExperimentService.new(root: @root, clock: @clock)
     end
 
     def chat_projection(chat)
