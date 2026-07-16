@@ -10,6 +10,8 @@ module SoulCore
       evidence_followup
       artifact_creation_preview
       artifact_creation_control
+      capability_catalog
+      capability_info
       capability_gap
       deterministic_fallback
     ].freeze

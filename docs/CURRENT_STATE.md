@@ -58,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul milestone has completed human review of the Phase 12E unified Review Center, Phase 12D.4 proposal lifecycle closeout, Phase 12C.1 seven-day personal authentication, conversation-management amendments, dedicated Skill Studio artwork, and the protected local systemd/Caddy LAN deployment. Phase 12D.5 is now a candidate with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13 remains the integrated conversational acceptance and closeout point after human review.
+The Conversational Soul implementation is candidate-complete through Phase 13. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. Final milestone approval remains pending the owner's review; no release or tag has been created.
 
 Detailed references:
 
@@ -69,4 +69,7 @@ Detailed references:
 - `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`
 - `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
 - `docs/soul/PHASE12E_UNIFIED_REVIEW_CENTER_BRIEF.md`
+- `docs/soul/PHASE13A_INTEGRATED_ACCEPTANCE_HARNESS_BRIEF.md`
+- `docs/soul/PHASE13B_LOCAL_MODEL_AND_DASHBOARD_ACCEPTANCE_BRIEF.md`
+- `docs/soul/PHASE13C_CONVERSATIONAL_SOUL_CLOSEOUT_BRIEF.md`
 - `docs/soul/HUMAN_REVIEW_GATE.md`
