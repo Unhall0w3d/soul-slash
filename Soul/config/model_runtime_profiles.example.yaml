@@ -1,0 +1,9 @@
+schema_version: soul.model_runtime_profiles.v1
+default_profile: nvidia-fallback
+profiles:
+  - id: nvidia-fallback
+    label: NVIDIA fallback
+    service: llama-server.service
+  - id: amd-quality
+    label: AMD quality
+    service: soul-model-amd.service

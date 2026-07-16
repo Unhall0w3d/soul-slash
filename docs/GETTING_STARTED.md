@@ -37,7 +37,7 @@ Soul/ uses a local model runtime through an OpenAI-compatible API.
 
 ### Optional dashboard model controls
 
-Soul can manually load or unload one existing, explicitly configured `systemd --user` model service. This is opt-in and does not install, enable, download, or automatically switch anything:
+Soul can manually load or unload one existing, explicitly configured `systemd --user` model service. This is opt-in and does not install, enable, or download anything:
 
 ```text
 SOUL_MODEL_RUNTIME_CONTROL=1
@@ -46,7 +46,26 @@ SOUL_MODEL_RUNTIME_SLOTS_URL=http://127.0.0.1:8082/slots
 SOUL_MODEL_RUNTIME_PROFILE=nvidia-fallback
 ```
 
-The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.
+After the single-profile controls work, an optional ignored profile inventory
+can expose up to four services for manual, preview-gated switching:
+
+```bash
+cp Soul/config/model_runtime_profiles.example.yaml Soul/config/model_runtime_profiles.local.yaml
+```
+
+Then add this to the private `.env`:
+
+```text
+SOUL_MODEL_RUNTIME_PROFILES_FILE=Soul/config/model_runtime_profiles.local.yaml
+```
+
+Every profile must use the same configured loopback endpoint, slots endpoint,
+and model alias. The profile file contains only IDs, labels, and allowlisted user
+service names; machine paths and model arguments remain in private systemd unit
+configuration. A listed service that is not installed appears unavailable and
+cannot be selected. Switching is always manual and separately confirmed.
+
+The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload or switching while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.
 
 Supported providers:
 

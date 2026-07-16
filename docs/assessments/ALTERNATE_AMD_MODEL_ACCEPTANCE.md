@@ -217,9 +217,9 @@ evaluation invocation. It never survived the invocation.
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: repository owner
-Date:
-Decision summary:
+Date: 2026-07-16
+Decision summary: Approved the alternate-port AMD/Ministral acceptance and authorized a separate guarded runtime-profile slice.
 Required changes: none in this candidate; runtime profile/cutover remains separate
 ```

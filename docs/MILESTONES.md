@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Model Runtime Portability 1: bounded provider leases and manual dashboard load/unload control
+Model Runtime Portability 2A: portable inventory and preview-gated manual profile switching
 ```
 
-This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The first slice controls only one explicitly configured existing model user service. The AMD Vulkan build and same-device microbenchmark are complete; the alternate-port behavioral benchmark, profile cutover, and multi-profile switching remain separate review gates.
+This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, same-device microbenchmark, and alternate-port Soul behavioral benchmark are complete. The current candidate adds a strict portable inventory and guarded manual switching while leaving AMD unit installation and the first live provider cutover behind a separate review gate.
 
 See:
 

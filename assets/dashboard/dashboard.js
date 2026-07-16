@@ -368,10 +368,20 @@ function renderModelRuntime(runtime, message = "") {
   state.modelRuntime = runtime; const card = document.querySelector(".runtime-card"); const runtimeState = runtime.state || "unavailable"; card.dataset.state = runtimeState;
   byId("runtime-state-label").textContent = runtimeState.replaceAll("_", " ");
   byId("runtime-details").replaceChildren(
-    detailRow("Profile", runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
+    detailRow("Profile", runtime.profile_label || runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
     detailRow("Service", runtime.service || "control disabled"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
     detailRow("Server", runtime.server?.health || "unavailable")
   );
+  const profiles = byId("runtime-profile-list"); profiles.replaceChildren();
+  (runtime.profiles || []).forEach((profile) => {
+    const row = document.createElement("div"); row.className = "runtime-profile"; row.classList.toggle("is-active", profile.active === true);
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = profile.label || profile.id;
+    const meta = document.createElement("small"); meta.textContent = [profile.id, profile.service_state, profile.selected ? "selected" : null].filter(Boolean).join(" · "); copy.append(title, meta); row.append(copy);
+    let action = null; if (!profile.active && profile.service_state === "inactive" && runtime.can_load_profile) action = "load"; else if (!profile.active && profile.service_state === "inactive" && runtime.can_switch) action = "switch";
+    if (action) { const button = document.createElement("button"); button.type = "button"; button.className = "runtime-profile-action"; button.textContent = action; button.addEventListener("click", () => previewModelRuntime(action, profile.id)); row.append(button); }
+    else { const stateLabel = document.createElement("span"); stateLabel.className = "runtime-profile-state"; stateLabel.textContent = profile.active ? "active" : profile.service_state; row.append(stateLabel); }
+    profiles.append(row);
+  });
   byId("load-model-runtime").disabled = !runtime.can_load; byId("unload-model-runtime").disabled = !runtime.can_unload;
   byId("runtime-card-status").textContent = message || (runtime.configured ? "Manual only · no automatic load or idle unload" : "Configure runtime control in the private environment file to enable actions.");
 }
@@ -386,21 +396,23 @@ async function refreshModelRuntime({ automatic = false } = {}) {
   finally { button.disabled = false; }
 }
 
-async function previewModelRuntime(action) {
+async function previewModelRuntime(action, profileId = null) {
   state.modelRuntimePreview = null; const status = byId("runtime-card-status"); status.textContent = `Checking whether ${action} is safe…`;
   try {
-    const envelope = await callSoul(`model_runtime.${action}.preview`); const runtime = dataOf(envelope); renderModelRuntime(runtime);
+    const parameters = profileId ? { profile_id: profileId } : {};
+    const envelope = await callSoul(`model_runtime.${action}.preview`, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || `Model ${action} is blocked.`; return; }
-    state.modelRuntimePreview = { action, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
-    byId("model-runtime-dialog-title").textContent = action === "load" ? "Load model runtime" : "Unload model runtime";
-    byId("model-runtime-preview-title").textContent = action === "load" ? "Start the configured user service" : "Release model GPU memory";
+    state.modelRuntimePreview = { action, profileId, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
+    const actionTitle = action === "switch" ? "Switch model runtime" : `${action === "load" ? "Load" : "Unload"} model runtime`;
+    byId("model-runtime-dialog-title").textContent = actionTitle;
+    byId("model-runtime-preview-title").textContent = action === "switch" ? "Transfer the verified inference profile" : (action === "load" ? "Start the selected user service" : "Release model GPU memory");
     byId("model-runtime-preview-details").replaceChildren(
-      detailRow("Profile", runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
-      detailRow("Service", runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
+      detailRow("Current", runtime.profile_label || runtime.profile || "not configured"), detailRow("Target", runtime.target_profile?.label || runtime.target_profile?.id || runtime.profile || "not configured"),
+      detailRow("Service", runtime.target_profile?.service || runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
       detailRow("Slots", runtime.server?.slots_reachable ? `${runtime.server.active_slots} active / ${runtime.server.total_slots} total` : "offline")
     );
     byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; byId("model-runtime-confirmation").value = ""; byId("execute-model-runtime").disabled = true;
-    byId("execute-model-runtime").textContent = action === "load" ? "Load verified model runtime" : "Unload verified model runtime";
+    byId("execute-model-runtime").textContent = action === "switch" ? "Switch verified model runtime" : `${action === "load" ? "Load" : "Unload"} verified model runtime`;
     byId("model-runtime-dialog-status").textContent = "The runtime state will be checked again before the service changes."; byId("model-runtime-dialog").showModal();
   } catch (error) { status.textContent = error.message || `Model ${action} preview failed safely.`; }
 }
@@ -409,7 +421,8 @@ async function executeModelRuntime() {
   const preview = state.modelRuntimePreview; if (!preview || byId("model-runtime-confirmation").value !== preview.confirmation) return;
   const button = byId("execute-model-runtime"); const status = byId("model-runtime-dialog-status"); button.disabled = true; status.textContent = "Revalidating active work and service state…";
   try {
-    const envelope = await callSoul(`model_runtime.${preview.action}.execute`, { confirmation: preview.confirmation, expected_digest: preview.digest }); const runtime = dataOf(envelope); renderModelRuntime(runtime);
+    const parameters = { confirmation: preview.confirmation, expected_digest: preview.digest }; if (preview.profileId) parameters.profile_id = preview.profileId;
+    const envelope = await callSoul(`model_runtime.${preview.action}.execute`, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Runtime change was blocked safely."; state.modelRuntimePreview = null; return; }
     state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(`Model runtime ${preview.action} complete`); await refreshModelRuntime();
   } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }

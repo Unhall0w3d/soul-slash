@@ -44,9 +44,9 @@
 
 - [x] bounded model-runtime leases and manual dashboard load/unload candidate
 - [x] parallel AMD Vulkan llama.cpp build and same-device microbenchmark
-- [ ] alternate-port AMD server and Soul behavioral benchmark
+- [x] alternate-port AMD server and Soul behavioral benchmark
 - [ ] reviewed AMD primary/NVIDIA fallback profile cutover
-- [ ] preview-gated multi-profile switching
+- [x] preview-gated multi-profile switching candidate
 - [ ] reviewed Proxmox deployment
 - [ ] backup and disaster-recovery design
 - [ ] voice input

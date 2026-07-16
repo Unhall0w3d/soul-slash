@@ -129,6 +129,7 @@ dashboard-service-uninstall:
 
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb
+> @ruby scripts/verify-model-runtime-profile-switching.rb
 
 clean-runtime:
 > @rm -rf run tmp

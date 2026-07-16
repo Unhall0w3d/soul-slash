@@ -114,10 +114,12 @@ module SoulCore
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [status_collector.collect, "complete", "none", false]
       when "model_runtime.status" then domain(model_runtime_control.status)
-      when "model_runtime.load.preview" then domain(model_runtime_control.preview(action: "load"))
-      when "model_runtime.load.execute" then domain(model_runtime_control.execute(action: "load", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "model_runtime.unload.preview" then domain(model_runtime_control.preview(action: "unload"))
-      when "model_runtime.unload.execute" then domain(model_runtime_control.execute(action: "unload", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "model_runtime.load.preview" then domain(model_runtime_control.preview(action: "load", profile_id: parameters["profile_id"]))
+      when "model_runtime.load.execute" then domain(model_runtime_control.execute(action: "load", profile_id: parameters["profile_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "model_runtime.unload.preview" then domain(model_runtime_control.preview(action: "unload", profile_id: parameters["profile_id"]))
+      when "model_runtime.unload.execute" then domain(model_runtime_control.execute(action: "unload", profile_id: parameters["profile_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "model_runtime.switch.preview" then domain(model_runtime_control.preview(action: "switch", profile_id: required(parameters, "profile_id")))
+      when "model_runtime.switch.execute" then domain(model_runtime_control.execute(action: "switch", profile_id: required(parameters, "profile_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "configuration.show" then domain(configuration_report)
       when "configuration.explain" then domain(configuration_explain(parameters))
       when "configuration.validate" then domain(configuration_validate)
@@ -169,9 +171,11 @@ module SoulCore
           "manual_only" => true,
           "automatic_load" => false,
           "automatic_unload" => false,
+          "automatic_switch" => false,
           "status_operation" => "model_runtime.status",
           "load_gate" => "preview_digest_and_exact_confirmation",
-          "unload_gate" => "active_work_check_preview_digest_and_exact_confirmation"
+          "unload_gate" => "active_work_check_preview_digest_and_exact_confirmation",
+          "switch_gate" => "active_work_check_target_bound_preview_digest_and_exact_confirmation"
         },
         "skill_studio" => {
           "available" => true,

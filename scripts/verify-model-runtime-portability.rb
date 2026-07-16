@@ -29,6 +29,8 @@ class FakeRunner
   def run(*command, **_options)
     @commands << command
     case command[2]
+    when "show"
+      result(true, "loaded\n", 0)
     when "is-active"
       result(@state == "active", "#{@state}\n", @state == "active" ? 0 : 3)
     when "start"
