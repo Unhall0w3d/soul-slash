@@ -216,9 +216,10 @@ function openClearDialog() {
   byId("clear-confirmation").value = "";
   byId("forget-preview").hidden = true;
   byId("forget-confirmation").value = "";
+  byId("forget-confirmation-phrase").textContent = "preview required";
   byId("execute-forget").disabled = true;
-  byId("preview-forget").disabled = !state.activeChat;
-  byId("forget-dialog-status").textContent = state.activeChat ? `Selected: ${state.activeChat.title || state.activeChat.id}` : "Select one conversation before using delete & forget.";
+  byId("preview-forget").disabled = state.chats.length === 0;
+  byId("forget-dialog-status").textContent = "Permanent deletion requires a separate inventory preview and exact dynamic confirmation.";
   byId("clear-dialog-status").textContent = "Preview is required before archival.";
   byId("clear-dialog").showModal();
 }
@@ -241,7 +242,7 @@ function renderClearSelection() {
     const title = document.createElement("strong"); title.textContent = chat.title || "Untitled conversation";
     const id = document.createElement("small"); id.textContent = chat.id;
     copy.append(title, id); item.append(input, copy); list.append(item);
-    input.addEventListener("change", () => { updateClearSelectionCount(); resetClearPreview(); });
+    input.addEventListener("change", () => { updateClearSelectionCount(); resetConversationPreviews(); });
   });
   if (!state.chats.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No active conversations are available."; list.append(empty); }
   updateClearSelectionCount();
@@ -255,31 +256,34 @@ function setClearModeFields() {
 
 async function previewForget() {
   const status = byId("forget-dialog-status");
-  if (!state.activeChat) { status.textContent = "Select one conversation first."; return; }
   state.forgetPreview = null; byId("forget-preview").hidden = true; status.textContent = "Inventorying conversation-owned data…";
   try {
-    const envelope = await callSoul("chats.forget.preview", { chat_id: state.activeChat.id }); lifecycle(envelope);
+    const parameters = clearParameters();
+    const envelope = await callSoul("chats.forget_many.preview", parameters); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget preview blocked."; return; }
-    const data = dataOf(envelope); state.forgetPreview = { chatId: state.activeChat.id, digest: data.inventory_digest };
-    byId("forget-preview-summary").textContent = `${data.message_count} message${data.message_count === 1 ? "" : "s"}, ${data.memory_ids.length} linked memor${data.memory_ids.length === 1 ? "y" : "ies"}, and ${data.artifact_ids.length} artifact attachment${data.artifact_ids.length === 1 ? "" : "s"} identified.`;
+    const data = dataOf(envelope); state.forgetPreview = { parameters, digest: data.inventory_digest, confirmation: data.confirmation_phrase };
+    byId("forget-preview-summary").textContent = `${data.conversation_count} conversation${data.conversation_count === 1 ? "" : "s"}, ${data.message_count} message${data.message_count === 1 ? "" : "s"}, ${data.memory_count} unique linked memor${data.memory_count === 1 ? "y" : "ies"}, and ${data.artifact_attachment_count} artifact attachment${data.artifact_attachment_count === 1 ? "" : "s"} identified.`;
     const list = byId("forget-preview-list"); list.replaceChildren();
+    (data.records || []).forEach((record) => { const item = document.createElement("div"); item.className = "clear-preview-item"; const title = document.createElement("strong"); title.textContent = record.title || "Untitled conversation"; const detail = document.createElement("small"); detail.textContent = `${record.id} · ${record.message_count} message${record.message_count === 1 ? "" : "s"}`; item.append(title, detail); list.append(item); });
     [
-      `Delete permanently: ${(data.owned_files || []).filter((file) => file.exists).map((file) => file.kind).join(", ") || "no owned files"}`,
-      `Forget logically: ${data.memory_ids.length} shared memory record(s)`,
-      `Detach only: ${data.artifact_ids.length} artifact(s); artifact files remain`,
+      `Delete permanently: ${data.owned_file_count} conversation-owned file(s), ${data.owned_file_bytes} byte(s) total`,
+      `Forget logically: ${data.memory_count} unique shared memory record(s)`,
+      `Detach only: ${data.artifact_attachment_count} artifact attachment(s); artifact files remain`,
       `Retain: ${(data.retained || []).join("; ")}`
     ].forEach((copy) => { const item = document.createElement("div"); item.className = "clear-preview-item"; const text = document.createElement("strong"); text.textContent = copy; item.append(text); list.append(item); });
-    byId("forget-confirmation").value = ""; byId("execute-forget").disabled = true; byId("forget-preview").hidden = false; status.textContent = `Review the scope for ${state.activeChat.id}, then type the exact confirmation.`;
+    byId("forget-confirmation-phrase").textContent = data.confirmation_phrase;
+    byId("forget-confirmation").value = ""; byId("execute-forget").disabled = true; byId("forget-preview").hidden = false; status.textContent = "Review every conversation and aggregate count, then type the exact confirmation.";
   } catch (error) { status.textContent = error.message || "Delete-and-forget preview failed safely."; }
 }
 
 async function executeForget() {
-  if (!state.forgetPreview || byId("forget-confirmation").value !== "DELETE_AND_FORGET_CONVERSATION") return;
-  const status = byId("forget-dialog-status"); byId("execute-forget").disabled = true; status.textContent = "Deleting the verified conversation and forgetting linked memory…";
+  if (!state.forgetPreview || byId("forget-confirmation").value !== state.forgetPreview.confirmation) return;
+  const status = byId("forget-dialog-status"); byId("execute-forget").disabled = true; status.textContent = "Deleting the verified conversations and forgetting linked memory…";
   try {
-    const envelope = await callSoul("chats.forget.execute", { chat_id: state.forgetPreview.chatId, confirmation: "DELETE_AND_FORGET_CONVERSATION", expected_digest: state.forgetPreview.digest }); lifecycle(envelope);
+    const parameters = { ...state.forgetPreview.parameters, confirmation: state.forgetPreview.confirmation, expected_digest: state.forgetPreview.digest };
+    const envelope = await callSoul("chats.forget_many.execute", parameters); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Delete-and-forget blocked for human review."; state.forgetPreview = null; return; }
-    state.activeChat = null; state.forgetPreview = null; byId("clear-dialog").close(); await loadChats(true); announce("Conversation permanently deleted and linked memories forgotten");
+    const count = dataOf(envelope).conversation_count || 0; state.activeChat = null; state.forgetPreview = null; byId("clear-dialog").close(); await loadChats(true); announce(`${count} conversation${count === 1 ? "" : "s"} permanently deleted and linked memories forgotten`);
   } catch (error) { status.textContent = error.message || "Delete-and-forget failed safely."; }
 }
 
@@ -296,6 +300,20 @@ function resetClearPreview() {
   byId("clear-confirmation").value = "";
   byId("execute-clear").disabled = true;
   byId("clear-dialog-status").textContent = "Scope changed; preview again.";
+}
+
+function resetForgetPreview() {
+  state.forgetPreview = null;
+  byId("forget-preview").hidden = true;
+  byId("forget-confirmation").value = "";
+  byId("forget-confirmation-phrase").textContent = "preview required";
+  byId("execute-forget").disabled = true;
+  byId("forget-dialog-status").textContent = "Scope changed; preview permanent deletion again.";
+}
+
+function resetConversationPreviews() {
+  resetClearPreview();
+  resetForgetPreview();
 }
 
 async function previewClear() {
@@ -832,15 +850,15 @@ byId("execute-production-promotion").addEventListener("click", executeProduction
 byId("new-chat").addEventListener("click", createChat);
 byId("clear-chats").addEventListener("click", openClearDialog);
 byId("close-clear-dialog").addEventListener("click", () => byId("clear-dialog").close());
-byId("clear-mode").addEventListener("change", () => { setClearModeFields(); resetClearPreview(); });
-byId("clear-title").addEventListener("input", resetClearPreview);
-byId("select-all-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = true; }); updateClearSelectionCount(); resetClearPreview(); });
-byId("select-none-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = false; }); updateClearSelectionCount(); resetClearPreview(); });
+byId("clear-mode").addEventListener("change", () => { setClearModeFields(); resetConversationPreviews(); });
+byId("clear-title").addEventListener("input", resetConversationPreviews);
+byId("select-all-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = true; }); updateClearSelectionCount(); resetConversationPreviews(); });
+byId("select-none-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = false; }); updateClearSelectionCount(); resetConversationPreviews(); });
 byId("preview-clear").addEventListener("click", previewClear);
 byId("clear-confirmation").addEventListener("input", () => { byId("execute-clear").disabled = !state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS"; });
 byId("execute-clear").addEventListener("click", executeClear);
 byId("preview-forget").addEventListener("click", previewForget);
-byId("forget-confirmation").addEventListener("input", () => { byId("execute-forget").disabled = !state.forgetPreview || byId("forget-confirmation").value !== "DELETE_AND_FORGET_CONVERSATION"; });
+byId("forget-confirmation").addEventListener("input", () => { byId("execute-forget").disabled = !state.forgetPreview || byId("forget-confirmation").value !== state.forgetPreview.confirmation; });
 byId("execute-forget").addEventListener("click", executeForget);
 byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);

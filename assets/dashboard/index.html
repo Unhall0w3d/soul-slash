@@ -323,9 +323,9 @@
   </dialog>
   <dialog id="clear-dialog" class="clear-dialog" aria-labelledby="clear-dialog-title">
     <form id="clear-form" method="dialog">
-      <div class="dialog-heading"><div><p class="eyebrow">Conversation lifecycle</p><h2 id="clear-dialog-title">Clear conversations</h2></div><button id="close-clear-dialog" class="icon-button" type="button" aria-label="Close clear conversations dialog">×</button></div>
-      <p class="dialog-note">Clearing archives conversation metadata so it leaves the active list. Transcripts remain stored locally and are not deleted.</p>
-      <label for="clear-mode">Clear scope</label>
+      <div class="dialog-heading"><div><p class="eyebrow">Conversation lifecycle</p><h2 id="clear-dialog-title">Manage conversations</h2></div><button id="close-clear-dialog" class="icon-button" type="button" aria-label="Close conversation management dialog">×</button></div>
+      <p class="dialog-note">Choose one scope below, then either archive it from the active list or permanently delete it. Each action has its own preview and confirmation.</p>
+      <label for="clear-mode">Conversation scope</label>
       <select id="clear-mode" name="mode">
         <option value="title">Exact title</option>
         <option value="selected">Selected conversations</option>
@@ -346,7 +346,12 @@
         </div>
         <div id="clear-selection-list" class="clear-selection-list" role="group" aria-labelledby="clear-selection-label"></div>
       </div>
-      <button id="preview-clear" class="dialog-button" type="button">Preview matches</button>
+      <section aria-labelledby="archive-heading">
+        <p class="eyebrow">Reversible list cleanup</p>
+        <h3 id="archive-heading">Archive this scope</h3>
+        <p>Removes matching conversations from the active list. Transcripts and related data remain stored locally.</p>
+        <button id="preview-clear" class="dialog-button" type="button">Preview archive</button>
+      </section>
       <section id="clear-preview" class="clear-preview" aria-live="polite" hidden>
         <h3>Verified preview</h3>
         <p id="clear-preview-summary"></p>
@@ -357,16 +362,16 @@
       </section>
       <section class="forget-panel" aria-labelledby="forget-heading">
         <p class="eyebrow">Irreversible deletion</p>
-        <h3 id="forget-heading">Delete &amp; forget selected conversation</h3>
-        <p>Deletes the selected transcript, chat metadata, conversation state, and grounded evidence. Linked shared memories are logically forgotten; artifact files and append-only safety records remain.</p>
-        <button id="preview-forget" class="dialog-button" type="button">Preview selected conversation</button>
+        <h3 id="forget-heading">Permanently delete this scope</h3>
+        <p>Deletes every matching transcript, chat metadata record, conversation state, and grounded evidence file. Linked shared memories are logically forgotten; artifact files and append-only safety records remain. This cannot be undone.</p>
+        <button id="preview-forget" class="dialog-button destructive-button" type="button">Preview permanent deletion</button>
         <section id="forget-preview" class="clear-preview" aria-live="polite" hidden>
           <h3>Destructive-action preview</h3>
           <p id="forget-preview-summary"></p>
           <div id="forget-preview-list" class="clear-preview-list"></div>
-          <label for="forget-confirmation">Type <code>DELETE_AND_FORGET_CONVERSATION</code> to confirm</label>
+          <label for="forget-confirmation">Type <code id="forget-confirmation-phrase"></code> to confirm</label>
           <input id="forget-confirmation" name="forget-confirmation" type="text" autocomplete="off" spellcheck="false">
-          <button id="execute-forget" class="danger-button destructive-button" type="button" disabled>Permanently delete selected conversation</button>
+          <button id="execute-forget" class="danger-button destructive-button" type="button" disabled>Permanently delete previewed conversations</button>
         </section>
         <p id="forget-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
       </section>

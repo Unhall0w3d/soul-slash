@@ -103,6 +103,8 @@ module SoulCore
       when "chats.clear.execute" then domain(conversation_clear_service.execute(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "chats.forget.preview" then domain(conversation_forget_service.preview(chat_id: required(parameters, "chat_id")))
       when "chats.forget.execute" then domain(conversation_forget_service.execute(chat_id: required(parameters, "chat_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "chats.forget_many.preview" then domain(conversation_forget_service.preview_many(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"]))
+      when "chats.forget_many.execute" then domain(conversation_forget_service.execute_many(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "workspace.list" then domain(workspace.list(**workspace_filters(parameters)))
       when "workspace.chat" then domain(workspace.list(**workspace_filters(parameters, require_chat: true)))
       when "workspace.detail" then domain(workspace.detail(artifact_id: required(parameters, "artifact_id")))

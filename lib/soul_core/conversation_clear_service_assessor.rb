@@ -125,7 +125,7 @@ module SoulCore
         html = File.read(File.join(@root, "assets/dashboard/index.html"))
         js = File.read(File.join(@root, "assets/dashboard/dashboard.js"))
         checks["dashboard_requires_preview_and_exact_confirmation"] =
-          html.include?("Transcripts remain stored locally") && html.include?("CLEAR_CONVERSATIONS") &&
+          html.include?("Transcripts and related data remain stored locally") && html.include?("CLEAR_CONVERSATIONS") &&
           html.include?('option value="selected"') && html.include?('id="clear-selection-list"') &&
           js.include?('callSoul("chats.clear.preview"') && js.include?('callSoul("chats.clear.execute"') &&
           js.include?("chat_ids: selectedClearChatIds()") &&

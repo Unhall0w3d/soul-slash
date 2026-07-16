@@ -32,6 +32,8 @@ module SoulCore
       "chats.clear.execute" => %w[mode title chat_ids confirmation expected_digest],
       "chats.forget.preview" => %w[chat_id],
       "chats.forget.execute" => %w[chat_id confirmation expected_digest],
+      "chats.forget_many.preview" => %w[mode title chat_ids],
+      "chats.forget_many.execute" => %w[mode title chat_ids confirmation expected_digest],
       "workspace.list" => %w[kind lifecycle privacy delivery_state limit],
       "workspace.chat" => %w[chat_id kind lifecycle privacy delivery_state limit],
       "workspace.detail" => %w[artifact_id],

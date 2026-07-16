@@ -106,11 +106,11 @@ module SoulCore
 
         html = File.read(File.join(@root, "assets/dashboard/index.html"))
         js = File.read(File.join(@root, "assets/dashboard/dashboard.js"))
-        checks["dashboard_requires_preview_exact_confirmation_and_selected_id"] =
-          html.include?("DELETE_AND_FORGET_CONVERSATION") && html.include?("append-only safety records remain") &&
-          js.include?('callSoul("chats.forget.preview"') && js.include?('callSoul("chats.forget.execute"') &&
-          js.index('callSoul("chats.forget.preview"') < js.index('callSoul("chats.forget.execute"') &&
-          js.include?('value !== "DELETE_AND_FORGET_CONVERSATION"') && !js.include?("innerHTML")
+        checks["dashboard_exposes_separate_scoped_bulk_permanent_route"] =
+          html.include?("forget-confirmation-phrase") && html.include?("append-only safety records remain") &&
+          js.include?('callSoul("chats.forget_many.preview"') && js.include?('callSoul("chats.forget_many.execute"') &&
+          js.index('callSoul("chats.forget_many.preview"') < js.index('callSoul("chats.forget_many.execute"') &&
+          js.include?("state.forgetPreview.confirmation") && !js.include?("innerHTML")
 
         details["deleted_chat_id"] = chat_id
         details["logically_deleted_memory_count"] = executed.dig("data", "memory_ids_logically_deleted").length
