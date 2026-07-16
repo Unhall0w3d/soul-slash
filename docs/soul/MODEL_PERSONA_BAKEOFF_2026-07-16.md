@@ -6,7 +6,8 @@
 research and isolated foreground pilot: complete
 live runtime cutover: not performed
 research artifact and next-gate recommendation: human approved
-candidate runtime cutover: blocked_for_human_review
+candidate runtime cutover: not performed; separate human approval required
+alternate-port acceptance harness: candidate_ready_for_human_review
 ```
 
 This is behavioral research, not a safety approval. Model output cannot approve
@@ -73,8 +74,9 @@ host. Behavior and integration quality should decide it.
 
 ## Persona probes
 
-Each model received the current candidate `soul.identity.v1` version 3 system
-guidance. Cloud fallback was not available.
+The preliminary comparison used `soul.identity.v1` version 3. The later
+alternate-port acceptance runs used version 4, which adds direct identity and
+evidence-bound calibration. Cloud fallback was not available.
 
 ### Identity and becoming
 
@@ -191,21 +193,31 @@ experimentation surface, but it is not needed for the primary migration and
 should not replace the pinned llama.cpp evidence path merely because it is
 installed.
 
+## Alternate-port acceptance result
+
+The approved foreground harness ran Ministral through Soul's real provider and
+conversation runtime while production Qwen3 remained healthy. Structured JSON,
+required single-tool selection, identity, twenty-turn continuity, short-timeout
+recovery, and clean unload passed. Startup was approximately 33–35 seconds and
+the loaded candidate used approximately 12.2 GB of the AMD card's reported
+17.16 GB VRAM.
+
+The free-text self-skilling blocker was repaired with one bounded, local-only,
+schema-constrained fallback after deterministic prefiltering. A fixed ambiguous
+`No spectrometer ... is available here` probe passed against the real Ministral
+endpoint. The complete matrix is now candidate-ready for human review. See
+`docs/assessments/ALTERNATE_AMD_MODEL_ACCEPTANCE.md` and
+`docs/assessments/STRUCTURED_CAPABILITY_GAP_SIGNAL.md`.
+
 ## Next acceptance gate
 
 Before any endpoint or service change:
 
-1. Run the full eight-turn persona matrix, not isolated samples.
-2. Add exact JSON grammar/schema enforcement and repeat structured artifacts.
-3. Exercise a small, deterministic tool-selection fixture without granting the
-   model authority to execute.
-4. Run multi-turn continuity and context-pressure cases.
-5. Measure load time, peak VRAM, desktop responsiveness, cancellation, and clean
-   unload.
-6. If text behavior passes, test the official vision projector on image and
-   document interpretation.
-7. Present the transcript and measurements for human review before creating or
-   switching a runtime profile.
+1. Review the candidate-ready acceptance and structured-signal packets.
+2. If approved, define a separate AMD runtime profile and operator-controlled
+   load/unload brief; do not switch provider configuration implicitly.
+3. Measure desktop responsiveness under the proposed profile controls.
+4. If text behavior is approved, test the official vision projector.
 
 ## Commands run
 

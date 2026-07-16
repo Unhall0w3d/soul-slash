@@ -11,6 +11,7 @@ module SoulCore
     MESSAGE_ROLES = %w[system user assistant tool].freeze
     CAPABILITIES = %w[chat streaming tools structured_output reasoning_control embeddings].freeze
     RESPONSE_FORMAT_TYPES = %w[text json_object json_schema].freeze
+    TOOL_CHOICES = %w[auto none required].freeze
     REASONING_MODES = %w[default disabled].freeze
     MAX_RESPONSE_FORMAT_BYTES = 65_536
 
@@ -102,6 +103,7 @@ module SoulCore
                   :temperature,
                   :max_output_tokens,
                   :tools,
+                  :tool_choice,
                   :response_format,
                   :reasoning_mode,
                   :privacy_requirement,
@@ -115,6 +117,7 @@ module SoulCore
         temperature: nil,
         max_output_tokens: nil,
         tools: [],
+        tool_choice: nil,
         response_format: nil,
         reasoning_mode: "default",
         privacy_requirement: "local_only",
@@ -129,6 +132,7 @@ module SoulCore
         @temperature = temperature
         @max_output_tokens = max_output_tokens
         @tools = Array(tools).map { |tool| stringify_keys(tool) }.freeze
+        @tool_choice = tool_choice&.to_s
         @response_format = normalize_response_format(response_format)
         @reasoning_mode = reasoning_mode.to_s
         @privacy_requirement = privacy_requirement.to_s
@@ -159,6 +163,8 @@ module SoulCore
         end
 
         errors.concat(response_format_validation_errors)
+        errors << "unsupported tool_choice: #{tool_choice}" if tool_choice && !TOOL_CHOICES.include?(tool_choice)
+        errors << "tool_choice requires at least one declared tool" if tool_choice && tools.empty?
         if !response_format.nil? && !tools.empty?
           errors << "response_format cannot be combined with tools in this contract version"
         end
@@ -180,6 +186,7 @@ module SoulCore
           "temperature" => temperature,
           "max_output_tokens" => max_output_tokens,
           "tools" => tools,
+          "tool_choice" => tool_choice,
           "response_format" => response_format,
           "reasoning_mode" => reasoning_mode,
           "privacy_requirement" => privacy_requirement,

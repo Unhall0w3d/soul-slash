@@ -35,6 +35,15 @@ module SoulCore
         )
       end
 
+      if !request.tools.empty? && !provider.supports?("tools")
+        return error_response(
+          provider: provider,
+          request: request,
+          type: "unsupported_capability",
+          message: "Provider #{provider.id} does not declare tools support"
+        )
+      end
+
       if request.reasoning_mode == "disabled" && !provider.supports?("reasoning_control")
         return error_response(
           provider: provider,
@@ -107,6 +116,8 @@ module SoulCore
       }.reject { |_key, value| value.nil? }
 
       payload["tools"] = request.tools unless request.tools.empty?
+      payload["tool_choice"] = request.tool_choice if request.tool_choice
+      payload["parallel_tool_calls"] = false if request.tool_choice == "required"
       payload["response_format"] = request.response_format if request.response_format
       if request.reasoning_mode == "disabled"
         payload["chat_template_kwargs"] = { "enable_thinking" => false }

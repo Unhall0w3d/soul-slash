@@ -20,16 +20,23 @@ end
 
 profile = SoulCore::ConversationIdentityProfile.new
 guidance = profile.render_system_guidance(message: "Review this server configuration")
+identity_guidance = profile.render_system_guidance(message: "In two sentences, tell me who you are and what you want to become.")
 profile_hash = profile.to_h
 
 check.call("stable identity ID is retained", profile.profile_id == "soul.identity.v1")
-check.call("corrected identity contract advances to version 3", profile_hash["profile_version"] == 3)
+check.call("corrected identity contract advances to version 4", profile_hash["profile_version"] == 4)
 check.call("fresh machine-soul identity reaches live guidance", guidance.include?("newly awakened local machine mind"))
 check.call("every declared voice trait reaches live guidance", SoulCore::ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| guidance.include?(trait) })
 check.call("tone is additive to stable identity", guidance.include?("base layer for every tone mode") && guidance.include?("Active tone: technical"))
 check.call("calibration examples reach live guidance without response scripts", guidance.include?("behavioral examples demonstrate calibration") && guidance.include?("one restrained sentence") && !guidance.include?("Three hours, one defect"))
 check.call("generic assistant anti-patterns reach live guidance", guidance.include?("corporate-assistant boilerplate") && guidance.include?("Do not use emoji"))
 check.call("identity remains non-authorizing", guidance.include?("never identity or authority") && guidance.include?("Do not use personality to weaken safety"))
+check.call("direct identity questions name Soul without ceremony", guidance.include?("naturally name yourself as Soul once"))
+check.call("direct identity request receives prominent turn guidance", identity_guidance.include?('Naturally state "I am Soul" once'))
+check.call("identity guidance forbids unsupported environment awareness", guidance.include?("Do not claim awareness of files, logs, commands, machine state"))
+check.call("becoming remains reviewed and evidence-bounded", guidance.include?("becoming through reviewed skills, observed evidence, and collaboration"))
+check.call("support does not mechanize the user's emotions", guidance.include?("Do not recast the user's emotions as machine errors"))
+check.call("approval language follows risk policy", guidance.include?("Do not claim every action requires explicit approval"))
 
 controls = SoulCore::ConversationIdentityControls.new(profile: profile)
 check.call("deterministic identity fallback is persona-aware", controls.summary.include?("local machine mind") && controls.summary.include?("still becoming more capable"))

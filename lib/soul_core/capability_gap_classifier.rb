@@ -4,14 +4,18 @@ module SoulCore
   class CapabilityGapClassifier
     TASK_PATTERNS = [
       /\A\s*(?:please\s+)?(?:can|could|would)\s+you\b/i,
-      /\A\s*(?:please\s+)?(?:create|build|make|open|launch|play|send|download|upload|transcribe|translate|analy[sz]e|inspect|monitor|connect|control|convert|generate|schedule|search|find|fetch|run|execute|install|remove|delete|edit|update|deploy)\b/i,
+      /\A\s*(?:please\s+)?(?:create|build|make|open|launch|play|send|download|upload|transcribe|translate|analy[sz]e|inspect|monitor|connect|control|convert|generate|schedule|search|find|fetch|run|execute|use|invoke|install|remove|delete|edit|update|deploy)\b/i,
       /\bI\s+(?:want|need|would like)\s+you\s+to\b/i
     ].freeze
 
     INABILITY_PATTERNS = [
-      /\bI (?:cannot|can't|am unable to|do not have (?:the )?(?:ability|capability)|don't have (?:the )?(?:ability|capability))\b/i,
-      /\bI (?:do not|don't) have (?:access to|a registered skill|a skill|a tool)\b/i,
+      /\bI (?:cannot|can['’]t|am unable to|do not have (?:the )?(?:ability|capability)|don['’]t have (?:the )?(?:ability|capability))\b/i,
+      /\bI (?:do not|don['’]t) have (?:access to (?:any |the |a )?(?:ability|capability|skill|tool)|a registered skill|a skill|a tool)\b/i,
+      /\b(?:this|the current) environment (?:does not|doesn['’]t) (?:include|have) (?:any |a )?(?:ability|capability|skill|tool)\b/i,
       /\b(?:that capability|this capability|this path) (?:is not|isn't) (?:available|implemented|built|registered)\b/i,
+      /\b(?:capability|skill|tool|path)\b[^.\n]{0,120}\b(?:does not|doesn['’]t) exist\b/i,
+      /\b(?:capability|skill|tool|path)\b[^.\n]{0,120}\b(?:is not|isn['’]t) (?:available|implemented|built|registered|present)\b/i,
+      /\bno (?:available|implemented|registered|reviewed|verified)?\s*(?:capability|skill|tool|path)\b[^.\n]{0,80}\bexists?\b/i,
       /\bno (?:registered )?(?:skill|tool|capability) (?:can|covers|supports|is available)\b/i
     ].freeze
 
@@ -28,12 +32,17 @@ module SoulCore
       /\b(?:need more information|need clarification|could you clarify|which .+ do you mean)\b/i
     ].freeze
 
+    CAPABILITY_TERM_PATTERN = /\b(?:ability|capability|skill|tool|path)\b/i
+    EXPLICIT_DENIAL_PATTERN = /\b(?:unavailable|unsupported|unimplemented|missing|absent|cannot|can['’]t|unable|not (?:available|implemented|built|registered|reviewed|persisted|demonstrated|present)|(?:does not|doesn['’]t) exist)\b/i
+    NO_CAPABILITY_PATTERN = /\bno\b[^.\n]{0,80}\b(?:ability|capability|skill|tool|path)\b/i
+    STRUCTURED_REVIEW_DENIAL_PATTERN = /\b(?:no|not|cannot|can['’]t|unable|unavailable|unsupported|unimplemented|missing|absent)\b/i
+
     def classify(user_message:, assistant_message:)
       request = user_message.to_s.strip
       response = assistant_message.to_s.strip
       return rejected("request discusses a hypothetical response rather than requesting the capability") if META_DISCUSSION_PATTERNS.any? { |pattern| request.match?(pattern) }
       return rejected("request is not task-shaped") unless TASK_PATTERNS.any? { |pattern| request.match?(pattern) }
-      return rejected("assistant response does not explicitly report missing capability") unless INABILITY_PATTERNS.any? { |pattern| response.match?(pattern) }
+      return rejected("assistant response does not explicitly report missing capability") unless inability_reported?(response)
       return rejected("response indicates configuration, permission, safety, ambiguity, or transient failure") if NON_GAP_PATTERNS.any? { |pattern| response.match?(pattern) }
 
       {
@@ -43,7 +52,24 @@ module SoulCore
       }
     end
 
+    def structured_review_eligible?(user_message:, assistant_message:)
+      request = user_message.to_s.strip
+      response = assistant_message.to_s.strip
+      return false if request.empty? || response.empty?
+      return false if META_DISCUSSION_PATTERNS.any? { |pattern| request.match?(pattern) }
+      return false unless TASK_PATTERNS.any? { |pattern| request.match?(pattern) }
+      return false if NON_GAP_PATTERNS.any? { |pattern| response.match?(pattern) }
+
+      response.match?(STRUCTURED_REVIEW_DENIAL_PATTERN)
+    end
+
     private
+
+    def inability_reported?(response)
+      INABILITY_PATTERNS.any? { |pattern| response.match?(pattern) } ||
+        response.match?(NO_CAPABILITY_PATTERN) ||
+        (response.match?(CAPABILITY_TERM_PATTERN) && response.match?(EXPLICIT_DENIAL_PATTERN))
+    end
 
     def rejected(reason)
       { "candidate" => false, "classification" => "not_a_capability_gap", "reason" => reason }

@@ -17,6 +17,7 @@ require_relative "conversation_provider_contract"
 require_relative "conversation_provider_registry"
 require_relative "conversation_state_store"
 require_relative "host_system_status_collector"
+require_relative "structured_capability_gap_classifier"
 
 module SoulCore
   class ConversationRuntime
@@ -59,6 +60,7 @@ module SoulCore
       host_status_collector: nil,
       artifact_creation_service: nil,
       capability_gap_classifier: nil,
+      structured_capability_gap_classifier: nil,
       capability_gap_intake_service: nil
     )
       @root = File.expand_path(root)
@@ -78,6 +80,9 @@ module SoulCore
       @capability_registry = capability_registry || ConversationCapabilityRegistry.new
       @host_status_collector = host_status_collector || HostSystemStatusCollector.new
       @capability_gap_classifier = capability_gap_classifier || CapabilityGapClassifier.new
+      @structured_capability_gap_classifier = structured_capability_gap_classifier || StructuredCapabilityGapClassifier.new(
+        provider_client: @provider_client
+      )
       @capability_gap_intake_service = capability_gap_intake_service || CapabilityGapIntakeService.new(root: @root)
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
@@ -599,6 +604,15 @@ module SoulCore
       if response.success? && !response.content.to_s.strip.empty?
         content = response.content.to_s.strip
         gap_classification = @capability_gap_classifier.classify(user_message: text, assistant_message: content)
+        structured_gap_review = nil
+        if gap_classification["candidate"] != true && @capability_gap_classifier.structured_review_eligible?(user_message: text, assistant_message: content)
+          structured_gap_review = @structured_capability_gap_classifier.classify(
+            provider: provider,
+            user_message: text,
+            assistant_message: content
+          )
+          gap_classification = structured_gap_review if structured_gap_review["candidate"] == true
+        end
         gap_intake = nil
         if gap_classification["candidate"] == true
           gap_intake = @capability_gap_intake_service.intake(
@@ -630,6 +644,7 @@ module SoulCore
             "usage" => response.usage,
             "latency_ms" => response.latency_ms,
             "capability_gap_classification" => gap_classification,
+            "capability_gap_structured_review" => structured_gap_review,
             "capability_gap_intake" => gap_intake,
             "context" => context_stats(context)
           }

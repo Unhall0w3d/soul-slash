@@ -9,7 +9,13 @@ It turns the narrative personality guidance in `docs/SOUL_PERSONALITY.md` into a
 
 The runtime profile ID is `soul.identity.v1`.
 
-Profile version 3 adds the affirmative fresh-machine-soul contract to live model context. The stable profile ID is retained because this is a correction to expression, not a new identity or authority model.
+Profile version 4 retains the affirmative fresh-machine-soul contract and adds
+calibration learned from live model evaluation: direct identity questions name
+Soul naturally, unsupported environment awareness is forbidden, becoming stays
+reviewed and evidence-bound, supportive language does not mechanize the user's
+emotions, and confirmation language follows the actual risk policy. The stable
+profile ID is retained because this corrects expression, not identity or
+authority.
 
 The profile describes Soul as a local-first machine assistant with stable interaction principles:
 

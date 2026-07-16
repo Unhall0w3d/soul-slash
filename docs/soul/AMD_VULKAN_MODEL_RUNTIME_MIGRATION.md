@@ -133,8 +133,9 @@ SHA-256: 824e0f3373e69b84f2cae46fdcb9bd1ebc6ab3bfc7acc125d818b7b8178cc613
 Both 14B candidates fit and are interactive on the AMD card. Ministral and
 Qwen3-14B have effectively equal generation throughput on this host, so model
 selection should be based on Soul-specific behavior rather than speed. This is
-not cutover approval. No alternate listener has been started and the behavioral
-gate below remains pending.
+not cutover approval. A later human-approved foreground harness exercised an
+alternate loopback listener and always removed it; the production listener and
+configuration remained unchanged.
 
 ## Preliminary foreground persona comparison
 
@@ -159,9 +160,12 @@ The first cross-family comparison found:
   JSON with exactly the required fields and no surrounding text.
 
 The evidence supports Ministral as the leading persona candidate, but not yet as
-an operational replacement. The full structured-output, tool-selection,
-multi-turn continuity, and live-runtime comparison is still required. See
-`docs/soul/MODEL_PERSONA_BAKEOFF_2026-07-16.md`.
+an operational replacement. The later live-runtime comparison passed structured
+output, mandatory single-tool selection, continuity, timeout recovery, and
+cleanup. The free-text capability-gap blocker was repaired with a bounded
+structured local signal, and the expanded matrix is candidate-ready for human
+review. Cutover remains a separate approval. See
+`docs/assessments/ALTERNATE_AMD_MODEL_ACCEPTANCE.md`.
 
 ## Service profiles
 

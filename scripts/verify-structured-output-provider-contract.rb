@@ -104,6 +104,17 @@ tools_and_schema = Contract::RequestEnvelope.new(
 )
 check("tools and structured output cannot be mixed", tools_and_schema.validation_errors.any? { |item| item.include?("cannot be combined") }, errors)
 
+required_tool = Contract::RequestEnvelope.new(
+  conversation_id: "required-tool-test",
+  messages: [{ role: "user", content: "Choose one tool." }],
+  tools: [{ type: "function", function: { name: "status", parameters: { type: "object" } } }],
+  tool_choice: "required"
+)
+check("required tool choice validates with declared tools", required_tool.valid?, errors)
+check("tool choice is preserved by the request contract", required_tool.to_h["tool_choice"] == "required", errors)
+check("tool choice without tools is rejected", Contract::RequestEnvelope.new(conversation_id: "missing-tools", messages: [{ role: "user", content: "Choose." }], tool_choice: "required").validation_errors.any? { |item| item.include?("requires at least one") }, errors)
+check("unsupported tool choice is rejected", Contract::RequestEnvelope.new(conversation_id: "bad-choice", messages: [{ role: "user", content: "Choose." }], tools: required_tool.tools, tool_choice: "sometimes").validation_errors.any? { |item| item.include?("unsupported tool_choice") }, errors)
+
 Dir.mktmpdir("soul-structured-output-") do |root|
   openai_client = CapturingProviderClient.new(root: root)
   openai_response = openai_client.chat(
@@ -114,6 +125,16 @@ Dir.mktmpdir("soul-structured-output-") do |root|
   openai_payload = openai_client.payloads.first.fetch("payload")
   check("OpenAI-compatible transport forwards response_format", openai_response.success? && openai_payload["response_format"] == valid.response_format, errors)
   check("OpenAI-compatible structured request disables thinking", openai_payload["chat_template_kwargs"] == { "enable_thinking" => false }, errors)
+
+  tool_client = CapturingProviderClient.new(root: root)
+  tool_response = tool_client.chat(
+    provider: provider(id: "test.tools", transport: "openai_compatible", capabilities: %w[chat tools]),
+    request: required_tool,
+    timeout_seconds: 2
+  )
+  tool_payload = tool_client.payloads.first.fetch("payload")
+  check("OpenAI-compatible transport forwards required tool choice", tool_response.success? && tool_payload["tool_choice"] == "required", errors)
+  check("required tool selection disables parallel calls", tool_payload["parallel_tool_calls"] == false, errors)
 
   ollama_client = CapturingProviderClient.new(root: root)
   ollama_response = ollama_client.chat(
@@ -132,6 +153,14 @@ Dir.mktmpdir("soul-structured-output-") do |root|
     timeout_seconds: 2
   )
   check("undeclared structured-output capability fails before network", !unsupported.success? && unsupported.error["type"] == "unsupported_capability" && unsupported_client.payloads.empty?, errors)
+
+  unsupported_tools_client = CapturingProviderClient.new(root: root)
+  unsupported_tools = unsupported_tools_client.chat(
+    provider: provider(id: "test.no-tools", transport: "openai_compatible", capabilities: %w[chat]),
+    request: required_tool,
+    timeout_seconds: 2
+  )
+  check("undeclared tools capability fails before network", !unsupported_tools.success? && unsupported_tools.error["type"] == "unsupported_capability" && unsupported_tools_client.payloads.empty?, errors)
 
   no_reasoning_client = CapturingProviderClient.new(root: root)
   no_reasoning_control = no_reasoning_client.chat(
