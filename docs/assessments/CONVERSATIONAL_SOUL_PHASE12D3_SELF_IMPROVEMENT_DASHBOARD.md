@@ -150,3 +150,17 @@ outcome: approved
 ```
 
 The owner reviewed the live Self Improvement tab in Opera GX and approved the visual and product slice. Repository merge remains a separate explicit gate.
+
+## 2026-07-16 bounded-lifecycle repair
+
+The owner reported that a manual Model Runtime assessment could remain visibly at `models · running` for more than an hour. Live inspection found no model assessment or inference job still executing; the model and dashboard services were healthy. The UI had entered its running state but did not replace that label when the request failed, and the service lacked one total assessment deadline around its individually bounded probes.
+
+Candidate repair:
+
+- all Self Improvement assessments have a 30-second backend foreground deadline;
+- an overrun terminates as `failed` with no mutation;
+- manual dashboard assessment requests have a 35-second browser deadline;
+- every manual failure visibly changes the scope from `running` to `failed` and re-enables assessment controls;
+- deterministic verification includes a deliberately slow model assessor.
+
+No model, service, package, proposal, memory, or host state is changed by this repair.

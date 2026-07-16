@@ -35,6 +35,19 @@ Recommended tools:
 
 Soul/ uses a local model runtime through an OpenAI-compatible API.
 
+### Optional dashboard model controls
+
+Soul can manually load or unload one existing, explicitly configured `systemd --user` model service. This is opt-in and does not install, enable, download, or automatically switch anything:
+
+```text
+SOUL_MODEL_RUNTIME_CONTROL=1
+SOUL_MODEL_RUNTIME_SERVICE=llama-server.service
+SOUL_MODEL_RUNTIME_SLOTS_URL=http://127.0.0.1:8082/slots
+SOUL_MODEL_RUNTIME_PROFILE=nvidia-fallback
+```
+
+The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.
+
 Supported providers:
 
 - llama.cpp server

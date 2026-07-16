@@ -14,6 +14,7 @@ require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
+require_relative "model_runtime_control_service"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
@@ -38,6 +39,7 @@ module SoulCore
       conversation_forget_service: nil,
       workspace_service: nil,
       status_collector: nil,
+      model_runtime_control_service: nil,
       approval_store: nil,
       activity_store: nil,
       skill_registry: nil,
@@ -54,6 +56,7 @@ module SoulCore
       @conversation_forget_service = conversation_forget_service
       @workspace_service = workspace_service
       @status_collector = status_collector
+      @model_runtime_control_service = model_runtime_control_service
       @approval_store = approval_store
       @activity_store = activity_store
       @skill_registry = skill_registry
@@ -108,6 +111,11 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [status_collector.collect, "complete", "none", false]
+      when "model_runtime.status" then domain(model_runtime_control.status)
+      when "model_runtime.load.preview" then domain(model_runtime_control.preview(action: "load"))
+      when "model_runtime.load.execute" then domain(model_runtime_control.execute(action: "load", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "model_runtime.unload.preview" then domain(model_runtime_control.preview(action: "unload"))
+      when "model_runtime.unload.execute" then domain(model_runtime_control.execute(action: "unload", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "configuration.show" then domain(configuration_report)
       when "configuration.explain" then domain(configuration_explain(parameters))
       when "configuration.validate" then domain(configuration_validate)
@@ -154,6 +162,15 @@ module SoulCore
         },
         "providers" => providers,
         "system_status" => { "collected" => false, "refresh_operation" => "system_status.refresh" },
+        "model_runtime" => {
+          "available" => true,
+          "manual_only" => true,
+          "automatic_load" => false,
+          "automatic_unload" => false,
+          "status_operation" => "model_runtime.status",
+          "load_gate" => "preview_digest_and_exact_confirmation",
+          "unload_gate" => "active_work_check_preview_digest_and_exact_confirmation"
+        },
         "skill_studio" => {
           "available" => true,
           "phase" => "12D.5",
@@ -349,6 +366,13 @@ module SoulCore
 
     def status_collector
       @status_collector ||= HostSystemStatusCollector.new
+    end
+
+    def model_runtime_control
+      return @model_runtime_control_service if @model_runtime_control_service
+
+      _report, resolver = resolved_configuration
+      @model_runtime_control_service ||= ModelRuntimeControlService.new(root: @root, env: resolver.effective_environment)
     end
 
     def approval_store

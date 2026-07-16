@@ -65,7 +65,7 @@ module SoulCore
       @store = store
       @env = env
       @registry = registry || ConversationProviderRegistry.new(env: env)
-      @provider_client = provider_client || ConversationProviderClient.new(env: env)
+      @provider_client = provider_client || ConversationProviderClient.new(env: env, root: @root)
       @artifact_creation_service = artifact_creation_service || ConversationArtifactCreationService.new(
         root: @root,
         env: env,

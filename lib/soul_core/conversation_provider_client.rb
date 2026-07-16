@@ -4,13 +4,15 @@ require "json"
 require "net/http"
 require "uri"
 require_relative "conversation_provider_contract"
+require_relative "model_runtime_lease_store"
 
 module SoulCore
   class ConversationProviderClient
     Contract = ConversationProviderContract
 
-    def initialize(env: ENV)
+    def initialize(env: ENV, root: Dir.pwd, lease_store: nil)
       @env = env
+      @lease_store = lease_store || ModelRuntimeLeaseStore.new(root: root)
     end
 
     def chat(provider:, request:, timeout_seconds: 120)
@@ -24,18 +26,20 @@ module SoulCore
         )
       end
 
-      case provider.transport
-      when "openai_compatible"
-        openai_chat(provider, request, timeout_seconds)
-      when "ollama"
-        ollama_chat(provider, request, timeout_seconds)
-      else
-        error_response(
-          provider: provider,
-          request: request,
-          type: "unsupported_transport",
-          message: "Unsupported provider transport: #{provider.transport}"
-        )
+      with_runtime_lease(provider, request, timeout_seconds) do
+        case provider.transport
+        when "openai_compatible"
+          openai_chat(provider, request, timeout_seconds)
+        when "ollama"
+          ollama_chat(provider, request, timeout_seconds)
+        else
+          error_response(
+            provider: provider,
+            request: request,
+            type: "unsupported_transport",
+            message: "Unsupported provider transport: #{provider.transport}"
+          )
+        end
       end
     rescue Net::OpenTimeout, Net::ReadTimeout, Timeout::Error => error
       error_response(
@@ -61,6 +65,19 @@ module SoulCore
     end
 
     private
+
+    def with_runtime_lease(provider, request, timeout_seconds, &block)
+      return yield unless %w[local_only local_network].include?(provider.privacy_class)
+
+      @lease_store.with_lease(
+        provider_id: provider.id,
+        model_id: request.model.to_s.empty? ? provider.model : request.model,
+        request_id: request.request_id,
+        conversation_id: request.conversation_id,
+        timeout_seconds: timeout_seconds,
+        &block
+      )
+    end
 
     def openai_chat(provider, request, timeout_seconds)
       uri = endpoint_uri(provider, "chat/completions")

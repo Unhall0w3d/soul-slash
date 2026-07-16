@@ -11,7 +11,7 @@ LAN_HOST ?=
 DASHBOARD_HTTPS_PORT ?= 8443
 CONFIRM ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-model-runtime-controls clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -36,6 +36,7 @@ help:
 > @echo "  make dashboard-service-status"
 > @echo "  make dashboard-service-logs"
 > @echo "  make dashboard-service-uninstall CONFIRM=REMOVE_SOUL_LAN_SERVICES"
+> @echo "  make verify-model-runtime-controls  Test leases and preview-gated model controls"
 > @echo
 > @echo "llama.cpp helper targets:"
 > @echo "  make download-model    Download/validate configured GGUF model"
@@ -125,6 +126,9 @@ dashboard-service-logs:
 dashboard-service-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_SOUL_LAN_SERVICES" || { echo "Set CONFIRM=REMOVE_SOUL_LAN_SERVICES to remove the two services."; exit 2; }
 > @scripts/soul-dashboard-service uninstall --confirmation "$(CONFIRM)"
+
+verify-model-runtime-controls:
+> @ruby scripts/verify-model-runtime-portability.rb
 
 clean-runtime:
 > @rm -rf run tmp

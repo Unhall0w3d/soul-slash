@@ -24,7 +24,7 @@ module SoulCore
         defaults_resolver = ConfigurationResolver.new(root: temp_root, process_env: empty_env)
         defaults = defaults_resolver.resolve
         checks["safe_defaults_are_typed_and_read_only"] =
-          defaults["ok"] && defaults["setting_count"] == 22 &&
+          defaults["ok"] && defaults["setting_count"] == ConfigurationSchema.definitions.length &&
           setting(defaults, "providers.local_openai.model")["value"] == "" &&
           setting(defaults, "dashboard.bind_host")["value"] == "127.0.0.1" &&
           setting(defaults, "dashboard.public_origin")["value"] == "" &&

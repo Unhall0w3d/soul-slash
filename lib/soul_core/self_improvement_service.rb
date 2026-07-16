@@ -3,6 +3,7 @@
 require "digest"
 require "json"
 require "time"
+require "timeout"
 
 require_relative "capability_matrix"
 require_relative "environment_assessor"
@@ -16,18 +17,21 @@ module SoulCore
     SCOPES = %w[environment updates models capabilities].freeze
     MAX_PROPOSALS = 100
     MAX_METADATA_BYTES = 256 * 1024
+    ASSESSMENT_TIMEOUT_SECONDS = 30
 
-    def initialize(root: Dir.pwd, clock: -> { Time.now }, environment_assessor: nil, model_assessor: nil, capability_matrix: nil, proposal_generator: nil)
+    def initialize(root: Dir.pwd, clock: -> { Time.now }, environment_assessor: nil, model_assessor: nil, capability_matrix: nil, proposal_generator: nil, assessment_timeout_seconds: ASSESSMENT_TIMEOUT_SECONDS)
       @root = File.expand_path(root)
       @clock = clock
       @environment_assessor = environment_assessor
       @model_assessor = model_assessor
       @capability_matrix = capability_matrix
       @proposal_generator = proposal_generator
+      @assessment_timeout_seconds = Float(assessment_timeout_seconds)
+      raise ArgumentError, "assessment timeout must be positive" unless @assessment_timeout_seconds.positive?
     end
 
     def snapshot
-      assessment = environment_assessor.assess(include_updates: false)
+      assessment = bounded_assessment { environment_assessor.assess(include_updates: false) }
       success({
         "schema_version" => "soul.self_improvement.v1",
         "generated_at" => @clock.call.iso8601,
@@ -40,18 +44,22 @@ module SoulCore
         "available_scopes" => SCOPES,
         "mutation_boundary" => mutation_boundary
       })
+    rescue Timeout::Error
+      failed("environment assessment exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
     end
 
     def refresh(scope:)
       scope = scope.to_s
       return awaiting("assessment scope must be one of: #{SCOPES.join(', ')}") unless SCOPES.include?(scope)
 
-      assessment = case scope
-                   when "environment" then environment_assessor.assess(include_updates: false)
-                   when "updates" then environment_assessor.assess(include_updates: true)
-                   when "models" then model_assessor.assess(include_processes: false)
-                   when "capabilities" then capability_matrix.assess(persist: false)
-                   end
+      assessment = bounded_assessment do
+        case scope
+        when "environment" then environment_assessor.assess(include_updates: false)
+        when "updates" then environment_assessor.assess(include_updates: true)
+        when "models" then model_assessor.assess(include_processes: false)
+        when "capabilities" then capability_matrix.assess(persist: false)
+        end
+      end
       success({
         "schema_version" => "soul.self_improvement.v1",
         "generated_at" => @clock.call.iso8601,
@@ -62,6 +70,8 @@ module SoulCore
         "proposals" => proposal_inventory,
         "mutation_boundary" => mutation_boundary
       })
+    rescue Timeout::Error
+      failed("#{scope} assessment exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
     end
 
     def proposal_preview
@@ -107,6 +117,10 @@ module SoulCore
     end
 
     private
+
+    def bounded_assessment
+      Timeout.timeout(@assessment_timeout_seconds) { yield }
+    end
 
     def environment_assessor
       @environment_assessor ||= EnvironmentAssessor.new(root: @root)
@@ -193,6 +207,10 @@ module SoulCore
 
     def blocked(reason)
       { "ok" => false, "lifecycle_state" => "blocked_for_human_review", "reason" => reason, "mutation" => "none" }
+    end
+
+    def failed(reason)
+      { "ok" => false, "lifecycle_state" => "failed", "reason" => reason, "mutation" => "none" }
     end
   end
 end

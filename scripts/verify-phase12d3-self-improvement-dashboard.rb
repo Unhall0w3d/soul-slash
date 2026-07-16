@@ -38,6 +38,14 @@ class FixtureModel
   end
 end
 
+class SlowFixtureModel
+  def assess(include_processes: false)
+    raise "process checks must remain disabled" if include_processes
+    sleep 0.2
+    { "assessment" => "model_runtime" }
+  end
+end
+
 class FixtureCapabilities
   def assess(persist: false)
     raise "capability refresh must not persist" if persist
@@ -82,6 +90,10 @@ Dir.mktmpdir("soul-self-improvement") do |root|
   check.call("model assessment disables process inventory", service.refresh(scope: "models").dig("data", "read_only") == true)
   check.call("capability assessment is non-persisting", service.refresh(scope: "capabilities").dig("data", "assessment", "summary", "available") == 5)
 
+  timed_service = SoulCore::SelfImprovementService.new(root: root, model_assessor: SlowFixtureModel.new, assessment_timeout_seconds: 0.02)
+  timed_result = timed_service.refresh(scope: "models")
+  check.call("overlong assessment terminates with failed lifecycle", timed_result["lifecycle_state"] == "failed" && timed_result["reason"].include?("foreground limit"))
+
   preview = service.proposal_preview
   blocked = service.generate_proposals(confirmation: "wrong", expected_digest: preview.dig("data", "expected_digest"))
   check.call("proposal write blocks without exact human confirmation", blocked["lifecycle_state"] == "blocked_for_human_review" && generator.writes.zero?)
@@ -110,6 +122,7 @@ javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __di
 check.call("dashboard exposes the third ARIA tab and assessment scopes", html.include?('id="improvement-tab"') && html.include?('id="improvement-panel"') && %w[environment updates models capabilities].all? { |scope| html.include?("data-assessment-scope=\"#{scope}\"") })
 check.call("dashboard requires preview and exact proposal confirmation", javascript.index('callSoul("self_improvement.proposals.preview"') < javascript.index('callSoul("self_improvement.proposals.execute"') && javascript.include?("confirmation_phrase") && html.include?("GENERATE_SELF_IMPROVEMENT_PROPOSALS"))
 check.call("dashboard adds no polling or unsafe HTML rendering", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML/))
+check.call("dashboard bounds manual assessment requests and clears running state on failure", javascript.include?("AbortSignal.timeout(35_000)") && javascript.include?('`${scope} · failed`'))
 check.call("host mutation is visibly unavailable", html.include?("Host mutation remains unavailable") && html.include?("separately reviewed executors"))
 
 abort "Phase 12D.3 verification failed: #{errors.join(', ')}" unless errors.empty?

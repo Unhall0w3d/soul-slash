@@ -102,6 +102,24 @@ Milestone stopping point:
 Phase 13
 ```
 
+## Active milestone
+
+### Deployment and Operations
+
+Status:
+
+```text
+in progress
+```
+
+Current candidate slice:
+
+```text
+Model Runtime Portability 1: bounded provider leases and manual dashboard load/unload control
+```
+
+This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The first slice controls only one explicitly configured existing model user service. The AMD Vulkan build and same-device microbenchmark are complete; the alternate-port behavioral benchmark, profile cutover, and multi-profile switching remain separate review gates.
+
 See:
 
 ```text
@@ -123,6 +141,5 @@ docs/soul/PHASE12D3_SELF_IMPROVEMENT_DASHBOARD_BRIEF.md
 - Interface and Presence
 - Broader Skills and Providers
 - Voice Interaction
-- Deployment and Operations
 
 Later work begins under a newly approved milestone rather than extending the Conversational Soul phase sequence.

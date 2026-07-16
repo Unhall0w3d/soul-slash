@@ -60,6 +60,8 @@ Human approval remains required for:
 
 The Conversational Soul milestone is complete at its Phase 13 stopping point following owner approval on 2026-07-15. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. No release or tag has been created; later work begins as a separately approved milestone.
 
+The Deployment and Operations milestone is now active. Its first candidate slice adds opt-in manual control of one existing model user service, active local-provider leases, llama.cpp slot/metrics blockers, and authenticated dashboard load/unload previews. It adds no service, timer, watcher, automatic idle behavior, GPU driver change, or live AMD cutover. A version-pinned RX 6900 XT Vulkan build and official Qwen3-14B Q4_K_M candidate have passed a same-device microbenchmark at 47.13 generation tokens/second. The alternate-port Soul behavioral benchmark and any profile cutover remain separate human-reviewed gates; the live provider is still the NVIDIA/Qwen3-8B fallback.
+
 Detailed references:
 
 - `docs/CONVERSATIONAL_SOUL_ROADMAP.md`

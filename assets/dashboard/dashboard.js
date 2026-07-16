@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -9,12 +9,13 @@ function requestId() {
   return `dash-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-async function callSoul(operation, parameters = {}, context = {}) {
+async function callSoul(operation, parameters = {}, context = {}, requestOptions = {}) {
   const response = await fetch("/api/v1/call", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
-    body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } })
+    body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
+    signal: requestOptions.signal
   });
   const envelope = await response.json();
   if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
@@ -34,7 +35,7 @@ async function authRequest(path, body) {
 function setDashboardLocked(locked) {
   document.body.classList.toggle("auth-locked", locked);
   const gate = byId("auth-gate"); gate.hidden = !locked;
-  [document.querySelector(".app-header"), document.querySelector("main"), byId("review-center"), byId("clear-dialog")].forEach((element) => { if (element) element.inert = locked; });
+  [document.querySelector(".app-header"), document.querySelector("main"), byId("review-center"), byId("clear-dialog"), byId("model-runtime-dialog")].forEach((element) => { if (element) element.inert = locked; });
   if (!locked) { byId("logout-button").hidden = false; byId("auth-status").textContent = ""; }
 }
 
@@ -344,6 +345,57 @@ async function refreshStatus({ automatic = false } = {}) {
   try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("Scope", data.scope || "Bounded host"), detailRow("State", envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Host", "Unavailable"), detailRow("Collected", "Initial collection failed"), detailRow("Scope", "Bounded host"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
 }
 
+function renderModelRuntime(runtime, message = "") {
+  state.modelRuntime = runtime; const card = document.querySelector(".runtime-card"); const runtimeState = runtime.state || "unavailable"; card.dataset.state = runtimeState;
+  byId("runtime-state-label").textContent = runtimeState.replaceAll("_", " ");
+  byId("runtime-details").replaceChildren(
+    detailRow("Profile", runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
+    detailRow("Service", runtime.service || "control disabled"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
+    detailRow("Server", runtime.server?.health || "unavailable")
+  );
+  byId("load-model-runtime").disabled = !runtime.can_load; byId("unload-model-runtime").disabled = !runtime.can_unload;
+  byId("runtime-card-status").textContent = message || (runtime.configured ? "Manual only · no automatic load or idle unload" : "Configure runtime control in the private environment file to enable actions.");
+}
+
+async function refreshModelRuntime({ automatic = false } = {}) {
+  const button = byId("refresh-model-runtime"); button.disabled = true;
+  try {
+    const envelope = await callSoul("model_runtime.status"); const runtime = dataOf(envelope);
+    renderModelRuntime(runtime, envelope.lifecycle_state === "complete" ? "Manual only · no automatic load or idle unload" : (envelope.errors?.[0]?.message || "Runtime status is unavailable."));
+    if (!automatic) announce("Model runtime status refreshed");
+  } catch (error) { renderModelRuntime({}, error.message || "Model runtime status failed safely."); }
+  finally { button.disabled = false; }
+}
+
+async function previewModelRuntime(action) {
+  state.modelRuntimePreview = null; const status = byId("runtime-card-status"); status.textContent = `Checking whether ${action} is safe…`;
+  try {
+    const envelope = await callSoul(`model_runtime.${action}.preview`); const runtime = dataOf(envelope); renderModelRuntime(runtime);
+    if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || `Model ${action} is blocked.`; return; }
+    state.modelRuntimePreview = { action, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
+    byId("model-runtime-dialog-title").textContent = action === "load" ? "Load model runtime" : "Unload model runtime";
+    byId("model-runtime-preview-title").textContent = action === "load" ? "Start the configured user service" : "Release model GPU memory";
+    byId("model-runtime-preview-details").replaceChildren(
+      detailRow("Profile", runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
+      detailRow("Service", runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
+      detailRow("Slots", runtime.server?.slots_reachable ? `${runtime.server.active_slots} active / ${runtime.server.total_slots} total` : "offline")
+    );
+    byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; byId("model-runtime-confirmation").value = ""; byId("execute-model-runtime").disabled = true;
+    byId("execute-model-runtime").textContent = action === "load" ? "Load verified model runtime" : "Unload verified model runtime";
+    byId("model-runtime-dialog-status").textContent = "The runtime state will be checked again before the service changes."; byId("model-runtime-dialog").showModal();
+  } catch (error) { status.textContent = error.message || `Model ${action} preview failed safely.`; }
+}
+
+async function executeModelRuntime() {
+  const preview = state.modelRuntimePreview; if (!preview || byId("model-runtime-confirmation").value !== preview.confirmation) return;
+  const button = byId("execute-model-runtime"); const status = byId("model-runtime-dialog-status"); button.disabled = true; status.textContent = "Revalidating active work and service state…";
+  try {
+    const envelope = await callSoul(`model_runtime.${preview.action}.execute`, { confirmation: preview.confirmation, expected_digest: preview.digest }); const runtime = dataOf(envelope); renderModelRuntime(runtime);
+    if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Runtime change was blocked safely."; state.modelRuntimePreview = null; return; }
+    state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(`Model runtime ${preview.action} complete`); await refreshModelRuntime();
+  } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }
+}
+
 function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
 
 function studioItem(titleText, metaText, active, onClick) {
@@ -598,8 +650,11 @@ async function loadSelfImprovement() {
 
 async function refreshSelfImprovement(scope) {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = `${scope} · running`; announce(`Running bounded ${scope} assessment`);
-  try { const envelope = await callSoul("self_improvement.refresh", { scope }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); announce(`${scope} assessment complete`); }
-  catch (error) { showError(error); }
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(35_000) : undefined;
+    const envelope = await callSoul("self_improvement.refresh", { scope }, {}, { signal }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); announce(`${scope} assessment complete`);
+  }
+  catch (error) { byId("improvement-scope").textContent = `${scope} · failed`; showError(new Error(error.name === "TimeoutError" ? `${scope} assessment exceeded the foreground time limit` : error.message)); }
   finally { setAssessmentButtonsDisabled(false); }
 }
 
@@ -731,7 +786,7 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true });
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
@@ -788,6 +843,12 @@ byId("forget-confirmation").addEventListener("input", () => { byId("execute-forg
 byId("execute-forget").addEventListener("click", executeForget);
 byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
+byId("refresh-model-runtime").addEventListener("click", refreshModelRuntime);
+byId("load-model-runtime").addEventListener("click", () => previewModelRuntime("load"));
+byId("unload-model-runtime").addEventListener("click", () => previewModelRuntime("unload"));
+byId("close-model-runtime-dialog").addEventListener("click", () => byId("model-runtime-dialog").close());
+byId("model-runtime-confirmation").addEventListener("input", () => { byId("execute-model-runtime").disabled = !state.modelRuntimePreview || byId("model-runtime-confirmation").value !== state.modelRuntimePreview.confirmation; });
+byId("execute-model-runtime").addEventListener("click", executeModelRuntime);
 byId("composer").addEventListener("submit", sendMessage);
 byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); byId("composer").requestSubmit(); } });
 initializeAuthentication();
