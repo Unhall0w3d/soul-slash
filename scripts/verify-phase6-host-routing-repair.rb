@@ -103,7 +103,7 @@ end
 runtime = File.read("lib/soul_core/conversation_runtime.rb")
 check(
   "runtime uses focused follow-up rendering",
-  runtime.include?("@grounding_policy.render_followup"),
+  runtime.include?("@evidence_followup_router.render"),
   errors
 )
 check(

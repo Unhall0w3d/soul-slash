@@ -39,10 +39,10 @@ checks["Phase 9 reviewed memory controls assessment"] = report["ok"] == true
 checks["Phase 9 reviewed memory controls text rendering"] = assessor.render(report).include?("Status: ready")
 
 roadmap = File.read(File.join(ROOT, "docs/CONVERSATIONAL_SOUL_ROADMAP.md"), encoding: "UTF-8")
-checks["roadmap keeps Phase 9 in progress"] =
-  roadmap.match?(/## Phase 9 — Layered Memory Foundation.*?Status:\s*in progress/m)
+checks["roadmap marks Phase 9 complete"] =
+  roadmap.match?(/### Phase 9: Layered memory.*?Status:\s*complete/m)
 checks["roadmap records reviewed memory controls"] =
-  roadmap.include?("reviewed conversational proposal, inspection, approval, supersession, and forgetting controls")
+  roadmap.include?("reviewed conversational proposal and mutation controls")
 checks["roadmap keeps identity after memory"] =
   roadmap.include?("### Phase 10: Identity, interests, and variation")
 

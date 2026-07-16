@@ -25,6 +25,7 @@ require_relative "conversation_provider_probe"
 require_relative "conversation_provider_foundation_assessor"
 require_relative "multiturn_conversation_runtime_assessor"
 require_relative "conversational_orchestrator_assessor"
+require_relative "conversational_soul_acceptance_assessor"
 require_relative "grounded_evidence_lifecycle_assessor"
 require_relative "bounded_host_system_status_assessor"
 require_relative "phase11_bounded_artifact_inspection_assessor"
@@ -607,6 +608,12 @@ when "documentation-registry", "doc-registry", "docs-registry"
         report = assessor.assess
         puts(json ? JSON.pretty_generate(report) : assessor.render(report))
         0
+      when "conversational-soul-acceptance", "conversational-acceptance", "phase13-acceptance"
+        json = @argv.include?("--json")
+        assessor = ConversationalSoulAcceptanceAssessor.new(root: Dir.pwd)
+        report = assessor.assess
+        puts(json ? JSON.pretty_generate(report) : assessor.render(report))
+        report["ok"] ? 0 : 1
       when "feature-direction", "features", "next-feature"
         json = @argv.include?("--json")
         assessor = FeatureDirectionAssessor.new(root: Dir.pwd)
@@ -750,6 +757,7 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul assess conversational-orchestrator"
       puts "  ruby bin/soul assess grounded-evidence-lifecycle"
       puts "  ruby bin/soul assess bounded-host-system-status"
+      puts "  ruby bin/soul assess conversational-soul-acceptance"
       puts "  ruby bin/soul assess phase12c-foreground-dashboard"
       puts "  ruby bin/soul assess dashboard-authentication"
       puts "  ruby bin/soul assess dashboard-deployment"

@@ -36,15 +36,16 @@ Foundation: complete
 Chat and planning: complete
 Usability foundation: complete
 Safe local action: complete
+Conversational Soul: complete
 ```
 
-The active milestone is:
+Current development posture:
 
 ```text
-Conversational Soul
+Observation period; next milestone not yet selected
 ```
 
-Phases 1 through 12D.3 have built the conversation runtime, memory controls, artifacts, foreground dashboard, Skill Studio, self-skilling intake, and Self Improvement assessment surface. The next planned interface slice is unified approvals/activity, followed by integrated Phase 13 acceptance and closeout.
+Phases 1 through 12 completed the conversation runtime, memory controls, artifacts, authenticated dashboard, Skill Studio lifecycle, self-skilling intake, Self Improvement, Review Center, and protected local LAN deployment. Phase 13A–C completed integrated acceptance and closeout, and the owner approved Conversational Soul at its documented stopping point.
 
 See [Current State](docs/CURRENT_STATE.md) for the concise implementation map and current boundaries.
 
@@ -319,7 +320,7 @@ docs/overlays/archive/
 
 ## Roadmap direction
 
-Current milestone:
+Latest completed milestone:
 
 ```text
 Conversational Soul
@@ -327,15 +328,13 @@ Conversational Soul
 
 Current focus:
 
-- unified approvals and activity views
-- integrated conversational acceptance testing
-- dashboard and Skill Studio refinement from human review
-- bounded expansion of local capabilities
+- daily-use observations to inform the next milestone
+- no additional Conversational Soul feature slices
 
 Later milestones may cover:
 
 - broader skills and providers
-- HTTP API and optional web UI
+- broader interface and presence work
 - voice input, TTS, and wake-word interaction
 - deployment, backup, and restore
 - broader project-aware and document-aware skills

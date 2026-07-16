@@ -43,20 +43,20 @@ legacy sequence Phase 63
 commit 2132b36
 ```
 
-## Current milestone
+## Latest completed milestone
 
 ### Conversational Soul
 
 Status:
 
 ```text
-in progress
+complete
 ```
 
 Current phase:
 
 ```text
-Protected LAN/systemd deployment review
+Phase 13 accepted stopping point
 ```
 
 Completed:
@@ -83,12 +83,17 @@ Phase 12D: Skill Studio Proposal/Beta lifecycle
 Phase 12D.2: capability-gap intake
 Phase 12D.3: Self Improvement dashboard
 Phase 12D.4: proposal stage, production linkage, and production-only closeout
+Phase 12D.5: gated Beta implementation workspace and production promotion
+Phase 12E: unified Review Center
+Phase 13A: deterministic integrated acceptance harness
+Phase 13B: bounded local-model and dashboard acceptance
+Phase 13C: documentation, curation, and accepted closeout
 ```
 
 Current work:
 
 ```text
-Phase 12D.5 gated Beta implementation and production promotion
+Owner approval recorded; observation period begins
 ```
 
 Milestone stopping point:
@@ -119,3 +124,5 @@ docs/soul/PHASE12D3_SELF_IMPROVEMENT_DASHBOARD_BRIEF.md
 - Broader Skills and Providers
 - Voice Interaction
 - Deployment and Operations
+
+Later work begins under a newly approved milestone rather than extending the Conversational Soul phase sequence.

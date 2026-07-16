@@ -32,8 +32,9 @@
 - [x] personal administrator authentication review
 - [x] protected LAN transport, user-service, and device-trust review
 - [x] unified approvals and activity views
-- [ ] gated proposal-to-Beta implementation and Beta-to-production promotion
-- [ ] integrated Phase 13 conversational acceptance and closeout
+- [x] gated proposal-to-Beta implementation and Beta-to-production promotion
+- [x] Phase 13 deterministic integration and bounded local-model acceptance candidate
+- [x] final human approval of the Conversational Soul milestone
 - [ ] more filesystem workflows
 - [ ] approved memory/rule loading into prompts
 - [ ] skill registry validation

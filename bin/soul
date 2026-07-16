@@ -5,4 +5,4 @@ $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 
 require "soul_core/app"
 
-SoulCore::App.new(ARGV).run
+exit SoulCore::App.new(ARGV).run

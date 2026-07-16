@@ -362,7 +362,7 @@ The public repository must not require the owner's IP addresses, hostnames, cred
 
 ### Phase 12D.5: Gated implementation and production promotion
 
-The candidate completes the safe Skill Studio lifecycle with two bounded foreground operations: prepare an approved exact proposal revision as an honest incomplete Beta workspace and Codex handoff, then promote an independently implemented, exact-tested, Gate-2-approved Beta revision through preview, digest revalidation, exact confirmation, atomic registry publication, byte-hash and rollback evidence, and human review. Soul invokes no implementation model and model or cloud output remains candidate material that cannot authorize either operation.
+Phase 12D.5 was reviewed and merged. It completes the safe Skill Studio lifecycle with two bounded foreground operations: prepare an approved exact proposal revision as an honest incomplete Beta workspace and Codex handoff, then promote an independently implemented, exact-tested, Gate-2-approved Beta revision through preview, digest revalidation, exact confirmation, atomic registry publication, byte-hash and rollback evidence, and human review. Soul invokes no implementation model and model or cloud output remains candidate material that cannot authorize either operation.
 
 ### Phase 13: Integrated acceptance and closeout
 
@@ -383,4 +383,16 @@ documentation and curation closeout
 
 Phase 13 is the clear stopping point.
 
-Proxmox is not required for Phases 11D through 13. A separate human-approved deployment brief follows successful local dashboard acceptance and defines the persistent-service exception, guest topology, environment file, LAN boundary, backup, recovery, upgrade, and rollback behavior.
+Candidate delivered in Phase 13:
+
+```text
+13A ten-scenario deterministic integration assessment in an isolated temporary root
+13A twenty user exchanges and twenty assistant responses through the shared application path
+13B bounded local-only twenty-turn behavioral evaluation with no transcript retention
+13B static dashboard/authentication/status/no-polling acceptance
+13C aggregate Phase 1–13 regression suite and documentation/curation closeout
+```
+
+All implementation slices passed review. The owner approved Conversational Soul as complete at the Phase 13 stopping point on 2026-07-15. No release or tag is implied by milestone acceptance.
+
+Proxmox was not required for Phases 11D through 13. Any Proxmox topology, backup, recovery, upgrade, or broader deployment work belongs to a separately approved later milestone.
