@@ -38,7 +38,7 @@ end
 
 stdout, stderr, status = Open3.capture3("ruby", "bin/soul", "assess", "phase12c-foreground-dashboard", "--json")
 report = JSON.parse(stdout) rescue nil
-assessment_ok = status.success? && report && report["ok"] == true && report["phase"] == "12C" && report["status"] == "blocked_for_human_review" && report.fetch("verification", {}).length == 21 && report.fetch("verification", {}).values.all?(true) && report["human_visual_review_required"] == true
+assessment_ok = status.success? && report && report["ok"] == true && report["phase"] == "12C" && report["status"] == "blocked_for_human_review" && report.fetch("verification", {}).length >= 22 && report.fetch("verification", {}).values.all?(true) && report["human_visual_review_required"] == true
 check("Phase 12C assessment JSON", assessment_ok, errors)
 unless assessment_ok
   warn stderr
@@ -52,8 +52,8 @@ html = File.read("assets/dashboard/index.html")
 css = File.read("assets/dashboard/dashboard.css")
 js = File.read("assets/dashboard/dashboard.js")
 server = File.read("lib/soul_core/dashboard_server.rb")
-review_boundary = html.include?("Human visual review") || (html.include?("Human Gate 1") && html.include?("Human Gate 2"))
-check("dashboard has approved three-tab visual hierarchy", html.index("Chat") < html.index("Skill Studio") && html.index("Skill Studio") < html.index("Self Improvement") && review_boundary, errors)
+review_boundary = html.include?("Human visual review") || (html.include?("Operator Gate 1") && html.include?("Operator Gate 2"))
+check("dashboard has approved three-tab visual hierarchy", html.index("Chat") < html.index("Skill Studio") && html.index("Skill Studio") < html.index("Self Assessment") && review_boundary, errors)
 check("browser remains timer-free and same-origin", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, css, js].any? { |source| source.match?(%r{https?://}) }, errors)
 check("server is sequential foreground-only", server.include?("listener.accept") && %w[Thread.new fork( daemon( Process.spawn].none? { |needle| server.include?(needle) }, errors)
 

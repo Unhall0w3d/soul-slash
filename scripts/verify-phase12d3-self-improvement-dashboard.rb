@@ -103,7 +103,7 @@ Dir.mktmpdir("soul-self-improvement") do |root|
   facade = SoulCore::ApplicationFacade.new(root: root, self_improvement_service: service)
   request = { "schema_version" => "soul.application.v1", "request_id" => "self-improvement-fixture", "operation" => "application.bootstrap", "parameters" => {}, "context" => { "interface" => "dashboard_test" } }
   bootstrap = facade.call(request)
-  check.call("application exposes Self Improvement as the third tab", bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Improvement"] && bootstrap.dig("data", "self_improvement", "host_mutation_available") == false)
+check.call("application exposes Self Assessment as the third tab", bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Assessment"] && bootstrap.dig("data", "self_improvement", "host_mutation_available") == false)
 
   generator_root = File.join(root, "generator")
   Dir.mkdir(generator_root)
@@ -123,7 +123,7 @@ check.call("dashboard exposes the third ARIA tab and assessment scopes", html.in
 check.call("dashboard requires preview and exact proposal confirmation", javascript.index('callSoul("self_improvement.proposals.preview"') < javascript.index('callSoul("self_improvement.proposals.execute"') && javascript.include?("confirmation_phrase") && html.include?("GENERATE_SELF_IMPROVEMENT_PROPOSALS"))
 check.call("dashboard adds no polling or unsafe HTML rendering", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML/))
 check.call("dashboard bounds manual assessment requests and clears running state on failure", javascript.include?("AbortSignal.timeout(35_000)") && javascript.include?('`${scope} · failed`'))
-check.call("host mutation is visibly unavailable", html.include?("Host mutation remains unavailable") && html.include?("separately reviewed executors"))
+check.call("host mutation remains visibly separated and approval-gated", html.include?("Host changes require separate approval") && html.include?("separately reviewed executors") && html.include?("Self Assessment only inspects"))
 
 abort "Phase 12D.3 verification failed: #{errors.join(', ')}" unless errors.empty?
 puts "Phase 12D.3 Self Improvement dashboard verification complete."

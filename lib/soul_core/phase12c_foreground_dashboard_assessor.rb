@@ -115,18 +115,26 @@ module SoulCore
       gated_phase12d =
         html.include?('id="proposal-approval"') &&
         html.include?('id="beta-promotion-card"') &&
-        html.include?("No automatic implementation, registration, or promotion") &&
+        (html.include?("No automatic implementation, registration, or promotion") || html.include?("Nothing is implemented, registered, or promoted automatically")) &&
         js.include?("skill_studio.proposals.approval.preview") &&
         js.include?("skill_studio.betas.promotion.preview") &&
         !js.include?("skill.execute")
       checks["skill_studio_surface_respects_current_phase"] = html.include?('id="studio-tab"') && (legacy_preview || gated_phase12d)
 
       required_dom = ['role="tablist"', 'role="tabpanel"', '<main>', '<form id="composer"', '<label for="message-input"', 'role="status"']
-      review_boundary = html.downcase.include?("human visual review") || (html.include?("Human Gate 1") && html.include?("Human Gate 2"))
+      review_boundary = html.downcase.include?("human visual review") || (html.include?("Operator Gate 1") && html.include?("Operator Gate 2"))
       checks["semantic_accessible_reviewable_dom_is_present"] = required_dom.all? { |needle| html.include?(needle) } && review_boundary
 
-      tokens = %w[#6E3DDF #00E2D6 #E6ECF1 #FFB14A #0A0D12 #151922]
-      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.scan("/brand/micro-mark.svg").length >= 2 && html.include?("rel=\"icon\"") && html.include?("/brand/supporting-scene.png")
+      tokens = %w[#060B11 #D4AF37 #00E5FF #FF1744 #B7D8DC]
+      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.scan("/brand/micro-mark.svg").length >= 4 && html.include?("rel=\"icon\"") && !html.include?("/brand/supporting-scene.png")
+
+      checks["readable_type_scale_and_signal_interactions_replace_legacy_microcopy"] =
+        css.include?("--type-micro:11px") &&
+        css.include?("--type-label:12px") &&
+        css.include?("--type-copy:14px") &&
+        css.include?(".workflow-stages span { display:block; margin-bottom:19px; color:var(--cyan); font:700 12px") &&
+        css.include?(".studio-header>div>p:last-child,.improvement-header>div>p:last-child { max-width:800px; margin:0; color:#91B2B7; font-size:14px") &&
+        !css.include?("rgba(110,61,223")
 
       checks["focus_reduced_motion_and_responsive_rules_exist"] = css.include?(":focus-visible") && css.include?("prefers-reduced-motion") && css.scan("@media").length >= 3
 

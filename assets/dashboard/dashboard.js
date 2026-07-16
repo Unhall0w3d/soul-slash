@@ -88,6 +88,7 @@ function lifecycle(envelope) {
   const value = envelope.lifecycle_state || "failed";
   byId("lifecycle-state").textContent = value.replaceAll("_", " ");
   document.querySelector(".state-ribbon").dataset.lifecycle = value;
+  document.querySelector(".conversation").dataset.lifecycle = value;
   byId("mutation-state").textContent = `mutation ${envelope.meta?.mutation || "none"}`;
   return value;
 }
@@ -324,7 +325,7 @@ async function executeClear() {
 
 async function sendMessage(event) {
   event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy) return;
-  setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending";
+  setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending"; document.querySelector(".state-ribbon").dataset.lifecycle = "pending"; document.querySelector(".conversation").dataset.lifecycle = "pending";
   try {
     const envelope = await callSoul("chats.send", { chat_id: state.activeChat.id, message }, { current_chat_id: state.activeChat.id }); lifecycle(envelope);
     if (envelope.lifecycle_state === "complete") input.value = "";
@@ -396,7 +397,7 @@ async function executeModelRuntime() {
   } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }
 }
 
-function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
+function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; document.querySelector(".conversation").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
 
 function studioItem(titleText, metaText, active, onClick) {
   const button = document.createElement("button"); button.type = "button"; button.className = "studio-item"; button.classList.toggle("is-active", active);
@@ -643,7 +644,7 @@ function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[da
 
 async function loadSelfImprovement() {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
-  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); state.improvementLoaded = true; announce("Self Improvement snapshot ready"); }
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
   catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
   finally { setAssessmentButtonsDisabled(false); }
 }

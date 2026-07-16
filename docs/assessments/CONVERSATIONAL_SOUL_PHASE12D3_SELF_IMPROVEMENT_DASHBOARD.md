@@ -1,5 +1,7 @@
 # Conversational Soul Phase 12D.3: Self Improvement Dashboard
 
+> Current product label: **Self Assessment**. The historical phase and internal `self_improvement.*` application namespace retain their original names for compatibility and traceability.
+
 ## Candidate status
 
 ```text
@@ -164,3 +166,98 @@ Candidate repair:
 - deterministic verification includes a deliberately slow model assessor.
 
 No model, service, package, proposal, memory, or host state is changed by this repair.
+
+## 2026-07-16 Self Assessment and signal-interface refresh
+
+This candidate renames the user-facing surface to **Self Assessment** so evidence gathering is not confused with the future Self Augmentation concept. Historical phase names and the internal `self_improvement.*` operation namespace remain unchanged for compatibility.
+
+Implemented:
+
+- replaced the compact brand mark with a scalable Soul-specific signal-path SVG used by the banner, login gate, favicon, Chat empty state, and Skill Studio empty state;
+- removed the two large arcane raster illustrations from active dashboard markup without deleting the historical source assets;
+- shifted the interface toward near-black navy, teal operational emphasis, restrained violet, condensed headings, and scalable grid fields;
+- calibrated interface copy against `docs/SOUL_PERSONALITY.md`, using Operator, signal, transmission, continuity, and capability only where each term describes a real product concept;
+- preserved exact approval, lifecycle, authentication, mutation, and foreground-execution boundaries.
+
+Files changed for this refresh include the dashboard HTML, CSS, JavaScript, SVG brand mark, application bootstrap label, current product documentation, and deterministic dashboard expectations.
+
+Verification run:
+
+```text
+ruby scripts/verify-phase12d3-self-improvement-dashboard.rb  PASS
+ruby scripts/verify-phase12c-foreground-dashboard.rb         PASS; visual review required
+ruby scripts/verify-phase12d-skill-studio.rb                  PASS
+ruby scripts/verify-phase12e-unified-review-center.rb         PASS
+ruby scripts/verify-phase12b-in-process-application-api.rb    PASS
+node --check assets/dashboard/dashboard.js                    PASS
+git diff --check                                               PASS
+git diff --cached --check                                      PASS
+```
+
+No local LLM eval was used for the visual change. No memory key, model, skill, service definition, host setting, or task lifecycle was added or changed. Risk remains bounded UI/documentation behavior with a required human visual review.
+
+Refresh review checklist:
+
+- [ ] The new mark remains recognizable in the banner and browser tab/bookmark.
+- [ ] Chat and Skill Studio empty states scale cleanly at the owner's normal viewport.
+- [ ] The palette and typography feel related to the owner's blog without copying its content.
+- [ ] Soul's persona is present but does not obscure product meaning.
+- [ ] Self Assessment is a clearer name than Self Improvement.
+- [ ] Warnings, approval gates, and unavailable host changes remain visually distinct.
+- [ ] Candidate is approved before commit or merge.
+
+### Holistic readability and responsiveness revision
+
+Following the first refresh review, the owner identified residual violet Self Assessment controls and unreadably small workflow, inventory, descriptive, and utility text. The candidate now:
+
+- removes the legacy violet interaction RGB values across the stylesheet;
+- assigns teal to active, available, selected, and verified interaction states;
+- keeps amber for Operator attention and approval, and red for failed or destructive states;
+- establishes an 11 px minimum utility scale, 12 px labels, 13–14 px supporting text, and 15 px conversational text through final cascade rules;
+- enlarges the Skill Studio lifecycle steps, inventory headings, header description, card details, Review Center records, authentication copy, and dialog controls;
+- revises Skill Studio and review language around capability development and explicit Operator authority;
+- adds short, finite state- and interaction-driven transitions for panel arrival, focus, hover, and control engagement;
+- respects `prefers-reduced-motion` and adds no JavaScript timer, polling, watcher, socket, or persistent process.
+
+The Phase 12C assessor now deterministically verifies the readable type tokens, enlarged workflow/header rules, and absence of the legacy violet interaction value. The Phase 12C, Phase 12D, Phase 12D.3, and Phase 12E focused verifiers pass. Human review remains required because deterministic checks cannot establish comfort, hierarchy, or aesthetic quality at the owner's actual viewport.
+
+### Gilded machine-soul redesign candidate
+
+At the owner's direction, the signal-console visual candidate was superseded before approval by a researched, gilded magitech direction. The new candidate:
+
+- uses `#060B11` as the low-luminance spatial canvas;
+- uses metallic gold gradients for structural frames, hierarchy, nodes, and Operator gates;
+- uses cerulean for Soul's active presence, available/verified state, and interaction paths;
+- uses muted pale cyan-gray instead of white for long-form readability;
+- reserves crimson for actual failure and destructive controls;
+- replaces conventional card silhouettes with asymmetric curved frames and restrained corner structures;
+- adds a new scalable gilded Soul core mark for banner, favicon, login, Chat, and Skill Studio;
+- adds short `core-unseal`, `inscription-resolve`, and `core-awaken` CSS reactions with no infinite animation or fabricated throughput signal;
+- retains the readable type-scale revision and every existing authentication, approval, lifecycle, and mutation boundary.
+
+Research and deliberate adaptations are documented in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`. This remains a visual-review candidate, not an approved merge.
+
+### Square-one composition rebuild
+
+The owner explicitly authorized redesigning the entire information architecture while retaining feature parity. The candidate therefore replaces the accumulated Phase 12 stylesheet plus visual overrides with one coherent stylesheet and recomposes the product surfaces around their purpose:
+
+- Chat is the Soul Chamber: a suspended transmission archive, dominant conversation vessel, real lifecycle-driven Soul presence, and Operator-side system/model/workspace/inbox assembly.
+- Skill Studio is the Capability Foundry: the five-stage mechanism is the primary hierarchy, with proposal, Beta, and production inventories feeding a single review vessel.
+- Self Assessment is the Internal Observatory: assessment scopes surround a central core and project evidence into instrument-like environment, runtime, capability, model, recommendation, and proposal surfaces.
+- Review Center is the shared Authority Chamber, retaining read-only approval and activity projections.
+- Authentication and destructive dialogs use the same material, geometry, type, and state vocabulary.
+
+The central Soul presence receives actual application lifecycle values (`pending`, `complete`, `failed`, and other declared states). Processing motion is finite—three iterations—and cannot continue as an unbounded ambient loop. Failed state uses the real failure lifecycle and crimson boundary. No operation, ID, confirmation phrase, API call, or stored data shape changed.
+
+The clean rebuild retains an 11 px secondary-text floor, responsive folds at 1180/820/520 px, reduced-motion gating, focus visibility, semantic tabs and dialogs, and the existing no-polling/no-unsafe-DOM constraints.
+
+### Square-one visual review outcome
+
+```text
+reviewed_at: 2026-07-16
+reviewer: human owner
+outcome: approved
+approved_direction: gilded machine-soul composition
+```
+
+The owner reviewed the deployed square-one redesign and approved it as the dashboard visual and composition baseline. This approval covers the Soul Chamber, Capability Foundry, Internal Observatory, Authority Chamber, unified dialogs/authentication, scalable gilded core mark, readable type scale, and real-state finite reactions. It does not pre-approve future hierarchy changes or new product surfaces.

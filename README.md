@@ -25,7 +25,7 @@ Soul/ currently has:
 - bounded artifact inspection, creation, and revision
 - a two-gate Skill Studio with separate Proposal, Beta, and Production inventories
 - conservative capability-gap intake that can deliver a proposal to Skill Studio
-- a Self Improvement dashboard for bounded environment, runtime, model, and capability assessment
+- a Self Assessment dashboard for bounded environment, runtime, model, and capability inspection
 - bounded cloud-assisted skill proposal tooling with disclosed provider boundaries
 - a controlled Codex handoff and review path that does not mutate production automatically
 
@@ -45,7 +45,7 @@ Current development posture:
 Observation period; next milestone not yet selected
 ```
 
-Phases 1 through 12 completed the conversation runtime, memory controls, artifacts, authenticated dashboard, Skill Studio lifecycle, self-skilling intake, Self Improvement, Review Center, and protected local LAN deployment. Phase 13A–C completed integrated acceptance and closeout, and the owner approved Conversational Soul at its documented stopping point.
+Phases 1 through 12 completed the conversation runtime, memory controls, artifacts, authenticated dashboard, Skill Studio lifecycle, self-skilling intake, the Self Assessment surface (originally delivered as Self Improvement), Review Center, and protected local LAN deployment. Phase 13A–C completed integrated acceptance and closeout, and the owner approved Conversational Soul at its documented stopping point.
 
 See [Current State](docs/CURRENT_STATE.md) for the concise implementation map and current boundaries.
 

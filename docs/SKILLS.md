@@ -156,9 +156,9 @@ proposal intake or draft
 
 Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. After Gate 1, Skill Studio can prepare an incomplete proposal-local Beta workspace and bounded Codex handoff, but does not invoke Codex or Mistral. After separate implementation, current passing tests, and Gate 2 approval, production promotion remains a distinct preview/digest/exact-confirmation operation that never replaces an existing skill.
 
-### Self Improvement assessments
+### Self Assessment workflows
 
-Self Improvement is also an application workflow rather than a production skill. The dashboard can run bounded read-only environment, update, model-runtime, and capability assessments. Generating advisory improvement proposals requires preview and exact confirmation; host/package mutation is unavailable.
+Self Assessment is an application workflow rather than a production skill. The dashboard can run bounded read-only environment, update, model-runtime, and capability assessments. Generating advisory improvement proposals requires preview and exact confirmation; host/package mutation is unavailable. The application API retains the historical `self_improvement.*` namespace.
 
 ## Documentation rule
 

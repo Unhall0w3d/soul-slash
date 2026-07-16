@@ -77,7 +77,7 @@ Dir.mktmpdir("soul-phase12e-") do |root|
 
   bootstrap = facade.call(request("application.bootstrap"))
   check.call("Review Center is supporting UI, not a fourth product tab",
-    bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Improvement"] &&
+    bootstrap.dig("data", "product_tabs") == ["Chat", "Skill Studio", "Self Assessment"] &&
     bootstrap.dig("data", "unified_operations", "surface") == "Review Center" &&
     bootstrap.dig("data", "unified_operations", "read_only") == true)
 
@@ -123,7 +123,7 @@ check.call("frontend uses only registered read projections", javascript.include?
 forbidden_operations = %w[approvals.revoke approvals.execute approvals.clear activities.replay activities.retry activities.clear activities.prune activities.export]
 check.call("Review Center adds no approval or history mutation", forbidden_operations.none? { |operation| javascript.include?(operation) })
 check.call("Review Center adds no polling or unsafe HTML rendering", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML|insertAdjacentHTML/) && javascript.include?("textContent") && javascript.include?("replaceChildren"))
-check.call("responsive, focus, and human-attention styling is present", css.include?(".review-center") && css.include?(".review-state-chip") && css.include?("@media (max-width: 760px)") && css.include?("var(--gold)"))
+check.call("responsive, focus, and human-attention styling is present", css.include?(".review-center") && css.include?(".review-state-chip") && css.include?("@media (max-width:820px)") && css.include?("var(--gold)"))
 check.call("brief preserves authority and visual review gates", brief.include?("Inspection is not approval") && brief.include?("material_visual_review_required: yes") && brief.include?("must not") && brief.include?("No polling"))
 required_review_sections = ["## What was implemented", "## Files changed", "## Commands run", "## Deterministic test results", "## Local LLM eval results", "## Known weaknesses", "## Memory keys", "## Task lifecycle states touched", "## Risk classification", "## Human review checklist"]
 check.call("human review artifact contains required sections", required_review_sections.all? { |heading| review.include?(heading) })

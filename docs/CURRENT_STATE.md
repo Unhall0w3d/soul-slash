@@ -7,7 +7,7 @@ Soul/ is an experimental local-first assistant runtime, not only a model fronten
 ```text
 Chat
 Skill Studio
-Self Improvement
+Self Assessment
 ```
 
 Chat provides persistent multi-turn conversations, local/model-backed responses, skill routing, artifacts, workspace metadata, inbox delivery, initial host status, and explicit refresh.
@@ -16,7 +16,7 @@ The browser dashboard has a single personal administrator boundary. First-run `a
 
 Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 may prepare an exact proposal-local incomplete Beta workspace and bounded Codex handoff without invoking a model. A human or explicitly invoked Codex task implements and tests that candidate. Human Gate 2 approves an exact tested Beta revision; a separate preview/digest/exact-confirmation operation may then copy its self-contained Ruby entrypoint and atomically add one new production registry entry. Existing skills are never replaced, and no gate promotes automatically.
 
-Self Improvement provides one lightweight read-only environment snapshot when opened plus explicit foreground environment, package-update, model-runtime, and capability assessments. It may generate advisory improvement proposal packets only after preview, digest revalidation, and exact confirmation. It cannot apply updates or mutate the host.
+Self Assessment provides one lightweight read-only environment snapshot when opened plus explicit foreground environment, package-update, model-runtime, and capability assessments. It may generate advisory improvement proposal packets only after preview, digest revalidation, and exact confirmation. It cannot apply updates or mutate the host. The internal `self_improvement.*` operation namespace remains stable for compatibility.
 
 ## Implemented core capabilities
 

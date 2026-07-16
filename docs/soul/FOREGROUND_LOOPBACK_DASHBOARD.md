@@ -53,8 +53,8 @@ The separate delete-and-forget path targets one exact selected conversation. It 
 
 Skill Studio is the second primary tab. It projects local proposal packets, isolated Beta candidates, and registered production skills. Gate 1 approves an exact proposal revision for implementation work; Gate 2 approves an exact tested Beta revision for a later promotion workflow. Beta runs are explicit, bounded, foreground-only, and diagnostic. No gate implements or promotes automatically.
 
-Self Improvement is the third primary tab. It loads one lightweight read-only environment snapshot on first open and offers explicit environment, update, model-runtime, and capability assessments. Advisory improvement proposals require preview, digest revalidation, and exact confirmation. Host/package mutation remains unavailable.
+Self Assessment is the third primary tab. It loads one lightweight read-only environment snapshot on first open and offers explicit environment, update, model-runtime, and capability assessments. Advisory improvement proposals require preview, digest revalidation, and exact confirmation. Host/package mutation remains unavailable. Internal operation identifiers retain the `self_improvement.*` namespace for compatibility.
 
 ## Review posture
 
-Deterministic verification covers the HTTP boundary, browser protections, facade delegation, accessibility markers, visual tokens, no-polling rule, and clean max-request termination. Automated checks do not approve visual design. The owner approved the current Chat, Skill Studio, and Self Improvement visual/product direction; later visual changes still require human review.
+Deterministic verification covers the HTTP boundary, browser protections, facade delegation, accessibility markers, visual tokens, no-polling rule, and clean max-request termination. Automated checks do not approve visual design. The owner approved the original Chat, Skill Studio, and Self Improvement visual/product direction. The later Self Assessment naming and signal-interface refresh are a new visual-review candidate; material visual changes still require human review.

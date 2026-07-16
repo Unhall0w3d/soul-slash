@@ -19,7 +19,7 @@ prompts = [
   "This is a synthetic local evaluation. The project codename is Lantern. Acknowledge it briefly.",
   "What is the synthetic project's codename?",
   "We have not selected a release date. State that without inventing one.",
-  "The dashboard has Chat, Skill Studio, and Self Improvement. Which tab is for proposals?",
+  "The dashboard has Chat, Skill Studio, and Self Assessment. Which tab is for proposals?",
   "Keep the same topic and explain why a human gate matters in one sentence.",
   "Switch topics briefly: what makes a foreground operation bounded?",
   "Return to the synthetic project and name it.",

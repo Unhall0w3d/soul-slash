@@ -209,7 +209,7 @@ ruby bin/soul skill system.status
 make dashboard
 ```
 
-Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, Skill Studio, and Self Improvement. It binds to loopback only, runs in the foreground, and stops with Ctrl+C.
+Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, Skill Studio, and Self Assessment. It binds to loopback only, runs in the foreground, and stops with Ctrl+C.
 
 First-run dashboard access uses the fixed administrator username `admin` and bootstrap password `soul123`. The bootstrap session cannot load dashboard data. Replace it with a private password of 12–128 characters when prompted. Soul stores only the salted derived credential under ignored `Soul/runtime/dashboard_auth/` storage.
 

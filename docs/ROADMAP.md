@@ -26,7 +26,7 @@
 - [x] foreground loopback dashboard with Chat, workspace, and system status
 - [x] guided Skill Studio with Proposal, Beta, and Production inventories
 - [x] capability-gap intake from Chat to Skill Studio
-- [x] Self Improvement dashboard with bounded environment and capability assessment
+- [x] Self Assessment dashboard with bounded environment and capability assessment (delivered as Self Improvement in Phase 12D.3)
 - [x] proposal stage, production skill linkage, and production-only closeout
 - [x] human visual review of the three-tab dashboard aesthetic
 - [x] personal administrator authentication review

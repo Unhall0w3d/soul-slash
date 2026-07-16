@@ -11,7 +11,7 @@ Human-facing inputs and outputs:
 - CLI chat
 - single-shot CLI messages
 - foreground loopback dashboard over the versioned application facade
-- dashboard Chat, Skill Studio, and Self Improvement tabs
+- dashboard Chat, Skill Studio, and Self Assessment tabs
 - shared workspace and inbox metadata inside Chat
 - future voice input
 - future TTS output
@@ -149,7 +149,7 @@ Phase 11C adds approval-scoped artifact creation and revision. Phase 11D project
 
 ## Improvement layer
 
-The Self Improvement surface composes existing read-only assessors for the host environment, package managers, language/tool versions, local model runtime, and Soul capability matrix.
+The Self Assessment surface composes existing read-only assessors for the host environment, package managers, language/tool versions, local model runtime, and Soul capability matrix. Its internal application operations retain the `self_improvement.*` namespace for compatibility.
 
 Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper checks are explicit foreground requests. Advisory proposal generation requires a preview, exact digest, and human confirmation. Package installation/removal, operating-system updates, service changes, model downloads, implementation, and promotion are not authorized by this layer.
 

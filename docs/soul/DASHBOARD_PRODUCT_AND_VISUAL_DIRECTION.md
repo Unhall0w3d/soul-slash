@@ -9,12 +9,12 @@ The primary navigation now has three tabs in this order:
 ```text
 1. Chat
 2. Skill Studio
-3. Self Improvement
+3. Self Assessment
 ```
 
 Chat is the daily operating surface. Skill Studio is the controlled skill-creation workflow. Shared workspace, system status, approvals, and activity are supporting views rather than separate assistant brains.
 
-Self Improvement is the evidence-and-review surface for Soul's host environment, language/tool versions, local model runtime, capability matrix, and advisory improvement proposals. It is not an autonomous package manager or privileged administration console.
+Self Assessment is the evidence-and-review surface for Soul's host environment, language/tool versions, local model runtime, capability matrix, and advisory improvement proposals. It is not an autonomous package manager or privileged administration console. The name distinguishes evidence gathering from the future Self Augmentation concept, which would prepare architecture-level proposals through a separate human-reviewed boundary.
 
 ### Chat tab
 
@@ -46,7 +46,7 @@ Skill Studio organizes proposals, Beta candidates, required tests, diagnostics, 
 
 Each proposal now shows one deterministic lifecycle stage and the exact skill ID from its Beta manifest. Once that exact ID is present in the production registry, Skill Studio may offer a separately previewed and confirmed closeout that deletes the proposal and superseded Beta copy while preserving the production skill and shared diagnostics.
 
-### Self Improvement tab
+### Self Assessment tab
 
 The tab loads one lightweight read-only environment snapshot when opened. Package update checks, local model assessment, and capability assessment remain explicit foreground actions. Generating advisory improvement proposal packets requires previewing and confirming the exact assessed revision.
 
@@ -133,7 +133,26 @@ The implementation must use distributable fonts or robust system fallbacks. It m
 
 ## Visual review posture
 
-The owner approved the initial Chat/Skill Studio direction and the later Self Improvement third tab. Material changes to dashboard hierarchy, visual language, or authority boundaries still pause for human review.
+The owner approved the initial Chat/Skill Studio direction and the third assessment tab. The July 2026 signal-interface refresh moves the visual language toward Soul's machine-familiar identity: dark technical surfaces, teal operational emphasis, restrained violet, scalable code-native fields, and concise persona-aware terms such as Operator, signal, transmission, continuity, and capability. It deliberately avoids making metaphor obscure product meaning. Material changes to dashboard hierarchy, visual language, or authority boundaries still pause for human review.
+
+The interface type scale treats 11 px as the minimum for secondary utility text at normal dashboard zoom. Labels use at least 12 px, supporting copy generally uses 13–14 px, and conversation content uses 15 px or larger. Teal represents active, available, and verified state; amber represents Operator attention and approval; red represents failure and destructive boundaries. Violet is atmospheric only, not an action color.
+
+Soul may feel responsive through short CSS transitions tied to a real tab, hover, focus, or runtime state. The dashboard does not use timers, polling, infinite ambient animation, or decorative motion that competes with information. Reduced-motion preferences disable the optional interaction animation layer.
+
+## Gilded machine-soul research direction
+
+The later design candidate takes inspiration from the design principles behind Warframe's Orokin and Cephalon technology without copying its named interface, glyphs, assets, or exact layouts. Research sources included:
+
+- Digital Extremes' official [Content Creator Art Style Guide](https://www.warframe.com/en/steamworkshop/content-creator-art-style-guide), particularly its emphasis on sweeping silhouettes, over-the-top whole-form composition, faction distinction, and restraint with high-frequency detail;
+- Digital Extremes' [TennoCon 2025 Art & Animation Deep Dive](https://www.warframe.com/de/news/tennocon-2025-art-animation-of-warframe-deep-dive), including the described approach to machinery that opens as the player approaches and the blending of organic shapes with mechanical detail;
+- the official [Warframe Mission Interface](https://support.warframe.com/hc/en-us/articles/38801911653517-Mission-Interface), used as a reference for peripheral transmissions and semantically consistent status placement;
+- the official [Operator Report: The Void](https://www.warframe.com/en/news/operator-report-the-void-ko), used only as thematic context for spatial depth and luminous energy contained by ancient high technology.
+
+Soul's translation uses abyssal indigo-black as the dominant screen material, metallic gold as structural hierarchy, cerulean as active machine presence, muted pale cyan-gray for readable copy, and crimson only for real destructive or failed state. Porcelain white is deliberately excluded from large digital surfaces because sustained high luminance is unsuitable for the owner's dashboard.
+
+Major containers use asymmetric curves, layered border gradients, orbital nodes, and restrained filigree rather than conventional flat cards. The visual system prioritizes overall silhouette over repeated ornament. Finite `core-unseal`, `inscription-resolve`, and `core-awaken` effects respond to real tab, message, or element appearance. They run only when reduced motion is not requested and do not simulate model throughput or introduce timers.
+
+The following remain future concepts until supported by real product behavior: runtime-reactive throughput visualization, parameter dials, a memory graph/arbor, first-instantiation narrative, and collaborative asset editing effects. Evocative names must not replace truthful CPU, GPU, memory, model, lifecycle, or authorization labels.
 
 The review should cover:
 

@@ -153,7 +153,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Skill Studio", "Self Improvement"],
+        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment"],
         "configuration" => {
           "ok" => report.fetch("ok"),
           "lifecycle_state" => report.fetch("lifecycle_state"),
