@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/configuration_resolver"
+require_relative "../lib/soul_core/model_runtime_selected_starter"
+
+options = { root: File.expand_path("..", __dir__) }
+OptionParser.new do |parser|
+  parser.banner = "Usage: scripts/soul-model-runtime-start-selected [--root PATH]"
+  parser.on("--root PATH") { |value| options[:root] = value }
+end.parse!(ARGV)
+
+root = File.expand_path(options.fetch(:root))
+resolver = SoulCore::ConfigurationResolver.new(root: root, process_env: ENV.to_h)
+configuration = resolver.resolve
+unless configuration.fetch("ok")
+  puts JSON.pretty_generate(configuration.slice("ok", "lifecycle_state", "errors"))
+  exit 2
+end
+
+result = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: resolver.effective_environment).run
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))

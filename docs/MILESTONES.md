@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Model Runtime Portability 2C: first guarded AMD live switch
+Model Runtime Portability 2D: selected-profile startup policy
 ```
 
-This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, alternate-port behavioral benchmark, portable guarded switching, and inactive AMD unit deployment are complete. The current gate has switched the live loopback provider to the AMD/Ministral profile under the controller's idle, digest, and exact-confirmation protections. AMD remains manually selected and static; reboot/startup policy is a separate future gate.
+This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, alternate-port behavioral benchmark, portable guarded switching, inactive AMD unit deployment, and live AMD cutover are complete. The current gate replaces NVIDIA-specific autostart with one enabled bounded oneshot that starts only Soul's last human-confirmed selected profile at user-manager startup. The policy was installed live without rebooting or restarting AMD.
 
 See:
 

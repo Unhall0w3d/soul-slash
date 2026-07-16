@@ -105,6 +105,40 @@ Removal refuses to stop an active unit. See
 
 The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload or switching while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.
 
+### Start the last selected model profile at login
+
+After multi-profile switching and both user units have been reviewed, replace a
+single model's autostart with Soul's bounded selected-profile startup policy:
+
+```bash
+make model-runtime-startup-plan
+make model-runtime-startup-install CONFIRM=INSTALL_SELECTED_MODEL_STARTUP
+make model-runtime-startup-status
+```
+
+No reboot is required. Installation enables one systemd user oneshot and
+disables the legacy `llama-server.service` startup link without using `--now`,
+so it does not stop or restart the active model. On a future user-manager start,
+the oneshot reads Soul's last human-confirmed profile selection, starts at most
+that one allowlisted model service, and exits. It blocks rather than stopping an
+unexpected active service.
+
+To verify the policy against the current session without restarting a model:
+
+```bash
+make model-runtime-startup-reconcile
+```
+
+If the selected profile is already active, this is a mutation-free success.
+Removal is separately confirmed and restores legacy NVIDIA autostart:
+
+```bash
+make model-runtime-startup-uninstall CONFIRM=REMOVE_SELECTED_MODEL_STARTUP
+```
+
+See `docs/soul/MODEL_RUNTIME_PORTABILITY_2D_SELECTED_STARTUP_BRIEF.md` for the
+exact persistence exception and failure behavior.
+
 Supported providers:
 
 - llama.cpp server

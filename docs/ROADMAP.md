@@ -49,7 +49,7 @@
 - [x] preview-gated multi-profile switching candidate
 - [x] inactive, unenabled AMD user-unit deployment candidate
 - [x] first guarded live AMD switch with NVIDIA rollback retained
-- [ ] explicit reboot/startup policy for the selected runtime profile
+- [x] bounded selected-profile startup policy installed without reboot
 - [ ] reviewed Proxmox deployment
 - [ ] backup and disaster-recovery design
 - [ ] voice input

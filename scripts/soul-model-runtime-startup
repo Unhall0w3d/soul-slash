@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/model_runtime_startup_deployment"
+
+options = {}
+OptionParser.new do |parser|
+  parser.banner = "Usage: scripts/soul-model-runtime-startup COMMAND [--confirmation PHRASE]"
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!(ARGV)
+
+deployment = SoulCore::ModelRuntimeStartupDeployment.new(root: File.expand_path("..", __dir__))
+result = case ARGV.shift
+         when "plan" then deployment.plan
+         when "install" then deployment.install(confirmation: options[:confirmation])
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else
+           warn "Usage: scripts/soul-model-runtime-startup COMMAND [--confirmation PHRASE]"
+           exit 1
+         end
+
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (result.lifecycle_state == "awaiting_input" || result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))
