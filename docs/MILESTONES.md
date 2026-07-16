@@ -115,10 +115,10 @@ in progress
 Current candidate slice:
 
 ```text
-Model Runtime Portability 2D: selected-profile startup policy
+Architecture and Stewardship A0: Self Augmentation and Host Improvement research/design
 ```
 
-This new milestone does not reopen or extend the accepted Conversational Soul phase sequence. The single-service controller, AMD Vulkan build, alternate-port behavioral benchmark, portable guarded switching, inactive AMD unit deployment, and live AMD cutover are complete. The current gate replaces NVIDIA-specific autostart with one enabled bounded oneshot that starts only Soul's last human-confirmed selected profile at user-manager startup. The policy was installed live without rebooting or restarting AMD.
+The model-runtime portability sequence is complete through the reviewed selected-profile startup policy. The current candidate defines separate authority for Self Assessment, Host Improvement, and Self Augmentation; uses terminal handoff before privileged execution; isolates future architectural experiments in Git worktrees; and keeps automatic Codex invocation, repository integration, and privileged brokers deferred. No host or source mutation is authorized by this design gate.
 
 See:
 

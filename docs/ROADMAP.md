@@ -50,6 +50,12 @@
 - [x] inactive, unenabled AMD user-unit deployment candidate
 - [x] first guarded live AMD switch with NVIDIA rollback retained
 - [x] bounded selected-profile startup policy installed without reboot
+- [x] approve Self Augmentation and Host Improvement A0 architecture
+- [ ] A1 correct package/update evidence and define typed plan schemas
+- [ ] A2 add Arch terminal handoff and postcondition receipt review
+- [ ] A3 add tracked-code augmentation census and proposal review tab
+- [ ] A4 prepare human-approved isolated worktree and Codex handoff
+- [ ] A5 review exact augmentation candidate and hand off external integration
 - [ ] reviewed Proxmox deployment
 - [ ] backup and disaster-recovery design
 - [ ] voice input
