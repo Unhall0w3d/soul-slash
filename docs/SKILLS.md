@@ -151,10 +151,10 @@ proposal intake or draft
 → bounded Beta implementation outside the production registry
 → explicit human-invoked testing and diagnostics
 → human Gate 2 approval of the exact tested revision
-→ separate later promotion workflow
+→ separate preview/digest/exact-confirmation production promotion
 ```
 
-Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. That self-skilling intake stops at human review and does not call Mistral, invoke Codex, build a Beta, or promote code automatically.
+Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. After Gate 1, Skill Studio can prepare an incomplete proposal-local Beta workspace and bounded Codex handoff, but does not invoke Codex or Mistral. After separate implementation, current passing tests, and Gate 2 approval, production promotion remains a distinct preview/digest/exact-confirmation operation that never replaces an existing skill.
 
 ### Self Improvement assessments
 

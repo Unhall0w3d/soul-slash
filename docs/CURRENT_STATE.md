@@ -14,7 +14,7 @@ Chat provides persistent multi-turn conversations, local/model-backed responses,
 
 The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage. Sessions are bounded to seven days and persist across dashboard restarts using owner-only token digests; raw bearer tokens remain in host-only browser cookies. Sign-ups and additional accounts are unavailable.
 
-Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 approves an exact proposal revision for Beta implementation work. Human Gate 2 approves an exact tested Beta revision for a later promotion workflow. Neither gate implements, registers, promotes, merges, or releases automatically.
+Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 may prepare an exact proposal-local incomplete Beta workspace and bounded Codex handoff without invoking a model. A human or explicitly invoked Codex task implements and tests that candidate. Human Gate 2 approves an exact tested Beta revision; a separate preview/digest/exact-confirmation operation may then copy its self-contained Ruby entrypoint and atomically add one new production registry entry. Existing skills are never replaced, and no gate promotes automatically.
 
 Self Improvement provides one lightweight read-only environment snapshot when opened plus explicit foreground environment, package-update, model-runtime, and capability assessments. It may generate advisory improvement proposal packets only after preview, digest revalidation, and exact confirmation. It cannot apply updates or mutate the host.
 
@@ -58,7 +58,7 @@ Human approval remains required for:
 
 ## Current development position
 
-The Conversational Soul milestone has completed human review of the Phase 12E unified Review Center, Phase 12D.4 proposal lifecycle closeout, Phase 12C.1 seven-day personal authentication, conversation-management amendments, dedicated Skill Studio artwork, and the protected local systemd/Caddy LAN deployment. The next checkpoint is Phase 12D.5: bounded proposal-to-Beta implementation and preview-gated Beta-to-production promotion. Phase 13 remains the integrated conversational acceptance and closeout point.
+The Conversational Soul milestone has completed human review of the Phase 12E unified Review Center, Phase 12D.4 proposal lifecycle closeout, Phase 12C.1 seven-day personal authentication, conversation-management amendments, dedicated Skill Studio artwork, and the protected local systemd/Caddy LAN deployment. Phase 12D.5 is now a candidate with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13 remains the integrated conversational acceptance and closeout point after human review.
 
 Detailed references:
 

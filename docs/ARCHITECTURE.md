@@ -101,6 +101,8 @@ Current bounded capabilities include:
 
 Separate Beta candidates are held outside the production registry. They run only after preview and exact human confirmation, with bounded foreground execution and local diagnostic evidence.
 
+Phase 12D.5 connects Gate 1 to an honest incomplete proposal-local Beta workspace and bounded Codex handoff without invoking a model. After separate implementation, current passing tests, and Gate 2 approval of the exact digest, production promotion is still a distinct preview/digest/exact-confirmation mutation. It copies one self-contained Ruby entrypoint into a fixed generated-skill directory, atomically adds a new registry entry, writes byte-hash and rollback evidence, and never replaces an existing production skill.
+
 Execution skills should produce structured results and explicit verification fields.
 
 Write-capable execution must preserve:

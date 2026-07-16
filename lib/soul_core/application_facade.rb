@@ -116,6 +116,8 @@ module SoulCore
       when "skill_studio.proposals.get" then domain(skill_studio.proposal(proposal_id: required(parameters, "proposal_id")))
       when "skill_studio.proposals.approval.preview" then domain(skill_studio.proposal_approval_preview(proposal_id: required(parameters, "proposal_id")))
       when "skill_studio.proposals.approval.execute" then domain(skill_studio.approve_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "skill_studio.proposals.beta_build.preview" then domain(skill_studio.beta_build_preview(proposal_id: required(parameters, "proposal_id"), skill_id: required(parameters, "skill_id")))
+      when "skill_studio.proposals.beta_build.execute" then domain(skill_studio.prepare_beta_build(proposal_id: required(parameters, "proposal_id"), skill_id: required(parameters, "skill_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.proposals.close.preview" then domain(skill_studio.proposal_close_preview(proposal_id: required(parameters, "proposal_id")))
       when "skill_studio.proposals.close.execute" then domain(skill_studio.close_production_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.list" then domain(skill_studio.betas(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
@@ -124,6 +126,8 @@ module SoulCore
       when "skill_studio.betas.run.execute" then domain(skill_studio.run_beta(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.promotion.preview" then domain(skill_studio.promotion_preview(beta_id: required(parameters, "beta_id")))
       when "skill_studio.betas.promotion.approve" then domain(skill_studio.approve_beta_for_promotion(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "skill_studio.betas.production.preview" then domain(skill_studio.production_promotion_preview(beta_id: required(parameters, "beta_id")))
+      when "skill_studio.betas.production.execute" then domain(skill_studio.promote_beta_to_production(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_improvement.snapshot" then domain(self_improvement.snapshot)
       when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
       when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
@@ -152,11 +156,13 @@ module SoulCore
         "system_status" => { "collected" => false, "refresh_operation" => "system_status.refresh" },
         "skill_studio" => {
           "available" => true,
-          "phase" => "12D",
+          "phase" => "12D.5",
           "maturity_name" => "Beta",
           "proposal_gate" => "human_exact_confirmation",
           "beta_gate" => "human_exact_confirmation",
-          "automatic_promotion" => false
+          "automatic_promotion" => false,
+          "beta_build_preparation" => "preview_and_exact_confirmation",
+          "production_promotion" => "preview_digest_and_exact_confirmation"
         },
         "self_improvement" => {
           "available" => true,

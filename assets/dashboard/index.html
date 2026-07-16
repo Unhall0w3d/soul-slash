@@ -159,6 +159,13 @@
               <div id="proposal-approval-confirm" hidden><label for="proposal-confirmation">Type <code>APPROVE_PROPOSAL_FOR_BETA_BUILD</code></label><input id="proposal-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-proposal-approval" class="gate-button gate-button--gold" type="button" disabled>Approve exact proposal revision</button></div>
               <p id="proposal-approval-status" class="dialog-status" role="status"></p>
             </section>
+            <section id="beta-build-card" class="gate-card" hidden>
+              <div><p class="eyebrow">Approved build workspace</p><h3>Prepare isolated Beta implementation</h3><p>Creates an incomplete proposal-local workspace and bounded Codex handoff. It does not invoke a model, implement behavior, or modify production.</p></div>
+              <label for="beta-build-skill-id">Canonical production skill ID</label><input id="beta-build-skill-id" type="text" maxlength="120" autocomplete="off" spellcheck="false" placeholder="category.skill_name">
+              <button id="preview-beta-build" class="gate-button" type="button">Preview Beta workspace</button>
+              <div id="beta-build-confirm" hidden><label for="beta-build-confirmation">Type the exact preparation phrase shown below</label><code id="beta-build-phrase"></code><input id="beta-build-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-beta-build" class="gate-button gate-button--gold" type="button" disabled>Prepare incomplete Beta workspace</button></div>
+              <p id="beta-build-status" class="dialog-status" role="status"></p>
+            </section>
             <section id="proposal-close-card" class="gate-card proposal-close-card" hidden>
               <div><p class="eyebrow">Production closeout</p><h3>Close completed proposal</h3><p>The exact linked skill is registered in production. Closing permanently deletes this proposal and its superseded Beta candidate copy, while preserving the production skill and shared diagnostics.</p></div>
               <button id="preview-proposal-close" class="gate-button" type="button">Preview production closeout</button>
@@ -185,6 +192,12 @@
               <button id="preview-beta-promotion" class="gate-button" type="button">Review promotion readiness</button>
               <div id="beta-promotion-confirm" hidden><div id="beta-promotion-blockers" class="test-list"></div><label for="beta-promotion-confirmation">Type <code>APPROVE_BETA_FOR_PROMOTION</code></label><input id="beta-promotion-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-beta-promotion" class="gate-button gate-button--gold" type="button" disabled>Approve exact tested revision</button></div>
               <p id="beta-promotion-status" class="dialog-status" role="status"></p>
+            </section>
+            <section id="production-promotion-card" class="gate-card" hidden>
+              <div><p class="eyebrow">Explicit production mutation</p><h3>Promote approved Beta</h3><p>Copies the exact reviewed entrypoint, writes hash and rollback evidence, and atomically adds one new production registry entry. Existing skills are never replaced.</p></div>
+              <button id="preview-production-promotion" class="gate-button" type="button">Preview production files and registry</button>
+              <div id="production-promotion-confirm" hidden><div id="production-promotion-scope" class="test-list"></div><label for="production-promotion-confirmation">Type the exact promotion phrase shown below</label><code id="production-promotion-phrase"></code><input id="production-promotion-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="execute-production-promotion" class="gate-button gate-button--gold" type="button" disabled>Promote exact tested Beta</button></div>
+              <p id="production-promotion-status" class="dialog-status" role="status"></p>
             </section>
           </article>
         </section>
