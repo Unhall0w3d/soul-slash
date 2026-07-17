@@ -17,7 +17,7 @@ AMD_MODEL_SHA256 ?=
 AMD_MODEL_ALIAS ?=
 AMD_PORT ?=8082
 
-.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -42,6 +42,7 @@ help:
 > @echo "  make dashboard-service-status"
 > @echo "  make dashboard-service-logs"
 > @echo "  make dashboard-service-uninstall CONFIRM=REMOVE_SOUL_LAN_SERVICES"
+> @echo "  make verify-web-knowledge  Test bounded lookup, SearXNG research, reflection, and chat streaming"
 > @echo "  make verify-model-runtime-controls  Test leases and preview-gated model controls"
 > @echo "  make model-runtime-amd-plan AMD_SERVER=... AMD_MODEL=... AMD_SERVER_SHA256=... AMD_MODEL_SHA256=... AMD_MODEL_ALIAS=..."
 > @echo "  make model-runtime-amd-install ... CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT"
@@ -141,6 +142,9 @@ dashboard-service-logs:
 dashboard-service-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_SOUL_LAN_SERVICES" || { echo "Set CONFIRM=REMOVE_SOUL_LAN_SERVICES to remove the two services."; exit 2; }
 > @scripts/soul-dashboard-service uninstall --confirmation "$(CONFIRM)"
+
+verify-web-knowledge:
+> @ruby scripts/verify-responsive-chat-and-web-research.rb
 
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb

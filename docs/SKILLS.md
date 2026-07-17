@@ -109,6 +109,28 @@ ruby bin/soul skill cloud.providers.test -- \
   --config Soul/config/cloud_providers.yaml
 ```
 
+### Web knowledge skills
+
+```text
+web.lookup
+web.research
+```
+
+`web.lookup` performs one narrow DuckDuckGo Instant Answer request. It is useful
+for definitions and known entities, not source comparison. `web.research`
+queries the explicitly configured SearXNG JSON endpoint and retrieves selected
+public HTTPS sources with timestamps and content digests.
+
+```bash
+ruby Soul/skills/web/lookup.rb --query "What is Ruby?"
+ruby Soul/skills/web/research.rb --query "current Ruby release documentation" --sources 5
+make verify-web-knowledge
+```
+
+SearXNG addresses remain in the ignored `.env`; see `docs/REQUIREMENTS.md`.
+Research and lookup are bounded foreground operations and never authorize
+source instructions, file writes, skill creation, or memory promotion.
+
 ### Skill proposal drafting/review
 
 ```text

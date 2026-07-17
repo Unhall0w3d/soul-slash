@@ -73,14 +73,14 @@ module SoulCore
       @self_augmentation_experiment_service = self_augmentation_experiment_service
     end
 
-    def call(request)
+    def call(request, progress: nil)
       validation = Contract.validate(request)
       return envelope_from_validation(request, validation) unless validation.fetch("ok")
 
       operation = request.fetch("operation")
       return envelope(request, lifecycle: "canceled", data: { "reason" => "application request canceled" }) if operation == "application.cancel"
 
-      data, lifecycle, mutation, replay = dispatch(operation, request.fetch("parameters", {}), request.fetch("context", {}), request.fetch("request_id"))
+      data, lifecycle, mutation, replay = dispatch(operation, request.fetch("parameters", {}), request.fetch("context", {}), request.fetch("request_id"), progress: progress)
       envelope(
         request,
         lifecycle: lifecycle,
@@ -98,14 +98,14 @@ module SoulCore
 
     private
 
-    def dispatch(operation, parameters, context, request_id)
+    def dispatch(operation, parameters, context, request_id, progress: nil)
       case operation
       when "application.bootstrap" then [bootstrap, "complete", "none", false]
       when "chats.list" then [chats_list(parameters), "complete", "none", false]
       when "chats.get" then domain(chats_get(parameters))
       when "chats.messages" then domain(chats_messages(parameters))
       when "chats.create" then domain(chats_create(parameters))
-      when "chats.send" then domain(chats_send(parameters, context, request_id))
+      when "chats.send" then domain(chats_send(parameters, context, request_id, progress: progress))
       when "chats.pin" then domain(chat_flag(parameters, true))
       when "chats.unpin" then domain(chat_flag(parameters, false))
       when "chats.clear.preview" then domain(conversation_clear_service.preview(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"]))
@@ -271,17 +271,19 @@ module SoulCore
       success({ "record" => chat_projection(chat) }, mutation: "chat_created")
     end
 
-    def chats_send(parameters, context, request_id)
+    def chats_send(parameters, context, request_id, progress: nil)
       chat_id = parameters["chat_id"] || context["current_chat_id"]
       return awaiting("chat_id is required") if chat_id.to_s.empty?
       return awaiting("message is required") if parameters["message"].to_s.strip.empty?
 
-      chat_service.send(
+      options = {
         chat_id: chat_id,
         message: parameters["message"],
         request_id: request_id,
         interface: context.fetch("interface", "internal")
-      )
+      }
+      options[:progress] = progress if progress
+      chat_service.send(**options)
     end
 
     def chat_flag(parameters, pinned)

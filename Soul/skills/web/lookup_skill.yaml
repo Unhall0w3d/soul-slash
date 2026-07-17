@@ -1,0 +1,20 @@
+id: web.lookup
+name: Bounded instant reference lookup
+description: Request one narrow DuckDuckGo Instant Answer without treating it as general web research.
+risk: read_only_network
+requires_approval: false
+writes_files: false
+network_access: true
+expected_output: json
+lifecycle_states:
+  - complete
+  - failed
+  - awaiting_input
+  - canceled
+  - blocked_for_human_review
+bounds:
+  queries: 1
+  response_bytes: 524288
+  overall_seconds: 30
+memory: shared_conversation_evidence_only
+background_execution: false

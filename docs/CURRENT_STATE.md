@@ -8,9 +8,15 @@ Soul/ is an experimental local-first assistant runtime, not only a model fronten
 Chat
 Skill Studio
 Self Assessment
+Self Augmentation
 ```
 
-Chat provides persistent multi-turn conversations, local/model-backed responses, skill routing, artifacts, workspace metadata, inbox delivery, initial host status, and explicit refresh.
+Chat provides persistent multi-turn conversations, immediate accepted-message
+rendering, truthful foreground work summaries, a responsive Soul familiar,
+local/model-backed responses, skill routing, artifacts, workspace metadata,
+inbox delivery, initial host status, and explicit refresh. Narrow orientation
+may use bounded DuckDuckGo Instant Answers; evidence-bearing work uses an
+explicitly configured SearXNG endpoint and selected public HTTPS sources.
 
 The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage. Sessions are bounded to seven days and persist across dashboard restarts using owner-only token digests; raw bearer tokens remain in host-only browser cookies. Sign-ups and additional accounts are unavailable.
 
@@ -31,6 +37,8 @@ Self Assessment provides one lightweight read-only environment snapshot when ope
 - conservative self-skilling intake for genuinely unsupported task requests;
 - environment, model-runtime, capability, and improvement-proposal assessment;
 - portable typed configuration through CLI overrides, process environment, ignored `.env`, and safe defaults.
+- separate bounded `web.lookup` and provenance-preserving `web.research` paths;
+- explicit review-only research reflection candidates with no automatic memory promotion.
 
 ## Runtime and deployment boundary
 

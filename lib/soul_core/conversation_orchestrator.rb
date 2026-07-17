@@ -57,6 +57,24 @@ module SoulCore
     ].freeze
 
     ARTIFACT_REVISION_REQUEST = /\b(?:revise|revision|update)\b.{0,120}\b(?:artifact|report|document|notes?|json|text)\b/i
+    RESEARCH_PATTERNS = [
+      /\b(?:research|web research|online research)\b/i,
+      /\b(?:search|look up|find)\b.{0,80}\b(?:online|on the web|sources?|documentation|current information)\b/i,
+      /\b(?:according to|based on)\b.{0,40}\b(?:current|public|external)\b.{0,20}\b(?:sources?|research|documentation)\b/i
+    ].freeze
+    RESEARCH_REFLECTION_PATTERNS = [
+      /\A\s*(?:please\s+)?reflect on (?:this|the) (?:research|work|troubleshooting|conversation)(?:\s+and propose memory candidates?)?\s*[?.!]*\z/i,
+      /\A\s*(?:create|draft|prepare) (?:a\s+)?research reflection(?: candidate)?\s*[?.!]*\z/i
+    ].freeze
+    LOOKUP_PATTERNS = [
+      /\A\s*(?:who|what)\s+(?:is|was|are|were)\s+.{2,160}[?.!]*\s*\z/i,
+      /\A\s*(?:briefly\s+)?(?:define|explain)\s+.{2,160}[?.!]*\s*\z/i,
+      /\A\s*(?:can you\s+)?tell me (?:briefly\s+)?about\s+.{2,160}[?.!]*\s*\z/i,
+      /\A\s*give me (?:a\s+)?(?:brief|short) (?:introduction|overview) (?:of|to)\s+.{2,160}[?.!]*\s*\z/i
+    ].freeze
+    LOOKUP_EXCLUSIONS = /\b(?:current|currently|latest|today|recent|compare|comparison|difference|relationship|versus|research|sources?|citations?|documentation|proposal|script|code|artifact|report|create|build|write|implement|troubleshoot|security|medical|legal|financial|Soul|yourself)\b/i
+    LOOKUP_SELF_REFERENCE = /(?:\b(?:what|who)\s+(?:is|are)\s+you\b|\btell me about your\b|\b(?:for|to) you\b|\byour\b)/i
+    RESEARCH_DELIVERABLE = /\b(?:proposal|script|code|artifact|report|file|document)\b/i
 
     INTEREST_CONTROL_PATTERNS = [
       /\A\s*(?:interest help|help interests?)\s*[?.!]*\z/i,
@@ -135,6 +153,28 @@ module SoulCore
         "artifact_decision" => artifact_decision.to_h,
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if RESEARCH_REFLECTION_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "research_reflection",
+          reason: "an explicit reflection request may draft a local review-only candidate from retained conversation evidence",
+          requires_model: true,
+          synthesize: false,
+          max_steps: 1,
+          flags: flags.merge("research_reflection" => true)
+        )
+      end
+
+      if RESEARCH_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "web_research",
+          reason: "the request explicitly requires current public-web evidence before synthesis",
+          requires_model: provider_available,
+          synthesize: provider_available,
+          max_steps: 1,
+          flags: flags.merge("web_research" => true, "research_deliverable" => text.match?(RESEARCH_DELIVERABLE))
+        )
+      end
 
       if ARTIFACT_CREATION_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
@@ -275,6 +315,17 @@ module SoulCore
         )
       end
 
+      if lookup_candidate?(text)
+        return decision(
+          kind: "web_lookup",
+          reason: "the request is a narrow orientation suitable for an Instant Answer, with research escalation if no structured answer exists",
+          requires_model: provider_available,
+          synthesize: provider_available,
+          max_steps: 1,
+          flags: flags.merge("web_lookup" => true)
+        )
+      end
+
       tools = matched_tools(text, intent).first(@max_tool_steps)
       unless tools.empty?
         if provider_available && tools.all? { |tool| tool.synthesis_allowed == true }
@@ -316,13 +367,25 @@ module SoulCore
 
     private
 
+    def lookup_candidate?(text)
+      return false if text.match?(LOOKUP_EXCLUSIONS)
+      return false if text.match?(LOOKUP_SELF_REFERENCE)
+
+      LOOKUP_PATTERNS.any? { |pattern| text.match?(pattern) }
+    end
+
     def matched_tools(text, intent)
       matches = @tool_catalog.match(text)
+      mapped_id = INTENT_TOOL_MAP[intent]
+      mapped = mapped_id && @tool_catalog.find(mapped_id)
+
+      # A question about the catalog may mention the job a skill should do.
+      # Answer the inventory question; do not silently execute that other job.
+      return [mapped] if intent == "skill_catalog" && mapped
+
       host = matches.find { |tool| tool.id == "host.system_status" }
       return [host] if host
 
-      mapped_id = INTENT_TOOL_MAP[intent]
-      mapped = mapped_id && @tool_catalog.find(mapped_id)
       matches << mapped if mapped && !matches.include?(mapped)
       matches.uniq { |tool| tool.id }
     end

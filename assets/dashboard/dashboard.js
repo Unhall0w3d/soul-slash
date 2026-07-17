@@ -24,6 +24,26 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
   return envelope;
 }
 
+async function callSoulStream(operation, parameters = {}, context = {}, onProgress = () => {}) {
+  const response = await fetch("/api/v1/chat-stream", {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+    body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
+    cache: "no-store"
+  });
+  if (!response.ok || !response.body) { const failure = await response.json().catch(() => ({})); throw new Error(failure.error?.reason || "Chat stream failed safely"); }
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let finalEnvelope = null;
+  while (true) {
+    const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n"); buffer = lines.pop() || "";
+    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; });
+    if (done) break;
+  }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") finalEnvelope = event.envelope; }
+  if (!finalEnvelope) throw new Error("Chat stream ended without a terminal result");
+  return finalEnvelope;
+}
+
 async function authRequest(path, body) {
   const options = { credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf } };
   if (body !== undefined) { options.method = "POST"; options.body = JSON.stringify(body); }
@@ -94,10 +114,20 @@ function lifecycle(envelope) {
   return value;
 }
 
+function setSoulActivity(activityState, summary) {
+  const presence = byId("soul-presence"); if (!presence) return;
+  presence.dataset.state = activityState || "idle";
+  const titles = { idle: "Soul is listening.", received: "Transmission received.", context: "Reading the thread.", planning: "Tracing a path.", inspecting: "Inspecting local evidence.", researching: "Following public signals.", synthesizing: "Shaping a response.", drafting: "Preparing an artifact.", reviewing: "Reviewing the result.", finalizing: "Sealing continuity.", complete: "Soul is present.", failed: "The path closed safely." };
+  byId("soul-presence-title").textContent = titles[activityState] || "Soul is working.";
+  byId("soul-activity-summary").textContent = summary || "Foreground work remains bounded to this request.";
+}
+
 function setBusy(busy, message = "") {
   state.busy = busy;
   byId("send-message").disabled = busy || !state.activeChat;
-  byId("message-input").disabled = busy || !state.activeChat;
+  byId("message-input").disabled = !state.activeChat;
+  byId("send-message").querySelector("span").textContent = busy ? "Working" : "Send";
+  byId("composer-hint").textContent = busy ? "Soul is working · you may draft, but ordinary Enter will not interrupt" : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected");
   if (message) announce(message);
 }
 
@@ -184,16 +214,26 @@ async function selectChat(chat) {
   } catch (error) { showError(error); } finally { setBusy(false); }
 }
 
+function messageArticle(record, { pending = false, working = false } = {}) {
+  const article = document.createElement("article"); const role = record.role === "user" ? "user" : "assistant"; article.className = `message message--${role}`;
+  if (pending) article.classList.add("message--pending"); if (working) article.classList.add("message--working");
+  const label = document.createElement("div"); label.className = "message-label"; label.textContent = role === "user" ? (pending ? "You · sending" : "You") : "Soul /";
+  const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body); return article;
+}
+
 function renderMessages(records, noChat = false) {
   const area = byId("messages"); area.replaceChildren();
   if (!records.length) { const empty = document.createElement("div"); empty.className = "empty-state"; const copy = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = noChat ? "Active list clear" : "Fresh context"; const heading = document.createElement("h2"); heading.textContent = noChat ? "Create a conversation when you’re ready." : "This conversation is ready."; const note = document.createElement("p"); note.textContent = noChat ? "Archived transcripts remain stored locally and are not deleted." : "Your first message will use Soul’s configured provider and shared context boundary."; copy.append(eyebrow, heading, note); empty.append(copy); area.append(empty); return; }
-  records.forEach((record) => {
-    const article = document.createElement("article"); const role = record.role === "user" ? "user" : "assistant"; article.className = `message message--${role}`;
-    const label = document.createElement("div"); label.className = "message-label"; label.textContent = role === "user" ? "You" : "Soul /";
-    const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body); area.append(article);
-  });
+  records.forEach((record) => area.append(messageArticle(record)));
   area.scrollTop = area.scrollHeight;
 }
+
+function appendPendingExchange(message) {
+  const area = byId("messages"); area.querySelector(".empty-state")?.remove(); area.append(messageArticle({ role: "user", content: message }, { pending: true }));
+  const working = messageArticle({ role: "assistant", content: "Reading the transmission…" }, { working: true }); working.id = "soul-working-message"; area.append(working); area.scrollTop = area.scrollHeight;
+}
+
+function updateWorkingMessage(summary) { const body = byId("soul-working-message")?.querySelector(".message-body"); if (body) body.textContent = summary; }
 
 function renderWorkspace(records) {
   byId("workspace-count").textContent = String(records.length); const list = byId("workspace-list"); list.replaceChildren();
@@ -354,14 +394,14 @@ async function executeClear() {
 
 async function sendMessage(event) {
   event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy) return;
+  const chatId = state.activeChat.id; input.value = ""; appendPendingExchange(message); setSoulActivity("received", "The interface has accepted your transmission.");
   setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending"; document.querySelector(".state-ribbon").dataset.lifecycle = "pending"; document.querySelector(".conversation").dataset.lifecycle = "pending";
   try {
-    const envelope = await callSoul("chats.send", { chat_id: state.activeChat.id, message }, { current_chat_id: state.activeChat.id }); lifecycle(envelope);
-    if (envelope.lifecycle_state === "complete") input.value = "";
-    const messages = await callSoul("chats.messages", { chat_id: state.activeChat.id, limit: 200 }, { current_chat_id: state.activeChat.id }); renderMessages(dataOf(messages).records || []);
-    const workspace = await callSoul("workspace.chat", { chat_id: state.activeChat.id, limit: 50 }, { current_chat_id: state.activeChat.id }); renderWorkspace(dataOf(workspace).records || []);
+    const envelope = await callSoulStream("chats.send", { chat_id: chatId, message }, { current_chat_id: chatId }, (progress) => { setSoulActivity(progress.state, progress.summary); updateWorkingMessage(progress.summary); }); lifecycle(envelope);
+    const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); renderMessages(dataOf(messages).records || []);
+    const workspace = await callSoul("workspace.chat", { chat_id: chatId, limit: 50 }, { current_chat_id: chatId }); renderWorkspace(dataOf(workspace).records || []);
     await loadChats(false); announce(`Request ${envelope.lifecycle_state || "finished"}`);
-  } catch (error) { showError(error); } finally { setBusy(false); input.focus(); }
+  } catch (error) { try { const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records); if (!records.some((record) => record.role === "user" && record.content === message)) input.value = message; } catch (_reconcileError) { input.value = message; } setSoulActivity("failed", "The exchange failed safely; an unsent draft has been restored."); showError(error); } finally { setBusy(false); input.focus(); }
 }
 
 async function togglePin() {
@@ -1077,5 +1117,5 @@ byId("close-model-runtime-dialog").addEventListener("click", () => byId("model-r
 byId("model-runtime-confirmation").addEventListener("input", () => { byId("execute-model-runtime").disabled = !state.modelRuntimePreview || byId("model-runtime-confirmation").value !== state.modelRuntimePreview.confirmation; });
 byId("execute-model-runtime").addEventListener("click", executeModelRuntime);
 byId("composer").addEventListener("submit", sendMessage);
-byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); byId("composer").requestSubmit(); } });
+byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (state.busy) { announce("Soul is still working; the draft was not sent or used as an interruption."); return; } byId("composer").requestSubmit(); } });
 initializeAuthentication();

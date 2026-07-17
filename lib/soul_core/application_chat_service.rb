@@ -14,7 +14,7 @@ module SoulCore
       @receipt_store = receipt_store || ApplicationRequestReceiptStore.new(root: @root)
     end
 
-    def send(chat_id:, message:, request_id:, interface: "internal")
+    def send(chat_id:, message:, request_id:, interface: "internal", progress: nil)
       raise ArgumentError, "invalid application request ID" unless request_id.to_s.match?(ApplicationContract::REQUEST_ID)
       raise ArgumentError, "invalid canonical chat ID" unless chat_id.to_s.match?(ApplicationContract::CHAT_ID)
       chat = @store.chat(chat_id)
@@ -45,7 +45,11 @@ module SoulCore
         content: text,
         metadata: application_metadata(request_id, interface)
       )
-      result = @runtime.respond(chat_id: chat_id, message: text)
+      emit(progress, "received", "Transmission received and written to local continuity.")
+      runtime_options = { chat_id: chat_id, message: text }
+      runtime_options[:progress] = progress if progress
+      result = @runtime.respond(**runtime_options)
+      emit(progress, "finalizing", "Sealing the response into this transmission.")
       assistant_message = @store.add_message(
         chat_id,
         role: "assistant",
@@ -63,6 +67,7 @@ module SoulCore
         user_message_id: user_message.fetch("id"),
         assistant_message_id: assistant_message.fetch("id")
       )
+      emit(progress, "complete", "Response complete.")
       success(user_message, assistant_message, result, replay: false)
     rescue ArgumentError => error
       safe_fail(request_id, "invalid_input")
@@ -76,6 +81,12 @@ module SoulCore
     end
 
     private
+
+    def emit(progress, state, summary)
+      progress&.call({ "state" => state, "summary" => summary })
+    rescue StandardError
+      nil
+    end
 
     def replay(receipt)
       user_message = @store.message(receipt.fetch("identity"), receipt.fetch("user_message_id"))

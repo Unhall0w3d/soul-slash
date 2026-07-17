@@ -148,12 +148,37 @@ module SoulCore
     end
 
     def write_response(client, response)
+      return write_stream_response(client, response) if response.body.respond_to?(:each) && !response.body.is_a?(String)
+
       body = response.body.to_s
       headers = response.headers.merge("Content-Length" => body.bytesize.to_s)
       client.write("HTTP/1.1 #{response.status} #{STATUS_TEXT.fetch(response.status, 'Response')}\r\n")
       headers.each { |key, value| client.write("#{key}: #{value}\r\n") }
       client.write("\r\n")
       client.write(body)
+    end
+
+    def write_stream_response(client, response)
+      headers = response.headers.merge("Transfer-Encoding" => "chunked")
+      client.write("HTTP/1.1 #{response.status} #{STATUS_TEXT.fetch(response.status, 'Response')}\r\n")
+      headers.each { |key, value| client.write("#{key}: #{value}\r\n") }
+      client.write("\r\n")
+      connected = true
+      response.body.each do |chunk|
+        bytes = chunk.to_s
+        next if bytes.empty?
+
+        if connected
+          begin
+            client.write("#{bytes.bytesize.to_s(16)}\r\n#{bytes}\r\n")
+          rescue IOError, Errno::EPIPE
+            connected = false
+          end
+        end
+      end
+      client.write("0\r\n\r\n") if connected
+    rescue IOError, Errno::EPIPE
+      nil
     end
 
     def write_plain_error(client, status, message)

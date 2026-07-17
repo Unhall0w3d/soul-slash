@@ -8,6 +8,7 @@ require_relative "conversation_style_controls"
 require_relative "conversation_identity_controls"
 require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
+require_relative "conversation_tool_catalog"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
 require_relative "read_only_skill_execution_gate"
@@ -64,7 +65,7 @@ module SoulCore
       when "identity"
         @identity_controls.summary
       when "skill_catalog"
-        simple_execute(intent, text, "assistant skill catalog")
+        execute_skill_catalog(intent, text)
       when "repo_status"
         simple_execute(intent, text, "system status")
       else
@@ -210,6 +211,35 @@ module SoulCore
       return gate_blocked_message(label, result) unless result.executed && result.ok
 
       ["I executed the read-only #{label}.", "Executed: true", "Skill: #{intent.skill_id}", "History recorded: true"].join("\n")
+    end
+
+    def execute_skill_catalog(intent, message)
+      result = @gate.evaluate(message, execute: true, record_history: true)
+      return gate_blocked_message("assistant skill catalog", result) unless result.executed && result.ok
+
+      data = JSON.parse(result.stdout)
+      skills = Array(data["skills"])
+      capabilities = ConversationToolCatalog.new.definitions
+      lines = [
+        "Available capabilities",
+        "",
+        "The bounded read-only capability suited to reviewing this machine's environment is `host.system_status`.",
+        "It inspects a defined Linux host-status scope and reports what was and was not collected; it does not make changes.",
+        ""
+      ]
+      capabilities.each do |capability|
+        lines << "- `#{capability.id}` — #{capability.scope} (#{capability.risk_class})"
+      end
+      lines << ""
+      lines << "Registered production skills (#{skills.length})"
+      skills.each do |skill|
+        lines << "- `#{skill['id']}` — #{skill['description']}"
+      end
+      lines << ""
+      lines << "Catalog execution: complete; history recorded."
+      lines.join("\n")
+    rescue JSON::ParserError, TypeError => e
+      "The assistant skill catalog completed, but its result could not be read safely (#{e.class})."
     end
 
     def gate_blocked_message(label, result)

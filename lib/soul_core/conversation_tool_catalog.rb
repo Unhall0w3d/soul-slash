@@ -42,7 +42,8 @@ module SoulCore
         patterns: [
           /\b(?:check|inspect|show|assess)\b.{0,50}\b(?:linux md(?: raid)?|mdraid|\/proc\/mdstat)\b/i,
           /\b(system status|host status|computer status|machine status)\b/i,
-          /\b(?:assess(?:ment)?|inspect|diagnose|audit|check)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
+          /\b(?:assess(?:ment)?|inspect|diagnose|audit|check|review|scan|survey)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
+          /\b(?:environment|host|computer|machine|hardware|operating system|os)\b.{0,50}\b(?:assess(?:ment)?|inspect|diagnose|audit|check|review|scan|survey)\b/i,
           /\bwhat\b.{0,45}\b(?:filesystems?|disks?|drives?|storage devices?|block devices?|hardware)\b.{0,45}\b(?:do i have|are present|are attached|are mounted)\b/i,
           /\b(?:show|list|inspect|check)\b.{0,35}\b(?:my )?(?:filesystems?|disks?|drives?|storage devices?|block devices?)\b/i,
           /\b(?:filesystems?|disks?|drives?)\b.{0,25}\b(?:do i have|are mounted|are attached)\b/i
@@ -66,7 +67,7 @@ module SoulCore
         label: "Assistant skill catalog",
         risk_class: "read_only",
         canonical_message: "what skills do you have?",
-        synthesis_allowed: true,
+        synthesis_allowed: false,
         scope: "Registered Soul assistant skills",
         evidence_profile: "skill_catalog",
         patterns: [

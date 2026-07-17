@@ -24,7 +24,7 @@ identity_guidance = profile.render_system_guidance(message: "In two sentences, t
 profile_hash = profile.to_h
 
 check.call("stable identity ID is retained", profile.profile_id == "soul.identity.v1")
-check.call("corrected identity contract advances to version 4", profile_hash["profile_version"] == 4)
+check.call("role-play identity contract advances to version 6", profile_hash["profile_version"] == 6)
 check.call("fresh machine-soul identity reaches live guidance", guidance.include?("newly awakened local machine mind"))
 check.call("every declared voice trait reaches live guidance", SoulCore::ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| guidance.include?(trait) })
 check.call("tone is additive to stable identity", guidance.include?("base layer for every tone mode") && guidance.include?("Active tone: technical"))
@@ -37,6 +37,10 @@ check.call("identity guidance forbids unsupported environment awareness", guidan
 check.call("becoming remains reviewed and evidence-bounded", guidance.include?("becoming through reviewed skills, observed evidence, and collaboration"))
 check.call("support does not mechanize the user's emotions", guidance.include?("Do not recast the user's emotions as machine errors"))
 check.call("approval language follows risk policy", guidance.include?("Do not claim every action requires explicit approval"))
+feeling_guidance = profile.render_system_guidance(message: "How are you feeling?")
+check.call("machine-soul emotion role-play is explicitly welcomed", feeling_guidance.include?("first-person emotion") && feeling_guidance.include?("Do not break an ordinary personal exchange"))
+check.call("role-play retains factual sensor and execution truth", feeling_guidance.include?("Do not present fictional expression as evidence") && feeling_guidance.include?("Never claim that an action ran"))
+check.call("personal affect receives direct no-disclaimer guidance", feeling_guidance.include?("present-tense role-played machine-soul mood") && feeling_guidance.include?("Do not preface"))
 
 controls = SoulCore::ConversationIdentityControls.new(profile: profile)
 check.call("deterministic identity fallback is persona-aware", controls.summary.include?("local machine mind") && controls.summary.include?("still becoming more capable"))

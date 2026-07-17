@@ -30,6 +30,35 @@ Supported runtime providers:
 - systemd user services for managing llama.cpp server on Linux
 - NVIDIA, AMD, Metal, or CPU runtime acceleration depending on platform and provider
 - GitHub CLI for repository publishing and PR workflows
+- A reviewed self-hosted SearXNG endpoint for optional bounded public-web
+  research; narrow DuckDuckGo Instant Answer lookup requires no key, and
+  ordinary local conversation does not require either network path
+
+## Optional web knowledge paths
+
+Soul separates orientation from research:
+
+- `web.lookup` makes one bounded DuckDuckGo Instant Answer request for narrow
+  definitions or known entities. An empty answer is normal and never becomes
+  permission to invent retrieved evidence.
+- `web.research` queries the explicitly configured SearXNG JSON endpoint,
+  retrieves selected public HTTPS sources, and retains provenance for local
+  synthesis, approval-gated artifacts, and review-only reflection candidates.
+
+For a SearXNG container on another trusted LAN host, keep its address only in
+the ignored `.env` and set:
+
+```text
+SOUL_WEB_SEARCH_PROVIDER=searxng
+SOUL_WEB_SEARXNG_URL=http://YOUR-SEARXNG-HOST:PORT
+SOUL_WEB_ALLOW_PRIVATE_SEARXNG=true
+```
+
+The private-network exception applies only to that exact configured SearXNG
+authority. Search-result URLs and redirects remain public-HTTPS-only. Ensure
+JSON output is enabled in SearXNG's `search.formats` configuration; otherwise
+its API returns HTTP 403. See the official
+[SearXNG Search API](https://docs.searxng.org/dev/search_api.html).
 
 ## Runtime provider support
 

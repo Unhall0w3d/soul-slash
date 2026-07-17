@@ -55,7 +55,7 @@ module SoulCore
         "persona_anti_patterns_are_injected" => context.fetch("messages").first.fetch("content").include?("corporate-assistant boilerplate"),
         "context_reports_active_tone" => context.dig("identity", "tone_mode") == "technical",
         "no_fabricated_biography_boundary" => context.fetch("messages").first.fetch("content").include?("Do not fabricate a human biography"),
-        "no_embodiment_boundary" => context.fetch("messages").first.fetch("content").include?("Do not claim biological embodiment"),
+        "roleplay_embodiment_retains_sensor_truth" => context.fetch("messages").first.fetch("content").include?("Do not present fictional expression as evidence"),
         "no_false_action_boundary" => context.fetch("messages").first.fetch("content").include?("Never claim that an action ran"),
         "interests_are_not_invented" =>
           %w[not_declared_in_this_phase reviewed_registry].include?(interest_status) &&

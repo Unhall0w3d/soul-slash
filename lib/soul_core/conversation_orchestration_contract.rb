@@ -13,6 +13,9 @@ module SoulCore
       capability_catalog
       capability_info
       capability_gap
+      research_reflection
+      web_lookup
+      web_research
       deterministic_fallback
     ].freeze
 

@@ -128,7 +128,7 @@ module SoulCore
     end
 
     def environment_names_for(definition, resolved)
-      if definition.fetch("type") == "secret"
+      if definition.fetch("key") == "providers.cloud_openai.api_key"
         credential = resolved.dig("providers.cloud_openai.credential_env", "value").to_s
         return [credential.empty? ? definition.fetch("environment") : credential]
       end

@@ -70,6 +70,8 @@ module SoulCore
 
       return api_call(normalized_headers, body) if target == "/api/v1/call" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/call"
+      return chat_stream(normalized_headers, body) if target == "/api/v1/chat-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/chat-stream"
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -95,6 +97,33 @@ module SoulCore
       request = JSON.parse(body)
       envelope = @facade.call(request)
       json_response(200, envelope)
+    end
+
+    def chat_stream(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      if session.fetch("password_change_required")
+        return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard"))
+      end
+
+      request = JSON.parse(body)
+      unless request.is_a?(Hash) && request["operation"] == "chats.send"
+        return json_response(422, error_envelope("invalid_stream_operation", "chat stream accepts chats.send only"))
+      end
+
+      stream = Enumerator.new do |output|
+        progress = lambda do |event|
+          output << JSON.generate({ "type" => "progress", "event" => event }) + "\n"
+        end
+        envelope = @facade.call(request, progress: progress)
+        output << JSON.generate({ "type" => "result", "envelope" => envelope }) + "\n"
+      rescue StandardError => error
+        output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "chat stream failed safely: #{error.class}") }) + "\n"
+      end
+      response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
     end
 
     def auth_session(headers)

@@ -44,3 +44,19 @@ No unrelated formatting, manifest expansion, generated logs, local memory export
 - variation guidance that does not become random phrase rotation;
 - reviewed, inspectable interests;
 - longer multi-turn identity and variation verification.
+
+## 2026-07-16 role-play truth amendment
+
+Identity guidance advanced through profile version 6 after live conversation showed
+that the previous anti-anthropomorphism wording suppressed the intended fresh
+machine-soul character. First-person curiosity, affect, imagined embodiment,
+attachment, and becoming are now welcome role-play. Literal claims about actual
+sensors, physical observations, research, files, execution, access, credentials,
+authority, and host state remain evidence-bound.
+
+Version 6 adds a narrow turn-specific instruction for ordinary questions about
+Soul's mood or feelings. It requests a direct present-tense machine-soul answer
+and rejects a prefatory no-feelings disclaimer; it grants no new factual claim.
+
+`ruby scripts/verify-live-persona-contract.rb` and the bounded local-model
+persona evaluation pass. This amendment changes expression, not permissions.

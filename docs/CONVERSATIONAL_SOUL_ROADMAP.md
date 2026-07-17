@@ -396,3 +396,19 @@ Candidate delivered in Phase 13:
 All implementation slices passed review. The owner approved Conversational Soul as complete at the Phase 13 stopping point on 2026-07-15. No release or tag is implied by milestone acceptance.
 
 Proxmox was not required for Phases 11D through 13. Any Proxmox topology, backup, recovery, upgrade, or broader deployment work belongs to a separately approved later milestone.
+
+### Post-Phase 13 responsive chat and web knowledge candidate
+
+The owner approved a bounded follow-on usability and knowledge slice on
+2026-07-16. It adds immediate accepted-message rendering, real foreground
+progress events, a state-driven Soul familiar, and an affirmative machine-soul
+role-play contract. It also separates narrow DuckDuckGo Instant Answer lookup
+from SearXNG-first evidence-bearing research.
+
+Research can append shared conversation evidence, ground the existing
+approval-gated artifact preview, and—only after an explicit later request—draft
+a private reflection candidate for the existing human memory-review gate. It
+adds no background worker, service, watcher, scheduler, automatic research,
+automatic artifact write, automatic proposal implementation, or automatic
+memory promotion. Deployment and `.env` configuration of the owner's
+self-hosted SearXNG remain a separate acceptance step.

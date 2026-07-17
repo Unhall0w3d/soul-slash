@@ -79,6 +79,26 @@ skills:
     network_access: true
     expected_output: json
     verifier: schema_basic
+  web.research:
+    path: Soul/skills/web/research.rb
+    language: ruby
+    description: Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: json
+    verifier: schema_basic
+  web.lookup:
+    path: Soul/skills/web/lookup.rb
+    language: ruby
+    description: Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general research backend.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: json
+    verifier: schema_basic
   cloud.providers.list:
     path: Soul/skills/cloud/providers/list.rb
     description: List configured cloud LLM providers without making network calls.

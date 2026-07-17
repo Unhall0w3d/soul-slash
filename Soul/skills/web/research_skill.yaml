@@ -1,0 +1,22 @@
+id: web.research
+name: Bounded public-web research
+description: Search configured public-web providers, retrieve selected HTTPS sources, and return provenance-bound evidence for synthesis.
+risk: read_only_network
+requires_approval: false
+writes_files: false
+network_access: true
+expected_output: json
+lifecycle_states:
+  - complete
+  - failed
+  - awaiting_input
+  - canceled
+  - blocked_for_human_review
+bounds:
+  queries: 3
+  sources: 8
+  response_bytes: 1048576
+  total_bytes: 4194304
+  overall_seconds: 90
+memory: shared_conversation_evidence_only
+background_execution: false
