@@ -88,6 +88,18 @@ rule: a target with the same major and a lower-or-equal minor capability runs
 on the higher-minor desktop GPU. It now requires both that compatible target
 and synchronized real computation, rather than trusting labels alone.
 
+After a separate owner approval, the model-download gate completed with this
+receipt:
+
+```text
+DiT checkpoint: acestep-v15-turbo
+LM checkpoint: acestep-5Hz-lm-0.6B
+Files verified: 25
+Bytes verified: 7,709,375,886
+Checkpoint disk footprint: 7.2 GiB
+Partial files remaining: 0
+```
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -96,8 +108,9 @@ host validation, not language-model judgment.
 
 ## Known weaknesses
 
-- No model files have been downloaded. The approved environment is installed;
-  its 6.8 GiB footprint includes upstream's broad inference/training/UI lock.
+- The approved environment and models are installed. The 6.8 GiB source and
+  environment footprint includes upstream's broad inference/training/UI lock;
+  the selected checkpoints add 7.2 GiB. No generation has run yet.
 - The CUDA 12.6 substitution is supported by PyTorch's Pascal matrix but still
   needs the real ACE-Step import and generation pilots.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
