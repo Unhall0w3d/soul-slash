@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/configuration_resolver"
+require_relative "../lib/soul_core/model_runtime_control_service"
+require_relative "../lib/soul_core/model_runtime_identity_migration"
+
+options = { root: File.expand_path("..", __dir__), home: Dir.home }
+parser = OptionParser.new do |value|
+  value.banner = "Usage: scripts/soul-model-runtime-identity COMMAND [options]"
+  value.on("--root PATH") { |path| options[:root] = path }
+  value.on("--home PATH") { |path| options[:home] = path }
+  value.on("--confirmation PHRASE") { |phrase| options[:confirmation] = phrase }
+  value.on("--expected-digest SHA256") { |digest| options[:expected_digest] = digest }
+end
+parser.parse!
+command = ARGV.shift
+abort(parser.to_s) unless %w[plan execute].include?(command) && ARGV.empty?
+
+resolver = SoulCore::ConfigurationResolver.new(root: options.fetch(:root), process_env: ENV)
+resolved = resolver.resolve
+unless resolved["ok"]
+  puts JSON.pretty_generate(resolved)
+  exit 1
+end
+env = resolver.effective_environment
+control = SoulCore::ModelRuntimeControlService.new(root: options.fetch(:root), env: env)
+migration = SoulCore::ModelRuntimeIdentityMigration.new(
+  root: options.fetch(:root), home: options.fetch(:home), runtime_control: control
+)
+result = if command == "plan"
+           migration.plan
+         else
+           migration.execute(confirmation: options[:confirmation], expected_digest: options[:expected_digest])
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] || result["lifecycle_state"] == "blocked_for_human_review" ? 0 : 1)

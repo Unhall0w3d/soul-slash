@@ -40,11 +40,14 @@ Default tested endpoint:
 http://127.0.0.1:8082/v1
 ```
 
-Default tested model alias:
+Stable local API alias:
 
 ```text
-soul-qwen3-8b-q4
+soul-local-chat
 ```
+
+The alias does not identify the loaded model. Runtime profile status separately
+reports the actual model, accelerator, service, and selected-at-login profile.
 
 Default tested GGUF model:
 

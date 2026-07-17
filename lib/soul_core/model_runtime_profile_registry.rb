@@ -4,13 +4,15 @@ require "yaml"
 
 module SoulCore
   class ModelRuntimeProfileRegistry
-    SCHEMA_VERSION = "soul.model_runtime_profiles.v1"
+    SCHEMA_VERSION = "soul.model_runtime_profiles.v2"
+    LEGACY_SCHEMA_VERSION = "soul.model_runtime_profiles.v1"
     MAX_BYTES = 32 * 1024
     MAX_PROFILES = 4
     PROFILE_ID = /\A[a-z][a-z0-9-]{0,39}\z/
     UNIT_PATTERN = /\A(?:llama-server|soul-[A-Za-z0-9@_.-]+)\.service\z/
     ROOT_KEYS = %w[schema_version default_profile profiles].freeze
-    PROFILE_KEYS = %w[id label service].freeze
+    PROFILE_KEYS = %w[id label model_name accelerator service].freeze
+    LEGACY_PROFILE_KEYS = %w[id label service].freeze
 
     class ConfigurationError < StandardError; end
 
@@ -42,6 +44,8 @@ module SoulCore
         "profiles" => [{
           "id" => profile_id,
           "label" => profile_id.tr("-", " ").split.map(&:capitalize).join(" "),
+          "model_name" => configured_model_name,
+          "accelerator" => "Configured local runtime",
           "service" => service
         }],
         "multi_profile" => false
@@ -67,11 +71,12 @@ module SoulCore
       raise ConfigurationError, "model runtime profiles document must be an object" unless data.is_a?(Hash)
       raise ConfigurationError, "model runtime profiles keys must be strings" unless data.keys.all? { |key| key.is_a?(String) }
       raise ConfigurationError, "model runtime profiles document contains unknown keys" unless (data.keys - ROOT_KEYS).empty?
-      raise ConfigurationError, "unsupported model runtime profiles schema" unless data["schema_version"] == SCHEMA_VERSION
+      schema = data["schema_version"]
+      raise ConfigurationError, "unsupported model runtime profiles schema" unless [LEGACY_SCHEMA_VERSION, SCHEMA_VERSION].include?(schema)
 
       rows = data["profiles"]
       raise ConfigurationError, "model runtime profiles must contain one to #{MAX_PROFILES} records" unless rows.is_a?(Array) && rows.length.between?(1, MAX_PROFILES)
-      profiles = rows.map { |row| normalize_profile(row) }
+      profiles = rows.map { |row| normalize_profile(row, schema: schema) }
       raise ConfigurationError, "model runtime profile IDs must be unique" unless profiles.map { |profile| profile.fetch("id") }.uniq.length == profiles.length
       raise ConfigurationError, "model runtime profile services must be unique" unless profiles.map { |profile| profile.fetch("service") }.uniq.length == profiles.length
 
@@ -83,20 +88,30 @@ module SoulCore
       raise ConfigurationError, "invalid model runtime profiles YAML: #{error.class}"
     end
 
-    def normalize_profile(row)
+    def normalize_profile(row, schema:)
       raise ConfigurationError, "model runtime profile must be an object" unless row.is_a?(Hash)
       raise ConfigurationError, "model runtime profile keys must be strings" unless row.keys.all? { |key| key.is_a?(String) }
-      raise ConfigurationError, "model runtime profile contains unknown keys" unless (row.keys - PROFILE_KEYS).empty?
-      raise ConfigurationError, "model runtime profile is missing required keys" unless (PROFILE_KEYS - row.keys).empty?
+      keys = schema == LEGACY_SCHEMA_VERSION ? LEGACY_PROFILE_KEYS : PROFILE_KEYS
+      raise ConfigurationError, "model runtime profile contains unknown keys" unless (row.keys - keys).empty?
+      raise ConfigurationError, "model runtime profile is missing required keys" unless (keys - row.keys).empty?
 
       id = row["id"].to_s
       label = row["label"].to_s.strip
+      model_name = schema == LEGACY_SCHEMA_VERSION ? configured_model_name : row["model_name"].to_s.strip
+      accelerator = schema == LEGACY_SCHEMA_VERSION ? "Legacy profile" : row["accelerator"].to_s.strip
       service = row["service"].to_s
       raise ConfigurationError, "model runtime profile ID is invalid" unless id.match?(PROFILE_ID)
       raise ConfigurationError, "model runtime profile label is invalid" unless label.length.between?(1, 80)
+      raise ConfigurationError, "model runtime profile model_name is invalid" unless model_name.length.between?(1, 120)
+      raise ConfigurationError, "model runtime profile accelerator is invalid" unless accelerator.length.between?(1, 80)
       raise ConfigurationError, "model runtime profile service is not allowlisted" unless service.match?(UNIT_PATTERN)
 
-      { "id" => id, "label" => label, "service" => service }
+      { "id" => id, "label" => label, "model_name" => model_name, "accelerator" => accelerator, "service" => service }
+    end
+
+    def configured_model_name
+      value = (@env["SOUL_LOCAL_OPENAI_MODEL"] || @env["SOUL_MODEL_ALIAS"]).to_s.strip
+      value.empty? ? "Configured local model" : value
     end
   end
 end

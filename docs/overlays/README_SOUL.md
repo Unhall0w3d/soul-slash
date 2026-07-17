@@ -19,7 +19,7 @@ http://127.0.0.1:8082/v1
 The current expected model alias is:
 
 ```text
-soul-qwen3-8b-q4
+soul-local-chat
 ```
 
 ## First commands
@@ -37,7 +37,7 @@ ruby bin/soul ask think "In one sentence, why should Soul verify actions before 
 
 ```bash
 export SOUL_OPENAI_BASE_URL="http://127.0.0.1:8082/v1"
-export SOUL_MODEL_ALIAS="soul-qwen3-8b-q4"
+export SOUL_MODEL_ALIAS="soul-local-chat"
 ```
 
 ## Current design rule

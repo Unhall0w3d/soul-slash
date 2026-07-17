@@ -16,8 +16,9 @@ AMD_SERVER_SHA256 ?=
 AMD_MODEL_SHA256 ?=
 AMD_MODEL_ALIAS ?=
 AMD_PORT ?=8082
+ALIAS_DIGEST ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -53,6 +54,8 @@ help:
 > @echo "  make model-runtime-startup-status"
 > @echo "  make model-runtime-startup-reconcile  Verify/start the selected profile once"
 > @echo "  make model-runtime-startup-uninstall CONFIRM=REMOVE_SELECTED_MODEL_STARTUP"
+> @echo "  make model-runtime-identity-plan  Preview neutral local API alias migration"
+> @echo "  make model-runtime-identity-execute ALIAS_DIGEST=... CONFIRM=MIGRATE_MODEL_ALIAS_TO_SOUL_LOCAL_CHAT"
 > @echo
 > @echo "llama.cpp helper targets:"
 > @echo "  make download-model    Download/validate configured GGUF model"
@@ -151,6 +154,7 @@ verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-profile-switching.rb
 > @ruby scripts/verify-model-runtime-profile-deployment.rb
 > @ruby scripts/verify-model-runtime-selected-startup.rb
+> @ruby scripts/verify-model-runtime-identity-2e.rb
 
 model-runtime-amd-plan:
 > @test -n "$(AMD_SERVER)" -a -n "$(AMD_MODEL)" -a -n "$(AMD_SERVER_SHA256)" -a -n "$(AMD_MODEL_SHA256)" -a -n "$(AMD_MODEL_ALIAS)" || { echo "AMD_SERVER, AMD_MODEL, AMD_SERVER_SHA256, AMD_MODEL_SHA256, and AMD_MODEL_ALIAS are required."; exit 2; }
@@ -183,6 +187,14 @@ model-runtime-startup-reconcile:
 model-runtime-startup-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_SELECTED_MODEL_STARTUP" || { echo "Set CONFIRM=REMOVE_SELECTED_MODEL_STARTUP to restore legacy NVIDIA startup."; exit 2; }
 > @ruby scripts/soul-model-runtime-startup uninstall --confirmation "$(CONFIRM)"
+
+model-runtime-identity-plan:
+> @ruby scripts/soul-model-runtime-identity plan --root "$(PROJECT_ROOT)"
+
+model-runtime-identity-execute:
+> @test -n "$(ALIAS_DIGEST)" || { echo "Run model-runtime-identity-plan first, then provide ALIAS_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "MIGRATE_MODEL_ALIAS_TO_SOUL_LOCAL_CHAT" || { echo "Exact confirmation MIGRATE_MODEL_ALIAS_TO_SOUL_LOCAL_CHAT is required."; exit 2; }
+> @ruby scripts/soul-model-runtime-identity execute --root "$(PROJECT_ROOT)" --expected-digest "$(ALIAS_DIGEST)" --confirmation "$(CONFIRM)"
 
 clean-runtime:
 > @rm -rf run tmp

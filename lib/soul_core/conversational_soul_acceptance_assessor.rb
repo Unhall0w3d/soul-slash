@@ -227,13 +227,13 @@ module SoulCore
     private
 
     def call(facade, operation, parameters, sequence)
-      facade.call(
+      facade.call({
         "schema_version" => ApplicationContract::SCHEMA_VERSION,
         "request_id" => format("phase13a.request.%03d", sequence),
         "operation" => operation,
         "parameters" => parameters,
         "context" => { "interface" => "internal" }
-      )
+      })
     end
 
     def fixture_provider

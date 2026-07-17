@@ -34,7 +34,7 @@ fi
 default_host="${SOUL_LLAMA_HOST:-127.0.0.1}"
 default_port="${SOUL_LLAMA_PORT:-8082}"
 default_base="${SOUL_OPENAI_BASE_URL:-http://${default_host}:${default_port}/v1}"
-default_alias="${SOUL_MODEL_ALIAS:-soul-qwen3-8b-q4}"
+default_alias="${SOUL_MODEL_ALIAS:-soul-local-chat}"
 default_model_dir="${SOUL_MODEL_DIR:-./models}"
 default_model_file="${SOUL_MODEL_FILE:-Qwen3-8B-Q4_K_M.gguf}"
 default_model_url="${SOUL_MODEL_URL:-https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf?download=true}"

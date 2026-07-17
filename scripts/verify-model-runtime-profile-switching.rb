@@ -42,6 +42,8 @@ class ProfileRunner
     when "is-active"
       state = states.fetch(unit, "unknown")
       result(state == "active", "#{state}\n", state == "active" ? 0 : 3)
+    when "is-enabled"
+      result(true, "enabled\n", 0)
     when "start"
       @mutations << [action, unit]
       return result(false, "", 1) if fail_start == unit
@@ -73,14 +75,18 @@ end
 
 def valid_profiles(extra: "")
   <<~YAML
-    schema_version: soul.model_runtime_profiles.v1
+    schema_version: soul.model_runtime_profiles.v2
     default_profile: nvidia-fallback
     profiles:
       - id: nvidia-fallback
         label: NVIDIA fallback
+        model_name: Qwen3 8B Q4_K_M
+        accelerator: NVIDIA CUDA
         service: llama-server.service
       - id: amd-quality
         label: AMD quality
+        model_name: Ministral 3 14B Instruct 2512 Q4_K_M
+        accelerator: AMD Vulkan
         service: soul-model-amd.service
     #{extra}
   YAML
@@ -111,6 +117,8 @@ Dir.mktmpdir("soul-runtime-profiles-") do |root|
 
   status = service.status
   check("status exposes two bounded profiles and the active rollback", status["ok"] && status.dig("data", "profiles").length == 2 && status.dig("data", "active_profile_id") == "nvidia-fallback" && status.dig("data", "can_switch"), errors)
+  check("status separates actual profile identity from neutral API alias", status.dig("data", "model_name") == "Qwen3 8B Q4_K_M" && status.dig("data", "accelerator") == "NVIDIA CUDA" && status.dig("data", "api_alias") == "soul-primary", errors)
+  check("status exposes selected-profile startup policy without mutation", status.dig("data", "startup", "enabled") == true && status.dig("data", "startup", "selected_profile_id") == "nvidia-fallback" && runner.mutations.empty?, errors)
 
   preview = service.preview(action: "switch", profile_id: "amd-quality")
   check("switch preview is target-bound and read-only", preview["ok"] && preview.dig("data", "confirmation_phrase") == "SWITCH_MODEL_RUNTIME_TO_AMD_QUALITY" && runner.mutations.empty?, errors)
@@ -189,9 +197,9 @@ Dir.mktmpdir("soul-runtime-profile-validation-") do |root|
     "unknown profile keys fail closed" => valid_profiles.sub("service: soul-model-amd.service", "service: soul-model-amd.service\n        command: unsafe"),
     "arbitrary units fail closed" => valid_profiles.sub("service: soul-model-amd.service", "service: ssh.service"),
     "more than four profiles fail closed" => valid_profiles +
-      "  - id: third-profile\n    label: Third\n    service: soul-third.service\n" \
-      "  - id: fourth-profile\n    label: Fourth\n    service: soul-fourth.service\n" \
-      "  - id: fifth-profile\n    label: Fifth\n    service: soul-fifth.service\n"
+      "  - id: third-profile\n    label: Third\n    model_name: Third Model\n    accelerator: Test\n    service: soul-third.service\n" \
+      "  - id: fourth-profile\n    label: Fourth\n    model_name: Fourth Model\n    accelerator: Test\n    service: soul-fourth.service\n" \
+      "  - id: fifth-profile\n    label: Fifth\n    model_name: Fifth Model\n    accelerator: Test\n    service: soul-fifth.service\n"
   }
   invalid_documents.each do |label, document|
     write_profiles(root, document)
@@ -206,6 +214,7 @@ dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
 html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 brief = File.read(File.join(__dir__, "../docs/soul/MODEL_RUNTIME_PORTABILITY_2_BRIEF.md"))
 check("dashboard renders explicit profiles and switch actions", html.include?('id="runtime-profile-list"') && dashboard.include?('previewModelRuntime(action, profileId = null)') && dashboard.include?('action = "switch"'), errors)
+check("dashboard distinguishes model identity, accelerator, API alias, and startup selection", %w[model_name accelerator api_alias selected_profile_id].all? { |field| dashboard.include?(field) }, errors)
 check("profile dashboard remains timer-free", !dashboard.match?(/setInterval|setTimeout|requestAnimationFrame/), errors)
 check("approved brief keeps host deployment behind a later gate", brief.include?("implementation_authorized: yes") && brief.include?("must not create, install, enable, start, stop, or modify the AMD"), errors)
 

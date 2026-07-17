@@ -196,11 +196,14 @@ Default tested llama.cpp model:
 Qwen3-8B-Q4_K_M.gguf
 ```
 
-Default tested alias:
+Stable local API alias:
 
 ```text
-soul-qwen3-8b-q4
+soul-local-chat
 ```
+
+This alias is the provider contract. The actual model identity is tracked
+separately by the selected runtime profile and may change when profiles switch.
 
 Start llama.cpp in the foreground:
 

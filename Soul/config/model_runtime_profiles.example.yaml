@@ -1,9 +1,13 @@
-schema_version: soul.model_runtime_profiles.v1
+schema_version: soul.model_runtime_profiles.v2
 default_profile: nvidia-fallback
 profiles:
   - id: nvidia-fallback
     label: NVIDIA fallback
+    model_name: Qwen3 8B Q4_K_M
+    accelerator: NVIDIA CUDA
     service: llama-server.service
   - id: amd-quality
     label: AMD quality
+    model_name: Ministral 3 14B Instruct 2512 Q4_K_M
+    accelerator: AMD Vulkan
     service: soul-model-amd.service

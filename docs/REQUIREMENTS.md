@@ -77,7 +77,7 @@ The setup workflows differ:
 
 ```text
 Endpoint: http://127.0.0.1:8082/v1
-Model alias: soul-qwen3-8b-q4
+API alias: soul-local-chat
 Model file: Qwen3-8B-Q4_K_M.gguf
 Model source: Qwen/Qwen3-8B-GGUF on Hugging Face
 Context size: 4096

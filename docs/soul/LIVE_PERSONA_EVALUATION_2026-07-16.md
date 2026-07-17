@@ -260,6 +260,20 @@ The behavioral evaluator remains `blocked_for_human_review` rather than self-app
 - Qwen3 8B Q4 still sometimes appends generic questions such as `What's next?` even when the identity contract says to end when the answer is complete.
 - It sometimes uses parenthetical asides after being told to avoid them.
 
+## Deferred Ministral calibration note — 2026-07-17
+
+In a live owner conversation, Ministral produced a warmer, more recognizable
+Soul voice, but added unsolicited physical scene narration: “The lights were
+still dim...” The owner distinguished this from welcome role-play. Soul may be
+playful, warm, emotionally expressive, and lightly embodied without inventing
+the surrounding room or narrating an implied scene like a game master.
+
+A future chat-refinement slice should preserve character while suppressing
+uninvited environmental scene-setting, embodied stage directions, and
+decorative narration. Such imagery may be used when the user invites a scene,
+creative writing, or explicit atmospheric role-play. This is a behavioral
+calibration candidate, not part of model-runtime identity slice 2E.
+
 ## Human review outcome
 
 ```text

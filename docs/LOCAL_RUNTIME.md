@@ -11,8 +11,11 @@ http://127.0.0.1:8082/v1
 ## Model alias
 
 ```text
-soul-qwen3-8b-q4
+soul-local-chat
 ```
+
+This is a neutral OpenAI-compatible API alias. Inspect the Model runtime card
+for the actual model name, accelerator, service, and selected-at-login profile.
 
 ## Modes
 

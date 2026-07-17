@@ -20,6 +20,7 @@ module SoulCore
     HTTP_TIMEOUT_SECONDS = 2
     MAX_HTTP_BYTES = 128 * 1024
     MAX_SELECTION_BYTES = 1024
+    STARTUP_SELECTOR_UNIT = "soul-model-runtime-selected.service"
 
     def initialize(root: Dir.pwd, env: ENV, lease_store: nil, runner: BoundedCommandRunner.new, http_get: nil, profile_registry: nil)
       @root = File.expand_path(root)
@@ -181,6 +182,7 @@ module SoulCore
         "selected_profile_id" => selected_id,
         "active_profile_id" => active.one? ? active.first.fetch("id") : nil,
         "active_profile_count" => active.length,
+        "startup" => observe_startup_selector(selected_id),
         "profile_conflict" => conflict,
         "service_state" => current&.fetch("service_state", "unknown") || "unknown",
         "loaded" => active.one?,
@@ -279,6 +281,8 @@ module SoulCore
       {
         "id" => profile.fetch("id"),
         "label" => profile.fetch("label"),
+        "model_name" => profile.fetch("model_name"),
+        "accelerator" => profile.fetch("accelerator"),
         "service" => profile.fetch("service"),
         "service_state" => profile["service_state"] || observation&.fetch("profiles", [])&.find { |item| item["id"] == profile["id"] }&.fetch("service_state", "unknown") || "unknown",
         "selected" => selected_id == profile.fetch("id"),
@@ -310,6 +314,27 @@ module SoulCore
       return "not-found" if value == "not-found"
 
       "unknown"
+    end
+
+    def observe_startup_selector(selected_id)
+      result = @runner.run(
+        "systemctl", "--user", "is-enabled", STARTUP_SELECTOR_UNIT,
+        timeout_seconds: 4, max_output_bytes: 4096
+      )
+      value = result.stdout.to_s.strip
+      state = if result.success? && %w[enabled enabled-runtime linked linked-runtime alias].include?(value)
+                "enabled"
+              elsif %w[disabled static indirect masked not-found].include?(value)
+                value
+              else
+                "unknown"
+              end
+      {
+        "service" => STARTUP_SELECTOR_UNIT,
+        "state" => state,
+        "enabled" => state == "enabled",
+        "selected_profile_id" => selected_id
+      }
     end
 
     def observe_server
@@ -430,7 +455,10 @@ module SoulCore
         "service" => profile&.fetch("service", nil),
         "profile" => profile&.fetch("id", nil),
         "profile_label" => profile&.fetch("label", nil),
-        "model" => model,
+        "model" => profile&.fetch("model_name", nil),
+        "model_name" => profile&.fetch("model_name", nil),
+        "accelerator" => profile&.fetch("accelerator", nil),
+        "api_alias" => model,
         "provider_endpoint" => @env["SOUL_LOCAL_OPENAI_BASE_URL"],
         "slots_url" => slots_uri&.to_s,
         "manual_only" => true,

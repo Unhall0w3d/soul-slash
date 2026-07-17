@@ -422,14 +422,16 @@ function renderModelRuntime(runtime, message = "") {
   byId("runtime-state-label").textContent = runtimeState.replaceAll("_", " ");
   byId("runtime-details").replaceChildren(
     detailRow("Profile", runtime.profile_label || runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
+    detailRow("Accelerator", runtime.accelerator || "not configured"), detailRow("API alias", runtime.api_alias || "not configured"),
     detailRow("Service", runtime.service || "control disabled"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
-    detailRow("Server", runtime.server?.health || "unavailable")
+    detailRow("Server", runtime.server?.health || "unavailable"),
+    detailRow("At login", runtime.startup ? `${runtime.startup.state || "unknown"} · ${runtime.startup.selected_profile_id || "no selection"}` : "not configured")
   );
   const profiles = byId("runtime-profile-list"); profiles.replaceChildren();
   (runtime.profiles || []).forEach((profile) => {
     const row = document.createElement("div"); row.className = "runtime-profile"; row.classList.toggle("is-active", profile.active === true);
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = profile.label || profile.id;
-    const meta = document.createElement("small"); meta.textContent = [profile.id, profile.service_state, profile.selected ? "selected" : null].filter(Boolean).join(" · "); copy.append(title, meta); row.append(copy);
+    const meta = document.createElement("small"); meta.textContent = [profile.model_name, profile.accelerator, profile.service_state, profile.selected ? "selected at login" : null].filter(Boolean).join(" · "); copy.append(title, meta); row.append(copy);
     let action = null; if (!profile.active && profile.service_state === "inactive" && runtime.can_load_profile) action = "load"; else if (!profile.active && profile.service_state === "inactive" && runtime.can_switch) action = "switch";
     if (action) { const button = document.createElement("button"); button.type = "button"; button.className = "runtime-profile-action"; button.textContent = action; button.addEventListener("click", () => previewModelRuntime(action, profile.id)); row.append(button); }
     else { const stateLabel = document.createElement("span"); stateLabel.className = "runtime-profile-state"; stateLabel.textContent = profile.active ? "active" : profile.service_state; row.append(stateLabel); }
