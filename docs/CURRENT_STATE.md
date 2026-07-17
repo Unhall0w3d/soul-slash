@@ -113,9 +113,12 @@ Music A2 now has a deterministic CLI candidate: private typed projects, exact
 generation previews, cross-runtime NVIDIA leases, bounded process-group
 cancellation, strict-offline project-input generation, and atomic linked
 FLAC/MP3 receipts. The live read-only inventory passes with AMD chat healthy,
-NVIDIA fallback inactive, 8,095 MiB free, and no compute process or lease. No
-A2 project generation has run; deterministic review and one explicitly approved
-live project remain the A2 human gates before dashboard work.
+NVIDIA fallback inactive, 8,095 MiB free, and no compute process or lease. The
+exactly confirmed `First Signal` live project then produced validated 30-second
+FLAC and MP3 artifacts, released its lease and GPU, and preserved AMD chat. The
+owner accepted the music but heard no lyrics; logs prove the lyrics reached the
+model and were embedded, making this a recorded adherence weakness rather than
+data loss. Music A2 is approved and complete. Music A3 dashboard work is next.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

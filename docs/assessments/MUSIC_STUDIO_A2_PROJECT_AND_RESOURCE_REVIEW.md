@@ -1,6 +1,6 @@
 # Music Studio A2 Project and Resource Review
 
-Status: candidate-complete; human review required
+Status: approved and complete
 
 Date: 2026-07-17
 
@@ -53,6 +53,8 @@ Date: 2026-07-17
 - Existing profile deployment, switching, selected-startup, and identity
   migration verifiers.
 - Live `make music-resources` read-only inventory.
+- Live project creation, exact generation preview, owner-confirmed generation,
+  dual-artifact inspection, and post-run resource inventory.
 - `git diff --check`
 
 ## Deterministic test results
@@ -88,8 +90,30 @@ Active Music lease: none
 Can acquire nvidia-music: yes
 ```
 
-No project or audio candidate was created and no live generation or cancellation
-was executed. Those remain separate human gates.
+The inventory preview created no state. After exact owner confirmation, the
+first live project and candidate completed:
+
+```text
+Project: First Signal (music_0aa57d7835cd9e33)
+Candidate: candidate_ed8c77216d9254f5
+Requested mode: vocal synth-rock
+Duration: 30.000 seconds
+FLAC: 5,473,828 bytes
+FLAC SHA-256: 08d1fdd31a8de9c9a0611be824eda7680621177ad26c176bed829e94a5608529
+MP3: 673,197 bytes
+MP3 SHA-256: 4a05aad9ba9c6a14d1a6f0c49c653bac82ade1865fcf8a113225b51bbf0a7392
+MP3 lineage: derived from the exact FLAC digest
+Post-run AMD conversation health: ok
+Post-run NVIDIA free memory: 8,095 MiB
+Post-run compute processes: 0
+Post-run Music lease: none
+```
+
+The owner accepted the musical result with one explicit qualification: it
+contained no audible lyrics. The retained log proves the full lyric block
+reached ACE-Step and lyric embeddings were computed, so this is model/prompt
+adherence rather than project data loss. A2 is approved with that weakness
+carried into candidate review and iteration design.
 
 ## Local LLM eval results
 
@@ -99,15 +123,14 @@ properties, not language-model behavior.
 
 ## Known weaknesses
 
-- The real A2 project-input path and FLAC-to-MP3 chain have not yet run against
-  the live ACE-Step environment. Deterministic tests use bounded fake process
-  and media adapters.
 - Cancellation is deterministically validated against exact fake process
   identities and signals but has not interrupted a live model generation.
 - The CLI verifies all 7.71 GB of checkpoint hashes before every generation.
   This is conservative and measurable but adds startup latency.
-- MP3 defaults to LAME V2. Browser playback and the exact size/quality tradeoff
-  still require a live candidate review.
+- The first vocal project produced acceptable music but no audible lyrics even
+  though ACE-Step received and embedded them. Future review must distinguish
+  technical validity from vocal/lyric adherence; retake controls should support
+  shorter lyric blocks, stronger vocal instructions, and alternate seeds.
 - Failed or canceled candidates remain in hidden `.candidate.partial`
   quarantine directories with bounded receipts. A later reviewed cleanup
   operation is needed; A2 never deletes them automatically.
@@ -140,11 +163,11 @@ bounded process group until return or a separately confirmed cancellation.
 
 ## Human review checklist
 
-- [ ] Confirm the A2 project fields and 10–180 second duration bound.
-- [ ] Confirm FLAC master plus LAME V2 MP3 proxy behavior.
-- [ ] Confirm NVIDIA music/fallback exclusion and AMD coexistence.
-- [ ] Confirm exact preview, digest, generation, and cancellation gates.
-- [ ] Confirm failed output quarantine without automatic deletion.
-- [ ] Approve one live Soul-native project generation.
-- [ ] Review both live artifacts and their receipt.
-- [ ] Approve, revise, or reject Music A2 before Music A3 dashboard work.
+- [x] Confirm the A2 project fields and 10–180 second duration bound.
+- [x] Confirm FLAC master plus LAME V2 MP3 proxy behavior.
+- [x] Confirm NVIDIA music/fallback exclusion and AMD coexistence.
+- [x] Confirm exact preview, digest, generation, and cancellation gates.
+- [x] Confirm failed output quarantine without automatic deletion.
+- [x] Approve one live Soul-native project generation.
+- [x] Review the live candidate and dual-artifact receipt.
+- [x] Approve Music A2 with lyric adherence recorded for later iteration.

@@ -112,15 +112,10 @@ Status:
 in progress
 ```
 
-Current completed slice:
+Current completed Music slices:
 
 ```text
 Music Studio A1 isolated NVIDIA feasibility pilot
-```
-
-Current candidate slice:
-
-```text
 Music Studio A2 private project schema and explicit resource coordinator
 ```
 
@@ -130,9 +125,11 @@ optional tooling checks, exact source and checkpoint pins, separate setup and
 download gates, and bounded offline pilot commands. The 30-, 90-, and
 180-second candidates passed deterministic host checks and owner listening
 review without disturbing AMD chat or retaining an NVIDIA process. Music A1 is
-complete; the project schema and explicit resource coordinator are next.
-The A2 candidate now implements those CLI-only boundaries and awaits human
-review plus one explicit live project generation. Music A3 remains unopened.
+complete. A2 added the CLI-only project and resource boundaries, then passed an
+exactly confirmed live FLAC/MP3 generation and post-run resource review. Its
+first vocal project rendered without audible lyrics despite verified lyric
+conditioning, which is retained as an iteration/adherence weakness. Music A3
+dashboard work is next but remains unopened.
 
 See:
 

@@ -59,7 +59,7 @@
 - [x] Multi-model and Music Studio A0 host-specific research and architecture
 - [x] Music A1 optional `uv`, exact model manifest, and preview-gated setup boundary
 - [x] Music A1 isolated NVIDIA feasibility pilot
-- [ ] Music A2 project schema and explicit resource coordinator
+- [x] Music A2 project schema and explicit resource coordinator
 - [ ] Music A3 first bounded Music Studio dashboard
 - [ ] Music A4 controlled repaint, extend, stem, lineage, and export workflow
 - [ ] Music A5 knowledge, lawful reference, and similarity refinement
