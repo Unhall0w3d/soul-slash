@@ -28,7 +28,8 @@ files, not services, listeners, scheduled jobs, or background processes.
   `dce621408bee8c31b4fcf4811682eb9359e1bc94`.
 - Use isolated Python 3.12; do not modify Arch's system Python.
 - Override upstream CUDA 12.8 wheels with PyTorch 2.10 CUDA 12.6 wheels because
-  the GTX 1070 is Pascal SM 6.1. Probe the installed wheel on the real GPU.
+  the GTX 1070 is Pascal SM 6.1. Probe the installed wheel on the real GPU with
+  synchronized matrix multiplication and require a compatible same-major cubin.
 - Default to `acestep-v15-turbo` and `acestep-5Hz-lm-0.6B` with the PyTorch LM
   backend, CPU offload, batch one, and INT8 weight-only quantization.
 - Reject unknown or case-mismatched checkpoint names.

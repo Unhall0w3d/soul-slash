@@ -38,7 +38,7 @@ check.call("general check labels uv as optional Music tooling", tool_check.inclu
 check.call("Make defaults are exact but manifest and names are overridable", makefile.include?("MUSIC_MODEL_MANIFEST ?=") && makefile.include?("MUSIC_DIT_MODEL ?= acestep-v15-turbo") && makefile.include?("MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B"))
 check.call("environment and weights require independent preview gates", makefile.include?("INSTALL_SOUL_MUSIC_PILOT") && makefile.include?("DOWNLOAD_SOUL_MUSIC_MODELS") && source.include?("authorize!(CONFIRMATION)") && source.include?("authorize!(DOWNLOAD_CONFIRMATION)"))
 check.call("pilot is foreground, offline, and bounded to approved durations", source.include?("DURATIONS = [30, 90, 180]") && source.include?("HF_HUB_OFFLINE") && source.include?("TRANSFORMERS_OFFLINE") && source.include?("timeout\", \"--signal=INT") && !source.include?("uvicorn"))
-check.call("Pascal wheel is probed on the real CUDA device", source.include?("get_device_capability") && source.include?("get_arch_list") && source.include?("sm_61"))
+check.call("Pascal wheel performs real CUDA work through a compatible cubin", source.include?("get_device_capability") && source.include?("get_arch_list") && source.include?("matmul_sum") && source.include?("compatible_cubin"))
 
 abort "#{failures.length} verification(s) failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music Studio A1 setup verification passed."

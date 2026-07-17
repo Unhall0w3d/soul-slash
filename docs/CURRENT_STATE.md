@@ -85,9 +85,12 @@ A0 installed and ran nothing. The first Music A1 candidate now provides an
 optional `uv` preflight, pinned and preview-gated user-local setup, separately
 confirmed verified model downloads, and a bounded offline foreground pilot.
 The default checkpoint names are exact but publicly overridable through a
-reviewed manifest. No environment or weights were installed during candidate
-verification, and full A1 remains open until the 30/90/180-second host pilots
-and audio review pass.
+reviewed manifest. After owner approval, the pinned v0.1.8 source and isolated
+Python 3.12 environment were installed user-locally. PyTorch 2.10 CUDA 12.6
+successfully imported ACE-Step and ran synchronized matrix multiplication on
+the GTX 1070 through its compatible `sm_60` cubin. No weights are downloaded,
+and full A1 remains open until the model-download gate plus 30/90/180-second
+host pilots and audio review pass.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

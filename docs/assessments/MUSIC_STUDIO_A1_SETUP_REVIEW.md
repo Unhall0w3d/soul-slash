@@ -16,7 +16,9 @@ Date: 2026-07-17
   closed; URLs are constructed from validated Hugging Face repository names.
 - Kept the upstream lock for non-PyTorch dependencies while substituting the
   PyTorch 2.10 CUDA 12.6 wheels needed for Pascal SM 6.1, followed by a real
-  CUDA allocation and architecture probe.
+  synchronized CUDA matrix multiplication and compatible-cubin probe. PyTorch's
+  wheel exposes `sm_60`; NVIDIA guarantees that cubin on the higher-minor
+  desktop `sm_61` device within the same major architecture.
 - Added an offline-only, foreground 30/90/180-second pilot command with fixed
   batch, seed, backend, offload, quantization, and timeout behavior.
 - Fixed Self Assessment reboot evidence using the exact CachyOS hook message
@@ -44,6 +46,8 @@ Date: 2026-07-17
 - `make check`
 - `make music-check`
 - `make music-pilot-plan`
+- Approved `make setup-music` with the reviewed digest and exact confirmation.
+- Live ACE-Step import plus synchronized CUDA matrix probe.
 - Existing environment and host-improvement verifiers.
 - Live read-only NVIDIA, fallback service, and reboot-evidence checks.
 - `git diff --check`
@@ -59,6 +63,31 @@ without the message, missing logs, and symlink rejection.
 
 Result: pass.
 
+## Approved live setup result
+
+After owner approval, the setup gate installed the exact ACE-Step v0.1.8
+revision and isolated Python 3.12 environment under
+`~/.local/share/soul/music/ace-step/v0.1.8`. The final probe reported:
+
+```text
+PyTorch: 2.10.0+cu126
+CUDA runtime: 12.6
+GPU: NVIDIA GeForce GTX 1070
+Compute capability: 6.1
+Wheel cubins: sm_50, sm_60, sm_70, sm_75, sm_80, sm_86, sm_90
+Synchronized 2x2 CUDA matrix result: 8.0
+ACE-Step import: passed
+Source plus environment size: 6.8 GiB
+Models downloaded: no
+```
+
+The first probe rejected the wheel because it demanded the exact label
+`sm_61`. Inspection showed that the wheel exposes `sm_60`, and the real CUDA
+operation had already succeeded. The corrected gate follows NVIDIA's cubin
+rule: a target with the same major and a lower-or-equal minor capability runs
+on the higher-minor desktop GPU. It now requires both that compatible target
+and synchronized real computation, rather than trusting labels alone.
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -67,7 +96,8 @@ host validation, not language-model judgment.
 
 ## Known weaknesses
 
-- No environment or model files were installed by the candidate tests.
+- No model files have been downloaded. The approved environment is installed;
+  its 6.8 GiB footprint includes upstream's broad inference/training/UI lock.
 - The CUDA 12.6 substitution is supported by PyTorch's Pascal matrix but still
   needs the real ACE-Step import and generation pilots.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
