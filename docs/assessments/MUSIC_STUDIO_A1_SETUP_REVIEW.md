@@ -1,6 +1,6 @@
 # Music Studio A1 Setup Boundary Review
 
-Status: candidate-complete; human review required
+Status: approved and complete
 
 Date: 2026-07-17
 
@@ -220,6 +220,8 @@ All mechanical A1 host gates have now passed. Full A1 remains
 `blocked_for_human_review` until the owner evaluates the three-minute song's
 coherence and usefulness.
 
+The owner accepted the 180-second candidate and approved advancing beyond A1.
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -233,10 +235,10 @@ host validation, not language-model judgment.
   the selected checkpoints add 7.2 GiB.
 - The 30-second candidate uses the upstream example prompt and fixed seed. It
   validates feasibility, not Soul's future project prompt/lyrics workflow.
-- Full A1 still needs human review of the successful 180-second candidate;
-  mechanical validity cannot establish musical quality or usefulness.
-- The CUDA 12.6 substitution has passed the ACE-Step import, CUDA matrix probe,
-  and 30-second generation; the longer 90- and 180-second stability gates remain.
+- Mechanical validity cannot establish quality for future prompts, genres, or
+  project-specific lyrics; each generated candidate still needs human review.
+- The CUDA 12.6 substitution passed the ACE-Step import, CUDA matrix probe, and
+  30-, 90-, and 180-second generations on the GTX 1070.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
   the CLI feasibility pilot does not need; minimizing that environment is
   deferred until feasibility is known.
@@ -244,8 +246,9 @@ host validation, not language-model judgment.
   it never starts a background cleanup or silently deletes a prior install.
 - The upstream profiler retains candidates under the run directory but is not
   yet a Soul-native generation schema. That belongs to Music A2.
-- Full Music A1 remains incomplete until the operator reviews measured GPU
-  stability, AMD chat responsiveness, time, and audio output at all gates.
+- A1 used one upstream example and fixed seed across duration gates. A2 must
+  establish Soul-native project inputs and provenance before broader quality
+  conclusions are possible.
 
 ## Memory keys added or used
 
@@ -278,5 +281,5 @@ watcher, scheduler, queue, or polling loop.
 - [x] Review the separate download plan before retrieving weights.
 - [x] Listen to and accept the 30-second audio candidate.
 - [x] Listen to and accept the 90-second audio candidate.
-- [ ] Listen to and accept or reject the 180-second audio candidate.
-- [ ] Approve, revise, or reject full A1 before proceeding to Music A2.
+- [x] Listen to and accept the 180-second audio candidate.
+- [x] Approve full A1 and proceed to Music A2.

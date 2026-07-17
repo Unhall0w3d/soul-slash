@@ -110,6 +110,22 @@ The first dashboard version should favor clear controls and iteration history
 over a DAW imitation. A waveform/timeline becomes useful for repainting, but a
 full multitrack editor is later work.
 
+### Audio artifact policy
+
+Every completed generation produces two linked artifacts from one model run:
+
+- a 48 kHz stereo FLAC as the canonical, lossless candidate master; and
+- an MP3 listening proxy for smaller dashboard playback, LAN transfer, and
+  convenient sharing.
+
+The MP3 is encoded from the retained FLAC in a bounded foreground post-process;
+it is never a second model generation and never replaces or deletes the master.
+The A2 schema records both paths, byte sizes, SHA-256 digests, codec details,
+encoder version, and exact arguments. The initial recommended proxy is LAME V2
+variable bitrate, subject to measured browser compatibility and owner review in
+the A2 brief. A generation reaches `complete` only after both artifacts validate;
+an encoding failure remains explicit and preserves the valid FLAC for review.
+
 ### Storage
 
 Private project material belongs under an ignored local root:
@@ -227,6 +243,8 @@ This document. No installation, weight download, generation, or new tab.
 ### A2 — project schema and resource coordinator
 
 - Add ignored project storage with deterministic schemas and provenance.
+- Define the linked FLAC-master and MP3-proxy artifact schema and bounded
+  transcode/validation receipt.
 - Add read-only GPU inventory and explicit cross-runtime leases.
 - Add bounded CLI create/generate/cancel/inspect operations.
 - Do not add the dashboard tab yet.

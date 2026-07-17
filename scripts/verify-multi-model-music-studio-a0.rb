@@ -37,6 +37,12 @@ check("pilot measures full target duration rather than trusting vendor claims",
         architecture.include?("90-second structured generation") &&
         architecture.include?("150–180-second song generation"),
       errors)
+check("audio candidates retain a FLAC master and derived MP3 proxy",
+      architecture.include?("48 kHz stereo FLAC") &&
+        architecture.include?("MP3 listening proxy") &&
+        architecture.include?("never a second model generation") &&
+        architecture.include?("both paths, byte sizes, SHA-256 digests"),
+      errors)
 check("project storage is private and shared memory remains authoritative",
       architecture.include?("Soul/music/projects/<project-id>/") &&
         architecture.include?("never committed") &&
@@ -60,7 +66,7 @@ check("sequential dashboard limitation blocks premature tab",
       errors)
 check("phases retain separate human gates",
       %w[A0 A1 A2 A3 A4 A5].all? { |phase| architecture.include?("### #{phase}") } &&
-        roadmap.include?("[ ] Music A1") && roadmap.include?("[ ] Music A3"),
+        roadmap.include?("[x] Music A1") && roadmap.include?("[ ] Music A3"),
       errors)
 check("A0 brief authorizes no runtime mutation",
       brief.include?("Downloading model weights or repositories") &&
@@ -71,11 +77,11 @@ check("stale augmentation roadmap state is corrected",
       roadmap.include?("[x] A4 prepare human-approved isolated worktree") &&
         roadmap.include?("[x] A5 review exact augmentation candidate"),
       errors)
-check("current milestone and state preserve the A0-to-A1 gate",
+check("current milestone and state record the approved A1 gate",
       milestones.include?("Music A0 defined the topology") &&
         current.include?("A0 installed and ran nothing") &&
-        current.match?(/full A1 (?:remains open|now awaits)/i) &&
-        current.match?(/awaits(?: only)? human\s+listening\s+review/),
+        current.include?("Music A1 is\ncomplete") &&
+        current.include?("Music A2 is the next human-gated slice"),
       errors)
 check("primary-source set covers candidates and host compatibility",
       %w[

@@ -101,8 +101,13 @@ non-silent 48 kHz stereo FLAC in 47.966 seconds of measured wall time, preserved
 AMD chat health, released NVIDIA afterward, and passed human listening review.
 The final 180-second host candidate then completed as a valid 48 kHz stereo
 FLAC in 73.167 seconds of measured wall time, with AMD chat healthy and NVIDIA
-released afterward. Full A1 now awaits only human listening review of that
-three-minute candidate.
+released afterward. The owner accepted its musical quality; Music A1 is
+complete and Music A2 is the next human-gated slice.
+
+The accepted Music Studio product direction retains a lossless 48 kHz stereo
+FLAC master for every candidate and derives a smaller MP3 listening proxy from
+that exact master. A2 will record both artifacts, hashes, encoder provenance,
+and validation without performing a second model generation.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is
