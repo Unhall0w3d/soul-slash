@@ -98,9 +98,11 @@ automatic downloader, retains bounded output, and rejects zero-exit failures.
 The final 30-second candidate is a verified 48 kHz stereo FLAC and passed human
 listening review. The subsequent 90-second candidate also completed as a valid,
 non-silent 48 kHz stereo FLAC in 47.966 seconds of measured wall time, preserved
-AMD chat health, and released NVIDIA afterward. It now awaits human listening
-review. Full A1 remains open until that review plus the 180-second host pilot
-passes.
+AMD chat health, released NVIDIA afterward, and passed human listening review.
+The final 180-second host candidate then completed as a valid 48 kHz stereo
+FLAC in 73.167 seconds of measured wall time, with AMD chat healthy and NVIDIA
+released afterward. Full A1 now awaits only human listening review of that
+three-minute candidate.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

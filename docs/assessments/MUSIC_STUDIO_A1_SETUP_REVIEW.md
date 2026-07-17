@@ -188,6 +188,38 @@ The candidate is mechanically valid and non-silent. Human review must determine
 whether its longer-form musical structure remains coherent enough to advance to
 the final 180-second A1 gate.
 
+The owner accepted the 90-second candidate as musically suitable to advance.
+
+## One-hundred-eighty-second pilot result
+
+The approved final A1 host gate used the same pinned, strict-offline foreground
+configuration and completed successfully:
+
+```text
+Lifecycle: blocked_for_human_review
+Run: 20260717T193944Z-180s
+Audio duration: 180.000 seconds
+Format: FLAC, 48 kHz, stereo
+File size: 39,794,158 bytes
+Audio SHA-256: 5d5c50cd3468b0b7f9503ca4d0592166d80a6de88716ddae14c6e90d9d56a6f4
+Mean volume: -15.5 dB
+Maximum volume: -1.0 dB
+Total measured wall time: 73.167 seconds
+Diffusion: 18.654 seconds / 8 steps
+VAE decode: 27.587 seconds
+Measured offload: 23.953 seconds
+Peak CUDA allocation reported by ACE-Step: 5.55 GiB
+Automatic downloader entered: no
+Generation failure/traceback: no
+Checkpoint manifest intact after run: yes
+AMD chat health after run: ok
+Lingering Music process or CUDA allocation: none
+```
+
+All mechanical A1 host gates have now passed. Full A1 remains
+`blocked_for_human_review` until the owner evaluates the three-minute song's
+coherence and usefulness.
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -201,9 +233,8 @@ host validation, not language-model judgment.
   the selected checkpoints add 7.2 GiB.
 - The 30-second candidate uses the upstream example prompt and fixed seed. It
   validates feasibility, not Soul's future project prompt/lyrics workflow.
-- Full A1 still needs human review of the 90-second candidate and a successful
-  180-second candidate. Full-song duration may still change memory, speed, and
-  structural quality.
+- Full A1 still needs human review of the successful 180-second candidate;
+  mechanical validity cannot establish musical quality or usefulness.
 - The CUDA 12.6 substitution has passed the ACE-Step import, CUDA matrix probe,
   and 30-second generation; the longer 90- and 180-second stability gates remain.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
@@ -246,6 +277,6 @@ watcher, scheduler, queue, or polling loop.
 - [x] Review the exact setup plan before installing the environment.
 - [x] Review the separate download plan before retrieving weights.
 - [x] Listen to and accept the 30-second audio candidate.
-- [ ] Listen to and accept or reject the 90-second audio candidate.
-- [ ] Review the 180-second stability, timing, and audio candidate.
+- [x] Listen to and accept the 90-second audio candidate.
+- [ ] Listen to and accept or reject the 180-second audio candidate.
 - [ ] Approve, revise, or reject full A1 before proceeding to Music A2.
