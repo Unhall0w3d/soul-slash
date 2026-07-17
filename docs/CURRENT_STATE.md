@@ -91,8 +91,13 @@ successfully imported ACE-Step and ran synchronized matrix multiplication on
 the GTX 1070 through its compatible `sm_60` cubin. After a second owner
 approval, all 7,709,375,886 bytes across the 25 selected
 checkpoint files passed their pinned size and SHA-256 checks; no partial file
-was retained as a checkpoint. Full A1 remains open until the 30/90/180-second
-host pilots and audio review pass.
+was retained as a checkpoint. The first 30-second float16 attempt produced NaN
+latents; a second float32 generation succeeded but exposed upstream output
+cleanup. The exact Soul compatibility overlay now honors float32, prevents the
+automatic downloader, retains bounded output, and rejects zero-exit failures.
+The final 30-second candidate is a verified 48 kHz stereo FLAC and awaits human
+listening review. Full A1 remains open until that review plus the 90- and
+180-second host pilots pass.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

@@ -21,6 +21,12 @@ Date: 2026-07-17
   desktop `sm_61` device within the same major architecture.
 - Added an offline-only, foreground 30/90/180-second pilot command with fixed
   batch, seed, backend, offload, quantization, and timeout behavior.
+- Added an exact v0.1.8 compatibility overlay that implements the release's
+  advertised Pascal float32 recovery, bypasses automatic download and code-sync
+  paths under Soul's strict-offline flag, and retains only explicitly reviewed
+  pilot output.
+- Hardened success detection: profiler exit zero is insufficient unless the log
+  is failure-free and a non-empty audio artifact is retained.
 - Fixed Self Assessment reboot evidence using the exact CachyOS hook message
   relative to current boot time; old, missing, and unsafe evidence fails
   honestly without rebooting the host.
@@ -48,6 +54,9 @@ Date: 2026-07-17
 - `make music-pilot-plan`
 - Approved `make setup-music` with the reviewed digest and exact confirmation.
 - Live ACE-Step import plus synchronized CUDA matrix probe.
+- Approved 30-second pilot, failure diagnosis, exact overlay application,
+  checkpoint repair/reverification, and final audio/mechanical review.
+- Post-pilot manifest verification of all 7,709,375,886 checkpoint bytes.
 - Existing environment and host-improvement verifiers.
 - Live read-only NVIDIA, fallback service, and reboot-evidence checks.
 - `git diff --check`
@@ -88,6 +97,16 @@ rule: a target with the same major and a lower-or-equal minor capability runs
 on the higher-minor desktop GPU. It now requires both that compatible target
 and synchronized real computation, rather than trusting labels alone.
 
+The pinned checkout remains at the exact upstream commit with three intentional
+working-tree overlay files. Their combined diff SHA-256 is
+`d0bbcd14527026f5225bb65aad0f242ec27600cdec766a5b4af244fffb69f576`:
+
+```text
+acestep/core/generation/handler/init_service_downloads.py
+acestep/core/generation/handler/init_service_orchestrator.py
+profile_inference.py
+```
+
 After a separate owner approval, the model-download gate completed with this
 receipt:
 
@@ -100,6 +119,42 @@ Checkpoint disk footprint: 7.2 GiB
 Partial files remaining: 0
 ```
 
+## Thirty-second pilot result
+
+The first invocation exposed an upstream false-success boundary: generation
+returned a failed result with 48,000 NaN float16 latents, but the profiler
+exited zero. It also entered its automatic downloader because its "main model"
+presence check expects the intentionally omitted bundled 1.7B LM. Offline mode
+prevented network access, but Soul now bypasses that path entirely.
+
+The release's error message recommends `ACESTEP_DTYPE=float32`, but v0.1.8 does
+not implement the variable. The exact overlay added that missing behavior. A
+float32 retry generated audio successfully, then revealed that the profiler
+deleted its own temporary output. The v2 overlay retains that directory only
+when Soul sets the bounded run flag. The final retry passed:
+
+```text
+Lifecycle: blocked_for_human_review
+Run: 20260717T105854Z-30s
+Audio duration: 30.000 seconds
+Format: FLAC, 48 kHz, stereo
+File size: 6,365,664 bytes
+Audio SHA-256: 0beb060a120a7873b80c5e659410d2759cccd200a26937ec4113b1031deca0b3
+Mean volume: -15.5 dB
+Maximum volume: -1.0 dB
+Diffusion: 2.993 seconds / 8 steps
+Measured offload: 21.506 seconds
+Peak CUDA allocation reported by ACE-Step: 4.83 GiB
+Automatic downloader entered: no
+Generation failure/traceback: no
+Checkpoint manifest intact after run: yes
+AMD chat health after run: ok
+Lingering Music process or CUDA allocation: none
+```
+
+The audio is mechanically valid and non-silent. Musical quality, usefulness,
+and whether it justifies the 90-second gate remain human judgments.
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -110,9 +165,13 @@ host validation, not language-model judgment.
 
 - The approved environment and models are installed. The 6.8 GiB source and
   environment footprint includes upstream's broad inference/training/UI lock;
-  the selected checkpoints add 7.2 GiB. No generation has run yet.
-- The CUDA 12.6 substitution is supported by PyTorch's Pascal matrix but still
-  needs the real ACE-Step import and generation pilots.
+  the selected checkpoints add 7.2 GiB.
+- The 30-second candidate uses the upstream example prompt and fixed seed. It
+  validates feasibility, not Soul's future project prompt/lyrics workflow.
+- Full A1 still needs human audio review and successful 90- and 180-second
+  candidates. Longer duration may change memory, speed, and structural quality.
+- The CUDA 12.6 substitution has passed the ACE-Step import, CUDA matrix probe,
+  and 30-second generation; the longer 90- and 180-second stability gates remain.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
   the CLI feasibility pilot does not need; minimizing that environment is
   deferred until feasibility is known.
@@ -147,10 +206,11 @@ watcher, scheduler, queue, or polling loop.
 
 ## Human review checklist
 
-- [ ] Confirm the 7.71 GB selected checkpoint download set.
-- [ ] Confirm CUDA 12.6 is the right explicit Pascal compatibility lane.
-- [ ] Confirm general Soul setup should continue when `uv` is absent.
-- [ ] Review the exact setup plan before installing the environment.
-- [ ] Review the separate download plan before retrieving weights.
-- [ ] Review 30-, 90-, and 180-second stability, timing, and audio candidates.
+- [x] Confirm the 7.71 GB selected checkpoint download set.
+- [x] Confirm CUDA 12.6 is the right explicit Pascal compatibility lane.
+- [x] Confirm general Soul setup should continue when `uv` is absent.
+- [x] Review the exact setup plan before installing the environment.
+- [x] Review the separate download plan before retrieving weights.
+- [ ] Listen to and accept or reject the 30-second audio candidate.
+- [ ] Review 90- and 180-second stability, timing, and audio candidates.
 - [ ] Approve, revise, or reject full A1 before proceeding to Music A2.

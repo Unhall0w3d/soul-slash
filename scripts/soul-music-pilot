@@ -50,9 +50,11 @@ class MusicPilot
     ensure_qwen_inactive!
     FileUtils.mkdir_p(File.dirname(@source_dir))
     install_source unless exact_source?
+    apply_compatibility_overlay
     install_environment
     probe_cuda
-    emit("lifecycle_state"=>"complete", "source_dir"=>@source_dir, "environment"=>File.join(@source_dir, ".venv"), "models_downloaded"=>false, "next"=>"Run the model download preview and review its byte count before downloading.")
+    models_present = all_models_valid?
+    emit("lifecycle_state"=>"complete", "source_dir"=>@source_dir, "environment"=>File.join(@source_dir, ".venv"), "models_present_and_verified"=>models_present, "next"=>(models_present ? "Run the bounded foreground pilot." : "Run the model download preview and review its byte count before downloading."))
   rescue Canceled => error
     emit("lifecycle_state"=>"canceled", "error"=>error.message, "source_dir"=>@source_dir)
     exit 1
@@ -98,11 +100,16 @@ class MusicPilot
       "--duration", duration.to_s, "--batch-size", "1", "--seed", "1701", "--no-warmup",
       "--benchmark-output", File.join(run_dir, "benchmark.json")
     ]
-    result = capture(command, timeout: seconds + 45, chdir: @source_dir, env: {"TMPDIR"=>run_dir, "HF_HUB_OFFLINE"=>"1", "TRANSFORMERS_OFFLINE"=>"1", "HF_DATASETS_OFFLINE"=>"1"}, max_bytes: 2 * 1024 * 1024)
+    result = capture(command, timeout: seconds + 45, chdir: @source_dir, env: {"TMPDIR"=>run_dir, "HF_HUB_OFFLINE"=>"1", "TRANSFORMERS_OFFLINE"=>"1", "HF_DATASETS_OFFLINE"=>"1", "SOUL_ACESTEP_STRICT_OFFLINE"=>"1", "SOUL_ACESTEP_RETAIN_OUTPUT"=>"1", "ACESTEP_DTYPE"=>"float32"}, max_bytes: 2 * 1024 * 1024)
     File.write(File.join(run_dir, "pilot.log"), result[:stdout].to_s + result[:stderr].to_s)
-    state = result[:ok] ? "blocked_for_human_review" : ((result[:interrupted] || result[:exit_status] == 124) ? "canceled" : "failed")
-    emit("lifecycle_state"=>state, "duration_seconds"=>duration, "run_dir"=>run_dir, "exit_status"=>result[:exit_status], "human_audio_review_required"=>result[:ok])
-    exit 1 unless result[:ok]
+    audio_files = %w[flac wav mp3].flat_map { |extension| Dir.glob(File.join(run_dir, "**", "*.#{extension}")) }.select { |path| File.file?(path) && File.size(path).positive? }
+    log = result[:stdout].to_s + result[:stderr].to_s
+    generation_failed = log.include?("Generation failed") || log.include?("  FAILED:") || log.include?("Traceback (most recent call last)")
+    checkpoints_intact = all_models_valid?
+    accepted = result[:ok] && !generation_failed && !audio_files.empty? && checkpoints_intact
+    state = accepted ? "blocked_for_human_review" : ((result[:interrupted] || result[:exit_status] == 124) ? "canceled" : "failed")
+    emit("lifecycle_state"=>state, "duration_seconds"=>duration, "run_dir"=>run_dir, "exit_status"=>result[:exit_status], "audio_files"=>audio_files, "checkpoints_intact"=>checkpoints_intact, "human_audio_review_required"=>accepted)
+    exit 1 unless accepted
   rescue StandardError => error
     emit("lifecycle_state"=>"failed", "error"=>error.message)
     exit 1
@@ -140,6 +147,7 @@ class MusicPilot
       "source_revision"=>@source.fetch("revision"),
       "python"=>@source.fetch("python"),
       "pytorch_compatibility_override"=>{"version"=>@source.fetch("pytorch"), "index"=>@source.fetch("pytorch_index"), "reason"=>"GTX 1070 Pascal SM 6.1 requires the CUDA 12.6 binary lane"},
+      "soul_compatibility_overlay"=>@source.fetch("soul_compatibility_overlay"),
       "dit_model"=>@options.fetch(:dit_model),
       "lm_model"=>@options.fetch(:lm_model),
       "download_bytes"=>model_bytes,
@@ -208,6 +216,108 @@ class MusicPilot
     raise "Pascal-compatible PyTorch install failed: #{result[:stderr]}" unless result[:ok]
   end
 
+  def apply_compatibility_overlay
+    orchestrator = File.join(@source_dir, "acestep", "core", "generation", "handler", "init_service_orchestrator.py")
+    downloads = File.join(@source_dir, "acestep", "core", "generation", "handler", "init_service_downloads.py")
+    profiler = File.join(@source_dir, "profile_inference.py")
+    dtype_marker = "SOUL_PASCAL_FP32_OVERLAY_V1"
+    unless File.read(orchestrator).include?(dtype_marker)
+      original = [
+        '            elif resolved_device == "cuda":',
+        '                if gpu_config.cuda_supports_bfloat16():',
+        '                    self.dtype = torch.bfloat16',
+        '                else:',
+        '                    self.dtype = torch.float16',
+        '                    logger.info(',
+        '                        "[initialize_service] Pre-Ampere CUDA detected: "',
+        '                        "using float16 instead of bfloat16."',
+        '                    )'
+      ].join("\n")
+      replacement = [
+        '            elif resolved_device == "cuda":',
+        '                # SOUL_PASCAL_FP32_OVERLAY_V1: v0.1.8 advertises ACESTEP_DTYPE',
+        '                # for pre-Ampere overflow recovery but does not implement it.',
+        '                dtype_override = os.environ.get("ACESTEP_DTYPE", "").strip().lower()',
+        '                if dtype_override == "float32":',
+        '                    self.dtype = torch.float32',
+        '                    logger.info("[initialize_service] Soul Pascal overlay: using explicit float32 dtype.")',
+        '                elif gpu_config.cuda_supports_bfloat16():',
+        '                    self.dtype = torch.bfloat16',
+        '                else:',
+        '                    self.dtype = torch.float16',
+        '                    logger.info(',
+        '                        "[initialize_service] Pre-Ampere CUDA detected: "',
+        '                        "using float16 instead of bfloat16."',
+        '                    )'
+      ].join("\n")
+      replace_exact!(orchestrator, original, replacement)
+    end
+
+    offline_marker = "SOUL_STRICT_OFFLINE_OVERLAY_V1"
+    unless File.read(downloads).include?(offline_marker)
+      original = [
+        '        """Ensure required checkpoint assets exist locally, downloading when missing."""',
+        '        if not check_main_model_exists(checkpoint_path):'
+      ].join("\n")
+      replacement = [
+        '        """Ensure required checkpoint assets exist locally, downloading when missing."""',
+        '        # SOUL_STRICT_OFFLINE_OVERLAY_V1: a Soul pilot must never enter an',
+        '        # upstream downloader or mutate pinned checkpoint code.',
+        '        if os.environ.get("SOUL_ACESTEP_STRICT_OFFLINE") == "1":',
+        '            required = (',
+        '                checkpoint_path / config_path / "model.safetensors",',
+        '                checkpoint_path / "vae" / "diffusion_pytorch_model.safetensors",',
+        '                checkpoint_path / "Qwen3-Embedding-0.6B" / "model.safetensors",',
+        '            )',
+        '            missing = [str(path) for path in required if not path.is_file()]',
+        '            if missing:',
+        '                return f"ERROR: Strict offline checkpoint files missing: {missing}", False',
+        '            return None',
+        '        if not check_main_model_exists(checkpoint_path):'
+      ].join("\n")
+      replace_exact!(downloads, original, replacement)
+      import_original = "from pathlib import Path\n"
+      replace_exact!(downloads, import_original, "import os\nfrom pathlib import Path\n")
+
+      sync_original = [
+        '        """Sync model-side python files when checkpoint code metadata diverges."""',
+        '        from acestep.model_downloader import _check_code_mismatch, _sync_model_code_files'
+      ].join("\n")
+      sync_replacement = [
+        '        """Sync model-side python files when checkpoint code metadata diverges."""',
+        '        if os.environ.get("SOUL_ACESTEP_STRICT_OFFLINE") == "1":',
+        '            return',
+        '        from acestep.model_downloader import _check_code_mismatch, _sync_model_code_files'
+      ].join("\n")
+      replace_exact!(downloads, sync_original, sync_replacement)
+    end
+
+    retain_marker = "SOUL_RETAIN_OUTPUT_OVERLAY_V2"
+    unless File.read(profiler).include?(retain_marker)
+      original = [
+        'def _cleanup_dir(path: str):',
+        '    """Remove temporary directory silently."""',
+        '    try:'
+      ].join("\n")
+      replacement = [
+        'def _cleanup_dir(path: str):',
+        '    """Remove temporary directory unless a bounded Soul pilot retains it."""',
+        '    # SOUL_RETAIN_OUTPUT_OVERLAY_V2',
+        '    if os.environ.get("SOUL_ACESTEP_RETAIN_OUTPUT") == "1":',
+        '        return',
+        '    try:'
+      ].join("\n")
+      replace_exact!(profiler, original, replacement)
+    end
+  end
+
+  def replace_exact!(path, original, replacement)
+    content = File.read(path)
+    count = content.scan(original).length
+    raise "compatibility overlay expected one exact source block in #{path}, found #{count}" unless count == 1
+    File.write(path, content.sub(original, replacement))
+  end
+
   def probe_cuda
     python = File.join(@source_dir, ".venv", "bin", "python")
     code = "import json,torch; x=torch.ones((2,2),device='cuda'); y=x@x; torch.cuda.synchronize(); print(json.dumps({'cuda':torch.cuda.is_available(),'device':torch.cuda.get_device_name(0),'capability':torch.cuda.get_device_capability(0),'arches':torch.cuda.get_arch_list(),'matmul_sum':y.sum().item()}))"
@@ -240,7 +350,7 @@ class MusicPilot
       raise "digest or size mismatch for #{path}" unless valid_file?(partial, bytes, sha)
       File.rename(partial, target)
     ensure
-      FileUtils.rm_f(partial) if defined?(partial) && File.exist?(partial)
+      FileUtils.rm_f(partial) if defined?(partial) && partial && File.exist?(partial)
     end
   end
 
@@ -251,6 +361,13 @@ class MusicPilot
   def verify_all_models!
     @dit.fetch("files").each { |path, bytes, sha| raise "missing or invalid checkpoint #{path}" unless valid_file?(File.join(@checkpoint_dir, path), bytes, sha) }
     @lm.fetch("files").each { |path, bytes, sha| raise "missing or invalid LM checkpoint #{path}" unless valid_file?(File.join(@checkpoint_dir, @options.fetch(:lm_model), path), bytes, sha) }
+  end
+
+  def all_models_valid?
+    verify_all_models!
+    true
+  rescue StandardError
+    false
   end
 
   def capture(command, timeout:, chdir: nil, env: {}, max_bytes: 256 * 1024)
@@ -296,6 +413,7 @@ class MusicPilot
   def emit(data) = puts(JSON.pretty_generate(data))
 end
 
+if $PROGRAM_NAME == __FILE__
 options = {
   manifest: ENV.fetch("MUSIC_MODEL_MANIFEST", File.expand_path("../config/music_pilot_models.json", __dir__)),
   root: ENV.fetch("MUSIC_ROOT", File.join(Dir.home, ".local", "share", "soul", "music")),
@@ -322,4 +440,5 @@ when "setup" then pilot.setup
 when "download" then pilot.download
 when "run" then pilot.run
 else abort "usage: soul-music-pilot [check|plan|setup|download|run] [options]"
+end
 end

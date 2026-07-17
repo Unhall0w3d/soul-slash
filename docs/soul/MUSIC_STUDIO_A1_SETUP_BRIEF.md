@@ -30,6 +30,11 @@ files, not services, listeners, scheduled jobs, or background processes.
 - Override upstream CUDA 12.8 wheels with PyTorch 2.10 CUDA 12.6 wheels because
   the GTX 1070 is Pascal SM 6.1. Probe the installed wheel on the real GPU with
   synchronized matrix multiplication and require a compatible same-major cubin.
+- Permit one exact, versioned compatibility overlay against the pinned release:
+  honor its advertised `ACESTEP_DTYPE=float32` recovery on Pascal, prohibit its
+  automatic downloader during Soul pilots, and retain output only for the
+  explicit bounded pilot run. Exact source replacement must fail closed if the
+  upstream revision no longer matches.
 - Default to `acestep-v15-turbo` and `acestep-5Hz-lm-0.6B` with the PyTorch LM
   backend, CPU offload, batch one, and INT8 weight-only quantization.
 - Reject unknown or case-mismatched checkpoint names.
@@ -38,6 +43,8 @@ files, not services, listeners, scheduled jobs, or background processes.
 - Limit pilot durations to 30, 90, and 180 seconds with explicit timeouts.
 - Retain generated pilot output for human review and do not promote Music A1
   until the measured feasibility gates are reviewed.
+- Treat a zero profiler exit as failure when the generation result failed or no
+  non-empty audio artifact remains.
 
 ## Excluded
 

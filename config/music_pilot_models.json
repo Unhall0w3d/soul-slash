@@ -8,7 +8,8 @@
     "pytorch": "2.10.0+cu126",
     "torchvision": "0.25.0+cu126",
     "torchaudio": "2.10.0+cu126",
-    "pytorch_index": "https://download.pytorch.org/whl/cu126"
+    "pytorch_index": "https://download.pytorch.org/whl/cu126",
+    "soul_compatibility_overlay": "pascal-fp32-strict-offline-retain-v2"
   },
   "dit_models": {
     "acestep-v15-turbo": {
