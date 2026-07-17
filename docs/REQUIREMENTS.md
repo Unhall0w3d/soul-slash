@@ -38,6 +38,12 @@ Supported runtime providers:
 - The separately gated Music Studio vocal-analysis option installs its own
   pinned whisper.cpp command and English model. It uses bounded CPU time only
   when explicitly triggered and does not create a resident process or service.
+- The separately gated music-reference option prefers an operating-system
+  yt-dlp package and uses `uv` to install pinned Essentia in an ignored
+  project-local environment. A pinned local yt-dlp is used only when no system
+  command exists. FFmpeg remains a system prerequisite. These tools run only
+  for an exact-confirmed foreground URL analysis and retain no source audio in
+  analysis-only mode.
 
 The Music pilot uses `uv` to create an isolated Python 3.12 environment without
 changing the distribution-managed Python installation. Install `uv` through

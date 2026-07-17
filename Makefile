@@ -25,8 +25,11 @@ MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B
 MUSIC_DURATION ?= 30
 MUSIC_TRANSCRIPTION_MANIFEST ?= $(PROJECT_ROOT)/config/music_transcription_models.json
 MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
+MUSIC_REFERENCE_PYTHON ?= 3.14
+MUSIC_REFERENCE_YTDLP_VERSION ?= 2026.7.4
+MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -139,6 +142,17 @@ music-transcription-install:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-transcription-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_TRANSCRIPTION" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_TRANSCRIPTION is required."; exit 2; }
 > @ruby scripts/soul-music-transcription install --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-reference-tooling-check:
+> @ruby scripts/soul-music-reference-tooling check --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)"
+
+music-reference-tooling-plan:
+> @ruby scripts/soul-music-reference-tooling plan --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)"
+
+music-reference-tooling-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-reference-tooling-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_MUSIC_REFERENCE_TOOLS" || { echo "Exact confirmation INSTALL_MUSIC_REFERENCE_TOOLS is required."; exit 2; }
+> @ruby scripts/soul-music-reference-tooling install --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-projects:
 > @ruby scripts/soul-music-studio projects list --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
@@ -290,3 +304,6 @@ verify-music-vocal-analysis:
 
 verify-music-references:
 > @ruby scripts/verify-music-reference-library-a5.rb
+
+verify-music-reference-analysis:
+> @ruby scripts/verify-music-reference-analysis-a5.rb

@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -282,7 +282,7 @@ async function loadMusicStudio() {
   state.musicLoaded = true;
   try {
     const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope);
-    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicResources();
+    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicReferenceStatus(); await refreshMusicResources();
     if (state.musicProjects.length) await selectMusicProject(state.musicProjects[0]);
   } catch (error) { state.musicLoaded = false; byId("music-form-status").textContent = error.message; }
 }
@@ -291,6 +291,26 @@ async function loadMusicReferences() {
   const envelope = await callSoul("music.references.list", { limit: 200 }); lifecycle(envelope);
   if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Reference library needs attention");
   state.musicReferences = dataOf(envelope); renderMusicReferences();
+}
+
+async function refreshMusicReferenceStatus() {
+  try { const envelope = await callSoul("music.references.status"); const data = dataOf(envelope); const ready = data.available === true; byId("music-reference-tool-status").textContent = ready ? "Local reference tools ready · no resident process" : (data.blockers || []).join(" · ") || "Reference tools unavailable"; byId("preview-music-reference").disabled = !ready; }
+  catch (error) { byId("music-reference-tool-status").textContent = error.message; byId("preview-music-reference").disabled = true; }
+}
+
+async function previewMusicReference() {
+  state.musicReferencePreview = null; byId("music-reference-confirm").hidden = true; byId("music-reference-status").textContent = "Reading metadata only; no media is downloaded at this gate."; byId("preview-music-reference").disabled = true;
+  try { const params = { url: byId("music-reference-url").value, rights_assertion: byId("music-reference-rights").value }; const envelope = await callSoul("music.references.analysis.preview", params); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Reference preview is unavailable"); state.musicReferencePreview = { ...data, ...params }; byId("music-reference-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-confirmation").value = ""; byId("analyze-music-reference").disabled = true; byId("music-reference-confirm").hidden = false; byId("music-reference-status").textContent = `${data.metadata.title} · ${data.metadata.artists.join(", ")} · ${data.metadata.duration_seconds}s. Exact confirmation is required.`; }
+  catch (error) { byId("music-reference-status").textContent = error.message; }
+  finally { byId("preview-music-reference").disabled = false; }
+}
+
+async function analyzeMusicReference() {
+  if (!state.musicReferencePreview || state.musicReferenceAnalyzing) return; state.musicReferenceAnalyzing = true; byId("analyze-music-reference").disabled = true; byId("preview-music-reference").disabled = true;
+  const params = { url: state.musicReferencePreview.url, rights_assertion: state.musicReferencePreview.rights_assertion, confirmation: byId("music-reference-confirmation").value, expected_digest: state.musicReferencePreview.expected_digest };
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.references.analysis.execute", params, {}, (event) => { const message = String(event.message || "").trim(); if (message) byId("music-reference-status").textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${message.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).reference) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); byId("music-reference-status").textContent = "Derived evidence recorded. Source audio and temporary analysis files were removed."; state.musicReferencePreview = null; byId("music-reference-confirm").hidden = true; await loadMusicReferences(); }
+  catch (error) { byId("music-reference-status").textContent = error.message; }
+  finally { state.musicReferenceAnalyzing = false; byId("preview-music-reference").disabled = false; byId("analyze-music-reference").disabled = !state.musicReferencePreview || byId("music-reference-confirmation").value !== state.musicReferencePreview.confirmation_phrase; }
 }
 
 function renderMusicReferences() {
@@ -1272,6 +1292,9 @@ byId("self-improvement-navigation").addEventListener("keydown", (event) => { if 
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
+byId("preview-music-reference").addEventListener("click", previewMusicReference);
+byId("music-reference-confirmation").addEventListener("input", () => { byId("analyze-music-reference").disabled = !state.musicReferencePreview || byId("music-reference-confirmation").value !== state.musicReferencePreview.confirmation_phrase; });
+byId("analyze-music-reference").addEventListener("click", analyzeMusicReference);
 byId("preview-music-generation").addEventListener("click", previewMusicGeneration);
 byId("music-generation-confirmation").addEventListener("input", () => { byId("start-music-generation").disabled = !state.musicPreview || byId("music-generation-confirmation").value !== state.musicPreview.confirmation_phrase; });
 byId("start-music-generation").addEventListener("click", startMusicGeneration);

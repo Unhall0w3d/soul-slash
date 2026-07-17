@@ -22,9 +22,11 @@ module SoulCore
     end
 
     class ForegroundProcessRunner
-      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:, progress: nil)
+      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:, progress: nil, rlimit_fsize_bytes: nil)
         stdout = +""; stderr = +""; process_status = nil; state = "failed"; pid = nil
-        Open3.popen3(env, *command, chdir: chdir, pgroup: true) do |stdin, out, err, wait|
+        spawn_options = { chdir: chdir, pgroup: true }
+        spawn_options[:rlimit_fsize] = Integer(rlimit_fsize_bytes) if rlimit_fsize_bytes
+        Open3.popen3(env, *command, **spawn_options) do |stdin, out, err, wait|
           stdin.close
           pid = wait.pid
           begin

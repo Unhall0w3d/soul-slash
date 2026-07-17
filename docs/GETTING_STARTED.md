@@ -440,6 +440,9 @@ make music-model-download  Download verified weights after a separate gate
 make music-pilot-run  Run one foreground 30/90/180-second feasibility pilot
 make music-transcription-plan  Preview optional pinned CPU vocal analysis
 make music-transcription-install  Install it after digest and exact confirmation
+make music-reference-tooling-check  Inspect optional URL-analysis tools
+make music-reference-tooling-plan  Preview the pinned local tooling environment
+make music-reference-tooling-install  Install after digest and exact confirmation
 make test-runtime     Test configured runtime
 make test-fast        Test FAST/no_think request mode
 make test-think       Test THINK request mode
@@ -483,6 +486,24 @@ per-candidate preview and confirmation; the process exits and releases its
 memory after transcription, failure, cancellation, timeout, or an abandoned
 dashboard stream. Machine-heard OK leads to human testing. Machine-heard BAD
 leads to an Operator-triggered revision attempt. Neither result is approval.
+
+YouTube reference analysis is another optional, separately reviewed path. It
+uses system yt-dlp when available and a project-local Python 3.14 environment
+for exact default `essentia==2.1b6.dev1438`. If yt-dlp is unavailable, the same
+environment receives the exact `yt-dlp==2026.7.4` fallback. Review the plan
+before allowing the networked package installation:
+
+```bash
+make music-reference-tooling-check
+make music-reference-tooling-plan
+make music-reference-tooling-install EXPECTED_DIGEST=<digest-from-plan> CONFIRM=INSTALL_MUSIC_REFERENCE_TOOLS
+```
+
+This setup creates no service or listener and does not run when Soul starts.
+Once installed, Music Studio first performs a metadata-only URL preview. The
+separate `ANALYZE_MUSIC_REFERENCE` gate retrieves one bounded transient audio
+source, extracts non-expressive evidence, writes a private candidate profile,
+and removes source media and the analysis WAV at every terminal outcome.
 
 ## 16. Clock-skew warning after applying overlays
 

@@ -1,0 +1,113 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "optparse"
+require "open3"
+require "securerandom"
+
+CONFIRMATION = "INSTALL_MUSIC_REFERENCE_TOOLS"
+options = {
+  root: File.expand_path("..", __dir__),
+  python: ENV.fetch("MUSIC_REFERENCE_PYTHON", "3.14"),
+  yt_dlp: ENV.fetch("MUSIC_REFERENCE_YTDLP_VERSION", "2026.7.4"),
+  essentia: ENV.fetch("MUSIC_REFERENCE_ESSENTIA_VERSION", "2.1b6.dev1438")
+}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--python VERSION") { |value| options[:python] = value }
+  parser.on("--yt-dlp-version VERSION") { |value| options[:yt_dlp] = value }
+  parser.on("--essentia-version VERSION") { |value| options[:essentia] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+def executable(name)
+  ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }.find { |path| File.executable?(path) && !File.directory?(path) }
+end
+
+begin
+  root = File.expand_path(options.fetch(:root))
+  install_dir = File.join(root, "Soul", "music", "tooling", "reference-analysis")
+  raise "tooling destination must remain inside the repository" unless install_dir.start_with?(root + File::SEPARATOR)
+  system_ytdlp = executable("yt-dlp")
+  system_ytdlp_version = if system_ytdlp
+    output, status = Open3.capture2e(system_ytdlp, "--version")
+    status.success? ? output.strip : nil
+  end
+  install_packages = { "essentia" => options.fetch(:essentia) }
+  install_packages["yt-dlp"] = options.fetch(:yt_dlp) unless system_ytdlp_version
+  plan = {
+    "operation" => "music_reference_tooling_install", "install_dir" => install_dir,
+    "python" => options.fetch(:python), "packages" => install_packages,
+    "yt_dlp" => { "source" => system_ytdlp_version ? "system" : "local_environment", "path" => system_ytdlp, "version" => system_ytdlp_version || options.fetch(:yt_dlp) },
+    "confirmation_phrase" => CONFIRMATION, "persistent_service" => false, "network_listener" => false,
+    "resident_process" => false, "automatic_install" => false, "system_package_mutation" => false,
+    "automatic_python_download" => false
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+
+  if action == "check"
+    python = File.join(install_dir, ".venv", "bin", "python")
+    ytdlp = system_ytdlp || File.join(install_dir, ".venv", "bin", "yt-dlp")
+    versions = {}
+    if File.executable?(python)
+      output, status = Open3.capture2e(python, "-c", 'import essentia; from importlib.metadata import version; print(version("essentia"))')
+      versions["essentia"] = output.strip if status.success?
+    end
+    if File.executable?(ytdlp)
+      output, status = Open3.capture2e(ytdlp, "--version")
+      versions["yt-dlp"] = output.strip if status.success?
+    end
+    emit("lifecycle_state" => "complete", "available" => versions.keys.sort == %w[essentia yt-dlp], "install_dir" => install_dir, "versions" => versions, "ffmpeg" => executable("ffmpeg"), "uv" => executable("uv"))
+  end
+  emit(plan.merge("lifecycle_state" => "blocked_for_human_review")) if action == "plan"
+  raise "action must be check, plan, or install" unless action == "install"
+  raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+  raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+  uv = executable("uv")
+  raise "uv is required; install it through your operating system package manager" unless uv
+  raise "ffmpeg is required; install it through your operating system package manager" unless executable("ffmpeg")
+  raise "reference tooling already exists; inspect it rather than overwriting" if File.exist?(install_dir) || File.symlink?(install_dir)
+
+  parent = File.dirname(install_dir)
+  FileUtils.mkdir_p(parent, mode: 0o700)
+  staging = "#{install_dir}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+  FileUtils.mkdir_p(staging, mode: 0o700)
+  venv = File.join(staging, ".venv")
+  uv_env = { "UV_PYTHON_DOWNLOADS" => "never" }
+  system(uv_env, uv, "--no-config", "venv", "--python", options.fetch(:python), venv) or raise "uv could not create the reference tooling environment from an installed Python"
+  python = File.join(venv, "bin", "python")
+  package_arguments = install_packages.map { |name, version| "#{name}==#{version}" }
+  system(uv_env, uv, "--no-config", "pip", "install", "--python", python, *package_arguments) or raise "pinned reference tooling installation failed"
+  output, status = Open3.capture2e(python, "-c", 'import json, essentia; from importlib.metadata import version; print(json.dumps({"package": version("essentia"), "runtime": essentia.__version__}))')
+  begin
+    essentia_identity = JSON.parse(output)
+  rescue JSON::ParserError
+    essentia_identity = {}
+  end
+  raise "Essentia import validation failed: #{output.to_s.gsub(/\s+/, ' ').byteslice(0, 800)}" unless status.success? && essentia_identity["package"] == options.fetch(:essentia) && !essentia_identity["runtime"].to_s.empty?
+  ytdlp = system_ytdlp || File.join(venv, "bin", "yt-dlp")
+  output, status = Open3.capture2e(ytdlp, "--version")
+  expected_ytdlp = system_ytdlp_version || options.fetch(:yt_dlp)
+  raise "yt-dlp validation failed" unless status.success? && output.strip == expected_ytdlp
+  freeze, status = Open3.capture2e(uv_env, uv, "--no-config", "pip", "freeze", "--python", python)
+  raise "reference tooling receipt could not be collected" unless status.success?
+  File.write(File.join(staging, "install-receipt.json"), JSON.pretty_generate(plan.merge("installed" => true, "resolved_packages" => freeze.lines.map(&:strip).reject(&:empty?))) + "\n", mode: "wx", perm: 0o600)
+  File.rename(staging, install_dir)
+  emit("lifecycle_state" => "complete", "install_dir" => install_dir, "versions" => plan.fetch("packages").merge("yt-dlp" => expected_ytdlp, "essentia_runtime" => essentia_identity.fetch("runtime")), "yt_dlp_source" => plan.dig("yt_dlp", "source"), "resident_process" => false)
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial environment removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end
