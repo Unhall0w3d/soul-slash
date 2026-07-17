@@ -161,8 +161,8 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   runner = A2Runner.new
   coordinator = A2Coordinator.new
   process_runner = A2ProcessRunner.new
-  ids = %w[1111111111111111 2222222222222222]
-  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift || "3333333333333333" }, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
+  ids = %w[1111111111111111 2222222222222222 3333333333333333 4444444444444444]
+  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift || "5555555555555555" }, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
   service = SoulCore::MusicGenerationService.new(root: root, music_root: music_root, manifest_path: manifest_path, project_store: store, coordinator: coordinator, process_runner: process_runner, runner: runner, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
 
   missing_rights = service.create_project(project_input.except("rights_status"))
@@ -191,6 +191,31 @@ Dir.mktmpdir("soul-music-a2-") do |root|
 
   inspected = service.inspect_project(project_id: project_id)
   check.call("project inspection exposes only published candidates", inspected["lifecycle_state"] == "complete" && inspected.dig("data", "generations").map { |item| item["candidate_id"] } == [candidate_id])
+
+  source_input = inspected.dig("data", "generations", 0, "generation_input")
+  seed_only = service.revision_preview(project_id: project_id, source_candidate_id: candidate_id, revision: {
+    "caption" => source_input.fetch("caption"), "lyrics" => source_input.fetch("lyrics"), "bpm" => source_input.fetch("bpm"),
+    "keyscale" => source_input.fetch("keyscale"), "timesignature" => source_input.fetch("timesignature"), "seed" => source_input.fetch("seed") + 1
+  })
+  check.call("revision cannot be a seed-only retry", seed_only["lifecycle_state"] == "awaiting_input" && seed_only["reason"].include?("materially change") && process_runner.calls.length == 2)
+
+  revision = {
+    "caption" => "Energetic melodic rock with an immediate two-bar vocal pickup, sparse verse one, and clearly separated lead vocal.",
+    "lyrics" => source_input.fetch("lyrics"), "bpm" => 116, "keyscale" => source_input.fetch("keyscale"),
+    "timesignature" => source_input.fetch("timesignature"), "seed" => 1702
+  }
+  revision_preview = service.revision_preview(project_id: project_id, source_candidate_id: candidate_id, revision: revision)
+  revision_candidate = revision_preview.dig("data", "candidate_id")
+  revision_wrong = service.revision_execute(project_id: project_id, source_candidate_id: candidate_id, candidate_id: revision_candidate, revision: revision, confirmation: "START_MUSIC_GENERATION", expected_digest: revision_preview.dig("data", "expected_digest"))
+  check.call("revision preview binds changed sound and structure without starting work", revision_preview["lifecycle_state"] == "blocked_for_human_review" && revision_preview.dig("data", "confirmation_phrase") == "START_MUSIC_REVISION" && revision_preview.dig("data", "preview_scope", "changed_fields").sort == %w[bpm caption seed] && process_runner.calls.length == 2)
+  check.call("revision requires its distinct exact confirmation", revision_wrong["lifecycle_state"] == "blocked_for_human_review" && process_runner.calls.length == 2)
+
+  revised = service.revision_execute(project_id: project_id, source_candidate_id: candidate_id, candidate_id: revision_candidate, revision: revision, confirmation: "START_MUSIC_REVISION", expected_digest: revision_preview.dig("data", "expected_digest"))
+  revised_receipt = revised.dig("data", "candidate")
+  revised_input = store.candidate_input(project_id, revision_candidate)
+  check.call("confirmed revision creates a linked candidate from the exact edited input", revised["lifecycle_state"] == "blocked_for_human_review" && process_runner.calls.length == 4 && revised_receipt["generation_kind"] == "revision" && revised_receipt["source_candidate_id"] == candidate_id && revised_input["caption"] == revision["caption"] && revised_input["bpm"] == 116)
+  revised_inspection = service.inspect_project(project_id: project_id)
+  check.call("revision preserves the source and appears in the same project", revised_inspection.dig("data", "generations").map { |item| item["candidate_id"] } == [candidate_id, revision_candidate])
 
   failed_runner = A2FailProcessRunner.new
   failed_service = SoulCore::MusicGenerationService.new(root: root, music_root: music_root, manifest_path: manifest_path, project_store: store, coordinator: coordinator, process_runner: failed_runner, runner: runner, clock: -> { Time.utc(2026, 7, 17, 20, 1, 0) })

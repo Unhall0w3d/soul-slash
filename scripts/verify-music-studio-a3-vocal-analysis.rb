@@ -48,7 +48,7 @@ check.call("installer retains only the foreground CLI and required libraries", i
 dashboard = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes exact analysis preview and comparison", dashboard.include?("ANALYZE_MUSIC_CANDIDATE") == false && dashboard.include?("music.candidates.analysis.preview") && dashboard.include?("music-lyric-compare"))
 check.call("existing evidence receives formatted line and stanza breaks without re-analysis", dashboard.include?("formatMachineHeardLyrics") && dashboard.include?("machine_heard_formatted"))
-check.call("BAD routing prepares an editable brief without automatic generation", dashboard.include?("Prepare revision brief") && dashboard.include?("Nothing has been generated") && dashboard.include?("prepareMusicRevision"))
+check.call("BAD routing requests a Soul draft but preserves editable exact generation gates", dashboard.include?("Ask Soul to draft revision") && dashboard.include?("music.candidates.revision.draft") && dashboard.include?("music.candidates.revision.preview") && dashboard.include?("music.candidates.revision.execute") && dashboard.include?("Preview exact revision"))
 
 abort "Music vocal-analysis verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music Studio A3 vocal-analysis deterministic verification passed."

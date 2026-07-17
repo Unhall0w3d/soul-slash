@@ -105,6 +105,9 @@ module SoulCore
       "music.generation.cancel.execute" => %w[candidate_id confirmation expected_digest],
       "music.candidates.analysis.preview" => %w[project_id candidate_id],
       "music.candidates.analysis.execute" => %w[project_id candidate_id confirmation expected_digest],
+      "music.candidates.revision.draft" => %w[project_id source_candidate_id],
+      "music.candidates.revision.preview" => %w[project_id source_candidate_id revision],
+      "music.candidates.revision.execute" => %w[project_id source_candidate_id candidate_id revision confirmation expected_digest],
       "music.candidates.review" => %w[project_id candidate_id review],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
@@ -209,6 +212,8 @@ module SoulCore
       return "project_id is invalid" if project_id && !project_id.to_s.match?(MUSIC_PROJECT_ID)
       candidate_id = parameters["candidate_id"]
       return "candidate_id is invalid" if candidate_id && !candidate_id.to_s.match?(MUSIC_CANDIDATE_ID)
+      source_candidate_id = parameters["source_candidate_id"]
+      return "source_candidate_id is invalid" if source_candidate_id && !source_candidate_id.to_s.match?(MUSIC_CANDIDATE_ID)
       chat_ids = parameters["chat_ids"]
       return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 
@@ -219,7 +224,7 @@ module SoulCore
       parameters.each do |key, value|
         if key == "limit"
           return "limit must be an integer" unless value.is_a?(Integer)
-        elsif key == "filters" || key == "project" || key == "review"
+        elsif key == "filters" || key == "project" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "args" || key == "chat_ids" || key == "allowed_files"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }

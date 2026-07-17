@@ -12,6 +12,8 @@ module SoulCore
     PROJECT_ID = /\Amusic_[a-f0-9]{16}\z/
     CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
     REVIEW_VALUES = %w[passed partial failed not_applicable].freeze
+    REVISION_FIELDS = %w[caption lyrics bpm keyscale timesignature seed].freeze
+    GENERATION_INPUT_FIELDS = %w[caption lyrics bpm keyscale timesignature language duration seed batch_size inference_steps].freeze
     DEFAULT_DIRECTORY = File.join("Soul", "music", "projects")
     MAX_PROJECTS = 1_000
     MAX_PROJECT_BYTES = 64 * 1024
@@ -128,6 +130,47 @@ module SoulCore
       Digest::SHA256.hexdigest(JSON.generate(input_payload(project)))
     end
 
+    def generation_input_digest(input)
+      validate_generation_input!(input)
+      Digest::SHA256.hexdigest(JSON.generate(input))
+    end
+
+    def candidate_input(project_id, candidate_id)
+      project_id = validate_project_id!(project_id)
+      raise ValidationError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
+      candidate_dir = File.join(generations_path(project_id), candidate_id.to_s)
+      assert_regular_directory!(candidate_dir, "music candidate")
+      path = File.join(candidate_dir, "input.json")
+      raise ValidationError, "music candidate input does not exist" unless File.file?(path) && !File.symlink?(path)
+      raise IntegrityError, "music candidate input exceeds size limit" if File.size(path) > MAX_PROJECT_BYTES
+      input = JSON.parse(File.binread(path, MAX_PROJECT_BYTES))
+      validate_generation_input!(input)
+      input
+    rescue JSON::ParserError => error
+      raise IntegrityError, "invalid music candidate input: #{error.class}"
+    end
+
+    def revision_input(project:, source_input:, attributes:)
+      validate_record!(project, project.fetch("project_id"))
+      validate_generation_input!(source_input)
+      data = stringify_keys(attributes)
+      raise ValidationError, "revision fields are invalid" unless data.keys.sort == REVISION_FIELDS.sort
+      revised = source_input.merge(
+        "caption" => data.fetch("caption"),
+        "lyrics" => data.fetch("lyrics"),
+        "bpm" => Integer(data.fetch("bpm")),
+        "keyscale" => data.fetch("keyscale"),
+        "timesignature" => data.fetch("timesignature").to_s,
+        "seed" => Integer(data.fetch("seed"))
+      )
+      validate_generation_input!(revised, error_class: ValidationError)
+      material_fields = REVISION_FIELDS - ["seed"]
+      raise ValidationError, "revision must materially change sound, structure, lyrics, or musical parameters" if material_fields.all? { |field| revised.fetch(field) == source_input.fetch(field) }
+      revised
+    rescue ArgumentError, TypeError
+      raise ValidationError, "revision bpm and seed must be integers"
+    end
+
     def candidate_id
       id = "candidate_#{@id_generator.call}"
       raise IntegrityError, "generated candidate ID is invalid" unless id.match?(CANDIDATE_ID)
@@ -204,6 +247,22 @@ module SoulCore
     end
 
     private
+
+    def validate_generation_input!(input, error_class: IntegrityError)
+      raise error_class, "music generation input must be an object" unless input.is_a?(Hash) && input.keys.sort == GENERATION_INPUT_FIELDS.sort
+      pseudo = {
+        "title" => "candidate input", "intent" => "candidate input", "target_duration_seconds" => input.fetch("duration"),
+        "vocal_mode" => input.fetch("lyrics").to_s.empty? ? "instrumental" : "vocal", "rights_status" => "original",
+        "caption" => input.fetch("caption"), "lyrics" => input.fetch("lyrics"), "bpm" => input.fetch("bpm"),
+        "keyscale" => input.fetch("keyscale"), "timesignature" => input.fetch("timesignature"), "language" => input.fetch("language"), "seed" => input.fetch("seed")
+      }
+      validate_inputs!(pseudo)
+      raise error_class, "music generation batch size is invalid" unless input.fetch("batch_size") == 1
+      raise error_class, "music generation inference steps are invalid" unless input.fetch("inference_steps") == 8
+      true
+    rescue ValidationError, KeyError => error
+      raise error_class, "invalid music generation input: #{error.message}"
+    end
 
     def prepare_root!
       assert_safe_components!(@directory)

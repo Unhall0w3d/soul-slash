@@ -9,6 +9,7 @@ require_relative "chat_execution_history"
 require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "conversation_provider_registry"
+require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
 require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
@@ -23,6 +24,7 @@ require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
 require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
+require_relative "music_revision_draft_service"
 
 module SoulCore
   class ApplicationFacade
@@ -54,7 +56,9 @@ module SoulCore
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
       music_generation_service: nil,
-      music_candidate_analysis_service: nil
+      music_candidate_analysis_service: nil,
+      music_revision_draft_service: nil,
+      music_revision_provider: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -77,6 +81,8 @@ module SoulCore
       @self_augmentation_experiment_service = self_augmentation_experiment_service
       @music_generation_service = music_generation_service
       @music_candidate_analysis_service = music_candidate_analysis_service
+      @music_revision_draft_service = music_revision_draft_service
+      @music_revision_provider = music_revision_provider
     end
 
     def call(request, progress: nil)
@@ -191,6 +197,9 @@ module SoulCore
       when "music.generation.cancel.execute" then domain(music_generation.cancel_execute(candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.candidates.analysis.preview" then domain(music_candidate_analysis.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id")))
       when "music.candidates.analysis.execute" then domain(music_candidate_analysis.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.candidates.revision.draft" then domain(draft_music_revision(project_id: required(parameters, "project_id"), source_candidate_id: required(parameters, "source_candidate_id")))
+      when "music.candidates.revision.preview" then domain(music_generation.revision_preview(project_id: required(parameters, "project_id"), source_candidate_id: required(parameters, "source_candidate_id"), revision: required(parameters, "revision")))
+      when "music.candidates.revision.execute" then domain(music_generation.revision_execute(project_id: required(parameters, "project_id"), source_candidate_id: required(parameters, "source_candidate_id"), candidate_id: required(parameters, "candidate_id"), revision: required(parameters, "revision"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "music.candidates.review" then domain(music_generation.record_review(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), review: required(parameters, "review")))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
@@ -495,6 +504,34 @@ module SoulCore
         candidate["analysis"] = music_candidate_analysis.read(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
       end
       result
+    end
+
+    def draft_music_revision(project_id:, source_candidate_id:)
+      project_result = music_generation.inspect_project(project_id: project_id)
+      return project_result unless project_result.fetch("ok", false)
+      data = project_result.fetch("data")
+      candidate = data.fetch("generations").find { |item| item["candidate_id"] == source_candidate_id }
+      return awaiting("source music candidate does not exist") unless candidate
+      analysis = music_candidate_analysis.read(project_id: project_id, candidate_id: source_candidate_id)
+      service, provider = music_revision_drafting
+      service.draft(project: data.fetch("project"), candidate: candidate, analysis: analysis, provider: provider)
+    end
+
+    def music_revision_drafting
+      return [@music_revision_draft_service, music_revision_provider] if @music_revision_draft_service
+      report, resolver = resolved_configuration
+      raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
+      env = resolver.effective_environment
+      provider = ConversationProviderRegistry.new(env: env).local.find(&:configured?)
+      @music_revision_draft_service = MusicRevisionDraftService.new(provider_client: ConversationProviderClient.new(env: env, root: @root))
+      [@music_revision_draft_service, provider]
+    end
+
+    def music_revision_provider
+      return @music_revision_provider if @music_revision_provider
+      report, resolver = resolved_configuration
+      return nil unless report.fetch("ok")
+      ConversationProviderRegistry.new(env: resolver.effective_environment).local.find(&:configured?)
     end
 
     def chat_projection(chat)

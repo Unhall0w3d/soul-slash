@@ -25,7 +25,7 @@ Candidate-local evidence records the pinned runtime identity, transcript segment
 
 The transcript is an ASR estimate over sung vocals. It may miss, merge, or substitute words and must not be treated as ground truth.
 
-For a BAD route, the dashboard can prepare a new editable brief from the
-immutable source project. This copies inputs into the form, assigns a new seed,
-and starts no generation. The Operator may revise or abandon it; creating the
-new project and generating its candidate retain their existing explicit gates.
+For a BAD route, the dashboard exposes the separately bounded revision pipeline
+defined in `MUSIC_STUDIO_REVISION_PIPELINE_BRIEF.md`. Soul may draft a material
+change from the evidence, but the Operator edits and confirms the exact revision
+before any same-project candidate generation begins.

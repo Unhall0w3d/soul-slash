@@ -13,6 +13,7 @@ require_relative "music_resource_coordinator"
 module SoulCore
   class MusicGenerationService
     CONFIRMATION = "START_MUSIC_GENERATION"
+    REVISION_CONFIRMATION = "START_MUSIC_REVISION"
     MAX_LOG_BYTES = 2 * 1024 * 1024
     MP3_ARGUMENTS = %w[-map_metadata -1 -codec:a libmp3lame -q:a 2].freeze
 
@@ -159,7 +160,7 @@ module SoulCore
       project = @store.read(project_id)
       generations = Dir.children(@store.generations_path(project_id)).grep(MusicProjectStore::CANDIDATE_ID).sort.filter_map do |candidate_id|
         candidate = read_candidate(project_id, candidate_id)
-        candidate&.merge("review" => @store.read_review(project_id, candidate_id))
+        candidate&.merge("review" => @store.read_review(project_id, candidate_id), "generation_input" => @store.candidate_input(project_id, candidate_id))
       end
       outcome("complete", true, "music project inspected", data: { "project" => project, "input_digest" => @store.input_digest(project), "generations" => generations })
     rescue MusicProjectStore::ValidationError => error
@@ -169,6 +170,45 @@ module SoulCore
     end
 
     def resource_inventory = @coordinator.inventory
+
+    def revision_preview(project_id:, source_candidate_id:, revision:)
+      project = @store.read(project_id)
+      source_input = @store.candidate_input(project_id, source_candidate_id)
+      revised_input = @store.revision_input(project: project, source_input: source_input, attributes: revision)
+      candidate_id = @store.candidate_id
+      inventory = @coordinator.inventory
+      return inventory unless inventory["lifecycle_state"] == "complete"
+      scope = revision_scope(project, source_candidate_id, candidate_id, source_input, revised_input)
+      blockers = inventory.fetch("blockers", []) + environment_blockers
+      return outcome("blocked_for_human_review", false, blockers.join("; "), data: { "resource_inventory" => inventory }) unless blockers.empty?
+      outcome("blocked_for_human_review", true, "exact revision confirmation required", data: {
+        "project" => project,
+        "source_candidate_id" => source_candidate_id,
+        "candidate_id" => candidate_id,
+        "confirmation_phrase" => REVISION_CONFIRMATION,
+        "expected_digest" => Digest::SHA256.hexdigest(JSON.generate(scope)),
+        "preview_scope" => scope,
+        "revision_input" => revised_input,
+        "resource_inventory" => inventory
+      })
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def revision_execute(project_id:, source_candidate_id:, candidate_id:, revision:, confirmation:, expected_digest:, progress: nil)
+      project = @store.read(project_id)
+      source_input = @store.candidate_input(project_id, source_candidate_id)
+      revised_input = @store.revision_input(project: project, source_input: source_input, attributes: revision)
+      scope = revision_scope(project, source_candidate_id, candidate_id, source_input, revised_input)
+      generation_execute(project_id: project_id, candidate_id: candidate_id, confirmation: confirmation, expected_digest: expected_digest, progress: progress,
+        input_override: revised_input, scope_override: scope, confirmation_phrase: REVISION_CONFIRMATION, source_candidate_id: source_candidate_id)
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
 
     def generation_preview(project_id:)
       project = @store.read(project_id)
@@ -192,13 +232,13 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil)
+    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil, input_override: nil, scope_override: nil, confirmation_phrase: CONFIRMATION, source_candidate_id: nil)
       progress&.call({ "stage" => "validation", "message" => "Validating exact project scope" })
       return outcome("awaiting_input", false, "confirmation and expected_digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return outcome("awaiting_input", false, "candidate_id is invalid") unless candidate_id.to_s.match?(MusicProjectStore::CANDIDATE_ID)
       project = @store.read(project_id)
-      scope = generation_scope(project, candidate_id)
-      return outcome("blocked_for_human_review", false, "exact generation confirmation did not match") unless confirmation == CONFIRMATION
+      scope = scope_override || generation_scope(project, candidate_id)
+      return outcome("blocked_for_human_review", false, "exact generation confirmation did not match") unless confirmation == confirmation_phrase
       return outcome("blocked_for_human_review", false, "music generation state changed; preview again") unless secure_compare(expected_digest, Digest::SHA256.hexdigest(JSON.generate(scope)))
       blockers = environment_blockers
       return outcome("blocked_for_human_review", false, blockers.join("; ")) unless blockers.empty?
@@ -210,13 +250,15 @@ module SoulCore
       staging = File.join(generations, ".#{candidate_id}.partial")
       return outcome("blocked_for_human_review", false, "candidate output already exists") if File.exist?(target) || File.symlink?(target) || File.exist?(staging) || File.symlink?(staging)
       Dir.mkdir(staging, 0o700)
-      input = @store.input_payload(project)
+      input = input_override || @store.input_payload(project)
+      input_digest = @store.generation_input_digest(input)
       input_path = File.join(staging, "input.json")
       File.write(input_path, JSON.pretty_generate(input) + "\n", mode: "wx", perm: 0o600)
       progress&.call({ "stage" => "resources", "message" => "Acquiring the bounded NVIDIA music lane" })
-      lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: @store.input_digest(project), ttl_seconds: project.fetch("target_duration_seconds") + 240)
+      duration = input.fetch("duration")
+      lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: input_digest, ttl_seconds: duration + 240)
       progress&.call({ "stage" => "model", "message" => "Generating the candidate in the foreground" })
-      generation = run_generation(project, input_path, staging, lease, progress)
+      generation = run_generation(input, input_path, staging, lease, progress)
       return quarantined_outcome(generation.status == "canceled" ? "canceled" : "failed", staging, generation, lease) unless generation.success?
 
       log = generation.stdout.to_s + generation.stderr.to_s
@@ -227,13 +269,13 @@ module SoulCore
       flac_path = File.join(staging, "master.flac")
       File.rename(flac_sources.first, flac_path)
       progress&.call({ "stage" => "validation", "message" => "Inspecting the lossless master" })
-      flac = inspect_audio(flac_path, "flac", project.fetch("target_duration_seconds"))
+      flac = inspect_audio(flac_path, "flac", duration)
 
       mp3_path = File.join(staging, "listening.mp3")
       progress&.call({ "stage" => "transcode", "message" => "Deriving the MP3 listening copy" })
-      transcode = run_transcode(flac_path, mp3_path, staging, lease, project.fetch("target_duration_seconds"), progress)
+      transcode = run_transcode(flac_path, mp3_path, staging, lease, duration, progress)
       return quarantined_outcome(transcode.status == "canceled" ? "canceled" : "failed", staging, transcode, lease, "MP3 derivation failed") unless transcode.success?
-      mp3 = inspect_audio(mp3_path, "mp3", project.fetch("target_duration_seconds")).merge(
+      mp3 = inspect_audio(mp3_path, "mp3", duration).merge(
         "derived_from_sha256" => flac.fetch("sha256"),
         "encoder" => "ffmpeg/libmp3lame",
         "encoder_arguments" => MP3_ARGUMENTS
@@ -244,7 +286,9 @@ module SoulCore
         "project_id" => project_id,
         "lifecycle_state" => "blocked_for_human_review",
         "created_at" => @clock.call.iso8601,
-        "input_digest" => @store.input_digest(project),
+        "input_digest" => input_digest,
+        "generation_kind" => source_candidate_id ? "revision" : "initial",
+        "source_candidate_id" => source_candidate_id,
         "model_profile" => model_profile,
         "resource_receipt" => {
           "lane" => "nvidia-music",
@@ -309,6 +353,28 @@ module SoulCore
       }
     end
 
+    def revision_scope(project, source_candidate_id, candidate_id, source_input, revised_input)
+      changed = MusicProjectStore::REVISION_FIELDS.select { |field| source_input.fetch(field) != revised_input.fetch(field) }
+      {
+        "operation" => "music_revision_generation",
+        "project_id" => project.fetch("project_id"),
+        "source_candidate_id" => source_candidate_id,
+        "candidate_id" => candidate_id,
+        "source_input_digest" => @store.generation_input_digest(source_input),
+        "revised_input_digest" => @store.generation_input_digest(revised_input),
+        "changed_fields" => changed,
+        "revision_input" => revised_input.slice(*MusicProjectStore::REVISION_FIELDS),
+        "model_profile" => model_profile,
+        "artifacts" => { "master" => "FLAC 48kHz stereo", "proxy" => "MP3 LAME V2 derived from master" },
+        "resource_lane" => "nvidia-music",
+        "timeout_seconds" => revised_input.fetch("duration") + 180,
+        "persistent_service" => false,
+        "network_listener" => false,
+        "automatic_download" => false,
+        "automatic_continuation" => false
+      }
+    end
+
     def model_profile
       {
         "source_release" => @source.fetch("release"),
@@ -340,10 +406,10 @@ module SoulCore
       items
     end
 
-    def run_generation(project, input_path, staging, lease, progress)
+    def run_generation(input, input_path, staging, lease, progress)
       python = File.join(@source_dir, ".venv", "bin", "python")
-      command = [python, "profile_inference.py", "--device", "cuda", "--lm-backend", "pt", "--config-path", @dit_name, "--lm-model", @lm_name, "--offload-to-cpu", "--offload-dit-to-cpu", "--quantization", "int8_weight_only", "--example", input_path, "--duration", project.fetch("target_duration_seconds").to_s, "--batch-size", "1", "--seed", project.fetch("seed").to_s, "--no-warmup"]
-      process(command, staging, lease, project.fetch("target_duration_seconds") + 180, {
+      command = [python, "profile_inference.py", "--device", "cuda", "--lm-backend", "pt", "--config-path", @dit_name, "--lm-model", @lm_name, "--offload-to-cpu", "--offload-dit-to-cpu", "--quantization", "int8_weight_only", "--example", input_path, "--duration", input.fetch("duration").to_s, "--batch-size", "1", "--seed", input.fetch("seed").to_s, "--no-warmup"]
+      process(command, staging, lease, input.fetch("duration") + 180, {
         "TMPDIR" => staging,
         "HF_HUB_OFFLINE" => "1",
         "TRANSFORMERS_OFFLINE" => "1",

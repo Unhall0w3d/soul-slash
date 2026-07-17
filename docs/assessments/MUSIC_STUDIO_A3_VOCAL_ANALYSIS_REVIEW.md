@@ -14,8 +14,8 @@ Status: candidate-complete; requires human review.
 - Music Studio preview/confirmation/progress surface, intended-versus-heard comparison, per-line evidence, visible rights status, and labeled 1–5 rating scale.
 - Machine-heard segments render as lyric lines with stanza breaks inferred only
   from five-second-or-longer audio gaps; structural labels are not invented.
-- BAD evidence exposes a deliberate revision-brief action that copies the
-  immutable inputs into an editable form but performs no generation.
+- BAD evidence exposes the deliberate, separately reviewed Soul-drafted revision
+  pipeline; it performs no generation without its own exact human confirmation.
 
 ## Files changed
 
@@ -43,7 +43,8 @@ Not run. This slice performs deterministic ASR evidence extraction and does not 
 - Singing ASR is fallible; backing vocals, effects, pronunciation, and arrangement can lower recall.
 - The line matcher is an ordered heuristic, not forced alignment and not a rights/copyright comparison tool.
 - English is the only pinned default model in this candidate.
-- A revision attempt is routed but remains a separate Operator-triggered workflow; no automatic regeneration is included.
+- Revision remains an Operator-triggered, editable, exact-confirmation workflow;
+  no automatic regeneration is included.
 
 ## Memory and lifecycle
 
