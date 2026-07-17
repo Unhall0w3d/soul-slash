@@ -81,7 +81,18 @@ Ministral conversation on AMD and proposes a measured ACE-Step 1.5 foreground
 pilot on the otherwise-idle NVIDIA card, mutually exclusive with Qwen fallback.
 The target product is an iterative project workspace for 2–3 minute songs,
 lyrics, lawful references, candidates, repainting, stems, and creative review.
-A0 installs and runs nothing; Music A1 remains a separate human gate.
+A0 installed and ran nothing. The first Music A1 candidate now provides an
+optional `uv` preflight, pinned and preview-gated user-local setup, separately
+confirmed verified model downloads, and a bounded offline foreground pilot.
+The default checkpoint names are exact but publicly overridable through a
+reviewed manifest. No environment or weights were installed during candidate
+verification, and full A1 remains open until the 30/90/180-second host pilots
+and audio review pass.
+
+Self Assessment now also projects the exact CachyOS core-package reboot request
+relative to current boot time. On this host the July 17 package transaction is
+newer than the July 11 boot, so a reboot is correctly recommended without Soul
+performing or scheduling it.
 
 Detailed references:
 
@@ -93,6 +104,7 @@ Detailed references:
 - `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
 - `docs/soul/PHASE12E_UNIFIED_REVIEW_CENTER_BRIEF.md`
 - `docs/soul/PHASE13A_INTEGRATED_ACCEPTANCE_HARNESS_BRIEF.md`
+- `docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md`
 - `docs/soul/PHASE13B_LOCAL_MODEL_AND_DASHBOARD_ACCEPTANCE_BRIEF.md`
 - `docs/soul/PHASE13C_CONVERSATIONAL_SOUL_CLOSEOUT_BRIEF.md`
 - `docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md`

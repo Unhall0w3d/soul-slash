@@ -71,9 +71,10 @@ check("stale augmentation roadmap state is corrected",
       roadmap.include?("[x] A4 prepare human-approved isolated worktree") &&
         roadmap.include?("[x] A5 review exact augmentation candidate"),
       errors)
-check("current milestone and state point to A0",
-      milestones.include?("Multi-model and Music Studio A0") &&
-        current.include?("Music A1 remains a separate human gate"),
+check("current milestone and state preserve the A0-to-A1 gate",
+      milestones.include?("Music A0 defined the topology") &&
+        current.include?("A0 installed and ran nothing") &&
+        current.include?("full A1 remains open"),
       errors)
 check("primary-source set covers candidates and host compatibility",
       %w[

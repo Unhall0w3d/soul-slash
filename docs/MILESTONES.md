@@ -115,15 +115,15 @@ in progress
 Current candidate slice:
 
 ```text
-Multi-model and Music Studio A0: host-specific topology and product architecture
+Music Studio A1 setup boundary: optional uv, pinned models, and reboot evidence
 ```
 
 The model-runtime portability sequence and Architecture and Stewardship A1–A5
-are implemented. A0 now defines a measured, no-install path toward 2–3 minute
-local music creation: Ministral remains on AMD, ACE-Step 1.5 is the lead
-foreground NVIDIA pilot, and Qwen fallback is mutually exclusive with music.
-No model, dependency, service, listener, worker, or dashboard tab is added by
-this architecture slice.
+are implemented. Music A0 defined the topology; the A1 setup boundary now adds
+optional tooling checks, exact source and checkpoint pins, separate setup and
+download gates, and bounded offline pilot commands. It does not install during
+general setup, start a service or listener, or mark the feasibility pilot
+complete. Host generation and human audio review remain the next A1 gate.
 
 See:
 

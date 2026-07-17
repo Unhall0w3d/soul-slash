@@ -17,8 +17,14 @@ AMD_MODEL_SHA256 ?=
 AMD_MODEL_ALIAS ?=
 AMD_PORT ?=8082
 ALIAS_DIGEST ?=
+EXPECTED_DIGEST ?=
+MUSIC_ROOT ?= $(HOME)/.local/share/soul/music
+MUSIC_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/music_pilot_models.json
+MUSIC_DIT_MODEL ?= acestep-v15-turbo
+MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B
+MUSIC_DURATION ?= 30
 
-.PHONY: help check setup setup-llamacpp setup-ollama detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -29,6 +35,11 @@ help:
 > @echo "  make setup             Detect providers and guide setup"
 > @echo "  make setup-llamacpp    Configure llama.cpp server provider"
 > @echo "  make setup-ollama      Configure Ollama provider"
+> @echo "  make music-check       Check optional Music pilot tools (including uv)"
+> @echo "  make music-pilot-plan  Preview pinned ACE-Step environment and model downloads"
+> @echo "  make setup-music EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_PILOT"
+> @echo "  make music-model-download EXPECTED_DIGEST=... CONFIRM=DOWNLOAD_SOUL_MUSIC_MODELS"
+> @echo "  make music-pilot-run MUSIC_DURATION=30  Run one bounded foreground pilot"
 > @echo "  make test-runtime      Test configured OpenAI-compatible runtime"
 > @echo "  make test-fast         Test FAST/no_think request mode"
 > @echo "  make test-think        Test THINK request mode"
@@ -92,6 +103,25 @@ setup-llamacpp: chmod-scripts
 
 setup-ollama: chmod-scripts
 > @scripts/soul-setup-ollama.sh
+
+music-check:
+> @ruby scripts/soul-music-pilot check --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
+
+music-pilot-plan:
+> @ruby scripts/soul-music-pilot plan --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
+
+setup-music:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-pilot-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_PILOT" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_PILOT is required."; exit 2; }
+> @ruby scripts/soul-music-pilot setup --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-model-download:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-pilot-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "DOWNLOAD_SOUL_MUSIC_MODELS" || { echo "Exact confirmation DOWNLOAD_SOUL_MUSIC_MODELS is required."; exit 2; }
+> @ruby scripts/soul-music-pilot download --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-pilot-run:
+> @ruby scripts/soul-music-pilot run --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --duration "$(MUSIC_DURATION)"
 
 test-runtime: chmod-scripts
 > @scripts/soul-runtime-test.sh

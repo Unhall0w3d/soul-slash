@@ -57,6 +57,7 @@
 - [x] A4 prepare human-approved isolated worktree and Codex handoff
 - [x] A5 review exact augmentation candidate and hand off external integration
 - [x] Multi-model and Music Studio A0 host-specific research and architecture
+- [x] Music A1 optional `uv`, exact model manifest, and preview-gated setup boundary
 - [ ] Music A1 isolated NVIDIA feasibility pilot
 - [ ] Music A2 project schema and explicit resource coordinator
 - [ ] Music A3 first bounded Music Studio dashboard

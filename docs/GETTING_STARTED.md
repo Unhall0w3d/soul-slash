@@ -433,6 +433,11 @@ make detect           Detect runtimes, endpoints, config, and local GGUF models
 make setup            Guided runtime setup
 make setup-llamacpp   Configure llama.cpp provider
 make setup-ollama     Configure Ollama provider
+make music-check      Check optional Music pilot tools; does not install
+make music-pilot-plan Preview pinned environment and exact checkpoint bytes
+make setup-music      Install only after plan digest and exact confirmation
+make music-model-download  Download verified weights after a separate gate
+make music-pilot-run  Run one foreground 30/90/180-second feasibility pilot
 make test-runtime     Test configured runtime
 make test-fast        Test FAST/no_think request mode
 make test-think       Test THINK request mode
@@ -441,6 +446,25 @@ make doctor           Run Soul/ doctor
 make env-show         Show local runtime config
 make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew warnings
 ```
+
+Music setup is optional. Its defaults are the reviewed 8 GiB pair:
+`MUSIC_DIT_MODEL=acestep-v15-turbo` and
+`MUSIC_LM_MODEL=acestep-5Hz-lm-0.6B`. Override either with an exact,
+case-sensitive name present in `MUSIC_MODEL_MANIFEST`; unknown names stop
+without downloading. ACE-Step checkpoints are directories rather than GGUF
+files, so the exact checkpoint name is the equivalent of `SOUL_MODEL_FILE`.
+
+Start by reviewing the plan:
+
+```bash
+make music-check
+make music-pilot-plan
+```
+
+The plan prints the current digest and distinct confirmation phrases. Setup and
+model download never run as part of `make setup`, and neither starts a service,
+listener, worker, or background process. See
+`docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md` before proceeding.
 
 ## 16. Clock-skew warning after applying overlays
 

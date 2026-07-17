@@ -42,6 +42,15 @@ else
   printf '  missing Ollama: ollama\n'
 fi
 
+printf '\nOptional Music pilot tools:\n'
+for tool in uv ffmpeg nvidia-smi; do
+  if soul_have "$tool"; then
+    printf '  found   %-11s %s\n' "$tool" "$(command -v "$tool")"
+  else
+    printf '  missing %-11s (required only for Music pilot setup)\n' "$tool"
+  fi
+done
+
 printf '\nConfig:\n'
 if [ -f "$SOUL_ENV_FILE" ]; then
   printf '  found   %s\n' "$SOUL_ENV_FILE"

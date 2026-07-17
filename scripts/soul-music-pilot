@@ -1,0 +1,320 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "pathname"
+require "time"
+
+class MusicPilot
+  class Canceled < StandardError; end
+  CONFIRMATION = "INSTALL_SOUL_MUSIC_PILOT"
+  DOWNLOAD_CONFIRMATION = "DOWNLOAD_SOUL_MUSIC_MODELS"
+  DURATIONS = [30, 90, 180].freeze
+
+  def initialize(options)
+    @options = options
+    @manifest = JSON.parse(File.read(options.fetch(:manifest)))
+    @source = @manifest.fetch("source")
+    @dit = exact_model("dit_models", options.fetch(:dit_model))
+    @lm = exact_model("lm_models", options.fetch(:lm_model))
+    @root = File.expand_path(options.fetch(:root))
+    @source_dir = File.join(@root, "ace-step", @source.fetch("release"))
+    @checkpoint_dir = File.join(@source_dir, "checkpoints")
+  end
+
+  def check
+    tools = %w[uv git curl ffmpeg nvidia-smi systemctl timeout].to_h { |name| [name, which(name)] }
+    gpu = capture(["nvidia-smi", "--query-gpu=name,memory.total,compute_cap", "--format=csv,noheader,nounits"], timeout: 10)
+    fallback = capture(["systemctl", "--user", "is-active", "llama-server.service"], timeout: 10)
+    emit(
+      "lifecycle_state" => "complete",
+      "tools" => tools.transform_values { |path| {"available"=>!path.nil?, "path"=>path} },
+      "ready" => tools.values.none?(&:nil?) && gpu[:ok] && fallback[:stdout].strip != "active",
+      "nvidia" => gpu.slice(:ok, :stdout, :stderr),
+      "qwen_fallback" => fallback[:stdout].strip.empty? ? "unknown" : fallback[:stdout].strip,
+      "note" => "uv is optional for Soul generally and required only for Music pilot setup."
+    )
+  end
+
+  def plan
+    emit(plan_data.merge("lifecycle_state"=>"blocked_for_human_review"))
+  end
+
+  def setup
+    authorize!(CONFIRMATION)
+    required_tools!(%w[uv git nvidia-smi systemctl timeout])
+    ensure_qwen_inactive!
+    FileUtils.mkdir_p(File.dirname(@source_dir))
+    install_source unless exact_source?
+    install_environment
+    probe_cuda
+    emit("lifecycle_state"=>"complete", "source_dir"=>@source_dir, "environment"=>File.join(@source_dir, ".venv"), "models_downloaded"=>false, "next"=>"Run the model download preview and review its byte count before downloading.")
+  rescue Canceled => error
+    emit("lifecycle_state"=>"canceled", "error"=>error.message, "source_dir"=>@source_dir)
+    exit 1
+  rescue StandardError => error
+    emit("lifecycle_state"=>"failed", "error"=>error.message, "source_dir"=>@source_dir)
+    exit 1
+  end
+
+  def download
+    authorize!(DOWNLOAD_CONFIRMATION)
+    required_tools!(%w[curl systemctl])
+    raise "exact ACE-Step source is not installed; run setup first" unless exact_source?
+    ensure_qwen_inactive!
+    download_group(@dit, @checkpoint_dir)
+    download_group(@lm, File.join(@checkpoint_dir, @options.fetch(:lm_model)))
+    emit("lifecycle_state"=>"complete", "checkpoint_dir"=>@checkpoint_dir, "bytes_verified"=>model_bytes, "dit_model"=>@options.fetch(:dit_model), "lm_model"=>@options.fetch(:lm_model))
+  rescue Canceled => error
+    emit("lifecycle_state"=>"canceled", "error"=>error.message, "checkpoint_dir"=>@checkpoint_dir)
+    exit 1
+  rescue StandardError => error
+    emit("lifecycle_state"=>"failed", "error"=>error.message, "checkpoint_dir"=>@checkpoint_dir)
+    exit 1
+  end
+
+  def run
+    duration = Integer(@options.fetch(:duration))
+    raise "duration must be exactly one of #{DURATIONS.join(', ')} seconds" unless DURATIONS.include?(duration)
+    required_tools!(%w[timeout nvidia-smi systemctl])
+    ensure_qwen_inactive!
+    raise "exact ACE-Step source is not installed" unless exact_source?
+    verify_all_models!
+    run_dir = File.join(@root, "pilot-runs", Time.now.utc.strftime("%Y%m%dT%H%M%SZ-#{duration}s"))
+    FileUtils.mkdir_p(run_dir)
+    seconds = {30=>1800, 90=>3600, 180=>7200}.fetch(duration)
+    python = File.join(@source_dir, ".venv", "bin", "python")
+    raise "Music pilot Python environment is missing; run setup first" unless File.executable?(python)
+    command = [
+      "timeout", "--signal=INT", "--kill-after=30", seconds.to_s,
+      python, "profile_inference.py",
+      "--device", "cuda", "--lm-backend", "pt",
+      "--config-path", @options.fetch(:dit_model), "--lm-model", @options.fetch(:lm_model),
+      "--offload-to-cpu", "--offload-dit-to-cpu", "--quantization", "int8_weight_only",
+      "--duration", duration.to_s, "--batch-size", "1", "--seed", "1701", "--no-warmup",
+      "--benchmark-output", File.join(run_dir, "benchmark.json")
+    ]
+    result = capture(command, timeout: seconds + 45, chdir: @source_dir, env: {"TMPDIR"=>run_dir, "HF_HUB_OFFLINE"=>"1", "TRANSFORMERS_OFFLINE"=>"1", "HF_DATASETS_OFFLINE"=>"1"}, max_bytes: 2 * 1024 * 1024)
+    File.write(File.join(run_dir, "pilot.log"), result[:stdout].to_s + result[:stderr].to_s)
+    state = result[:ok] ? "blocked_for_human_review" : ((result[:interrupted] || result[:exit_status] == 124) ? "canceled" : "failed")
+    emit("lifecycle_state"=>state, "duration_seconds"=>duration, "run_dir"=>run_dir, "exit_status"=>result[:exit_status], "human_audio_review_required"=>result[:ok])
+    exit 1 unless result[:ok]
+  rescue StandardError => error
+    emit("lifecycle_state"=>"failed", "error"=>error.message)
+    exit 1
+  end
+
+  private
+
+  def exact_model(group, name)
+    models = @manifest.fetch(group)
+    model = models[name]
+    raise "unknown exact #{group.sub('_models', '')} model name #{name.inspect}; available: #{models.keys.sort.join(', ')}" unless model
+    validate_repository!(model.fetch("repository"))
+    model.fetch("files").each { |path, bytes, sha| validate_file!(path, bytes, sha) }
+    model
+  end
+
+  def validate_repository!(name)
+    raise "invalid Hugging Face repository name" unless name.match?(%r{\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\z})
+  end
+
+  def validate_file!(path, bytes, sha)
+    clean = Pathname.new(path).cleanpath.to_s
+    raise "unsafe checkpoint path #{path.inspect}" if clean != path || path.start_with?("/") || path.split("/").include?("..")
+    raise "invalid checkpoint byte count" unless bytes.is_a?(Integer) && bytes.positive?
+    raise "invalid checkpoint SHA-256" unless sha.match?(/\A[0-9a-f]{64}\z/)
+  end
+
+  def plan_data
+    data = {
+      "operation"=>"music_pilot_setup",
+      "root"=>@root,
+      "source_dir"=>@source_dir,
+      "source_repository"=>@source.fetch("repository"),
+      "source_release"=>@source.fetch("release"),
+      "source_revision"=>@source.fetch("revision"),
+      "python"=>@source.fetch("python"),
+      "pytorch_compatibility_override"=>{"version"=>@source.fetch("pytorch"), "index"=>@source.fetch("pytorch_index"), "reason"=>"GTX 1070 Pascal SM 6.1 requires the CUDA 12.6 binary lane"},
+      "dit_model"=>@options.fetch(:dit_model),
+      "lm_model"=>@options.fetch(:lm_model),
+      "download_bytes"=>model_bytes,
+      "setup_confirmation"=>CONFIRMATION,
+      "download_confirmation"=>DOWNLOAD_CONFIRMATION,
+      "persistent_service"=>false,
+      "network_listener"=>false,
+      "automatic_download"=>false,
+      "qwen_must_be_inactive"=>true
+    }
+    data["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(data))
+    data
+  end
+
+  def model_bytes = (@dit.fetch("files") + @lm.fetch("files")).sum { |item| item[1] }
+
+  def authorize!(phrase)
+    expected = plan_data.fetch("expected_digest")
+    raise "review the current plan and provide its exact EXPECTED_DIGEST" unless @options[:expected_digest] == expected
+    raise "exact confirmation #{phrase} is required" unless @options[:confirmation] == phrase
+  end
+
+  def which(name)
+    ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |dir| File.join(dir, name) }.find { |path| File.file?(path) && File.executable?(path) }
+  end
+
+  def required_tools!(names)
+    missing = names.reject { |name| which(name) }
+    raise "missing required Music tool(s): #{missing.join(', ')}" unless missing.empty?
+  end
+
+  def ensure_qwen_inactive!
+    result = capture(["systemctl", "--user", "is-active", "llama-server.service"], timeout: 10)
+    raise "NVIDIA Qwen fallback is active; unload it before claiming the GTX 1070" if result[:stdout].strip == "active"
+  end
+
+  def exact_source?
+    return false unless File.directory?(File.join(@source_dir, ".git"))
+    capture(["git", "rev-parse", "HEAD"], timeout: 10, chdir: @source_dir)[:stdout].strip == @source.fetch("revision")
+  end
+
+  def install_source
+    raise "source directory exists but is not the pinned revision: #{@source_dir}" if File.exist?(@source_dir)
+    temporary = "#{@source_dir}.partial-#{Process.pid}"
+    FileUtils.rm_rf(temporary)
+    result = capture(["git", "clone", "--filter=blob:none", "--branch", @source.fetch("release"), "--single-branch", @source.fetch("repository"), temporary], timeout: 900, max_bytes: 1024 * 1024)
+    raise Canceled, "ACE-Step source clone canceled" if result[:interrupted]
+    raise "ACE-Step source clone failed: #{result[:stderr]}" unless result[:ok]
+    revision = capture(["git", "rev-parse", "HEAD"], timeout: 10, chdir: temporary)[:stdout].strip
+    raise "ACE-Step revision mismatch: expected #{@source.fetch('revision')}, received #{revision}" unless revision == @source.fetch("revision")
+    FileUtils.mv(temporary, @source_dir)
+  ensure
+    FileUtils.rm_rf(temporary) if defined?(temporary) && File.exist?(temporary)
+  end
+
+  def install_environment
+    sync = ["uv", "sync", "--locked", "--python", @source.fetch("python"), "--no-install-package", "torch", "--no-install-package", "torchvision", "--no-install-package", "torchaudio", "--no-install-package", "flash-attn"]
+    result = capture(sync, timeout: 3600, chdir: @source_dir, max_bytes: 2 * 1024 * 1024)
+    raise Canceled, "uv environment sync canceled" if result[:interrupted]
+    raise "uv environment sync failed: #{result[:stderr]}" unless result[:ok]
+    python = File.join(@source_dir, ".venv", "bin", "python")
+    packages = [@source.fetch("pytorch"), @source.fetch("torchvision"), @source.fetch("torchaudio")]
+    command = ["uv", "pip", "install", "--python", python, "--index-url", @source.fetch("pytorch_index"), "torch==#{packages[0]}", "torchvision==#{packages[1]}", "torchaudio==#{packages[2]}"]
+    result = capture(command, timeout: 3600, chdir: @source_dir, max_bytes: 2 * 1024 * 1024)
+    raise Canceled, "Pascal-compatible PyTorch install canceled" if result[:interrupted]
+    raise "Pascal-compatible PyTorch install failed: #{result[:stderr]}" unless result[:ok]
+  end
+
+  def probe_cuda
+    python = File.join(@source_dir, ".venv", "bin", "python")
+    code = "import json,torch; x=torch.ones(1,device='cuda'); print(json.dumps({'cuda':torch.cuda.is_available(),'device':torch.cuda.get_device_name(0),'capability':torch.cuda.get_device_capability(0),'arches':torch.cuda.get_arch_list(),'value':x.item()}))"
+    result = capture([python, "-c", code], timeout: 60, chdir: @source_dir)
+    raise Canceled, "CUDA compatibility probe canceled" if result[:interrupted]
+    raise "CUDA compatibility probe failed: #{result[:stderr]}" unless result[:ok]
+    data = JSON.parse(result[:stdout].lines.last)
+    raise "installed PyTorch wheel does not expose Pascal sm_61" unless data.fetch("cuda") && data.fetch("capability") == [6, 1] && data.fetch("arches").include?("sm_61")
+  end
+
+  def download_group(model, destination)
+    repository = model.fetch("repository")
+    revision = model.fetch("revision")
+    model.fetch("files").each do |path, bytes, sha|
+      partial = nil
+      target = File.join(destination, path)
+      next if valid_file?(target, bytes, sha)
+      FileUtils.mkdir_p(File.dirname(target))
+      partial = "#{target}.partial"
+      FileUtils.rm_f(partial)
+      url = "https://huggingface.co/#{repository}/resolve/#{revision}/#{path}"
+      result = capture(["curl", "--fail", "--location", "--retry", "3", "--connect-timeout", "20", "--max-time", "7200", "--output", partial, url], timeout: 7230, max_bytes: 512 * 1024)
+      raise Canceled, "model download canceled while retrieving #{path}" if result[:interrupted]
+      raise "download failed for #{path}: #{result[:stderr]}" unless result[:ok]
+      raise "digest or size mismatch for #{path}" unless valid_file?(partial, bytes, sha)
+      File.rename(partial, target)
+    ensure
+      FileUtils.rm_f(partial) if defined?(partial) && File.exist?(partial)
+    end
+  end
+
+  def valid_file?(path, bytes, sha)
+    File.file?(path) && File.size(path) == bytes && Digest::SHA256.file(path).hexdigest == sha
+  end
+
+  def verify_all_models!
+    @dit.fetch("files").each { |path, bytes, sha| raise "missing or invalid checkpoint #{path}" unless valid_file?(File.join(@checkpoint_dir, path), bytes, sha) }
+    @lm.fetch("files").each { |path, bytes, sha| raise "missing or invalid LM checkpoint #{path}" unless valid_file?(File.join(@checkpoint_dir, @options.fetch(:lm_model), path), bytes, sha) }
+  end
+
+  def capture(command, timeout:, chdir: nil, env: {}, max_bytes: 256 * 1024)
+    stdout = +""
+    stderr = +""
+    status = nil
+    interrupted = false
+    spawn_options = {pgroup: true}
+    spawn_options[:chdir] = chdir if chdir
+    Open3.popen3(env, *command, **spawn_options) do |stdin, out, err, wait|
+      stdin.close
+      previous_int = Signal.trap("INT") do
+        interrupted = true
+        Process.kill("TERM", -wait.pid) rescue nil
+      end
+      readers = [[out, stdout], [err, stderr]].map do |io, buffer|
+        Thread.new do
+          loop do
+            chunk = io.readpartial(16 * 1024)
+            remaining = max_bytes - buffer.bytesize
+            buffer << chunk.byteslice(0, remaining) if remaining.positive?
+          end
+        rescue EOFError, IOError
+          nil
+        end
+      end
+      begin
+        unless wait.join(timeout)
+          Process.kill("TERM", -wait.pid) rescue nil
+          wait.join(5) || (Process.kill("KILL", -wait.pid) rescue nil)
+        end
+        readers.each(&:join)
+        status = wait.value
+      ensure
+        Signal.trap("INT", previous_int)
+      end
+    end
+    {ok: status.success?, stdout: stdout, stderr: stderr, exit_status: status.exitstatus, interrupted: interrupted}
+  rescue Errno::ENOENT => error
+    {ok: false, stdout: "", stderr: error.message, exit_status: nil}
+  end
+
+  def emit(data) = puts(JSON.pretty_generate(data))
+end
+
+options = {
+  manifest: ENV.fetch("MUSIC_MODEL_MANIFEST", File.expand_path("../config/music_pilot_models.json", __dir__)),
+  root: ENV.fetch("MUSIC_ROOT", File.join(Dir.home, ".local", "share", "soul", "music")),
+  dit_model: ENV.fetch("MUSIC_DIT_MODEL", "acestep-v15-turbo"),
+  lm_model: ENV.fetch("MUSIC_LM_MODEL", "acestep-5Hz-lm-0.6B"),
+  duration: ENV.fetch("MUSIC_DURATION", "30")
+}
+parser = OptionParser.new do |opts|
+  opts.on("--manifest PATH") { |value| options[:manifest] = value }
+  opts.on("--root PATH") { |value| options[:root] = value }
+  opts.on("--dit-model NAME") { |value| options[:dit_model] = value }
+  opts.on("--lm-model NAME") { |value| options[:lm_model] = value }
+  opts.on("--duration SECONDS") { |value| options[:duration] = value }
+  opts.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+  opts.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end
+parser.parse!
+command = ARGV.shift || "check"
+pilot = MusicPilot.new(options)
+case command
+when "check" then pilot.check
+when "plan" then pilot.plan
+when "setup" then pilot.setup
+when "download" then pilot.download
+when "run" then pilot.run
+else abort "usage: soul-music-pilot [check|plan|setup|download|run] [options]"
+end

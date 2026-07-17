@@ -7,20 +7,23 @@ require_relative "soul_project_assessor"
 
 module SoulCore
   class EnvironmentAssessor
-    def initialize(root: Dir.pwd, runner: BoundedCommandRunner.new)
+    def initialize(root: Dir.pwd, runner: BoundedCommandRunner.new, clock: -> { Time.now }, pacman_log_path: "/var/log/pacman.log", uptime_path: "/proc/uptime")
       @root = root
       @runner = runner
+      @clock = clock
+      @pacman_log_path = pacman_log_path
+      @uptime_path = uptime_path
     end
 
     def assess(include_updates: false)
       system = system_inventory
-      package_managers = PackageManagerAssessor.new(runner: @runner).assess(include_updates: include_updates)
+      package_managers = PackageManagerAssessor.new(runner: @runner, clock: @clock, pacman_log_path: @pacman_log_path, uptime_path: @uptime_path).assess(include_updates: include_updates)
       runtimes = RuntimeAssessor.new(runner: @runner).assess
       project = SoulProjectAssessor.new(root: @root, runner: @runner).assess
       {
         "status"=>"ok",
         "assessment"=>"environment",
-        "generated_at"=>Time.now.iso8601,
+        "generated_at"=>@clock.call.iso8601,
         "read_only"=>true,
         "update_checks_requested"=>include_updates,
         "system"=>system,
@@ -90,6 +93,7 @@ module SoulCore
       recs << rec("warn","Soul repo has uncommitted changes","The repository is dirty. Review the working tree before more overlays.","Run `git status --short`.") if project.dig("git","dirty")
       recs << rec("info","Arch package update checks available","pacman was detected. Read-only update and orphan checks can be included.","Run `ruby bin/soul assess environment --updates`.") if pm.dig("managers","pacman","detected") && !include_updates
       recs << rec("warn","Pacman orphan candidates detected","`pacman -Qdtq` reported packages that may no longer be required.","Review manually before considering `sudo pacman -Rns <packages>`.") if pm.dig("managers","pacman","orphans","count").to_i > 0
+      recs << rec("warn","System reboot recommended","A CachyOS package hook requested a reboot after the current boot began. Soul will not reboot the host.","Save active work and reboot at an operator-chosen time.") if pm.dig("reboot","recommended") == true
       recs << rec("info","Flatpak unused runtime candidates detected","Flatpak dry-run cleanup reported unused entries.","Review `flatpak uninstall --unused --dry-run`.") if pm.dig("managers","flatpak","unused","count").to_i > 0
       recs << rec("blocker","Ruby runtime missing","Soul requires Ruby to run.","Install Ruby before running Soul workflows.") unless rt.dig("runtimes","ruby","detected")
       recs

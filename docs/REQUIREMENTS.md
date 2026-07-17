@@ -33,6 +33,14 @@ Supported runtime providers:
 - A reviewed self-hosted SearXNG endpoint for optional bounded public-web
   research; narrow DuckDuckGo Instant Answer lookup requires no key, and
   ordinary local conversation does not require either network path
+- `uv`, FFmpeg, and an NVIDIA CUDA GPU for the separately gated Music Studio
+  feasibility pilot. They are not required for conversation or the dashboard.
+
+The Music pilot uses `uv` to create an isolated Python 3.12 environment without
+changing the distribution-managed Python installation. Install `uv` through
+the operating system package manager when available; then run `make
+music-check`. Soul does not bootstrap `uv` by downloading and executing a
+remote installer.
 
 ## Optional web knowledge paths
 
