@@ -155,6 +155,39 @@ Lingering Music process or CUDA allocation: none
 The audio is mechanically valid and non-silent. Musical quality, usefulness,
 and whether it justifies the 90-second gate remain human judgments.
 
+The owner accepted the 30-second candidate as musically suitable to advance.
+
+## Ninety-second pilot result
+
+The approved 90-second gate used the same upstream example, fixed seed, pinned
+models, float32 compatibility overlay, strict-offline boundary, and bounded
+foreground lifecycle. It passed:
+
+```text
+Lifecycle: blocked_for_human_review
+Run: 20260717T171608Z-90s
+Audio duration: 90.000 seconds
+Format: FLAC, 48 kHz, stereo
+File size: 19,610,981 bytes
+Audio SHA-256: 9e175cc39051307a6c429267e4175e67ee0dff496e3795b6a156760863c529b8
+Mean volume: -15.9 dB
+Maximum volume: -1.0 dB
+Total measured wall time: 47.966 seconds
+Diffusion: 8.293 seconds / 8 steps
+VAE decode: 14.429 seconds
+Measured offload: 23.084 seconds
+Peak CUDA allocation reported by ACE-Step: 5.02 GiB
+Automatic downloader entered: no
+Generation failure/traceback: no
+Checkpoint manifest intact after run: yes
+AMD chat health after run: ok
+Lingering Music process or CUDA allocation: none
+```
+
+The candidate is mechanically valid and non-silent. Human review must determine
+whether its longer-form musical structure remains coherent enough to advance to
+the final 180-second A1 gate.
+
 ## Local LLM eval results
 
 Not run. Dependency isolation, hashes, CUDA compatibility, reboot evidence,
@@ -168,8 +201,9 @@ host validation, not language-model judgment.
   the selected checkpoints add 7.2 GiB.
 - The 30-second candidate uses the upstream example prompt and fixed seed. It
   validates feasibility, not Soul's future project prompt/lyrics workflow.
-- Full A1 still needs human audio review and successful 90- and 180-second
-  candidates. Longer duration may change memory, speed, and structural quality.
+- Full A1 still needs human review of the 90-second candidate and a successful
+  180-second candidate. Full-song duration may still change memory, speed, and
+  structural quality.
 - The CUDA 12.6 substitution has passed the ACE-Step import, CUDA matrix probe,
   and 30-second generation; the longer 90- and 180-second stability gates remain.
 - Upstream's non-PyTorch lock includes many training and UI dependencies that
@@ -211,6 +245,7 @@ watcher, scheduler, queue, or polling loop.
 - [x] Confirm general Soul setup should continue when `uv` is absent.
 - [x] Review the exact setup plan before installing the environment.
 - [x] Review the separate download plan before retrieving weights.
-- [ ] Listen to and accept or reject the 30-second audio candidate.
-- [ ] Review 90- and 180-second stability, timing, and audio candidates.
+- [x] Listen to and accept the 30-second audio candidate.
+- [ ] Listen to and accept or reject the 90-second audio candidate.
+- [ ] Review the 180-second stability, timing, and audio candidate.
 - [ ] Approve, revise, or reject full A1 before proceeding to Music A2.

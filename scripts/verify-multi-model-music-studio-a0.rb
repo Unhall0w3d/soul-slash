@@ -75,7 +75,7 @@ check("current milestone and state preserve the A0-to-A1 gate",
       milestones.include?("Music A0 defined the topology") &&
         current.include?("A0 installed and ran nothing") &&
         current.match?(/full A1 remains open/i) &&
-        current.include?("awaits human\nlistening review"),
+        current.match?(/awaits human\s+listening\s+review/),
       errors)
 check("primary-source set covers candidates and host compatibility",
       %w[
