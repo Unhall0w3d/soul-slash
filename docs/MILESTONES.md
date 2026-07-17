@@ -115,10 +115,15 @@ in progress
 Current candidate slice:
 
 ```text
-Architecture and Stewardship A4–A5: isolated experiment and candidate review gates
+Multi-model and Music Studio A0: host-specific topology and product architecture
 ```
 
-The model-runtime portability sequence and A1–A3 assessment/census foundation are complete. A4–A5 now provide exact Gate A1 preparation of one detached linked worktree and Codex handoff, plus a bounded no-network candidate dossier and exact Gate A2 external integration handoff. Soul invokes no implementation agent, modifies no primary-worktree source, performs no integration, refuses dirty cleanup, and retains all review records. Privileged brokers remain deferred.
+The model-runtime portability sequence and Architecture and Stewardship A1–A5
+are implemented. A0 now defines a measured, no-install path toward 2–3 minute
+local music creation: Ministral remains on AMD, ACE-Step 1.5 is the lead
+foreground NVIDIA pilot, and Qwen fallback is mutually exclusive with music.
+No model, dependency, service, listener, worker, or dashboard tab is added by
+this architecture slice.
 
 See:
 
@@ -134,6 +139,7 @@ docs/soul/BOUNDED_ARTIFACT_INSPECTION.md
 docs/CURRENT_STATE.md
 docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md
 docs/soul/PHASE12D3_SELF_IMPROVEMENT_DASHBOARD_BRIEF.md
+docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md
 ```
 
 ## Later milestone candidates

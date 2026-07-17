@@ -54,8 +54,14 @@
 - [x] A1 correct package/update evidence and define typed plan schemas
 - [x] A2 add Arch terminal handoff and postcondition receipt review
 - [x] A3 add tracked-code augmentation census and proposal review tab
-- [ ] A4 prepare human-approved isolated worktree and Codex handoff
-- [ ] A5 review exact augmentation candidate and hand off external integration
+- [x] A4 prepare human-approved isolated worktree and Codex handoff
+- [x] A5 review exact augmentation candidate and hand off external integration
+- [x] Multi-model and Music Studio A0 host-specific research and architecture
+- [ ] Music A1 isolated NVIDIA feasibility pilot
+- [ ] Music A2 project schema and explicit resource coordinator
+- [ ] Music A3 first bounded Music Studio dashboard
+- [ ] Music A4 controlled repaint, extend, stem, lineage, and export workflow
+- [ ] Music A5 knowledge, lawful reference, and similarity refinement
 - [ ] reviewed Proxmox deployment
 - [ ] backup and disaster-recovery design
 - [ ] voice input

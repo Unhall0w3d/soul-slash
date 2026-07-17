@@ -76,6 +76,13 @@ switching, fallback, idle unload, or reboot is introduced. Runtime identity is
 reported separately from the stable `soul-local-chat` OpenAI-compatible API
 alias, so callers do not misidentify the loaded model.
 
+The next accepted design direction is Multi-model and Music Studio A0. It keeps
+Ministral conversation on AMD and proposes a measured ACE-Step 1.5 foreground
+pilot on the otherwise-idle NVIDIA card, mutually exclusive with Qwen fallback.
+The target product is an iterative project workspace for 2–3 minute songs,
+lyrics, lawful references, candidates, repainting, stems, and creative review.
+A0 installs and runs nothing; Music A1 remains a separate human gate.
+
 Detailed references:
 
 - `docs/CONVERSATIONAL_SOUL_ROADMAP.md`
@@ -88,4 +95,5 @@ Detailed references:
 - `docs/soul/PHASE13A_INTEGRATED_ACCEPTANCE_HARNESS_BRIEF.md`
 - `docs/soul/PHASE13B_LOCAL_MODEL_AND_DASHBOARD_ACCEPTANCE_BRIEF.md`
 - `docs/soul/PHASE13C_CONVERSATIONAL_SOUL_CLOSEOUT_BRIEF.md`
+- `docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md`
 - `docs/soul/HUMAN_REVIEW_GATE.md`
