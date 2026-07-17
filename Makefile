@@ -24,7 +24,7 @@ MUSIC_DIT_MODEL ?= acestep-v15-turbo
 MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B
 MUSIC_DURATION ?= 30
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -40,6 +40,11 @@ help:
 > @echo "  make setup-music EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_PILOT"
 > @echo "  make music-model-download EXPECTED_DIGEST=... CONFIRM=DOWNLOAD_SOUL_MUSIC_MODELS"
 > @echo "  make music-pilot-run MUSIC_DURATION=30  Run one bounded foreground pilot"
+> @echo "  make music-projects    List private Music Studio projects"
+> @echo "  make music-resources   Inspect AMD/NVIDIA/CPU Music resource lanes"
+> @echo "  make music-project-create MUSIC_INPUT=/path/project.json"
+> @echo "  make music-generate-preview MUSIC_PROJECT_ID=music_..."
+> @echo "  make music-generate-execute MUSIC_PROJECT_ID=... MUSIC_CANDIDATE_ID=... EXPECTED_DIGEST=... CONFIRM=START_MUSIC_GENERATION"
 > @echo "  make test-runtime      Test configured OpenAI-compatible runtime"
 > @echo "  make test-fast         Test FAST/no_think request mode"
 > @echo "  make test-think        Test THINK request mode"
@@ -122,6 +127,41 @@ music-model-download:
 
 music-pilot-run:
 > @ruby scripts/soul-music-pilot run --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --duration "$(MUSIC_DURATION)"
+
+music-projects:
+> @ruby scripts/soul-music-studio projects list --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-resources:
+> @ruby scripts/soul-music-studio resources inspect --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-project-create:
+> @test -n "$(MUSIC_INPUT)" || { echo "MUSIC_INPUT=/path/to/project.json is required."; exit 2; }
+> @ruby scripts/soul-music-studio projects create --input "$(MUSIC_INPUT)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-project-inspect:
+> @test -n "$(MUSIC_PROJECT_ID)" || { echo "MUSIC_PROJECT_ID is required."; exit 2; }
+> @ruby scripts/soul-music-studio projects inspect --project-id "$(MUSIC_PROJECT_ID)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-generate-preview:
+> @test -n "$(MUSIC_PROJECT_ID)" || { echo "MUSIC_PROJECT_ID is required."; exit 2; }
+> @ruby scripts/soul-music-studio generate preview --project-id "$(MUSIC_PROJECT_ID)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-generate-execute:
+> @test -n "$(MUSIC_PROJECT_ID)" -a -n "$(MUSIC_CANDIDATE_ID)" -a -n "$(EXPECTED_DIGEST)" || { echo "MUSIC_PROJECT_ID, MUSIC_CANDIDATE_ID, and EXPECTED_DIGEST are required."; exit 2; }
+> @test "$(CONFIRM)" = "START_MUSIC_GENERATION" || { echo "Exact confirmation START_MUSIC_GENERATION is required."; exit 2; }
+> @ruby scripts/soul-music-studio generate execute --project-id "$(MUSIC_PROJECT_ID)" --candidate-id "$(MUSIC_CANDIDATE_ID)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-cancel-preview:
+> @test -n "$(MUSIC_CANDIDATE_ID)" || { echo "MUSIC_CANDIDATE_ID is required."; exit 2; }
+> @ruby scripts/soul-music-studio cancel preview --candidate-id "$(MUSIC_CANDIDATE_ID)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+music-cancel-execute:
+> @test -n "$(MUSIC_CANDIDATE_ID)" -a -n "$(EXPECTED_DIGEST)" || { echo "MUSIC_CANDIDATE_ID and EXPECTED_DIGEST are required."; exit 2; }
+> @test "$(CONFIRM)" = "CANCEL_MUSIC_GENERATION" || { echo "Exact confirmation CANCEL_MUSIC_GENERATION is required."; exit 2; }
+> @ruby scripts/soul-music-studio cancel execute --candidate-id "$(MUSIC_CANDIDATE_ID)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)" --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
+
+verify-music-a2:
+> @ruby scripts/verify-music-studio-a2.rb
 
 test-runtime: chmod-scripts
 > @scripts/soul-runtime-test.sh

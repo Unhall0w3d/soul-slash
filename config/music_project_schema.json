@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.music.project.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "title", "intent", "target_duration_seconds", "vocal_mode", "rights_status", "caption", "lyrics", "bpm", "keyscale", "timesignature", "language", "seed", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": {"const": "soul.music.project.v1"},
+    "project_id": {"type": "string", "pattern": "^music_[a-f0-9]{16}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 120},
+    "intent": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "target_duration_seconds": {"type": "integer", "minimum": 10, "maximum": 180},
+    "vocal_mode": {"enum": ["vocal", "instrumental"]},
+    "rights_status": {"enum": ["original", "licensed", "public_domain"]},
+    "caption": {"type": "string", "minLength": 1, "maxLength": 8000},
+    "lyrics": {"type": "string", "maxLength": 20000},
+    "bpm": {"type": "integer", "minimum": 30, "maximum": 300},
+    "keyscale": {"type": "string", "maxLength": 40},
+    "timesignature": {"enum": ["2", "3", "4", "5", "6", "7", "9", "12"]},
+    "language": {"type": "string", "pattern": "^[a-z]{2,3}$"},
+    "seed": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

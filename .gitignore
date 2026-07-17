@@ -58,6 +58,7 @@ Soul/runtime/*.tmp
 Soul/runtime/*.log
 !Soul/runtime/.keep
 Soul/runtime/
+Soul/music/
 # Local model files and model directories
 models/
 *.gguf

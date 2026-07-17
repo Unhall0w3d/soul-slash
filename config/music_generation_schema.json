@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.music.generation.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "candidate_id", "project_id", "lifecycle_state", "created_at", "input_digest", "model_profile", "resource_receipt", "artifacts", "human_review_required"],
+  "properties": {
+    "schema_version": {"const": "soul.music.generation.v1"},
+    "candidate_id": {"type": "string", "pattern": "^candidate_[a-f0-9]{16}$"},
+    "project_id": {"type": "string", "pattern": "^music_[a-f0-9]{16}$"},
+    "lifecycle_state": {"const": "blocked_for_human_review"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "input_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "model_profile": {"type": "object"},
+    "resource_receipt": {"type": "object"},
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flac", "mp3"],
+      "properties": {
+        "flac": {"$ref": "#/$defs/artifact"},
+        "mp3": {"$ref": "#/$defs/artifact"}
+      }
+    },
+    "human_review_required": {"const": true}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "sha256", "codec", "duration_seconds", "sample_rate", "channels"],
+      "properties": {
+        "path": {"type": "string"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "codec": {"enum": ["flac", "mp3"]},
+        "duration_seconds": {"type": "number", "minimum": 1},
+        "sample_rate": {"const": 48000},
+        "channels": {"const": 2},
+        "derived_from_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "encoder": {"type": "string"},
+        "encoder_arguments": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

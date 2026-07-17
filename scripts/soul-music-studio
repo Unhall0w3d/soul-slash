@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/music_generation_service"
+
+options = {
+  root: File.expand_path("..", __dir__),
+  music_root: ENV.fetch("MUSIC_ROOT", File.join(Dir.home, ".local", "share", "soul", "music")),
+  manifest: ENV.fetch("MUSIC_MODEL_MANIFEST", File.expand_path("../config/music_pilot_models.json", __dir__)),
+  limit: 100
+}
+
+parser = OptionParser.new do |value|
+  value.banner = "Usage: soul-music-studio AREA ACTION [options]"
+  value.on("--root PATH") { |item| options[:root] = item }
+  value.on("--music-root PATH") { |item| options[:music_root] = item }
+  value.on("--manifest PATH") { |item| options[:manifest] = item }
+  value.on("--input PATH") { |item| options[:input] = item }
+  value.on("--project-id ID") { |item| options[:project_id] = item }
+  value.on("--candidate-id ID") { |item| options[:candidate_id] = item }
+  value.on("--limit N", Integer) { |item| options[:limit] = item }
+  value.on("--confirmation PHRASE") { |item| options[:confirmation] = item }
+  value.on("--expected-digest SHA256") { |item| options[:expected_digest] = item }
+end
+
+area = ARGV.shift
+action = ARGV.shift
+parser.parse!(ARGV)
+
+begin
+service = SoulCore::MusicGenerationService.new(root: options[:root], music_root: options[:music_root], manifest_path: options[:manifest])
+
+result = case [area, action]
+         when %w[projects create]
+           path = options[:input].to_s
+           if path.empty?
+             { "ok" => false, "lifecycle_state" => "awaiting_input", "reason" => "--input project JSON is required", "data" => {}, "mutation" => "none" }
+           else
+             stat = File.lstat(path)
+             raise "project input must be a regular non-symlink file" unless stat.file? && !stat.symlink? && stat.size <= 64 * 1024
+             service.create_project(JSON.parse(File.binread(path, 64 * 1024)))
+           end
+         when %w[projects list]
+           service.list_projects(limit: options[:limit])
+         when %w[projects inspect]
+           service.inspect_project(project_id: options[:project_id])
+         when %w[resources inspect]
+           service.resource_inventory
+         when %w[generate preview]
+           service.generation_preview(project_id: options[:project_id])
+         when %w[generate execute]
+           service.generation_execute(project_id: options[:project_id], candidate_id: options[:candidate_id], confirmation: options[:confirmation], expected_digest: options[:expected_digest])
+         when %w[cancel preview]
+           service.cancel_preview(candidate_id: options[:candidate_id])
+         when %w[cancel execute]
+           service.cancel_execute(candidate_id: options[:candidate_id], confirmation: options[:confirmation], expected_digest: options[:expected_digest])
+         else
+           warn parser
+           exit 1
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : (%w[awaiting_input blocked_for_human_review canceled].include?(result["lifecycle_state"]) ? 2 : 1))
+rescue StandardError => error
+  puts JSON.pretty_generate("ok" => false, "lifecycle_state" => "awaiting_input", "reason" => error.message, "data" => {}, "mutation" => "none")
+  exit 2
+end

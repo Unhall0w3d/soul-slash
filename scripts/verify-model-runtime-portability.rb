@@ -142,6 +142,11 @@ Dir.mktmpdir("soul-model-runtime-") do |root|
   stopped = service.execute(action: "unload", confirmation: "UNLOAD_MODEL_RUNTIME", expected_digest: unload.dig("data", "expected_digest"))
   check("verified unload stops only configured user unit", stopped["ok"] && runner.state == "inactive" && runner.commands.include?(["systemctl", "--user", "stop", "llama-server.service"]), errors)
 
+  music_lease = lease_store.acquire(provider_id: "nvidia-music", model_id: "ace-step-1.5", request_id: "candidate-fixture", ttl_seconds: 120)
+  music_busy = service.preview(action: "load")
+  check("active Music lease blocks unloaded NVIDIA runtime load", music_busy["lifecycle_state"] == "blocked_for_human_review" && music_busy.dig("data", "active_work_count") == 1 && runner.state == "inactive", errors)
+  lease_store.release(music_lease.fetch("lease_id"))
+
   load = service.preview(action: "load")
   started = service.execute(action: "load", confirmation: "LOAD_MODEL_RUNTIME", expected_digest: load.dig("data", "expected_digest"))
   check("verified load starts only configured user unit", load["ok"] && started["ok"] && runner.commands.include?(["systemctl", "--user", "start", "llama-server.service"]), errors)

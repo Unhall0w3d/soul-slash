@@ -226,6 +226,7 @@ module SoulCore
       case action
       when "load"
         return "a model runtime profile is already loaded" unless active.empty?
+        return "active model work must complete or be canceled before the runtime changes" unless observation["active_work_count"].zero?
         target_state = observation.fetch("profiles").find { |profile| profile.fetch("id") == target.fetch("id") }.fetch("service_state")
         return "target model runtime profile service is not installed and loaded" if target_state == "unavailable"
         return "target model runtime profile must be inactive" unless target_state == "inactive"
