@@ -328,7 +328,66 @@ async function cancelMusicGeneration() {
 
 function renderMusicCandidates(candidates) {
   const section = byId("music-candidates"); section.hidden = candidates.length === 0; byId("music-candidate-count").textContent = String(candidates.length); const list = byId("music-candidate-list"); list.replaceChildren();
-  candidates.slice().reverse().forEach((candidate) => { const card = document.createElement("article"); card.className = "music-candidate"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = candidate.candidate_id; const meta = document.createElement("small"); meta.textContent = `${candidate.artifacts?.flac?.duration_seconds?.toFixed?.(1) || "—"}s · ${candidate.generation_kind === "revision" ? "revision" : "original"} · ${candidate.review ? "reviewed" : "awaiting review"}`; heading.append(title, meta); const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`; const download = document.createElement("a"); download.href = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/flac`; download.textContent = "Open lossless FLAC"; download.target = "_blank"; const analysis = musicAnalysisPanel(candidate); const revision = candidate.review?.disposition === "revise" || candidate.analysis?.machine_route === "revision_recommended" ? musicRevisionPanel(candidate) : null; const form = musicReviewForm(candidate); card.append(heading, audio, download, analysis); if (revision) card.append(revision); card.append(form); list.append(card); });
+  const linkedSources = new Set(candidates.map((candidate) => candidate.source_candidate_id).filter(Boolean));
+  candidates.slice().reverse().forEach((candidate) => {
+    const older = candidate.review?.disposition === "revise" && linkedSources.has(candidate.candidate_id);
+    const card = document.createElement("article"); card.className = "music-candidate"; card.classList.toggle("is-older-version", older);
+    const heading = document.createElement("div"); heading.className = "card-heading";
+    const title = document.createElement("strong"); title.textContent = candidate.candidate_id;
+    const meta = document.createElement("small"); meta.textContent = `${candidate.artifacts?.flac?.duration_seconds?.toFixed?.(1) || "—"}s · ${older ? "older version" : (candidate.generation_kind === "revision" ? "revision" : "original")} · ${candidate.review ? candidate.review.disposition : "awaiting review"}`;
+    heading.append(title, meta);
+    const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`;
+    const details = document.createElement("div"); details.className = "music-candidate-details"; details.hidden = older;
+    const download = document.createElement("a"); download.href = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/flac`; download.textContent = "Open lossless FLAC"; download.target = "_blank";
+    const analysis = musicAnalysisPanel(candidate);
+    const revision = !older && (candidate.review?.disposition === "revise" || candidate.analysis?.machine_route === "revision_recommended") ? musicRevisionPanel(candidate) : null;
+    details.append(download, analysis); if (revision) details.append(revision); if (candidate.review) details.append(musicDispositionPanel(candidate)); details.append(musicReviewForm(candidate));
+    card.append(heading, audio);
+    if (older) { const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "text-button music-version-toggle"; toggle.textContent = "Inspect older version"; toggle.addEventListener("click", () => { details.hidden = !details.hidden; toggle.textContent = details.hidden ? "Inspect older version" : "Collapse older version"; }); card.append(toggle); }
+    card.append(details); list.append(card);
+  });
+}
+
+function musicDispositionPanel(candidate) {
+  const panel = document.createElement("section"); panel.className = `music-disposition music-disposition--${candidate.review.disposition}`;
+  const status = document.createElement("p"); status.className = "dialog-status";
+  if (candidate.review.disposition === "reject") {
+    const button = document.createElement("button"); button.type = "button"; button.className = "danger-button"; button.textContent = "Preview permanent candidate deletion";
+    button.addEventListener("click", () => previewMusicDisposition(candidate, "reject", panel, button, status)); panel.append(button, status);
+  } else if (candidate.review.disposition === "keep") {
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview finished-song export";
+    button.addEventListener("click", () => previewMusicDisposition(candidate, "export", panel, button, status)); panel.append(button, status);
+  } else {
+    status.textContent = "Revision evidence is retained here until a linked candidate is generated."; panel.append(status);
+  }
+  return panel;
+}
+
+async function previewMusicDisposition(candidate, kind, panel, button, status) {
+  button.disabled = true; status.textContent = kind === "reject" ? "Binding exact destructive scope…" : "Checking transcription and finished-library scope…";
+  try {
+    const envelope = await callSoul(`music.candidates.${kind}.preview`, { project_id: candidate.project_id, candidate_id: candidate.candidate_id }); const data = dataOf(envelope);
+    if (envelope.lifecycle_state === "complete" && data.export) { status.textContent = `Already exported to ${data.export.destination}`; return; }
+    if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || `${kind} preview is unavailable`);
+    const gate = document.createElement("div"); gate.className = "music-disposition-gate";
+    const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
+    const label = document.createElement("label"); label.textContent = `Type ${data.confirmation_phrase}`;
+    const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false;
+    const execute = document.createElement("button"); execute.type = "button"; execute.className = kind === "reject" ? "danger-button" : "gate-button gate-button--gold"; execute.textContent = kind === "reject" ? "Delete rejected candidate" : "Export finished song"; execute.disabled = true;
+    input.addEventListener("input", () => { execute.disabled = input.value !== data.confirmation_phrase; });
+    execute.addEventListener("click", () => executeMusicDisposition(candidate, kind, data, input.value, execute, status));
+    label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "reject" ? "Deletion removes FLAC, MP3, inputs, and transcription; a small lineage receipt remains." : "Export is atomic, owner-private, and will not overwrite an existing song folder.";
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+async function executeMusicDisposition(candidate, kind, preview, confirmation, button, status) {
+  button.disabled = true; status.textContent = kind === "reject" ? "Deleting only the confirmed rejected candidate…" : "Copying the confirmed candidate into the finished-song library…";
+  try {
+    const envelope = await callSoul(`music.candidates.${kind}.execute`, { project_id: candidate.project_id, candidate_id: candidate.candidate_id, confirmation, expected_digest: preview.expected_digest }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state);
+    if (kind === "reject") { await selectMusicProject({ project_id: candidate.project_id }); return; }
+    status.textContent = `Finished song exported to ${dataOf(envelope).export?.destination || "the Soul music library"}.`;
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
 function musicAnalysisPanel(candidate) {
@@ -374,7 +433,7 @@ async function cancelRevisionGeneration(candidateId, status) {
 }
 
 function musicReviewForm(candidate) {
-  const form = document.createElement("form"); form.className = "music-review"; const fields = [["musical_quality", "Musical quality"], ["prompt_adherence", "Prompt"], ["vocal_adherence", "Vocals"], ["lyric_adherence", "Lyrics"]]; fields.forEach(([name, label]) => { const wrapper = document.createElement("label"); wrapper.textContent = label; const select = document.createElement("select"); select.name = name; ["passed", "partial", "failed", "not_applicable"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value.replaceAll("_", " "); select.append(option); }); wrapper.append(select); form.append(wrapper); }); const rating = document.createElement("label"); rating.textContent = "Overall rating"; const ratingInput = document.createElement("select"); ratingInput.name = "rating"; [[1,"1 · unusable"],[2,"2 · poor"],[3,"3 · workable"],[4,"4 · strong"],[5,"5 · excellent"]].forEach(([value,text]) => { const option = document.createElement("option"); option.value = String(value); option.textContent = text; option.selected = value === 3; ratingInput.append(option); }); rating.append(ratingInput); form.append(rating); const disposition = document.createElement("label"); disposition.textContent = "Disposition"; const dispositionSelect = document.createElement("select"); dispositionSelect.name = "disposition"; ["keep", "revise", "reject"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value; dispositionSelect.append(option); }); disposition.append(dispositionSelect); form.append(disposition); const notes = document.createElement("textarea"); notes.name = "notes"; notes.maxLength = 8000; notes.placeholder = "What matched, what drifted, and what should change?"; const submit = document.createElement("button"); submit.type = "submit"; submit.className = "gate-button"; submit.textContent = candidate.review ? "Record revised review" : "Record review"; const status = document.createElement("p"); status.className = "dialog-status"; form.append(notes, submit, status); form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(form)); values.rating = Number(values.rating); submit.disabled = true; try { const envelope = await callSoul("music.candidates.review", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, review: values }); if (envelope.lifecycle_state === "complete") { status.textContent = "Listening evidence recorded; any prior revision remains preserved."; await selectMusicProject({ project_id: candidate.project_id }); } else { status.textContent = envelope.errors?.[0]?.message || envelope.lifecycle_state; } } catch (error) { status.textContent = error.message; } finally { submit.disabled = false; } }); return form;
+  const form = document.createElement("form"); form.className = "music-review"; const fields = [["musical_quality", "Musical quality"], ["prompt_adherence", "Prompt"], ["vocal_adherence", "Vocals"], ["lyric_adherence", "Lyrics"]]; fields.forEach(([name, label]) => { const wrapper = document.createElement("label"); wrapper.textContent = label; const select = document.createElement("select"); select.name = name; ["passed", "partial", "failed", "not_applicable"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value.replaceAll("_", " "); select.append(option); }); wrapper.append(select); form.append(wrapper); }); const rating = document.createElement("label"); rating.textContent = "Overall rating"; const ratingInput = document.createElement("select"); ratingInput.name = "rating"; [[1,"1 · unusable"],[2,"2 · poor"],[3,"3 · workable"],[4,"4 · strong"],[5,"5 · excellent"]].forEach(([value,text]) => { const option = document.createElement("option"); option.value = String(value); option.textContent = text; option.selected = value === 3; ratingInput.append(option); }); rating.append(ratingInput); form.append(rating); const disposition = document.createElement("label"); disposition.textContent = "Disposition"; const dispositionSelect = document.createElement("select"); dispositionSelect.name = "disposition"; ["keep", "revise", "reject"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value; dispositionSelect.append(option); }); disposition.append(dispositionSelect); form.append(disposition); const notes = document.createElement("textarea"); notes.name = "notes"; notes.maxLength = 8000; notes.placeholder = "What matched, what drifted, and what should change?"; const submit = document.createElement("button"); submit.type = "submit"; submit.className = "gate-button"; submit.textContent = candidate.review ? "Record revised review" : "Record review"; const status = document.createElement("p"); status.className = "dialog-status"; form.append(notes, submit, status); if (candidate.review) { fields.forEach(([name]) => { form.elements[name].value = candidate.review[name]; }); ratingInput.value = String(candidate.review.rating); dispositionSelect.value = candidate.review.disposition; notes.value = candidate.review.notes || ""; } form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(form)); values.rating = Number(values.rating); submit.disabled = true; try { const envelope = await callSoul("music.candidates.review", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, review: values }); if (envelope.lifecycle_state === "complete") { status.textContent = "Listening evidence recorded; any prior revision remains preserved."; await selectMusicProject({ project_id: candidate.project_id }); } else { status.textContent = envelope.errors?.[0]?.message || envelope.lifecycle_state; } } catch (error) { status.textContent = error.message; } finally { submit.disabled = false; } }); return form;
 }
 
 function openClearDialog() {

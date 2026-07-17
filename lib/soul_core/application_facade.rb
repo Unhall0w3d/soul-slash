@@ -25,6 +25,7 @@ require_relative "self_augmentation_experiment_service"
 require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
+require_relative "music_candidate_disposition_service"
 
 module SoulCore
   class ApplicationFacade
@@ -58,7 +59,8 @@ module SoulCore
       music_generation_service: nil,
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
-      music_revision_provider: nil
+      music_revision_provider: nil,
+      music_candidate_disposition_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -83,6 +85,7 @@ module SoulCore
       @music_candidate_analysis_service = music_candidate_analysis_service
       @music_revision_draft_service = music_revision_draft_service
       @music_revision_provider = music_revision_provider
+      @music_candidate_disposition_service = music_candidate_disposition_service
     end
 
     def call(request, progress: nil)
@@ -201,6 +204,10 @@ module SoulCore
       when "music.candidates.revision.preview" then domain(music_generation.revision_preview(project_id: required(parameters, "project_id"), source_candidate_id: required(parameters, "source_candidate_id"), revision: required(parameters, "revision")))
       when "music.candidates.revision.execute" then domain(music_generation.revision_execute(project_id: required(parameters, "project_id"), source_candidate_id: required(parameters, "source_candidate_id"), candidate_id: required(parameters, "candidate_id"), revision: required(parameters, "revision"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "music.candidates.review" then domain(music_generation.record_review(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), review: required(parameters, "review")))
+      when "music.candidates.reject.preview" then domain(music_candidate_disposition.reject_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id")))
+      when "music.candidates.reject.execute" then domain(music_candidate_disposition.reject_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.candidates.export.preview" then domain(music_candidate_disposition.export_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id")))
+      when "music.candidates.export.execute" then domain(music_candidate_disposition.export_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -495,6 +502,10 @@ module SoulCore
 
     def music_candidate_analysis
       @music_candidate_analysis_service ||= MusicCandidateAnalysisService.new(root: @root)
+    end
+
+    def music_candidate_disposition
+      @music_candidate_disposition_service ||= MusicCandidateDispositionService.new(root: @root, analysis_service: music_candidate_analysis)
     end
 
     def music_project_with_analysis(project_id:)

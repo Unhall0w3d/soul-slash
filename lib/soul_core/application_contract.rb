@@ -109,6 +109,10 @@ module SoulCore
       "music.candidates.revision.preview" => %w[project_id source_candidate_id revision],
       "music.candidates.revision.execute" => %w[project_id source_candidate_id candidate_id revision confirmation expected_digest],
       "music.candidates.review" => %w[project_id candidate_id review],
+      "music.candidates.reject.preview" => %w[project_id candidate_id],
+      "music.candidates.reject.execute" => %w[project_id candidate_id confirmation expected_digest],
+      "music.candidates.export.preview" => %w[project_id candidate_id],
+      "music.candidates.export.execute" => %w[project_id candidate_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze

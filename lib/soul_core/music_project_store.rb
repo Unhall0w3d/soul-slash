@@ -241,7 +241,9 @@ module SoulCore
       raise ValidationError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
       filename = { "mp3" => "listening.mp3", "flac" => "master.flac" }[artifact.to_s]
       raise ValidationError, "music artifact is invalid" unless filename
-      path = File.join(generations_path(project_id), candidate_id.to_s, filename)
+      candidate_dir = File.join(generations_path(project_id), candidate_id.to_s)
+      assert_regular_directory!(candidate_dir, "music candidate")
+      path = File.join(candidate_dir, filename)
       raise ValidationError, "music artifact does not exist" unless File.file?(path) && !File.symlink?(path)
       path
     end
