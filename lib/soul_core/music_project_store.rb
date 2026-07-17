@@ -11,6 +11,7 @@ module SoulCore
     SCHEMA_VERSION = "soul.music.project.v1"
     PROJECT_ID = /\Amusic_[a-f0-9]{16}\z/
     CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
+    REVIEW_VALUES = %w[passed partial failed not_applicable].freeze
     DEFAULT_DIRECTORY = File.join("Soul", "music", "projects")
     MAX_PROJECTS = 1_000
     MAX_PROJECT_BYTES = 64 * 1024
@@ -146,6 +147,62 @@ module SoulCore
       target
     end
 
+    def record_review(project_id:, candidate_id:, attributes:)
+      project_id = validate_project_id!(project_id)
+      raise ValidationError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
+      candidate = File.join(generations_path(project_id), candidate_id.to_s, "candidate.json")
+      raise ValidationError, "music candidate does not exist" unless File.file?(candidate) && !File.symlink?(candidate)
+      data = stringify_keys(attributes)
+      expected = %w[rating disposition musical_quality prompt_adherence vocal_adherence lyric_adherence notes]
+      raise ValidationError, "review fields are invalid" unless data.keys.sort == expected.sort
+      rating = Integer(data.fetch("rating"))
+      raise ValidationError, "rating must be 1..5" unless (1..5).cover?(rating)
+      raise ValidationError, "disposition is invalid" unless %w[keep revise reject].include?(data.fetch("disposition"))
+      %w[musical_quality prompt_adherence vocal_adherence lyric_adherence].each do |key|
+        raise ValidationError, "#{key} is invalid" unless REVIEW_VALUES.include?(data.fetch(key))
+      end
+      notes = data.fetch("notes")
+      raise ValidationError, "notes must be a UTF-8 string" unless notes.is_a?(String) && notes.valid_encoding?
+      raise ValidationError, "notes exceed 8000 characters" if notes.length > 8_000
+      review = data.merge(
+        "schema_version" => "soul.music.candidate_review.v1",
+        "project_id" => project_id,
+        "candidate_id" => candidate_id.to_s,
+        "rating" => rating,
+        "reviewed_at" => @clock.call.iso8601
+      )
+      reviews = File.join(path_for(project_id), "reviews")
+      current = File.join(reviews, "#{candidate_id}.json")
+      preserve_review_revision(current, reviews, candidate_id.to_s) if File.exist?(current) || File.symlink?(current)
+      atomic_json(current, review)
+      review
+    rescue ArgumentError, TypeError
+      raise ValidationError, "rating must be an integer"
+    end
+
+    def read_review(project_id, candidate_id)
+      project_id = validate_project_id!(project_id)
+      raise ValidationError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
+      path = File.join(path_for(project_id), "reviews", "#{candidate_id}.json")
+      return nil unless File.exist?(path)
+      stat = File.lstat(path)
+      raise IntegrityError, "music review must be a regular file" unless stat.file? && !stat.symlink?
+      raise IntegrityError, "music review exceeds size limit" if stat.size > MAX_PROJECT_BYTES
+      JSON.parse(File.binread(path, MAX_PROJECT_BYTES))
+    rescue JSON::ParserError => error
+      raise IntegrityError, "invalid music review: #{error.class}"
+    end
+
+    def candidate_artifact_path(project_id, candidate_id, artifact)
+      project_id = validate_project_id!(project_id)
+      raise ValidationError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
+      filename = { "mp3" => "listening.mp3", "flac" => "master.flac" }[artifact.to_s]
+      raise ValidationError, "music artifact is invalid" unless filename
+      path = File.join(generations_path(project_id), candidate_id.to_s, filename)
+      raise ValidationError, "music artifact does not exist" unless File.file?(path) && !File.symlink?(path)
+      path
+    end
+
     private
 
     def prepare_root!
@@ -231,6 +288,25 @@ module SoulCore
       File.rename(temporary, path)
     ensure
       FileUtils.rm_f(temporary) if defined?(temporary) && temporary
+    end
+
+    def preserve_review_revision(current, reviews, candidate_id)
+      stat = File.lstat(current)
+      raise IntegrityError, "music review must be a regular file" unless stat.file? && !stat.symlink?
+      raise IntegrityError, "music review exceeds size limit" if stat.size > MAX_PROJECT_BYTES
+      body = File.binread(current, MAX_PROJECT_BYTES)
+      prior = JSON.parse(body)
+      raise IntegrityError, "music review identity is invalid" unless prior["project_id"].to_s.match?(PROJECT_ID) && prior["candidate_id"] == candidate_id
+      history = File.join(reviews, "history")
+      if File.exist?(history) || File.symlink?(history)
+        assert_regular_directory!(history, "music review history")
+      else
+        Dir.mkdir(history, 0o700)
+      end
+      revision = File.join(history, "#{candidate_id}.#{Digest::SHA256.hexdigest(body)[0, 16]}.json")
+      atomic_json(revision, prior) unless File.exist?(revision)
+    rescue JSON::ParserError => error
+      raise IntegrityError, "invalid music review: #{error.class}"
     end
 
     def within?(path, parent)

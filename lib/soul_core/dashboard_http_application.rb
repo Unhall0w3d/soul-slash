@@ -20,7 +20,7 @@ module SoulCore
     }.freeze
 
     SECURITY_HEADERS = {
-      "Content-Security-Policy" => "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "Content-Security-Policy" => "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       "X-Content-Type-Options" => "nosniff",
       "X-Frame-Options" => "DENY",
       "Referrer-Policy" => "no-referrer",
@@ -72,6 +72,12 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/call"
       return chat_stream(normalized_headers, body) if target == "/api/v1/chat-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/chat-stream"
+      return music_stream(normalized_headers, body) if target == "/api/v1/music-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-stream"
+      if (match = target.match(%r{\A/api/v1/music/audio/(music_[a-f0-9]{16})/(candidate_[a-f0-9]{16})/(mp3|flac)\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return music_audio(normalized_headers, *match.captures)
+      end
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -124,6 +130,77 @@ module SoulCore
         output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "chat stream failed safely: #{error.class}") }) + "\n"
       end
       response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
+    end
+
+    def music_stream(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      request = JSON.parse(body)
+      allowed = %w[music.generation.execute music.candidates.analysis.execute]
+      unless request.is_a?(Hash) && allowed.include?(request["operation"])
+        return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts foreground generation or candidate analysis only"))
+      end
+      stream = Enumerator.new do |output|
+        progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
+        envelope = @facade.call(request, progress: progress)
+        output << JSON.generate({ "type" => "result", "envelope" => envelope }) + "\n"
+      rescue StandardError => error
+        output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "music stream failed safely: #{error.class}") }) + "\n"
+      end
+      response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
+    end
+
+    def music_audio(headers, project_id, candidate_id, artifact)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.music_artifact_path(project_id: project_id, candidate_id: candidate_id, artifact: artifact)
+      content_type = artifact == "mp3" ? "audio/mpeg" : "audio/flac"
+      size = File.size(path)
+      range = audio_range(headers["range"], size)
+      return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
+      offset, length = range || [0, size]
+      extra = { "Content-Type" => content_type, "Content-Length" => length.to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store", "Accept-Ranges" => "bytes" }
+      extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
+      response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
+    rescue MusicProjectStore::ValidationError, MusicProjectStore::IntegrityError
+      response(404, "Not Found")
+    end
+
+    class FileStream
+      def initialize(path, offset: 0, length: File.size(path)) = (@path, @offset, @length = path, offset, length)
+      def each
+        File.open(@path, "rb") do |file|
+          file.seek(@offset)
+          remaining = @length
+          while remaining.positive?
+            chunk = file.read([64 * 1024, remaining].min)
+            break unless chunk
+            remaining -= chunk.bytesize
+            yield chunk
+          end
+        end
+      end
+    end
+
+    def audio_range(header, size)
+      return nil if header.to_s.empty?
+      match = header.match(/\Abytes=(\d*)-(\d*)\z/)
+      return nil unless match && (!match[1].empty? || !match[2].empty?)
+      if match[1].empty?
+        length = [Integer(match[2]), size].min
+        return nil unless length.positive?
+        [size - length, length]
+      else
+        first = Integer(match[1]); last = match[2].empty? ? size - 1 : [Integer(match[2]), size - 1].min
+        return nil if first >= size || last < first
+        [first, last - first + 1]
+      end
+    rescue ArgumentError
+      nil
     end
 
     def auth_session(headers)

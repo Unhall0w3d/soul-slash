@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -25,8 +25,8 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
   return envelope;
 }
 
-async function callSoulStream(operation, parameters = {}, context = {}, onProgress = () => {}) {
-  const response = await fetch("/api/v1/chat-stream", {
+async function callNdjson(endpoint, operation, parameters = {}, context = {}, onProgress = () => {}) {
+  const response = await fetch(endpoint, {
     method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
     body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
@@ -41,9 +41,11 @@ async function callSoulStream(operation, parameters = {}, context = {}, onProgre
     if (done) break;
   }
   if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") finalEnvelope = event.envelope; }
-  if (!finalEnvelope) throw new Error("Chat stream ended without a terminal result");
+  if (!finalEnvelope) throw new Error("Foreground stream ended without a terminal result");
   return finalEnvelope;
 }
+
+const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress);
 
 async function authRequest(path, body) {
   const options = { credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf } };
@@ -138,21 +140,26 @@ function switchTab(name) {
   const studio = name === "studio";
   const improvement = name === "improvement";
   const augmentation = name === "augmentation";
+  const music = name === "music";
   byId("chat-panel").hidden = !chat;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
   byId("augmentation-panel").hidden = !augmentation;
+  byId("music-panel").hidden = !music;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
   byId("augmentation-tab").classList.toggle("is-active", augmentation);
+  byId("music-tab").classList.toggle("is-active", music);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("studio-tab").setAttribute("aria-selected", String(studio));
   byId("improvement-tab").setAttribute("aria-selected", String(improvement));
   byId("augmentation-tab").setAttribute("aria-selected", String(augmentation));
+  byId("music-tab").setAttribute("aria-selected", String(music));
   if (studio && !state.studioLoaded) loadSkillStudio();
   if (improvement && !state.improvementLoaded) loadSelfImprovement();
   if (augmentation && !state.augmentationLoaded) loadSelfAugmentation();
+  if (music && !state.musicLoaded) loadMusicStudio();
 }
 
 function renderChatList() {
@@ -251,6 +258,93 @@ function renderInbox(data) {
 async function createChat() {
   setBusy(true, "Creating conversation");
   try { const envelope = await callSoul("chats.create"); lifecycle(envelope); const chat = dataOf(envelope).record; await loadChats(false); await selectChat(chat); } catch (error) { showError(error); } finally { setBusy(false); }
+}
+
+function musicProjectInput() {
+  const vocalMode = byId("music-vocal-mode").value;
+  return { title: byId("music-title").value, intent: byId("music-intent").value, target_duration_seconds: Number(byId("music-duration").value), vocal_mode: vocalMode, rights_status: byId("music-rights").value, caption: byId("music-caption").value, lyrics: vocalMode === "instrumental" ? "" : byId("music-lyrics").value, bpm: Number(byId("music-bpm").value), keyscale: byId("music-key").value, timesignature: byId("music-time").value, language: "en", seed: Number(byId("music-seed").value) };
+}
+
+async function loadMusicStudio() {
+  state.musicLoaded = true;
+  try {
+    const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope);
+    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await refreshMusicResources();
+    if (state.musicProjects.length) await selectMusicProject(state.musicProjects[0]);
+  } catch (error) { state.musicLoaded = false; byId("music-form-status").textContent = error.message; }
+}
+
+function renderMusicProjects() {
+  byId("music-project-count").textContent = String(state.musicProjects.length); const list = byId("music-project-list"); list.replaceChildren();
+  if (!state.musicProjects.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No compositions yet."; list.append(p); return; }
+  state.musicProjects.forEach((project) => { const button = document.createElement("button"); button.type = "button"; button.className = `studio-item${state.selectedMusicProject?.project_id === project.project_id ? " is-active" : ""}`; const title = document.createElement("strong"); title.textContent = project.title; const meta = document.createElement("small"); meta.textContent = `${project.target_duration_seconds}s · ${project.vocal_mode} · ${project.bpm} BPM`; button.append(title, meta); button.addEventListener("click", () => selectMusicProject(project)); list.append(button); });
+}
+
+function resetMusicForm() {
+  state.selectedMusicProject = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
+}
+
+async function createMusicProject(event) {
+  event.preventDefault(); byId("save-music-project").disabled = true;
+  try { const envelope = await callSoul("music.projects.create", { project: musicProjectInput() }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Project needs attention"); state.musicLoaded = false; await loadMusicStudio(); byId("music-form-status").textContent = "Project created. Preview before generation."; } catch (error) { byId("music-form-status").textContent = error.message; } finally { byId("save-music-project").disabled = false; }
+}
+
+async function selectMusicProject(project) {
+  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); byId("save-music-project").hidden = true; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+}
+
+async function refreshMusicResources() {
+  try { const envelope = await callSoul("music.resources.status"); const data = dataOf(envelope); const ready = data.can_acquire_nvidia_music === true; byId("music-resource-state").textContent = ready ? "Lane ready" : "Lane held"; byId("music-resource-state").classList.toggle("is-ready", ready); byId("music-generation-summary").textContent = ready ? "AMD conversation remains online; the NVIDIA lane is available for one foreground candidate." : (data.blockers || []).join(" · ") || "Music resources need attention."; } catch (error) { byId("music-resource-state").textContent = "Unavailable"; }
+}
+
+async function previewMusicGeneration() {
+  if (!state.selectedMusicProject) return; byId("music-generation-status").textContent = "Inspecting exact generation scope…";
+  try { const envelope = await callSoul("music.generation.preview", { project_id: state.selectedMusicProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || data.reason || "Generation is blocked"); state.musicPreview = data; state.musicCandidateId = data.candidate_id; byId("music-generation-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-generation-confirm").hidden = false; byId("music-generation-confirmation").value = ""; byId("start-music-generation").disabled = true; byId("music-generation-status").textContent = `Candidate ${data.candidate_id} is bound to this preview.`; } catch (error) { byId("music-generation-status").textContent = error.message; }
+}
+
+async function startMusicGeneration() {
+  if (!state.musicPreview || state.musicGenerating) return; state.musicGenerating = true; byId("start-music-generation").disabled = true; byId("cancel-music-generation").disabled = false; byId("music-progress").hidden = false;
+  const params = { project_id: state.selectedMusicProject.project_id, candidate_id: state.musicPreview.candidate_id, confirmation: byId("music-generation-confirmation").value, expected_digest: state.musicPreview.expected_digest };
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.generation.execute", params, {}, (event) => { byId("music-progress-stage").textContent = (event.stage || "working").replaceAll("_", " "); const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) byId("music-progress-message").textContent = line.slice(0, 240); }); lifecycle(envelope); byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject(state.selectedMusicProject); } catch (error) { byId("music-generation-status").textContent = error.message; } finally { state.musicGenerating = false; byId("cancel-music-generation").disabled = true; byId("music-progress").hidden = true; }
+}
+
+async function cancelMusicGeneration() {
+  if (!state.musicCandidateId) return;
+  try { const preview = await callSoul("music.generation.cancel.preview", { candidate_id: state.musicCandidateId }); const data = dataOf(preview); if (!data.expected_digest) throw new Error(preview.errors?.[0]?.message || "Cancellation is not ready yet"); const phrase = window.prompt(`Cancel only ${state.musicCandidateId}? Type ${data.confirmation_phrase}`); if (phrase !== data.confirmation_phrase) { byId("music-generation-status").textContent = "Cancellation confirmation did not match; generation continues."; return; } const result = await callSoul("music.generation.cancel.execute", { candidate_id: state.musicCandidateId, confirmation: phrase, expected_digest: data.expected_digest }); byId("music-generation-status").textContent = result.lifecycle_state === "canceled" ? "Cancellation signal completed." : (result.errors?.[0]?.message || result.lifecycle_state); } catch (error) { byId("music-generation-status").textContent = error.message; }
+}
+
+function renderMusicCandidates(candidates) {
+  const section = byId("music-candidates"); section.hidden = candidates.length === 0; byId("music-candidate-count").textContent = String(candidates.length); const list = byId("music-candidate-list"); list.replaceChildren();
+  candidates.slice().reverse().forEach((candidate) => { const card = document.createElement("article"); card.className = "music-candidate"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = candidate.candidate_id; const meta = document.createElement("small"); meta.textContent = `${candidate.artifacts?.flac?.duration_seconds?.toFixed?.(1) || "—"}s · ${candidate.review ? "reviewed" : "awaiting review"}`; heading.append(title, meta); const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`; const download = document.createElement("a"); download.href = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/flac`; download.textContent = "Open lossless FLAC"; download.target = "_blank"; const analysis = musicAnalysisPanel(candidate); const form = musicReviewForm(candidate); card.append(heading, audio, download, analysis, form); list.append(card); });
+}
+
+function musicAnalysisPanel(candidate) {
+  const panel = document.createElement("section"); panel.className = "music-analysis"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Vocal evidence"; const badge = document.createElement("small"); heading.append(title, badge); panel.append(heading);
+  if (candidate.analysis) { renderMusicAnalysisEvidence(panel, candidate.analysis, badge, candidate); return panel; }
+  badge.textContent = "not analyzed"; const explanation = document.createElement("p"); explanation.className = "muted"; explanation.textContent = "Run one CPU-only foreground transcription. The model exits after the bounded pass; machine evidence routes to human testing or revision but never approves the candidate."; const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview vocal analysis"; const status = document.createElement("p"); status.className = "dialog-status"; panel.append(explanation, preview, status);
+  preview.addEventListener("click", async () => { preview.disabled = true; status.textContent = "Inspecting exact CPU analysis scope…"; try { const envelope = await callSoul("music.candidates.analysis.preview", { project_id: candidate.project_id, candidate_id: candidate.candidate_id }); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Analysis is unavailable"); const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Type ${data.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const run = document.createElement("button"); run.type = "button"; run.className = "gate-button gate-button--gold"; run.textContent = "Analyze vocals in foreground"; run.disabled = true; input.addEventListener("input", () => { run.disabled = input.value !== data.confirmation_phrase; }); run.addEventListener("click", () => runMusicAnalysis(candidate, data, input.value, status, run)); preview.replaceWith(scope, label, input, run); status.textContent = "No daemon, queue, listener, or resident model will be created."; } catch (error) { status.textContent = error.message; preview.disabled = false; } }); return panel;
+}
+
+async function runMusicAnalysis(candidate, preview, confirmation, status, button) {
+  button.disabled = true; status.textContent = "Starting bounded CPU transcription…"; const params = { project_id: candidate.project_id, candidate_id: candidate.candidate_id, confirmation, expected_digest: preview.expected_digest };
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.analysis.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).analysis) throw new Error(envelope.errors?.[0]?.message || "Analysis did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+function renderMusicAnalysisEvidence(panel, analysis, badge, candidate) {
+  const route = analysis.machine_route === "human_listening_test" ? "Machine heard OK → human test" : "Machine heard BAD → revision attempt"; badge.textContent = route; badge.className = analysis.machine_route === "human_listening_test" ? "is-ready" : "is-warning"; const summary = document.createElement("p"); summary.textContent = `${Math.round((analysis.alignment?.sequence_recall || 0) * 100)}% sequence recall · ${analysis.alignment?.problem_line_count || 0} likely problem lines. ${analysis.disclaimer}`; const columns = document.createElement("div"); columns.className = "music-lyric-compare"; [["Intended lyrics", analysis.intended_lyrics], ["Machine-heard lyrics", analysis.machine_heard_formatted || formatMachineHeardLyrics(analysis.segments) || analysis.machine_heard_lyrics]].forEach(([name, value]) => { const section = document.createElement("section"); const h = document.createElement("h4"); h.textContent = name; const text = document.createElement("pre"); text.textContent = value || "—"; section.append(h, text); columns.append(section); }); const lines = document.createElement("ol"); lines.className = "music-line-evidence"; (analysis.alignment?.lines || []).forEach((item) => { const line = document.createElement("li"); line.dataset.status = item.status; line.textContent = `${item.status.replaceAll("_", " ")} · ${Math.round(item.sequence_recall * 100)}% — ${item.intended}`; lines.append(line); }); panel.append(summary, columns, lines);
+  if (analysis.machine_route === "revision_recommended") { const revise = document.createElement("button"); revise.type = "button"; revise.className = "gate-button"; revise.textContent = "Prepare revision brief"; revise.addEventListener("click", () => prepareMusicRevision(candidate)); panel.append(revise); }
+}
+
+function formatMachineHeardLyrics(segments) {
+  let previousEnd = null; const lines = []; (segments || []).forEach((segment) => { if (previousEnd !== null && Number(segment.start_ms) - Number(previousEnd) >= 5000) lines.push(""); lines.push(String(segment.text || "").trim()); previousEnd = segment.end_ms; }); return lines.join("\n").trim();
+}
+
+function prepareMusicRevision(candidate) {
+  const p = state.selectedMusicProject; if (!p) return; state.selectedMusicProject = null; state.musicPreview = null; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-title").value = `${p.title} · revision`.slice(0, 120); byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-workbench-title").textContent = "Revision attempt"; byId("save-music-project").hidden = false; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = `Editable revision prepared from ${candidate.candidate_id}. Nothing has been generated; adjust the brief, lyrics, or seed, then create a new immutable project.`; renderMusicProjects(); byId("music-project-form").scrollIntoView({ block: "start" });
+}
+
+function musicReviewForm(candidate) {
+  const form = document.createElement("form"); form.className = "music-review"; const fields = [["musical_quality", "Musical quality"], ["prompt_adherence", "Prompt"], ["vocal_adherence", "Vocals"], ["lyric_adherence", "Lyrics"]]; fields.forEach(([name, label]) => { const wrapper = document.createElement("label"); wrapper.textContent = label; const select = document.createElement("select"); select.name = name; ["passed", "partial", "failed", "not_applicable"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value.replaceAll("_", " "); select.append(option); }); wrapper.append(select); form.append(wrapper); }); const rating = document.createElement("label"); rating.textContent = "Overall rating"; const ratingInput = document.createElement("select"); ratingInput.name = "rating"; [[1,"1 · unusable"],[2,"2 · poor"],[3,"3 · workable"],[4,"4 · strong"],[5,"5 · excellent"]].forEach(([value,text]) => { const option = document.createElement("option"); option.value = String(value); option.textContent = text; option.selected = value === 3; ratingInput.append(option); }); rating.append(ratingInput); form.append(rating); const disposition = document.createElement("label"); disposition.textContent = "Disposition"; const dispositionSelect = document.createElement("select"); dispositionSelect.name = "disposition"; ["keep", "revise", "reject"].forEach((value) => { const option = document.createElement("option"); option.value = value; option.textContent = value; dispositionSelect.append(option); }); disposition.append(dispositionSelect); form.append(disposition); const notes = document.createElement("textarea"); notes.name = "notes"; notes.maxLength = 8000; notes.placeholder = "What matched, what drifted, and what should change?"; const submit = document.createElement("button"); submit.type = "submit"; submit.className = "gate-button"; submit.textContent = candidate.review ? "Record revised review" : "Record review"; const status = document.createElement("p"); status.className = "dialog-status"; form.append(notes, submit, status); form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(form)); values.rating = Number(values.rating); submit.disabled = true; try { const envelope = await callSoul("music.candidates.review", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, review: values }); status.textContent = envelope.lifecycle_state === "complete" ? "Listening evidence recorded; any prior revision remains preserved." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); } catch (error) { status.textContent = error.message; } finally { submit.disabled = false; } }); return form;
 }
 
 function openClearDialog() {
@@ -1053,6 +1147,14 @@ byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
+byId("music-tab").addEventListener("click", () => switchTab("music"));
+byId("new-music-project").addEventListener("click", resetMusicForm);
+byId("music-project-form").addEventListener("submit", createMusicProject);
+byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
+byId("preview-music-generation").addEventListener("click", previewMusicGeneration);
+byId("music-generation-confirmation").addEventListener("input", () => { byId("start-music-generation").disabled = !state.musicPreview || byId("music-generation-confirmation").value !== state.musicPreview.confirmation_phrase; });
+byId("start-music-generation").addEventListener("click", startMusicGeneration);
+byId("cancel-music-generation").addEventListener("click", cancelMusicGeneration);
 document.querySelectorAll("[data-assessment-scope]").forEach((button) => button.addEventListener("click", () => refreshSelfImprovement(button.dataset.assessmentScope)));
 byId("preview-improvement-proposals").addEventListener("click", previewImprovementProposals);
 byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });

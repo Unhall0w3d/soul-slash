@@ -438,6 +438,8 @@ make music-pilot-plan Preview pinned environment and exact checkpoint bytes
 make setup-music      Install only after plan digest and exact confirmation
 make music-model-download  Download verified weights after a separate gate
 make music-pilot-run  Run one foreground 30/90/180-second feasibility pilot
+make music-transcription-plan  Preview optional pinned CPU vocal analysis
+make music-transcription-install  Install it after digest and exact confirmation
 make test-runtime     Test configured runtime
 make test-fast        Test FAST/no_think request mode
 make test-think       Test THINK request mode
@@ -465,6 +467,22 @@ The plan prints the current digest and distinct confirmation phrases. Setup and
 model download never run as part of `make setup`, and neither starts a service,
 listener, worker, or background process. See
 `docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md` before proceeding.
+
+Vocal analysis is a separate optional install. Its reviewed default is the
+exact `ggml-small.en.bin` filename from `MUSIC_TRANSCRIPTION_MANIFEST`; a
+different filename must match another manifest entry exactly. Review and run:
+
+```bash
+make music-transcription-plan
+make music-transcription-install EXPECTED_DIGEST=<digest-from-plan> CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION
+```
+
+This installs a pinned CPU-only whisper.cpp command and model. It does not
+create or start a service. Music Studio invokes it only after an exact
+per-candidate preview and confirmation; the process exits and releases its
+memory after transcription, failure, cancellation, timeout, or an abandoned
+dashboard stream. Machine-heard OK leads to human testing. Machine-heard BAD
+leads to an Operator-triggered revision attempt. Neither result is approval.
 
 ## 16. Clock-skew warning after applying overlays
 

@@ -51,6 +51,7 @@
       <button id="studio-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="studio-panel">Skill Studio <span class="phase-tag">Beta</span></button>
       <button id="improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="improvement-panel">Self Assessment</button>
       <button id="augmentation-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="augmentation-panel">Self Augmentation</button>
+      <button id="music-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="music-panel">Music Studio <span class="phase-tag">A3</span></button>
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
@@ -142,6 +143,23 @@
             <p id="inbox-summary" class="muted">No active conversation.</p>
           </section>
         </aside>
+      </div>
+    </section>
+
+    <section id="music-panel" class="tab-panel music-panel" role="tabpanel" aria-labelledby="music-tab" hidden>
+      <header class="studio-header music-header"><div><p class="eyebrow">Resonance workshop</p><h1>Music Studio</h1><p>Shape a local composition, bind an exact generation, then listen and record what the machine actually produced.</p></div><div class="studio-boundary"><strong>Foreground creation only</strong><span>Brief → exact preview → generation → listening review</span><small>No queue, automatic model loading, publishing, or unattended continuation.</small></div></header>
+      <div class="music-layout">
+        <aside class="music-projects"><div class="studio-list-heading"><div><p class="eyebrow">Composition archive</p><h2>Projects</h2></div><span id="music-project-count" class="count-badge">0</span></div><button id="new-music-project" class="gate-button" type="button">New composition</button><div id="music-project-list" class="studio-list"><p class="muted">Open the channel to inspect projects.</p></div></aside>
+        <section class="music-workbench">
+          <form id="music-project-form" class="music-form">
+            <div class="studio-detail-heading"><div><p class="eyebrow">Creative brief</p><h2 id="music-workbench-title">New composition</h2></div><span id="music-resource-state" class="maturity-chip">Not inspected</span></div>
+            <div class="music-form-grid"><label>Title<input id="music-title" maxlength="120" required></label><label>Intent<input id="music-intent" maxlength="2000" required></label><label>Duration<select id="music-duration"><option value="30">30 seconds</option><option value="90">90 seconds</option><option value="180">3 minutes</option></select></label><label>Mode<select id="music-vocal-mode"><option value="vocal">Vocal</option><option value="instrumental">Instrumental</option></select></label><label>Rights status<select id="music-rights"><option value="original">Original material</option><option value="licensed">Licensed material</option><option value="public_domain">Public domain</option></select></label><label>BPM<input id="music-bpm" type="number" min="30" max="300" value="110" required></label><label>Key<input id="music-key" maxlength="40" value="C minor" required></label><label>Time<input id="music-time" value="4" pattern="2|3|4|5|6|7|9|12" required></label><label>Seed<input id="music-seed" type="number" min="0" max="2147483647" value="42" required></label></div>
+            <label>Sound and structure<textarea id="music-caption" rows="5" maxlength="8000" required></textarea></label><label>Lyrics and section markers<textarea id="music-lyrics" rows="9" maxlength="20000" placeholder="[Verse]\n…"></textarea></label>
+            <div class="music-actions"><button id="save-music-project" class="gate-button gate-button--gold" type="submit">Create project</button><button id="refresh-music-resources" class="gate-button" type="button">Inspect resources</button></div><p id="music-form-status" class="dialog-status" role="status"></p>
+          </form>
+          <section id="music-generation-card" class="gate-card" hidden><div><p class="eyebrow">Exact generation boundary</p><h3>Generate one local candidate</h3><p id="music-generation-summary">Preview the project before engaging the NVIDIA music lane.</p></div><button id="preview-music-generation" class="gate-button" type="button">Preview generation</button><div id="music-generation-confirm" hidden><pre id="music-generation-scope" class="diagnostic-output"></pre><label for="music-generation-confirmation">Type <code>START_MUSIC_GENERATION</code></label><input id="music-generation-confirmation" autocomplete="off" spellcheck="false"><div class="music-actions"><button id="start-music-generation" class="gate-button gate-button--gold" type="button" disabled>Start foreground generation</button><button id="cancel-music-generation" class="danger-button" type="button" disabled>Cancel active generation</button></div></div><div id="music-progress" class="music-progress" hidden><i></i><strong id="music-progress-stage">Preparing</strong><span id="music-progress-message">Waiting for the local lane.</span></div><p id="music-generation-status" class="dialog-status" role="status"></p></section>
+          <section id="music-candidates" class="music-candidates" hidden><div class="studio-detail-heading"><div><p class="eyebrow">Listening evidence</p><h2>Candidates</h2></div><span id="music-candidate-count" class="count-badge">0</span></div><div id="music-candidate-list"></div></section>
+        </section>
       </div>
     </section>
 

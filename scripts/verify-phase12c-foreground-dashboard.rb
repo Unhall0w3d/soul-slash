@@ -55,7 +55,7 @@ server = File.read("lib/soul_core/dashboard_server.rb")
 review_boundary = html.include?("Human visual review") || (html.include?("Operator Gate 1") && html.include?("Operator Gate 2"))
 check("dashboard has approved three-tab visual hierarchy", html.index("Chat") < html.index("Skill Studio") && html.index("Skill Studio") < html.index("Self Assessment") && review_boundary, errors)
 check("browser remains timer-free and same-origin", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, css, js].any? { |source| source.match?(%r{https?://}) }, errors)
-check("server is sequential foreground-only", server.include?("listener.accept") && %w[Thread.new fork( daemon( Process.spawn].none? { |needle| server.include?(needle) }, errors)
+check("server uses only bounded request-scoped concurrency", server.include?("listener.accept") && server.include?("MAX_CONCURRENT_REQUESTS = 8") && server.include?("close_and_join_requests") && %w[fork( daemon( Process.spawn].none? { |needle| server.include?(needle) }, errors)
 
 probe = TCPServer.new("127.0.0.1", 0)
 port = probe.addr[1]

@@ -21,6 +21,8 @@ require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
+require_relative "music_generation_service"
+require_relative "music_candidate_analysis_service"
 
 module SoulCore
   class ApplicationFacade
@@ -50,7 +52,9 @@ module SoulCore
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
       self_augmentation_service: nil,
-      self_augmentation_experiment_service: nil
+      self_augmentation_experiment_service: nil,
+      music_generation_service: nil,
+      music_candidate_analysis_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -71,6 +75,8 @@ module SoulCore
       @host_improvement_plan_service = host_improvement_plan_service
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
+      @music_generation_service = music_generation_service
+      @music_candidate_analysis_service = music_candidate_analysis_service
     end
 
     def call(request, progress: nil)
@@ -94,6 +100,10 @@ module SoulCore
       safe_error_envelope(request, "blocked_for_human_review", "runtime_integrity", error.message)
     rescue StandardError => error
       safe_error_envelope(request, "failed", "dependency_failure", "application dependency failed safely: #{error.class}")
+    end
+
+    def music_artifact_path(project_id:, candidate_id:, artifact:)
+      music_generation.artifact_path(project_id: project_id, candidate_id: candidate_id, artifact: artifact)
     end
 
     private
@@ -171,6 +181,17 @@ module SoulCore
       when "self_augmentation.model_qualification.execute" then domain(self_augmentation_experiments.record_model_qualification(experiment_id: required(parameters,"experiment_id"), suite_id: required(parameters,"suite_id"), model_profile: required(parameters,"model_profile"), result: required(parameters,"result"), evidence_digest: required(parameters,"evidence_digest"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.experiments.cleanup.preview" then domain(self_augmentation_experiments.cleanup_preview(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.experiments.cleanup.execute" then domain(self_augmentation_experiments.cleanup(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.projects.list" then domain(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)))
+      when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
+      when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.resources.status" then domain(music_generation.resource_inventory)
+      when "music.generation.preview" then domain(music_generation.generation_preview(project_id: required(parameters, "project_id")))
+      when "music.generation.execute" then domain(music_generation.generation_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.generation.cancel.preview" then domain(music_generation.cancel_preview(candidate_id: required(parameters, "candidate_id")))
+      when "music.generation.cancel.execute" then domain(music_generation.cancel_execute(candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.candidates.analysis.preview" then domain(music_candidate_analysis.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id")))
+      when "music.candidates.analysis.execute" then domain(music_candidate_analysis.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.candidates.review" then domain(music_generation.record_review(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), review: required(parameters, "review")))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -184,7 +205,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment", "Self Augmentation"],
+        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment", "Self Augmentation", "Music"],
         "configuration" => {
           "ok" => report.fetch("ok"),
           "lifecycle_state" => report.fetch("lifecycle_state"),
@@ -229,6 +250,14 @@ module SoulCore
           "implementation_available" => "external_handoff_only",
           "automatic_codex_invocation" => false,
           "worktree_creation" => "human_gate_a1_only"
+        },
+        "music_studio" => {
+          "available" => true,
+          "phase" => "A3",
+          "foreground_only" => true,
+          "generation_gate" => "preview_digest_and_exact_confirmation",
+          "automatic_model_loading" => false,
+          "queue" => false
         },
         "unified_operations" => {
           "available" => true,
@@ -448,6 +477,23 @@ module SoulCore
 
     def self_augmentation_experiments
       @self_augmentation_experiment_service ||= SelfAugmentationExperimentService.new(root: @root, clock: @clock)
+    end
+
+    def music_generation
+      @music_generation_service ||= MusicGenerationService.new(root: @root)
+    end
+
+    def music_candidate_analysis
+      @music_candidate_analysis_service ||= MusicCandidateAnalysisService.new(root: @root)
+    end
+
+    def music_project_with_analysis(project_id:)
+      result = music_generation.inspect_project(project_id: project_id)
+      return result unless result.fetch("ok", false)
+      result.fetch("data").fetch("generations").each do |candidate|
+        candidate["analysis"] = music_candidate_analysis.read(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
+      end
+      result
     end
 
     def chat_projection(chat)

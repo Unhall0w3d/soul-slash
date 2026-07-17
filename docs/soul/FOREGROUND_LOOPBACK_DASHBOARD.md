@@ -11,7 +11,7 @@ ruby bin/soul dashboard --max-requests 25
 ruby bin/soul dashboard --reset-admin-password
 ```
 
-The command validates the shared Phase 12A configuration, binds only to loopback, prints the exact URL, and serves requests sequentially in the foreground. Ctrl+C, TERM, a configured request cap, a bind failure, or a fatal error ends the process. It does not daemonize, restart, poll, or install persistence.
+The command validates the shared Phase 12A configuration, binds only to loopback, prints the exact URL, and serves at most eight tracked request-scoped threads. This bounded concurrency lets an authenticated cancellation request reach an active foreground stream; it is not a queue or detached worker. Ctrl+C, TERM, a configured request cap, a bind failure, or a fatal error ends the process, closes active sockets, and joins request threads. It does not daemonize, restart, poll, or install persistence.
 
 Configuration remains portable:
 

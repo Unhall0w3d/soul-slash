@@ -1,9 +1,15 @@
 # Changelog
 
+- Added the Music Studio A3 dashboard candidate: immutable local composition projects, exact foreground generation preview and progress, explicit cancellation, authenticated FLAC/MP3 listening, and structured adherence review. Dashboard request concurrency is capped, tracked, and joined so cancellation and disconnect cleanup remain truthful without adding a queue or background worker.
+
 ## Unreleased
 
 ### Conversational Soul
 
+- Added optional, exact-confirmation Music Studio vocal analysis: a pinned
+  CPU-only whisper.cpp pass exits after each candidate, preserves machine-heard
+  evidence beside intended lyrics, routes OK to human testing and BAD to an
+  Operator-triggered revision attempt, and never grants approval itself.
 - Repaired dashboard refresh health after service restarts by reloading stale
   CSRF pages and allowing the dashboard service's bounded user-systemd status
   inspection over local Unix sockets.

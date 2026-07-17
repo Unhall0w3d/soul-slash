@@ -11,11 +11,12 @@ module SoulCore
     HEADER_COUNT_LIMIT = 64
     BODY_LIMIT = 128 * 1024
     READ_TIMEOUT = 5
+    MAX_CONCURRENT_REQUESTS = 8
 
     STATUS_TEXT = {
-      200 => "OK", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
+      200 => "OK", 206 => "Partial Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
       405 => "Method Not Allowed", 408 => "Request Timeout", 413 => "Payload Too Large",
-      415 => "Unsupported Media Type", 422 => "Unprocessable Content", 429 => "Too Many Requests",
+      415 => "Unsupported Media Type", 416 => "Range Not Satisfiable", 422 => "Unprocessable Content", 429 => "Too Many Requests",
       500 => "Internal Server Error"
     }.freeze
 
@@ -29,6 +30,8 @@ module SoulCore
       @max_requests = max_requests
       @output = output
       @stopping = false
+      @request_mutex = Mutex.new
+      @request_threads = {}
     end
 
     def run
@@ -41,8 +44,23 @@ module SoulCore
       until @stopping || (@max_requests && handled >= @max_requests)
         begin
           client = listener.accept
-          handle(client)
           handled += 1
+          unless reserve_request(client)
+            write_plain_error(client, 429, "Too Many Requests")
+            client.close unless client.closed?
+            next
+          end
+          gate = Queue.new
+          thread = Thread.new do
+            gate.pop
+            begin
+              handle(client)
+            ensure
+              release_request(client)
+            end
+          end
+          register_thread(thread, client)
+          gate << true
         rescue Errno::EINTR, IOError, Errno::EBADF
           break if @stopping
           raise
@@ -54,12 +72,14 @@ module SoulCore
       "canceled"
     ensure
       listener&.close unless listener&.closed?
+      close_and_join_requests(close_clients: @stopping)
       restore_signal_handlers
     end
 
     def stop
       @stopping = true
       @listener&.close unless @listener&.closed?
+      close_active_clients
     rescue IOError
       nil
     end
@@ -93,6 +113,8 @@ module SoulCore
       write_plain_error(client, 408, "Request Timeout")
     rescue PayloadTooLarge
       write_plain_error(client, 413, "Payload Too Large")
+    rescue ClientDisconnected, IOError, Errno::EPIPE
+      nil
     rescue StandardError
       write_plain_error(client, 400, "Bad Request")
     ensure
@@ -100,6 +122,37 @@ module SoulCore
     end
 
     class PayloadTooLarge < StandardError; end
+    class ClientDisconnected < StandardError; end
+
+    def reserve_request(client)
+      @request_mutex.synchronize do
+        return false if @request_threads.length >= MAX_CONCURRENT_REQUESTS
+        @request_threads[client.object_id] = { client: client, thread: nil }
+        true
+      end
+    end
+
+    def register_thread(thread, client)
+      @request_mutex.synchronize do
+        entry = @request_threads[client.object_id]
+        entry[:thread] = thread if entry
+      end
+    end
+
+    def release_request(client)
+      @request_mutex.synchronize { @request_threads.delete(client.object_id) }
+    end
+
+    def close_active_clients
+      clients = @request_mutex.synchronize { @request_threads.values.map { |entry| entry[:client] } }
+      clients.each { |client| client.close unless client.closed? rescue nil }
+    end
+
+    def close_and_join_requests(close_clients:)
+      close_active_clients if close_clients
+      threads = @request_mutex.synchronize { @request_threads.values.filter_map { |entry| entry[:thread] } }
+      threads.each(&:join)
+    end
 
     def read_request(client)
       line = bounded_line(client, REQUEST_LINE_LIMIT)
@@ -159,26 +212,19 @@ module SoulCore
     end
 
     def write_stream_response(client, response)
-      headers = response.headers.merge("Transfer-Encoding" => "chunked")
+      fixed_length = response.headers.key?("Content-Length")
+      headers = fixed_length ? response.headers : response.headers.merge("Transfer-Encoding" => "chunked")
       client.write("HTTP/1.1 #{response.status} #{STATUS_TEXT.fetch(response.status, 'Response')}\r\n")
       headers.each { |key, value| client.write("#{key}: #{value}\r\n") }
       client.write("\r\n")
-      connected = true
       response.body.each do |chunk|
         bytes = chunk.to_s
         next if bytes.empty?
-
-        if connected
-          begin
-            client.write("#{bytes.bytesize.to_s(16)}\r\n#{bytes}\r\n")
-          rescue IOError, Errno::EPIPE
-            connected = false
-          end
-        end
+        client.write(fixed_length ? bytes : "#{bytes.bytesize.to_s(16)}\r\n#{bytes}\r\n")
       end
-      client.write("0\r\n\r\n") if connected
+      client.write("0\r\n\r\n") unless fixed_length
     rescue IOError, Errno::EPIPE
-      nil
+      raise ClientDisconnected
     end
 
     def write_plain_error(client, status, message)

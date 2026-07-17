@@ -23,6 +23,8 @@ Class 5: Security-sensitive foreground network listener exception
 
 The approved exception is one explicitly user-started foreground HTTP listener bound to loopback only. It is not a service, daemon, auto-start process, LAN server, or unattended monitor. It runs only while the foreground dashboard command remains active and stops on Ctrl+C, termination, configured request cap, or fatal bind error.
 
+Music Studio A3 later authorizes up to eight tracked request-scoped threads inside this same listener so an explicit cancellation request can reach a foreground generation stream. Excess requests fail with `429`; shutdown closes sockets and joins all request threads. This does not authorize a queue, detached work, or continuation after the request.
+
 ## Approved scope
 
 Phase 12C may:

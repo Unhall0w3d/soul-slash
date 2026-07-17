@@ -21,7 +21,7 @@ module SoulCore
     end
 
     class ForegroundProcessRunner
-      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:)
+      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:, progress: nil)
         stdout = +""; stderr = +""; process_status = nil; state = "failed"; pid = nil
         Open3.popen3(env, *command, chdir: chdir, pgroup: true) do |stdin, out, err, wait|
           stdin.close
@@ -32,26 +32,44 @@ module SoulCore
             terminate_group(pid, wait)
             raise
           end
-          readers = [[out, stdout], [err, stderr]].map { |io, buffer| bounded_reader(io, buffer, max_output_bytes) }
+          events = SizedQueue.new(128)
+          readers = [[out, stdout, "stdout"], [err, stderr, "stderr"]].map { |io, buffer, source| bounded_reader(io, buffer, max_output_bytes, events, source) }
           interrupted = false
-          previous_int = Signal.trap("INT") do
-            interrupted = true
-            Process.kill("TERM", -pid) rescue nil
-          end
-          previous_term = Signal.trap("TERM") do
-            interrupted = true
-            Process.kill("TERM", -pid) rescue nil
+          previous_int = previous_term = nil
+          if Thread.current == Thread.main
+            previous_int = Signal.trap("INT") do
+              interrupted = true
+              Process.kill("TERM", -pid) rescue nil
+            end
+            previous_term = Signal.trap("TERM") do
+              interrupted = true
+              Process.kill("TERM", -pid) rescue nil
+            end
           end
           begin
-            Timeout.timeout(Float(timeout_seconds)) { process_status = wait.value }
+            deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Float(timeout_seconds)
+            until wait.join(0.1)
+              drain_progress(events, progress)
+              raise Interrupt, "music generation canceled" if canceled.call
+              raise Timeout::Error if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+            end
+            process_status = wait.value
+            drain_progress(events, progress)
             state = process_status.success? ? "ok" : ((interrupted || canceled.call) ? "canceled" : "failed")
+          rescue Interrupt
+            state = "canceled"
+            terminate_group(pid, wait)
+            process_status = wait.value
           rescue Timeout::Error
             state = "canceled"
             terminate_group(pid, wait)
             process_status = wait.value
+          rescue StandardError
+            terminate_group(pid, wait)
+            raise
           ensure
-            Signal.trap("INT", previous_int)
-            Signal.trap("TERM", previous_term)
+            Signal.trap("INT", previous_int) if previous_int
+            Signal.trap("TERM", previous_term) if previous_term
             readers.each { |reader| reader.join(2) || reader.kill }
           end
         end
@@ -64,15 +82,30 @@ module SoulCore
 
       private
 
-      def bounded_reader(io, buffer, maximum)
+      def bounded_reader(io, buffer, maximum, events, source)
         Thread.new do
           loop do
             chunk = io.readpartial(16 * 1024)
             remaining = maximum - buffer.bytesize
             buffer << chunk.byteslice(0, remaining) if remaining.positive?
+            begin
+              events.push({ "stage" => "model", "source" => source, "message" => safe_text(chunk, 2_000) }, true)
+            rescue ThreadError
+              nil # The bounded progress queue may drop display-only output; the full bounded log remains captured.
+            end
           end
         rescue EOFError, IOError
           nil
+        end
+      end
+
+      def drain_progress(events, progress)
+        return unless progress
+        32.times do
+          event = events.pop(true)
+          progress.call(event)
+        rescue ThreadError
+          break
         end
       end
 
@@ -125,7 +158,8 @@ module SoulCore
     def inspect_project(project_id:)
       project = @store.read(project_id)
       generations = Dir.children(@store.generations_path(project_id)).grep(MusicProjectStore::CANDIDATE_ID).sort.filter_map do |candidate_id|
-        read_candidate(project_id, candidate_id)
+        candidate = read_candidate(project_id, candidate_id)
+        candidate&.merge("review" => @store.read_review(project_id, candidate_id))
       end
       outcome("complete", true, "music project inspected", data: { "project" => project, "input_digest" => @store.input_digest(project), "generations" => generations })
     rescue MusicProjectStore::ValidationError => error
@@ -158,7 +192,8 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:)
+    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil)
+      progress&.call({ "stage" => "validation", "message" => "Validating exact project scope" })
       return outcome("awaiting_input", false, "confirmation and expected_digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return outcome("awaiting_input", false, "candidate_id is invalid") unless candidate_id.to_s.match?(MusicProjectStore::CANDIDATE_ID)
       project = @store.read(project_id)
@@ -167,6 +202,7 @@ module SoulCore
       return outcome("blocked_for_human_review", false, "music generation state changed; preview again") unless secure_compare(expected_digest, Digest::SHA256.hexdigest(JSON.generate(scope)))
       blockers = environment_blockers
       return outcome("blocked_for_human_review", false, blockers.join("; ")) unless blockers.empty?
+      progress&.call({ "stage" => "checkpoints", "message" => "Verifying pinned local checkpoints" })
       verify_checkpoints!
 
       generations = @store.generations_path(project_id)
@@ -177,8 +213,10 @@ module SoulCore
       input = @store.input_payload(project)
       input_path = File.join(staging, "input.json")
       File.write(input_path, JSON.pretty_generate(input) + "\n", mode: "wx", perm: 0o600)
+      progress&.call({ "stage" => "resources", "message" => "Acquiring the bounded NVIDIA music lane" })
       lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: @store.input_digest(project), ttl_seconds: project.fetch("target_duration_seconds") + 240)
-      generation = run_generation(project, input_path, staging, lease)
+      progress&.call({ "stage" => "model", "message" => "Generating the candidate in the foreground" })
+      generation = run_generation(project, input_path, staging, lease, progress)
       return quarantined_outcome(generation.status == "canceled" ? "canceled" : "failed", staging, generation, lease) unless generation.success?
 
       log = generation.stdout.to_s + generation.stderr.to_s
@@ -188,10 +226,12 @@ module SoulCore
       return quarantined_outcome("failed", staging, generation, lease, "generation did not produce exactly one FLAC") unless flac_sources.one?
       flac_path = File.join(staging, "master.flac")
       File.rename(flac_sources.first, flac_path)
+      progress&.call({ "stage" => "validation", "message" => "Inspecting the lossless master" })
       flac = inspect_audio(flac_path, "flac", project.fetch("target_duration_seconds"))
 
       mp3_path = File.join(staging, "listening.mp3")
-      transcode = run_transcode(flac_path, mp3_path, staging, lease, project.fetch("target_duration_seconds"))
+      progress&.call({ "stage" => "transcode", "message" => "Deriving the MP3 listening copy" })
+      transcode = run_transcode(flac_path, mp3_path, staging, lease, project.fetch("target_duration_seconds"), progress)
       return quarantined_outcome(transcode.status == "canceled" ? "canceled" : "failed", staging, transcode, lease, "MP3 derivation failed") unless transcode.success?
       mp3 = inspect_audio(mp3_path, "mp3", project.fetch("target_duration_seconds")).merge(
         "derived_from_sha256" => flac.fetch("sha256"),
@@ -221,6 +261,7 @@ module SoulCore
       }
       remove_nested_generation_directories(staging)
       published = @store.publish_candidate(project_id, candidate_id, staging, receipt)
+      progress&.call({ "stage" => "review", "message" => "Candidate ready for Operator listening review" })
       outcome("blocked_for_human_review", true, "music candidate generated; listening review required", data: { "candidate" => receipt, "candidate_path" => published }, mutation: "music_candidate_created")
     rescue MusicResourceCoordinator::Busy => error
       outcome("blocked_for_human_review", false, error.message)
@@ -234,6 +275,19 @@ module SoulCore
 
     def cancel_preview(candidate_id:) = @coordinator.cancel_preview(candidate_id: candidate_id)
     def cancel_execute(candidate_id:, confirmation:, expected_digest:) = @coordinator.cancel_execute(candidate_id: candidate_id, confirmation: confirmation, expected_digest: expected_digest)
+
+    def record_review(project_id:, candidate_id:, review:)
+      record = @store.record_review(project_id: project_id, candidate_id: candidate_id, attributes: review)
+      outcome("complete", true, "music candidate review recorded", data: { "review" => record }, mutation: "music_candidate_review_recorded")
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def artifact_path(project_id:, candidate_id:, artifact:)
+      @store.candidate_artifact_path(project_id, candidate_id, artifact)
+    end
 
     private
 
@@ -286,7 +340,7 @@ module SoulCore
       items
     end
 
-    def run_generation(project, input_path, staging, lease)
+    def run_generation(project, input_path, staging, lease, progress)
       python = File.join(@source_dir, ".venv", "bin", "python")
       command = [python, "profile_inference.py", "--device", "cuda", "--lm-backend", "pt", "--config-path", @dit_name, "--lm-model", @lm_name, "--offload-to-cpu", "--offload-dit-to-cpu", "--quantization", "int8_weight_only", "--example", input_path, "--duration", project.fetch("target_duration_seconds").to_s, "--batch-size", "1", "--seed", project.fetch("seed").to_s, "--no-warmup"]
       process(command, staging, lease, project.fetch("target_duration_seconds") + 180, {
@@ -297,18 +351,20 @@ module SoulCore
         "SOUL_ACESTEP_STRICT_OFFLINE" => "1",
         "SOUL_ACESTEP_RETAIN_OUTPUT" => "1",
         "ACESTEP_DTYPE" => "float32"
-      }, chdir: @source_dir)
+      }, chdir: @source_dir, progress: progress)
     end
 
-    def run_transcode(flac, mp3, staging, lease, duration)
+    def run_transcode(flac, mp3, staging, lease, duration, progress)
       command = [@runner.which("ffmpeg") || "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", flac, *MP3_ARGUMENTS, mp3]
-      process(command, staging, lease, [duration, 120].min, {}, chdir: staging)
+      process(command, staging, lease, [duration, 120].min, {}, chdir: staging, progress: progress)
     end
 
-    def process(command, staging, lease, timeout, env, chdir:)
-      @process_runner.run(command, env: env, chdir: chdir, timeout_seconds: timeout, max_output_bytes: MAX_LOG_BYTES,
+    def process(command, staging, lease, timeout, env, chdir:, progress: nil)
+      options = { env: env, chdir: chdir, timeout_seconds: timeout, max_output_bytes: MAX_LOG_BYTES,
         on_spawn: ->(pid, pgid) { @coordinator.attach_child(lease_id: lease.fetch("lease_id"), child_pid: pid, process_group_id: pgid) },
-        canceled: -> { @coordinator.cancellation_requested?(lease.fetch("lease_id")) })
+        canceled: -> { @coordinator.cancellation_requested?(lease.fetch("lease_id")) } }
+      options[:progress] = progress if progress
+      @process_runner.run(command, **options)
     end
 
     def inspect_audio(path, codec, expected_duration)

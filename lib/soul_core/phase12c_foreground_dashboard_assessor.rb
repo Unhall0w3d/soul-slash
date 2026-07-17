@@ -138,8 +138,10 @@ module SoulCore
 
       checks["focus_reduced_motion_and_responsive_rules_exist"] = css.include?(":focus-visible") && css.include?("prefers-reduced-motion") && css.scan("@media").length >= 3
 
-      forbidden_server = %w[Thread.new fork( daemon( Process.spawn systemd cron launchd inotify]
-      checks["foreground_server_has_no_worker_or_persistence_primitive"] = forbidden_server.none? { |needle| [server, command].any? { |source| source.include?(needle) } }
+      forbidden_server = %w[fork( daemon( Process.spawn systemd cron launchd inotify]
+      checks["foreground_server_has_only_bounded_request_workers"] =
+        forbidden_server.none? { |needle| [server, command].any? { |source| source.include?(needle) } } &&
+        server.include?("MAX_CONCURRENT_REQUESTS = 8") && server.include?("close_and_join_requests")
 
       checks["listener_rejects_non_loopback_before_bind"] = !DashboardServer.loopback?("0.0.0.0") && !DashboardServer.loopback?("192.168.1.10") && DashboardServer.loopback?("127.0.0.1") && raises_argument? { DashboardServer.new(host: "0.0.0.0", port: 4567, application: app) }
 

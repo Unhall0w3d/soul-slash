@@ -23,8 +23,10 @@ MUSIC_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/music_pilot_models.json
 MUSIC_DIT_MODEL ?= acestep-v15-turbo
 MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B
 MUSIC_DURATION ?= 30
+MUSIC_TRANSCRIPTION_MANIFEST ?= $(PROJECT_ROOT)/config/music_transcription_models.json
+MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -40,6 +42,8 @@ help:
 > @echo "  make setup-music EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_PILOT"
 > @echo "  make music-model-download EXPECTED_DIGEST=... CONFIRM=DOWNLOAD_SOUL_MUSIC_MODELS"
 > @echo "  make music-pilot-run MUSIC_DURATION=30  Run one bounded foreground pilot"
+> @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
+> @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
 > @echo "  make music-projects    List private Music Studio projects"
 > @echo "  make music-resources   Inspect AMD/NVIDIA/CPU Music resource lanes"
 > @echo "  make music-project-create MUSIC_INPUT=/path/project.json"
@@ -127,6 +131,14 @@ music-model-download:
 
 music-pilot-run:
 > @ruby scripts/soul-music-pilot run --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --duration "$(MUSIC_DURATION)"
+
+music-transcription-plan:
+> @ruby scripts/soul-music-transcription plan --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)"
+
+music-transcription-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-transcription-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_TRANSCRIPTION" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_TRANSCRIPTION is required."; exit 2; }
+> @ruby scripts/soul-music-transcription install --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-projects:
 > @ruby scripts/soul-music-studio projects list --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"
@@ -269,3 +281,9 @@ model-runtime-identity-execute:
 clean-runtime:
 > @rm -rf run tmp
 > @echo "Removed local runtime directories: run tmp"
+
+verify-music-studio-a3:
+> @ruby scripts/verify-music-studio-a3.rb
+
+verify-music-vocal-analysis:
+> @ruby scripts/verify-music-studio-a3-vocal-analysis.rb

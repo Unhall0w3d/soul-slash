@@ -35,6 +35,9 @@ Supported runtime providers:
   ordinary local conversation does not require either network path
 - `uv`, FFmpeg, and an NVIDIA CUDA GPU for the separately gated Music Studio
   feasibility pilot. They are not required for conversation or the dashboard.
+- The separately gated Music Studio vocal-analysis option installs its own
+  pinned whisper.cpp command and English model. It uses bounded CPU time only
+  when explicitly triggered and does not create a resident process or service.
 
 The Music pilot uses `uv` to create an isolated Python 3.12 environment without
 changing the distribution-managed Python installation. Install `uv` through

@@ -17,6 +17,8 @@ module SoulCore
     BETA_ID = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\z/
     HOST_PLAN_ID = /\Ahip_[a-f0-9]{16}\z/
     EXPERIMENT_ID = /\Aexp_[a-f0-9]{16}\z/
+    MUSIC_PROJECT_ID = /\Amusic_[a-f0-9]{16}\z/
+    MUSIC_CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
@@ -93,6 +95,17 @@ module SoulCore
       "self_augmentation.model_qualification.execute" => %w[experiment_id suite_id model_profile result evidence_digest confirmation expected_digest],
       "self_augmentation.experiments.cleanup.preview" => %w[experiment_id],
       "self_augmentation.experiments.cleanup.execute" => %w[experiment_id confirmation expected_digest],
+      "music.projects.list" => %w[limit],
+      "music.projects.create" => %w[project],
+      "music.projects.get" => %w[project_id],
+      "music.resources.status" => [],
+      "music.generation.preview" => %w[project_id],
+      "music.generation.execute" => %w[project_id candidate_id confirmation expected_digest],
+      "music.generation.cancel.preview" => %w[candidate_id],
+      "music.generation.cancel.execute" => %w[candidate_id confirmation expected_digest],
+      "music.candidates.analysis.preview" => %w[project_id candidate_id],
+      "music.candidates.analysis.execute" => %w[project_id candidate_id confirmation expected_digest],
+      "music.candidates.review" => %w[project_id candidate_id review],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -192,6 +205,10 @@ module SoulCore
       return "experiment_id is invalid" if experiment_id && !experiment_id.to_s.match?(EXPERIMENT_ID)
       skill_id = parameters["skill_id"]
       return "skill_id is invalid" if skill_id && !skill_id.to_s.match?(SKILL_ID)
+      project_id = parameters["project_id"]
+      return "project_id is invalid" if project_id && !project_id.to_s.match?(MUSIC_PROJECT_ID)
+      candidate_id = parameters["candidate_id"]
+      return "candidate_id is invalid" if candidate_id && !candidate_id.to_s.match?(MUSIC_CANDIDATE_ID)
       chat_ids = parameters["chat_ids"]
       return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 
@@ -202,8 +219,8 @@ module SoulCore
       parameters.each do |key, value|
         if key == "limit"
           return "limit must be an integer" unless value.is_a?(Integer)
-        elsif key == "filters"
-          return "filters must be an object" unless value.is_a?(Hash) && string_keys?(value)
+        elsif key == "filters" || key == "project" || key == "review"
+          return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "args" || key == "chat_ids" || key == "allowed_files"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else

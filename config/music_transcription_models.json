@@ -1,0 +1,22 @@
+{
+  "schema_version": "soul.music_transcription.models.v1",
+  "runtime": {
+    "name": "whisper.cpp",
+    "release": "v1.9.1",
+    "archive_url": "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-ubuntu-x64.tar.gz",
+    "archive_filename": "whisper-bin-ubuntu-x64.tar.gz",
+    "archive_bytes": 9379235,
+    "archive_sha256": "f3bf3b4369a99b54665b0f19b88483b30de27f25963b0414235dea03198515c5",
+    "binary": "whisper-cli"
+  },
+  "models": {
+    "ggml-small.en.bin": {
+      "repository": "ggerganov/whisper.cpp",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small.en.bin?download=true",
+      "bytes": 487614201,
+      "sha256": "c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d",
+      "language": "en"
+    }
+  }
+}

@@ -1,0 +1,86 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "securerandom"
+
+CONFIRMATION = "INSTALL_SOUL_MUSIC_TRANSCRIPTION"
+options = {
+  manifest: File.expand_path("../config/music_transcription_models.json", __dir__),
+  root: ENV.fetch("MUSIC_ROOT", File.join(Dir.home, ".local", "share", "soul", "music")),
+  model: ENV.fetch("MUSIC_TRANSCRIPTION_MODEL", "ggml-small.en.bin")
+}
+OptionParser.new do |parser|
+  parser.on("--manifest PATH") { |value| options[:manifest] = value }
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--model EXACT_FILENAME") { |value| options[:model] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+begin
+  manifest = JSON.parse(File.read(options.fetch(:manifest)))
+  runtime = manifest.fetch("runtime")
+  model = manifest.fetch("models")[options.fetch(:model)]
+  raise "unknown exact transcription model filename; available: #{manifest.fetch('models').keys.join(', ')}" unless model
+  install_dir = File.join(File.expand_path(options.fetch(:root)), "transcription", runtime.fetch("release"))
+  plan = {
+    "operation" => "music_transcription_install",
+    "install_dir" => install_dir,
+    "runtime" => runtime.slice("name", "release", "archive_url", "archive_filename", "archive_bytes", "archive_sha256"),
+    "model" => options.fetch(:model), "model_url" => model.fetch("url"), "model_bytes" => model.fetch("bytes"), "model_sha256" => model.fetch("sha256"),
+    "confirmation_phrase" => CONFIRMATION, "persistent_service" => false, "network_listener" => false, "resident_process" => false, "automatic_download" => false
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+  emit(plan.merge("lifecycle_state" => "blocked_for_human_review")) if action == "plan"
+  raise "action must be plan or install" unless action == "install"
+  raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+  raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+  raise "curl and tar are required" unless %w[curl tar].all? { |name| ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, name)) } }
+  raise "install directory already exists; inspect it rather than overwriting" if File.exist?(install_dir) || File.symlink?(install_dir)
+  staging = "#{install_dir}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+  FileUtils.mkdir_p(staging, mode: 0o700)
+  archive = File.join(staging, runtime.fetch("archive_filename"))
+  model_path = File.join(staging, options.fetch(:model))
+  [[runtime.fetch("archive_url"), archive, runtime.fetch("archive_bytes"), runtime.fetch("archive_sha256")], [model.fetch("url"), model_path, model.fetch("bytes"), model.fetch("sha256")]].each do |url, path, bytes, sha|
+    system("curl", "--fail", "--location", "--proto", "=https", "--retry", "2", "--connect-timeout", "20", "--max-time", "900", "--output", path, url) or raise "download failed for #{File.basename(path)}"
+    raise "byte count mismatch for #{File.basename(path)}" unless File.size(path) == bytes
+    raise "SHA-256 mismatch for #{File.basename(path)}" unless Digest::SHA256.file(path).hexdigest == sha
+  end
+  extracted = File.join(staging, "extracted")
+  Dir.mkdir(extracted, 0o700)
+  system("tar", "-xzf", archive, "-C", extracted, "--no-same-owner", "--no-same-permissions") or raise "runtime extraction failed"
+  source = Dir.glob(File.join(extracted, "**", "whisper-cli")).find { |path| File.file?(path) && !File.symlink?(path) }
+  raise "runtime archive did not contain whisper-cli" unless source
+  Dir.children(File.dirname(source)).each do |name|
+    next unless name == "whisper-cli" || name == "LICENSE" || name.start_with?("libggml") || name.start_with?("libwhisper")
+    path = File.join(File.dirname(source), name)
+    FileUtils.cp(path, File.join(staging, name), preserve: true) if File.file?(path) && !File.symlink?(path)
+    if File.symlink?(path)
+      link = File.readlink(path)
+      raise "runtime archive contains an unsafe library link" unless link == File.basename(link) && link.match?(/\A[A-Za-z0-9_.-]+\z/)
+      File.symlink(link, File.join(staging, name))
+    end
+  end
+  FileUtils.rm_rf(extracted); FileUtils.rm_f(archive)
+  raise "installed runtime is not executable" unless File.executable?(File.join(staging, runtime.fetch("binary")))
+  FileUtils.mkdir_p(File.dirname(install_dir), mode: 0o700)
+  File.rename(staging, install_dir)
+  emit("lifecycle_state" => "complete", "install_dir" => install_dir, "model" => options.fetch(:model), "resident_process" => false)
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial files removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end
