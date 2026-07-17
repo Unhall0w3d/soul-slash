@@ -26,6 +26,7 @@ require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
+require_relative "music_reference_library_service"
 
 module SoulCore
   class ApplicationFacade
@@ -60,7 +61,8 @@ module SoulCore
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
       music_revision_provider: nil,
-      music_candidate_disposition_service: nil
+      music_candidate_disposition_service: nil,
+      music_reference_library_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -86,6 +88,7 @@ module SoulCore
       @music_revision_draft_service = music_revision_draft_service
       @music_revision_provider = music_revision_provider
       @music_candidate_disposition_service = music_candidate_disposition_service
+      @music_reference_library_service = music_reference_library_service
     end
 
     def call(request, progress: nil)
@@ -193,6 +196,8 @@ module SoulCore
       when "music.projects.list" then domain(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)))
       when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
       when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.references.list" then domain(music_reference_library.inventory(limit: bounded_limit(parameters["limit"], 500)))
+      when "music.references.get" then domain(music_reference_library.inspect(identifier: required(parameters, "reference_id")))
       when "music.resources.status" then domain(music_generation.resource_inventory)
       when "music.generation.preview" then domain(music_generation.generation_preview(project_id: required(parameters, "project_id")))
       when "music.generation.execute" then domain(music_generation.generation_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
@@ -506,6 +511,10 @@ module SoulCore
 
     def music_candidate_disposition
       @music_candidate_disposition_service ||= MusicCandidateDispositionService.new(root: @root, analysis_service: music_candidate_analysis)
+    end
+
+    def music_reference_library
+      @music_reference_library_service ||= MusicReferenceLibraryService.new(root: @root)
     end
 
     def music_project_with_analysis(project_id:)

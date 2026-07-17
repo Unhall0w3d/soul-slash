@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -282,9 +282,38 @@ async function loadMusicStudio() {
   state.musicLoaded = true;
   try {
     const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope);
-    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await refreshMusicResources();
+    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicResources();
     if (state.musicProjects.length) await selectMusicProject(state.musicProjects[0]);
   } catch (error) { state.musicLoaded = false; byId("music-form-status").textContent = error.message; }
+}
+
+async function loadMusicReferences() {
+  const envelope = await callSoul("music.references.list", { limit: 200 }); lifecycle(envelope);
+  if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Reference library needs attention");
+  state.musicReferences = dataOf(envelope); renderMusicReferences();
+}
+
+function renderMusicReferences() {
+  const library = state.musicReferences || { artists: [], tracks: [], fusions: [] };
+  byId("music-reference-count").textContent = String((library.tracks || []).length);
+  byId("music-fusion-count").textContent = String((library.fusions || []).length);
+  const list = byId("music-reference-list"); list.replaceChildren();
+  if (!(library.artists || []).length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No reviewed reference profiles yet."; list.append(empty); }
+  (library.artists || []).forEach((artist) => {
+    const group = document.createElement("details"); group.className = "music-reference-artist";
+    const summary = document.createElement("summary"); const name = document.createElement("strong"); name.textContent = artist.name; const count = document.createElement("small"); count.textContent = `${artist.albums.reduce((sum, album) => sum + album.tracks.length, 0)} tracks`; summary.append(name, count); group.append(summary);
+    artist.albums.forEach((album) => { const release = document.createElement("section"); release.className = "music-reference-album"; const title = document.createElement("h3"); title.textContent = album.title; release.append(title); album.tracks.forEach((track) => { const button = document.createElement("button"); button.type = "button"; button.className = "music-reference-track"; const trackTitle = document.createElement("strong"); trackTitle.textContent = track.provenance.title; const meta = document.createElement("small"); const evidence = track.evidence || {}; meta.textContent = [evidence.bpm ? `${evidence.bpm} BPM` : null, evidence.key || null, track.status].filter(Boolean).join(" · ") || track.status; button.append(trackTitle, meta); button.addEventListener("click", () => inspectMusicReference(track.reference_id, button)); release.append(button); }); group.append(release); });
+    list.append(group);
+  });
+  const fusions = byId("music-fusion-list"); fusions.querySelectorAll(".music-reference-track").forEach((node) => node.remove());
+  (library.fusions || []).forEach((fusion) => { const button = document.createElement("button"); button.type = "button"; button.className = "music-reference-track"; const title = document.createElement("strong"); title.textContent = fusion.title; const meta = document.createElement("small"); meta.textContent = `${fusion.source_reference_ids.length} sources · ${fusion.status}`; button.append(title, meta); button.addEventListener("click", () => inspectMusicReference(fusion.fusion_id, button)); fusions.append(button); });
+}
+
+async function inspectMusicReference(referenceId, button) {
+  button.disabled = true;
+  try { const envelope = await callSoul("music.references.get", { reference_id: referenceId }); lifecycle(envelope); const reference = dataOf(envelope).reference; button.querySelector("small").textContent = reference.record_type === "track" ? `${reference.status} · synthesis ${reference.synthesis.status}` : `${reference.status} · ${reference.source_reference_ids.length} sources`; }
+  catch (error) { button.querySelector("small").textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function renderMusicProjects() {

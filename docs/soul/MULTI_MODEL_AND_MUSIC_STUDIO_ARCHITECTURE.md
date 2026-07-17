@@ -155,11 +155,15 @@ Soul must distinguish three inputs:
    licensed, or otherwise have permission to use for the selected operation.
 
 By default Soul distills named inspiration into musical attributes and removes
-artist names from the generation prompt. It does not download audio, scrape
-streaming services, train a LoRA, clone a voice, or create a cover from a
-commercial recording. Reference-audio, cover, source-structure, and LoRA modes
-each require a later operation-specific brief because they preserve different
-amounts of timbre, melody, rhythm, harmony, and structure.
+artist names from the generation prompt. The approved A5 design may transiently
+decode one Operator-supplied YouTube URL in a bounded, foreground,
+`analysis_only` operation, retaining provenance and non-expressive derived
+evidence while deleting source audio and raw transcription. The exact boundary
+is defined in `MUSIC_REFERENCE_LIBRARY_AND_URL_INGESTION_DESIGN.md`. It does not
+scrape streaming services, train a LoRA, clone a voice, or create a cover from a
+commercial recording. Retained reference audio, cover, source-structure, and
+LoRA modes each still require a later operation-specific brief because they
+preserve different amounts of timbre, melody, rhythm, harmony, and structure.
 
 Generated output remains a candidate. Soul records provenance and similarity
 review notes but cannot certify originality, copyright status, permissions, or
@@ -263,7 +267,9 @@ This document. No installation, weight download, generation, or new tab.
 ### A5 — knowledge and reference refinement
 
 - Bounded genre/production research with citations.
-- Audio feature extraction and descriptor suggestions.
+- Bounded URL feature extraction and descriptor suggestions with transient media.
+- Private Artist → Album → Track profiles and versioned composition syntheses.
+- Human-reviewed whole/component retry and coherent two-to-five-profile fusion.
 - Separately reviewed lawful reference, personalization, and similarity checks.
 
 ## Acceptance criteria for A1

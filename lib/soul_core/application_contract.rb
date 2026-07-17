@@ -98,6 +98,8 @@ module SoulCore
       "music.projects.list" => %w[limit],
       "music.projects.create" => %w[project],
       "music.projects.get" => %w[project_id],
+      "music.references.list" => %w[limit],
+      "music.references.get" => %w[reference_id],
       "music.resources.status" => [],
       "music.generation.preview" => %w[project_id],
       "music.generation.execute" => %w[project_id candidate_id confirmation expected_digest],
