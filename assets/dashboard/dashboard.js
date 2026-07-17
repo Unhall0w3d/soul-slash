@@ -141,25 +141,38 @@ function switchTab(name) {
   const improvement = name === "improvement";
   const augmentation = name === "augmentation";
   const music = name === "music";
+  const selfImprovement = studio || improvement || augmentation;
   byId("chat-panel").hidden = !chat;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
   byId("chat-tab").classList.toggle("is-active", chat);
+  byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
   byId("augmentation-tab").classList.toggle("is-active", augmentation);
   byId("music-tab").classList.toggle("is-active", music);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
-  byId("studio-tab").setAttribute("aria-selected", String(studio));
-  byId("improvement-tab").setAttribute("aria-selected", String(improvement));
-  byId("augmentation-tab").setAttribute("aria-selected", String(augmentation));
+  byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
+  byId("studio-tab").classList.toggle("is-active", studio);
+  byId("improvement-tab").classList.toggle("is-active", improvement);
+  byId("augmentation-tab").classList.toggle("is-active", augmentation);
+  byId("studio-tab").setAttribute("aria-current", studio ? "page" : "false");
+  byId("improvement-tab").setAttribute("aria-current", improvement ? "page" : "false");
+  byId("augmentation-tab").setAttribute("aria-current", augmentation ? "page" : "false");
   byId("music-tab").setAttribute("aria-selected", String(music));
+  setSelfImprovementMenu(false);
   if (studio && !state.studioLoaded) loadSkillStudio();
   if (improvement && !state.improvementLoaded) loadSelfImprovement();
   if (augmentation && !state.augmentationLoaded) loadSelfAugmentation();
   if (music && !state.musicLoaded) loadMusicStudio();
+}
+
+function setSelfImprovementMenu(open) {
+  byId("self-improvement-menu").hidden = !open;
+  byId("self-improvement-tab").setAttribute("aria-expanded", String(open));
+  byId("self-improvement-navigation").classList.toggle("is-open", open);
 }
 
 function renderChatList() {
@@ -1144,10 +1157,13 @@ document.querySelectorAll("[data-activity-filter]").forEach((button) => button.a
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
 byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
+byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
+document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); });
+byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);

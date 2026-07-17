@@ -103,7 +103,7 @@ Dir.mktmpdir("soul-self-improvement") do |root|
   facade = SoulCore::ApplicationFacade.new(root: root, self_improvement_service: service)
   request = { "schema_version" => "soul.application.v1", "request_id" => "self-improvement-fixture", "operation" => "application.bootstrap", "parameters" => {}, "context" => { "interface" => "dashboard_test" } }
   bootstrap = facade.call(request)
-check.call("application preserves Self Assessment as the third tab", bootstrap.dig("data", "product_tabs").first(3) == ["Chat", "Skill Studio", "Self Assessment"] && bootstrap.dig("data", "self_improvement", "host_mutation_available") == false)
+check.call("application nests Self Assessment beneath Self Improvement", bootstrap.dig("data", "product_tabs") == ["Chat", "Self Improvement", "Music Studio"] && bootstrap.dig("data", "self_improvement_surfaces") == ["Skill Studio", "Self Assessment", "Self Augmentation"] && bootstrap.dig("data", "self_improvement", "host_mutation_available") == false)
 
   generator_root = File.join(root, "generator")
   Dir.mkdir(generator_root)

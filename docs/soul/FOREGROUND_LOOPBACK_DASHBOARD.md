@@ -51,7 +51,7 @@ The approved conversation-clearing amendment adds a preview-first `chats.clear` 
 
 The separate delete-and-forget path targets one exact selected conversation. It requires a destructive preview, unchanged digest, and `DELETE_AND_FORGET_CONVERSATION`. It deletes the transcript and conversation state and logically forgets derived shared memories while preserving append-only safety evidence and independently managed artifacts.
 
-Skill Studio is the second primary tab. It projects local proposal packets, isolated Beta candidates, and registered production skills. Gate 1 approves an exact proposal revision for implementation work; Gate 2 approves an exact tested Beta revision for a later promotion workflow. Beta runs are explicit, bounded, foreground-only, and diagnostic. No gate implements or promotes automatically.
+Self Improvement is the second primary destination and unfolds Skill Studio, Self Assessment, and Self Augmentation. Skill Studio projects local proposal packets, isolated Beta candidates, and registered production skills. Gate 1 approves an exact proposal revision for implementation work; Gate 2 approves an exact tested Beta revision for a later promotion workflow. Beta runs are explicit, bounded, foreground-only, and diagnostic. No gate implements or promotes automatically.
 
 Self Assessment is the third primary tab. It loads one lightweight read-only environment snapshot on first open and offers explicit environment, update, model-runtime, and capability assessments. Advisory improvement proposals require preview, digest revalidation, and exact confirmation. Host/package mutation remains unavailable. Internal operation identifiers retain the `self_improvement.*` namespace for compatibility.
 

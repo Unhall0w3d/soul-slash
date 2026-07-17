@@ -48,9 +48,14 @@
     </a>
     <nav class="primary-tabs" aria-label="Primary" role="tablist">
       <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
-      <button id="studio-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="studio-panel">Skill Studio <span class="phase-tag">Beta</span></button>
-      <button id="improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="improvement-panel">Self Assessment</button>
-      <button id="augmentation-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="augmentation-panel">Self Augmentation</button>
+      <div id="self-improvement-navigation" class="tab-menu">
+        <button id="self-improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="self-improvement-menu">Self Improvement <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
+        <div id="self-improvement-menu" class="self-improvement-menu" role="menu" aria-label="Self Improvement surfaces" hidden>
+          <button id="studio-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="studio-panel"><strong>Skill Studio</strong><span>Proposals, Beta candidates, and production capabilities</span></button>
+          <button id="improvement-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="improvement-panel"><strong>Self Assessment</strong><span>Host, runtime, and capability evidence</span></button>
+          <button id="augmentation-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="augmentation-panel"><strong>Self Augmentation</strong><span>Architecture proposals and controlled experiments</span></button>
+        </div>
+      </div>
       <button id="music-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="music-panel">Music Studio <span class="phase-tag">A3</span></button>
     </nav>
     <div class="header-state" aria-label="Runtime state">
@@ -163,7 +168,7 @@
       </div>
     </section>
 
-    <section id="studio-panel" class="tab-panel studio-panel" role="tabpanel" aria-labelledby="studio-tab" hidden>
+    <section id="studio-panel" class="tab-panel studio-panel" role="tabpanel" aria-labelledby="self-improvement-tab studio-tab" hidden>
       <header class="studio-header">
         <div><p class="eyebrow">Capability foundry</p><h1>Skill Studio</h1><p>Shape new capabilities with Soul, inspect each working Beta, and decide what earns a place in production.</p></div>
         <div class="studio-boundary"><strong>Two Operator gates</strong><span>Proposal approval → Beta review</span><small>Nothing is implemented, registered, or promoted automatically.</small></div>
@@ -242,7 +247,7 @@
       </div>
     </section>
 
-    <section id="improvement-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="improvement-tab" hidden>
+    <section id="improvement-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="self-improvement-tab improvement-tab" hidden>
       <header class="improvement-header">
         <div><p class="eyebrow">Inner survey</p><h1>Self Assessment</h1><p>Soul can inspect its operating environment, identify capability gaps, and prepare bounded recommendations for your review.</p></div>
         <div class="improvement-boundary"><strong>Operator authority preserved</strong><span>Inspect → assess → propose → review</span><small>No package, service, model, skill, or system change is automatic.</small></div>
@@ -317,7 +322,7 @@
       </aside>
     </section>
 
-    <section id="augmentation-panel" class="tab-panel augmentation-panel" role="tabpanel" aria-labelledby="augmentation-tab" hidden>
+    <section id="augmentation-panel" class="tab-panel augmentation-panel" role="tabpanel" aria-labelledby="self-improvement-tab augmentation-tab" hidden>
       <header class="improvement-header augmentation-header"><div><p class="eyebrow">Core introspection</p><h1>Self Augmentation</h1><p>Soul can survey its tracked construction and prepare architectural candidates. Core changes remain separate human-reviewed implementation work.</p></div><div class="improvement-boundary"><strong>Every transition is explicit</strong><span>Observe → propose → experiment → review</span><small>Implementation and integration remain external.</small></div></header>
       <ol class="augmentation-stages" aria-label="Self augmentation lifecycle"><li class="is-available"><span>01</span><strong>Observe</strong><small>Bounded tracked-code census</small></li><li class="is-available"><span>02</span><strong>Propose</strong><small>Human-authored objective packet</small></li><li class="is-available"><span>03</span><strong>Experiment</strong><small>Gate A1 · isolated handoff</small></li><li class="is-available"><span>04</span><strong>Review</strong><small>Gate A2 · external integration handoff</small></li></ol>
       <div class="augmentation-grid">

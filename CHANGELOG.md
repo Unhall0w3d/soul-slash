@@ -6,6 +6,9 @@
 
 ### Conversational Soul
 
+- Consolidated Skill Studio, Self Assessment, and Self Augmentation beneath a
+  visually consistent Self Improvement top-bar menu while preserving their
+  separate pages, operations, and authority boundaries.
 - Added optional, exact-confirmation Music Studio vocal analysis: a pinned
   CPU-only whisper.cpp pass exits after each candidate, preserves machine-heard
   evidence beside intended lyrics, routes OK to human testing and BAD to an

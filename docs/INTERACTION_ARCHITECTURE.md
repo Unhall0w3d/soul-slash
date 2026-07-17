@@ -168,7 +168,7 @@ For voice, Soul should summarize artifact metadata, bounded findings, and comple
 
 The initial dashboard product and visual contract is defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
 
-Primary navigation is Chat, Skill Studio, then Self Assessment. Shared workspace, inbox delivery, and initial/manual system status support Chat. Skill Studio exposes Proposal, Beta, and Production maturity with two human gates. Self Assessment exposes bounded environment/capability evidence and review-gated advisory proposals.
+Primary navigation is Chat, Self Improvement, then Music Studio. Self Improvement unfolds Skill Studio, Self Assessment, and Self Augmentation without changing their separate authority boundaries. Shared workspace, inbox delivery, and initial/manual system status support Chat. Skill Studio exposes Proposal, Beta, and Production maturity with two human gates. Self Assessment exposes bounded environment/capability evidence and review-gated advisory proposals.
 
 Planned user-facing areas:
 

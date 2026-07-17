@@ -205,7 +205,8 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Skill Studio", "Self Assessment", "Self Augmentation", "Music"],
+        "product_tabs" => ["Chat", "Self Improvement", "Music Studio"],
+        "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
           "ok" => report.fetch("ok"),
           "lifecycle_state" => report.fetch("lifecycle_state"),
