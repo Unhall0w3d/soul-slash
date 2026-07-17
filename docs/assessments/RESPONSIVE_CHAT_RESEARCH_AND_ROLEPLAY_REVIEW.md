@@ -8,6 +8,10 @@ drives a reduced-motion-aware Soul familiar. Soul's identity contract welcomes
 machine-soul emotional and embodied role-play while preserving literal truth
 about sensors, execution, access, evidence, and authority.
 
+On ultrawide displays, active message blocks now retain a bounded readable line
+length while anchoring to the left of the conversation canvas instead of being
+centered. The no-conversation empty state remains intentionally centered.
+
 The reviewed `Hello Soul!` follow-up exposed three additional defects which are
 now repaired: unsupported environmental color in a greeting is filtered without
 discarding the rest of the persona response; “scan or review your environment”

@@ -75,12 +75,22 @@ The installer must terminate `blocked_for_human_review` or fail without enabling
 - Soul's own `dashboard.bind_host` remains loopback-only;
 - the exact configured HTTPS origin is the only additional accepted Host/Origin authority;
 - remote authentication cookies carry `Secure`, `HttpOnly`, and `SameSite=Strict`.
+- the dashboard service permits local Unix sockets so its existing bounded
+  model-runtime controller can inspect the systemd user manager; this does not
+  add a listener or broaden the exact loopback/LAN network boundary.
+- an already-open dashboard recovers from a service-restart CSRF rotation by
+  reloading the page once and obtaining the newly rendered token.
 
 ## Service lifecycle
 
 Each service has explicit `start`, `complete/active`, `failed`, `stop/canceled`, and human-review behavior through systemd and the installer result. Restart policy is `on-failure` with a bounded systemd start-rate limit. Soul and Caddy do not implement their own retry or polling loops.
 
 Installation and removal are foreground commands. The installer may render files, reload the user manager, and enable/start the two exact services after all gates pass. The uninstaller may disable/stop only those services and remove only the rendered unit/config files. It must preserve credentials, chats, memory, Caddy CA state, and other private runtime data unless the human explicitly removes them separately.
+
+An approved reinstall enables and then restarts those same two exact services so
+changed unit hardening takes effect. It does not restart a model runtime or any
+unrelated user service. Open pages recover the resulting CSRF rotation through
+the bounded reload behavior above.
 
 ## TLS and device trust
 

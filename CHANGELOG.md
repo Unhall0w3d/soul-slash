@@ -4,6 +4,13 @@
 
 ### Conversational Soul
 
+- Repaired dashboard refresh health after service restarts by reloading stale
+  CSRF pages and allowing the dashboard service's bounded user-systemd status
+  inspection over local Unix sockets.
+- Made confirmed dashboard-service reinstalls restart the same two approved
+  units so changed hardening cannot remain dormant behind `enable --now`.
+- Left-anchored bounded Chat message blocks on ultrawide displays instead of
+  centering the active conversation column.
 - Added immediate accepted-message rendering, truthful foreground chat progress,
   a reduced-motion-aware Soul familiar, and non-interrupting draft composition.
 - Added separate bounded DuckDuckGo Instant Answer lookup and SearXNG-first web

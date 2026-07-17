@@ -419,6 +419,8 @@ check.call("browser appends the pending exchange before awaiting the stream", ap
 check.call("composer remains draftable and busy Enter does not interrupt", js.include?("draft was not sent") && !js.include?("message-input\").disabled = busy"))
 check.call("responsive UI remains free of timers and background transports", %w[setTimeout setInterval WebSocket EventSource].none? { |term| js.include?(term) })
 check.call("Soul familiar is state-driven and reduced-motion aware", html.include?("soul-presence") && css.include?("data-state") && css.include?("prefers-reduced-motion"))
+check.call("stale restart-bound CSRF tokens recover through one page reload", js.scan('envelope.error?.code === "csrf"').length == 2 && js.scan("window.location.reload()").length >= 4)
+check.call("wide-screen conversation messages remain readable and left anchored", css.include?(".message { max-width:920px; margin:0 0 29px; }") && !css.include?(".message { max-width:820px; margin:0 auto 29px; }"))
 
 if failures.empty?
   puts "Responsive chat, lookup, and web research verification complete."

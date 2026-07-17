@@ -82,7 +82,8 @@ module SoulCore
           checks["confirmed_install_validates_renders_and_enables_two_services"] =
             installed.ok && installed.lifecycle_state == "complete" &&
             commands.any? { |command| command.include?("validate") } &&
-            commands.count { |command| command.include?("enable") && command.include?("--now") } == 2 &&
+            commands.count { |command| command.include?("enable") && !command.include?("--now") } == 2 &&
+            commands.count { |command| command.include?("restart") } == 2 &&
             plan.details["files"].values.all? { |path| File.file?(path) && (File.stat(path).mode & 0o077).zero? }
 
           credential_path = File.join(temporary_root, DashboardAuthentication::CREDENTIAL_PATH)

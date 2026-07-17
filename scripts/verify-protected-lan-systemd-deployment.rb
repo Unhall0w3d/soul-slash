@@ -42,6 +42,7 @@ end
 deployment = File.read("lib/soul_core/dashboard_deployment.rb")
 makefile = File.read("Makefile")
 check("exact service allowlist", deployment.include?("SERVICE_NAMES = %w[soul-dashboard.service soul-dashboard-proxy.service]") && deployment.include?("SERVICE_NAMES.length") == false, errors)
+check("dashboard retains local user-manager access without broadening its listener", deployment.include?("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6"), errors)
 make_targets = %w[dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall]
 check("Makefile exposes gated deployment lifecycle", make_targets.all? { |target| makefile.match?(/^#{Regexp.escape(target)}:/) } && makefile.include?("CONFIRM=INSTALL_SOUL_LAN_SERVICES") && makefile.include?("CONFIRM=REMOVE_SOUL_LAN_SERVICES"), errors)
 check("no package firewall router or privileged-port mutation", %w[pacman apt dnf iptables nftables firewall-cmd setcap port-forward].none? { |primitive| deployment.match?(/\b#{Regexp.escape(primitive)}\b/i) }, errors)

@@ -203,6 +203,7 @@ module SoulCore
       schema = File.read(File.join(@root, "lib/soul_core/configuration_schema.rb"))
       brief = File.read(File.join(@root, "docs/soul/PHASE12C1_DASHBOARD_AUTHENTICATION_BRIEF.md"))
       auth_source = File.read(File.join(@root, "lib/soul_core/dashboard_authentication.rb"))
+      forget_source = File.read(File.join(@root, "lib/soul_core/conversation_forget_service.rb"))
 
       checks["locked_dashboard_is_blurred_inert_and_accessibly_overlaid"] =
         html.include?('class="auth-locked"') && html.include?('id="auth-gate"') && html.include?('aria-modal="true"') &&
@@ -213,7 +214,10 @@ module SoulCore
       checks["no_signup_or_account_creation_surface_exists"] =
         %w[/auth/v1/signup /auth/v1/register createAccount registerAccount].none? { |primitive| [html, javascript].any? { |source| source.include?(primitive) } }
       checks["authentication_does_not_weaken_existing_approval_gates"] =
-        html.include?("APPROVE_PROPOSAL_FOR_BETA_BUILD") && html.include?("APPROVE_BETA_FOR_PROMOTION") && html.include?("DELETE_AND_FORGET_CONVERSATION")
+        html.include?("APPROVE_PROPOSAL_FOR_BETA_BUILD") && html.include?("APPROVE_BETA_FOR_PROMOTION") &&
+        forget_source.include?('CONFIRMATION = "DELETE_AND_FORGET_CONVERSATION"') &&
+        forget_source.include?('"DELETE_AND_FORGET_#{count}_CONVERSATIONS"') &&
+        javascript.include?("state.forgetPreview.confirmation")
       checks["lan_and_background_persistence_remain_excluded"] =
         schema.include?(":loopback_host") && !DashboardServer.loopback?("0.0.0.0") &&
         %w[systemd daemon( Thread.new].none? { |primitive| [server, auth_source].any? { |source| source.include?(primitive) } } &&

@@ -8,6 +8,14 @@
 - Added Caddy internal TLS on an exact assigned IPv4 address and unprivileged port `8443`.
 - Disabled the Caddy admin API, automatic HTTP redirect listener, HTTP/3, remote ACME, on-demand TLS, and active health checks.
 - Added bounded systemd restart policies, owner-only rendered files, deterministic prerequisite gates, rollback, status, and uninstall behavior.
+- Corrected dashboard hardening to permit `AF_UNIX` for bounded communication
+  with the existing systemd user manager. IPv4/IPv6 listener policy is
+  unchanged, and no additional service or socket is introduced.
+- Added automatic page reload when an already-open dashboard presents the stale
+  CSRF token left by a dashboard-service restart.
+- Corrected reinstall behavior to enable and restart the same two approved
+  services, ensuring changed unit hardening is applied rather than leaving the
+  previous process restrictions active.
 - Added Make targets for the complete preview, confirmed install, status, logs, and confirmed uninstall lifecycle.
 - Documented Caddy and lingering prerequisites, first-login sequencing, narrow UFW access, public-CA transfer, client validation, and rollback.
 - Kept machine paths, addresses, and generated certificate state out of Git.
@@ -41,6 +49,10 @@ ruby bin/soul assess phase12a-configuration --json
 ruby bin/soul assess dashboard-authentication --json
 ruby bin/soul assess dashboard-deployment --json
 ruby scripts/verify-protected-lan-systemd-deployment.rb
+ruby scripts/verify-responsive-chat-and-web-research.rb
+ruby scripts/verify-model-runtime-portability.rb
+ruby scripts/verify-model-runtime-profile-switching.rb
+ruby scripts/verify-phase12c-foreground-dashboard.rb
 make help
 make dashboard-service-plan
 make dashboard-service-install
@@ -54,6 +66,19 @@ curl http://127.0.0.1:4567/
 curl --connect-timeout 3 http://192.168.124.238:4567/
 openssl s_client -connect 192.168.124.238:8443 -CAfile ~/.local/share/caddy/pki/authorities/local/root.crt -verify_return_error
 ```
+
+The 2026-07-16 refresh-health repair was applied through the same confirmed
+installer. Live verification then reported both status operations `complete`,
+host `maven`, model runtime `loaded`, service `active`, server health `ready`,
+and idle state certain. Dashboard, proxy, and AMD model services were active;
+certificate-validated LAN HTTPS returned HTTP 200 on the unchanged exact
+address and port.
+
+The first repair reinstall exposed a systemd semantic gap: `enable --now` left
+the already-active dashboard process running under its earlier socket-family
+restriction. A deliberate dashboard restart loaded `AF_UNIX`; the installer is
+now regression-tested to enable and restart both exact approved services on
+reinstall so rendered unit changes cannot remain dormant.
 
 The corrected installation completed at `2026-07-15T21:48:13Z`. Both allowlisted user services became enabled and active. Live verification returned HTTP 200 through trusted HTTPS, HTTP 401 for an anonymous private API call after valid CSRF handling, HTTP 200 on Soul's loopback endpoint, and connection refusal for direct LAN access to Soul port `4567`.
 
@@ -74,7 +99,15 @@ The deployment assessor verifies:
 - uninstall preserves Soul runtime data and Caddy PKI state;
 - wrong public Hosts and Origins fail closed;
 - the exact HTTPS origin receives a host-only `Secure`, `HttpOnly`, `SameSite=Strict` cookie;
+- stale CSRF tokens from a service restart trigger a page reload rather than
+  leaving status cards in a generic unavailable state;
+- the dashboard unit permits Unix sockets required for `systemctl --user`
+  inspection while retaining its existing loopback HTTP bind;
 - prior configuration, authentication, dashboard, Skill Studio, Self Improvement, and privacy regressions remain green.
+
+The authentication regression now recognizes the current single- and
+multi-conversation permanent-deletion confirmation gates whether their literal
+is rendered in static markup or by the bounded browser controller.
 
 The first local activation attempt failed safely because systemd does not accept a quoted `WorkingDirectory=` value. Both services were rolled back before a LAN listener started. The renderer was corrected to use systemd path escaping, and a regression now rejects quoted working-directory output.
 

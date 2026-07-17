@@ -20,6 +20,7 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
   });
   const envelope = await response.json();
   if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
+  if (response.status === 403 && envelope.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed"); }
   if (!response.ok) throw new Error(envelope.error?.reason || "Dashboard transport failed");
   return envelope;
 }
@@ -49,6 +50,7 @@ async function authRequest(path, body) {
   if (body !== undefined) { options.method = "POST"; options.body = JSON.stringify(body); }
   const response = await fetch(path, options);
   const envelope = await response.json();
+  if (response.status === 403 && envelope.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed"); }
   if (!response.ok) throw new Error(envelope.error?.reason || "Authentication failed safely");
   return envelope;
 }

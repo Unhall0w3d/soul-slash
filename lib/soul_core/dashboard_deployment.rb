@@ -71,8 +71,10 @@ module SoulCore
       write_rendered_files(contents)
       commands = [
         [@systemctl_path, "--user", "daemon-reload"],
-        [@systemctl_path, "--user", "enable", "--now", "soul-dashboard.service"],
-        [@systemctl_path, "--user", "enable", "--now", "soul-dashboard-proxy.service"]
+        [@systemctl_path, "--user", "enable", "soul-dashboard.service"],
+        [@systemctl_path, "--user", "enable", "soul-dashboard-proxy.service"],
+        [@systemctl_path, "--user", "restart", "soul-dashboard.service"],
+        [@systemctl_path, "--user", "restart", "soul-dashboard-proxy.service"]
       ]
       commands.each do |command|
         execution = run(command)
@@ -189,7 +191,7 @@ module SoulCore
           ProtectKernelTunables=true
           RestrictSUIDSGID=true
           LockPersonality=true
-          RestrictAddressFamilies=AF_INET AF_INET6
+          RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
           [Install]
           WantedBy=default.target
