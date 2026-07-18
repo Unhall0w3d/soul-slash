@@ -19,6 +19,7 @@ module SoulCore
     STATUSES = %w[candidate approved rejected].freeze
 
     class ValidationError < StandardError; end
+    class StaleStateError < ValidationError; end
     class IntegrityError < StandardError; end
 
     def initialize(root: Dir.pwd, directory: DIRECTORY, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) })
@@ -30,6 +31,12 @@ module SoulCore
     end
 
     attr_reader :directory
+
+    def synthesis_revision_id
+      id = "syn_#{@id_generator.call}"
+      raise IntegrityError, "generated synthesis revision ID is invalid" unless id.match?(/\Asyn_[a-f0-9]{16}\z/)
+      id
+    end
 
     def list(limit: 200)
       prepare_root!
@@ -75,7 +82,7 @@ module SoulCore
         "status" => data.fetch("status", "candidate"),
         "provenance" => data.fetch("provenance"),
         "evidence" => data.fetch("evidence", default_evidence),
-        "synthesis" => data.fetch("synthesis", { "status" => "pending", "selected_revision_id" => nil, "revisions" => [] }),
+        "synthesis" => normalize_synthesis(data.fetch("synthesis", { "status" => "pending", "selected_revision_id" => nil, "rejected_revision_ids" => [], "revisions" => [] })),
         "created_at" => data.fetch("created_at", now),
         "updated_at" => now
       }
@@ -96,7 +103,7 @@ module SoulCore
         "title" => data.fetch("title"),
         "source_reference_ids" => data.fetch("source_reference_ids"),
         "roles" => data.fetch("roles"),
-        "synthesis" => data.fetch("synthesis"),
+        "synthesis" => normalize_synthesis(data.fetch("synthesis")),
         "created_at" => data.fetch("created_at", now),
         "updated_at" => now
       }
@@ -105,12 +112,85 @@ module SoulCore
       write_new("fusions", id, value)
     end
 
+    def append_synthesis_revision(identifier, revision)
+      with_record_lock(identifier) do
+        current = read(identifier)
+        data = stringify_keys(revision)
+        revision_id = data.fetch("revision_id")
+        raise ValidationError, "synthesis revision already exists" if current.dig("synthesis", "revisions").any? { |item| item["revision_id"] == revision_id }
+        validate_synthesis_revision!(data)
+        revisions = current.dig("synthesis", "revisions")
+        raise ValidationError, "first synthesis revision must use all scope" if revisions.empty? && data["scope"] != "all"
+        raise ValidationError, "music synthesis revision limit exceeded" if revisions.length >= 100
+        updated = deep_copy(current)
+        updated.fetch("synthesis").fetch("revisions") << data
+        updated.fetch("synthesis")["status"] = "candidate"
+        updated["status"] = "candidate" unless updated.dig("synthesis", "selected_revision_id")
+        updated["updated_at"] = @clock.call.iso8601
+        validate_for_identity!(updated, identifier)
+        replace_record(identifier, updated)
+      end
+    end
+
+    def approve_synthesis(identifier, revision_id, expected_state:)
+      with_record_lock(identifier) do
+        current = read(identifier)
+        revision = current.dig("synthesis", "revisions").find { |item| item["revision_id"] == revision_id.to_s }
+        raise ValidationError, "synthesis revision does not exist" unless revision
+        raise ValidationError, "rejected synthesis revision cannot be approved" if current.dig("synthesis", "rejected_revision_ids").include?(revision_id.to_s)
+        next current if current.dig("synthesis", "status") == "approved" && current.dig("synthesis", "selected_revision_id") == revision_id
+        actual_state = {
+          "currently_selected_revision_id" => current.dig("synthesis", "selected_revision_id"),
+          "latest_revision_id" => current.dig("synthesis", "revisions").last&.fetch("revision_id"),
+          "revision_count" => current.dig("synthesis", "revisions").length
+        }
+        raise StaleStateError, "synthesis state changed; preview approval again" unless actual_state == expected_state
+        updated = deep_copy(current)
+        updated.fetch("synthesis")["status"] = "approved"
+        updated.fetch("synthesis")["selected_revision_id"] = revision_id.to_s
+        updated["status"] = "approved"
+        updated["title"] = revision.fetch("title") if identifier.to_s.match?(FUSION_ID)
+        updated["updated_at"] = @clock.call.iso8601
+        validate_for_identity!(updated, identifier)
+        replace_record(identifier, updated)
+      end
+    end
+
+    def reject_synthesis(identifier, revision_id, expected_state:)
+      with_record_lock(identifier) do
+        current = read(identifier)
+        synthesis = current.fetch("synthesis")
+        revision = synthesis.fetch("revisions").find { |item| item["revision_id"] == revision_id.to_s }
+        raise ValidationError, "synthesis revision does not exist" unless revision
+        return current if synthesis.fetch("rejected_revision_ids").include?(revision_id.to_s)
+        raise ValidationError, "only the latest unapproved synthesis revision can be rejected" unless synthesis.fetch("revisions").last["revision_id"] == revision_id.to_s && synthesis["selected_revision_id"] != revision_id.to_s
+        actual_state = {
+          "currently_selected_revision_id" => synthesis["selected_revision_id"],
+          "latest_revision_id" => synthesis.fetch("revisions").last&.fetch("revision_id"),
+          "revision_count" => synthesis.fetch("revisions").length
+        }
+        raise StaleStateError, "synthesis state changed; preview rejection again" unless actual_state == expected_state
+        updated = deep_copy(current)
+        updated.fetch("synthesis").fetch("rejected_revision_ids") << revision_id.to_s
+        if updated.dig("synthesis", "selected_revision_id")
+          updated.fetch("synthesis")["status"] = "approved"
+          updated["status"] = "approved"
+        else
+          updated.fetch("synthesis")["status"] = "rejected"
+          updated["status"] = "rejected"
+        end
+        updated["updated_at"] = @clock.call.iso8601
+        validate_for_identity!(updated, identifier)
+        replace_record(identifier, updated)
+      end
+    end
+
     private
 
     def prepare_root!
       assert_safe_components!(@directory)
       FileUtils.mkdir_p(@directory, mode: 0o700)
-      %w[tracks fusions].each do |name|
+      %w[tracks fusions locks].each do |name|
         path = File.join(@directory, name)
         assert_safe_components!(path)
         FileUtils.mkdir_p(path, mode: 0o700)
@@ -135,6 +215,7 @@ module SoulCore
       raise IntegrityError, "music reference record must be a regular file" unless stat.file? && !stat.symlink?
       raise IntegrityError, "music reference record exceeds size limit" unless stat.size.between?(1, MAX_RECORD_BYTES)
       value = JSON.parse(File.binread(path, MAX_RECORD_BYTES))
+      value["synthesis"] = normalize_synthesis(value["synthesis"]) if value.is_a?(Hash) && value["synthesis"].is_a?(Hash)
       begin
         schema == TRACK_SCHEMA ? validate_track!(value, id) : validate_fusion!(value, id)
       rescue ValidationError, ArgumentError => error
@@ -145,6 +226,10 @@ module SoulCore
       raise ValidationError, "music reference does not exist"
     rescue JSON::ParserError => error
       raise IntegrityError, "invalid music reference record: #{error.class}"
+    end
+
+    def validate_for_identity!(value, identifier)
+      identifier.to_s.match?(REFERENCE_ID) ? validate_track!(value, identifier.to_s) : validate_fusion!(value, identifier.to_s)
     end
 
     def validate_track!(value, id)
@@ -208,13 +293,17 @@ module SoulCore
     end
 
     def validate_synthesis!(value)
-      exact_object!(value, %w[status selected_revision_id revisions], "synthesis")
+      exact_object!(value, %w[status selected_revision_id rejected_revision_ids revisions], "synthesis")
       raise ValidationError, "music synthesis status is invalid" unless %w[pending candidate approved rejected].include?(value["status"])
       selected = value["selected_revision_id"]
       raise ValidationError, "selected synthesis revision is invalid" unless selected.nil? || selected.to_s.match?(/\Asyn_[a-f0-9]{16}\z/)
       revisions = value["revisions"]
       raise ValidationError, "music synthesis revisions must be a bounded list" unless revisions.is_a?(Array) && revisions.length <= 100
       revisions.each { |revision| validate_synthesis_revision!(revision) }
+      rejected = value["rejected_revision_ids"]
+      raise ValidationError, "rejected synthesis revisions must be a unique bounded list" unless rejected.is_a?(Array) && rejected.uniq.length == rejected.length && rejected.length <= 100
+      raise ValidationError, "rejected synthesis revision is invalid" unless rejected.all? { |revision_id| revision_id.to_s.match?(/\Asyn_[a-f0-9]{16}\z/) && revisions.any? { |revision| revision["revision_id"] == revision_id } }
+      raise ValidationError, "selected synthesis revision cannot be rejected" if selected && rejected.include?(selected)
       raise ValidationError, "selected synthesis revision does not exist" if selected && revisions.none? { |revision| revision.is_a?(Hash) && revision["revision_id"] == selected }
       bounded_json_object!(value, "synthesis")
     end
@@ -256,6 +345,43 @@ module SoulCore
       raise IntegrityError, "music reference record exceeds size limit" if body.bytesize > MAX_RECORD_BYTES
       File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(body); file.flush; file.fsync }
       value
+    end
+
+    def replace_record(identifier, value)
+      kind = identifier.to_s.match?(REFERENCE_ID) ? "tracks" : "fusions"
+      path = File.join(@directory, kind, "#{identifier}.json")
+      stat = File.lstat(path)
+      raise IntegrityError, "music reference record must remain a regular file" unless stat.file? && !stat.symlink?
+      body = JSON.pretty_generate(value) + "\n"
+      raise IntegrityError, "music reference record exceeds size limit" if body.bytesize > MAX_RECORD_BYTES
+      temporary = "#{path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(body); file.flush; file.fsync }
+      File.rename(temporary, path)
+      value
+    ensure
+      FileUtils.rm_f(temporary) if defined?(temporary) && temporary
+    end
+
+    def with_record_lock(identifier)
+      id = identifier.to_s
+      raise ValidationError, "music reference ID is invalid" unless id.match?(REFERENCE_ID) || id.match?(FUSION_ID)
+      prepare_root!
+      path = File.join(@directory, "locks", "#{id}.lock")
+      if File.exist?(path) || File.symlink?(path)
+        stat = File.lstat(path)
+        raise IntegrityError, "music reference lock must be a regular file" unless stat.file? && !stat.symlink?
+      end
+      flags = File::RDWR | File::CREAT
+      flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)
+      File.open(path, flags, 0o600) do |lock|
+        raise IntegrityError, "music reference lock must be a regular file" unless lock.stat.file?
+        lock.flock(File::LOCK_EX)
+        yield
+      ensure
+        lock.flock(File::LOCK_UN) if lock
+      end
+    rescue Errno::ELOOP
+      raise IntegrityError, "music reference lock must not be a symlink"
     end
 
     def artist_hierarchy(tracks)
@@ -311,6 +437,14 @@ module SoulCore
     def stringify_keys(value)
       raise ValidationError, "music reference input must be an object" unless value.is_a?(Hash)
       value.to_h { |key, item| [key.to_s, item] }
+    end
+
+    def deep_copy(value) = JSON.parse(JSON.generate(value))
+
+    def normalize_synthesis(value)
+      normalized = deep_copy(value)
+      normalized["rejected_revision_ids"] ||= []
+      normalized
     end
 
     def within?(path, parent)

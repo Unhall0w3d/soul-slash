@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -322,18 +322,96 @@ function renderMusicReferences() {
   (library.artists || []).forEach((artist) => {
     const group = document.createElement("details"); group.className = "music-reference-artist";
     const summary = document.createElement("summary"); const name = document.createElement("strong"); name.textContent = artist.name; const count = document.createElement("small"); count.textContent = `${artist.albums.reduce((sum, album) => sum + album.tracks.length, 0)} tracks`; summary.append(name, count); group.append(summary);
-    artist.albums.forEach((album) => { const release = document.createElement("section"); release.className = "music-reference-album"; const title = document.createElement("h3"); title.textContent = album.title; release.append(title); album.tracks.forEach((track) => { const button = document.createElement("button"); button.type = "button"; button.className = "music-reference-track"; const trackTitle = document.createElement("strong"); trackTitle.textContent = track.provenance.title; const meta = document.createElement("small"); const evidence = track.evidence || {}; meta.textContent = [evidence.bpm ? `${evidence.bpm} BPM` : null, evidence.key || null, track.status].filter(Boolean).join(" · ") || track.status; button.append(trackTitle, meta); button.addEventListener("click", () => inspectMusicReference(track.reference_id, button)); release.append(button); }); group.append(release); });
+    artist.albums.forEach((album) => { const release = document.createElement("section"); release.className = "music-reference-album"; const title = document.createElement("h3"); title.textContent = album.title; release.append(title); album.tracks.forEach((track) => { const row = document.createElement("div"); row.className = "music-reference-track-row"; const eligible = track.synthesis?.status === "approved" && Boolean(track.synthesis?.selected_revision_id); const picker = document.createElement("input"); picker.type = "checkbox"; picker.className = "music-reference-picker"; picker.setAttribute("aria-label", `Select ${track.provenance.title} for fusion`); picker.disabled = !eligible; picker.checked = eligible && state.musicFusionSources.has(track.reference_id); if (!eligible) state.musicFusionSources.delete(track.reference_id); picker.addEventListener("change", () => toggleMusicFusionSource(track.reference_id, picker)); const button = document.createElement("button"); button.type = "button"; button.className = "music-reference-track"; const trackTitle = document.createElement("strong"); trackTitle.textContent = track.provenance.title; const meta = document.createElement("small"); const evidence = track.evidence || {}; meta.textContent = [evidence.bpm ? `${evidence.bpm} BPM` : null, evidence.key || null, eligible ? "fusion ready" : `synthesis ${track.synthesis?.status || "pending"}`].filter(Boolean).join(" · "); button.append(trackTitle, meta); button.addEventListener("click", () => inspectMusicReference(track.reference_id, button)); row.append(picker, button); release.append(row); }); group.append(release); });
     list.append(group);
   });
   const fusions = byId("music-fusion-list"); fusions.querySelectorAll(".music-reference-track").forEach((node) => node.remove());
   (library.fusions || []).forEach((fusion) => { const button = document.createElement("button"); button.type = "button"; button.className = "music-reference-track"; const title = document.createElement("strong"); title.textContent = fusion.title; const meta = document.createElement("small"); meta.textContent = `${fusion.source_reference_ids.length} sources · ${fusion.status}`; button.append(title, meta); button.addEventListener("click", () => inspectMusicReference(fusion.fusion_id, button)); fusions.append(button); });
+  updateMusicFusionSelection();
+}
+
+function toggleMusicFusionSource(referenceId, picker) {
+  if (picker.checked && state.musicFusionSources.size >= 5) { picker.checked = false; byId("music-reference-fusion-status").textContent = "A fusion may contain at most five approved targets."; return; }
+  if (picker.checked) state.musicFusionSources.add(referenceId); else state.musicFusionSources.delete(referenceId); updateMusicFusionSelection();
+}
+
+function updateMusicFusionSelection() {
+  const count = state.musicFusionSources.size; const button = byId("draft-music-reference-fusion"); button.textContent = `Draft fusion · ${count} selected`; button.disabled = state.musicSynthesisBusy || count < 2 || count > 5;
 }
 
 async function inspectMusicReference(referenceId, button) {
   button.disabled = true;
-  try { const envelope = await callSoul("music.references.get", { reference_id: referenceId }); lifecycle(envelope); const reference = dataOf(envelope).reference; button.querySelector("small").textContent = reference.record_type === "track" ? `${reference.status} · synthesis ${reference.synthesis.status}` : `${reference.status} · ${reference.source_reference_ids.length} sources`; }
+  try { const envelope = await callSoul("music.references.get", { reference_id: referenceId }); lifecycle(envelope); const reference = dataOf(envelope).reference; state.selectedMusicReference = reference; state.musicSynthesisApproval = null; state.musicSynthesisRejection = null; button.querySelector("small").textContent = reference.record_type === "track" ? `${reference.status} · synthesis ${reference.synthesis.status}` : `${reference.status} · ${reference.source_reference_ids.length} sources`; renderMusicReferenceDetail(); }
   catch (error) { button.querySelector("small").textContent = error.message; }
   finally { button.disabled = false; }
+}
+
+function renderMusicReferenceDetail() {
+  const reference = state.selectedMusicReference; const detail = byId("music-reference-detail");
+  detail.hidden = !reference; if (detail.hidden) return;
+  const track = reference.record_type === "track"; const provenance = reference.provenance || {}; const evidence = reference.evidence || {}; const synthesis = reference.synthesis || { revisions: [] };
+  const revisions = synthesis.revisions || []; const latest = revisions.at(-1); const selected = revisions.find((item) => item.revision_id === synthesis.selected_revision_id);
+  const latestRejected = Boolean(latest && (synthesis.rejected_revision_ids || []).includes(latest.revision_id));
+  byId("music-reference-detail-title").textContent = track ? (provenance.title || "Reference profile") : reference.title;
+  byId("music-reference-detail-meta").textContent = track ? [provenance.artists?.join(", "), provenance.album, `${provenance.duration_seconds}s`, provenance.rights_assertion?.replaceAll("_", " ")].filter(Boolean).join(" · ") : `${reference.source_reference_ids.length} approved sources · fusion candidate`;
+  byId("music-reference-synthesis-state").textContent = synthesis.status || "pending";
+  byId("music-reference-observed").previousElementSibling.textContent = track ? "Fallible measurements derived from the source" : "Approved targets and the role Soul assigned each source";
+  byId("music-reference-observed").textContent = JSON.stringify(track ? { bpm: evidence.bpm, bpm_alternatives: evidence.bpm_alternatives, key: evidence.key, key_alternatives: evidence.key_alternatives, meter: evidence.meter, sections: evidence.sections, instrumentation: evidence.instrumentation, production_traits: evidence.production_traits, energy_curve: evidence.energy_curve, vocal_traits: evidence.vocal_traits, lyrical_traits: evidence.lyrical_traits, confidence_notes: evidence.confidence_notes } : { source_reference_ids: reference.source_reference_ids, roles: reference.roles }, null, 2);
+  byId("music-reference-target").textContent = latest ? JSON.stringify({ revision_id: latest.revision_id, scope: latest.scope, intent: latest.intent, title: latest.title, sound_and_structure: latest.caption, lyrics: latest.lyrics, bpm: latest.bpm, key: latest.keyscale, time: latest.timesignature, exclusions: latest.exclusions, rationale: latest.rationale }, null, 2) : "";
+  byId("music-reference-target-note").textContent = latest ? `Revision ${revisions.length} · ${latest.revision_id}${selected?.revision_id === latest.revision_id ? " · approved target" : latestRejected ? " · rejected" : " · awaiting Operator decision"}` : "No synthesis has been drafted.";
+  const scope = byId("music-reference-synthesis-scope"); if (!latest) scope.value = "all"; scope.disabled = !latest;
+  byId("draft-music-reference-synthesis").hidden = !track && !latest; byId("draft-music-reference-synthesis").textContent = track ? (latest ? "Retry selected scope" : "Draft composition target") : "Retry fusion scope";
+  byId("draft-music-reference-synthesis").disabled = state.musicSynthesisBusy;
+  byId("preview-music-reference-synthesis-approval").hidden = !latest || latestRejected || selected?.revision_id === latest.revision_id;
+  byId("preview-music-reference-synthesis-rejection").hidden = !latest || latestRejected || selected?.revision_id === latest.revision_id;
+  byId("music-reference-synthesis-confirm").hidden = !state.musicSynthesisApproval;
+  byId("music-reference-synthesis-reject-confirm").hidden = !state.musicSynthesisRejection;
+}
+
+async function draftMusicReferenceSynthesis() {
+  const reference = state.selectedMusicReference; if (!reference || state.musicSynthesisBusy) return;
+  state.musicSynthesisBusy = true; state.musicSynthesisApproval = null; state.musicSynthesisRejection = null; renderMusicReferenceDetail(); byId("music-reference-synthesis-status").textContent = "Soul is translating observed evidence into one original composition target…";
+  try { const envelope = await callSoul("music.references.synthesis.draft", { reference_id: reference.reference_id || reference.fusion_id, scope: byId("music-reference-synthesis-scope").value }); lifecycle(envelope); const updated = dataOf(envelope).reference; if (!updated) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = updated; byId("music-reference-synthesis-status").textContent = "Candidate revision recorded. Review the exact target before approval."; renderMusicReferenceDetail(); await loadMusicReferences(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { state.musicSynthesisBusy = false; renderMusicReferenceDetail(); }
+}
+
+async function draftMusicReferenceFusion() {
+  if (state.musicSynthesisBusy || state.musicFusionSources.size < 2 || state.musicFusionSources.size > 5) return;
+  state.musicSynthesisBusy = true; updateMusicFusionSelection(); byId("music-reference-fusion-status").textContent = "Soul is reconciling the selected targets into one original composition…";
+  try { const envelope = await callSoul("music.references.fusion.draft", { reference_ids: [...state.musicFusionSources] }); lifecycle(envelope); const reference = dataOf(envelope).reference; if (!reference) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = reference; state.musicSynthesisApproval = null; state.musicFusionSources.clear(); byId("music-reference-fusion-status").textContent = "Fusion candidate recorded. Review its roles and exact target before approval."; renderMusicReferenceDetail(); await loadMusicReferences(); }
+  catch (error) { byId("music-reference-fusion-status").textContent = error.message; }
+  finally { state.musicSynthesisBusy = false; updateMusicFusionSelection(); }
+}
+
+async function previewMusicReferenceSynthesisApproval() {
+  const reference = state.selectedMusicReference; const revision = reference?.synthesis?.revisions?.at(-1); if (!reference || !revision) return;
+  byId("preview-music-reference-synthesis-approval").disabled = true;
+  try { const envelope = await callSoul("music.references.synthesis.approval.preview", { reference_id: reference.reference_id || reference.fusion_id, revision_id: revision.revision_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicSynthesisApproval = data; byId("music-reference-synthesis-scope-preview").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-synthesis-confirmation").value = ""; byId("approve-music-reference-synthesis").disabled = true; byId("music-reference-synthesis-status").textContent = "Exact revision approval is ready for Operator confirmation."; renderMusicReferenceDetail(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { byId("preview-music-reference-synthesis-approval").disabled = false; }
+}
+
+async function previewMusicReferenceSynthesisRejection() {
+  const reference = state.selectedMusicReference; const revision = reference?.synthesis?.revisions?.at(-1); if (!reference || !revision) return;
+  byId("preview-music-reference-synthesis-rejection").disabled = true;
+  try { const envelope = await callSoul("music.references.synthesis.rejection.preview", { reference_id: reference.reference_id || reference.fusion_id, revision_id: revision.revision_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicSynthesisRejection = data; state.musicSynthesisApproval = null; byId("music-reference-synthesis-reject-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-synthesis-reject-confirmation").value = ""; byId("reject-music-reference-synthesis").disabled = true; byId("music-reference-synthesis-status").textContent = "Exact revision rejection is ready for Operator confirmation."; renderMusicReferenceDetail(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { byId("preview-music-reference-synthesis-rejection").disabled = false; }
+}
+
+async function rejectMusicReferenceSynthesis() {
+  const rejection = state.musicSynthesisRejection; const reference = state.selectedMusicReference; if (!rejection || !reference) return;
+  byId("reject-music-reference-synthesis").disabled = true;
+  try { const envelope = await callSoul("music.references.synthesis.rejection.execute", { reference_id: reference.reference_id || reference.fusion_id, revision_id: rejection.revision.revision_id, confirmation: byId("music-reference-synthesis-reject-confirmation").value, expected_digest: rejection.expected_digest }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = dataOf(envelope).reference; state.musicSynthesisRejection = null; byId("music-reference-synthesis-status").textContent = "Revision rejected and preserved. You may now retry the entire target or one component."; renderMusicReferenceDetail(); await loadMusicReferences(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+}
+
+async function approveMusicReferenceSynthesis() {
+  const approval = state.musicSynthesisApproval; const reference = state.selectedMusicReference; if (!approval || !reference) return;
+  byId("approve-music-reference-synthesis").disabled = true;
+  try { const envelope = await callSoul("music.references.synthesis.approval.execute", { reference_id: reference.reference_id || reference.fusion_id, revision_id: approval.revision.revision_id, confirmation: byId("music-reference-synthesis-confirmation").value, expected_digest: approval.expected_digest }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = dataOf(envelope).reference; state.musicSynthesisApproval = null; byId("music-reference-synthesis-status").textContent = "Original composition target approved. Observed evidence remains unchanged."; renderMusicReferenceDetail(); await loadMusicReferences(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
 }
 
 function renderMusicProjects() {
@@ -1295,6 +1373,14 @@ byId("refresh-music-resources").addEventListener("click", refreshMusicResources)
 byId("preview-music-reference").addEventListener("click", previewMusicReference);
 byId("music-reference-confirmation").addEventListener("input", () => { byId("analyze-music-reference").disabled = !state.musicReferencePreview || byId("music-reference-confirmation").value !== state.musicReferencePreview.confirmation_phrase; });
 byId("analyze-music-reference").addEventListener("click", analyzeMusicReference);
+byId("draft-music-reference-synthesis").addEventListener("click", draftMusicReferenceSynthesis);
+byId("draft-music-reference-fusion").addEventListener("click", draftMusicReferenceFusion);
+byId("preview-music-reference-synthesis-approval").addEventListener("click", previewMusicReferenceSynthesisApproval);
+byId("preview-music-reference-synthesis-rejection").addEventListener("click", previewMusicReferenceSynthesisRejection);
+byId("music-reference-synthesis-confirmation").addEventListener("input", () => { byId("approve-music-reference-synthesis").disabled = !state.musicSynthesisApproval || byId("music-reference-synthesis-confirmation").value !== state.musicSynthesisApproval.confirmation_phrase; });
+byId("approve-music-reference-synthesis").addEventListener("click", approveMusicReferenceSynthesis);
+byId("music-reference-synthesis-reject-confirmation").addEventListener("input", () => { byId("reject-music-reference-synthesis").disabled = !state.musicSynthesisRejection || byId("music-reference-synthesis-reject-confirmation").value !== state.musicSynthesisRejection.confirmation_phrase; });
+byId("reject-music-reference-synthesis").addEventListener("click", rejectMusicReferenceSynthesis);
 byId("preview-music-generation").addEventListener("click", previewMusicGeneration);
 byId("music-generation-confirmation").addEventListener("input", () => { byId("start-music-generation").disabled = !state.musicPreview || byId("music-generation-confirmation").value !== state.musicPreview.confirmation_phrase; });
 byId("start-music-generation").addEventListener("click", startMusicGeneration);

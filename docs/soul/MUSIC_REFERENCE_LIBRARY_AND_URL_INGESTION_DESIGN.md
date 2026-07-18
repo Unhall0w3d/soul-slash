@@ -120,6 +120,44 @@ or `blocked_for_human_review`. Successful analysis returns
 - Preserve immutable revisions and distinguish observed values from targets.
 - Add album/artist aggregation, multi-profile fusion, and human approval.
 
+#### A5.3 bounded behavior
+
+- Synthesis uses one configured local provider request with a 90-second timeout,
+  strict structured output, no tools, and no cloud-provider fallback.
+- A first synthesis must use scope `all`. Later retries may use `all`, `intent`,
+  `title`, `caption`, `lyrics`, `bpm`, `keyscale`, or `timesignature`.
+- Component retry supplies the complete current packet for coherence but code
+  preserves every non-requested component byte-for-byte. Every attempt receives
+  an immutable `syn_` revision ID; revisions are never overwritten.
+- Source titles and credited artists may inform local interpretation, but the
+  stored Sound and Structure and generated lyrics must not name the source,
+  request imitation, or reproduce source lyrics. The model receives no source
+  audio or raw source transcription.
+- Drafting terminates `blocked_for_human_review`. Approval requires an exact
+  preview digest plus `APPROVE_MUSIC_REFERENCE_SYNTHESIS`; only that operation
+  sets the selected revision and makes a reference eligible for fusion.
+- Fusion accepts two to five approved track references. Soul receives their
+  selected derived packets without artist names and must assign a clear role and
+  weight to every source, reconcile conflicts, and return one unified packet.
+  Prompt concatenation, automatic generation, and automatic profile approval are
+  prohibited.
+
+#### A5.3 acceptance criteria
+
+- Invalid/local-cloud providers, malformed JSON, Markdown-wrapped JSON, missing
+  evidence, and unchanged retry output fail before any approval mutation.
+- Whole and component retries append immutable revisions; component retries
+  cannot alter unrequested fields.
+- Approval is digest-bound, exact-confirmed, idempotent, and never approves a
+  different revision.
+- Rejection is independently digest-bound and exact-confirmed, preserves the
+  immutable revision, prevents its later approval, and leaves the profile
+  available for a new candidate retry.
+- Fusion rejects unapproved, duplicate, missing, fewer-than-two, or more-than-five
+  sources and stores roles/weights alongside its candidate synthesis.
+- Dashboard views visibly separate observed source evidence from proposed target
+  material and expose no automatic retry, approval, fusion, or generation.
+
 ### A5.4 — composition and conversation bridge
 
 - Seed the composition form from one or more approved references or fusions.

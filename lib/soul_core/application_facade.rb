@@ -28,6 +28,7 @@ require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
+require_relative "music_reference_synthesis_service"
 
 module SoulCore
   class ApplicationFacade
@@ -64,7 +65,9 @@ module SoulCore
       music_revision_provider: nil,
       music_candidate_disposition_service: nil,
       music_reference_library_service: nil,
-      music_reference_analysis_service: nil
+      music_reference_analysis_service: nil,
+      music_reference_synthesis_service: nil,
+      music_reference_synthesis_provider: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -92,6 +95,8 @@ module SoulCore
       @music_candidate_disposition_service = music_candidate_disposition_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
+      @music_reference_synthesis_service = music_reference_synthesis_service
+      @music_reference_synthesis_provider = music_reference_synthesis_provider
     end
 
     def call(request, progress: nil)
@@ -204,6 +209,12 @@ module SoulCore
       when "music.references.status" then domain(music_reference_analysis.status)
       when "music.references.analysis.preview" then domain(music_reference_analysis.preview(url: required(parameters, "url"), rights_assertion: required(parameters, "rights_assertion")))
       when "music.references.analysis.execute" then domain(music_reference_analysis.execute(url: required(parameters, "url"), rights_assertion: required(parameters, "rights_assertion"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.references.synthesis.draft" then domain(draft_music_reference_synthesis(reference_id: required(parameters, "reference_id"), scope: required(parameters, "scope")))
+      when "music.references.synthesis.approval.preview" then domain(music_reference_synthesis.approval_preview(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id")))
+      when "music.references.synthesis.approval.execute" then domain(music_reference_synthesis.approve(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.references.synthesis.rejection.preview" then domain(music_reference_synthesis.rejection_preview(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id")))
+      when "music.references.synthesis.rejection.execute" then domain(music_reference_synthesis.reject(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.references.fusion.draft" then domain(draft_music_reference_fusion(reference_ids: required(parameters, "reference_ids")))
       when "music.resources.status" then domain(music_generation.resource_inventory)
       when "music.generation.preview" then domain(music_generation.generation_preview(project_id: required(parameters, "project_id")))
       when "music.generation.execute" then domain(music_generation.generation_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
@@ -525,6 +536,34 @@ module SoulCore
 
     def music_reference_analysis
       @music_reference_analysis_service ||= MusicReferenceAnalysisService.new(root: @root)
+    end
+
+    def music_reference_synthesis
+      return @music_reference_synthesis_service if @music_reference_synthesis_service
+      report, resolver = resolved_configuration
+      raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
+      env = resolver.effective_environment
+      @music_reference_synthesis_service = MusicReferenceSynthesisService.new(root: @root, provider_client: ConversationProviderClient.new(env: env, root: @root))
+    end
+
+    def draft_music_reference_synthesis(reference_id:, scope:)
+      provider = @music_reference_synthesis_provider
+      unless provider
+        report, resolver = resolved_configuration
+        return awaiting("configuration is invalid") unless report.fetch("ok")
+        provider = ConversationProviderRegistry.new(env: resolver.effective_environment).local.find(&:configured?)
+      end
+      music_reference_synthesis.draft(reference_id: reference_id, scope: scope, provider: provider)
+    end
+
+    def draft_music_reference_fusion(reference_ids:)
+      provider = @music_reference_synthesis_provider
+      unless provider
+        report, resolver = resolved_configuration
+        return awaiting("configuration is invalid") unless report.fetch("ok")
+        provider = ConversationProviderRegistry.new(env: resolver.effective_environment).local.find(&:configured?)
+      end
+      music_reference_synthesis.draft_fusion(reference_ids: reference_ids, provider: provider)
     end
 
     def music_project_with_analysis(project_id:)
