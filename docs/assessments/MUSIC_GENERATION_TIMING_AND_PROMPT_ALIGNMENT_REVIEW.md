@@ -8,6 +8,8 @@ Status: candidate implementation verified; liquid-DnB listening review pending
 - Displayed total generation time and a phase breakdown in candidate cards.
 - Limited new and revised captions to 512 characters while preserving legacy project readability.
 - Corrected instrumental conditioning to exact `[Instrumental]`.
+- Corrected runtime-input validation so exact `[Instrumental]` is accepted only after the human-facing instrumental project has stored an empty lyrics field.
+- Moved staging creation after runtime-input validation so rejected input cannot leave an empty partial candidate.
 - Corrected the Vulkan request language key to `vocal_language`.
 - Narrowed Soul-assisted reference and revision captions toward one coherent genre center and concise compatible directions.
 - Retained batch size one and every existing exact generation gate.
@@ -27,7 +29,7 @@ Status: candidate implementation verified; liquid-DnB listening review pending
 
 - Ruby syntax checks for all changed services — PASS
 - `node --check assets/dashboard/dashboard.js` — PASS
-- `ruby scripts/verify-music-studio-a2.rb` — PASS (31 checks)
+- `ruby scripts/verify-music-studio-a2.rb` — PASS (32 checks)
 - `ruby scripts/verify-music-studio-a3.rb` — PASS (16 checks)
 - `ruby scripts/verify-music-core-vulkan-feasibility.rb` — PASS (34 checks)
 - `ruby scripts/verify-music-reference-synthesis-a5.rb` — PASS (30 checks)

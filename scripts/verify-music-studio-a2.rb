@@ -227,6 +227,14 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   revised_inspection = service.inspect_project(project_id: project_id)
   check.call("revision preserves the source and candidates are newest-first", revised_inspection.dig("data", "generations").map { |item| item["candidate_id"] } == [revision_candidate, candidate_id])
 
+  instrumental_project = service.create_project(project_input.merge("title" => "Instrumental fixture", "vocal_mode" => "instrumental", "lyrics" => ""))
+  instrumental_id = instrumental_project.dig("data", "project", "project_id")
+  instrumental_preview = service.generation_preview(project_id: instrumental_id)
+  instrumental_candidate = instrumental_preview.dig("data", "candidate_id")
+  instrumental_generated = service.generation_execute(project_id: instrumental_id, candidate_id: instrumental_candidate, confirmation: "START_MUSIC_GENERATION", expected_digest: instrumental_preview.dig("data", "expected_digest"))
+  instrumental_input = store.candidate_input(instrumental_id, instrumental_candidate)
+  check.call("exact-gated instrumental generation accepts only the runtime no-vocal token", instrumental_generated["lifecycle_state"] == "blocked_for_human_review" && instrumental_input["lyrics"] == "[Instrumental]" && process_runner.calls.length == 6)
+
   failed_runner = A2FailProcessRunner.new
   failed_service = SoulCore::MusicGenerationService.new(root: root, music_root: music_root, manifest_path: manifest_path, project_store: store, coordinator: coordinator, process_runner: failed_runner, runner: runner, clock: -> { Time.utc(2026, 7, 17, 20, 1, 0) })
   failed_preview = failed_service.generation_preview(project_id: project_id)

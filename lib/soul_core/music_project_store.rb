@@ -255,10 +255,11 @@ module SoulCore
 
     def validate_generation_input!(input, error_class: IntegrityError)
       raise error_class, "music generation input must be an object" unless input.is_a?(Hash) && input.keys.sort == GENERATION_INPUT_FIELDS.sort
+      runtime_lyrics = input.fetch("lyrics")
       pseudo = {
         "title" => "candidate input", "intent" => "candidate input", "target_duration_seconds" => input.fetch("duration"),
-        "vocal_mode" => input.fetch("lyrics").to_s.empty? || input.fetch("lyrics") == "[Instrumental]" ? "instrumental" : "vocal", "rights_status" => "original",
-        "caption" => input.fetch("caption"), "lyrics" => input.fetch("lyrics"), "bpm" => input.fetch("bpm"),
+        "vocal_mode" => runtime_lyrics.to_s.empty? || runtime_lyrics == "[Instrumental]" ? "instrumental" : "vocal", "rights_status" => "original",
+        "caption" => input.fetch("caption"), "lyrics" => runtime_lyrics == "[Instrumental]" ? "" : runtime_lyrics, "bpm" => input.fetch("bpm"),
         "keyscale" => input.fetch("keyscale"), "timesignature" => input.fetch("timesignature"), "language" => input.fetch("language"), "seed" => input.fetch("seed")
       }
       validate_inputs!(pseudo, supported_duration_only: false)
