@@ -16,7 +16,10 @@ module SoulCore
       "/brand/primary-mark.png" => ["assets/brand/soul-slash-primary-mark.png", "image/png"],
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
       "/brand/supporting-scene.png" => ["assets/brand/soul-slash-supporting-scene.png", "image/png"],
-      "/brand/skill-studio.png" => ["assets/brand/soul-slash-skill-studio.png", "image/png"]
+      "/brand/skill-studio.png" => ["assets/brand/soul-slash-skill-studio.png", "image/png"],
+      "/brand/character/soul-full-body.png" => ["assets/brand/character/soul-full-body.png", "image/png"],
+      "/brand/character/soul-portrait-unmasked.png" => ["assets/brand/character/soul-portrait-unmasked.png", "image/png"],
+      "/brand/character/soul-portrait-masked.png" => ["assets/brand/character/soul-portrait-masked.png", "image/png"]
     }.freeze
 
     SECURITY_HEADERS = {

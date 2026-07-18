@@ -617,7 +617,7 @@ async function buildMusicTrimControls(candidate, sourceAudio, panel, status) {
 }
 
 function drawMusicWaveform(canvas, buffer) {
-  const context = canvas.getContext("2d"); const samples = buffer.getChannelData(0); const width = canvas.width; const height = canvas.height; const step = Math.max(1, Math.floor(samples.length / width)); context.clearRect(0, 0, width, height); context.fillStyle = "#07121A"; context.fillRect(0, 0, width, height); context.strokeStyle = "#00E5FF"; context.lineWidth = 1; context.beginPath();
+  const context = canvas.getContext("2d"); const samples = buffer.getChannelData(0); const width = canvas.width; const height = canvas.height; const step = Math.max(1, Math.floor(samples.length / width)); context.clearRect(0, 0, width, height); context.fillStyle = "#161B25"; context.fillRect(0, 0, width, height); context.strokeStyle = "#3AAEDF"; context.lineWidth = 1; context.beginPath();
   for (let x = 0; x < width; x += 1) { let low = 1; let high = -1; const offset = x * step; for (let index = 0; index < step && offset + index < samples.length; index += 1) { const value = samples[offset + index]; low = Math.min(low, value); high = Math.max(high, value); } context.moveTo(x, (1 + low) * height / 2); context.lineTo(x, (1 + high) * height / 2); }
   context.stroke();
 }

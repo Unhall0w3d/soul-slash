@@ -64,10 +64,12 @@ module SoulCore
 
       static_responses = DashboardHttpApplication::STATIC_ROUTES.keys.map { |route| app.call(method: "GET", target: route, headers: get_headers) }
       skill_studio_asset = DashboardHttpApplication::STATIC_ROUTES["/brand/skill-studio.png"]
+      character_assets = DashboardHttpApplication::STATIC_ROUTES.select { |route, _value| route.start_with?("/brand/character/") }
       checks["exact_static_allowlist_serves_only_approved_assets"] =
         static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } &&
-        DashboardHttpApplication::STATIC_ROUTES.length == 7 &&
-        skill_studio_asset == ["assets/brand/soul-slash-skill-studio.png", "image/png"]
+        DashboardHttpApplication::STATIC_ROUTES.length == 10 &&
+        skill_studio_asset == ["assets/brand/soul-slash-skill-studio.png", "image/png"] &&
+        character_assets.length == 3 && character_assets.values.all? { |path, content_type| path.start_with?("assets/brand/character/") && content_type == "image/png" }
 
       rejected_targets = ["/../.env", "/%2e%2e/.env", "/assets/../.env", "/assets/dashboard.js?x=1", "/unknown.png"]
       checks["traversal_query_confusion_and_unknown_paths_fail_closed"] = rejected_targets.all? { |target| app.call(method: "GET", target: target, headers: get_headers).status == 404 }
@@ -125,15 +127,15 @@ module SoulCore
       review_boundary = html.downcase.include?("human visual review") || (html.include?("Operator Gate 1") && html.include?("Operator Gate 2"))
       checks["semantic_accessible_reviewable_dom_is_present"] = required_dom.all? { |needle| html.include?(needle) } && review_boundary
 
-      tokens = %w[#060B11 #D4AF37 #00E5FF #FF1744 #B7D8DC]
-      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.scan("/brand/micro-mark.svg").length >= 4 && html.include?("rel=\"icon\"") && !html.include?("/brand/supporting-scene.png")
+      tokens = %w[#0B0D13 #A77B5B #3AAEDF #FF1744 #A9D1E4]
+      checks["approved_visual_tokens_and_brand_assets_are_used"] = tokens.all? { |token| css.include?(token) } && html.scan("/brand/micro-mark.svg").length >= 4 && html.include?("rel=\"icon\"") && html.include?("/brand/character/soul-portrait-unmasked.png") && !html.include?("/brand/supporting-scene.png")
 
       checks["readable_type_scale_and_signal_interactions_replace_legacy_microcopy"] =
         css.include?("--type-micro:11px") &&
         css.include?("--type-label:12px") &&
         css.include?("--type-copy:14px") &&
         css.include?(".workflow-stages span { display:block; margin-bottom:19px; color:var(--cyan); font:700 12px") &&
-        css.include?(".studio-header>div>p:last-child,.improvement-header>div>p:last-child { max-width:800px; margin:0; color:#91B2B7; font-size:14px") &&
+        css.include?(".studio-header>div>p:last-child,.improvement-header>div>p:last-child { max-width:800px; margin:0; color:#93A5B9; font-size:14px") &&
         !css.include?("rgba(110,61,223")
 
       checks["focus_reduced_motion_and_responsive_rules_exist"] = css.include?(":focus-visible") && css.include?("prefers-reduced-motion") && css.scan("@media").length >= 3
