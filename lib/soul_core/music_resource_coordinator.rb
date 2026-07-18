@@ -80,7 +80,7 @@ module SoulCore
       cross_lease = @model_lease_store.acquire(provider_id: "nvidia-music", model_id: "ace-step-1.5", request_id: candidate_id, conversation_id: project_id, ttl_seconds: ttl_seconds)
       record = with_lock do
         hardware = observe_hardware
-        active = active_lease_unlocked
+        active = active_lease_unlocked(cleanup_stale: true)
         conflicts = blockers(hardware, active)
         raise Busy, conflicts.join("; ") unless conflicts.empty?
         now = @clock.call
@@ -215,10 +215,11 @@ module SoulCore
       items
     end
 
-    def active_lease_unlocked
+    def active_lease_unlocked(cleanup_stale: false)
       record = read_lease
       return nil unless record
       if stale?(record)
+        return record unless cleanup_stale
         @model_lease_store.release(record["model_runtime_lease_id"])
         safe_unlink(@lease_path)
         nil

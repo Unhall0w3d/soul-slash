@@ -26,6 +26,7 @@ require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
+require_relative "music_candidate_trim_service"
 require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
@@ -65,6 +66,7 @@ module SoulCore
       music_revision_draft_service: nil,
       music_revision_provider: nil,
       music_candidate_disposition_service: nil,
+      music_candidate_trim_service: nil,
       music_project_deletion_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
@@ -95,6 +97,7 @@ module SoulCore
       @music_revision_draft_service = music_revision_draft_service
       @music_revision_provider = music_revision_provider
       @music_candidate_disposition_service = music_candidate_disposition_service
+      @music_candidate_trim_service = music_candidate_trim_service
       @music_project_deletion_service = music_project_deletion_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
@@ -239,6 +242,8 @@ module SoulCore
       when "music.candidates.reject.execute" then domain(music_candidate_disposition.reject_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.candidates.export.preview" then domain(music_candidate_disposition.export_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id")))
       when "music.candidates.export.execute" then domain(music_candidate_disposition.export_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.candidates.trim.preview" then domain(music_candidate_trim.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), start_seconds: required(parameters, "start_seconds"), end_seconds: required(parameters, "end_seconds")))
+      when "music.candidates.trim.execute" then domain(music_candidate_trim.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), start_seconds: required(parameters, "start_seconds"), end_seconds: required(parameters, "end_seconds"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -537,6 +542,10 @@ module SoulCore
 
     def music_candidate_disposition
       @music_candidate_disposition_service ||= MusicCandidateDispositionService.new(root: @root, analysis_service: music_candidate_analysis)
+    end
+
+    def music_candidate_trim
+      @music_candidate_trim_service ||= MusicCandidateTrimService.new(root: @root)
     end
 
     def music_project_deletion

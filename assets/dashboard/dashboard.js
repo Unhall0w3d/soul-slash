@@ -110,6 +110,18 @@ async function logout() {
 
 function announce(message) { byId("live-status").textContent = message; }
 function dataOf(envelope) { return envelope.data || {}; }
+function prefillApprovalGate(inputOrId, buttonOrId, phrase, enabled = true) {
+  const input = typeof inputOrId === "string" ? byId(inputOrId) : inputOrId;
+  const button = typeof buttonOrId === "string" ? byId(buttonOrId) : buttonOrId;
+  const exact = String(phrase || "");
+  input.value = enabled ? exact : "";
+  input.readOnly = enabled;
+  input.dataset.approvalMode = enabled ? "click" : "typed";
+  const label = input.id ? document.querySelector(`label[for="${input.id}"]`) : null;
+  const labelText = label && Array.from(label.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+  if (enabled && labelText) labelText.textContent = "Approval phrase ";
+  button.disabled = !enabled || exact.length === 0;
+}
 function lifecycle(envelope) {
   const value = envelope.lifecycle_state || "failed";
   byId("lifecycle-state").textContent = value.replaceAll("_", " ");
@@ -305,7 +317,7 @@ async function refreshMusicReferenceStatus() {
 
 async function previewMusicReference() {
   state.musicReferencePreview = null; byId("music-reference-confirm").hidden = true; byId("music-reference-status").textContent = "Reading metadata only; no media is downloaded at this gate."; byId("preview-music-reference").disabled = true;
-  try { const params = { url: byId("music-reference-url").value, rights_assertion: byId("music-reference-rights").value }; const envelope = await callSoul("music.references.analysis.preview", params); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Reference preview is unavailable"); state.musicReferencePreview = { ...data, ...params }; byId("music-reference-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-confirmation").value = ""; byId("analyze-music-reference").disabled = true; byId("music-reference-confirm").hidden = false; byId("music-reference-status").textContent = `${data.metadata.title} · ${data.metadata.artists.join(", ")} · ${data.metadata.duration_seconds}s. Exact confirmation is required.`; }
+  try { const params = { url: byId("music-reference-url").value, rights_assertion: byId("music-reference-rights").value }; const envelope = await callSoul("music.references.analysis.preview", params); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Reference preview is unavailable"); state.musicReferencePreview = { ...data, ...params }; byId("music-reference-scope").textContent = JSON.stringify(data.preview_scope, null, 2); prefillApprovalGate("music-reference-confirmation", "analyze-music-reference", data.confirmation_phrase); byId("music-reference-confirm").hidden = false; byId("music-reference-status").textContent = `${data.metadata.title} · ${data.metadata.artists.join(", ")} · ${data.metadata.duration_seconds}s. Review the scope; clicking Analyze authorizes this foreground pass.`; }
   catch (error) { byId("music-reference-status").textContent = error.message; }
   finally { byId("preview-music-reference").disabled = false; }
 }
@@ -381,7 +393,7 @@ function renderMusicReferenceDetail() {
 async function previewMusicReferenceReanalysis() {
   const reference = state.selectedMusicReference; if (!reference || reference.record_type !== "track" || state.musicReferenceAnalyzing) return;
   state.musicReferenceReanalysis = null; byId("music-reference-reanalysis-confirm").hidden = true; byId("reanalyze-music-reference").disabled = true; byId("music-reference-synthesis-status").textContent = "Preparing a complete reanalysis preview; no source media has been downloaded yet.";
-  try { const envelope = await callSoul("music.references.reanalysis.preview", { reference_id: reference.reference_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicReferenceReanalysis = data; byId("music-reference-reanalysis-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-reanalysis-confirmation").value = ""; byId("execute-music-reference-reanalysis").disabled = true; byId("music-reference-synthesis-status").textContent = "Exact foreground reanalysis is ready for confirmation."; renderMusicReferenceDetail(); }
+  try { const envelope = await callSoul("music.references.reanalysis.preview", { reference_id: reference.reference_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicReferenceReanalysis = data; byId("music-reference-reanalysis-scope").textContent = JSON.stringify(data.preview_scope, null, 2); prefillApprovalGate("music-reference-reanalysis-confirmation", "execute-music-reference-reanalysis", data.confirmation_phrase); byId("music-reference-synthesis-status").textContent = "Review the scope; clicking Reanalyze authorizes this foreground pass."; renderMusicReferenceDetail(); }
   catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
   finally { byId("reanalyze-music-reference").disabled = false; }
 }
@@ -428,7 +440,7 @@ async function draftMusicReferenceFusion() {
 async function previewMusicReferenceSynthesisApproval() {
   const reference = state.selectedMusicReference; const revision = reference?.synthesis?.revisions?.at(-1); if (!reference || !revision) return;
   byId("preview-music-reference-synthesis-approval").disabled = true;
-  try { const envelope = await callSoul("music.references.synthesis.approval.preview", { reference_id: reference.reference_id || reference.fusion_id, revision_id: revision.revision_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicSynthesisApproval = data; byId("music-reference-synthesis-scope-preview").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-synthesis-confirmation").value = ""; byId("approve-music-reference-synthesis").disabled = true; byId("music-reference-synthesis-status").textContent = "Exact revision approval is ready for Operator confirmation."; renderMusicReferenceDetail(); }
+  try { const envelope = await callSoul("music.references.synthesis.approval.preview", { reference_id: reference.reference_id || reference.fusion_id, revision_id: revision.revision_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicSynthesisApproval = data; byId("music-reference-synthesis-scope-preview").textContent = JSON.stringify(data.preview_scope, null, 2); prefillApprovalGate("music-reference-synthesis-confirmation", "approve-music-reference-synthesis", data.confirmation_phrase); byId("music-reference-synthesis-status").textContent = "Review the exact revision; clicking Approve records the Operator decision."; renderMusicReferenceDetail(); }
   catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
   finally { byId("preview-music-reference-synthesis-approval").disabled = false; }
 }
@@ -495,7 +507,7 @@ async function refreshMusicResources() {
 
 async function previewMusicGeneration() {
   if (!state.selectedMusicProject) return; byId("music-generation-status").textContent = "Inspecting exact generation scope…";
-  try { const envelope = await callSoul("music.generation.preview", { project_id: state.selectedMusicProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || data.reason || "Generation is blocked"); state.musicPreview = data; state.musicCandidateId = data.candidate_id; byId("music-generation-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-generation-confirm").hidden = false; byId("music-generation-confirmation").value = ""; byId("start-music-generation").disabled = true; byId("music-generation-status").textContent = `Candidate ${data.candidate_id} is bound to this preview.`; } catch (error) { byId("music-generation-status").textContent = error.message; }
+  try { const envelope = await callSoul("music.generation.preview", { project_id: state.selectedMusicProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || data.reason || "Generation is blocked"); state.musicPreview = data; state.musicCandidateId = data.candidate_id; byId("music-generation-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-generation-confirm").hidden = false; prefillApprovalGate("music-generation-confirmation", "start-music-generation", data.confirmation_phrase); byId("music-generation-status").textContent = `Candidate ${data.candidate_id} is bound to this preview. Clicking Start authorizes this exact foreground run.`; } catch (error) { byId("music-generation-status").textContent = error.message; }
 }
 
 async function startMusicGeneration() {
@@ -525,7 +537,7 @@ function renderMusicCandidates(candidates) {
     const download = document.createElement("a"); download.href = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/flac`; download.textContent = "Open lossless FLAC"; download.target = "_blank";
     const analysis = musicAnalysisPanel(candidate);
     const revision = !older && (candidate.review?.disposition === "revise" || candidate.analysis?.machine_route === "revision_recommended") ? musicRevisionPanel(candidate) : null;
-    details.append(download, analysis); if (revision) details.append(revision); if (candidate.review) details.append(musicDispositionPanel(candidate)); details.append(musicReviewForm(candidate));
+    details.append(download, analysis); if (revision) details.append(revision); if (candidate.review) details.append(musicDispositionPanel(candidate)); if (candidate.review?.disposition === "keep") details.append(musicTrimPanel(candidate, audio)); details.append(musicReviewForm(candidate));
     card.append(heading, audio);
     if (older) { const toggle = document.createElement("button"); toggle.type = "button"; toggle.className = "text-button music-version-toggle"; toggle.textContent = "Inspect older version"; toggle.addEventListener("click", () => { details.hidden = !details.hidden; toggle.textContent = details.hidden ? "Inspect older version" : "Collapse older version"; }); card.append(toggle); }
     card.append(details); list.append(card);
@@ -555,10 +567,11 @@ async function previewMusicDisposition(candidate, kind, panel, button, status) {
     if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || `${kind} preview is unavailable`);
     const gate = document.createElement("div"); gate.className = "music-disposition-gate";
     const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
-    const label = document.createElement("label"); label.textContent = `Type ${data.confirmation_phrase}`;
+    const label = document.createElement("label"); label.textContent = kind === "reject" ? `Type ${data.confirmation_phrase}` : `Approval phrase · ${data.confirmation_phrase}`;
     const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false;
     const execute = document.createElement("button"); execute.type = "button"; execute.className = kind === "reject" ? "danger-button" : "gate-button gate-button--gold"; execute.textContent = kind === "reject" ? "Delete rejected candidate" : "Export finished song"; execute.disabled = true;
     input.addEventListener("input", () => { execute.disabled = input.value !== data.confirmation_phrase; });
+    if (kind === "export") prefillApprovalGate(input, execute, data.confirmation_phrase);
     execute.addEventListener("click", () => executeMusicDisposition(candidate, kind, data, input.value, execute, status));
     label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "reject" ? "Deletion removes FLAC, MP3, inputs, and transcription; a small lineage receipt remains." : "Export is atomic, owner-private, and will not overwrite an existing song folder.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
@@ -574,11 +587,65 @@ async function executeMusicDisposition(candidate, kind, preview, confirmation, b
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
+function musicTrimPanel(candidate, sourceAudio) {
+  const panel = document.createElement("section"); panel.className = "music-trim";
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Lite Edit"; const boundary = document.createElement("small"); boundary.textContent = "source edges only"; heading.append(title, boundary);
+  const explanation = document.createElement("p"); explanation.textContent = "Create a new FLAC and MP3 from the immutable original. Internal cuts, fades, and arrangement repair remain revision work.";
+  const open = document.createElement("button"); open.type = "button"; open.className = "gate-button"; open.textContent = "Open trim controls";
+  const status = document.createElement("p"); status.className = "dialog-status"; status.textContent = "Export the accepted original first; edited copies never overwrite it.";
+  panel.append(heading, explanation, open, status);
+  open.addEventListener("click", async () => { open.disabled = true; status.textContent = "Reading the source waveform locally…"; try { await buildMusicTrimControls(candidate, sourceAudio, panel, status); open.remove(); status.textContent = "Set source boundaries, audition the selection, then preview the exact derivative."; } catch (error) { status.textContent = error.message; open.disabled = false; } });
+  return panel;
+}
+
+async function buildMusicTrimControls(candidate, sourceAudio, panel, status) {
+  const sourceUrl = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`;
+  const response = await fetch(sourceUrl, { credentials: "same-origin", cache: "no-store" }); if (!response.ok) throw new Error("Source listening copy is unavailable");
+  const bytes = await response.arrayBuffer(); const Context = window.AudioContext || window.webkitAudioContext; if (!Context) throw new Error("This browser cannot render the waveform");
+  const context = new Context(); let buffer; try { buffer = await context.decodeAudioData(bytes.slice(0)); } finally { await context.close(); }
+  const recordedDuration = Number(candidate.artifacts?.flac?.duration_seconds); const duration = Number((Number.isFinite(recordedDuration) && recordedDuration > 0 ? recordedDuration : buffer.duration).toFixed(3)); const controls = document.createElement("div"); controls.className = "music-trim-controls";
+  const canvas = document.createElement("canvas"); canvas.width = 1200; canvas.height = 150; canvas.setAttribute("aria-label", "Source audio waveform"); drawMusicWaveform(canvas, buffer);
+  const grid = document.createElement("div"); grid.className = "music-trim-grid";
+  const makeBoundary = (name, value) => { const label = document.createElement("label"); label.textContent = name; const input = document.createElement("input"); input.type = "number"; input.min = "0"; input.max = String(duration); input.step = "0.001"; input.value = value.toFixed(3); label.append(input); return [label, input]; };
+  const [startLabel, start] = makeBoundary("Start seconds", 0); const [endLabel, end] = makeBoundary("End seconds", duration); const result = document.createElement("output"); result.textContent = `${duration.toFixed(3)} seconds selected`; grid.append(startLabel, endLabel, result);
+  const actions = document.createElement("div"); actions.className = "music-actions"; const audition = document.createElement("button"); audition.type = "button"; audition.className = "quiet-button"; audition.textContent = "Audition selection"; const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview trimmed copy"; actions.append(audition, preview);
+  const update = () => { const startAt = Number(start.value); const endAt = Number(end.value); const valid = Number.isFinite(startAt) && Number.isFinite(endAt) && startAt >= 0 && endAt <= duration + 0.01 && endAt - startAt >= 1 && (startAt >= 0.01 || duration - endAt >= 0.01); preview.disabled = !valid; audition.disabled = !valid; result.textContent = valid ? `${(endAt - startAt).toFixed(3)} seconds selected` : "Choose at least one second and change an edge"; };
+  start.addEventListener("input", update); end.addEventListener("input", update); update();
+  audition.addEventListener("click", () => auditionMusicSelection(sourceAudio, Number(start.value), Number(end.value), audition));
+  preview.addEventListener("click", () => previewMusicTrim(candidate, Number(start.value), Number(end.value), controls, preview, status));
+  controls.append(canvas, grid, actions); panel.insertBefore(controls, status);
+}
+
+function drawMusicWaveform(canvas, buffer) {
+  const context = canvas.getContext("2d"); const samples = buffer.getChannelData(0); const width = canvas.width; const height = canvas.height; const step = Math.max(1, Math.floor(samples.length / width)); context.clearRect(0, 0, width, height); context.fillStyle = "#07121A"; context.fillRect(0, 0, width, height); context.strokeStyle = "#00E5FF"; context.lineWidth = 1; context.beginPath();
+  for (let x = 0; x < width; x += 1) { let low = 1; let high = -1; const offset = x * step; for (let index = 0; index < step && offset + index < samples.length; index += 1) { const value = samples[offset + index]; low = Math.min(low, value); high = Math.max(high, value); } context.moveTo(x, (1 + low) * height / 2); context.lineTo(x, (1 + high) * height / 2); }
+  context.stroke();
+}
+
+function auditionMusicSelection(audio, startAt, endAt, button) {
+  audio.pause(); audio.currentTime = startAt; audio.play(); button.disabled = true; button.textContent = "Playing selection";
+  const stop = () => { if (audio.currentTime >= endAt || audio.paused || audio.ended) { if (audio.currentTime >= endAt) audio.pause(); audio.removeEventListener("timeupdate", stop); audio.removeEventListener("pause", stop); button.disabled = false; button.textContent = "Audition selection"; } };
+  audio.addEventListener("timeupdate", stop); audio.addEventListener("pause", stop);
+}
+
+async function previewMusicTrim(candidate, startSeconds, endSeconds, controls, button, status) {
+  button.disabled = true; status.textContent = "Binding immutable source and exact edge boundaries…";
+  try { const envelope = await callSoul("music.candidates.trim.preview", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, start_seconds: startSeconds, end_seconds: endSeconds }); const data = dataOf(envelope); if (envelope.lifecycle_state === "complete" && data.trim) { status.textContent = `This exact trim already exists at ${data.trim.destination}`; return; } if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Trim preview is unavailable");
+    controls.querySelectorAll("input,button").forEach((control) => { control.disabled = true; }); const gate = document.createElement("div"); gate.className = "music-disposition-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); const apply = document.createElement("button"); apply.type = "button"; apply.className = "gate-button gate-button--gold"; apply.textContent = "Create trimmed copy"; prefillApprovalGate(input, apply, data.confirmation_phrase); apply.addEventListener("click", () => executeMusicTrim(candidate, startSeconds, endSeconds, data, input.value, apply, status)); label.append(input); gate.append(scope, label, apply); controls.append(gate); status.textContent = "Clicking Create authorizes this one source-derived FLAC and MP3. The original remains untouched.";
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+async function executeMusicTrim(candidate, startSeconds, endSeconds, preview, confirmation, button, status) {
+  button.disabled = true; status.textContent = "Creating the bounded source-derived copies…";
+  try { const envelope = await callSoul("music.candidates.trim.execute", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, start_seconds: startSeconds, end_seconds: endSeconds, confirmation, expected_digest: preview.expected_digest }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); status.textContent = `Trimmed FLAC and MP3 created at ${dataOf(envelope).trim?.destination || "the finished song edit folder"}.`; }
+  catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
 function musicAnalysisPanel(candidate) {
   const panel = document.createElement("section"); panel.className = "music-analysis"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Vocal evidence"; const badge = document.createElement("small"); heading.append(title, badge); panel.append(heading);
   if (candidate.analysis) { renderMusicAnalysisEvidence(panel, candidate.analysis, badge, candidate); return panel; }
   badge.textContent = "not analyzed"; const explanation = document.createElement("p"); explanation.className = "muted"; explanation.textContent = "Run one CPU-only foreground transcription. The model exits after the bounded pass; machine evidence routes to human testing or revision but never approves the candidate."; const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview vocal analysis"; const status = document.createElement("p"); status.className = "dialog-status"; panel.append(explanation, preview, status);
-  preview.addEventListener("click", async () => { preview.disabled = true; status.textContent = "Inspecting exact CPU analysis scope…"; try { const envelope = await callSoul("music.candidates.analysis.preview", { project_id: candidate.project_id, candidate_id: candidate.candidate_id }); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Analysis is unavailable"); const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Type ${data.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const run = document.createElement("button"); run.type = "button"; run.className = "gate-button gate-button--gold"; run.textContent = "Analyze vocals in foreground"; run.disabled = true; input.addEventListener("input", () => { run.disabled = input.value !== data.confirmation_phrase; }); run.addEventListener("click", () => runMusicAnalysis(candidate, data, input.value, status, run)); preview.replaceWith(scope, label, input, run); status.textContent = "No daemon, queue, listener, or resident model will be created."; } catch (error) { status.textContent = error.message; preview.disabled = false; } }); return panel;
+  preview.addEventListener("click", async () => { preview.disabled = true; status.textContent = "Inspecting exact CPU analysis scope…"; try { const envelope = await callSoul("music.candidates.analysis.preview", { project_id: candidate.project_id, candidate_id: candidate.candidate_id }); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Analysis is unavailable"); const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const run = document.createElement("button"); run.type = "button"; run.className = "gate-button gate-button--gold"; run.textContent = "Analyze vocals in foreground"; run.disabled = true; input.addEventListener("input", () => { run.disabled = input.value !== data.confirmation_phrase; }); prefillApprovalGate(input, run, data.confirmation_phrase); run.addEventListener("click", () => runMusicAnalysis(candidate, data, input.value, status, run)); preview.replaceWith(scope, label, input, run); status.textContent = "Review the scope; clicking Analyze authorizes the bounded CPU pass. No resident model will remain."; } catch (error) { status.textContent = error.message; preview.disabled = false; } }); return panel;
 }
 
 async function runMusicAnalysis(candidate, preview, confirmation, status, button) {
@@ -608,12 +675,12 @@ async function draftMusicRevision(candidate, panel, launch, status) {
 
 function prepareMusicRevision(candidate, panel, launch, status, draft) {
   const source = candidate.generation_input; if (!source) { status.textContent = "The exact source input is unavailable; revision stopped safely."; return; } const form = document.createElement("form"); form.className = "music-revision"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Revision input"; const sourceLabel = document.createElement("small"); sourceLabel.textContent = `from ${candidate.candidate_id}`; heading.append(title, sourceLabel);
-  const field = (labelText, control) => { const label = document.createElement("label"); label.textContent = labelText; label.append(control); return label; }; const caption = document.createElement("textarea"); caption.name = "caption"; caption.rows = 6; caption.maxLength = 8000; caption.required = true; caption.value = draft.caption; const lyrics = document.createElement("textarea"); lyrics.name = "lyrics"; lyrics.rows = 9; lyrics.maxLength = 20000; lyrics.required = true; lyrics.value = draft.lyrics; const grid = document.createElement("div"); grid.className = "music-revision-grid"; const bpm = document.createElement("input"); bpm.name = "bpm"; bpm.type = "number"; bpm.min = "30"; bpm.max = "300"; bpm.required = true; bpm.value = String(draft.bpm); const key = document.createElement("input"); key.name = "keyscale"; key.maxLength = 40; key.required = true; key.value = draft.keyscale; const time = document.createElement("input"); time.name = "timesignature"; time.pattern = "2|3|4|5|6|7|9|12"; time.required = true; time.value = draft.timesignature; const seed = document.createElement("input"); seed.name = "seed"; seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.required = true; seed.value = String(Math.floor(Math.random() * 2147483647)); grid.append(field("BPM", bpm), field("Key", key), field("Time", time), field("Seed", seed)); const preview = document.createElement("button"); preview.type = "submit"; preview.className = "gate-button"; preview.textContent = "Preview exact revision"; form.append(heading, field("Sound and structure", caption), field("Lyrics and section markers", lyrics), grid, preview); panel.insertBefore(form, status);
+  const field = (labelText, control) => { const label = document.createElement("label"); label.textContent = labelText; label.append(control); return label; }; const caption = document.createElement("textarea"); caption.name = "caption"; caption.rows = 6; caption.maxLength = 8000; caption.required = true; caption.placeholder = "Overall sonic identity only; keep BPM, key, time, and exact section timing in their dedicated fields or lyrics script."; caption.value = draft.caption; const lyrics = document.createElement("textarea"); lyrics.name = "lyrics"; lyrics.rows = 9; lyrics.maxLength = 20000; lyrics.required = true; lyrics.placeholder = "[Verse 1 - rhythmic male vocal]\nOne lyric line at a time"; lyrics.value = draft.lyrics; const grid = document.createElement("div"); grid.className = "music-revision-grid"; const bpm = document.createElement("input"); bpm.name = "bpm"; bpm.type = "number"; bpm.min = "30"; bpm.max = "300"; bpm.required = true; bpm.value = String(draft.bpm); const key = document.createElement("input"); key.name = "keyscale"; key.maxLength = 40; key.required = true; key.value = draft.keyscale; const time = document.createElement("input"); time.name = "timesignature"; time.pattern = "2|3|4|5|6|7|9|12"; time.required = true; time.value = draft.timesignature; const seed = document.createElement("input"); seed.name = "seed"; seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.required = true; seed.value = String(Math.floor(Math.random() * 2147483647)); grid.append(field("BPM", bpm), field("Key", key), field("Time", time), field("Seed", seed)); const preview = document.createElement("button"); preview.type = "submit"; preview.className = "gate-button"; preview.textContent = "Preview exact revision"; form.append(heading, field("Sound and structure", caption), field("Lyrics and section markers", lyrics), grid, preview); panel.insertBefore(form, status);
   form.addEventListener("submit", async (event) => { event.preventDefault(); const revision = { caption: caption.value, lyrics: lyrics.value, bpm: Number(bpm.value), keyscale: key.value, timesignature: time.value, seed: Number(seed.value) }; preview.disabled = true; status.textContent = "Binding the revised input to one new candidate…"; try { const envelope = await callSoul("music.candidates.revision.preview", { project_id: candidate.project_id, source_candidate_id: candidate.candidate_id, revision }); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Revision preview is unavailable"); form.querySelectorAll("input,textarea,button").forEach((control) => { control.disabled = true; }); const gate = musicRevisionGate(candidate, revision, data, status); panel.insertBefore(gate, status); status.textContent = `New candidate ${data.candidate_id} is bound to this exact revision. No generation has started.`; } catch (error) { status.textContent = error.message; preview.disabled = false; } });
 }
 
 function musicRevisionGate(sourceCandidate, revision, preview, status) {
-  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Type ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded NVIDIA revision pass…"; const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; } finally { state.musicGenerating = false; cancel.disabled = true; } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions); return gate;
+  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); prefillApprovalGate(input, start, preview.confirmation_phrase); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded NVIDIA revision pass…"; const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; } finally { state.musicGenerating = false; cancel.disabled = true; } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions); return gate;
 }
 
 async function cancelRevisionGeneration(candidateId, status) {
@@ -837,7 +904,7 @@ async function previewModelRuntime(action, profileId = null) {
       detailRow("Service", runtime.target_profile?.service || runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
       detailRow("Slots", runtime.server?.slots_reachable ? `${runtime.server.active_slots} active / ${runtime.server.total_slots} total` : "offline")
     );
-    byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; byId("model-runtime-confirmation").value = ""; byId("execute-model-runtime").disabled = true;
+    byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; prefillApprovalGate("model-runtime-confirmation", "execute-model-runtime", runtime.confirmation_phrase);
     byId("execute-model-runtime").textContent = action === "switch" ? "Switch verified model runtime" : `${action === "load" ? "Load" : "Unload"} verified model runtime`;
     byId("model-runtime-dialog-status").textContent = "The runtime state will be checked again before the service changes."; byId("model-runtime-dialog").showModal();
   } catch (error) { status.textContent = error.message || `Model ${action} preview failed safely.`; }
@@ -934,7 +1001,7 @@ async function previewProposalApproval() {
   const status = byId("proposal-approval-status"); status.textContent = "Checking proposal revision…";
   const envelope = await callSoul("skill_studio.proposals.approval.preview", { proposal_id: state.selectedProposal.proposal_id }); const data = dataOf(envelope);
   if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Approval preview blocked."; return; }
-  state.proposalApproval = data; byId("proposal-approval-confirm").hidden = false; byId("proposal-confirmation").value = ""; byId("execute-proposal-approval").disabled = true; status.textContent = "Approval authorizes implementation work only; it does not generate, execute, register, or promote a skill.";
+  state.proposalApproval = data; byId("proposal-approval-confirm").hidden = false; prefillApprovalGate("proposal-confirmation", "execute-proposal-approval", data.confirmation_phrase || "APPROVE_PROPOSAL_FOR_BETA_BUILD"); status.textContent = "Review the exact proposal; clicking Approve records Gate 1 authority only.";
 }
 
 async function executeProposalApproval() {
@@ -948,7 +1015,7 @@ async function previewBetaBuild() {
   if (!state.selectedProposal) return; const status = byId("beta-build-status"); const skillId = byId("beta-build-skill-id").value.trim(); status.textContent = "Validating Gate 1 and proposal revision…";
   const envelope = await callSoul("skill_studio.proposals.beta_build.preview", { proposal_id: state.selectedProposal.proposal_id, skill_id: skillId }); const data = dataOf(envelope);
   if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Beta preparation preview blocked."; return; }
-  state.betaBuildPreview = data; byId("beta-build-confirm").hidden = false; byId("beta-build-phrase").textContent = data.confirmation_phrase; byId("beta-build-confirmation").value = ""; byId("execute-beta-build").disabled = true; status.textContent = "Review the exact skill ID and candidate-only boundary, then type the preparation phrase.";
+  state.betaBuildPreview = data; byId("beta-build-confirm").hidden = false; byId("beta-build-phrase").textContent = data.confirmation_phrase; prefillApprovalGate("beta-build-confirmation", "execute-beta-build", data.confirmation_phrase); status.textContent = "Review the exact skill ID and candidate-only boundary; clicking Prepare authorizes this workspace.";
 }
 
 async function executeBetaBuild() {
@@ -991,7 +1058,7 @@ async function previewBetaRun() {
   if (!state.selectedBeta) return; const status = byId("beta-run-status"); status.textContent = "Preparing bounded Beta run preview…";
   const envelope = await callSoul("skill_studio.betas.run.preview", { beta_id: state.selectedBeta.beta_id, args: betaArguments() }); const data = dataOf(envelope);
   if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Beta run preview blocked."; return; }
-  state.betaRunPreview = data; byId("beta-run-confirm").hidden = false; byId("beta-run-phrase").textContent = data.confirmation_phrase; byId("beta-run-confirmation").value = ""; byId("execute-beta-run").disabled = true; status.textContent = `Foreground timeout: ${data.timeout_seconds}s. A bounded local diagnostic record will be written.`;
+  state.betaRunPreview = data; byId("beta-run-confirm").hidden = false; byId("beta-run-phrase").textContent = data.confirmation_phrase; prefillApprovalGate("beta-run-confirmation", "execute-beta-run", data.confirmation_phrase); status.textContent = `Foreground timeout: ${data.timeout_seconds}s. Clicking Run authorizes this bounded invocation.`;
 }
 
 async function executeBetaRun() {
@@ -1003,7 +1070,7 @@ async function executeBetaRun() {
 async function previewBetaPromotion() {
   if (!state.selectedBeta) return; const status = byId("beta-promotion-status"); status.textContent = "Checking test evidence and revision integrity…";
   const envelope = await callSoul("skill_studio.betas.promotion.preview", { beta_id: state.selectedBeta.beta_id }); const data = dataOf(envelope); if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Promotion preview blocked."; return; }
-  state.betaPromotionPreview = data; byId("beta-promotion-confirm").hidden = false; const blockers = (data.blockers || []).map((text) => ({ text, passed: false })); renderChecklist(byId("beta-promotion-blockers"), blockers, "All deterministic prerequisites are satisfied."); byId("beta-promotion-confirmation").value = ""; byId("execute-beta-promotion").disabled = true; status.textContent = data.ready ? "Ready for your Gate 2 decision. Approval will not perform promotion." : "Promotion approval is blocked until every listed requirement is satisfied.";
+  state.betaPromotionPreview = data; byId("beta-promotion-confirm").hidden = false; const blockers = (data.blockers || []).map((text) => ({ text, passed: false })); renderChecklist(byId("beta-promotion-blockers"), blockers, "All deterministic prerequisites are satisfied."); prefillApprovalGate("beta-promotion-confirmation", "execute-beta-promotion", data.confirmation_phrase || "APPROVE_BETA_FOR_PROMOTION", data.ready === true); status.textContent = data.ready ? "Ready for Gate 2. Clicking Approve records the decision but does not perform promotion." : "Promotion approval is blocked until every listed requirement is satisfied.";
 }
 
 async function executeBetaPromotion() {
@@ -1017,7 +1084,7 @@ async function previewProductionPromotion() {
   if (!state.selectedBeta) return; const status = byId("production-promotion-status"); status.textContent = "Revalidating Gate 2, tests, source bytes, and production target…";
   const envelope = await callSoul("skill_studio.betas.production.preview", { beta_id: state.selectedBeta.beta_id }); const data = dataOf(envelope);
   if (!data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || data.reason || "Production promotion preview blocked."; return; }
-  state.productionPromotionPreview = data; byId("production-promotion-confirm").hidden = false; byId("production-promotion-phrase").textContent = data.confirmation_phrase; byId("production-promotion-confirmation").value = ""; byId("execute-production-promotion").disabled = true;
+  state.productionPromotionPreview = data; byId("production-promotion-confirm").hidden = false; byId("production-promotion-phrase").textContent = data.confirmation_phrase; prefillApprovalGate("production-promotion-confirmation", "execute-production-promotion", data.confirmation_phrase);
   renderChecklist(byId("production-promotion-scope"), [{ text: `Copy ${data.source_entrypoint} → ${data.production_entrypoint}`, complete: true }, { text: `Register ${data.beta_id} in ${data.registry_path}`, complete: true }, { text: `Source SHA-256 ${data.source_sha256}`, complete: true }, ...((data.rollback || []).map((text) => ({ text: `Rollback: ${text}`, complete: true })))], "No production scope returned."); status.textContent = "Exact source, target, hash, registry definition, and rollback are bound into this preview.";
 }
 
@@ -1123,8 +1190,8 @@ async function previewImprovementProposals() {
   state.improvementProposalPreview = data; const list = byId("improvement-proposal-preview-list"); list.replaceChildren();
   (data.proposals || []).forEach((record) => list.append(labeledRecord(record.title || record.id, `${record.priority || "unranked"} · ${record.summary || "advisory candidate"}`)));
   if (!data.proposals?.length) list.append(labeledRecord("No new capability candidates", "Generating now will not create implementation work."));
-  byId("improvement-proposal-confirm").hidden = false; byId("improvement-proposal-confirmation").value = ""; byId("execute-improvement-proposals").disabled = true;
-  status.textContent = "Review this exact candidate set. Confirmation writes proposal packets only.";
+  byId("improvement-proposal-confirm").hidden = false; prefillApprovalGate("improvement-proposal-confirmation", "execute-improvement-proposals", data.confirmation_phrase || "GENERATE_SELF_IMPROVEMENT_PROPOSALS");
+  status.textContent = "Review this exact candidate set; clicking Generate writes proposal packets only.";
 }
 
 async function executeImprovementProposals() {
@@ -1153,7 +1220,7 @@ async function previewHostPlan() {
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "A fresh Arch plan could not be prepared.");
     state.hostPlanPreview = data; const plan = data.plan; const list = byId("host-plan-preview-details"); list.replaceChildren();
     list.append(labeledRecord(`${plan.pending_update_count} pending package records`, "Class 5 · interactive terminal only"), labeledRecord("Exact command", "sudo pacman -Syu · never executed by Soul"));
-    byId("host-plan-preview").hidden = false; byId("host-plan-confirmation").value = ""; byId("create-host-plan").disabled = true; status.textContent = "Review the exact handoff boundary, then confirm packet creation.";
+    byId("host-plan-preview").hidden = false; prefillApprovalGate("host-plan-confirmation", "create-host-plan", data.confirmation_phrase || "CREATE_ARCH_FULL_UPGRADE_HANDOFF"); status.textContent = "Review the exact handoff boundary; clicking Create writes the terminal packet and runs no host command.";
   } catch (error) { status.textContent = error.message; }
   finally { byId("preview-host-plan").disabled = false; }
 }
@@ -1202,7 +1269,7 @@ async function previewAugmentationProposal() {
   const envelope = await callSoul("self_augmentation.proposals.preview", { objective, why_not_skill: why }); const data = dataOf(envelope);
   if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Proposal preview failed safely."; return; }
   state.augmentationPreview = data; const proposal = data.proposal; const list = byId("augmentation-proposal-preview-details"); list.replaceChildren(); list.append(labeledRecord(proposal.objective, `${proposal.risk_class} · source ${proposal.head.slice(0, 12)}`), labeledRecord("Core-change rationale", proposal.why_not_skill));
-  byId("augmentation-proposal-preview").hidden = false; byId("augmentation-confirmation").value = ""; byId("create-augmentation-proposal").disabled = true; status.textContent = "Review this exact census-bound packet. No implementation is authorized.";
+  byId("augmentation-proposal-preview").hidden = false; prefillApprovalGate("augmentation-confirmation", "create-augmentation-proposal", data.confirmation_phrase || "CREATE_SELF_AUGMENTATION_PROPOSAL"); status.textContent = "Review this exact census-bound packet; clicking Create writes no implementation.";
 }
 
 async function createAugmentationProposal() {
@@ -1234,7 +1301,7 @@ async function previewAugmentationExperiment() {
   const envelope = await callSoul("self_augmentation.experiments.gate_a1.preview", { proposal_id: state.selectedAugmentationProposal.proposal_id, allowed_files: selectedAllowedFiles() }); const data = dataOf(envelope);
   if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Gate A1 preview blocked safely."; return; }
   state.augmentationExperimentPreview = data; const list = byId("augmentation-experiment-preview-details"); list.replaceChildren(); list.append(labeledRecord("Exact base", data.base_commit), labeledRecord("Allowed scope", `${data.allowed_files.length} exact path(s) · no globs`));
-  byId("augmentation-experiment-preview").hidden = false; byId("augmentation-experiment-confirmation").value = ""; byId("create-augmentation-experiment").disabled = true; status.textContent = "Gate A1 creates one detached worktree and handoff; it does not invoke Codex.";
+  byId("augmentation-experiment-preview").hidden = false; prefillApprovalGate("augmentation-experiment-confirmation", "create-augmentation-experiment", data.confirmation_phrase || "APPROVE_AUGMENTATION_EXPERIMENT"); status.textContent = "Gate A1 creates one detached worktree and handoff; clicking Create does not invoke Codex.";
 }
 
 async function createAugmentationExperiment() {
@@ -1261,7 +1328,7 @@ async function previewAugmentationGateA2() {
   if (!state.selectedAugmentationExperiment) return; const status = byId("augmentation-review-status"); status.textContent = "Revalidating candidate commit and dossier…";
   const envelope = await callSoul("self_augmentation.reviews.gate_a2.preview", { experiment_id: state.selectedAugmentationExperiment.experiment_id }); const data = dataOf(envelope);
   if (envelope.lifecycle_state !== "complete") { if (data.dossier) renderAugmentationDossier(data.dossier); status.textContent = envelope.errors?.[0]?.message || "Gate A2 remains blocked."; return; }
-  state.augmentationGateA2Preview = data; renderAugmentationDossier(data.dossier); byId("augmentation-gate-a2-preview").hidden = false; byId("augmentation-gate-a2-confirmation").value = ""; byId("execute-augmentation-gate-a2").disabled = true; status.textContent = "Review the exact candidate. Approval writes an external integration handoff only.";
+  state.augmentationGateA2Preview = data; renderAugmentationDossier(data.dossier); byId("augmentation-gate-a2-preview").hidden = false; prefillApprovalGate("augmentation-gate-a2-confirmation", "execute-augmentation-gate-a2", data.confirmation_phrase || "APPROVE_AUGMENTATION_FOR_INTEGRATION_REVIEW"); status.textContent = "Review the exact candidate; clicking Approve writes an external integration handoff only.";
 }
 
 async function executeAugmentationGateA2() {
@@ -1288,7 +1355,7 @@ function augmentationModelParameters() { return { experiment_id: state.selectedA
 async function previewAugmentationModelResult() {
   if (!state.selectedAugmentationExperiment) return; const envelope = await callSoul("self_augmentation.model_qualification.preview", augmentationModelParameters()); const data = dataOf(envelope);
   if (envelope.lifecycle_state !== "complete") { byId("augmentation-review-status").textContent = envelope.errors?.[0]?.message || "Qualification record preview failed."; return; }
-  state.augmentationModelPreview = data; byId("augmentation-model-preview").hidden = false; byId("augmentation-model-confirmation").value = ""; byId("record-augmentation-model-result").disabled = true; byId("augmentation-review-status").textContent = "This records external local-eval evidence; it authorizes nothing.";
+  state.augmentationModelPreview = data; byId("augmentation-model-preview").hidden = false; prefillApprovalGate("augmentation-model-confirmation", "record-augmentation-model-result", data.confirmation_phrase || "RECORD_AUGMENTATION_MODEL_QUALIFICATION"); byId("augmentation-review-status").textContent = "Review the evidence; clicking Record stores it but authorizes nothing else.";
 }
 async function recordAugmentationModelResult() {
   if (!state.augmentationModelPreview) return; const envelope = await callSoul("self_augmentation.model_qualification.execute", { ...augmentationModelParameters(), confirmation: byId("augmentation-model-confirmation").value, expected_digest: state.augmentationModelPreview.expected_digest }); lifecycle(envelope);

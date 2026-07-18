@@ -130,6 +130,8 @@ module SoulCore
       "music.candidates.reject.execute" => %w[project_id candidate_id confirmation expected_digest],
       "music.candidates.export.preview" => %w[project_id candidate_id],
       "music.candidates.export.execute" => %w[project_id candidate_id confirmation expected_digest],
+      "music.candidates.trim.preview" => %w[project_id candidate_id start_seconds end_seconds],
+      "music.candidates.trim.execute" => %w[project_id candidate_id start_seconds end_seconds confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -245,6 +247,8 @@ module SoulCore
       parameters.each do |key, value|
         if key == "limit"
           return "limit must be an integer" unless value.is_a?(Integer)
+        elsif key == "start_seconds" || key == "end_seconds"
+          return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
         elsif key == "filters" || key == "project" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "args" || key == "chat_ids" || key == "allowed_files"

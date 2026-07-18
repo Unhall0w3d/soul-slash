@@ -99,6 +99,7 @@ Dir.mktmpdir("soul-reference-synthesis-a5") do |root|
   packet = JSON.parse(request.messages.last.fetch("content"))
   check.call("first draft requires all scope and records one immutable candidate", wrong_first["lifecycle_state"] == "awaiting_input" && first["lifecycle_state"] == "blocked_for_human_review" && first["mutation"] == "music_reference_synthesis_candidate_recorded" && store.read(track_fixture["reference_id"]).dig("synthesis", "revisions").length == 1)
   check.call("one bounded local request uses strict structured output and no tools", client.calls.length == 1 && client.calls.first.fetch(:timeout_seconds) == 90.0 && request.max_output_tokens == 3_500 && request.response_format == SoulCore::MusicReferenceSynthesisService::RESPONSE_FORMAT && request.reasoning_mode == "disabled" && request.tools.empty? && request.privacy_requirement == "local_only")
+  check.call("profile synthesis separates sonic portrait from metadata and temporal script", request.messages.first.fetch("content").include?("overall sonic portrait only") && request.messages.first.fetch("content").include?("separate lyrics value is the temporal script"))
   encoded_packet = JSON.generate(packet)
   check.call("packet distinguishes fallible observations from target synthesis", packet.dig("observed_evidence", "bpm") == 116.8 && packet.dig("rules", "original_material_only") == true && packet["current_synthesis"].nil? && packet["digest"].match?(/\A[a-f0-9]{64}\z/))
   check.call("synthesis withholds source identity and raw extractor scalars", !encoded_packet.include?("Observed Source") && !encoded_packet.include?("Fixture Artist") && !encoded_packet.include?("Fixture Album") && !encoded_packet.include?("extractor_receipt") && packet.dig("source_constraints", "duration_seconds") == 201)
@@ -158,6 +159,15 @@ Dir.mktmpdir("soul-reference-synthesis-a5") do |root|
   check.call("application contract exposes the synthesis approval gate", envelope["lifecycle_state"] == "blocked_for_human_review" && envelope.dig("data", "confirmation_phrase") == SoulCore::MusicReferenceSynthesisService::CONFIRMATION)
 end
 
+Dir.mktmpdir("soul-reference-synthesis-caption-contract-a5") do |root|
+  store = SoulCore::MusicReferenceLibraryStore.new(root: root)
+  store.write_track(track_fixture)
+  caption = "High-energy progressive rock at 110 BPM in D minor and 4/4 time, driven by distorted electric guitars, technical bass, deep 808 sub-bass, rapid trap hi-hats, and hard dry drums. The arrangement begins with a clean electric motif before escalating into a dense final passage with an aggressive close vocal and precise rhythmic articulation. Layer tapping guitar above the central riff, leave deliberate space around each vocal phrase, and use a compact instrumental turn to connect the restrained opening with the forceful final hook. Keep the production polished, immediate, and rhythmically exact."
+  client = ReferenceSynthesisClient.new(proposal("caption" => caption))
+  result = SoulCore::MusicReferenceSynthesisService.new(provider_client: client, store: store).draft(reference_id: track_fixture["reference_id"], scope: "all", provider: provider)
+  check.call("profile synthesis rejects metadata embedded in Sound and Structure", result["lifecycle_state"] == "awaiting_input" && result["reason"].include?("dedicated field"))
+end
+
 
 Dir.mktmpdir("soul-reference-synthesis-insufficient-a5") do |root|
   store = SoulCore::MusicReferenceLibraryStore.new(root: root)
@@ -210,6 +220,7 @@ html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("Music Studio separates evidence targets approval and exact rejection", %w[music-reference-observed music-reference-target music-reference-synthesis-confirmation music-reference-synthesis-reject-confirmation].all? { |id| html.include?(id) } && javascript.include?("music.references.synthesis.draft") && javascript.include?("music.references.synthesis.approval.execute") && javascript.include?("music.references.synthesis.rejection.execute"))
 check.call("fusion UI requires explicit profile selection and exposes no automatic generation", html.include?("draft-music-reference-fusion") && javascript.include?("music.references.fusion.draft") && javascript.include?("count < 2 || count > 5") && !javascript.include?("setInterval(draftMusicReference"))
+check.call("composition form teaches the ACE-Step caption and temporal-script split", html.include?("Describe the overall sonic identity here") && html.include?("[Intro - clean electric guitar instrumental]") && html.include?("Put BPM, key, and time in their dedicated fields"))
 
 abort "Music reference synthesis A5 verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music reference synthesis A5 verification passed."

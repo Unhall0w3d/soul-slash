@@ -31,7 +31,7 @@ MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
 MUSIC_REFERENCE_MODEL_CACHE ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -52,6 +52,7 @@ help:
 > @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
 > @echo "  make music-reference-enrichment-install EXPECTED_DIGEST=... CONFIRM=INSTALL_MUSIC_REFERENCE_ENRICHMENT"
 > @echo "  make verify-music-reference-synthesis  Test reference synthesis retry approval and fusion gates"
+> @echo "  make verify-music-lite-edit  Test immutable-source start/end trimming and receipts"
 > @echo "  make music-projects    List private Music Studio projects"
 > @echo "  make music-resources   Inspect AMD/NVIDIA/CPU Music resource lanes"
 > @echo "  make music-project-create MUSIC_INPUT=/path/project.json"
@@ -326,3 +327,6 @@ verify-music-reference-analysis:
 
 verify-music-reference-synthesis:
 > @ruby scripts/verify-music-reference-synthesis-a5.rb
+
+verify-music-lite-edit:
+> @ruby scripts/verify-music-lite-edit.rb

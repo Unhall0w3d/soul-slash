@@ -168,7 +168,8 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   missing_rights = service.create_project(project_input.except("rights_status"))
   unknown = service.create_project(project_input.merge("surprise" => true))
   unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 45))
-  check.call("project schema rejects missing rights, unknown fields, and unsupported duration without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && !File.exist?(File.join(root, "Soul", "music", "projects")))
+  embedded_metadata = service.create_project(project_input.merge("caption" => "Energetic melodic rock at 110 BPM in D minor and 4/4 time with clear drums and guitars."))
+  check.call("project schema rejects missing rights, unknown fields, unsupported duration, and embedded caption metadata without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && !File.exist?(File.join(root, "Soul", "music", "projects")))
 
   created = service.create_project(project_input)
   project = created.dig("data", "project")
@@ -199,6 +200,11 @@ Dir.mktmpdir("soul-music-a2-") do |root|
     "keyscale" => source_input.fetch("keyscale"), "timesignature" => source_input.fetch("timesignature"), "seed" => source_input.fetch("seed") + 1
   })
   check.call("revision cannot be a seed-only retry", seed_only["lifecycle_state"] == "awaiting_input" && seed_only["reason"].include?("materially change") && process_runner.calls.length == 2)
+  timed_caption = service.revision_preview(project_id: project_id, source_candidate_id: candidate_id, revision: {
+    "caption" => "Verse 1 (30 sec) begins with clear drums and tightly separated vocal lines before the guitar widens.", "lyrics" => source_input.fetch("lyrics"), "bpm" => source_input.fetch("bpm"),
+    "keyscale" => source_input.fetch("keyscale"), "timesignature" => source_input.fetch("timesignature"), "seed" => source_input.fetch("seed") + 2
+  })
+  check.call("revision rejects exact section timing from Sound and Structure", timed_caption["lifecycle_state"] == "awaiting_input" && timed_caption["reason"].include?("temporal section changes") && process_runner.calls.length == 2)
 
   revision = {
     "caption" => "Energetic melodic rock with an immediate two-bar vocal pickup, sparse verse one, and clearly separated lead vocal.",
@@ -274,12 +280,15 @@ Dir.mktmpdir("soul-music-a2-lease-") do |root|
     conflict = true
   end
   coordinator.attach_child(lease_id: lease.fetch("lease_id"), child_pid: 42_424, process_group_id: 42_424)
+  uncertain_observer = SoulCore::MusicResourceCoordinator.new(root: root, runner: runner, process_start: ->(_pid) { raise Errno::ESRCH })
+  uncertain_inventory = uncertain_observer.inventory
   cancel = coordinator.cancel_preview(candidate_id: "candidate_2222222222222222")
   wrong = coordinator.cancel_execute(candidate_id: "candidate_2222222222222222", confirmation: "yes", expected_digest: cancel.dig("data", "expected_digest"))
   exact = coordinator.cancel_execute(candidate_id: "candidate_2222222222222222", confirmation: "CANCEL_MUSIC_GENERATION", expected_digest: cancel.dig("data", "expected_digest"))
   check.call("resource inventory is write-free and named-lane bounded", inventory["lifecycle_state"] == "complete" && inventory["can_acquire_nvidia_music"] && inventory.dig("lanes", "amd-conversation", "health") == "ok" && inventory_write_free)
   check.call("one-owner lease rejects a concurrent NVIDIA claimant", conflict)
   check.call("music lease is visible to model-runtime switching", cross_runtime.one? && cross_runtime.first["provider_id"] == "nvidia-music" && cross_runtime.first["request_id"] == "candidate_2222222222222222")
+  check.call("read-only uncertain inspection cannot revoke active foreground work", uncertain_inventory.dig("lanes", "nvidia-music", "lease", "lease_id") == lease.fetch("lease_id") && SoulCore::ModelRuntimeLeaseStore.new(root: root).active_leases.one?)
   check.call("cancellation requires exact preview and signals only recorded group", wrong["lifecycle_state"] == "blocked_for_human_review" && exact["lifecycle_state"] == "canceled" && signals == [["TERM", -42_424], ["KILL", -42_424]])
   coordinator.release(lease.fetch("lease_id"))
   check.call("music release clears its cross-runtime lease", SoulCore::ModelRuntimeLeaseStore.new(root: root).active_leases.empty?)

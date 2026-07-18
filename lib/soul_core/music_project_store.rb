@@ -42,6 +42,7 @@ module SoulCore
       raise ValidationError, "missing project fields: #{missing.join(', ')}" unless missing.empty?
 
       validate_inputs!(data)
+      validate_caption_contract!(data.fetch("caption"))
       prepare_root!
       raise IntegrityError, "music project limit exceeded" if safe_entries(@directory).length >= MAX_PROJECTS
 
@@ -165,6 +166,7 @@ module SoulCore
         "seed" => Integer(data.fetch("seed"))
       )
       validate_generation_input!(revised, error_class: ValidationError)
+      validate_caption_contract!(revised.fetch("caption"))
       material_fields = REVISION_FIELDS - ["seed"]
       raise ValidationError, "revision must materially change sound, structure, lyrics, or musical parameters" if material_fields.all? { |field| revised.fetch(field) == source_input.fetch(field) }
       revised
@@ -299,6 +301,14 @@ module SoulCore
       raise ValidationError, "language must be a two- or three-letter lowercase code" unless data["language"].to_s.match?(/\A[a-z]{2,3}\z/)
     rescue ArgumentError, TypeError
       raise ValidationError, "duration, bpm, and seed must be integers"
+    end
+
+    def validate_caption_contract!(caption)
+      raise ValidationError, "Sound and Structure must keep BPM in the dedicated field" if caption.match?(/\b\d{2,3}\s*BPM\b/i)
+      raise ValidationError, "Sound and Structure must keep time signature in the dedicated field" if caption.match?(/\b(?:2|3|4|5|6|7|9|12)\s*\/\s*(?:4|8|16)\b/)
+      raise ValidationError, "Sound and Structure must keep key in the dedicated field" if caption.match?(/\b[A-G](?:[#b]|-flat|-sharp)?\s+(?:major|minor)\b/)
+      raise ValidationError, "Sound and Structure must put temporal section changes in the lyrics script" if caption.match?(/\b\d{1,3}\s*(?:sec|second)s?\b/i)
+      raise ValidationError, "Sound and Structure must not embed revision directives" if caption.match?(/\b(?:revision directives?|key revisions?)\s*:/i)
     end
 
     def validate_record!(data, id)
