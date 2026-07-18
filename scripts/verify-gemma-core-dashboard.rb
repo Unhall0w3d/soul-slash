@@ -12,6 +12,7 @@ end
 
 StatusFixture = Struct.new(:record) { def collect = record }
 RuntimeFixture = Struct.new(:record) { def status = record }
+CoreFixture = Struct.new(:record) { def status = record }
 MusicFixture = Struct.new(:record) { def resource_inventory = record }
 
 Dir.mktmpdir("soul-core-status-") do |root|
@@ -23,7 +24,8 @@ Dir.mktmpdir("soul-core-status-") do |root|
     }
   }
   music = { "engine" => { "model" => "ACE-Step 1.5", "accelerator" => "NVIDIA CUDA", "residency" => "on_demand", "loaded" => false } }
-  facade = SoulCore::ApplicationFacade.new(root:, process_env: {}, status_collector: StatusFixture.new({ "ok" => true, "collected" => { "host" => { "hostname" => "fixture" } } }), model_runtime_control_service: RuntimeFixture.new(runtime), music_generation_service: MusicFixture.new(music))
+  core_runtime = runtime.merge("data" => runtime.fetch("data").merge("core_mode" => "daily", "active_core_label" => "Daily Core", "music_lane" => { "available_in_active_core" => true }))
+  facade = SoulCore::ApplicationFacade.new(root:, process_env: {}, status_collector: StatusFixture.new({ "ok" => true, "collected" => { "host" => { "hostname" => "fixture" } } }), model_runtime_control_service: RuntimeFixture.new(runtime), core_orchestration_service: CoreFixture.new(core_runtime), music_generation_service: MusicFixture.new(music))
   envelope = facade.call({ "schema_version" => "soul.application.v1", "request_id" => "core-status", "operation" => "system_status.refresh", "parameters" => {}, "context" => { "interface" => "dashboard_test" } })
   core = envelope.dig("data", "core")
   check.call("System Status exposes Daily Core and exact chat engine identity", core["mode"] == "daily" && core["role"] == "daily-chat" && core.dig("chat_engine", "model") == "Gemma 4 12B Instruct Q4_K_M" && core.dig("chat_engine", "runtime") == "ollama_openai")

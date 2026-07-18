@@ -16,6 +16,7 @@ require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "model_runtime_control_service"
+require_relative "core_orchestration_service"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
@@ -53,6 +54,7 @@ module SoulCore
       workspace_service: nil,
       status_collector: nil,
       model_runtime_control_service: nil,
+      core_orchestration_service: nil,
       approval_store: nil,
       activity_store: nil,
       skill_registry: nil,
@@ -84,6 +86,7 @@ module SoulCore
       @workspace_service = workspace_service
       @status_collector = status_collector
       @model_runtime_control_service = model_runtime_control_service
+      @core_orchestration_service = core_orchestration_service
       @approval_store = approval_store
       @activity_store = activity_store
       @skill_registry = skill_registry
@@ -158,6 +161,9 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
+      when "core.status" then domain(core_orchestration.status)
+      when "core.activate.preview" then domain(core_orchestration.preview(core_id: required(parameters, "core_id")))
+      when "core.activate.execute" then domain(core_orchestration.execute(core_id: required(parameters, "core_id"), target_profile_id: required(parameters, "target_profile_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "model_runtime.status" then domain(model_runtime_control.status)
       when "model_runtime.load.preview" then domain(model_runtime_control.preview(action: "load", profile_id: parameters["profile_id"]))
       when "model_runtime.load.execute" then domain(model_runtime_control.execute(action: "load", profile_id: parameters["profile_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -277,6 +283,14 @@ module SoulCore
           "load_gate" => "preview_digest_and_exact_confirmation",
           "unload_gate" => "active_work_check_preview_digest_and_exact_confirmation",
           "switch_gate" => "active_work_check_target_bound_preview_digest_and_exact_confirmation"
+        },
+        "cores" => {
+          "available" => true,
+          "manual_only" => true,
+          "status_operation" => "core.status",
+          "activation_gate" => "existing_runtime_idle_check_preview_digest_and_exact_confirmation",
+          "automatic_switch" => false,
+          "music_studio_is_a_core" => false
         },
         "skill_studio" => {
           "available" => true,
@@ -496,12 +510,13 @@ module SoulCore
     def collect_system_status
       host = status_collector.collect
       begin
-        runtime_envelope = model_runtime_control.status
-        runtime = runtime_envelope.fetch("data", {})
+        core_envelope = core_orchestration.status
+        runtime = core_envelope.fetch("data", {})
         music = music_generation.resource_inventory
         host.merge(
           "core" => {
-            "mode" => "daily",
+            "mode" => runtime["core_mode"] || "unavailable",
+            "label" => runtime["active_core_label"],
             "role" => runtime["core_role"] || "daily-chat",
             "chat_engine" => {
               "profile" => runtime["profile"],
@@ -512,7 +527,8 @@ module SoulCore
               "model_resident" => runtime.dig("server", "model_resident")
             }.compact,
             "music_engine" => music.fetch("engine", {}),
-            "runtime_status" => runtime_envelope.fetch("lifecycle_state", "unknown")
+            "music_lane" => runtime["music_lane"],
+            "runtime_status" => core_envelope.fetch("lifecycle_state", "unknown")
           }
         )
       rescue StandardError => error
@@ -525,6 +541,13 @@ module SoulCore
 
       _report, resolver = resolved_configuration
       @model_runtime_control_service ||= ModelRuntimeControlService.new(root: @root, env: resolver.effective_environment)
+    end
+
+    def core_orchestration
+      return @core_orchestration_service if @core_orchestration_service
+
+      _report, resolver = resolved_configuration
+      @core_orchestration_service ||= CoreOrchestrationService.new(root: @root, env: resolver.effective_environment, runtime_control: model_runtime_control)
     end
 
     def approval_store

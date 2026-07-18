@@ -109,7 +109,7 @@ FLAC master for every candidate and derives a smaller MP3 listening proxy from
 that exact master. A2 will record both artifacts, hashes, encoder provenance,
 and validation without performing a second model generation.
 
-Music A2 now has a deterministic CLI candidate: private typed projects, exact
+Music A2 added a deterministic CLI candidate: private typed projects, exact
 generation previews, cross-runtime NVIDIA leases, bounded process-group
 cancellation, strict-offline project-input generation, and atomic linked
 FLAC/MP3 receipts. The live read-only inventory passes with AMD chat healthy,
@@ -118,7 +118,23 @@ exactly confirmed `First Signal` live project then produced validated 30-second
 FLAC and MP3 artifacts, released its lease and GPU, and preserved AMD chat. The
 owner accepted the music but heard no lyrics; logs prove the lyrics reached the
 model and were embedded, making this a recorded adherence weakness rather than
-data loss. Music A2 is approved and complete. Music A3 dashboard work is next.
+data loss. Music A2 is approved and complete.
+
+Music A3 and bounded follow-on slices now provide the dashboard project
+archive, foreground generation, machine-heard vocal evidence, repeated-section
+alignment, listening review and disposition, Soul-assisted revision drafts,
+lawful URL reference analysis and synthesis, profile fusion, permanent
+project/reference deletion, finished FLAC/MP3 export, and one-generation lite
+front/back trimming. Repaint, extend, stems, publishing, and broader editing
+remain later work.
+
+The reviewed model bake-off subsequently integrated Gemma 4 12B Q4_K_M as an
+inactive-by-default, manually selectable AMD/Ollama candidate while retaining
+Ministral as the current selected Daily profile and Qwen as rollback. The
+current Core orchestration candidate groups explicit `daily-chat` profiles as
+Daily Core and the `reserve-chat` NVIDIA profile as AMD-Free Core. It adds no
+automatic switching or default change. Music Studio remains an on-demand
+workload because Qwen chat and ACE-Step conflict on the same NVIDIA lane.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

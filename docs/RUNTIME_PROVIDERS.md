@@ -134,6 +134,14 @@ make model-runtime-gemma-status
 Installation does not start, enable, select, or make Gemma the default Core.
 Runtime changes still use the authenticated dashboard preview/digest gate.
 
+The role is also the portable Core boundary. `daily-chat` profiles form Daily
+Core; `reserve-chat` profiles form AMD-Free Core; `music-chat` is reserved for
+a separately reviewed dedicated music-chat arrangement; and `specialist`
+profiles are not offered as Operator-selectable Cores. Core activation remains
+a thin wrapper around the same manual runtime gate. Music Studio's ACE-Step
+engine remains an on-demand NVIDIA workload and cannot run while an NVIDIA chat
+profile is active.
+
 ## Environment variables
 
 Soul/ should read local runtime settings from `.env` when present.

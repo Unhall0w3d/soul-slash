@@ -9,7 +9,7 @@ profiles:
     accelerator: NVIDIA CUDA
     service: llama-server.service
     endpoint: http://127.0.0.1:8082/v1
-    core_role: daily-chat
+    core_role: reserve-chat
   - id: amd-quality
     label: AMD quality
     model_name: Ministral 3 14B Instruct 2512 Q4_K_M

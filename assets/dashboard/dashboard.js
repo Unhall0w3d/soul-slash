@@ -2,7 +2,7 @@
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
 const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel" });
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -850,9 +850,35 @@ async function togglePin() {
 }
 
 function detailRow(term, description) { const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = term; const dd = document.createElement("dd"); dd.textContent = description; row.append(dt, dd); return row; }
+function setCoreMenu(open) { const menu = byId("core-menu"); menu.hidden = !open; byId("core-navigation").classList.toggle("is-open", open); byId("core-selector").setAttribute("aria-expanded", String(open)); }
+function renderCores(coreStatus) {
+  state.coreStatus = coreStatus; const activeLabel = coreStatus.active_core_label || (coreStatus.core_mode === "unloaded" && coreStatus.selected_core_label ? `${coreStatus.selected_core_label} · unloaded` : (coreStatus.core_mode === "unloaded" ? "Core unloaded" : "Core unavailable")); byId("core-label").textContent = activeLabel;
+  const menu = byId("core-menu"); menu.replaceChildren();
+  (coreStatus.cores || []).forEach((core) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = "core-menu-item"; button.setAttribute("role", "menuitem"); button.disabled = core.active || !core.can_activate;
+    const heading = document.createElement("span"); const title = document.createElement("strong"); title.textContent = core.label; const stateLabel = document.createElement("em"); stateLabel.textContent = core.active ? "Active" : (core.can_activate ? "Available" : "Held"); heading.append(title, stateLabel);
+    const purpose = document.createElement("small"); purpose.textContent = core.purpose; const target = document.createElement("small"); target.textContent = `Chat engine: ${core.target_profile?.model_name || core.target_profile?.label || "not configured"}`;
+    button.append(heading, purpose, target); button.addEventListener("click", () => previewCore(core.id)); menu.append(button);
+  });
+  const boundary = document.createElement("p"); boundary.className = "core-menu-boundary"; boundary.textContent = coreStatus.music_lane?.conflict || "Music Studio uses NVIDIA on demand and is not a Core."; menu.append(boundary);
+}
+async function refreshCores({ automatic = false } = {}) {
+  try { const envelope = await callSoul("core.status"); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Core status is unavailable"); renderCores(dataOf(envelope)); if (!automatic) announce("Core status refreshed"); }
+  catch (error) { byId("core-label").textContent = "Core unavailable"; byId("core-menu").replaceChildren(Object.assign(document.createElement("p"), { textContent: error.message || "Core status failed safely." })); }
+}
+async function previewCore(coreId) {
+  setCoreMenu(false); byId("core-label").textContent = "Checking Core…";
+  try {
+    const envelope = await callSoul("core.activate.preview", { core_id: coreId }); const runtime = dataOf(envelope); if (envelope.lifecycle_state !== "complete") { await refreshCores({ automatic: true }); throw new Error(envelope.errors?.[0]?.message || "Core activation is blocked."); }
+    renderModelRuntime(runtime); state.modelRuntimePreview = { kind: "core", action: runtime.action, coreId, targetProfileId: runtime.target_profile?.id, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
+    byId("model-runtime-dialog-title").textContent = `Activate ${runtime.target_core?.label || "Core"}`; byId("model-runtime-preview-title").textContent = "Transfer the verified chat engine";
+    byId("model-runtime-preview-details").replaceChildren(detailRow("Current Core", runtime.source_core?.label || "Unloaded"), detailRow("Target Core", runtime.target_core?.label || coreId), detailRow("Target model", runtime.target_profile?.model_name || runtime.target_profile?.label || "unavailable"), detailRow("Accelerator", runtime.target_profile?.accelerator || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)), detailRow("Music lane", runtime.target_core?.id === "amd-free" ? "held while NVIDIA chat is active" : "NVIDIA available on demand"));
+    byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; prefillApprovalGate("model-runtime-confirmation", "execute-model-runtime", runtime.confirmation_phrase); byId("execute-model-runtime").textContent = `Activate ${runtime.target_core?.label || "verified Core"}`; byId("model-runtime-dialog-status").textContent = "The Core and all active work will be checked again before either service changes."; byId("model-runtime-dialog").showModal();
+  } catch (error) { announce(error.message || "Core activation preview failed safely."); }
+}
 async function refreshStatus({ automatic = false } = {}) {
   const button = byId("refresh-status"); button.disabled = true; announce("Collecting bounded host status");
-  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const core = data.core || {}; const chat = core.chat_engine || {}; const music = core.music_engine || {}; const chatEngine = [chat.model, chat.runtime?.replaceAll("_", " "), chat.accelerator].filter(Boolean).join(" · ") || "Unavailable"; const musicEngine = [music.model, music.accelerator, music.residency?.replaceAll("_", " ")].filter(Boolean).join(" · ") || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Core", core.mode || "daily"), detailRow("Chat engine", chatEngine), detailRow("Music engine", musicEngine), detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("State", core.runtime_status || envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Core", "Unavailable"), detailRow("Chat engine", "Unavailable"), detailRow("Music engine", "Unavailable"), detailRow("Host", "Unavailable"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
+  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const core = data.core || {}; const chat = core.chat_engine || {}; const music = core.music_engine || {}; const chatEngine = [chat.model, chat.runtime?.replaceAll("_", " "), chat.accelerator].filter(Boolean).join(" · ") || "Unavailable"; const musicEngine = [music.model, music.accelerator, music.residency?.replaceAll("_", " ")].filter(Boolean).join(" · ") || "Unavailable"; const musicLane = core.music_lane?.conflict || (core.music_lane?.available_in_active_core === true ? "Available on demand" : "Unavailable"); const details = byId("system-details"); details.replaceChildren(detailRow("Core", core.label || core.mode || "Unavailable"), detailRow("Chat engine", chatEngine), detailRow("Music engine", musicEngine), detailRow("Music lane", musicLane), detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("State", core.runtime_status || envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Core", "Unavailable"), detailRow("Chat engine", "Unavailable"), detailRow("Music engine", "Unavailable"), detailRow("Music lane", "Unavailable"), detailRow("Host", "Unavailable"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
 }
 
 function renderModelRuntime(runtime, message = "") {
@@ -895,7 +921,7 @@ async function previewModelRuntime(action, profileId = null) {
     const parameters = profileId ? { profile_id: profileId } : {};
     const envelope = await callSoul(`model_runtime.${action}.preview`, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || `Model ${action} is blocked.`; return; }
-    state.modelRuntimePreview = { action, profileId, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
+    state.modelRuntimePreview = { kind: "runtime", action, profileId, digest: runtime.expected_digest, confirmation: runtime.confirmation_phrase };
     const actionTitle = action === "switch" ? "Switch model runtime" : `${action === "load" ? "Load" : "Unload"} model runtime`;
     byId("model-runtime-dialog-title").textContent = actionTitle;
     byId("model-runtime-preview-title").textContent = action === "switch" ? "Transfer the verified inference profile" : (action === "load" ? "Start the selected user service" : "Release model GPU memory");
@@ -914,10 +940,10 @@ async function executeModelRuntime() {
   const preview = state.modelRuntimePreview; if (!preview || byId("model-runtime-confirmation").value !== preview.confirmation) return;
   const button = byId("execute-model-runtime"); const status = byId("model-runtime-dialog-status"); button.disabled = true; status.textContent = "Revalidating active work and service state…";
   try {
-    const parameters = { confirmation: preview.confirmation, expected_digest: preview.digest }; if (preview.profileId) parameters.profile_id = preview.profileId;
-    const envelope = await callSoul(`model_runtime.${preview.action}.execute`, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
+    const parameters = { confirmation: preview.confirmation, expected_digest: preview.digest }; let operation = `model_runtime.${preview.action}.execute`; if (preview.kind === "core") { operation = "core.activate.execute"; parameters.core_id = preview.coreId; parameters.target_profile_id = preview.targetProfileId; } else if (preview.profileId) parameters.profile_id = preview.profileId;
+    const envelope = await callSoul(operation, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Runtime change was blocked safely."; state.modelRuntimePreview = null; return; }
-    state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(`Model runtime ${preview.action} complete`); await refreshModelRuntime();
+    state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(preview.kind === "core" ? "Core activation complete" : `Model runtime ${preview.action} complete`); await refreshModelRuntime(); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true });
   } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }
 }
 
@@ -1472,13 +1498,14 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
 byId("login-form").addEventListener("submit", login);
 byId("password-change-form").addEventListener("submit", changePassword);
 byId("logout-button").addEventListener("click", logout);
+byId("core-selector").addEventListener("click", () => setCoreMenu(byId("core-menu").hidden));
 byId("review-center-button").addEventListener("click", openReviewCenter);
 byId("close-review-center").addEventListener("click", closeReviewCenter);
 byId("refresh-review-center").addEventListener("click", loadReviewCenter);
@@ -1494,8 +1521,9 @@ byId("improvement-tab").addEventListener("click", () => switchTab("improvement")
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
 window.addEventListener("hashchange", () => { const tab = tabFromLocation(); if (tab) switchTab(tab, { updateLocation: false }); });
-document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); });
+document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
 byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
+byId("core-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCoreMenu(false); byId("core-selector").focus(); } });
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);

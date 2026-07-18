@@ -268,6 +268,7 @@ verify-web-knowledge:
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb
 > @ruby scripts/verify-model-runtime-profile-switching.rb
+> @ruby scripts/verify-core-orchestration.rb
 > @ruby scripts/verify-model-runtime-profile-deployment.rb
 > @ruby scripts/verify-ollama-model-runtime-deployment.rb
 > @ruby scripts/verify-model-runtime-selected-startup.rb

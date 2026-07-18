@@ -18,7 +18,7 @@ module SoulCore
     V2_PROFILE_KEYS = %w[id label model_name accelerator service].freeze
     LEGACY_PROFILE_KEYS = %w[id label service].freeze
     RUNTIMES = %w[llamacpp_openai ollama_openai].freeze
-    CORE_ROLES = %w[daily-chat music-chat specialist].freeze
+    CORE_ROLES = %w[daily-chat reserve-chat music-chat specialist].freeze
 
     class ConfigurationError < StandardError; end
 
