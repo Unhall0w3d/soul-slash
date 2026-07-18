@@ -94,7 +94,7 @@ server_source = File.read(File.expand_path("../lib/soul_core/dashboard_server.rb
 http_source = File.read(File.expand_path("../lib/soul_core/dashboard_http_application.rb", __dir__))
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("dashboard concurrency is capped and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 8") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
+check.call("dashboard concurrency is capped for browser media traffic and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 24") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
 check.call("music stream and authenticated audio routes are explicit", http_source.include?("/api/v1/music-stream") && http_source.include?("/api/v1/music/audio/"))
 check.call("Music Studio exposes preview progress cancel playback and review", %w[music-panel preview-music-generation music-progress cancel-music-generation music-candidates].all? { |id| html.include?(id) } && js.include?("music.candidates.review"))
 check.call("browser adds no timer queue or remote dependency", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, js].any? { |source| source.match?(%r{https?://}) })

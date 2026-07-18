@@ -73,10 +73,10 @@ def track_fixture
     },
     "evidence" => {
       "status" => "extracted", "bpm" => 116.8, "bpm_alternatives" => [58.4], "key" => "D minor",
-      "key_alternatives" => ["F major"], "meter" => nil, "sections" => [],
+      "key_alternatives" => ["F major"], "meter" => "4/4 likely", "sections" => ["restrained verse", "widening refrain"],
       "instrumentation" => ["guitar likely", "bass likely"], "production_traits" => ["moderate dynamic range"],
-      "energy_curve" => ["rising final third"], "vocal_traits" => [], "lyrical_traits" => [],
-      "confidence_notes" => ["meter was not measured"], "extractor_receipt" => { "audio_retained" => false }
+      "energy_curve" => ["rising final third"], "vocal_traits" => ["single lead vocal likely"], "lyrical_traits" => ["compact phrases"],
+      "confidence_notes" => ["meter remains a fallible estimate"], "extractor_receipt" => { "audio_retained" => false, "semantic_evidence_version" => 1 }
     }
   }
 end
@@ -99,7 +99,9 @@ Dir.mktmpdir("soul-reference-synthesis-a5") do |root|
   packet = JSON.parse(request.messages.last.fetch("content"))
   check.call("first draft requires all scope and records one immutable candidate", wrong_first["lifecycle_state"] == "awaiting_input" && first["lifecycle_state"] == "blocked_for_human_review" && first["mutation"] == "music_reference_synthesis_candidate_recorded" && store.read(track_fixture["reference_id"]).dig("synthesis", "revisions").length == 1)
   check.call("one bounded local request uses strict structured output and no tools", client.calls.length == 1 && client.calls.first.fetch(:timeout_seconds) == 90.0 && request.max_output_tokens == 3_500 && request.response_format == SoulCore::MusicReferenceSynthesisService::RESPONSE_FORMAT && request.reasoning_mode == "disabled" && request.tools.empty? && request.privacy_requirement == "local_only")
+  encoded_packet = JSON.generate(packet)
   check.call("packet distinguishes fallible observations from target synthesis", packet.dig("observed_evidence", "bpm") == 116.8 && packet.dig("rules", "original_material_only") == true && packet["current_synthesis"].nil? && packet["digest"].match?(/\A[a-f0-9]{64}\z/))
+  check.call("synthesis withholds source identity and raw extractor scalars", !encoded_packet.include?("Observed Source") && !encoded_packet.include?("Fixture Artist") && !encoded_packet.include?("Fixture Album") && !encoded_packet.include?("extractor_receipt") && packet.dig("source_constraints", "duration_seconds") == 201)
   check.call("stored target fields are plain text with nonrepeating section markers", !first_revision["intent"].include?("**") && first_revision["lyrics"].start_with?("[Verse 1]\n") && first_revision["lyrics"].scan("[Verse 1]").length == 1 && first_revision["lyrics"].scan("[Chorus]").length == 1)
 
   stale_preview = service.approval_preview(reference_id: track_fixture["reference_id"], revision_id: first_revision["revision_id"])
@@ -154,6 +156,21 @@ Dir.mktmpdir("soul-reference-synthesis-a5") do |root|
   facade = SoulCore::ApplicationFacade.new(root: root, music_reference_synthesis_service: service, music_reference_synthesis_provider: provider)
   envelope = facade.call({ "schema_version" => "soul.application.v1", "request_id" => "reference-synthesis-a5-0001", "operation" => "music.references.synthesis.approval.preview", "parameters" => { "reference_id" => track_fixture["reference_id"], "revision_id" => second_revision["revision_id"] }, "context" => {} })
   check.call("application contract exposes the synthesis approval gate", envelope["lifecycle_state"] == "blocked_for_human_review" && envelope.dig("data", "confirmation_phrase") == SoulCore::MusicReferenceSynthesisService::CONFIRMATION)
+end
+
+
+Dir.mktmpdir("soul-reference-synthesis-insufficient-a5") do |root|
+  store = SoulCore::MusicReferenceLibraryStore.new(root: root)
+  sparse = track_fixture
+  sparse["evidence"] = sparse.fetch("evidence").merge(
+    "sections" => [], "instrumentation" => [], "vocal_traits" => [], "lyrical_traits" => [],
+    "energy_curve" => ["segment 1: steady relative energy", "segment 2: lower relative energy"],
+    "extractor_receipt" => { "dynamic_complexity" => 3.3248, "danceability" => 1.1342 }
+  )
+  store.write_track(sparse)
+  client = ReferenceSynthesisClient.new(proposal)
+  result = SoulCore::MusicReferenceSynthesisService.new(provider_client: client, store: store).draft(reference_id: sparse["reference_id"], scope: "all", provider: provider)
+  check.call("sparse extractor-only evidence fails closed before the model", result["lifecycle_state"] == "awaiting_input" && result["reason"].include?("semantic evidence is incomplete") && result["reason"].include?("enrichment receipt") && client.calls.empty?)
 end
 
 Dir.mktmpdir("soul-reference-synthesis-rejection-a5") do |root|

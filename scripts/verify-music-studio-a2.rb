@@ -167,7 +167,8 @@ Dir.mktmpdir("soul-music-a2-") do |root|
 
   missing_rights = service.create_project(project_input.except("rights_status"))
   unknown = service.create_project(project_input.merge("surprise" => true))
-  check.call("project schema rejects missing rights and unknown fields without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && !File.exist?(File.join(root, "Soul", "music", "projects")))
+  unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 45))
+  check.call("project schema rejects missing rights, unknown fields, and unsupported duration without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && !File.exist?(File.join(root, "Soul", "music", "projects")))
 
   created = service.create_project(project_input)
   project = created.dig("data", "project")
@@ -215,7 +216,7 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   revised_input = store.candidate_input(project_id, revision_candidate)
   check.call("confirmed revision creates a linked candidate from the exact edited input", revised["lifecycle_state"] == "blocked_for_human_review" && process_runner.calls.length == 4 && revised_receipt["generation_kind"] == "revision" && revised_receipt["source_candidate_id"] == candidate_id && revised_input["caption"] == revision["caption"] && revised_input["bpm"] == 116)
   revised_inspection = service.inspect_project(project_id: project_id)
-  check.call("revision preserves the source and appears in the same project", revised_inspection.dig("data", "generations").map { |item| item["candidate_id"] } == [candidate_id, revision_candidate])
+  check.call("revision preserves the source and candidates are newest-first", revised_inspection.dig("data", "generations").map { |item| item["candidate_id"] } == [revision_candidate, candidate_id])
 
   failed_runner = A2FailProcessRunner.new
   failed_service = SoulCore::MusicGenerationService.new(root: root, music_root: music_root, manifest_path: manifest_path, project_store: store, coordinator: coordinator, process_runner: failed_runner, runner: runner, clock: -> { Time.utc(2026, 7, 17, 20, 1, 0) })
@@ -227,6 +228,18 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   quarantine = File.join(store.generations_path(project_id), ".#{failed_candidate}.partial")
   check.call("stale generation digest starts no process", stale["lifecycle_state"] == "blocked_for_human_review" && stale_no_process)
   check.call("failed foreground generation is terminal and quarantined", failed["lifecycle_state"] == "failed" && File.file?(File.join(quarantine, "failure.json")) && !File.exist?(File.join(store.generations_path(project_id), failed_candidate)) && coordinator.released == "music_lease_1111111111111111")
+end
+
+Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
+  ids = %w[7777777777777777 8888888888888888 9999999999999999]
+  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift }, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
+  projects = [30, 90, 180].map { |duration| store.create(project_input.merge("target_duration_seconds" => duration)) }
+  check.call("all three supported duration presets create projects", projects.map { |item| item.fetch("target_duration_seconds") } == [30, 90, 180])
+  project = projects.first
+  record_path = File.join(store.project_path(project.fetch("project_id")), "project.json")
+  legacy = JSON.parse(File.read(record_path)).merge("target_duration_seconds" => 45)
+  File.write(record_path, JSON.generate(legacy))
+  check.call("bounded legacy non-preset projects remain readable", store.read(project.fetch("project_id")).fetch("target_duration_seconds") == 45)
 end
 
 Dir.mktmpdir("soul-music-a2-path-") do |root|

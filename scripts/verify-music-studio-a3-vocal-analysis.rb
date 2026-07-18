@@ -39,6 +39,52 @@ Dir.mktmpdir("soul-vocal-analysis") do |root|
   check.call("successful evidence remains blocked for human review", result["lifecycle_state"] == "blocked_for_human_review" && evidence["disclaimer"].include?("never constitutes human approval"))
   check.call("candidate-local evidence can be read without a resident model", service.read(project_id: project.fetch("project_id"), candidate_id: candidate)["machine_heard_lyrics"] == "First line present")
   check.call("machine-heard evidence is formatted as a lyric sheet", evidence["machine_heard_formatted"] == "First line present")
+
+  repeated_lyrics = <<~LYRICS
+    [Verse 1]
+    You never place a wager
+    Unless you know what happens next
+    [Hook]
+    Stay until the signal changes
+    Let the city lose our names
+    If you came here for an answer
+    I can make the darkness wait
+    [Verse 2]
+    The glass is catching shadows
+    The hour is wearing thin
+    There is no need for winning
+    No crown for us to claim
+    [Hook]
+    Stay until the signal changes
+    Let the city lose our names
+    If you came here for an answer
+    I can make the darkness wait
+    [Bridge]
+    Maybe morning breaks the spell
+    Maybe neither of us tells
+    For now let the silence choose
+    What neither one of us will lose
+    [Final Hook]
+    Stay until the signal changes
+    Let the city lose our names
+    You don't need to ask the question
+    I can make the darkness wait
+    [Outro]
+    Keep the room low
+    Leave the final card face down
+  LYRICS
+  repeated_transcript = "Stay until the signal changes let the city lose our names if you came here for an answer I can make the darkness weep the glass is catching shadows before the room forgets our name stay until the signal changes let the city lose our names if you came here for an answer I can make the darkness weep maybe morning breaks the spell maybe neither of us do for now let the silence choose what neither one of us will lose stay until the signal changes let the city lose our names you don't need to ask the question I can make the darkness weep keep the room low leave the final card face down"
+  repeated = service.send(:align_lyrics, repeated_lyrics, repeated_transcript)
+  repeated_stays = repeated.fetch("lines").select { |line| line["intended"] == "Stay until the signal changes" }
+  bridge = repeated.fetch("lines").find { |line| line["intended"] == "Maybe morning breaks the spell" }
+  outro = repeated.fetch("lines").find { |line| line["intended"] == "Leave the final card face down" }
+  omitted = repeated.fetch("lines").find { |line| line["intended"] == "There is no need for winning" }
+  check.call("global alignment resynchronizes every repeated hook after omitted blocks", repeated_stays.length == 3 && repeated_stays.all? { |line| line["status"] == "heard" })
+  check.call("post-omission bridge and outro remain aligned while real omissions remain visible", bridge["status"] == "heard" && outro["status"] == "heard" && omitted["status"] == "not_heard" && repeated["machine_route"] == "revision_recommended")
+  legacy = { "intended_lyrics" => repeated_lyrics, "machine_heard_lyrics" => repeated_transcript, "alignment" => { "algorithm_version" => 1 }, "machine_route" => "revision_recommended", "next_gate" => "operator_triggered_revision_attempt" }
+  projected = service.send(:project_current_alignment, legacy)
+  projected_stays = projected.dig("alignment", "lines").select { |line| line["intended"] == "Stay until the signal changes" }
+  check.call("stored transcripts receive current alignment on read without retranscription", projected.dig("alignment", "algorithm_version") == 2 && projected_stays.all? { |line| line["status"] == "heard" })
 end
 
 source = File.read(File.expand_path("../lib/soul_core/music_candidate_analysis_service.rb", __dir__))

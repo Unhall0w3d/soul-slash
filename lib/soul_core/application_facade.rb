@@ -26,6 +26,7 @@ require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
+require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
@@ -64,6 +65,7 @@ module SoulCore
       music_revision_draft_service: nil,
       music_revision_provider: nil,
       music_candidate_disposition_service: nil,
+      music_project_deletion_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
       music_reference_synthesis_service: nil,
@@ -93,6 +95,7 @@ module SoulCore
       @music_revision_draft_service = music_revision_draft_service
       @music_revision_provider = music_revision_provider
       @music_candidate_disposition_service = music_candidate_disposition_service
+      @music_project_deletion_service = music_project_deletion_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
       @music_reference_synthesis_service = music_reference_synthesis_service
@@ -204,11 +207,17 @@ module SoulCore
       when "music.projects.list" then domain(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)))
       when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
       when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.projects.delete.preview" then domain(music_project_deletion.preview(project_id: required(parameters, "project_id")))
+      when "music.projects.delete.execute" then domain(music_project_deletion.execute(project_id: required(parameters, "project_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.references.list" then domain(music_reference_library.inventory(limit: bounded_limit(parameters["limit"], 500)))
       when "music.references.get" then domain(music_reference_library.inspect(identifier: required(parameters, "reference_id")))
+      when "music.references.delete.preview" then domain(music_reference_library.deletion_preview(identifier: required(parameters, "reference_id")))
+      when "music.references.delete.execute" then domain(music_reference_library.delete(identifier: required(parameters, "reference_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.references.status" then domain(music_reference_analysis.status)
       when "music.references.analysis.preview" then domain(music_reference_analysis.preview(url: required(parameters, "url"), rights_assertion: required(parameters, "rights_assertion")))
       when "music.references.analysis.execute" then domain(music_reference_analysis.execute(url: required(parameters, "url"), rights_assertion: required(parameters, "rights_assertion"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.references.reanalysis.preview" then domain(music_reference_analysis.reanalysis_preview(reference_id: required(parameters, "reference_id")))
+      when "music.references.reanalysis.execute" then domain(music_reference_analysis.reanalyze(reference_id: required(parameters, "reference_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "music.references.synthesis.draft" then domain(draft_music_reference_synthesis(reference_id: required(parameters, "reference_id"), scope: required(parameters, "scope")))
       when "music.references.synthesis.approval.preview" then domain(music_reference_synthesis.approval_preview(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id")))
       when "music.references.synthesis.approval.execute" then domain(music_reference_synthesis.approve(reference_id: required(parameters, "reference_id"), revision_id: required(parameters, "revision_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -528,6 +537,10 @@ module SoulCore
 
     def music_candidate_disposition
       @music_candidate_disposition_service ||= MusicCandidateDispositionService.new(root: @root, analysis_service: music_candidate_analysis)
+    end
+
+    def music_project_deletion
+      @music_project_deletion_service ||= MusicProjectDeletionService.new(root: @root)
     end
 
     def music_reference_library

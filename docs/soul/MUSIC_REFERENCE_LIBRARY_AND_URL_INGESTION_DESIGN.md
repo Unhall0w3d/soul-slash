@@ -79,9 +79,13 @@ The foreground operation has two gates:
 Execution uses `yt-dlp --ignore-config --no-playlist` without cookies,
 authentication, external downloaders, or execution hooks. Limits are one URL,
 15 minutes duration, 250 MiB transfer, bounded output, fixed timeouts, and finite
-retries. FFmpeg creates a temporary analysis copy; Essentia supplies deterministic
-audio descriptors; the existing transient whisper.cpp lane may supply lyrical
-and section evidence. Optional MusicBrainz enrichment is bounded and ambiguous
+retries. FFmpeg creates temporary analysis copies. Plain Essentia supplies basic
+audio descriptors; a separately pinned Essentia TensorFlow environment supplies
+fallible genre, mood/theme, instrumentation, voice-presence, and structural-change
+evidence. When voice is likely, the existing transient whisper.cpp lane derives
+non-expressive lyrical traits. Source audio and raw machine transcription may
+exist only inside the operation's private temporary directory and are removed on
+every terminal outcome. Optional MusicBrainz enrichment is bounded and ambiguous
 matches require Operator selection.
 
 All subprocesses belong to the request and terminate on success, failure,
@@ -89,6 +93,18 @@ cancellation, timeout, client abandonment, or dashboard shutdown. Temporary
 media and raw source transcription are removed at every terminal outcome in
 `analysis_only` mode. There is no queue, watcher, resident model, scheduler,
 automatic retry after return, or background continuation.
+
+New references use one exact-gated foreground operation and one source download
+to collect both basic and rich evidence. Legacy profiles that lack versioned
+semantic evidence expose `REANALYZE_MUSIC_REFERENCE`; reanalysis redownloads the
+source transiently and replaces only observed evidence. It is blocked when an
+approved synthesis or fusion depends on the current evidence.
+
+One selected track profile may be permanently removed with a fresh digest-bound
+preview and `DELETE_MUSIC_REFERENCE`. The operation is blocked while a fusion
+depends on that track. Artist and album groupings are derived from remaining
+tracks, so an empty grouping disappears automatically. No source media is retained
+or deleted because it was already removed at analysis completion.
 
 ## Lifecycle
 
@@ -110,9 +126,12 @@ or `blocked_for_human_review`. Successful analysis returns
 ### A5.2 — bounded YouTube evidence
 
 - Add metadata preview and exact-confirmation foreground execution.
-- Add pinned optional setup/checks for yt-dlp and Essentia.
+- Add pinned optional setup/checks for yt-dlp, plain Essentia, the isolated
+  Essentia TensorFlow classifier set, and transient whisper.cpp.
 - Extract, validate, and retain provenance plus non-expressive evidence; remove
   transient media and raw transcription.
+- Collect basic and rich evidence in the same user-facing operation; expose a
+  separately exact-gated reanalysis path for incomplete legacy profiles.
 
 ### A5.3 — synthesis, retry, and fusion
 
@@ -129,10 +148,14 @@ or `blocked_for_human_review`. Successful analysis returns
 - Component retry supplies the complete current packet for coherence but code
   preserves every non-requested component byte-for-byte. Every attempt receives
   an immutable `syn_` revision ID; revisions are never overwritten.
-- Source titles and credited artists may inform local interpretation, but the
-  stored Sound and Structure and generated lyrics must not name the source,
-  request imitation, or reproduce source lyrics. The model receives no source
-  audio or raw source transcription.
+- Source titles, credited artists, albums, channels, and other identity metadata
+  are withheld from synthesis. The model receives only bounded duration plus
+  reviewed semantic evidence; it receives no source audio, raw extractor receipt,
+  or raw source transcription. Stored Sound and Structure and generated lyrics
+  must not request imitation or reproduce source lyrics.
+- Synthesis fails closed unless the evidence carries a versioned semantic
+  enrichment receipt and non-empty section, instrumentation, production, energy,
+  and vocal observations. Tempo/key plus raw extractor scalars are insufficient.
 - Drafting terminates `blocked_for_human_review`. Approval requires an exact
   preview digest plus `APPROVE_MUSIC_REFERENCE_SYNTHESIS`; only that operation
   sets the selected revision and makes a reference eligible for fusion.

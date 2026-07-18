@@ -1,0 +1,16 @@
+{
+  "schema_version": "soul.music.reference_enrichment.models.v1",
+  "python": "3.14",
+  "package": { "name": "essentia-tensorflow", "version": "2.1b6.dev1438" },
+  "models": [
+    { "filename": "discogs-effnet-bs64-1.pb", "url": "https://essentia.upf.edu/models/feature-extractors/discogs-effnet/discogs-effnet-bs64-1.pb", "bytes": 18366619, "sha256": "3ed9af50d5367c0b9c795b294b00e7599e4943244f4cbd376869f3bfc87721b1" },
+    { "filename": "genre_discogs400-discogs-effnet-1.pb", "url": "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.pb", "bytes": 2057977, "sha256": "3885ba078a35249af94b8e5e4247689afac40deca4401a4bc888daf5a579c01c" },
+    { "filename": "genre_discogs400-discogs-effnet-1.json", "url": "https://essentia.upf.edu/models/classification-heads/genre_discogs400/genre_discogs400-discogs-effnet-1.json", "bytes": 14951, "sha256": "2d367319d9b782ffa10f69abf0e805b3ac4e10899025e5bdbaceda3919b243e0" },
+    { "filename": "mtg_jamendo_moodtheme-discogs-effnet-1.pb", "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.pb", "bytes": 2739668, "sha256": "03f2b047020aee4ab39f8880da7bdae2a36d06a1508d656c6d424ad4d6de07a9" },
+    { "filename": "mtg_jamendo_moodtheme-discogs-effnet-1.json", "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_moodtheme/mtg_jamendo_moodtheme-discogs-effnet-1.json", "bytes": 3646, "sha256": "d62cd90263e4d613fa7fcce7a831e339450394794af63685f96e065c1a896ab0" },
+    { "filename": "mtg_jamendo_instrument-discogs-effnet-1.pb", "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.pb", "bytes": 2706836, "sha256": "2e8c3003c722e098da371b6a1f7ad0ce62fac0dcfc09c7c7997d430941196c2a" },
+    { "filename": "mtg_jamendo_instrument-discogs-effnet-1.json", "url": "https://essentia.upf.edu/models/classification-heads/mtg_jamendo_instrument/mtg_jamendo_instrument-discogs-effnet-1.json", "bytes": 3382, "sha256": "7d02204c6451b5615e2968ec6364bbae3b915c886e608f05f00d3a38dc5177c4" },
+    { "filename": "voice_instrumental-discogs-effnet-1.pb", "url": "https://essentia.upf.edu/models/classification-heads/voice_instrumental/voice_instrumental-discogs-effnet-1.pb", "bytes": 514458, "sha256": "c8033548e17c292874265db62e82a051247768d10375a35a769e7bf695f16acf" },
+    { "filename": "voice_instrumental-discogs-effnet-1.json", "url": "https://essentia.upf.edu/models/classification-heads/voice_instrumental/voice_instrumental-discogs-effnet-1.json", "bytes": 2013, "sha256": "43ac2c3b055dfaed20f6232e0f10636c287f1c5a6e5bd02c5585860031964c8f" }
+  ]
+}

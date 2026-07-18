@@ -36,7 +36,7 @@ def evidence(bpm:, key: nil)
 end
 
 Dir.mktmpdir("soul-music-reference-a5") do |root|
-  ids = %w[1111111111111111 2222222222222222 3333333333333333 4444444444444444]
+  ids = %w[1111111111111111 2222222222222222 3333333333333333 4444444444444444 5555555555555555]
   store = SoulCore::MusicReferenceLibraryStore.new(root: root, clock: -> { Time.utc(2026, 7, 17, 12) }, id_generator: -> { ids.shift })
   first = store.write_track({
     "status" => "approved", "provenance" => provenance(source_id: "abcDEF12345", title: "First signal", artists: ["Test Artist"], album: "Test Album"),
@@ -53,6 +53,10 @@ Dir.mktmpdir("soul-music-reference-a5") do |root|
       { "reference_id" => second.fetch("reference_id"), "role" => "song architecture", "weight" => 0.45 }
     ],
     "synthesis" => { "status" => "pending", "selected_revision_id" => nil, "revisions" => [] }
+  })
+  removable = store.write_track({
+    "status" => "candidate", "provenance" => provenance(source_id: "delDEL45678", title: "Temporary profile", artists: ["Temporary Artist"]),
+    "evidence" => evidence(bpm: 88, key: "A minor")
   })
 
   inventory = store.list
@@ -79,6 +83,16 @@ Dir.mktmpdir("soul-music-reference-a5") do |root|
   }
   result = facade.call(request)
   check.call("typed read-only application operation returns terminal inventory", SoulCore::ApplicationContract.validate(request)["ok"] == true && result["lifecycle_state"] == "complete" && result.dig("meta", "mutation") == "none")
+
+  dependent = service.deletion_preview(identifier: first.fetch("reference_id"))
+  preview = service.deletion_preview(identifier: removable.fetch("reference_id"))
+  wrong = service.delete(identifier: removable.fetch("reference_id"), confirmation: "yes", expected_digest: preview.dig("data", "expected_digest"))
+  check.call("fusion dependencies block reference deletion", dependent["lifecycle_state"] == "blocked_for_human_review" && dependent.dig("data", "dependent_fusion_ids") == [fusion.fetch("fusion_id")])
+  check.call("reference deletion previews exact provenance evidence and synthesis scope", preview.dig("data", "confirmation_phrase") == "DELETE_MUSIC_REFERENCE" && preview.dig("data", "preview_scope", "title") == "Temporary profile")
+  check.call("wrong reference deletion confirmation preserves profile", wrong["lifecycle_state"] == "blocked_for_human_review" && store.read(removable.fetch("reference_id"))["reference_id"] == removable.fetch("reference_id"))
+  deleted = service.delete(identifier: removable.fetch("reference_id"), confirmation: "DELETE_MUSIC_REFERENCE", expected_digest: preview.dig("data", "expected_digest"))
+  inventory_after_delete = store.list
+  check.call("exact reference deletion removes profile and derived artist grouping", deleted["lifecycle_state"] == "complete" && inventory_after_delete.fetch("tracks").none? { |item| item["reference_id"] == removable.fetch("reference_id") } && inventory_after_delete.fetch("artists").none? { |item| item["name"] == "Temporary Artist" })
 end
 
 Dir.mktmpdir("soul-music-reference-symlink") do |root|
@@ -99,6 +113,7 @@ js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 brief = File.read(File.expand_path("../docs/soul/MUSIC_REFERENCE_LIBRARY_AND_URL_INGESTION_DESIGN.md", __dir__))
 check.call("Music Studio exposes Artist Album Track and Fusion inventory", %w[music-reference-library music-reference-list music-fusion-list].all? { |needle| html.include?(needle) } && js.include?("music.references.list"))
 check.call("reference foundation exposes the separately gated URL intake seam", html.include?('id="music-reference-url"') && html.include?('id="preview-music-reference"') && html.include?("ANALYZE_MUSIC_REFERENCE"))
+check.call("track profiles expose exact permanent deletion", %w[preview-music-reference-delete music-reference-delete-confirmation delete-music-reference].all? { |needle| html.include?(needle) } && js.include?("music.references.delete.preview") && js.include?("music.references.delete.execute"))
 check.call("reference library moves beneath the workbench at narrow widths", css.include?(".music-reference-library { grid-column:1/-1"))
 check.call("A5.1 adds no browser polling or remote dependency", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, js].any? { |source| source.match?(%r{(?:src|href)=["']https?://}) })
 check.call("brief keeps URL analysis foreground and transient", brief.include?("ANALYZE_MUSIC_REFERENCE") && brief.include?("raw source transcription are removed") && brief.include?("There is no queue"))

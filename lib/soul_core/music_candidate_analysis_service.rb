@@ -15,6 +15,7 @@ module SoulCore
     TIMEOUT_SECONDS = 360
     MAX_JSON_BYTES = 8 * 1024 * 1024
     MAX_LOG_BYTES = 512 * 1024
+    MAX_ALIGNMENT_CELLS = 6_000_000
 
     def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_transcription_models.json", __dir__), project_store: nil, process_runner: MusicGenerationService::ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
@@ -108,7 +109,7 @@ module SoulCore
       candidate_dir = File.dirname(@store.candidate_artifact_path(project_id, candidate_id, "flac"))
       path = File.join(candidate_dir, "analysis", "analysis.json")
       return nil unless File.file?(path) && !File.symlink?(path) && File.size(path).between?(1, MAX_JSON_BYTES)
-      JSON.parse(File.binread(path, MAX_JSON_BYTES))
+      project_current_alignment(JSON.parse(File.binread(path, MAX_JSON_BYTES)))
     rescue JSON::ParserError => error
       raise MusicProjectStore::IntegrityError, "invalid candidate analysis: #{error.class}"
     end
@@ -166,39 +167,68 @@ module SoulCore
     def align_lyrics(intended, heard)
       lines = intended.lines.map(&:strip).reject { |line| line.empty? || line.match?(/\A\[[^\]]+\]\z/) }
       heard_words = words(heard)
-      cursor = 0
-      line_results = lines.map do |line|
-        target = words(line)
-        best = { score: 0.0, start: nil }
-        max_start = [heard_words.length - 1, 0].max
-        (cursor..max_start).each do |start|
-          window = heard_words[start, [target.length + 3, heard_words.length - start].min] || []
-          score = target.empty? ? 0.0 : lcs(target, window).fdiv(target.length)
-          best = { score: score, start: start } if score > best[:score]
-        end
-        status = best[:score] >= 0.75 ? "heard" : (best[:score] >= 0.4 ? "partial" : "not_heard")
-        cursor = best[:start] + [target.length, 1].max if best[:start] && status != "not_heard"
-        { "intended" => line, "status" => status, "sequence_recall" => best[:score].round(3) }
+      line_words = lines.map { |line| words(line) }
+      intended_words = line_words.flatten
+      matched = lcs_word_matches(intended_words, heard_words)
+      offset = 0
+      line_results = lines.each_with_index.map do |line, index|
+        target = line_words[index]
+        matched_count = matched[offset, target.length].to_a.count(true)
+        offset += target.length
+        score = target.empty? ? 0.0 : matched_count.fdiv(target.length)
+        status = score >= 0.75 ? "heard" : (score >= 0.4 ? "partial" : "not_heard")
+        { "intended" => line, "status" => status, "sequence_recall" => score.round(3) }
       end
-      intended_words = words(lines.join(" "))
-      recall = intended_words.empty? ? 0.0 : lcs(intended_words, heard_words).fdiv(intended_words.length)
+      recall = intended_words.empty? ? 0.0 : matched.count(true).fdiv(intended_words.length)
       problem_lines = line_results.count { |item| item["status"] != "heard" }
       route = recall >= 0.72 && problem_lines <= [1, (line_results.length * 0.2).floor].max ? "human_listening_test" : "revision_recommended"
-      { "intended_word_count" => intended_words.length, "machine_heard_word_count" => heard_words.length, "sequence_recall" => recall.round(3), "lines" => line_results, "problem_line_count" => problem_lines, "machine_route" => route }
+      { "algorithm_version" => 2, "intended_word_count" => intended_words.length, "machine_heard_word_count" => heard_words.length, "sequence_recall" => recall.round(3), "lines" => line_results, "problem_line_count" => problem_lines, "machine_route" => route }
+    end
+
+    def project_current_alignment(evidence)
+      alignment = align_lyrics(evidence.fetch("intended_lyrics"), evidence.fetch("machine_heard_lyrics"))
+      evidence["alignment"] = alignment
+      evidence["machine_route"] = alignment.fetch("machine_route")
+      evidence["next_gate"] = alignment.fetch("machine_route") == "human_listening_test" ? "human_listening_test" : "operator_triggered_revision_attempt"
+      evidence
     end
 
     def words(value) = value.to_s.downcase.scan(/[a-z0-9]+(?:'[a-z0-9]+)?/)
-    def lcs(left, right)
-      row = Array.new(right.length + 1, 0)
-      left.each do |word|
-        previous = 0
-        right.each_with_index do |other, index|
-          saved = row[index + 1]
-          row[index + 1] = word == other ? previous + 1 : [row[index + 1], row[index]].max
-          previous = saved
+
+    def lcs_word_matches(left, right)
+      cells = (left.length + 1) * (right.length + 1)
+      raise MusicProjectStore::IntegrityError, "lyric alignment exceeds bounded comparison size" if cells > MAX_ALIGNMENT_CELLS
+      width = right.length + 1
+      directions = "\0".b * cells
+      previous = Array.new(width, 0)
+      current = Array.new(width, 0)
+      left.each_with_index do |word, left_index|
+        current[0] = 0
+        right.each_with_index do |other, right_index|
+          cell = (left_index + 1) * width + right_index + 1
+          if word == other
+            current[right_index + 1] = previous[right_index] + 1
+            directions.setbyte(cell, 1)
+          elsif previous[right_index + 1] >= current[right_index]
+            current[right_index + 1] = previous[right_index + 1]
+            directions.setbyte(cell, 2)
+          else
+            current[right_index + 1] = current[right_index]
+            directions.setbyte(cell, 3)
+          end
+        end
+        previous, current = current, previous
+      end
+      matches = Array.new(left.length, false)
+      left_index = left.length; right_index = right.length
+      while left_index.positive? && right_index.positive?
+        case directions.getbyte(left_index * width + right_index)
+        when 1 then matches[left_index - 1] = true; left_index -= 1; right_index -= 1
+        when 2 then left_index -= 1
+        else right_index -= 1
         end
       end
-      row.last
+      matches
     end
 
     def publish_analysis(candidate_dir, staging)

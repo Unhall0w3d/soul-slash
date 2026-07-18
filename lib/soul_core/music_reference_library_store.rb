@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
 require "securerandom"
 require "time"
@@ -182,6 +183,36 @@ module SoulCore
         updated["updated_at"] = @clock.call.iso8601
         validate_for_identity!(updated, identifier)
         replace_record(identifier, updated)
+      end
+    end
+
+    def delete_track(reference_id, expected_state:)
+      with_record_lock(reference_id) do
+        current = read(reference_id)
+        raise ValidationError, "only track reference profiles can be deleted" unless current["record_type"] == "track"
+        dependencies = read_collection("fusions", FUSION_ID, FUSION_SCHEMA).select { |fusion| fusion.fetch("source_reference_ids").include?(reference_id.to_s) }.map { |fusion| fusion.fetch("fusion_id") }.sort
+        actual = { "record_digest" => Digest::SHA256.hexdigest(JSON.generate(current)), "dependent_fusion_ids" => dependencies }
+        raise StaleStateError, "music reference state changed; preview deletion again" unless actual == expected_state
+        raise ValidationError, "music reference is used by fusion profiles: #{dependencies.join(', ')}" unless dependencies.empty?
+        path = File.join(@directory, "tracks", "#{reference_id}.json")
+        stat = File.lstat(path)
+        raise IntegrityError, "music reference record must remain a regular file" unless stat.file? && !stat.symlink?
+        File.unlink(path)
+        raise IntegrityError, "music reference deletion could not be verified" if File.exist?(path) || File.symlink?(path)
+        current
+      end
+    end
+
+    def replace_track_evidence(reference_id, evidence, expected_record_digest:)
+      with_record_lock(reference_id) do
+        current = read(reference_id)
+        actual = Digest::SHA256.hexdigest(JSON.generate(current))
+        raise StaleStateError, "music reference state changed; preview reanalysis again" unless actual == expected_record_digest
+        updated = deep_copy(current)
+        updated["evidence"] = stringify_keys(evidence)
+        updated["updated_at"] = @clock.call.iso8601
+        validate_track!(updated, reference_id.to_s)
+        replace_record(reference_id, updated)
       end
     end
 

@@ -1,7 +1,8 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel" });
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
 function requestId() {
@@ -135,7 +136,10 @@ function setBusy(busy, message = "") {
   if (message) announce(message);
 }
 
-function switchTab(name) {
+function tabFromLocation() { return Object.entries(TAB_LOCATIONS).find(([, hash]) => hash === window.location.hash)?.[0] || null; }
+
+function switchTab(name, { updateLocation = true } = {}) {
+  if (!Object.hasOwn(TAB_LOCATIONS, name)) name = "chat";
   const chat = name === "chat";
   const studio = name === "studio";
   const improvement = name === "improvement";
@@ -163,10 +167,11 @@ function switchTab(name) {
   byId("augmentation-tab").setAttribute("aria-current", augmentation ? "page" : "false");
   byId("music-tab").setAttribute("aria-selected", String(music));
   setSelfImprovementMenu(false);
-  if (studio && !state.studioLoaded) loadSkillStudio();
-  if (improvement && !state.improvementLoaded) loadSelfImprovement();
-  if (augmentation && !state.augmentationLoaded) loadSelfAugmentation();
-  if (music && !state.musicLoaded) loadMusicStudio();
+  if (updateLocation && window.location.hash !== TAB_LOCATIONS[name]) window.history.replaceState(null, "", TAB_LOCATIONS[name]);
+  if (studio && state.authenticated && !state.studioLoaded) loadSkillStudio();
+  if (improvement && state.authenticated && !state.improvementLoaded) loadSelfImprovement();
+  if (augmentation && state.authenticated && !state.augmentationLoaded) loadSelfAugmentation();
+  if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
 }
 
 function setSelfImprovementMenu(open) {
@@ -341,7 +346,7 @@ function updateMusicFusionSelection() {
 
 async function inspectMusicReference(referenceId, button) {
   button.disabled = true;
-  try { const envelope = await callSoul("music.references.get", { reference_id: referenceId }); lifecycle(envelope); const reference = dataOf(envelope).reference; state.selectedMusicReference = reference; state.musicSynthesisApproval = null; state.musicSynthesisRejection = null; button.querySelector("small").textContent = reference.record_type === "track" ? `${reference.status} · synthesis ${reference.synthesis.status}` : `${reference.status} · ${reference.source_reference_ids.length} sources`; renderMusicReferenceDetail(); }
+  try { const envelope = await callSoul("music.references.get", { reference_id: referenceId }); lifecycle(envelope); const reference = dataOf(envelope).reference; state.selectedMusicReference = reference; state.musicReferenceDelete = null; state.musicReferenceReanalysis = null; state.musicSynthesisApproval = null; state.musicSynthesisRejection = null; button.querySelector("small").textContent = reference.record_type === "track" ? `${reference.status} · synthesis ${reference.synthesis.status}` : `${reference.status} · ${reference.source_reference_ids.length} sources`; renderMusicReferenceDetail(); }
   catch (error) { button.querySelector("small").textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -352,20 +357,56 @@ function renderMusicReferenceDetail() {
   const track = reference.record_type === "track"; const provenance = reference.provenance || {}; const evidence = reference.evidence || {}; const synthesis = reference.synthesis || { revisions: [] };
   const revisions = synthesis.revisions || []; const latest = revisions.at(-1); const selected = revisions.find((item) => item.revision_id === synthesis.selected_revision_id);
   const latestRejected = Boolean(latest && (synthesis.rejected_revision_ids || []).includes(latest.revision_id));
+  const semanticEvidenceReady = !track || (evidence.extractor_receipt?.semantic_evidence_version === 1 && ["sections", "instrumentation", "production_traits", "energy_curve", "vocal_traits"].every((field) => Array.isArray(evidence[field]) && evidence[field].length > 0 && evidence[field].every((value) => typeof value === "string" && value.trim())));
   byId("music-reference-detail-title").textContent = track ? (provenance.title || "Reference profile") : reference.title;
   byId("music-reference-detail-meta").textContent = track ? [provenance.artists?.join(", "), provenance.album, `${provenance.duration_seconds}s`, provenance.rights_assertion?.replaceAll("_", " ")].filter(Boolean).join(" · ") : `${reference.source_reference_ids.length} approved sources · fusion candidate`;
   byId("music-reference-synthesis-state").textContent = synthesis.status || "pending";
   byId("music-reference-observed").previousElementSibling.textContent = track ? "Fallible measurements derived from the source" : "Approved targets and the role Soul assigned each source";
   byId("music-reference-observed").textContent = JSON.stringify(track ? { bpm: evidence.bpm, bpm_alternatives: evidence.bpm_alternatives, key: evidence.key, key_alternatives: evidence.key_alternatives, meter: evidence.meter, sections: evidence.sections, instrumentation: evidence.instrumentation, production_traits: evidence.production_traits, energy_curve: evidence.energy_curve, vocal_traits: evidence.vocal_traits, lyrical_traits: evidence.lyrical_traits, confidence_notes: evidence.confidence_notes } : { source_reference_ids: reference.source_reference_ids, roles: reference.roles }, null, 2);
   byId("music-reference-target").textContent = latest ? JSON.stringify({ revision_id: latest.revision_id, scope: latest.scope, intent: latest.intent, title: latest.title, sound_and_structure: latest.caption, lyrics: latest.lyrics, bpm: latest.bpm, key: latest.keyscale, time: latest.timesignature, exclusions: latest.exclusions, rationale: latest.rationale }, null, 2) : "";
-  byId("music-reference-target-note").textContent = latest ? `Revision ${revisions.length} · ${latest.revision_id}${selected?.revision_id === latest.revision_id ? " · approved target" : latestRejected ? " · rejected" : " · awaiting Operator decision"}` : "No synthesis has been drafted.";
+  byId("music-reference-target-note").textContent = latest ? `Revision ${revisions.length} · ${latest.revision_id}${selected?.revision_id === latest.revision_id ? " · approved target" : latestRejected ? " · rejected" : " · awaiting Operator decision"}` : semanticEvidenceReady ? "No synthesis has been drafted." : "Source identity and basic measurements are recorded. Semantic enrichment is required before Soul may draft from this reference.";
   const scope = byId("music-reference-synthesis-scope"); if (!latest) scope.value = "all"; scope.disabled = !latest;
   byId("draft-music-reference-synthesis").hidden = !track && !latest; byId("draft-music-reference-synthesis").textContent = track ? (latest ? "Retry selected scope" : "Draft composition target") : "Retry fusion scope";
-  byId("draft-music-reference-synthesis").disabled = state.musicSynthesisBusy;
+  byId("draft-music-reference-synthesis").disabled = state.musicSynthesisBusy || !semanticEvidenceReady;
   byId("preview-music-reference-synthesis-approval").hidden = !latest || latestRejected || selected?.revision_id === latest.revision_id;
   byId("preview-music-reference-synthesis-rejection").hidden = !latest || latestRejected || selected?.revision_id === latest.revision_id;
   byId("music-reference-synthesis-confirm").hidden = !state.musicSynthesisApproval;
   byId("music-reference-synthesis-reject-confirm").hidden = !state.musicSynthesisRejection;
+  byId("preview-music-reference-delete").hidden = !track;
+  byId("music-reference-delete-confirm").hidden = !state.musicReferenceDelete;
+  byId("reanalyze-music-reference").hidden = !track || semanticEvidenceReady;
+  byId("music-reference-reanalysis-confirm").hidden = !state.musicReferenceReanalysis;
+}
+
+async function previewMusicReferenceReanalysis() {
+  const reference = state.selectedMusicReference; if (!reference || reference.record_type !== "track" || state.musicReferenceAnalyzing) return;
+  state.musicReferenceReanalysis = null; byId("music-reference-reanalysis-confirm").hidden = true; byId("reanalyze-music-reference").disabled = true; byId("music-reference-synthesis-status").textContent = "Preparing a complete reanalysis preview; no source media has been downloaded yet.";
+  try { const envelope = await callSoul("music.references.reanalysis.preview", { reference_id: reference.reference_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicReferenceReanalysis = data; byId("music-reference-reanalysis-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-reanalysis-confirmation").value = ""; byId("execute-music-reference-reanalysis").disabled = true; byId("music-reference-synthesis-status").textContent = "Exact foreground reanalysis is ready for confirmation."; renderMusicReferenceDetail(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { byId("reanalyze-music-reference").disabled = false; }
+}
+
+async function executeMusicReferenceReanalysis() {
+  const reference = state.selectedMusicReference; const preview = state.musicReferenceReanalysis; if (!reference || !preview || state.musicReferenceAnalyzing) return;
+  state.musicReferenceAnalyzing = true; byId("execute-music-reference-reanalysis").disabled = true;
+  try { const params = { reference_id: reference.reference_id, confirmation: byId("music-reference-reanalysis-confirmation").value, expected_digest: preview.expected_digest }; const envelope = await callNdjson("/api/v1/music-stream", "music.references.reanalysis.execute", params, {}, (event) => { const message = String(event.message || "").trim(); if (message) byId("music-reference-synthesis-status").textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${message.slice(0, 240)}`; }); lifecycle(envelope); const updated = dataOf(envelope).reference; if (!updated) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = updated; state.musicReferenceReanalysis = null; byId("music-reference-synthesis-status").textContent = "Complete evidence profile recorded. Temporary source audio and transcript were removed."; renderMusicReferenceDetail(); await loadMusicReferences(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { state.musicReferenceAnalyzing = false; }
+}
+
+async function previewMusicReferenceDelete() {
+  const reference = state.selectedMusicReference; if (!reference || reference.record_type !== "track") return;
+  state.musicReferenceDelete = null; byId("music-reference-delete-confirm").hidden = true; byId("preview-music-reference-delete").disabled = true; byId("music-reference-synthesis-status").textContent = "Inventorying this reference and checking saved fusion dependencies…";
+  try { const envelope = await callSoul("music.references.delete.preview", { reference_id: reference.reference_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicReferenceDelete = data; byId("music-reference-delete-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-reference-delete-confirmation").value = ""; byId("delete-music-reference").disabled = true; byId("music-reference-synthesis-status").textContent = "Review the exact profile deletion, then type the confirmation phrase."; renderMusicReferenceDetail(); }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
+  finally { byId("preview-music-reference-delete").disabled = false; }
+}
+
+async function deleteMusicReference() {
+  const reference = state.selectedMusicReference; const preview = state.musicReferenceDelete; if (!reference || !preview) return;
+  byId("delete-music-reference").disabled = true;
+  try { const envelope = await callSoul("music.references.delete.execute", { reference_id: reference.reference_id, confirmation: byId("music-reference-delete-confirmation").value, expected_digest: preview.expected_digest }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.selectedMusicReference = null; state.musicReferenceDelete = null; state.musicReferenceReanalysis = null; byId("music-reference-detail").hidden = true; await loadMusicReferences(); byId("music-reference-status").textContent = "Reference profile deleted. Empty artist and album groupings were removed from the archive."; }
+  catch (error) { byId("music-reference-synthesis-status").textContent = error.message; }
 }
 
 async function draftMusicReferenceSynthesis() {
@@ -421,7 +462,7 @@ function renderMusicProjects() {
 }
 
 function resetMusicForm() {
-  state.selectedMusicProject = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
+  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
 }
 
 async function createMusicProject(event) {
@@ -430,7 +471,22 @@ async function createMusicProject(event) {
 }
 
 async function selectMusicProject(project) {
-  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); byId("save-music-project").hidden = true; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); byId("save-music-project").hidden = true; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+}
+
+async function previewMusicProjectDelete() {
+  if (!state.selectedMusicProject || state.musicGenerating) return;
+  state.musicProjectDeletePreview = null; byId("music-project-delete-confirm").hidden = true; byId("preview-music-project-delete").disabled = true; byId("music-project-delete-status").textContent = "Inventorying archive-owned project data…";
+  try { const envelope = await callSoul("music.projects.delete.preview", { project_id: state.selectedMusicProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicProjectDeletePreview = data; byId("music-project-delete-scope").textContent = JSON.stringify(data.preview_scope, null, 2); byId("music-project-delete-confirmation").value = ""; byId("execute-music-project-delete").disabled = true; byId("music-project-delete-confirm").hidden = false; byId("music-project-delete-status").textContent = "Review the exact inventory and retained finished exports, then type the confirmation phrase."; }
+  catch (error) { byId("music-project-delete-status").textContent = error.message; }
+  finally { byId("preview-music-project-delete").disabled = false; }
+}
+
+async function executeMusicProjectDelete() {
+  const preview = state.musicProjectDeletePreview; const project = state.selectedMusicProject; if (!preview || !project || state.musicGenerating) return;
+  byId("execute-music-project-delete").disabled = true;
+  try { const envelope = await callSoul("music.projects.delete.execute", { project_id: project.project_id, confirmation: byId("music-project-delete-confirmation").value, expected_digest: preview.expected_digest }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicProjectDeletePreview = null; state.selectedMusicProject = null; state.musicLoaded = false; resetMusicForm(); await loadMusicStudio(); byId("music-form-status").textContent = "Composition permanently removed from the archive. Finished exports were left untouched."; }
+  catch (error) { byId("music-project-delete-status").textContent = error.message; }
 }
 
 async function refreshMusicResources() {
@@ -456,7 +512,8 @@ async function cancelMusicGeneration() {
 function renderMusicCandidates(candidates) {
   const section = byId("music-candidates"); section.hidden = candidates.length === 0; byId("music-candidate-count").textContent = String(candidates.length); const list = byId("music-candidate-list"); list.replaceChildren();
   const linkedSources = new Set(candidates.map((candidate) => candidate.source_candidate_id).filter(Boolean));
-  candidates.slice().reverse().forEach((candidate) => {
+  const newestFirst = candidates.slice().sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")) || String(right.candidate_id).localeCompare(String(left.candidate_id)));
+  newestFirst.forEach((candidate) => {
     const older = candidate.review?.disposition === "revise" && linkedSources.has(candidate.candidate_id);
     const card = document.createElement("article"); card.className = "music-candidate"; card.classList.toggle("is-older-version", older);
     const heading = document.createElement("div"); heading.className = "card-heading";
@@ -542,11 +599,15 @@ function musicRevisionPanel(candidate) {
 }
 
 async function draftMusicRevision(candidate, panel, launch, status) {
-  launch.disabled = true; status.textContent = "Soul is translating review evidence into a material revision…"; try { const envelope = await callSoul("music.candidates.revision.draft", { project_id: candidate.project_id, source_candidate_id: candidate.candidate_id }); const data = dataOf(envelope); if (!data.revision) throw new Error(envelope.errors?.[0]?.message || "Soul did not return a valid revision brief"); const summary = document.createElement("section"); summary.className = "music-revision-rationale"; const heading = document.createElement("strong"); heading.textContent = "Soul's proposed changes"; const rationale = document.createElement("p"); rationale.textContent = data.rationale; const changes = document.createElement("ul"); (data.changes || []).forEach((value) => { const item = document.createElement("li"); item.textContent = value; changes.append(item); }); const provider = document.createElement("small"); provider.textContent = `${data.provider?.model || "local model"} · review-only draft`; summary.append(heading, rationale, changes, provider); panel.insertBefore(summary, status); prepareMusicRevision(candidate, panel, launch, status, data.revision); } catch (error) { status.textContent = `${error.message}. No revision or generation was started.`; launch.disabled = false; launch.textContent = "Retry Soul revision draft"; }
+  if (state.musicGenerating) return;
+  launch.disabled = true; panel.querySelectorAll(".music-revision-rationale,.music-revision,.music-revision-gate").forEach((element) => element.remove()); status.textContent = "Soul is translating review evidence into a new material revision…";
+  try { const envelope = await callSoul("music.candidates.revision.draft", { project_id: candidate.project_id, source_candidate_id: candidate.candidate_id }); const data = dataOf(envelope); if (!data.revision) throw new Error(envelope.errors?.[0]?.message || "Soul did not return a valid revision brief"); const summary = document.createElement("section"); summary.className = "music-revision-rationale"; const heading = document.createElement("strong"); heading.textContent = "Soul's proposed changes"; const rationale = document.createElement("p"); rationale.textContent = data.rationale; const changes = document.createElement("ul"); (data.changes || []).forEach((value) => { const item = document.createElement("li"); item.textContent = value; changes.append(item); }); const provider = document.createElement("small"); provider.textContent = `${data.provider?.model || "local model"} · review-only draft`; summary.append(heading, rationale, changes, provider); panel.insertBefore(summary, status); prepareMusicRevision(candidate, panel, launch, status, data.revision); status.textContent = "Review or edit this draft, retry Soul, or preview the exact revision. No generation has started."; }
+  catch (error) { status.textContent = `${error.message}. No revision or generation was started.`; }
+  finally { launch.disabled = false; launch.textContent = "Retry Soul draft"; }
 }
 
 function prepareMusicRevision(candidate, panel, launch, status, draft) {
-  const source = candidate.generation_input; if (!source) { status.textContent = "The exact source input is unavailable; revision stopped safely."; return; } launch.hidden = true; const form = document.createElement("form"); form.className = "music-revision"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Revision input"; const sourceLabel = document.createElement("small"); sourceLabel.textContent = `from ${candidate.candidate_id}`; heading.append(title, sourceLabel);
+  const source = candidate.generation_input; if (!source) { status.textContent = "The exact source input is unavailable; revision stopped safely."; return; } const form = document.createElement("form"); form.className = "music-revision"; const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Revision input"; const sourceLabel = document.createElement("small"); sourceLabel.textContent = `from ${candidate.candidate_id}`; heading.append(title, sourceLabel);
   const field = (labelText, control) => { const label = document.createElement("label"); label.textContent = labelText; label.append(control); return label; }; const caption = document.createElement("textarea"); caption.name = "caption"; caption.rows = 6; caption.maxLength = 8000; caption.required = true; caption.value = draft.caption; const lyrics = document.createElement("textarea"); lyrics.name = "lyrics"; lyrics.rows = 9; lyrics.maxLength = 20000; lyrics.required = true; lyrics.value = draft.lyrics; const grid = document.createElement("div"); grid.className = "music-revision-grid"; const bpm = document.createElement("input"); bpm.name = "bpm"; bpm.type = "number"; bpm.min = "30"; bpm.max = "300"; bpm.required = true; bpm.value = String(draft.bpm); const key = document.createElement("input"); key.name = "keyscale"; key.maxLength = 40; key.required = true; key.value = draft.keyscale; const time = document.createElement("input"); time.name = "timesignature"; time.pattern = "2|3|4|5|6|7|9|12"; time.required = true; time.value = draft.timesignature; const seed = document.createElement("input"); seed.name = "seed"; seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.required = true; seed.value = String(Math.floor(Math.random() * 2147483647)); grid.append(field("BPM", bpm), field("Key", key), field("Time", time), field("Seed", seed)); const preview = document.createElement("button"); preview.type = "submit"; preview.className = "gate-button"; preview.textContent = "Preview exact revision"; form.append(heading, field("Sound and structure", caption), field("Lyrics and section markers", lyrics), grid, preview); panel.insertBefore(form, status);
   form.addEventListener("submit", async (event) => { event.preventDefault(); const revision = { caption: caption.value, lyrics: lyrics.value, bpm: Number(bpm.value), keyscale: key.value, timesignature: time.value, seed: Number(seed.value) }; preview.disabled = true; status.textContent = "Binding the revised input to one new candidate…"; try { const envelope = await callSoul("music.candidates.revision.preview", { project_id: candidate.project_id, source_candidate_id: candidate.candidate_id, revision }); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Revision preview is unavailable"); form.querySelectorAll("input,textarea,button").forEach((control) => { control.disabled = true; }); const gate = musicRevisionGate(candidate, revision, data, status); panel.insertBefore(gate, status); status.textContent = `New candidate ${data.candidate_id} is bound to this exact revision. No generation has started.`; } catch (error) { status.textContent = error.message; preview.disabled = false; } });
 }
@@ -1344,7 +1405,7 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; await loadChats(true); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
@@ -1365,6 +1426,7 @@ byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
+window.addEventListener("hashchange", () => { const tab = tabFromLocation(); if (tab) switchTab(tab, { updateLocation: false }); });
 document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); });
 byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
 byId("new-music-project").addEventListener("click", resetMusicForm);
@@ -1381,7 +1443,16 @@ byId("music-reference-synthesis-confirmation").addEventListener("input", () => {
 byId("approve-music-reference-synthesis").addEventListener("click", approveMusicReferenceSynthesis);
 byId("music-reference-synthesis-reject-confirmation").addEventListener("input", () => { byId("reject-music-reference-synthesis").disabled = !state.musicSynthesisRejection || byId("music-reference-synthesis-reject-confirmation").value !== state.musicSynthesisRejection.confirmation_phrase; });
 byId("reject-music-reference-synthesis").addEventListener("click", rejectMusicReferenceSynthesis);
+byId("preview-music-reference-delete").addEventListener("click", previewMusicReferenceDelete);
+byId("music-reference-delete-confirmation").addEventListener("input", () => { byId("delete-music-reference").disabled = !state.musicReferenceDelete || byId("music-reference-delete-confirmation").value !== state.musicReferenceDelete.confirmation_phrase; });
+byId("delete-music-reference").addEventListener("click", deleteMusicReference);
+byId("reanalyze-music-reference").addEventListener("click", previewMusicReferenceReanalysis);
+byId("music-reference-reanalysis-confirmation").addEventListener("input", () => { byId("execute-music-reference-reanalysis").disabled = !state.musicReferenceReanalysis || byId("music-reference-reanalysis-confirmation").value !== state.musicReferenceReanalysis.confirmation_phrase; });
+byId("execute-music-reference-reanalysis").addEventListener("click", executeMusicReferenceReanalysis);
 byId("preview-music-generation").addEventListener("click", previewMusicGeneration);
+byId("preview-music-project-delete").addEventListener("click", previewMusicProjectDelete);
+byId("music-project-delete-confirmation").addEventListener("input", () => { byId("execute-music-project-delete").disabled = !state.musicProjectDeletePreview || byId("music-project-delete-confirmation").value !== state.musicProjectDeletePreview.confirmation_phrase; });
+byId("execute-music-project-delete").addEventListener("click", executeMusicProjectDelete);
 byId("music-generation-confirmation").addEventListener("input", () => { byId("start-music-generation").disabled = !state.musicPreview || byId("music-generation-confirmation").value !== state.musicPreview.confirmation_phrase; });
 byId("start-music-generation").addEventListener("click", startMusicGeneration);
 byId("cancel-music-generation").addEventListener("click", cancelMusicGeneration);

@@ -164,10 +164,11 @@ module SoulCore
         candidate = read_candidate(project_id, candidate_id)
         candidate&.merge("review" => @store.read_review(project_id, candidate_id), "generation_input" => @store.candidate_input(project_id, candidate_id))
       end
+      generations.sort_by! { |candidate| [candidate.fetch("created_at"), candidate.fetch("candidate_id")] }.reverse!
       outcome("complete", true, "music project inspected", data: { "project" => project, "input_digest" => @store.input_digest(project), "generations" => generations })
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
-    rescue MusicProjectStore::IntegrityError => error
+    rescue MusicProjectStore::IntegrityError, KeyError => error
       outcome("blocked_for_human_review", false, error.message)
     end
 

@@ -28,8 +28,10 @@ MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
 MUSIC_REFERENCE_PYTHON ?= 3.14
 MUSIC_REFERENCE_YTDLP_VERSION ?= 2026.7.4
 MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
+MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
+MUSIC_REFERENCE_MODEL_CACHE ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -47,6 +49,8 @@ help:
 > @echo "  make music-pilot-run MUSIC_DURATION=30  Run one bounded foreground pilot"
 > @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
 > @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
+> @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
+> @echo "  make music-reference-enrichment-install EXPECTED_DIGEST=... CONFIRM=INSTALL_MUSIC_REFERENCE_ENRICHMENT"
 > @echo "  make verify-music-reference-synthesis  Test reference synthesis retry approval and fusion gates"
 > @echo "  make music-projects    List private Music Studio projects"
 > @echo "  make music-resources   Inspect AMD/NVIDIA/CPU Music resource lanes"
@@ -154,6 +158,17 @@ music-reference-tooling-install:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-reference-tooling-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "INSTALL_MUSIC_REFERENCE_TOOLS" || { echo "Exact confirmation INSTALL_MUSIC_REFERENCE_TOOLS is required."; exit 2; }
 > @ruby scripts/soul-music-reference-tooling install --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-reference-enrichment-check:
+> @ruby scripts/soul-music-reference-enrichment-tooling check --root "$(PROJECT_ROOT)" --manifest "$(MUSIC_REFERENCE_ENRICHMENT_MANIFEST)"
+
+music-reference-enrichment-plan:
+> @ruby scripts/soul-music-reference-enrichment-tooling plan --root "$(PROJECT_ROOT)" --manifest "$(MUSIC_REFERENCE_ENRICHMENT_MANIFEST)"
+
+music-reference-enrichment-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-reference-enrichment-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_MUSIC_REFERENCE_ENRICHMENT" || { echo "Exact confirmation INSTALL_MUSIC_REFERENCE_ENRICHMENT is required."; exit 2; }
+> @ruby scripts/soul-music-reference-enrichment-tooling install --root "$(PROJECT_ROOT)" --manifest "$(MUSIC_REFERENCE_ENRICHMENT_MANIFEST)" $(if $(strip $(MUSIC_REFERENCE_MODEL_CACHE)),--model-cache "$(MUSIC_REFERENCE_MODEL_CACHE)",) --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-projects:
 > @ruby scripts/soul-music-studio projects list --music-root "$(MUSIC_ROOT)" --manifest "$(MUSIC_MODEL_MANIFEST)"

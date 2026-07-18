@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""Bounded semantic evidence for one transient reference WAV."""
+
+import json
+import math
+import pathlib
+import sys
+
+import essentia
+import essentia.standard as es
+import numpy as np
+
+
+FILES = {
+    "embedding": "discogs-effnet-bs64-1.pb",
+    "genre": "genre_discogs400-discogs-effnet-1",
+    "mood": "mtg_jamendo_moodtheme-discogs-effnet-1",
+    "instrument": "mtg_jamendo_instrument-discogs-effnet-1",
+    "voice": "voice_instrumental-discogs-effnet-1",
+}
+
+
+def model_metadata(root, stem):
+    path = root / f"{stem}.json"
+    value = json.loads(path.read_text(encoding="utf-8"))
+    return value, root / f"{stem}.pb"
+
+
+def classify(embeddings, root, stem, count):
+    metadata, graph = model_metadata(root, stem)
+    input_name = metadata["schema"]["inputs"][0]["name"]
+    output_name = metadata["schema"]["outputs"][0]["name"]
+    model = es.TensorflowPredict2D(graphFilename=str(graph), input=input_name, output=output_name)
+    values = np.asarray(model(embeddings), dtype=np.float64)
+    scores = values.mean(axis=0) if values.ndim > 1 else values
+    pairs = sorted(zip(metadata["classes"], scores.tolist()), key=lambda item: item[1], reverse=True)
+    return [{"label": str(label), "score": round(float(score), 4)} for label, score in pairs[:count]]
+
+
+def section_topology(audio, embeddings):
+    count = max(1, len(embeddings))
+    duration = len(audio) / 16000.0
+    energies = []
+    for block in np.array_split(audio, count):
+        energies.append(math.sqrt(float(np.mean(np.square(block, dtype=np.float64)))) if len(block) else 0.0)
+    boundaries = []
+    if count > 2:
+        distances = []
+        for index in range(1, count):
+            left, right = embeddings[index - 1], embeddings[index]
+            denominator = float(np.linalg.norm(left) * np.linalg.norm(right))
+            distance = 1.0 - (float(np.dot(left, right)) / denominator if denominator else 0.0)
+            distances.append((distance, index))
+        for _, index in sorted(distances, reverse=True):
+            if all(abs(index - chosen) >= 2 for chosen in boundaries):
+                boundaries.append(index)
+            if len(boundaries) >= 3:
+                break
+    points = [0] + sorted(boundaries) + [count]
+    median = float(np.median(energies)) or 1.0
+    sections = []
+    for start, finish in zip(points, points[1:]):
+        relative = float(np.mean(energies[start:finish])) / median
+        level = "lower" if relative < 0.8 else "higher" if relative > 1.2 else "steady"
+        begin_s = round(start * duration / count, 1); end_s = round(finish * duration / count, 1)
+        sections.append(f"{begin_s:.1f}-{end_s:.1f}s: {level} relative energy; embedding change boundary")
+    return sections
+
+
+def main():
+    if len(sys.argv) != 3:
+        raise RuntimeError("one WAV and one model directory are required")
+    wav = pathlib.Path(sys.argv[1]).resolve(strict=True)
+    models = pathlib.Path(sys.argv[2]).resolve(strict=True)
+    if not wav.is_file() or wav.is_symlink() or wav.suffix.lower() != ".wav":
+        raise RuntimeError("semantic input must be one regular WAV")
+    if wav.stat().st_size > 200 * 1024 * 1024 or not models.is_dir() or models.is_symlink():
+        raise RuntimeError("semantic input boundary is invalid")
+    required = [models / FILES["embedding"]]
+    required += [models / f"{FILES[name]}.{suffix}" for name in ("genre", "mood", "instrument", "voice") for suffix in ("pb", "json")]
+    if any(not path.is_file() or path.is_symlink() for path in required):
+        raise RuntimeError("semantic model set is incomplete")
+
+    audio = es.MonoLoader(filename=str(wav), sampleRate=16000, resampleQuality=4)()
+    if len(audio) < 16000:
+        raise RuntimeError("semantic input is too short")
+    embeddings = np.asarray(es.TensorflowPredictEffnetDiscogs(graphFilename=str(models / FILES["embedding"]), output="PartitionedCall:1")(audio))
+    if embeddings.ndim != 2 or len(embeddings) == 0:
+        raise RuntimeError("semantic embedding output is invalid")
+    result = {
+        "schema_version": "soul.music.reference.semantic.v1",
+        "essentia_version": getattr(essentia, "__version__", "unknown"),
+        "genre": classify(embeddings, models, FILES["genre"], 6),
+        "mood_theme": classify(embeddings, models, FILES["mood"], 8),
+        "instrumentation": classify(embeddings, models, FILES["instrument"], 10),
+        "voice": classify(embeddings, models, FILES["voice"], 2),
+        "sections": section_topology(audio, embeddings),
+        "frame_count": len(embeddings),
+    }
+    print(json.dumps(result, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as error:
+        print(f"semantic enrichment failed: {error}", file=sys.stderr)
+        sys.exit(1)

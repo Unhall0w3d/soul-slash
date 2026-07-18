@@ -51,8 +51,10 @@ inspect resources
 → blocked_for_human_review
 ```
 
-Generation durations are 10–180 seconds in A2, batch size is one, the seed is
-explicit, and wall timeout is duration plus 180 seconds. The operation uses the
+New project generation durations are the supported 30-, 90-, and 180-second
+presets, batch size is one, the seed is explicit, and wall timeout is duration
+plus 180 seconds. Older bounded 10–180-second project records remain readable
+for compatibility but cannot be newly created through Soul. The operation uses the
 pinned A1 model profile with strict offline mode, float32 Pascal compatibility,
 CPU offload, and eight diffusion steps. It never performs a second model run
 for MP3.

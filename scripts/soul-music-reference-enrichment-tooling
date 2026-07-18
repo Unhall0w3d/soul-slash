@@ -1,0 +1,112 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "net/http"
+require "optparse"
+require "securerandom"
+require "uri"
+
+CONFIRMATION = "INSTALL_MUSIC_REFERENCE_ENRICHMENT"
+options = { root: File.expand_path("..", __dir__), manifest: File.expand_path("../config/music_reference_enrichment_models.json", __dir__) }
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--manifest PATH") { |value| options[:manifest] = value }
+  parser.on("--model-cache PATH") { |value| options[:model_cache] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0) = (puts(JSON.pretty_generate(value)); exit(status))
+def executable(name) = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }.find { |path| File.executable?(path) && !File.directory?(path) }
+
+def download(uri, destination, expected_bytes, redirects = 0)
+  raise "too many model redirects" if redirects > 5
+  request = Net::HTTP::Get.new(uri)
+  Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 120) do |http|
+    http.request(request) do |response|
+      return download(URI.join(uri.to_s, response["location"]), destination, expected_bytes, redirects + 1) if response.is_a?(Net::HTTPRedirection)
+      raise "model download failed with HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+      bytes = 0
+      File.open(destination, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        response.read_body do |chunk|
+          bytes += chunk.bytesize
+          raise "model download exceeded pinned byte count" if bytes > expected_bytes
+          file.write(chunk)
+        end
+      end
+      raise "model byte count does not match" unless bytes == expected_bytes
+    end
+  end
+end
+
+begin
+  root = File.expand_path(options.fetch(:root)); manifest_path = File.expand_path(options.fetch(:manifest)); manifest = JSON.parse(File.read(manifest_path))
+  raise "enrichment manifest is invalid" unless manifest["schema_version"] == "soul.music.reference_enrichment.models.v1"
+  install_dir = File.join(root, "Soul", "music", "tooling", "reference-enrichment")
+  raise "enrichment destination escaped the repository" unless install_dir.start_with?(root + File::SEPARATOR)
+  plan = {
+    "operation" => "music_reference_enrichment_install", "install_dir" => install_dir,
+    "python" => manifest.fetch("python"), "package" => manifest.fetch("package"),
+    "models" => manifest.fetch("models"), "confirmation_phrase" => CONFIRMATION,
+    "persistent_service" => false, "resident_process" => false, "automatic_install" => false,
+    "system_package_mutation" => false, "download_bytes" => manifest.fetch("models").sum { |model| model.fetch("bytes") }
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+  if action == "plan"
+    emit(plan.merge("lifecycle_state" => "blocked_for_human_review"))
+  elsif action == "check"
+    python = File.join(install_dir, ".venv", "bin", "python"); models = File.join(install_dir, "models")
+    valid = File.executable?(python) && manifest.fetch("models").all? { |model| path = File.join(models, model.fetch("filename")); File.file?(path) && !File.symlink?(path) && File.size(path) == model.fetch("bytes") && Digest::SHA256.file(path).hexdigest == model.fetch("sha256") }
+    if valid
+      output = IO.popen([python, "-c", 'import essentia.standard as es; assert hasattr(es,"TensorflowPredictEffnetDiscogs"); print("ok")'], err: [:child, :out], &:read)
+      valid = $?.success? && output.lines.any? { |line| line.strip == "ok" }
+    end
+    emit("lifecycle_state" => "complete", "available" => valid, "install_dir" => install_dir, "resident_process" => false)
+  elsif action == "install"
+    raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+    raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+    raise "reference enrichment tooling already exists" if File.exist?(install_dir) || File.symlink?(install_dir)
+    uv = executable("uv") or raise "uv is required"
+    staging = "#{install_dir}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"; FileUtils.mkdir_p(staging, mode: 0o700)
+    venv = File.join(staging, ".venv"); env = { "UV_PYTHON_DOWNLOADS" => "never" }
+    system(env, uv, "--no-config", "venv", "--python", manifest.fetch("python"), venv) or raise "could not create enrichment environment"
+    python = File.join(venv, "bin", "python"); package = manifest.fetch("package")
+    system(env, uv, "--no-config", "pip", "install", "--python", python, "#{package.fetch('name')}==#{package.fetch('version')}") or raise "pinned enrichment package installation failed"
+    models = File.join(staging, "models"); Dir.mkdir(models, 0o700)
+    manifest.fetch("models").each do |model|
+      path = File.join(models, model.fetch("filename"))
+      cached = options[:model_cache] && File.join(File.expand_path(options[:model_cache]), model.fetch("filename"))
+      if cached
+        stat = File.lstat(cached)
+        raise "cached model is not a regular file: #{model.fetch('filename')}" unless stat.file? && !stat.symlink?
+        raise "cached model byte count does not match: #{model.fetch('filename')}" unless stat.size == model.fetch("bytes")
+        raise "cached model digest does not match: #{model.fetch('filename')}" unless Digest::SHA256.file(cached).hexdigest == model.fetch("sha256")
+        FileUtils.copy_file(cached, path, true)
+        File.chmod(0o600, path)
+      else
+        download(URI(model.fetch("url")), path, model.fetch("bytes"))
+      end
+      raise "model digest does not match: #{model.fetch('filename')}" unless Digest::SHA256.file(path).hexdigest == model.fetch("sha256")
+    end
+    output = IO.popen([python, "-c", 'import essentia.standard as es; assert hasattr(es,"TensorflowPredictEffnetDiscogs"); print("ok")'], err: [:child, :out], &:read)
+    unless $?.success? && output.lines.any? { |line| line.strip == "ok" }
+      detail = output.to_s.gsub(/\s+/, " ").strip.byteslice(0, 1_000)
+      raise "Essentia TensorFlow validation failed#{detail.empty? ? '' : ": #{detail}"}"
+    end
+    File.write(File.join(staging, "install-receipt.json"), JSON.pretty_generate(plan.merge("installed" => true)) + "\n", mode: "wx", perm: 0o600)
+    FileUtils.mkdir_p(File.dirname(install_dir), mode: 0o700); File.rename(staging, install_dir)
+    emit("lifecycle_state" => "complete", "install_dir" => install_dir, "resident_process" => false)
+  else
+    raise "action must be check, plan, or install"
+  end
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial environment removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end

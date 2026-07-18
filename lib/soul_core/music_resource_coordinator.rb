@@ -67,6 +67,13 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
+    def active_project?(project_id)
+      lease = with_inspection_lock { active_lease_unlocked }
+      lease && lease["project_id"] == project_id.to_s
+    rescue Busy
+      true
+    end
+
     def acquire(project_id:, candidate_id:, input_digest:, ttl_seconds: LEASE_TTL_SECONDS)
       raise IntegrityError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
       raise IntegrityError, "input_digest is invalid" unless input_digest.to_s.match?(/\A[a-f0-9]{64}\z/)

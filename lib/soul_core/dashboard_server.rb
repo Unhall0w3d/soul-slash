@@ -11,7 +11,10 @@ module SoulCore
     HEADER_COUNT_LIMIT = 64
     BODY_LIMIT = 128 * 1024
     READ_TIMEOUT = 5
-    MAX_CONCURRENT_REQUESTS = 8
+    # Browser audio controls issue bounded range requests alongside ordinary API
+    # and asset traffic. Keep a hard ceiling while allowing one Music Studio page
+    # to load its visible candidates without starving an Operator action.
+    MAX_CONCURRENT_REQUESTS = 24
 
     STATUS_TEXT = {
       200 => "OK", 206 => "Partial Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",

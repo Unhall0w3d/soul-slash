@@ -58,10 +58,9 @@ analysis = {
   "alignment" => { "sequence_recall" => 0.71, "lines" => [{ "status" => "missing", "intended" => "First line", "sequence_recall" => 0.0 }] }
 }
 valid_draft = JSON.generate(
-  "caption" => "**Melodic rock** with a two-bar exposed vocal pickup before drums enter, restrained first verse, and clearly separated lead vocal throughout.",
+  "caption" => "**Verse 1 (32 sec)** opens with a two-bar exposed vocal pickup before drums enter, then moves into a restrained arrangement with clearly separated lead vocal. Keep the guitars narrow and subdued beneath each lyric, widen the latter phrases without masking consonants, and preserve the accepted ending with a short controlled decay.",
   "bpm" => 116, "keyscale" => "E minor", "timesignature" => "4",
-  "rationale" => "The exposed pickup and reduced opening arrangement should protect the missing lines while preserving the accepted ending.",
-  "changes" => ["**Open** with two bars of voice before the rhythm section.", "Reduce the tempo to create space for lyric articulation."]
+  "rationale" => "The exposed pickup and reduced opening arrangement should protect the missing lines while preserving the accepted ending."
 )
 
 client = RevisionDraftClient.new(valid_draft)
@@ -69,13 +68,41 @@ service = SoulCore::MusicRevisionDraftService.new(provider_client: client, clock
 result = service.draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
 request = client.calls.first.fetch(:request)
 packet = JSON.parse(request.messages.last.fetch("content"))
-check.call("Soul produces a complete plain-text revision block and code preserves lyrics", result["lifecycle_state"] == "blocked_for_human_review" && result.dig("data", "revision", "caption").include?("exposed vocal pickup") && result.dig("data", "revision", "caption").include?("Revision directives:\n- Open with two bars") && !result.dig("data", "revision", "caption").include?("**") && result.dig("data", "revision", "lyrics") == source["lyrics"] && result.dig("data", "automatic_generation") == false && result.dig("data", "human_edit_required") == true && result["mutation"] == "none")
+check.call("Soul produces one complete plain-text revision block and code preserves lyrics", result["lifecycle_state"] == "blocked_for_human_review" && result.dig("data", "revision", "caption").include?("exposed vocal pickup") && result.dig("data", "revision", "caption").include?("Revision directives:\n- Replace Sound and Structure") && !result.dig("data", "revision", "caption").include?("**") && result.dig("data", "revision", "lyrics") == source["lyrics"] && result.dig("data", "automatic_generation") == false && result.dig("data", "human_edit_required") == true && result["mutation"] == "none")
 check.call("one bounded local request uses strict structured output and no tools", client.calls.length == 1 && client.calls.first.fetch(:timeout_seconds) == 90.0 && request.max_output_tokens == 5_000 && request.response_format == SoulCore::MusicRevisionDraftService::RESPONSE_FORMAT && request.reasoning_mode == "disabled" && request.tools.empty? && request.privacy_requirement == "local_only")
 check.call("drafting packet carries exact source plus human and machine evidence", packet.dig("source_input", "caption") == source["caption"] && packet.dig("human_review", "notes") == review["notes"] && packet.dig("machine_heard", "route") == "revision_recommended" && packet["digest"].match?(/\A[a-f0-9]{64}\z/))
+check.call("drafting packet binds the authoritative repeated section sequence", packet["required_section_sequence"] == ["Verse 1"] && packet.dig("project", "target_duration_seconds") == 180)
+
+check.call("review summary is reconstructed from exact materially changed fields", result.dig("data", "changes") == ["Replace Sound and Structure with the proposed materially revised arrangement.", "Change tempo from 120 BPM to 116 BPM."])
+
+meter_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("timesignature" => "4/4")))
+meter = SoulCore::MusicRevisionDraftService.new(provider_client: meter_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
+check.call("conventional equivalent meter notation normalizes to Soul's compact generation value", meter["lifecycle_state"] == "blocked_for_human_review" && meter.dig("data", "revision", "timesignature") == "4" && meter.dig("data", "changes").none? { |change| change.include?("time signature") })
+
+unsupported_meter_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("timesignature" => "11/8")))
+unsupported_meter = SoulCore::MusicRevisionDraftService.new(provider_client: unsupported_meter_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
+check.call("unsupported meter notation remains fail-closed", unsupported_meter["lifecycle_state"] == "awaiting_input" && unsupported_meter["reason"].include?("time signature is invalid"))
+
+timed_source = source.merge("lyrics" => "[Verse 1]\nFirst line\n[Hook]\nStay here\n[Verse 2]\nSecond line\n[Hook]\nStay here\n[Outro]\nLeave now")
+timed_candidate = candidate.merge("generation_input" => timed_source)
+timed_project = project.merge("target_duration_seconds" => 180)
+over_budget_caption = "Verse 1 (40 sec) begins sparsely with precise diction and controlled breath. Hook (40 sec) widens without masking the lead. Verse 2 (50 sec) restores every supplied line over restrained percussion. Hook (40 sec) repeats with matching clarity. Outro (20 sec) closes quietly with a short decay."
+over_budget_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("caption" => over_budget_caption)))
+over_budget = SoulCore::MusicRevisionDraftService.new(provider_client: over_budget_client).draft(project: timed_project, candidate: timed_candidate, analysis: analysis, provider: provider)
+missing_repeat_caption = "Verse 1 (32 sec) begins sparsely with precise diction and controlled breath. Hook (24 sec) widens without masking the lead. Verse 2 (40 sec) restores every supplied line over restrained percussion. Outro (16 sec) closes quietly with a short decay while preserving the accepted atmosphere."
+missing_repeat_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("caption" => missing_repeat_caption)))
+missing_repeat = SoulCore::MusicRevisionDraftService.new(provider_client: missing_repeat_client).draft(project: timed_project, candidate: timed_candidate, analysis: analysis, provider: provider)
+normalized_seconds = over_budget.dig("data", "revision", "caption").to_s.scan(/\((\d+) sec\)/).flatten.map(&:to_i)
+check.call("over-budget section timing is proportionally normalized for review", over_budget["lifecycle_state"] == "blocked_for_human_review" && normalized_seconds.sum == 180 && over_budget.dig("data", "changes").include?("Scale explicit section timing from 190 seconds to the 180-second target.") && over_budget.dig("data", "automatic_generation") == false)
+check.call("section timing cannot omit a repeated lyric section", missing_repeat["lifecycle_state"] == "awaiting_input" && missing_repeat["reason"].include?("every lyric section in exact order"))
+
+fragment_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("caption" => "Revised noir arrangement. Key revisions: (1) Intro: Expand to include the full")))
+fragment = SoulCore::MusicRevisionDraftService.new(provider_client: fragment_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
+check.call("truncated or embedded-list Sound and Structure fails before generation", fragment["lifecycle_state"] == "awaiting_input" && fragment["reason"].match?(/too short|mid-thought|cohesive instruction/) && fragment["mutation"] == "none")
 
 unchanged_client = RevisionDraftClient.new(JSON.generate(
   "caption" => source["caption"], "bpm" => source["bpm"], "keyscale" => source["keyscale"], "timesignature" => source["timesignature"],
-  "rationale" => "Try another seed.", "changes" => ["Change only the seed."]
+  "rationale" => "Try another seed."
 ))
 unchanged = SoulCore::MusicRevisionDraftService.new(provider_client: unchanged_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
 check.call("seed-only or otherwise unchanged model advice fails before any generation", unchanged["lifecycle_state"] == "awaiting_input" && unchanged["reason"].include?("material revision") && unchanged["mutation"] == "none")
@@ -142,6 +169,9 @@ execute_envelope = request.call("music.candidates.revision.execute", { "project_
 check.call("application contract dispatches the review-only Soul draft", draft_envelope["lifecycle_state"] == "blocked_for_human_review" && draft_fixture.args&.dig(:provider)&.id == "fixture.music-revision")
 check.call("application contract dispatches exact revision preview", preview_envelope["lifecycle_state"] == "blocked_for_human_review" && generation_fixture.preview_args&.dig(:revision) == revision_input)
 check.call("application contract dispatches confirmed foreground revision", execute_envelope["lifecycle_state"] == "blocked_for_human_review" && generation_fixture.execute_args&.dig(:confirmation) == "START_MUSIC_REVISION")
+
+dashboard_js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+check.call("dashboard can retry a review-only Soul draft before generation", dashboard_js.include?('launch.textContent = "Retry Soul draft"') && dashboard_js.include?('.music-revision-rationale,.music-revision,.music-revision-gate') && dashboard_js.include?("No generation has started"))
 
 abort "#{failures.length} music revision draft verification(s) failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music revision draft deterministic verification passed."

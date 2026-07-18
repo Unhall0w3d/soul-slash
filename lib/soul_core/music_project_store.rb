@@ -17,6 +17,7 @@ module SoulCore
     DEFAULT_DIRECTORY = File.join("Soul", "music", "projects")
     MAX_PROJECTS = 1_000
     MAX_PROJECT_BYTES = 64 * 1024
+    SUPPORTED_DURATIONS = [30, 90, 180].freeze
     STRING_LIMITS = { "title" => 120, "intent" => 2_000, "caption" => 8_000, "lyrics" => 20_000, "keyscale" => 40 }.freeze
     REQUIRED_INPUTS = %w[title intent target_duration_seconds vocal_mode rights_status caption lyrics bpm keyscale timesignature language seed].freeze
 
@@ -258,7 +259,7 @@ module SoulCore
         "caption" => input.fetch("caption"), "lyrics" => input.fetch("lyrics"), "bpm" => input.fetch("bpm"),
         "keyscale" => input.fetch("keyscale"), "timesignature" => input.fetch("timesignature"), "language" => input.fetch("language"), "seed" => input.fetch("seed")
       }
-      validate_inputs!(pseudo)
+      validate_inputs!(pseudo, supported_duration_only: false)
       raise error_class, "music generation batch size is invalid" unless input.fetch("batch_size") == 1
       raise error_class, "music generation inference steps are invalid" unless input.fetch("inference_steps") == 8
       true
@@ -273,7 +274,7 @@ module SoulCore
       File.chmod(0o700, @directory)
     end
 
-    def validate_inputs!(data)
+    def validate_inputs!(data, supported_duration_only: true)
       STRING_LIMITS.each do |field, limit|
         value = data[field]
         raise ValidationError, "#{field} must be a UTF-8 string" unless value.is_a?(String) && value.valid_encoding?
@@ -287,7 +288,11 @@ module SoulCore
       duration = Integer(data["target_duration_seconds"])
       bpm = Integer(data["bpm"])
       seed = Integer(data["seed"])
-      raise ValidationError, "target duration must be 10..180 seconds" unless (10..180).cover?(duration)
+      if supported_duration_only
+        raise ValidationError, "target duration must be 30, 90, or 180 seconds" unless SUPPORTED_DURATIONS.include?(duration)
+      else
+        raise ValidationError, "legacy target duration must be 10..180 seconds" unless (10..180).cover?(duration)
+      end
       raise ValidationError, "bpm must be 30..300" unless (30..300).cover?(bpm)
       raise ValidationError, "seed must be 0..2147483647" unless (0..2_147_483_647).cover?(seed)
       raise ValidationError, "timesignature is invalid" unless %w[2 3 4 5 6 7 9 12].include?(data["timesignature"].to_s)
@@ -301,7 +306,7 @@ module SoulCore
       expected = %w[schema_version project_id title intent target_duration_seconds vocal_mode rights_status caption lyrics bpm keyscale timesignature language seed created_at updated_at]
       raise IntegrityError, "music project record fields are invalid" unless data.keys.sort == expected.sort
       raise IntegrityError, "music project schema is invalid" unless data["schema_version"] == SCHEMA_VERSION && data["project_id"] == id
-      validate_inputs!(data.slice(*REQUIRED_INPUTS))
+      validate_inputs!(data.slice(*REQUIRED_INPUTS), supported_duration_only: false)
       Time.iso8601(data.fetch("created_at")); Time.iso8601(data.fetch("updated_at"))
     rescue ValidationError, ArgumentError, KeyError => error
       raise IntegrityError, "invalid music project record: #{error.message}"
