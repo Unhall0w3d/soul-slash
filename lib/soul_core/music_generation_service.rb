@@ -125,7 +125,7 @@ module SoulCore
       end
     end
 
-    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_vulkan_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
+    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_vulkan_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
       @root = File.expand_path(root)
       @music_root = File.expand_path(music_root)
       @manifest_path = File.expand_path(manifest_path)
@@ -133,6 +133,7 @@ module SoulCore
       @runner = runner
       @process_runner = process_runner
       @clock = clock
+      @monotonic_clock = monotonic_clock
       @manifest = load_manifest
       @vulkan = @manifest["schema_version"] == MusicVulkanGenerationBackend::SUPPORTED_SCHEMA
       @coordinator = coordinator || MusicResourceCoordinator.new(root: @root, lane: @vulkan ? "amd-music" : "nvidia-music", runner: runner)
@@ -253,6 +254,8 @@ module SoulCore
       return outcome("blocked_for_human_review", false, blockers.join("; ")) unless blockers.empty?
       progress&.call({ "stage" => "checkpoints", "message" => "Verifying pinned local checkpoints" })
       verify_checkpoints!
+      generation_started_at = @clock.call
+      total_started = @monotonic_clock.call
 
       generations = @store.generations_path(project_id)
       target = File.join(generations, candidate_id)
@@ -267,7 +270,9 @@ module SoulCore
       duration = input.fetch("duration")
       lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: input_digest, ttl_seconds: generation_timeout(duration) + 120)
       progress&.call({ "stage" => "model", "message" => "Generating the candidate in the foreground" })
+      model_started = @monotonic_clock.call
       generation = run_generation(input, input_path, staging, lease, progress)
+      model_seconds = elapsed_seconds(model_started)
       if generation.respond_to?(:status) && generation.status == "blocked"
         return quarantined_outcome("blocked_for_human_review", staging, generation, lease, generation.stderr)
       end
@@ -277,9 +282,12 @@ module SoulCore
       File.write(File.join(staging, "generation.log"), log, mode: "wx", perm: 0o600)
       return quarantined_outcome("failed", staging, generation, lease, "ACE-Step reported a generation failure") if log.match?(/Generation failed|  FAILED:|Traceback \(most recent call last\)/)
       flac_path = File.join(staging, "master.flac")
+      flac_derivation_seconds = 0.0
       if @vulkan
         wav_path = generation.wav_path
+        flac_started = @monotonic_clock.call
         transcode_master = run_lossless_transcode(wav_path, flac_path, staging, lease, duration, progress)
+        flac_derivation_seconds = elapsed_seconds(flac_started)
         return quarantined_outcome(transcode_master.status == "canceled" ? "canceled" : "failed", staging, transcode_master, lease, "FLAC master derivation failed") unless transcode_master.success?
         FileUtils.rm_f(wav_path)
       else
@@ -292,19 +300,31 @@ module SoulCore
 
       mp3_path = File.join(staging, "listening.mp3")
       progress&.call({ "stage" => "transcode", "message" => "Deriving the MP3 listening copy" })
+      mp3_started = @monotonic_clock.call
       transcode = run_transcode(flac_path, mp3_path, staging, lease, duration, progress)
+      mp3_derivation_seconds = elapsed_seconds(mp3_started)
       return quarantined_outcome(transcode.status == "canceled" ? "canceled" : "failed", staging, transcode, lease, "MP3 derivation failed") unless transcode.success?
       mp3 = inspect_audio(mp3_path, "mp3", duration).merge(
         "derived_from_sha256" => flac.fetch("sha256"),
         "encoder" => "ffmpeg/libmp3lame",
         "encoder_arguments" => MP3_ARGUMENTS
       )
+      generation_completed_at = @clock.call
+      timings = {
+        "started_at" => generation_started_at.iso8601,
+        "completed_at" => generation_completed_at.iso8601,
+        "model_seconds" => model_seconds,
+        "flac_derivation_seconds" => flac_derivation_seconds,
+        "mp3_derivation_seconds" => mp3_derivation_seconds,
+        "total_seconds" => elapsed_seconds(total_started)
+      }
       receipt = {
         "schema_version" => "soul.music.generation.v1",
         "candidate_id" => candidate_id,
         "project_id" => project_id,
         "lifecycle_state" => "blocked_for_human_review",
-        "created_at" => @clock.call.iso8601,
+        "created_at" => generation_completed_at.iso8601,
+        "timings" => timings,
         "input_digest" => input_digest,
         "generation_kind" => source_candidate_id ? "revision" : "initial",
         "source_candidate_id" => source_candidate_id,
@@ -503,6 +523,10 @@ module SoulCore
     def resource_lane = @vulkan ? "amd-music" : "nvidia-music"
 
     def generation_timeout(duration) = @vulkan ? Integer(duration) + 1_800 : Integer(duration) + 180
+
+    def elapsed_seconds(started)
+      [(@monotonic_clock.call - started).round(3), 0.0].max
+    end
 
     def read_candidate(project_id, candidate_id)
       path = File.join(@store.generations_path(project_id), candidate_id, "candidate.json")

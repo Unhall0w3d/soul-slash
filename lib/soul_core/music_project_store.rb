@@ -116,7 +116,7 @@ module SoulCore
     def input_payload(project)
       {
         "caption" => project.fetch("caption"),
-        "lyrics" => project.fetch("lyrics"),
+        "lyrics" => project.fetch("vocal_mode") == "instrumental" ? "[Instrumental]" : project.fetch("lyrics"),
         "bpm" => project.fetch("bpm"),
         "keyscale" => project.fetch("keyscale"),
         "timesignature" => project.fetch("timesignature"),
@@ -257,7 +257,7 @@ module SoulCore
       raise error_class, "music generation input must be an object" unless input.is_a?(Hash) && input.keys.sort == GENERATION_INPUT_FIELDS.sort
       pseudo = {
         "title" => "candidate input", "intent" => "candidate input", "target_duration_seconds" => input.fetch("duration"),
-        "vocal_mode" => input.fetch("lyrics").to_s.empty? || instrumental_section_script?(input.fetch("lyrics")) ? "instrumental" : "vocal", "rights_status" => "original",
+        "vocal_mode" => input.fetch("lyrics").to_s.empty? || input.fetch("lyrics") == "[Instrumental]" ? "instrumental" : "vocal", "rights_status" => "original",
         "caption" => input.fetch("caption"), "lyrics" => input.fetch("lyrics"), "bpm" => input.fetch("bpm"),
         "keyscale" => input.fetch("keyscale"), "timesignature" => input.fetch("timesignature"), "language" => input.fetch("language"), "seed" => input.fetch("seed")
       }
@@ -283,9 +283,7 @@ module SoulCore
         raise ValidationError, "#{field} exceeds #{limit} characters" if value.length > limit
       end
       %w[title intent caption].each { |field| raise ValidationError, "#{field} is required" if data.fetch(field).strip.empty? }
-      if data["vocal_mode"] == "instrumental" && !data["lyrics"].empty? && !instrumental_section_script?(data["lyrics"])
-        raise ValidationError, "instrumental projects may contain only bracketed section markers"
-      end
+      raise ValidationError, "instrumental projects must not contain lyrics or section markers" if data["vocal_mode"] == "instrumental" && !data["lyrics"].empty?
       raise ValidationError, "vocal projects require lyrics" if data["vocal_mode"] == "vocal" && data["lyrics"].strip.empty?
       raise ValidationError, "vocal_mode is invalid" unless %w[vocal instrumental].include?(data["vocal_mode"])
       raise ValidationError, "rights_status is invalid" unless %w[original licensed public_domain].include?(data["rights_status"])
@@ -306,16 +304,12 @@ module SoulCore
     end
 
     def validate_caption_contract!(caption)
+      raise ValidationError, "Sound and Structure exceeds the runtime's 512-character caption limit" if caption.length > 512
       raise ValidationError, "Sound and Structure must keep BPM in the dedicated field" if caption.match?(/\b\d{2,3}\s*BPM\b/i)
       raise ValidationError, "Sound and Structure must keep time signature in the dedicated field" if caption.match?(/\b(?:2|3|4|5|6|7|9|12)\s*\/\s*(?:4|8|16)\b/)
       raise ValidationError, "Sound and Structure must keep key in the dedicated field" if caption.match?(/\b[A-G](?:[#b]|-flat|-sharp)?\s+(?:major|minor)\b/)
       raise ValidationError, "Sound and Structure must put temporal section changes in the lyrics script" if caption.match?(/\b\d{1,3}\s*(?:sec|second)s?\b/i)
       raise ValidationError, "Sound and Structure must not embed revision directives" if caption.match?(/\b(?:revision directives?|key revisions?)\s*:/i)
-    end
-
-    def instrumental_section_script?(lyrics)
-      lines = lyrics.to_s.lines.map(&:strip).reject(&:empty?)
-      !lines.empty? && lines.all? { |line| line.match?(/\A\[[^\]\n]{2,160}\]\z/) }
     end
 
     def validate_record!(data, id)

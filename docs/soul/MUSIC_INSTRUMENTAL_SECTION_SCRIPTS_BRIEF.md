@@ -1,22 +1,13 @@
-# Music Instrumental Section Scripts Brief
+# Instrumental Section-Script Experiment — Superseded
 
-## Objective
+This brief is retained as historical evidence. The marker-only instrumental experiment was superseded after checking the pinned `acestep.cpp` runtime contract.
 
-Allow an instrumental Music Studio project to send a bounded temporal section script to ACE-Step without implying sung lyrics.
+The pinned runtime has no `instrumental` boolean. Its lyrics field is the single source of truth:
 
-## Contract
+- empty lyrics asks the LM to generate lyrics;
+- exact `[Instrumental]` selects the trained no-vocal condition;
+- every other value is treated as user-provided lyrical conditioning.
 
-- Instrumental projects may leave the Lyrics and section markers field empty.
-- A non-empty instrumental script may contain only bracketed section markers, one marker per non-empty line.
-- Free prose, lyric lines, and other vocalizable text remain invalid in instrumental mode.
-- The marker-only script is preserved in the exact generation input and digest.
-- Vocal projects retain their existing lyric behavior.
-- Sound and Structure remains the overall sonic portrait. BPM, key, and dominant time signature remain dedicated fields.
-- ACE-Step still receives one dominant time-signature value. Section markers may request bounded transitions to other meters, but do not claim simultaneous polymeter support.
-- No generation, service, queue, watcher, or background process is started by this change.
+Soul therefore stores an instrumental project with an empty human lyrics field but sends exact `[Instrumental]` in the generation input. Instrumental structure must be expressed as a concise broad progression in Sound and Structure; bracketed temporal scripts remain available to vocal projects.
 
-## Lifecycle and risk
-
-Malformed instrumental prose terminates as `awaiting_input`. Valid project creation terminates `complete`; generation remains separately `blocked_for_human_review` behind its exact gate.
-
-Risk classification: low. This changes text conditioning for explicitly instrumental projects and may affect musical output, but does not weaken authorization or resource controls.
+The experiment did not weaken an authorization gate or start unattended work. Its deterministic tests were replaced by runtime-alignment tests.

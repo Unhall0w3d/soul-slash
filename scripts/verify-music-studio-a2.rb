@@ -169,7 +169,8 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   unknown = service.create_project(project_input.merge("surprise" => true))
   unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 45))
   embedded_metadata = service.create_project(project_input.merge("caption" => "Energetic melodic rock at 110 BPM in D minor and 4/4 time with clear drums and guitars."))
-  check.call("project schema rejects missing rights, unknown fields, unsupported duration, and embedded caption metadata without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && !File.exist?(File.join(root, "Soul", "music", "projects")))
+  oversized_caption = service.create_project(project_input.merge("caption" => "a" * 513))
+  check.call("project schema rejects missing rights, unknown fields, unsupported duration, embedded metadata, and oversized runtime captions without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && oversized_caption["reason"].include?("512-character") && !File.exist?(File.join(root, "Soul", "music", "projects")))
 
   created = service.create_project(project_input)
   project = created.dig("data", "project")
@@ -189,6 +190,8 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   candidate_path = generated.dig("data", "candidate_path")
   check.call("one foreground model run derives linked FLAC and MP3 artifacts", generated["lifecycle_state"] == "blocked_for_human_review" && process_runner.calls.length == 2 && receipt.dig("artifacts", "flac", "codec") == "flac" && receipt.dig("artifacts", "mp3", "codec") == "mp3" && receipt.dig("artifacts", "mp3", "derived_from_sha256") == receipt.dig("artifacts", "flac", "sha256"))
   check.call("candidate receipt is atomic, review-gated, and lease is released", File.file?(File.join(candidate_path, "candidate.json")) && !File.exist?(File.join(store.generations_path(project_id), ".#{candidate_id}.partial")) && receipt["human_review_required"] && coordinator.released == "music_lease_1111111111111111")
+  timings = receipt.fetch("timings")
+  check.call("candidate receipt preserves model transcode and total wall timing", %w[started_at completed_at model_seconds flac_derivation_seconds mp3_derivation_seconds total_seconds].all? { |key| timings.key?(key) } && timings.values_at("model_seconds", "flac_derivation_seconds", "mp3_derivation_seconds", "total_seconds").all? { |value| value.is_a?(Numeric) && value >= 0 } && Time.iso8601(timings.fetch("started_at")) && Time.iso8601(timings.fetch("completed_at")))
   check.call("generation uses strict offline project input and LAME V2", process_runner.calls.first.dig(:env, "HF_HUB_OFFLINE") == "1" && process_runner.calls.first[:command].include?(File.join(candidate_path.sub(candidate_id, ".#{candidate_id}.partial"), "input.json")) && process_runner.calls.last[:command].each_cons(2).any? { |a, b| a == "-q:a" && b == "2" })
 
   inspected = service.inspect_project(project_id: project_id)
@@ -248,21 +251,20 @@ Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
   check.call("bounded legacy non-preset projects remain readable", store.read(project.fetch("project_id")).fetch("target_duration_seconds") == 45)
 end
 
-Dir.mktmpdir("soul-music-a2-instrumental-script-") do |root|
+Dir.mktmpdir("soul-music-a2-instrumental-token-") do |root|
   store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { "abababababababab" }, clock: -> { Time.utc(2026, 7, 18, 20, 0, 0) })
-  markers = "[Immediate 7/8 Guitar Assault]\n\n[4/4 Drum-and-Bass Release]\n\n[Final 9/8 Ensemble Climax]"
-  instrumental = project_input.merge("vocal_mode" => "instrumental", "lyrics" => markers, "timesignature" => "7")
+  instrumental = project_input.merge("vocal_mode" => "instrumental", "lyrics" => "", "timesignature" => "7")
   project = store.create(instrumental)
   input = store.input_payload(project)
-  check.call("instrumental projects preserve marker-only temporal scripts", project["lyrics"] == markers && input["lyrics"] == markers && input["timesignature"] == "7")
+  check.call("instrumental projects send the pinned runtime's trained no-vocal token", project["lyrics"].empty? && input["lyrics"] == "[Instrumental]" && input["timesignature"] == "7")
 
   rejected = begin
-    store.create(instrumental.merge("lyrics" => "[Instrumental]\nSing or speak this prose"))
+    store.create(instrumental.merge("lyrics" => "[Instrumental Section]"))
     false
   rescue SoulCore::MusicProjectStore::ValidationError => error
-    error.message.include?("only bracketed section markers")
+    error.message.include?("must not contain lyrics or section markers")
   end
-  check.call("instrumental temporal scripts reject vocalizable prose", rejected)
+  check.call("instrumental projects reject ambiguous marker text from the lyrics channel", rejected)
 end
 
 Dir.mktmpdir("soul-music-a2-path-") do |root|

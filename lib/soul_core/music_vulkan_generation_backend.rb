@@ -61,7 +61,8 @@ module SoulCore
     end
 
     def run(input:, staging:, execute:)
-      request = input.merge(
+      request = input.except("language").merge(
+        "vocal_language" => input.fetch("lyrics") == "[Instrumental]" ? "unknown" : input.fetch("language"),
         "lm_model" => "acestep-5Hz-lm-4B-Q8_0.gguf",
         "synth_model" => "acestep-v15-turbo-Q8_0.gguf",
         "output_format" => "wav16",

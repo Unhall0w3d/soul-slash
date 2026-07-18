@@ -126,6 +126,7 @@ module SoulCore
 
     def validate_caption!(caption)
       raise ArgumentError, "revision Sound and Structure is too short to be generation-ready" if caption.length < 100
+      raise ArgumentError, "revision Sound and Structure exceeds the runtime's 512-character limit" if caption.length > 512
       raise ArgumentError, "revision Sound and Structure ends mid-thought; draft it again" unless caption.match?(/[.!?]\z/)
       raise ArgumentError, "revision Sound and Structure must be one cohesive instruction without an embedded revision list" if caption.match?(/\b(?:key\s+)?revisions?\s*:/i) || caption.match?(/(?:\A|\s)\(?\d{1,2}[.)]\s/)
       raise ArgumentError, "revision Sound and Structure must keep BPM in the dedicated field" if caption.match?(/\b\d{2,3}\s*BPM\b/i)
