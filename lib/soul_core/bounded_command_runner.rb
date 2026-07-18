@@ -14,18 +14,22 @@ module SoulCore
       end
     end
 
-    def run(*command, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES, chdir: nil)
+    def run(*command, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES, chdir: nil, env: nil)
       argv = command.flatten.map(&:to_s)
       raise ArgumentError, "command is required" if argv.empty?
+      unless env.nil? || (env.is_a?(Hash) && env.keys.all? { |key| key.is_a?(String) } && env.values.all? { |value| value.nil? || value.is_a?(String) })
+        raise ArgumentError, "command environment must contain only string keys and string or nil values"
+      end
 
       options = { pgroup: true }
       options[:chdir] = chdir if chdir
+      spawn_argv = env ? [env, *argv] : argv
       stdout = stderr = ""
       stdout_truncated = stderr_truncated = false
       process_status = nil
       run_status = "failed"
 
-      Open3.popen3(*argv, **options) do |stdin, out, err, wait_thread|
+      Open3.popen3(*spawn_argv, **options) do |stdin, out, err, wait_thread|
         stdin.close
         stdout_reader = bounded_reader(out, max_output_bytes)
         stderr_reader = bounded_reader(err, max_output_bytes)

@@ -196,7 +196,12 @@ module SoulCore
       nvidia_ready = memory.success? && memory.stdout.to_s.strip.match?(/\A\d+\z/) && processes.success?
       health = @runner.run("curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8082/health", timeout_seconds: 5, max_output_bytes: 4 * 1024)
       gemma = @runner.run("systemctl", "--user", "is-active", "soul-model-gemma.service", timeout_seconds: 5, max_output_bytes: 1024)
-      vulkan = @runner.run("vulkaninfo", "--summary", timeout_seconds: 8, max_output_bytes: 32 * 1024)
+      vulkan = @runner.run(
+        "vulkaninfo", "--summary",
+        env: { "DISPLAY" => nil, "WAYLAND_DISPLAY" => nil },
+        timeout_seconds: 8,
+        max_output_bytes: 32 * 1024
+      )
       {
         "fallback_state" => fallback_state,
         "nvidia_state" => nvidia_ready ? "available" : "unavailable",

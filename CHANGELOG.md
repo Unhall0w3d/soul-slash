@@ -6,6 +6,9 @@
 
 ### Conversational Soul
 
+- Repaired AMD Vulkan inventory under the hardened dashboard by making the
+  bounded `vulkaninfo` child device-only instead of inheriting unusable display
+  variables and failing on an unrelated XCB surface connection.
 - Repaired direct AMD-Free ↔ Music Core activation with an exact digest-bound,
   idle/lease-locked intent transition that keeps shared NVIDIA Qwen running and
   requires no Daily Core bridge or model-service mutation.
