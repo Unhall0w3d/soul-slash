@@ -46,10 +46,13 @@ This phase does not add automatic memory extraction or conversational write comm
 The default ledger is:
 
 ```text
-Soul/memory/conversation_memory.jsonl
+Soul/private/memory/conversation_memory.jsonl
 ```
 
-The runtime directory remains local and should not be committed.
+The private directory remains local and must not be committed. Installations
+created before the private-memory boundary continue reading and writing the
+legacy `Soul/memory/conversation_memory.jsonl` until the reviewed migration
+copies and verifies all memory files and writes its cutover marker.
 ## Reviewed conversation controls
 
 The next Phase 9 slice exposes deterministic controls for explicit user-directed mutation:
@@ -69,4 +72,3 @@ Approved reflection artifacts may contribute `candidate_memory_updates`, but the
 Memory snapshots export both the append-only event ledger and its materialized records. Every snapshot carries a canonical SHA-256 digest and can be replay-verified. Export does not mutate the source ledger, and physical purge remains outside the supported control surface.
 
 See `docs/MEMORY_REFLECTION_BRIDGE_AND_EXPORT.md`.
-

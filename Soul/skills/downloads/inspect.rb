@@ -6,6 +6,7 @@ require "yaml"
 require "optparse"
 require "pathname"
 require "time"
+require_relative "../../../lib/soul_core/memory_paths"
 
 options = {
   path: File.join(Dir.home, "Downloads"),
@@ -58,8 +59,9 @@ def expand_path(path)
 end
 
 def load_project_terms
-  project_path = File.join("Soul", "memory", "projects.yaml")
-  alias_path = File.join("Soul", "memory", "aliases.yaml")
+  paths = SoulCore::MemoryPaths.new(root: Dir.pwd)
+  project_path = paths.read_path("projects.yaml")
+  alias_path = paths.read_path("aliases.yaml")
 
   terms = []
 

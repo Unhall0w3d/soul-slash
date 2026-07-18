@@ -183,18 +183,26 @@ Soul requires several memory classes:
 - preference memory for user and workflow preferences
 - project memory for milestones, decisions, constraints, and current state
 
-Current human-readable memory and rule files live under:
+Owner-specific durable memory and approved rule files live under the ignored
+private root:
 
 ```text
-Soul/memory/
+Soul/private/memory/
 ```
 
 Current approved rule files include:
 
 ```text
-Soul/memory/approved_rules.md
-Soul/memory/approved_lessons.md
+Soul/private/memory/approved_rules.md
+Soul/private/memory/approved_lessons.md
 ```
+
+Older installations may retain compatibility sources under `Soul/memory/`
+until the digest-bound copy-and-verify migration is explicitly approved. The
+runtime cuts over only after every private copy is verified and the migration
+marker is written. Public defaults contain no owner-specific state.
+The tracked `Soul/memory/.public_seed_v1` marker tells a clean clone to read
+those neutral defaults while directing every mutable write to private storage.
 
 Future durable memory must retain provenance, confidence, editability, and promotion status.
 

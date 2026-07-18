@@ -103,6 +103,22 @@ module SoulCore
       blocked(error.message)
     end
 
+    # Internal coordination boundary for non-service runtime intent changes.
+    # The caller receives one fresh observation while the same bounded lock used
+    # by load/switch/unload remains held, and must return a terminal envelope.
+    def with_controlled_observation
+      return unavailable("model runtime control is disabled") unless enabled?
+
+      configuration
+      @lease_store.with_control_lock { yield(status_unlocked) }
+    rescue ModelRuntimeProfileRegistry::ConfigurationError => error
+      unavailable(error.message)
+    rescue ModelRuntimeLeaseStore::LockUnavailable
+      blocked("model runtime control is busy")
+    rescue ModelRuntimeLeaseStore::IntegrityError => error
+      blocked(error.message)
+    end
+
     private
 
     def mutate(action, target, before)

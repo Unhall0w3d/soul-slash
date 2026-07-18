@@ -1,6 +1,2 @@
----
-aliases:
-  Aetheia:
-    likely_means: "AletheiaUC"
-    status: "candidate"
-    reason: "Observed typo-like spelling during Soul/ planning discussion."
+# Public seed only. Owner-specific aliases live in Soul/private/memory/aliases.yaml.
+aliases: {}

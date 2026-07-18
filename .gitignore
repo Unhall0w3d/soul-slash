@@ -140,3 +140,6 @@ Soul/codex/reviews/
 
 Soul/identity/interests.jsonl
 Soul/artifacts/conversation_artifacts.jsonl
+
+# Durable owner-private memory. Public repositories retain neutral defaults only.
+Soul/private/

@@ -93,10 +93,12 @@ verify memory snapshot <simple-name>
 Snapshots are written beneath:
 
 ```text
-Soul/memory/exports/
+Soul/private/memory/exports/
 ```
 
-The files are local runtime artifacts and are ignored by Git.
+The files are owner-private runtime artifacts and are ignored by Git. Legacy
+installations retain `Soul/memory/exports/` until the explicit private-memory
+migration has completed.
 
 Verification checks:
 

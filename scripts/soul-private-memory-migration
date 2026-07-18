@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/private_memory_migration"
+
+options = { action: "preview", confirmation: nil, expected_digest: nil }
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: scripts/soul-private-memory-migration [preview|execute] [options]"
+  opts.on("--confirmation PHRASE", "Exact execution confirmation") { |value| options[:confirmation] = value }
+  opts.on("--expected-digest SHA256", "Digest returned by preview") { |value| options[:expected_digest] = value }
+end
+
+begin
+  parser.parse!(ARGV)
+  options[:action] = ARGV.shift || "preview"
+  raise OptionParser::InvalidArgument, "unexpected arguments: #{ARGV.join(' ')}" unless ARGV.empty?
+rescue OptionParser::ParseError => error
+  warn error.message
+  warn parser
+  exit 2
+end
+
+migration = SoulCore::PrivateMemoryMigration.new(root: Dir.pwd)
+result = case options[:action]
+         when "preview"
+           migration.preview
+         when "execute"
+           migration.execute(confirmation: options[:confirmation], expected_digest: options[:expected_digest])
+         else
+           warn parser
+           exit 2
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["lifecycle_state"] == "complete" || (options[:action] == "preview" && result["lifecycle_state"] == "blocked_for_human_review") ? 0 : 1)

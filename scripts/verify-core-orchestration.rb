@@ -122,7 +122,30 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   check.call("AMD-Free Core discloses NVIDIA music contention", switched.dig("data", "active_core_id") == "amd-free" && switched.dig("data", "music_lane", "available_in_active_core") == false && switched.dig("data", "music_lane", "conflict").include?("NVIDIA chat"))
 
   shared_preview = cores.preview(core_id: "music")
-  check.call("shared NVIDIA chat profile cannot silently relabel AMD-Free as Music Core", shared_preview["lifecycle_state"] == "awaiting_input" && runner.mutations.length == 2)
+  check.call("AMD-Free can preview a direct idle-safe Music intent transition without service mutation",
+             shared_preview["ok"] && shared_preview.dig("data", "action") == "core_intent" &&
+               shared_preview.dig("data", "confirmation_phrase") == "ACTIVATE_MUSIC_CORE" &&
+               shared_preview.dig("data", "service_mutation_required") == false && runner.mutations.length == 2)
+  stale_intent = cores.execute(core_id: "music", target_profile_id: "nvidia-fallback",
+                               confirmation: shared_preview.dig("data", "confirmation_phrase"), expected_digest: "0" * 64)
+  check.call("stale direct Core intent preview changes neither selection nor services",
+             stale_intent["lifecycle_state"] == "blocked_for_human_review" && runner.mutations.length == 2 &&
+               JSON.parse(File.read(selection_path)).fetch("active_core_id") == "amd-free")
+  direct_music = cores.execute(core_id: "music", target_profile_id: "nvidia-fallback",
+                               confirmation: shared_preview.dig("data", "confirmation_phrase"),
+                               expected_digest: shared_preview.dig("data", "expected_digest"))
+  check.call("direct AMD-Free to Music transition records intent while keeping Qwen active",
+             direct_music["ok"] && direct_music.dig("data", "active_core_id") == "music" &&
+               direct_music.dig("data", "music_lane", "available_in_active_core") == true &&
+               direct_music.dig("data", "mutation") == "core_intent_changed" && runner.mutations.length == 2 &&
+               JSON.parse(File.read(selection_path)).fetch("active_core_id") == "music")
+
+  direct_back_preview = cores.preview(core_id: "amd-free")
+  direct_back = cores.execute(core_id: "amd-free", target_profile_id: "nvidia-fallback",
+                              confirmation: direct_back_preview.dig("data", "confirmation_phrase"),
+                              expected_digest: direct_back_preview.dig("data", "expected_digest"))
+  check.call("Music can return directly to AMD-Free without restarting shared NVIDIA chat",
+             direct_back["ok"] && direct_back.dig("data", "active_core_id") == "amd-free" && runner.mutations.length == 2)
 
   return_preview = cores.preview(core_id: "daily")
   check.call("returning to Daily restores its recorded profile", return_preview.dig("data", "target_profile", "id") == "amd-gemma")

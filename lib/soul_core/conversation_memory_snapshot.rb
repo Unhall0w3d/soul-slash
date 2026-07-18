@@ -6,6 +6,7 @@ require "json"
 require "tmpdir"
 require "time"
 require_relative "conversation_memory_store"
+require_relative "memory_paths"
 
 module SoulCore
   class ConversationMemorySnapshot
@@ -15,12 +16,13 @@ module SoulCore
     def initialize(
       root: Dir.pwd,
       store: nil,
-      export_root: DEFAULT_EXPORT_ROOT,
+      export_root: nil,
       clock: -> { Time.now }
     )
       @root = File.expand_path(root)
       @store = store || ConversationMemoryStore.new(root: @root)
-      @export_root = File.expand_path(export_root, @root)
+      resolved_export_root = export_root || MemoryPaths.new(root: @root).write_path("exports")
+      @export_root = File.expand_path(resolved_export_root, @root)
       @clock = clock
       FileUtils.mkdir_p(@export_root)
     end

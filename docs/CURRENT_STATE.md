@@ -49,6 +49,14 @@ remains stable for compatibility.
 - separate bounded `web.lookup` and provenance-preserving `web.research` paths;
 - explicit review-only research reflection candidates with no automatic memory promotion.
 
+Owner-specific shared memory now has an ignored `Soul/private/memory` target
+with compatibility reads for older installations. Cutover is a bounded,
+digest-bound copy-and-verify migration: it retains every legacy source, writes
+no marker until hashes match, and requires a separate human-approved execution.
+The live cutover completed on 2026-07-18: seven files and 6,336 bytes were
+copied and hash-verified before the marker was written. The six tracked files
+are now neutral public seeds; `.public_seed_v1` keeps clean-clone writes private.
+
 ## Runtime and deployment boundary
 
 The dashboard is dependency-free static HTML/CSS/JavaScript served by a sequential Ruby foreground loopback process:
@@ -85,6 +93,11 @@ Ministral 3 14B has been retired from the supported profile inventory and
 startup path; historical bake-off evidence remains. No automatic Core switch,
 idle unload, or reboot is introduced. Runtime identity is reported separately
 from the stable `soul-local-chat` OpenAI-compatible API alias.
+
+AMD-Free and Music Cores share the already-running NVIDIA Qwen chat profile.
+They can transition directly through an idle/lease-revalidated exact intent
+gate that changes only the private Core-selection record; Daily is no longer a
+required intermediate Core and no model service is restarted in that path.
 
 The original Multi-model and Music Studio A0 direction kept conversation on
 AMD and piloted ACE-Step on NVIDIA. That historical CUDA path remains useful

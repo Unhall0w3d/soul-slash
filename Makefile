@@ -33,7 +33,7 @@ MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
 MUSIC_REFERENCE_MODEL_CACHE ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -369,6 +369,17 @@ model-runtime-identity-execute:
 > @test -n "$(ALIAS_DIGEST)" || { echo "Run model-runtime-identity-plan first, then provide ALIAS_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "MIGRATE_MODEL_ALIAS_TO_SOUL_LOCAL_CHAT" || { echo "Exact confirmation MIGRATE_MODEL_ALIAS_TO_SOUL_LOCAL_CHAT is required."; exit 2; }
 > @ruby scripts/soul-model-runtime-identity execute --root "$(PROJECT_ROOT)" --expected-digest "$(ALIAS_DIGEST)" --confirmation "$(CONFIRM)"
+
+private-memory-plan:
+> @ruby scripts/soul-private-memory-migration preview
+
+private-memory-execute:
+> @test -n "$(MEMORY_DIGEST)" || { echo "Run private-memory-plan first, then provide MEMORY_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "COPY_PRIVATE_MEMORY_STATE" || { echo "Exact confirmation COPY_PRIVATE_MEMORY_STATE is required."; exit 2; }
+> @ruby scripts/soul-private-memory-migration execute --expected-digest "$(MEMORY_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-private-memory:
+> @ruby scripts/verify-private-memory-separation.rb
 
 clean-runtime:
 > @rm -rf run tmp

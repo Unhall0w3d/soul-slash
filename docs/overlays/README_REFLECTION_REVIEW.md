@@ -18,8 +18,8 @@ ruby bin/soul reflection reject latest --reason "not useful"
 
 Approving a candidate:
 - moves the `.json` and `.md` candidate from `Soul/reflection/pending/` to `Soul/reflection/approved/`
-- appends candidate lessons to `Soul/memory/approved_lessons.md`
-- appends candidate rules to `Soul/memory/approved_rules.md`
+- appends candidate lessons to `Soul/private/memory/approved_lessons.md`
+- appends candidate rules to `Soul/private/memory/approved_rules.md`
 
 Rejecting a candidate:
 - moves the pair to `Soul/reflection/rejected/`

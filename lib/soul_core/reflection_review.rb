@@ -3,19 +3,22 @@
 require "json"
 require "fileutils"
 require "time"
+require_relative "memory_paths"
 
 module SoulCore
   class ReflectionReview
-    def initialize(pending_root: "Soul/reflection/pending",
+    def initialize(root: Dir.pwd,
+                   pending_root: "Soul/reflection/pending",
                    approved_root: "Soul/reflection/approved",
                    rejected_root: "Soul/reflection/rejected",
-                   approved_lessons_path: "Soul/memory/approved_lessons.md",
-                   approved_rules_path: "Soul/memory/approved_rules.md")
+                   approved_lessons_path: nil,
+                   approved_rules_path: nil)
+      paths = MemoryPaths.new(root: root)
       @pending_root = pending_root
       @approved_root = approved_root
       @rejected_root = rejected_root
-      @approved_lessons_path = approved_lessons_path
-      @approved_rules_path = approved_rules_path
+      @approved_lessons_path = approved_lessons_path || paths.write_path("approved_lessons.md")
+      @approved_rules_path = approved_rules_path || paths.write_path("approved_rules.md")
 
       [@pending_root, @approved_root, @rejected_root, File.dirname(@approved_lessons_path)].each do |path|
         FileUtils.mkdir_p(path)

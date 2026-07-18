@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
 require "securerandom"
 require_relative "model_runtime_control_service"
@@ -17,6 +18,7 @@ module SoulCore
       "music-chat" => { "id" => "music", "label" => "Music Core", "purpose" => "Dedicated music-planning chat" }
     }.freeze
     CORE_ID = /\A[a-z][a-z0-9-]{0,39}\z/
+    SHARED_INTENT_CORE_IDS = %w[amd-free music].freeze
 
     def initialize(root: Dir.pwd, runtime_control: nil, env: ENV)
       @root = File.expand_path(root)
@@ -45,7 +47,7 @@ module SoulCore
 
       target = core.fetch("target_profile")
       if observation["active_profile_id"] == target.fetch("id")
-        return awaiting("requested Core shares the active chat profile; return to Daily Core before changing operating intent", data: project(observation))
+        return shared_intent_preview(observation, core)
       end
       action = observation["active_profile_id"] ? "switch" : "load"
       preview = @runtime_control.preview(action: action, profile_id: target.fetch("id"))
@@ -74,6 +76,15 @@ module SoulCore
       target = before.fetch("profiles").find { |profile| profile.fetch("id") == target_profile_id.to_s }
       return blocked("target profile does not belong to the requested Core") unless target && profile_belongs_to_core?(target, core.fetch("id"))
       return blocked("Core target changed; preview again") unless core.dig("target_profile", "id") == target.fetch("id")
+
+      if before["active_profile_id"] == target.fetch("id")
+        return execute_shared_intent_transition(
+          core_id: core.fetch("id"),
+          target_profile_id: target.fetch("id"),
+          confirmation: confirmation,
+          expected_digest: expected_digest
+        )
+      end
 
       action = before["active_profile_id"] ? "switch" : "load"
       result = @runtime_control.execute(
@@ -116,7 +127,9 @@ module SoulCore
 
     def configured_cores(observation)
       profiles = observation.fetch("profiles")
-      preferences = read_selection(profiles: profiles).fetch("profiles")
+      selection = read_selection(profiles: profiles)
+      preferences = selection.fetch("profiles")
+      active_intent = selection["active_core_id"]
       CORE_DEFINITIONS.filter_map do |role, definition|
         members = profiles.select { |profile| profile.fetch("core_role") == role }
         members = profiles.select { |profile| profile.fetch("core_role") == "reserve-chat" } if role == "music-chat" && members.empty?
@@ -131,10 +144,21 @@ module SoulCore
           "target_profile" => target,
           "active" => false,
           "selected" => members.any? { |profile| profile.fetch("selected") },
-          "can_activate" => !members.any? { |profile| profile.fetch("active") } && target.fetch("service_state") == "inactive" &&
-            (observation.fetch("active_profile_count").zero? ? observation.fetch("can_load_profile", false) : observation.fetch("can_switch", false))
+          "can_activate" => can_activate_core?(
+            definition.fetch("id"), target, observation, active_intent
+          )
         )
       end
+    end
+
+    def can_activate_core?(core_id, target, observation, active_intent)
+      if target.fetch("active")
+        source_intent = active_intent || core_id_for_profile(target)
+        return shared_intent_pair?(source_intent, core_id) && shared_intent_blocker(observation, target).nil?
+      end
+
+      target.fetch("service_state") == "inactive" &&
+        (observation.fetch("active_profile_count").zero? ? observation.fetch("can_load_profile", false) : observation.fetch("can_switch", false))
     end
 
     def current_core(observation, cores: nil)
@@ -162,6 +186,117 @@ module SoulCore
     def profile_belongs_to_core?(profile, core_id)
       direct = core_id_for_profile(profile)
       direct == core_id || (core_id == "music" && profile.fetch("core_role") == "reserve-chat")
+    end
+
+    def shared_intent_preview(observation, core)
+      source = current_core(observation)
+      target = core.fetch("target_profile")
+      return awaiting("requested Core is already active", data: project(observation)) if source&.fetch("id", nil) == core.fetch("id")
+      return blocked("shared chat profile cannot represent this Core transition") unless shared_intent_pair?(source&.fetch("id", nil), core.fetch("id"))
+
+      blocker = shared_intent_blocker(observation, target)
+      return blocked(blocker) if blocker
+
+      scope = shared_intent_scope(observation, source, core, target)
+      success(observation.merge(
+        "action" => "core_intent",
+        "target_profile" => target,
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => shared_intent_confirmation(core.fetch("id")),
+        "preview_scope" => scope,
+        "core_action" => "activate",
+        "source_core" => source,
+        "target_core" => core,
+        "cores" => project(observation).fetch("cores"),
+        "service_mutation_required" => false,
+        "mutation" => "none"
+      ))
+    end
+
+    def execute_shared_intent_transition(core_id:, target_profile_id:, confirmation:, expected_digest:)
+      @runtime_control.with_controlled_observation do |before|
+        core = core_for_id(before, core_id)
+        return awaiting("known configured core_id is required") unless core
+        target = before.fetch("profiles").find { |profile| profile.fetch("id") == target_profile_id }
+        return blocked("Core target changed; preview again") unless target && core.dig("target_profile", "id") == target.fetch("id")
+
+        source = current_core(before)
+        return awaiting("requested Core is already active", data: project(before)) if source&.fetch("id", nil) == core.fetch("id")
+        return blocked("shared chat profile cannot represent this Core transition") unless shared_intent_pair?(source&.fetch("id", nil), core.fetch("id"))
+
+        blocker = shared_intent_blocker(before, target)
+        return blocked(blocker) if blocker
+        return blocked("exact Core intent confirmation did not match") unless confirmation == shared_intent_confirmation(core.fetch("id"))
+
+        scope = shared_intent_scope(before, source, core, target)
+        return blocked("Core intent state changed; preview again") unless secure_compare(expected_digest, digest(scope))
+
+        selection = read_selection(profiles: before.fetch("profiles"))
+        preferences = selection.fetch("profiles")
+        preferences[source.fetch("id")] = target.fetch("id")
+        preferences[core.fetch("id")] = target.fetch("id")
+        write_selection({ "active_core_id" => core.fetch("id"), "profiles" => preferences }, profiles: before.fetch("profiles"))
+        success(project(before).merge(
+          "core_action" => "activate",
+          "activated_core_id" => core.fetch("id"),
+          "service_mutation_required" => false,
+          "mutation" => "core_intent_changed"
+        ), mutation: "core_intent_changed")
+      end
+    end
+
+    def shared_intent_pair?(source_core_id, target_core_id)
+      source_core_id != target_core_id &&
+        [source_core_id, target_core_id].compact.sort == SHARED_INTENT_CORE_IDS.sort
+    end
+
+    def shared_intent_blocker(observation, target)
+      return "multiple model runtime profiles are active; resolve the conflict manually" if observation["profile_conflict"]
+      return "exactly one shared chat profile must be active" unless observation["active_profile_count"] == 1
+      return "shared chat profile changed; preview again" unless observation["active_profile_id"] == target.fetch("id")
+      return "active model work must complete or be canceled before the Core intent changes" unless observation["active_work_count"].zero?
+      return "runtime activity state is unavailable; safe idle state cannot be established" unless observation["idle_certain"]
+
+      nil
+    end
+
+    def shared_intent_scope(observation, source, target_core, target_profile)
+      {
+        "action" => "core_intent",
+        "source_core_id" => source.fetch("id"),
+        "target_core_id" => target_core.fetch("id"),
+        "shared_profile_id" => target_profile.fetch("id"),
+        "shared_service" => target_profile.fetch("service"),
+        "profile_states" => observation.fetch("profiles").map { |profile| profile.slice("id", "service", "service_state") },
+        "active_work_count" => observation.fetch("active_work_count"),
+        "active_lease_ids" => observation.fetch("active_leases", []).map { |lease| lease["lease_id"] }.sort,
+        "idle_certain" => observation.fetch("idle_certain"),
+        "service_mutation_required" => false
+      }
+    end
+
+    def shared_intent_confirmation(core_id)
+      "ACTIVATE_#{core_id.upcase.tr('-', '_')}_CORE"
+    end
+
+    def digest(value)
+      Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+    end
+
+    def canonicalize(value)
+      case value
+      when Hash then value.keys.map(&:to_s).sort.to_h { |key| [key, canonicalize(value.fetch(key))] }
+      when Array then value.map { |item| canonicalize(item) }
+      else value
+      end
+    end
+
+    def secure_compare(left, right)
+      left = left.to_s
+      right = right.to_s
+      return false unless left.bytesize == right.bytesize
+
+      left.bytes.zip(right.bytes).reduce(0) { |difference, pair| difference | (pair[0] ^ pair[1]) }.zero?
     end
 
     def remember_successful_profiles(before, after, target, target_core_id)

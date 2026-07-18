@@ -4,6 +4,7 @@ require "fileutils"
 require "json"
 require "securerandom"
 require "time"
+require_relative "memory_paths"
 
 module SoulCore
   class ConversationMemoryStore
@@ -16,12 +17,13 @@ module SoulCore
 
     def initialize(
       root: Dir.pwd,
-      path: DEFAULT_PATH,
+      path: nil,
       clock: -> { Time.now },
       id_generator: -> { SecureRandom.hex(5) }
     )
       @root = File.expand_path(root)
-      @path = File.expand_path(path, @root)
+      resolved_path = path || MemoryPaths.new(root: @root).write_path("conversation_memory.jsonl")
+      @path = File.expand_path(resolved_path, @root)
       @clock = clock
       @id_generator = id_generator
       FileUtils.mkdir_p(File.dirname(@path))

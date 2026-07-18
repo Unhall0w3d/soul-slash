@@ -111,7 +111,10 @@ module SoulCore
         export_output = controls.respond("export memory snapshot phase9-closeout-fixture")
         verification_output = controls.respond("verify memory snapshot phase9-closeout-fixture")
         valid_verification = snapshot.verify("phase9-closeout-fixture")
-        snapshot_path = File.join(directory, "Soul/memory/exports/phase9-closeout-fixture.json")
+        snapshot_path = snapshot.export_paths.find do |path|
+          File.basename(path) == "phase9-closeout-fixture.json"
+        end
+        raise "fixture memory snapshot was not created" unless snapshot_path
         tampered = JSON.parse(File.read(snapshot_path, encoding: "UTF-8"))
         tampered.fetch("records").first["content"] = "tampered content"
         File.write(snapshot_path, JSON.pretty_generate(tampered), encoding: "UTF-8")

@@ -80,6 +80,13 @@ If the target Core is already active, activation returns `awaiting_input`
 without mutation. If chat, research, transcription, Music Studio, or any other
 Soul-owned lease is active, the existing controller blocks the transition.
 
+AMD-Free and Music intentionally share the same NVIDIA Qwen chat profile. A
+later repair permits a direct transition between those two operating intents:
+it revalidates idle state and active leases, binds the exact source/target Core
+and shared profile in a digest, requires exact confirmation, and atomically
+changes only the owner-private Core-selection record. It does not stop or start
+Qwen, touch Gemma, or load the foreground music engine.
+
 ## Hard boundaries
 
 - No reboot, automatic switching, failover, preemption, idle unload, queue,

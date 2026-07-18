@@ -6,6 +6,12 @@
 
 ### Conversational Soul
 
+- Repaired direct AMD-Free ↔ Music Core activation with an exact digest-bound,
+  idle/lease-locked intent transition that keeps shared NVIDIA Qwen running and
+  requires no Daily Core bridge or model-service mutation.
+- Added the candidate private-memory boundary: ignored owner-only storage,
+  legacy-compatible reads and writes before cutover, and a bounded exact-gated
+  copy-and-verify migration that retains all legacy sources for rollback.
 - Added Storage & Retention A1 as a manual Self Assessment scope: protected and
   reviewable local storage classifications, point-in-time dashboard memory
   evidence, and exact preview-only cleanup manifests with no deletion executor.

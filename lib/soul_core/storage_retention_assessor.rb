@@ -91,7 +91,8 @@ module SoulCore
         category("transcription_runtime", File.join(music_root, "transcription"), "protected", "Bounded transcription runtime and models"),
         category("finished_music_exports", File.join(@home, "Music", "soul-music"), "protected", "Operator-selected finished exports"),
         category("project_logs", File.join(@root, "Soul", "logs"), "age_review", "Logs remain reviewable; files older than 30 days may be previewed"),
-        category("shared_memory", File.join(@root, "Soul", "memory"), "protected", "Shared Soul memory; migration is a separate slice"),
+        category("shared_memory", File.join(@root, "Soul", "private", "memory"), "protected", "Owner-private shared Soul memory"),
+        category("legacy_memory_sources", File.join(@root, "Soul", "memory"), "manual_review", "Retained rollback sources; public sanitization requires the separate migration gate"),
         category("temporary_soul_residue", @temp_root, "mixed_review", "Only known allowlisted prefixes older than 24 hours are previewable", temp_scope: true)
       ]
     end
