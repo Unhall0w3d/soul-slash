@@ -5,6 +5,13 @@ const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-pane
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 
+function formatBytes(value) {
+  const bytes = Number(value); if (!Number.isFinite(bytes) || bytes < 0) return "unavailable";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"]; let amount = bytes; let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit += 1; }
+  return `${amount >= 10 || unit === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
+}
+
 function requestId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") return `dash-${globalThis.crypto.randomUUID()}`;
   return `dash-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
@@ -1168,6 +1175,40 @@ function renderModelSummary(report) {
   byId("model-state").textContent = `${reachable}/${endpoints.length || 0} reachable`;
 }
 
+function renderStorageRetention(report) {
+  const card = byId("storage-retention-card"); card.hidden = false;
+  const summary = report?.summary || {}; const memory = report?.dashboard_memory || {};
+  byId("storage-retention-state").textContent = `${summary.cleanup_candidate_count || 0} reviewable`;
+  renderDefinitionList(byId("storage-retention-summary"), [
+    ["Observed", formatBytes(summary.observed_bytes)],
+    ["Protected", formatBytes(summary.protected_bytes)],
+    ["Candidates", String(summary.cleanup_candidate_count || 0)],
+    ["Dashboard now", formatBytes(memory.current_bytes)],
+    ["Dashboard peak", formatBytes(memory.peak_bytes)],
+    ["Sampling", memory.point_in_time ? "point-in-time only" : "unavailable"]
+  ]);
+  const list = byId("storage-retention-categories"); list.replaceChildren();
+  (report?.categories || []).forEach((category) => {
+    const retention = String(category.retention || "unclassified").replaceAll("_", " ");
+    const note = `${formatBytes(category.bytes)} · ${category.entry_count || 0} top-level entries · ${retention}${category.blocked ? ` · ${category.blocked}` : ""}`;
+    list.append(labeledRecord(category.id.replaceAll("_", " "), note, category.retention === "protected" ? "is-available" : "is-warning"));
+  });
+  if (!report?.categories?.length) list.append(labeledRecord("Storage unavailable", "No bounded category evidence was returned.", "is-warning"));
+  byId("storage-cleanup-scope").hidden = true;
+  byId("storage-cleanup-status").textContent = "Execution is deliberately unavailable in this slice.";
+}
+
+async function previewStorageCleanup() {
+  const button = byId("preview-storage-cleanup"); const status = byId("storage-cleanup-status"); button.disabled = true; status.textContent = "Binding current metadata into one exact read-only scope…";
+  try {
+    const envelope = await callSoul("storage_retention.cleanup.preview", { category: byId("storage-cleanup-category").value }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || dataOf(envelope).reason || "Cleanup preview blocked safely.");
+    const data = dataOf(envelope); const output = byId("storage-cleanup-scope"); output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
+    status.textContent = `${data.entry_count || 0} candidate${data.entry_count === 1 ? "" : "s"} · ${formatBytes(data.total_bytes)}. No cleanup execution exists in A1.`;
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
 function renderRecommendations(records) {
   const list = byId("recommendation-list"); list.replaceChildren(); byId("recommendation-count").textContent = String(records.length);
   records.forEach((record) => list.append(labeledRecord(record.title || "Recommendation", `${record.severity || "info"} · ${record.detail || "Review the assessed evidence."}`, record.severity === "warn" || record.severity === "blocker" ? "is-warning" : "")));
@@ -1183,9 +1224,11 @@ function renderImprovementProposals(inventory) {
 function renderSelfImprovement(data) {
   const scope = data.assessment_scope || "environment"; const report = data.assessment || {};
   byId("improvement-scope").textContent = `${scope}${data.automatic ? " · automatic" : ""}`;
+  byId("storage-retention-card").hidden = scope !== "storage";
   if (scope === "environment" || scope === "updates") renderImprovementEnvironment(report);
   if (scope === "models") renderModelSummary(report);
   if (scope === "capabilities") { renderCapabilitySummary(report.summary); renderModelSummary(report.sources?.model_runtime); }
+  if (scope === "storage") renderStorageRetention(report);
   if (data.cached_capabilities?.available) renderCapabilitySummary(data.cached_capabilities.summary, `Cached assessment from ${formatTime(data.cached_capabilities.generated_at)}; run Capabilities to refresh.`);
   renderRecommendations(report.recommendations || []); renderImprovementProposals(data.proposals);
 }
@@ -1555,6 +1598,7 @@ document.querySelectorAll("[data-assessment-scope]").forEach((button) => button.
 byId("preview-improvement-proposals").addEventListener("click", previewImprovementProposals);
 byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });
 byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);
+byId("preview-storage-cleanup").addEventListener("click", previewStorageCleanup);
 byId("preview-host-plan").addEventListener("click", previewHostPlan);
 byId("host-plan-confirmation").addEventListener("input", () => { byId("create-host-plan").disabled = !state.hostPlanPreview || byId("host-plan-confirmation").value !== state.hostPlanPreview.confirmation_phrase; });
 byId("create-host-plan").addEventListener("click", createHostPlan);

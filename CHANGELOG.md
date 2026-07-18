@@ -6,6 +6,9 @@
 
 ### Conversational Soul
 
+- Added Storage & Retention A1 as a manual Self Assessment scope: protected and
+  reviewable local storage classifications, point-in-time dashboard memory
+  evidence, and exact preview-only cleanup manifests with no deletion executor.
 - Consolidated Skill Studio, Self Assessment, and Self Augmentation beneath a
   visually consistent Self Improvement top-bar menu while preserving their
   separate pages, operations, and authority boundaries.

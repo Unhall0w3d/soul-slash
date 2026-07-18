@@ -119,7 +119,7 @@ check.call("assessment command runner terminates timed-out foreground work", tim
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("dashboard exposes the third ARIA tab and assessment scopes", html.include?('id="improvement-tab"') && html.include?('id="improvement-panel"') && %w[environment updates models capabilities].all? { |scope| html.include?("data-assessment-scope=\"#{scope}\"") })
+check.call("dashboard exposes the third ARIA tab and assessment scopes", html.include?('id="improvement-tab"') && html.include?('id="improvement-panel"') && %w[environment updates models capabilities storage].all? { |scope| html.include?("data-assessment-scope=\"#{scope}\"") })
 check.call("dashboard requires preview and exact proposal confirmation", javascript.index('callSoul("self_improvement.proposals.preview"') < javascript.index('callSoul("self_improvement.proposals.execute"') && javascript.include?("confirmation_phrase") && html.include?("GENERATE_SELF_IMPROVEMENT_PROPOSALS"))
 check.call("dashboard adds no polling or unsafe HTML rendering", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML/))
 check.call("dashboard bounds manual assessment requests and clears running state on failure", javascript.include?("AbortSignal.timeout(35_000)") && javascript.include?('`${scope} · failed`'))

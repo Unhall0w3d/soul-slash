@@ -286,6 +286,7 @@
           <button type="button" data-assessment-scope="updates">Update checks</button>
           <button type="button" data-assessment-scope="models">Model runtime</button>
           <button type="button" data-assessment-scope="capabilities">Capabilities</button>
+          <button type="button" data-assessment-scope="storage">Storage</button>
         </div>
       </div>
 
@@ -308,6 +309,23 @@
           <div id="model-summary" class="runtime-list"><p class="muted">Run the model assessment to check loopback endpoints and bounded local inventory.</p></div>
         </section>
       </div>
+
+      <section id="storage-retention-card" class="improvement-card storage-retention-card" aria-labelledby="storage-retention-heading" hidden>
+        <div class="card-heading"><div><p class="eyebrow">Local data lifecycle</p><h2 id="storage-retention-heading">Storage &amp; Retention</h2></div><span id="storage-retention-state" class="count-badge">not assessed</span></div>
+        <p class="card-note">One point-in-time metadata inspection. Protected projects, exports, memory, production models, and accepted pilots are never cleanup candidates.</p>
+        <div class="storage-retention-grid">
+          <dl id="storage-retention-summary" class="improvement-details"><div><dt>Collection</dt><dd>Select Storage above</dd></div></dl>
+          <div id="storage-retention-categories" class="recommendation-list storage-retention-categories"><p class="muted">No storage classifications loaded.</p></div>
+        </div>
+        <section class="gate-card storage-preview-gate">
+          <div><p class="eyebrow">Read-only scope binding</p><h3>Preview cleanup candidates</h3><p>A1 can inventory an exact category, but it cannot delete or move anything.</p></div>
+          <label for="storage-cleanup-category">Candidate category</label>
+          <select id="storage-cleanup-category"><option value="temp_review_artifacts">Temporary review artifacts · older than 24 hours</option><option value="expired_project_logs">Project logs · older than 30 days</option><option value="failed_music_quarantine">Failed music quarantine · older than 24 hours</option></select>
+          <button id="preview-storage-cleanup" class="gate-button" type="button">Preview exact scope</button>
+          <pre id="storage-cleanup-scope" class="diagnostic-output" hidden></pre>
+          <p id="storage-cleanup-status" class="dialog-status" role="status">Execution is deliberately unavailable in this slice.</p>
+        </section>
+      </section>
 
       <div class="improvement-lower-grid">
         <section class="improvement-card recommendations-card" aria-labelledby="recommendations-heading">

@@ -22,7 +22,16 @@ The browser dashboard has a single personal administrator boundary. First-run `a
 
 The dashboard groups Skill Studio, Self Assessment, and Self Augmentation beneath the primary Self Improvement destination. Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 may prepare an exact proposal-local incomplete Beta workspace and bounded Codex handoff without invoking a model. A human or explicitly invoked Codex task implements and tests that candidate. Human Gate 2 approves an exact tested Beta revision; a separate preview/digest/exact-confirmation operation may then copy its self-contained Ruby entrypoint and atomically add one new production registry entry. Existing skills are never replaced, and no gate promotes automatically.
 
-Self Assessment provides one lightweight read-only environment snapshot when opened plus explicit foreground environment, package-update, model-runtime, and capability assessments. It may generate advisory improvement proposal packets only after preview, digest revalidation, and exact confirmation. It cannot apply updates or mutate the host. The internal `self_improvement.*` operation namespace remains stable for compatibility.
+Self Assessment provides one lightweight read-only environment snapshot when
+opened plus explicit foreground environment, package-update, model-runtime,
+capability, and Storage & Retention assessments. Storage A1 classifies protected
+projects, exports, memory, production models, accepted pilots, legacy runtimes,
+logs, and known temporary residue; it also reports point-in-time dashboard
+memory. Exact cleanup manifests are preview-only and no cleanup executor exists.
+Advisory improvement proposal packets still require preview, digest
+revalidation, and exact confirmation. Self Assessment cannot apply updates,
+delete data, or mutate the host. The internal `self_improvement.*` namespace
+remains stable for compatibility.
 
 ## Implemented core capabilities
 
@@ -35,7 +44,7 @@ Self Assessment provides one lightweight read-only environment snapshot when ope
 - preview-first conversation clearing by exact title, selected set, or all active chats, plus exact single-conversation delete-and-forget;
 - production skill registry plus isolated Beta candidates and bounded diagnostics;
 - conservative self-skilling intake for genuinely unsupported task requests;
-- environment, model-runtime, capability, and improvement-proposal assessment;
+- environment, model-runtime, capability, storage-retention, and improvement-proposal assessment;
 - portable typed configuration through CLI overrides, process environment, ignored `.env`, and safe defaults.
 - separate bounded `web.lookup` and provenance-preserving `web.research` paths;
 - explicit review-only research reflection candidates with no automatic memory promotion.

@@ -10,22 +10,24 @@ require_relative "environment_assessor"
 require_relative "improvement_proposal_generator"
 require_relative "improvement_proposal_paths"
 require_relative "model_runtime_assessor"
+require_relative "storage_retention_assessor"
 
 module SoulCore
   class SelfImprovementService
     CONFIRMATION = "GENERATE_SELF_IMPROVEMENT_PROPOSALS"
-    SCOPES = %w[environment updates models capabilities].freeze
+    SCOPES = %w[environment updates models capabilities storage].freeze
     MAX_PROPOSALS = 100
     MAX_METADATA_BYTES = 256 * 1024
     ASSESSMENT_TIMEOUT_SECONDS = 30
 
-    def initialize(root: Dir.pwd, clock: -> { Time.now }, environment_assessor: nil, model_assessor: nil, capability_matrix: nil, proposal_generator: nil, assessment_timeout_seconds: ASSESSMENT_TIMEOUT_SECONDS)
+    def initialize(root: Dir.pwd, clock: -> { Time.now }, environment_assessor: nil, model_assessor: nil, capability_matrix: nil, proposal_generator: nil, storage_assessor: nil, assessment_timeout_seconds: ASSESSMENT_TIMEOUT_SECONDS)
       @root = File.expand_path(root)
       @clock = clock
       @environment_assessor = environment_assessor
       @model_assessor = model_assessor
       @capability_matrix = capability_matrix
       @proposal_generator = proposal_generator
+      @storage_assessor = storage_assessor
       @assessment_timeout_seconds = Float(assessment_timeout_seconds)
       raise ArgumentError, "assessment timeout must be positive" unless @assessment_timeout_seconds.positive?
     end
@@ -58,6 +60,7 @@ module SoulCore
         when "updates" then environment_assessor.assess(include_updates: true)
         when "models" then model_assessor.assess(include_processes: false)
         when "capabilities" then capability_matrix.assess(persist: false)
+        when "storage" then storage_assessor.inventory
         end
       end
       success({
@@ -72,6 +75,12 @@ module SoulCore
       })
     rescue Timeout::Error
       failed("#{scope} assessment exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
+    end
+
+    def storage_cleanup_preview(category:)
+      bounded_assessment { storage_assessor.preview(category: category) }
+    rescue Timeout::Error
+      failed("storage cleanup preview exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
     end
 
     def proposal_preview
@@ -136,6 +145,10 @@ module SoulCore
 
     def proposal_generator
       @proposal_generator ||= ImprovementProposalGenerator.new(root: @root)
+    end
+
+    def storage_assessor
+      @storage_assessor ||= StorageRetentionAssessor.new(root: @root)
     end
 
     def proposal_payload(report)

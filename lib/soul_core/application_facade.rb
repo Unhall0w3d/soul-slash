@@ -195,6 +195,7 @@ module SoulCore
       when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
       when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
       when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "storage_retention.cleanup.preview" then domain(self_improvement.storage_cleanup_preview(category: required(parameters, "category")))
       when "host_improvement.plans.list" then domain(host_improvement.list(limit: bounded_limit(parameters["limit"], HostImprovementPlanService::MAX_RECORDS)))
       when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
       when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))

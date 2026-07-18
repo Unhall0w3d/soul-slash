@@ -80,6 +80,7 @@ module SoulCore
       "self_improvement.refresh" => %w[scope],
       "self_improvement.proposals.preview" => [],
       "self_improvement.proposals.execute" => %w[confirmation expected_digest],
+      "storage_retention.cleanup.preview" => %w[category],
       "host_improvement.plans.list" => %w[limit],
       "host_improvement.arch_upgrade.preview" => [],
       "host_improvement.arch_upgrade.handoff" => %w[confirmation expected_digest],
