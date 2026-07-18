@@ -33,10 +33,24 @@ soul_pick_python() {
 
 soul_load_env() {
   if [ -f "$SOUL_ENV_FILE" ]; then
-    set -a
-    # shellcheck disable=SC1090
-    . "$SOUL_ENV_FILE"
-    set +a
+    local line key value first last
+    while IFS= read -r line || [ -n "$line" ]; do
+      line="${line%$'\r'}"
+      [[ "$line" =~ ^[[:space:]]*$ || "$line" =~ ^[[:space:]]*# ]] && continue
+      key="${line%%=*}"
+      value="${line#*=}"
+      [[ "$line" == *=* ]] || soul_fail "Invalid .env line without '=' in ${SOUL_ENV_FILE}."
+      [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || soul_fail "Invalid .env key in ${SOUL_ENV_FILE}."
+      if [ "${#value}" -ge 2 ]; then
+        first="${value:0:1}"
+        last="${value: -1}"
+        if { [ "$first" = '"' ] && [ "$last" = '"' ]; } || { [ "$first" = "'" ] && [ "$last" = "'" ]; }; then
+          value="${value:1:${#value}-2}"
+        fi
+      fi
+      printf -v "$key" '%s' "$value"
+      export "$key"
+    done < "$SOUL_ENV_FILE"
   fi
 }
 

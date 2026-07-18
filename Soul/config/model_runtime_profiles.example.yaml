@@ -1,5 +1,5 @@
 schema_version: soul.model_runtime_profiles.v3
-default_profile: nvidia-fallback
+default_profile: amd-gemma
 profiles:
   - id: nvidia-fallback
     label: NVIDIA fallback
@@ -10,17 +10,8 @@ profiles:
     service: llama-server.service
     endpoint: http://127.0.0.1:8082/v1
     core_role: reserve-chat
-  - id: amd-quality
-    label: AMD quality
-    model_name: Ministral 3 14B Instruct 2512 Q4_K_M
-    api_model: soul-local-chat
-    runtime: llamacpp_openai
-    accelerator: AMD Vulkan
-    service: soul-model-amd.service
-    endpoint: http://127.0.0.1:8082/v1
-    core_role: daily-chat
   - id: amd-gemma
-    label: AMD Gemma candidate
+    label: AMD main
     model_name: Gemma 4 12B Instruct Q4_K_M
     api_model: soul-local-chat
     runtime: ollama_openai

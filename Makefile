@@ -19,10 +19,12 @@ AMD_PORT ?=8082
 ALIAS_DIGEST ?=
 EXPECTED_DIGEST ?=
 MUSIC_ROOT ?= $(HOME)/.local/share/soul/music
-MUSIC_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/music_pilot_models.json
+MUSIC_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/music_vulkan_models.json
+MUSIC_LEGACY_MANIFEST ?= $(PROJECT_ROOT)/config/music_pilot_models.json
 MUSIC_DIT_MODEL ?= acestep-v15-turbo
 MUSIC_LM_MODEL ?= acestep-5Hz-lm-0.6B
 MUSIC_DURATION ?= 30
+MUSIC_VULKAN_MANIFEST ?= $(PROJECT_ROOT)/config/music_vulkan_models.json
 MUSIC_TRANSCRIPTION_MANIFEST ?= $(PROJECT_ROOT)/config/music_transcription_models.json
 MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
 MUSIC_REFERENCE_PYTHON ?= 3.14
@@ -31,7 +33,7 @@ MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
 MUSIC_REFERENCE_MODEL_CACHE ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -47,6 +49,9 @@ help:
 > @echo "  make setup-music EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_PILOT"
 > @echo "  make music-model-download EXPECTED_DIGEST=... CONFIRM=DOWNLOAD_SOUL_MUSIC_MODELS"
 > @echo "  make music-pilot-run MUSIC_DURATION=30  Run one bounded foreground pilot"
+> @echo "  make music-vulkan-setup-plan  Preview the pinned AMD Vulkan ACE-Step runtime"
+> @echo "  make music-vulkan-download-plan  Preview the exact 4B LM / 2B Turbo GGUF set"
+> @echo "  make music-vulkan-run-plan MUSIC_INPUT=/path/request.json  Preview one AMD pilot"
 > @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
 > @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
 > @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
@@ -127,23 +132,55 @@ setup-ollama: chmod-scripts
 > @scripts/soul-setup-ollama.sh
 
 music-check:
-> @ruby scripts/soul-music-pilot check --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
+> @ruby scripts/soul-music-pilot check --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
 
 music-pilot-plan:
-> @ruby scripts/soul-music-pilot plan --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
+> @ruby scripts/soul-music-pilot plan --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
 
 setup-music:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-pilot-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_PILOT" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_PILOT is required."; exit 2; }
-> @ruby scripts/soul-music-pilot setup --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+> @ruby scripts/soul-music-pilot setup --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-model-download:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-pilot-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "DOWNLOAD_SOUL_MUSIC_MODELS" || { echo "Exact confirmation DOWNLOAD_SOUL_MUSIC_MODELS is required."; exit 2; }
-> @ruby scripts/soul-music-pilot download --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+> @ruby scripts/soul-music-pilot download --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-pilot-run:
-> @ruby scripts/soul-music-pilot run --manifest "$(MUSIC_MODEL_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --duration "$(MUSIC_DURATION)"
+> @ruby scripts/soul-music-pilot run --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)" --duration "$(MUSIC_DURATION)"
+
+music-vulkan-check:
+> @ruby scripts/soul-music-vulkan-pilot check --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)"
+
+music-vulkan-setup-plan:
+> @ruby scripts/soul-music-vulkan-pilot plan --action setup --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)"
+
+music-vulkan-setup:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-vulkan-setup-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_MUSIC_VULKAN_RUNTIME" || { echo "Exact confirmation INSTALL_MUSIC_VULKAN_RUNTIME is required."; exit 2; }
+> @ruby scripts/soul-music-vulkan-pilot setup --action setup --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-vulkan-download-plan:
+> @ruby scripts/soul-music-vulkan-pilot plan --action download --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)"
+
+music-vulkan-download:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-vulkan-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "DOWNLOAD_MUSIC_VULKAN_MODELS" || { echo "Exact confirmation DOWNLOAD_MUSIC_VULKAN_MODELS is required."; exit 2; }
+> @ruby scripts/soul-music-vulkan-pilot download --action download --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+music-vulkan-run-plan:
+> @test -n "$(MUSIC_INPUT)" || { echo "MUSIC_INPUT=/path/to/request.json is required."; exit 2; }
+> @ruby scripts/soul-music-vulkan-pilot plan --action run --request "$(MUSIC_INPUT)" --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)" $(if $(MUSIC_RETRY_LM_SEED),--retry-lm-seed "$(MUSIC_RETRY_LM_SEED)",)
+
+music-vulkan-run:
+> @test -n "$(MUSIC_INPUT)" || { echo "MUSIC_INPUT=/path/to/request.json is required."; exit 2; }
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run music-vulkan-run-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "RUN_MUSIC_VULKAN_PILOT" || { echo "Exact confirmation RUN_MUSIC_VULKAN_PILOT is required."; exit 2; }
+> @ruby scripts/soul-music-vulkan-pilot run --action run --request "$(MUSIC_INPUT)" --manifest "$(MUSIC_VULKAN_MANIFEST)" --root "$(MUSIC_ROOT)" $(if $(MUSIC_RETRY_LM_SEED),--retry-lm-seed "$(MUSIC_RETRY_LM_SEED)",) --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-music-core-vulkan:
+> @ruby scripts/verify-music-core-vulkan-feasibility.rb
 
 music-transcription-plan:
 > @ruby scripts/soul-music-transcription plan --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)"

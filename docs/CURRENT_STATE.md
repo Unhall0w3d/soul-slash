@@ -68,17 +68,18 @@ Human approval remains required for:
 
 The Conversational Soul milestone is complete at its Phase 13 stopping point following owner approval on 2026-07-15. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. No release or tag has been created; later work begins as a separately approved milestone.
 
-The Deployment and Operations milestone now has manual, preview-gated
-multi-profile runtime control and selected-profile login startup. The active
-quality profile uses Ministral 3 14B Instruct 2512 Q4_K_M on AMD Vulkan; Qwen3
-8B Q4_K_M on NVIDIA CUDA remains an explicit fallback profile. No automatic
-switching, fallback, idle unload, or reboot is introduced. Runtime identity is
-reported separately from the stable `soul-local-chat` OpenAI-compatible API
-alias, so callers do not misidentify the loaded model.
+The Deployment and Operations milestone has manual, preview-gated Core and
+runtime control with selected-profile login startup. Gemma 4 12B Instruct
+Q4_K_M through Ollama/Vulkan is the supported AMD Daily Core. Qwen3 8B Q4_K_M
+through llama.cpp/CUDA is the NVIDIA reserve used by AMD-Free and Music Cores.
+Ministral 3 14B has been retired from the supported profile inventory and
+startup path; historical bake-off evidence remains. No automatic Core switch,
+idle unload, or reboot is introduced. Runtime identity is reported separately
+from the stable `soul-local-chat` OpenAI-compatible API alias.
 
-The next accepted design direction is Multi-model and Music Studio A0. It keeps
-Ministral conversation on AMD and proposes a measured ACE-Step 1.5 foreground
-pilot on the otherwise-idle NVIDIA card, mutually exclusive with Qwen fallback.
+The original Multi-model and Music Studio A0 direction kept conversation on
+AMD and piloted ACE-Step on NVIDIA. That historical CUDA path remains useful
+compatibility evidence but is no longer the Music Core production path.
 The target product is an iterative project workspace for 2–3 minute songs,
 lyrics, lawful references, candidates, repainting, stems, and creative review.
 A0 installed and ran nothing. The first Music A1 candidate now provides an
@@ -128,13 +129,16 @@ project/reference deletion, finished FLAC/MP3 export, and one-generation lite
 front/back trimming. Repaint, extend, stems, publishing, and broader editing
 remain later work.
 
-The reviewed model bake-off subsequently integrated Gemma 4 12B Q4_K_M as an
-inactive-by-default, manually selectable AMD/Ollama candidate while retaining
-Ministral as the current selected Daily profile and Qwen as rollback. The
-current Core orchestration candidate groups explicit `daily-chat` profiles as
-Daily Core and the `reserve-chat` NVIDIA profile as AMD-Free Core. It adds no
-automatic switching or default change. Music Studio remains an on-demand
-workload because Qwen chat and ACE-Step conflict on the same NVIDIA lane.
+The reviewed model bake-off promoted Gemma 4 12B Q4_K_M to the sole supported
+AMD Daily profile. The Music Core switches chat to Qwen on NVIDIA and exposes
+the accepted pinned ACE-Step 1.5 4B LM / 2B Turbo Q8_0 pipeline on AMD Vulkan.
+It supports exactly 30, 90, and 180 seconds, uses VAE chunk 256, rejects a
+collapsed LM audio-code plan before synthesis, and may derive a new LM seed for
+at most three attempts inside the already-approved candidate scope. It then
+publishes a validated 48 kHz stereo FLAC master and derived MP3, removes the
+WAV/LM attempt intermediates after success, and stops at human listening review.
+No music model remains resident and no background queue or automatic Core
+switch was added.
 
 Self Assessment now also projects the exact CachyOS core-package reboot request
 relative to current boot time. On this host the July 17 package transaction is

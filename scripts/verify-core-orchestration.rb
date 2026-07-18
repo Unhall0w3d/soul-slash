@@ -56,7 +56,7 @@ def write_profiles(root)
   FileUtils.mkdir_p(File.dirname(path))
   File.write(path, <<~YAML)
     schema_version: soul.model_runtime_profiles.v3
-    default_profile: amd-quality
+    default_profile: amd-gemma
     profiles:
       - id: nvidia-fallback
         label: NVIDIA fallback
@@ -67,20 +67,11 @@ def write_profiles(root)
         service: llama-server.service
         endpoint: http://127.0.0.1:8082/v1
         core_role: reserve-chat
-      - id: amd-quality
-        label: AMD quality
-        model_name: Ministral 3 14B Q4_K_M
-        api_model: soul-local-chat
-        runtime: llamacpp_openai
-        accelerator: AMD Vulkan
-        service: soul-model-amd.service
-        endpoint: http://127.0.0.1:8082/v1
-        core_role: daily-chat
       - id: amd-gemma
-        label: AMD Gemma candidate
+        label: AMD main
         model_name: Gemma 4 12B Q4_K_M
         api_model: soul-local-chat
-        runtime: llamacpp_openai
+        runtime: ollama_openai
         accelerator: AMD Vulkan
         service: soul-model-gemma.service
         endpoint: http://127.0.0.1:8082/v1
@@ -98,9 +89,11 @@ puts "Soul Core orchestration verification:"
 
 Dir.mktmpdir("soul-core-orchestration-") do |root|
   file = write_profiles(root)
-  runner = CoreRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "active", "soul-model-gemma.service" => "inactive")
+  runner = CoreRunner.new("llama-server.service" => "inactive", "soul-model-gemma.service" => "active")
   http_get = lambda do |uri|
     case uri.path
+    when "/api/tags" then { status: 200, body: '{"models":[{"name":"soul-local-chat"}]}' }
+    when "/api/ps" then { status: 200, body: '{"models":[]}' }
     when "/slots" then { status: 200, body: '[{"is_processing":false}]' }
     when "/metrics" then { status: 200, body: "llamacpp:requests_processing 0\nllamacpp:requests_deferred 0\n" }
     when "/health" then { status: 200, body: '{"status":"ok"}' }
@@ -112,9 +105,9 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   cores = SoulCore::CoreOrchestrationService.new(root:, runtime_control: runtime, env:)
 
   status = cores.status
-  check.call("explicit roles form Daily and AMD-Free Cores", status["ok"] && status.dig("data", "cores").map { |core| core["id"] } == %w[daily amd-free])
-  check.call("active Daily Core keeps NVIDIA available for Music Studio", status.dig("data", "active_core_id") == "daily" && status.dig("data", "music_lane", "available_in_active_core") == true)
-  check.call("Daily fallback target is the first configured Daily profile", status.dig("data", "cores", 0, "target_profile", "id") == "amd-quality")
+  check.call("explicit roles form Daily, AMD-Free, and virtual Music Cores", status["ok"] && status.dig("data", "cores").map { |core| core["id"] } == %w[daily amd-free music])
+  check.call("Daily Core requires an explicit Music Core transition", status.dig("data", "active_core_id") == "daily" && status.dig("data", "music_lane", "available_in_active_core") == false && status.dig("data", "music_lane", "conflict").include?("Activate Music Core"))
+  check.call("Daily Core targets the promoted Gemma profile", status.dig("data", "cores", 0, "target_profile", "id") == "amd-gemma")
 
   preview = cores.preview(core_id: "amd-free")
   check.call("Core preview delegates the exact runtime confirmation", preview["ok"] && preview.dig("data", "confirmation_phrase") == "SWITCH_MODEL_RUNTIME_TO_NVIDIA_FALLBACK" && runner.mutations.empty?)
@@ -124,14 +117,22 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   switched = cores.execute(core_id: "amd-free", target_profile_id: "nvidia-fallback", confirmation: preview.dig("data", "confirmation_phrase"), expected_digest: preview.dig("data", "expected_digest"))
   selection_path = File.join(root, SoulCore::CoreOrchestrationService::SELECTION_PATH)
   selection = JSON.parse(File.read(selection_path))
-  check.call("exact Core activation uses the reviewed stop-start controller", switched["ok"] && runner.mutations == [["stop", "soul-model-amd.service"], ["start", "llama-server.service"]])
-  check.call("successful activation records only bounded per-Core profile choices", selection == { "schema_version" => "soul.core_selection.v1", "profiles" => { "amd-free" => "nvidia-fallback", "daily" => "amd-quality" } })
+  check.call("exact Core activation uses the reviewed stop-start controller", switched["ok"] && runner.mutations == [["stop", "soul-model-gemma.service"], ["start", "llama-server.service"]])
+  check.call("successful activation records only bounded per-Core profile choices", selection == { "schema_version" => "soul.core_selection.v2", "active_core_id" => "amd-free", "profiles" => { "amd-free" => "nvidia-fallback", "daily" => "amd-gemma" } })
   check.call("AMD-Free Core discloses NVIDIA music contention", switched.dig("data", "active_core_id") == "amd-free" && switched.dig("data", "music_lane", "available_in_active_core") == false && switched.dig("data", "music_lane", "conflict").include?("NVIDIA chat"))
 
+  shared_preview = cores.preview(core_id: "music")
+  check.call("shared NVIDIA chat profile cannot silently relabel AMD-Free as Music Core", shared_preview["lifecycle_state"] == "awaiting_input" && runner.mutations.length == 2)
+
   return_preview = cores.preview(core_id: "daily")
-  check.call("returning to Daily restores its recorded profile", return_preview.dig("data", "target_profile", "id") == "amd-quality")
-  wrong_target = cores.execute(core_id: "daily", target_profile_id: "amd-gemma", confirmation: return_preview.dig("data", "confirmation_phrase"), expected_digest: return_preview.dig("data", "expected_digest"))
+  check.call("returning to Daily restores its recorded profile", return_preview.dig("data", "target_profile", "id") == "amd-gemma")
+  wrong_target = cores.execute(core_id: "daily", target_profile_id: "nvidia-fallback", confirmation: return_preview.dig("data", "confirmation_phrase"), expected_digest: return_preview.dig("data", "expected_digest"))
   check.call("execution cannot substitute another profile after preview", wrong_target["lifecycle_state"] == "blocked_for_human_review")
+
+  restored = cores.execute(core_id: "daily", target_profile_id: "amd-gemma", confirmation: return_preview.dig("data", "confirmation_phrase"), expected_digest: return_preview.dig("data", "expected_digest"))
+  music_preview = cores.preview(core_id: "music")
+  music = cores.execute(core_id: "music", target_profile_id: "nvidia-fallback", confirmation: music_preview.dig("data", "confirmation_phrase"), expected_digest: music_preview.dig("data", "expected_digest"))
+  check.call("Music Core reuses reserve chat and exposes the promoted Vulkan engine", restored["ok"] && music["ok"] && music.dig("data", "active_core_id") == "music" && music.dig("data", "music_lane", "accelerator") == "AMD Vulkan" && music.dig("data", "music_lane", "durations") == [30, 90, 180] && !music.dig("data", "music_lane").key?("candidate"))
 
   facade = SoulCore::ApplicationFacade.new(root:, process_env: {}, core_orchestration_service: cores, model_runtime_control_service: runtime)
   facade_status = facade.call(request("core.status"))
@@ -141,9 +142,17 @@ end
 
 Dir.mktmpdir("soul-core-selection-integrity-") do |root|
   file = write_profiles(root)
-  runner = CoreRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "active", "soul-model-gemma.service" => "inactive")
+  runner = CoreRunner.new("llama-server.service" => "inactive", "soul-model-gemma.service" => "active")
   env = { "SOUL_MODEL_RUNTIME_CONTROL" => "1", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => file, "SOUL_LOCAL_OPENAI_MODEL" => "soul-local-chat" }
-  http_get = ->(uri) { uri.path == "/slots" ? { status: 200, body: '[{"is_processing":false}]' } : { status: 200, body: "" } }
+  http_get = lambda do |uri|
+    if uri.path == "/api/tags"
+      { status: 200, body: '{"models":[{"name":"soul-local-chat"}]}' }
+    elsif uri.path == "/api/ps"
+      { status: 200, body: '{"models":[]}' }
+    else
+      { status: 200, body: "" }
+    end
+  end
   runtime = SoulCore::ModelRuntimeControlService.new(root:, env:, runner:, http_get:)
   path = File.join(root, SoulCore::CoreOrchestrationService::SELECTION_PATH)
   FileUtils.mkdir_p(File.dirname(path)); File.symlink("missing-target", path)

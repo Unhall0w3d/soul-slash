@@ -15,13 +15,13 @@ module SoulCore
     CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
     DEFAULT_DIRECTORY = File.join("Soul", "runtime", "music")
     MAX_LEASE_BYTES = 16 * 1024
-    LEASE_TTL_SECONDS = 420
+    LEASE_TTL_SECONDS = 2_100
     MIN_FREE_MIB = 6_000
 
     class Busy < StandardError; end
     class IntegrityError < StandardError; end
 
-    def initialize(root: Dir.pwd, directory: DEFAULT_DIRECTORY, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, process_start: nil, signaler: ->(signal, target) { Process.kill(signal, target) }, sleeper: ->(seconds) { sleep(seconds) }, model_lease_store: nil)
+    def initialize(root: Dir.pwd, directory: DEFAULT_DIRECTORY, lane: "nvidia-music", runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, process_start: nil, signaler: ->(signal, target) { Process.kill(signal, target) }, sleeper: ->(seconds) { sleep(seconds) }, model_lease_store: nil)
       @root = File.expand_path(root)
       @directory = File.expand_path(directory, @root)
       @runner = runner
@@ -32,7 +32,9 @@ module SoulCore
       @sleeper = sleeper
       @model_lease_store = model_lease_store || ModelRuntimeLeaseStore.new(root: @root, clock: @clock)
       @lock_path = File.join(@directory, "control.lock")
-      @lease_path = File.join(@directory, "nvidia-music.json")
+      raise IntegrityError, "music resource lane is invalid" unless %w[nvidia-music amd-music].include?(lane)
+      @lane = lane
+      @lease_path = File.join(@directory, "#{@lane}.json")
       raise IntegrityError, "music runtime directory must remain inside repository root" unless within?(@directory, @root)
     end
 
@@ -44,27 +46,20 @@ module SoulCore
         "schema_version" => "soul.music.resource_inventory.v1",
         "lifecycle_state" => "complete",
         "reason" => "music resource inventory inspected",
-        "lanes" => {
-          "amd-conversation" => { "health" => hardware.fetch("amd_health") },
-          "nvidia-fallback" => { "service" => "llama-server.service", "state" => hardware.fetch("fallback_state") },
-          "nvidia-music" => {
-            "gpu_state" => hardware.fetch("nvidia_state"),
-            "free_mib" => hardware["nvidia_free_mib"],
-            "compute_process_count" => hardware.fetch("nvidia_compute_processes").length,
-            "lease" => public_lease(lease)
-          },
-          "cpu-audio" => { "state" => "available" }
-        },
+        "lanes" => lane_inventory(hardware, lease),
         "engine" => {
-          "model" => "ACE-Step 1.5",
-          "accelerator" => "NVIDIA CUDA",
+          "model" => @lane == "amd-music" ? "ACE-Step 1.5 4B LM / 2B Turbo Q8_0" : "ACE-Step 1.5 0.6B LM / 2B Turbo",
+          "accelerator" => @lane == "amd-music" ? "AMD Vulkan" : "NVIDIA CUDA",
           "residency" => lease ? "foreground_active" : "on_demand",
           "loaded" => !lease.nil?
         },
-        "can_acquire_nvidia_music" => blockers(hardware, lease).empty?,
+        "resource_lane" => @lane,
+        "can_acquire_music" => blockers(hardware, lease).empty?,
+        "can_acquire_nvidia_music" => @lane == "nvidia-music" && blockers(hardware, lease).empty?,
         "blockers" => blockers(hardware, lease),
         "automatic_preemption" => false,
-        "automatic_retry" => false,
+        "automatic_retry" => @lane == "amd-music",
+        "automatic_retry_limit" => @lane == "amd-music" ? 3 : 0,
         "mutation" => "none"
       }
     rescue Busy
@@ -83,7 +78,7 @@ module SoulCore
     def acquire(project_id:, candidate_id:, input_digest:, ttl_seconds: LEASE_TTL_SECONDS)
       raise IntegrityError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
       raise IntegrityError, "input_digest is invalid" unless input_digest.to_s.match?(/\A[a-f0-9]{64}\z/)
-      cross_lease = @model_lease_store.acquire(provider_id: "nvidia-music", model_id: "ace-step-1.5", request_id: candidate_id, conversation_id: project_id, ttl_seconds: ttl_seconds)
+      cross_lease = @model_lease_store.acquire(provider_id: @lane, model_id: @lane == "amd-music" ? "ace-step-1.5-vulkan-4b" : "ace-step-1.5", request_id: candidate_id, conversation_id: project_id, ttl_seconds: ttl_seconds)
       record = with_lock do
         hardware = observe_hardware
         active = active_lease_unlocked(cleanup_stale: true)
@@ -93,7 +88,7 @@ module SoulCore
         record = {
           "schema_version" => LEASE_SCHEMA,
           "lease_id" => "music_lease_#{@id_generator.call}",
-          "lane" => "nvidia-music",
+          "lane" => @lane,
           "project_id" => project_id.to_s,
           "candidate_id" => candidate_id.to_s,
           "input_digest" => input_digest.to_s,
@@ -200,16 +195,39 @@ module SoulCore
       processes = @runner.run("nvidia-smi", "--query-compute-apps=pid,process_name", "--format=csv,noheader", timeout_seconds: 5, max_output_bytes: 8 * 1024)
       nvidia_ready = memory.success? && memory.stdout.to_s.strip.match?(/\A\d+\z/) && processes.success?
       health = @runner.run("curl", "--fail", "--silent", "--show-error", "--max-time", "3", "http://127.0.0.1:8082/health", timeout_seconds: 5, max_output_bytes: 4 * 1024)
+      gemma = @runner.run("systemctl", "--user", "is-active", "soul-model-gemma.service", timeout_seconds: 5, max_output_bytes: 1024)
+      vulkan = @runner.run("vulkaninfo", "--summary", timeout_seconds: 8, max_output_bytes: 32 * 1024)
       {
         "fallback_state" => fallback_state,
         "nvidia_state" => nvidia_ready ? "available" : "unavailable",
         "nvidia_free_mib" => nvidia_ready ? Integer(memory.stdout.strip) : nil,
         "nvidia_compute_processes" => processes.success? ? processes.stdout.lines.map(&:strip).reject(&:empty?).first(32) : [],
-        "amd_health" => health.success? && health.stdout.include?("ok") ? "ok" : "unavailable"
+        "amd_health" => health.success? && health.stdout.include?("ok") ? "ok" : "unavailable",
+        "gemma_state" => gemma.stdout.to_s.strip,
+        "active_core_id" => active_core_id,
+        "amd_vulkan_state" => vulkan.success? && vulkan.stdout.to_s.match?(/AMD|RADV|NAVI21|RX 6900/i) ? "available" : "unavailable"
+      }
+    end
+
+    def lane_inventory(hardware, lease)
+      return {
+        "chat-runtime" => { "service" => "llama-server.service", "accelerator" => "NVIDIA CUDA", "state" => hardware.fetch("fallback_state") },
+        "amd-music" => { "gpu_state" => hardware.fetch("amd_vulkan_state"), "lease" => public_lease(lease) },
+        "cpu-audio" => { "state" => "available" }
+      } if @lane == "amd-music"
+
+      {
+        "amd-conversation" => { "health" => hardware.fetch("amd_health") },
+        "nvidia-fallback" => { "service" => "llama-server.service", "state" => hardware.fetch("fallback_state") },
+        "nvidia-music" => { "gpu_state" => hardware.fetch("nvidia_state"), "free_mib" => hardware["nvidia_free_mib"],
+          "compute_process_count" => hardware.fetch("nvidia_compute_processes").length, "lease" => public_lease(lease) },
+        "cpu-audio" => { "state" => "available" }
       }
     end
 
     def blockers(hardware, lease)
+      return amd_blockers(hardware, lease) if @lane == "amd-music"
+
       items = []
       items << "NVIDIA fallback service is active" if hardware["fallback_state"] == "active"
       items << "NVIDIA fallback service state is uncertain" unless %w[inactive failed].include?(hardware["fallback_state"])
@@ -219,6 +237,26 @@ module SoulCore
       items << "NVIDIA has active compute processes" unless hardware["nvidia_compute_processes"].empty?
       items << "nvidia-music lease is active" if lease
       items
+    end
+
+    def amd_blockers(hardware, lease)
+      items = []
+      items << "Music Core is not active" unless hardware["active_core_id"] == "music"
+      items << "NVIDIA reserve chat service is not active" unless hardware["fallback_state"] == "active"
+      items << "Gemma AMD chat service is still active" if hardware["gemma_state"] == "active"
+      items << "Gemma AMD chat service state is uncertain" unless %w[inactive failed].include?(hardware["gemma_state"])
+      items << "AMD Vulkan music device is unavailable" unless hardware["amd_vulkan_state"] == "available"
+      items << "#{@lane} lease is active" if lease
+      items
+    end
+
+    def active_core_id
+      path = File.join(@root, "Soul", "runtime", "model_runtime", "core_selection.json")
+      return nil unless File.file?(path) && !File.symlink?(path) && File.size(path) <= 4 * 1024
+      record = JSON.parse(File.binread(path, 4 * 1024))
+      record["active_core_id"]
+    rescue JSON::ParserError, Errno::ENOENT
+      nil
     end
 
     def active_lease_unlocked(cleanup_stale: false)
@@ -250,7 +288,7 @@ module SoulCore
       raise IntegrityError, "music lease must be an object" unless record.is_a?(Hash)
       raise IntegrityError, "music lease schema is invalid" unless record["schema_version"] == LEASE_SCHEMA
       raise IntegrityError, "music lease ID is invalid" unless record["lease_id"].to_s.match?(LEASE_ID)
-      raise IntegrityError, "music lease lane is invalid" unless record["lane"] == "nvidia-music"
+      raise IntegrityError, "music lease lane is invalid" unless record["lane"] == @lane
       raise IntegrityError, "music lease candidate is invalid" unless record["candidate_id"].to_s.match?(CANDIDATE_ID)
       raise IntegrityError, "music lease owner is invalid" unless record["owner_pid"].is_a?(Integer) && record["owner_pid"].positive? && !record["owner_process_start"].to_s.empty?
       raise IntegrityError, "music cross-runtime lease is invalid" unless record["model_runtime_lease_id"].to_s.match?(/\A[0-9a-f]{32}\z/)

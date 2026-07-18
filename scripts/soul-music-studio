@@ -8,7 +8,7 @@ require_relative "../lib/soul_core/music_generation_service"
 options = {
   root: File.expand_path("..", __dir__),
   music_root: ENV.fetch("MUSIC_ROOT", File.join(Dir.home, ".local", "share", "soul", "music")),
-  manifest: ENV.fetch("MUSIC_MODEL_MANIFEST", File.expand_path("../config/music_pilot_models.json", __dir__)),
+  manifest: ENV.fetch("MUSIC_MODEL_MANIFEST", File.expand_path("../config/music_vulkan_models.json", __dir__)),
   limit: 100
 }
 

@@ -9,6 +9,7 @@ require "time"
 require_relative "bounded_command_runner"
 require_relative "music_project_store"
 require_relative "music_resource_coordinator"
+require_relative "music_vulkan_generation_backend"
 
 module SoulCore
   class MusicGenerationService
@@ -124,20 +125,25 @@ module SoulCore
       end
     end
 
-    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_pilot_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
+    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_vulkan_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @music_root = File.expand_path(music_root)
       @manifest_path = File.expand_path(manifest_path)
       @store = project_store || MusicProjectStore.new(root: @root)
       @runner = runner
-      @coordinator = coordinator || MusicResourceCoordinator.new(root: @root, runner: runner)
       @process_runner = process_runner
       @clock = clock
       @manifest = load_manifest
-      @source = @manifest.fetch("source")
-      @dit_name = @manifest.fetch("dit_models").keys.first
-      @lm_name = @manifest.fetch("lm_models").keys.first
-      @source_dir = File.join(@music_root, "ace-step", @source.fetch("release"))
+      @vulkan = @manifest["schema_version"] == MusicVulkanGenerationBackend::SUPPORTED_SCHEMA
+      @coordinator = coordinator || MusicResourceCoordinator.new(root: @root, lane: @vulkan ? "amd-music" : "nvidia-music", runner: runner)
+      if @vulkan
+        @vulkan_backend = MusicVulkanGenerationBackend.new(music_root: @music_root, manifest: @manifest, runner: @runner)
+      else
+        @source = @manifest.fetch("source")
+        @dit_name = @manifest.fetch("dit_models").keys.first
+        @lm_name = @manifest.fetch("lm_models").keys.first
+        @source_dir = File.join(@music_root, "ace-step", @source.fetch("release"))
+      end
     end
 
     def create_project(attributes)
@@ -257,20 +263,30 @@ module SoulCore
       input_digest = @store.generation_input_digest(input)
       input_path = File.join(staging, "input.json")
       File.write(input_path, JSON.pretty_generate(input) + "\n", mode: "wx", perm: 0o600)
-      progress&.call({ "stage" => "resources", "message" => "Acquiring the bounded NVIDIA music lane" })
+      progress&.call({ "stage" => "resources", "message" => "Acquiring the bounded #{resource_lane == 'amd-music' ? 'AMD Vulkan' : 'NVIDIA'} music lane" })
       duration = input.fetch("duration")
-      lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: input_digest, ttl_seconds: duration + 240)
+      lease = @coordinator.acquire(project_id: project_id, candidate_id: candidate_id, input_digest: input_digest, ttl_seconds: generation_timeout(duration) + 120)
       progress&.call({ "stage" => "model", "message" => "Generating the candidate in the foreground" })
       generation = run_generation(input, input_path, staging, lease, progress)
+      if generation.respond_to?(:status) && generation.status == "blocked"
+        return quarantined_outcome("blocked_for_human_review", staging, generation, lease, generation.stderr)
+      end
       return quarantined_outcome(generation.status == "canceled" ? "canceled" : "failed", staging, generation, lease) unless generation.success?
 
       log = generation.stdout.to_s + generation.stderr.to_s
       File.write(File.join(staging, "generation.log"), log, mode: "wx", perm: 0o600)
       return quarantined_outcome("failed", staging, generation, lease, "ACE-Step reported a generation failure") if log.match?(/Generation failed|  FAILED:|Traceback \(most recent call last\)/)
-      flac_sources = Dir.glob(File.join(staging, "**", "*.flac")).select { |path| File.file?(path) && File.size(path).positive? }
-      return quarantined_outcome("failed", staging, generation, lease, "generation did not produce exactly one FLAC") unless flac_sources.one?
       flac_path = File.join(staging, "master.flac")
-      File.rename(flac_sources.first, flac_path)
+      if @vulkan
+        wav_path = generation.wav_path
+        transcode_master = run_lossless_transcode(wav_path, flac_path, staging, lease, duration, progress)
+        return quarantined_outcome(transcode_master.status == "canceled" ? "canceled" : "failed", staging, transcode_master, lease, "FLAC master derivation failed") unless transcode_master.success?
+        FileUtils.rm_f(wav_path)
+      else
+        flac_sources = Dir.glob(File.join(staging, "**", "*.flac")).select { |path| File.file?(path) && File.size(path).positive? }
+        return quarantined_outcome("failed", staging, generation, lease, "generation did not produce exactly one FLAC") unless flac_sources.one?
+        File.rename(flac_sources.first, flac_path)
+      end
       progress&.call({ "stage" => "validation", "message" => "Inspecting the lossless master" })
       flac = inspect_audio(flac_path, "flac", duration)
 
@@ -294,9 +310,12 @@ module SoulCore
         "source_candidate_id" => source_candidate_id,
         "model_profile" => model_profile,
         "resource_receipt" => {
-          "lane" => "nvidia-music",
+          "lane" => resource_lane,
           "lease_id" => lease.fetch("lease_id"),
-          "amd_conversation_preserved" => true,
+          "amd_conversation_preserved" => !@vulkan,
+          "chat_engine_preserved" => true,
+          "lm_attempts" => generation.respond_to?(:lm_attempts) ? generation.lm_attempts : nil,
+          "code_health" => generation.respond_to?(:code_health) ? generation.code_health : nil,
           "automatic_model_load" => false,
           "automatic_model_unload" => false
         },
@@ -306,6 +325,7 @@ module SoulCore
         },
         "human_review_required" => true
       }
+      FileUtils.rm_f(File.join(staging, "selected-request.json")) if @vulkan
       remove_nested_generation_directories(staging)
       published = @store.publish_candidate(project_id, candidate_id, staging, receipt)
       progress&.call({ "stage" => "review", "message" => "Candidate ready for Operator listening review" })
@@ -348,8 +368,8 @@ module SoulCore
         "seed" => project.fetch("seed"),
         "model_profile" => model_profile,
         "artifacts" => { "master" => "FLAC 48kHz stereo", "proxy" => "MP3 LAME V2 derived from master" },
-        "resource_lane" => "nvidia-music",
-        "timeout_seconds" => project.fetch("target_duration_seconds") + 180,
+        "resource_lane" => resource_lane,
+        "timeout_seconds" => generation_timeout(project.fetch("target_duration_seconds")),
         "persistent_service" => false,
         "network_listener" => false,
         "automatic_download" => false
@@ -369,8 +389,8 @@ module SoulCore
         "revision_input" => revised_input.slice(*MusicProjectStore::REVISION_FIELDS),
         "model_profile" => model_profile,
         "artifacts" => { "master" => "FLAC 48kHz stereo", "proxy" => "MP3 LAME V2 derived from master" },
-        "resource_lane" => "nvidia-music",
-        "timeout_seconds" => revised_input.fetch("duration") + 180,
+        "resource_lane" => resource_lane,
+        "timeout_seconds" => generation_timeout(revised_input.fetch("duration")),
         "persistent_service" => false,
         "network_listener" => false,
         "automatic_download" => false,
@@ -379,6 +399,8 @@ module SoulCore
     end
 
     def model_profile
+      return @vulkan_backend.model_profile if @vulkan
+
       {
         "source_release" => @source.fetch("release"),
         "source_revision" => @source.fetch("revision"),
@@ -392,6 +414,8 @@ module SoulCore
     end
 
     def environment_blockers
+      return @vulkan_backend.environment_blockers if @vulkan
+
       items = []
       items << "pinned ACE-Step source is missing" unless File.directory?(File.join(@source_dir, ".git")) && !File.symlink?(@source_dir)
       items << "Music Python environment is missing" unless File.executable?(File.join(@source_dir, ".venv", "bin", "python"))
@@ -410,6 +434,13 @@ module SoulCore
     end
 
     def run_generation(input, input_path, staging, lease, progress)
+      if @vulkan
+        executor = lambda do |command, timeout, env, chdir|
+          process(command, staging, lease, timeout, env, chdir: chdir, progress: progress)
+        end
+        return @vulkan_backend.run(input: input, staging: staging, execute: executor)
+      end
+
       python = File.join(@source_dir, ".venv", "bin", "python")
       command = [python, "profile_inference.py", "--device", "cuda", "--lm-backend", "pt", "--config-path", @dit_name, "--lm-model", @lm_name, "--offload-to-cpu", "--offload-dit-to-cpu", "--quantization", "int8_weight_only", "--example", input_path, "--duration", input.fetch("duration").to_s, "--batch-size", "1", "--seed", input.fetch("seed").to_s, "--no-warmup"]
       process(command, staging, lease, input.fetch("duration") + 180, {
@@ -426,6 +457,12 @@ module SoulCore
     def run_transcode(flac, mp3, staging, lease, duration, progress)
       command = [@runner.which("ffmpeg") || "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", flac, *MP3_ARGUMENTS, mp3]
       process(command, staging, lease, [duration, 120].min, {}, chdir: staging, progress: progress)
+    end
+
+    def run_lossless_transcode(wav, flac, staging, lease, duration, progress)
+      command = [@runner.which("ffmpeg") || "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-i", wav,
+        "-map_metadata", "-1", "-codec:a", "flac", "-sample_fmt", "s16", "-ar", "48000", "-ac", "2", flac]
+      process(command, staging, lease, [duration + 30, 240].min, {}, chdir: staging, progress: progress)
     end
 
     def process(command, staging, lease, timeout, env, chdir:, progress: nil)
@@ -452,6 +489,8 @@ module SoulCore
     end
 
     def verify_checkpoints!
+      return @vulkan_backend.verify_checkpoints! if @vulkan
+
       groups = [[@manifest.fetch("dit_models").fetch(@dit_name), File.join(@source_dir, "checkpoints")], [@manifest.fetch("lm_models").fetch(@lm_name), File.join(@source_dir, "checkpoints", @lm_name)]]
       groups.each do |model, base|
         model.fetch("files").each do |path, bytes, sha|
@@ -460,6 +499,10 @@ module SoulCore
         end
       end
     end
+
+    def resource_lane = @vulkan ? "amd-music" : "nvidia-music"
+
+    def generation_timeout(duration) = @vulkan ? Integer(duration) + 1_800 : Integer(duration) + 180
 
     def read_candidate(project_id, candidate_id)
       path = File.join(@store.generations_path(project_id), candidate_id, "candidate.json")
@@ -472,6 +515,8 @@ module SoulCore
 
     def quarantined_outcome(state, staging, result, lease, reason = nil)
       payload = { "schema_version" => "soul.music.generation_failure.v1", "lifecycle_state" => state, "reason" => reason || "music generation #{result.status}", "exit_status" => result.exit_status, "recorded_at" => @clock.call.iso8601, "lease_id" => lease.fetch("lease_id") }
+      payload["lm_attempts"] = result.lm_attempts if result.respond_to?(:lm_attempts) && result.lm_attempts
+      payload["code_health"] = result.code_health if result.respond_to?(:code_health) && result.code_health
       File.write(File.join(staging, "failure.json"), JSON.pretty_generate(payload) + "\n", mode: "w", perm: 0o600)
       File.write(File.join(staging, "failure.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(0, MAX_LOG_BYTES), mode: "w", perm: 0o600)
       outcome(state, false, payload.fetch("reason"), data: { "quarantine_path" => staging, "exit_status" => result.exit_status }, mutation: "music_candidate_quarantined")

@@ -1,21 +1,23 @@
 # Multi-Model and Music Studio Architecture
 
-## Decision
+## Current production decision
 
 Soul should not become a pile of always-loaded models. The practical topology
-for this host is one stable conversation model plus manually invoked specialist
-workloads:
+for this host is one selected chat model plus manually invoked foreground
+specialists:
 
 | Hardware lane | Primary role | Mutually exclusive roles |
 | --- | --- | --- |
-| RX 6900 XT, 16 GiB, RADV Vulkan | Ministral 3 14B conversation, planning, synthesis | Future manually selected reasoning or vision profile |
-| GTX 1070, 8 GiB, CUDA compute 6.1 | ACE-Step 1.5 foreground music pilot | Qwen3 8B emergency fallback, future Whisper/OCR experiments |
-| Ryzen 7 5800X and 62 GiB RAM | Ruby control plane, storage, audio metadata, post-processing | CPU/offload support for one bounded specialist |
+| RX 6900 XT, 16 GiB, RADV Vulkan | Gemma 4 12B Daily chat | ACE-Step 1.5 4B LM / 2B Turbo foreground Music Core, future qualified vision specialist |
+| GTX 1070, 8 GiB, CUDA compute 6.1 | Qwen3 8B reserve chat in Music and AMD-Free Cores | Future bounded speech/OCR specialists |
+| Ryzen 7 5800X and 62 GiB RAM | Ruby control plane, storage, audio metadata, post-processing | CPU Whisper transcription and future bounded specialists |
 
-The AMD conversation lane remains loaded during an NVIDIA music run. Qwen
-fallback must be inactive before music claims NVIDIA. Music never triggers an
-automatic conversation switch. If AMD chat is unavailable, the operator chooses
-between Qwen fallback and music; Soul does not decide.
+Daily Core keeps Gemma on AMD and leaves NVIDIA available. Music Core is an
+explicit, previewed Core transition: Qwen becomes chat on NVIDIA and ACE-Step
+claims AMD only for a foreground generation. The music model exits when the
+operation terminates. AMD-Free keeps Qwen chat and leaves AMD to the Operator.
+Music never triggers an automatic Core switch; Soul does not decide to evict a
+chat engine.
 
 No always-running small routing model is justified yet. Deterministic Ruby
 routing is faster, inspectable, and already authoritative. A specialist earns a
@@ -34,7 +36,13 @@ Read-only inspection on 2026-07-17 found:
 - Ollama and Ollama Vulkan installed but inactive and unnecessary for this
   music pilot.
 
-## Candidate assessment
+## Historical candidate assessment
+
+The following sections preserve the original NVIDIA/Python pilot rationale and
+acceptance evidence. They are not the current production topology. The accepted
+production lane is the pinned native Vulkan backend described in
+`GEMMA_AND_VULKAN_PRODUCTION_PROMOTION_BRIEF.md` and
+`MUSIC_CORE_VULKAN_FEASIBILITY_REVIEW.md`.
 
 ### Lead: ACE-Step 1.5 turbo / 2B on NVIDIA
 

@@ -165,11 +165,15 @@ end
 request = { "schema_version" => "soul.application.v1", "request_id" => "reference-analysis-a5-1", "operation" => "music.references.analysis.execute", "parameters" => { "url" => "https://youtu.be/abcDEF12345", "rights_assertion" => "analysis_only", "confirmation" => "ANALYZE_MUSIC_REFERENCE", "expected_digest" => "a" * 64 }, "context" => { "interface" => "dashboard" } }
 check.call("typed application contract exposes preview status and execution", SoulCore::ApplicationContract.validate(request)["ok"] == true && %w[music.references.status music.references.analysis.preview music.references.analysis.execute].all? { |operation| SoulCore::ApplicationContract::OPERATIONS.key?(operation) })
 
-plan_json, plan_error, plan_status = Open3.capture3(RbConfig.ruby, File.expand_path("soul-music-reference-tooling", __dir__), "plan", "--root", Dir.mktmpdir("soul-tooling-plan"))
+plan_json, plan_error, plan_status = Dir.mktmpdir("soul-tooling-plan") do |temporary|
+  Open3.capture3(RbConfig.ruby, File.expand_path("soul-music-reference-tooling", __dir__), "plan", "--root", temporary)
+end
 plan = JSON.parse(plan_json)
 check.call("optional tooling plan reuses system yt-dlp or pins a local fallback", plan_status.success? && plan_error.empty? && plan["lifecycle_state"] == "blocked_for_human_review" && %w[system local_environment].include?(plan.dig("yt_dlp", "source")) && plan.dig("packages", "essentia") == "2.1b6.dev1438" && (plan.dig("yt_dlp", "source") == "system" || plan.dig("packages", "yt-dlp") == "2026.7.4") && plan["resident_process"] == false && plan["confirmation_phrase"] == "INSTALL_MUSIC_REFERENCE_TOOLS")
 
-enrichment_json, enrichment_error, enrichment_status = Open3.capture3(RbConfig.ruby, File.expand_path("soul-music-reference-enrichment-tooling", __dir__), "plan", "--root", Dir.mktmpdir("soul-enrichment-plan"))
+enrichment_json, enrichment_error, enrichment_status = Dir.mktmpdir("soul-enrichment-plan") do |temporary|
+  Open3.capture3(RbConfig.ruby, File.expand_path("soul-music-reference-enrichment-tooling", __dir__), "plan", "--root", temporary)
+end
 enrichment_plan = JSON.parse(enrichment_json)
 check.call("rich enrichment install is pinned separate bounded and exact-gated", enrichment_status.success? && enrichment_error.empty? && enrichment_plan["lifecycle_state"] == "blocked_for_human_review" && enrichment_plan["confirmation_phrase"] == "INSTALL_MUSIC_REFERENCE_ENRICHMENT" && enrichment_plan["resident_process"] == false && enrichment_plan["system_package_mutation"] == false && enrichment_plan["models"].length == 9)
 

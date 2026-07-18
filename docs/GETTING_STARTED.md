@@ -65,10 +65,38 @@ service names; machine paths and model arguments remain in private systemd unit
 configuration. A listed service that is not installed appears unavailable and
 cannot be selected. Switching is always manual and separately confirmed.
 
-### Optional inactive AMD unit deployment
+### Recommended AMD Daily Core: Gemma through Ollama/Vulkan
 
-After separately validating an AMD Vulkan llama.cpp binary and model, preview an
-inactive user-unit installation with explicit local paths and recorded digests:
+The supported AMD profile is Gemma 4 12B Instruct Q4_K_M through the local
+Ollama-compatible service. Install Ollama and the exact reviewed model first,
+record the local executable and model digests, then preview the inactive unit:
+
+```bash
+make model-runtime-gemma-plan \
+  OLLAMA_SHA256=<recorded-ollama-sha256> \
+  GEMMA_MODEL_DIGEST=<recorded-local-model-digest>
+```
+
+After reviewing the JSON plan, repeat those inputs and add:
+
+```bash
+make model-runtime-gemma-install \
+  OLLAMA_SHA256=<recorded-ollama-sha256> \
+  GEMMA_MODEL_DIGEST=<recorded-local-model-digest> \
+  CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT
+make model-runtime-gemma-status
+```
+
+The action installs an inactive, unenabled user unit. It does not stop another
+runtime or select Gemma automatically. Use the dashboard's digest-bound runtime
+or Core switch after adding `amd-gemma` to the private profile inventory.
+
+### Legacy/custom inactive AMD llama.cpp unit
+
+The generic AMD llama.cpp deployment remains available for migration and custom
+model experiments, but it is not Soul's supported Daily Core. After separately
+validating a Vulkan binary and model, preview an inactive unit with explicit
+local paths and recorded digests:
 
 ```bash
 make model-runtime-amd-plan \
@@ -100,7 +128,8 @@ make model-runtime-amd-status
 make model-runtime-amd-uninstall CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT
 ```
 
-Removal refuses to stop an active unit. See
+Removal refuses to stop an active unit. This legacy path must not be added to a
+production profile inventory without a new model-acceptance review. See
 `docs/soul/MODEL_RUNTIME_PORTABILITY_2B_AMD_UNIT_BRIEF.md`.
 
 The llama.cpp service must expose `/slots`. The authenticated dashboard blocks unload or switching while Soul has an active provider lease, llama.cpp has an active slot, or idle state cannot be proven. See `docs/soul/AMD_VULKAN_MODEL_RUNTIME_MIGRATION.md` for the reversible AMD/NVIDIA profile design.

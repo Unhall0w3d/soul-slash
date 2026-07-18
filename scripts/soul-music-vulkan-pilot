@@ -1,0 +1,426 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "securerandom"
+require "timeout"
+require "time"
+
+class MusicVulkanPilot
+  SETUP_CONFIRMATION = "INSTALL_MUSIC_VULKAN_RUNTIME"
+  DOWNLOAD_CONFIRMATION = "DOWNLOAD_MUSIC_VULKAN_MODELS"
+  RUN_CONFIRMATION = "RUN_MUSIC_VULKAN_PILOT"
+  DURATIONS = [30, 90, 180].freeze
+  MAX_MANIFEST_BYTES = 64 * 1024
+  MAX_REQUEST_BYTES = 64 * 1024
+  MAX_LOG_BYTES = 2 * 1024 * 1024
+  MAX_LM_SEED = (2**32) - 1
+
+  def initialize(options)
+    @options = options
+    @manifest_path = File.expand_path(options.fetch(:manifest))
+    @root = File.expand_path(options.fetch(:root))
+    @manifest = load_manifest
+    @runtime = @manifest.fetch("runtime")
+    @models = @manifest.fetch("models")
+    @profile = @manifest.fetch("profile")
+    @install_dir = File.join(@root, "acestep-cpp", @runtime.fetch("revision"))
+    @models_dir = File.join(@install_dir, "models")
+    @runs_dir = File.join(@root, "vulkan-pilot-runs")
+  end
+
+  def plan
+    action = @options.fetch(:action)
+    scope = scope_for(action)
+    emit("ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "exact #{action} confirmation required",
+      "confirmation_phrase" => confirmation_for(action), "expected_digest" => digest(scope), "preview_scope" => scope)
+  rescue ArgumentError => error
+    emit("ok" => false, "lifecycle_state" => "awaiting_input", "reason" => error.message)
+    exit 2
+  end
+
+  def check
+    source_ok = installed_source?
+    binaries = %w[ace-lm ace-synth].to_h { |name| [name, binary_valid?(name)] }
+    files = @models.fetch("files").to_h { |item| [item.fetch("filename"), valid_file?(File.join(@models_dir, item.fetch("filename")), item)] }
+    emit("ok" => source_ok && binaries.values.all? && files.values.all?, "lifecycle_state" => "complete",
+      "source" => source_ok, "binaries" => binaries, "models" => files, "install_dir" => @install_dir,
+      "profile" => @profile, "persistent_process" => false)
+  end
+
+  def setup
+    authorize!("setup")
+    raise "runtime is already installed" if File.exist?(@install_dir) || File.symlink?(@install_dir)
+    require_tools!(%w[git cmake ninja g++ glslc])
+    prepare_root!
+    temporary = "#{@install_dir}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+    FileUtils.mkdir_p(File.dirname(temporary), mode: 0o700)
+    run!(["git", "clone", "--recurse-submodules", @runtime.fetch("repository"), temporary], timeout: 1_800)
+    run!(["git", "checkout", "--detach", @runtime.fetch("revision")], chdir: temporary, timeout: 120)
+    run!(["git", "submodule", "update", "--init", "--recursive"], chdir: temporary, timeout: 1_800)
+    validate_source!(temporary)
+    build = File.join(temporary, "build")
+    run!(["cmake", "-S", temporary, "-B", build, "-G", "Ninja", "-DGGML_VULKAN=ON", "-DGGML_CUDA=OFF", "-DGGML_HIP=OFF", "-DCMAKE_BUILD_TYPE=Release"], env: { "CCACHE_DISABLE" => "1" }, timeout: 300)
+    run!(["cmake", "--build", build, "--target", "ace-lm", "ace-synth", "-j", "8"], env: { "CCACHE_DISABLE" => "1" }, timeout: 1_800)
+    %w[ace-lm ace-synth].each { |name| raise "#{name} was not built" unless File.executable?(File.join(build, name)) }
+    models = File.join(temporary, "models")
+    raise "model directory is unsafe" if File.symlink?(models) || (File.exist?(models) && !File.directory?(models))
+    FileUtils.mkdir_p(models, mode: 0o700)
+    File.chmod(0o700, models)
+    File.rename(temporary, @install_dir)
+    emit("ok" => true, "lifecycle_state" => "complete", "mutation" => "music_vulkan_runtime_installed", "install_dir" => @install_dir)
+  rescue Interrupt
+    emit("ok" => false, "lifecycle_state" => "canceled", "reason" => "setup canceled")
+    exit 130
+  rescue StandardError => error
+    emit("ok" => false, "lifecycle_state" => "failed", "reason" => error.message)
+    exit 1
+  ensure
+    FileUtils.rm_rf(temporary) if defined?(temporary) && temporary && File.directory?(temporary) && within?(temporary, @root)
+  end
+
+  def download
+    authorize!("download")
+    raise "pinned runtime is not installed" unless installed_source?
+    require_tools!(%w[curl])
+    @models.fetch("files").each do |item|
+      target = File.join(@models_dir, item.fetch("filename"))
+      next if valid_file?(target, item)
+      raise "model destination is unsafe" unless within?(target, @models_dir) && !File.symlink?(target)
+      partial = "#{target}.partial-#{Process.pid}"
+      url = "https://huggingface.co/#{@models.fetch('repository')}/resolve/#{@models.fetch('revision')}/#{item.fetch('filename')}?download=true"
+      run!(["curl", "--fail", "--location", "--proto", "=https", "--proto-redir", "=https", "--retry", "2", "--connect-timeout", "20", "--max-time", "7200", "--output", partial, url], timeout: 7_230)
+      raise "downloaded model failed size or digest verification: #{item.fetch('filename')}" unless valid_file?(partial, item)
+      File.rename(partial, target)
+    ensure
+      FileUtils.rm_f(partial) if defined?(partial) && partial && File.exist?(partial)
+    end
+    emit("ok" => true, "lifecycle_state" => "complete", "mutation" => "music_vulkan_models_downloaded", "models" => @models.fetch("files").map { |item| item.fetch("filename") })
+  rescue Interrupt
+    emit("ok" => false, "lifecycle_state" => "canceled", "reason" => "download canceled")
+    exit 130
+  rescue StandardError => error
+    emit("ok" => false, "lifecycle_state" => "failed", "reason" => error.message)
+    exit 1
+  end
+
+  def run
+    authorize!("run")
+    raise "pinned runtime or models are incomplete" unless installed_source? && all_models_valid?
+    request = effective_request
+    duration = Integer(request.fetch("duration"))
+    raise "pilot duration must be exactly 30, 90, or 180 seconds" unless DURATIONS.include?(duration)
+    prepare_runs!
+    run_dir = File.join(@runs_dir, Time.now.utc.strftime("%Y%m%dT%H%M%SZ-#{duration}s-#{SecureRandom.hex(3)}"))
+    Dir.mkdir(run_dir, 0o700)
+    pilot_request = request.merge("lm_model" => "acestep-5Hz-lm-4B-Q8_0.gguf", "synth_model" => "acestep-v15-turbo-Q8_0.gguf", "output_format" => "wav16", "batch_size" => 1, "inference_steps" => 8)
+    File.write(File.join(run_dir, "request.json"), JSON.pretty_generate(pilot_request) + "\n", mode: "wx", perm: 0o600)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    log = +""
+    # The pinned upstream build emits GGML's shared libraries beside the two
+    # executables without embedding an install-time rpath. Keep resolution
+    # bounded to that verified build directory instead of modifying the host
+    # linker configuration.
+    env = {
+      "GGML_VK_VISIBLE_DEVICES" => "0",
+      "LD_LIBRARY_PATH" => runtime_library_path
+    }
+    lm_attempts = []
+    lm_seed = Integer(request.fetch("lm_seed", -1)) & MAX_LM_SEED
+    enriched = nil
+    code_health = nil
+    lm = nil
+    max_lm_attempts.times do |index|
+      attempt_number = index + 1
+      attempt_dir = File.join(run_dir, "lm-attempt-#{attempt_number}")
+      Dir.mkdir(attempt_dir, 0o700)
+      attempt_input = File.join(attempt_dir, "request.json")
+      File.write(attempt_input, JSON.pretty_generate(pilot_request.merge("lm_seed" => lm_seed)) + "\n", mode: "wx", perm: 0o600)
+      lm = run!([binary("ace-lm"), "--models", @models_dir, "--request", attempt_input], chdir: attempt_dir, env: env, timeout: 900, capture: log)
+      attempt_output = File.join(attempt_dir, "request0.json")
+      raise "ACE-Step LM did not produce exactly one enriched request" unless File.file?(attempt_output) && File.size(attempt_output).between?(1, 2 * 1024 * 1024)
+      enriched_request = JSON.parse(File.binread(attempt_output, 2 * 1024 * 1024))
+      code_health = audio_code_health(enriched_request.fetch("audio_codes"), duration)
+      lm_attempts << { "attempt" => attempt_number, "lm_seed" => lm_seed, "code_health" => code_health }
+      unless code_health.fetch("degenerate")
+        enriched = File.join(run_dir, "selected-request.json")
+        FileUtils.cp(attempt_output, enriched, preserve: false)
+        File.chmod(0o600, enriched)
+        break
+      end
+      lm_seed = next_lm_seed(lm_seed, attempt_number)
+    end
+    unless enriched
+      write_log(run_dir, "pilot.log", log)
+      emit("ok" => false, "lifecycle_state" => "blocked_for_human_review",
+        "reason" => "three consecutive LM audio-code plans degenerated; synthesis was not started",
+        "run_dir" => run_dir, "lm_attempts" => lm_attempts,
+        "retry" => { "automatic_attempts_exhausted" => true, "attempt_limit" => max_lm_attempts },
+        "persistent_process" => false)
+      return
+    end
+    synth = run!([binary("ace-synth"), "--models", @models_dir, "--vae-chunk", vae_chunk.to_s, "--request", enriched], chdir: run_dir, env: env, timeout: duration + 900, capture: log)
+    wavs = Dir.glob(File.join(run_dir, "*.wav")).select { |path| File.file?(path) && File.size(path).positive? }
+    raise "ACE-Step Vulkan pilot did not produce exactly one WAV" unless wavs.one?
+    audio = inspect_wav(wavs.first, duration)
+    write_log(run_dir, "pilot.log", log)
+    emit("ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "Vulkan pilot completed; human listening review required",
+      "run_dir" => run_dir, "wall_seconds" => (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(2),
+      "audio" => audio, "code_health" => code_health, "lm_attempts" => lm_attempts,
+      "lm_exit_status" => lm, "synth_exit_status" => synth, "persistent_process" => false)
+  rescue Interrupt
+    emit("ok" => false, "lifecycle_state" => "canceled", "reason" => "pilot canceled")
+    exit 130
+  rescue StandardError => error
+    retain_failure_log(run_dir, log) if defined?(run_dir) && defined?(log)
+    emit("ok" => false, "lifecycle_state" => "failed", "reason" => safe_text(error.message))
+    exit 1
+  end
+
+  private
+
+  def load_manifest
+    stat = File.lstat(@manifest_path)
+    raise "manifest must be a regular non-symlink file" unless stat.file? && !stat.symlink? && stat.size <= MAX_MANIFEST_BYTES
+    data = JSON.parse(File.binread(@manifest_path, MAX_MANIFEST_BYTES))
+    raise "manifest schema is invalid" unless %w[soul.music_vulkan_pilot.models.v1 soul.music_vulkan.models.v1].include?(data["schema_version"])
+    raise "manifest fields are invalid" unless data.keys.sort == %w[models profile runtime schema_version]
+    data
+  rescue Errno::ENOENT, JSON::ParserError => error
+    raise "invalid Vulkan pilot manifest: #{error.class}"
+  end
+
+  def scope_for(action)
+    case action
+    when "setup"
+      { "action" => action, "root" => @root, "runtime" => @runtime, "build_targets" => %w[ace-lm ace-synth], "persistent_service" => false }
+    when "download"
+      { "action" => action, "install_dir" => @install_dir, "models" => @models, "automatic_download" => false }
+    when "run"
+      request = effective_request
+      scope = { "action" => action, "profile" => @profile, "request_sha256" => Digest::SHA256.file(File.expand_path(@options.fetch(:request))).hexdigest,
+        "duration" => request.fetch("duration"), "foreground" => true, "persistent_process" => false }
+      scope["lm_seed_override"] = request.fetch("lm_seed") if @options.key?(:retry_lm_seed)
+      scope
+    else
+      raise ArgumentError, "action must be setup, download, or run"
+    end
+  end
+
+  def confirmation_for(action) = { "setup" => SETUP_CONFIRMATION, "download" => DOWNLOAD_CONFIRMATION, "run" => RUN_CONFIRMATION }.fetch(action)
+
+  def authorize!(action)
+    scope = scope_for(action)
+    raise "confirmation and expected digest are required" if @options[:confirmation].to_s.empty? || @options[:expected_digest].to_s.empty?
+    raise "exact #{action} confirmation did not match" unless @options[:confirmation] == confirmation_for(action)
+    raise "#{action} scope changed; preview again" unless secure_compare(@options[:expected_digest], digest(scope))
+  end
+
+  def validated_request
+    path = File.expand_path(@options.fetch(:request))
+    stat = File.lstat(path)
+    raise "pilot request must be a regular non-symlink file" unless stat.file? && !stat.symlink? && stat.size <= MAX_REQUEST_BYTES
+    data = JSON.parse(File.binread(path, MAX_REQUEST_BYTES))
+    required = %w[caption lyrics bpm keyscale timesignature language duration seed]
+    allowed = required + %w[lm_seed]
+    raise "pilot request fields are invalid" unless data.is_a?(Hash) && (required - data.keys).empty? && (data.keys - allowed).empty?
+    raise "caption is required" unless data["caption"].is_a?(String) && !data["caption"].strip.empty? && data["caption"].bytesize <= 8_000
+    raise "lyrics are invalid" unless data["lyrics"].is_a?(String) && data["lyrics"].bytesize <= 20_000
+    Integer(data.fetch("bpm")); Integer(data.fetch("duration")); Integer(data.fetch("seed"))
+    Integer(data["lm_seed"]) if data.key?("lm_seed")
+    data
+  rescue Errno::ENOENT, JSON::ParserError, KeyError, ArgumentError, TypeError => error
+    raise "invalid pilot request: #{error.message}"
+  end
+
+  def effective_request
+    data = validated_request
+    return data unless @options.key?(:retry_lm_seed)
+    seed = Integer(@options.fetch(:retry_lm_seed))
+    raise "retry LM seed must be an unsigned 32-bit integer" unless seed.between?(0, MAX_LM_SEED)
+    raise "retry LM seed must differ from the prior LM seed" if data["lm_seed"] == seed
+    data.merge("lm_seed" => seed)
+  rescue ArgumentError, TypeError => error
+    raise "invalid retry LM seed: #{error.message}"
+  end
+
+  def validate_source!(directory)
+    revision = run!(["git", "rev-parse", "HEAD"], chdir: directory, timeout: 20, output: true).strip
+    raise "runtime revision mismatch" unless revision == @runtime.fetch("revision")
+    @runtime.fetch("submodules").each do |path, expected|
+      actual = run!(["git", "-C", path, "rev-parse", "HEAD"], chdir: directory, timeout: 20, output: true).strip
+      raise "submodule revision mismatch: #{path}" unless actual == expected
+    end
+  end
+
+  def installed_source?
+    return false unless File.directory?(@install_dir) && !File.symlink?(@install_dir)
+    validate_source!(@install_dir)
+    true
+  rescue StandardError
+    false
+  end
+
+  def binary(name) = File.join(@install_dir, "build", name)
+  def vae_chunk
+    value = Integer(@profile.fetch("vae_chunk"))
+    raise "VAE chunk must be between 64 and 1024 latent frames" unless value.between?(64, 1024)
+    value
+  end
+
+  def max_lm_attempts
+    value = Integer(@profile.fetch("max_lm_attempts"))
+    raise "LM attempt limit must be exactly 3" unless value == 3
+    value
+  end
+
+  def runtime_library_path
+    build = File.join(@install_dir, "build")
+    existing = ENV.fetch("LD_LIBRARY_PATH", "").split(File::PATH_SEPARATOR).reject(&:empty?)
+    ([build] + existing).uniq.join(File::PATH_SEPARATOR)
+  end
+  def binary_valid?(name) = File.executable?(binary(name)) && !File.symlink?(binary(name))
+  def valid_file?(path, item) = File.file?(path) && !File.symlink?(path) && File.size(path) == Integer(item.fetch("bytes")) && Digest::SHA256.file(path).hexdigest == item.fetch("sha256")
+  def all_models_valid? = @models.fetch("files").all? { |item| valid_file?(File.join(@models_dir, item.fetch("filename")), item) }
+
+  def audio_code_health(value, duration)
+    codes = value.to_s.split(",").map { |item| Integer(item, 10) }
+    raise "LM audio-code plan is empty" if codes.empty?
+    raise "LM audio-code plan contains an out-of-range token" unless codes.all? { |code| code.between?(0, 65_535) }
+    unique_ratio = codes.uniq.length.fdiv(codes.length)
+    adjacent_repeats = codes.each_cons(2).count { |left, right| left == right }
+    adjacent_ratio = adjacent_repeats.fdiv([codes.length - 1, 1].max)
+    dominant_ratio = codes.tally.values.max.fdiv(codes.length)
+    expected_codes = (Float(duration) * 5).round
+    count_delta_ratio = (codes.length - expected_codes).abs.fdiv([expected_codes, 1].max)
+    degenerate = (unique_ratio < 0.25 && adjacent_ratio > 0.50) || dominant_ratio > 0.60 || count_delta_ratio > 0.05
+    {
+      "degenerate" => degenerate, "code_count" => codes.length, "expected_code_count" => expected_codes,
+      "unique_ratio" => unique_ratio.round(4), "adjacent_repeat_ratio" => adjacent_ratio.round(4),
+      "dominant_code_ratio" => dominant_ratio.round(4), "count_delta_ratio" => count_delta_ratio.round(4),
+      "policy" => { "minimum_unique_ratio_when_high_repetition" => 0.25,
+        "maximum_adjacent_repeat_ratio" => 0.50, "maximum_dominant_code_ratio" => 0.60,
+        "maximum_count_delta_ratio" => 0.05 }
+    }
+  rescue ArgumentError
+    raise "LM audio-code plan is malformed"
+  end
+
+  def next_lm_seed(current, attempt_number)
+    request_digest = Digest::SHA256.file(File.expand_path(@options.fetch(:request))).hexdigest
+    candidate = Digest::SHA256.hexdigest("#{current}:#{request_digest}:retry:#{attempt_number}")[0, 8].to_i(16)
+    candidate = (candidate + 1) & MAX_LM_SEED if candidate == current
+    candidate
+  end
+
+  def write_log(run_dir, filename, log)
+    File.write(File.join(run_dir, filename), safe_text(log.byteslice(0, MAX_LOG_BYTES)), mode: "wx", perm: 0o600)
+  end
+
+  def retain_failure_log(run_dir, log)
+    return unless run_dir && within?(run_dir, @runs_dir) && File.directory?(run_dir) && log
+    path = File.join(run_dir, "pilot.failed.log")
+    File.write(path, safe_text(log.byteslice(0, MAX_LOG_BYTES)), mode: "wx", perm: 0o600) unless File.exist?(path)
+  rescue StandardError
+    nil
+  end
+
+  def safe_text(value) = value.to_s.dup.force_encoding(Encoding::UTF_8).scrub
+
+  def run!(command, chdir: nil, env: {}, timeout:, capture: nil, output: false)
+    stdout = +""; stderr = +""; status = nil
+    options = { pgroup: true }; options[:chdir] = chdir if chdir
+    Open3.popen3(env, *command, **options) do |stdin, out, err, wait|
+      stdin.close
+      readers = [[out, stdout], [err, stderr]].map do |io, buffer|
+        Thread.new do
+          loop do
+            chunk = io.readpartial(16 * 1024)
+            remaining = MAX_LOG_BYTES - buffer.bytesize
+            buffer << chunk.byteslice(0, remaining) if remaining.positive?
+          end
+        rescue EOFError, IOError
+          nil
+        end
+      end
+      previous = Signal.trap("INT") { Process.kill("TERM", -wait.pid) rescue nil }
+      unless wait.join(timeout)
+        Process.kill("TERM", -wait.pid) rescue nil
+        wait.join(5) || (Process.kill("KILL", -wait.pid) rescue nil)
+      end
+      readers.each { |thread| thread.join(2) || thread.kill }
+      status = wait.value
+      Signal.trap("INT", previous)
+    end
+    if capture
+      combined = safe_text(stdout) + safe_text(stderr)
+      remaining = MAX_LOG_BYTES - capture.bytesize
+      capture << combined.byteslice(0, remaining) if remaining.positive?
+    end
+    raise "command failed (#{File.basename(command.first)}): #{safe_text(stderr).lines.last(8).join.strip}" unless status.success?
+    output ? stdout : status.exitstatus
+  end
+
+  def inspect_wav(path, expected_duration)
+    probe, status = Open3.capture2("ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_name,sample_rate,channels", "-of", "json", path)
+    raise "WAV probe failed" unless status.success?
+    data = JSON.parse(probe); stream = Array(data["streams"]).find { |item| item["codec_name"].to_s.start_with?("pcm_") }
+    duration = Float(data.dig("format", "duration"))
+    raise "WAV format is invalid" unless stream && Integer(stream["sample_rate"]) == 48_000 && Integer(stream["channels"]) == 2
+    raise "WAV duration is outside tolerance" if (duration - expected_duration).abs > 2.0
+    { "path" => path, "bytes" => File.size(path), "sha256" => Digest::SHA256.file(path).hexdigest, "duration_seconds" => duration, "sample_rate" => 48_000, "channels" => 2 }
+  end
+
+  def prepare_root!
+    raise "runtime root must be an absolute user-local path" unless @root.start_with?(File.join(Dir.home, ".local", "share", "soul", "music") + File::SEPARATOR) || @root == File.join(Dir.home, ".local", "share", "soul", "music")
+    FileUtils.mkdir_p(@root, mode: 0o700)
+    raise "runtime root must not be a symlink" if File.symlink?(@root)
+  end
+
+  def prepare_runs!
+    prepare_root!
+    FileUtils.mkdir_p(@runs_dir, mode: 0o700)
+    raise "pilot runs directory must not be a symlink" if File.symlink?(@runs_dir)
+  end
+
+  def require_tools!(tools)
+    missing = tools.reject { |tool| ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |directory| File.executable?(File.join(directory, tool)) } }
+    raise "required tools are missing: #{missing.join(', ')}" unless missing.empty?
+  end
+
+  def within?(path, parent) = path == parent || path.start_with?(parent + File::SEPARATOR)
+  def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))
+  def secure_compare(left, right) = left.to_s.bytesize == right.bytesize && left.to_s.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
+  def emit(data) = puts(JSON.pretty_generate(data))
+end
+
+if $PROGRAM_NAME == __FILE__
+  options = {
+    manifest: File.expand_path("../config/music_vulkan_models.json", __dir__),
+    root: File.join(Dir.home, ".local", "share", "soul", "music"),
+    action: "setup"
+  }
+  OptionParser.new do |parser|
+    parser.on("--manifest PATH") { |value| options[:manifest] = value }
+    parser.on("--root PATH") { |value| options[:root] = value }
+    parser.on("--action ACTION") { |value| options[:action] = value }
+    parser.on("--request PATH") { |value| options[:request] = value }
+    parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+    parser.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+    parser.on("--retry-lm-seed INTEGER") { |value| options[:retry_lm_seed] = value }
+  end.parse!
+
+  pilot = MusicVulkanPilot.new(options)
+  case ARGV.shift || "check"
+  when "plan" then pilot.plan
+  when "check" then pilot.check
+  when "setup" then pilot.setup
+  when "download" then pilot.download
+  when "run" then pilot.run
+  else abort "usage: soul-music-vulkan-pilot [plan|check|setup|download|run] [options]"
+  end
+end

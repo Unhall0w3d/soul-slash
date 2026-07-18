@@ -1,0 +1,30 @@
+{
+  "schema_version": "soul.music_vulkan.models.v1",
+  "runtime": {
+    "repository": "https://github.com/ServeurpersoCom/acestep.cpp.git",
+    "revision": "7eb27775fd110a8b2503ac089aedcc02416caa0a",
+    "submodules": { "ggml": "9e2947f17583acc2f657a77c29b6593ca0fbc6c4" },
+    "build": "vulkan"
+  },
+  "models": {
+    "repository": "Serveurperso/ACE-Step-1.5-GGUF",
+    "revision": "9b3707625776cc4cf775e9b12ab82f9fe48335ff",
+    "files": [
+      { "filename": "Qwen3-Embedding-0.6B-Q8_0.gguf", "bytes": 784144960, "sha256": "972f23255e46adfe744a0eb9a0039f3c63988f65753b0968d776e8b27168c321" },
+      { "filename": "acestep-5Hz-lm-4B-Q8_0.gguf", "bytes": 4457323648, "sha256": "972f91147a167f0c041f1b158d67985a82c0f6a852e68cdf70e46030cf08b1bc" },
+      { "filename": "acestep-v15-turbo-Q8_0.gguf", "bytes": 2549528000, "sha256": "288f708a61cfc241013a98a62f98ba331f83fe34d0d3559acdd9b0f6a2f7cd6b" },
+      { "filename": "vae-BF16.gguf", "bytes": 337420928, "sha256": "0599862ac5d15cd308e1d2e368373aea6c02e25ebd1737ad4a4562a0901b0ef8" }
+    ]
+  },
+  "profile": {
+    "id": "ace-step-vulkan-4b",
+    "label": "ACE-Step 1.5 4B LM / 2B Turbo Q8_0",
+    "accelerator": "AMD Vulkan",
+    "durations": [30, 90, 180],
+    "batch_size": 1,
+    "inference_steps": 8,
+    "vae_chunk": 256,
+    "max_lm_attempts": 3,
+    "offload": false
+  }
+}
