@@ -299,7 +299,7 @@ async function createChat() {
 
 function musicProjectInput() {
   const vocalMode = byId("music-vocal-mode").value;
-  return { title: byId("music-title").value, intent: byId("music-intent").value, target_duration_seconds: Number(byId("music-duration").value), vocal_mode: vocalMode, rights_status: byId("music-rights").value, caption: byId("music-caption").value, lyrics: vocalMode === "instrumental" ? "" : byId("music-lyrics").value, bpm: Number(byId("music-bpm").value), keyscale: byId("music-key").value, timesignature: byId("music-time").value, language: "en", seed: Number(byId("music-seed").value) };
+  return { title: byId("music-title").value, intent: byId("music-intent").value, target_duration_seconds: Number(byId("music-duration").value), vocal_mode: vocalMode, rights_status: byId("music-rights").value, caption: byId("music-caption").value, lyrics: byId("music-lyrics").value, bpm: Number(byId("music-bpm").value), keyscale: byId("music-key").value, timesignature: byId("music-time").value, language: "en", seed: Number(byId("music-seed").value) };
 }
 
 async function loadMusicStudio() {

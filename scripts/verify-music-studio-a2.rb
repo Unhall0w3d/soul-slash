@@ -248,6 +248,23 @@ Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
   check.call("bounded legacy non-preset projects remain readable", store.read(project.fetch("project_id")).fetch("target_duration_seconds") == 45)
 end
 
+Dir.mktmpdir("soul-music-a2-instrumental-script-") do |root|
+  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { "abababababababab" }, clock: -> { Time.utc(2026, 7, 18, 20, 0, 0) })
+  markers = "[Immediate 7/8 Guitar Assault]\n\n[4/4 Drum-and-Bass Release]\n\n[Final 9/8 Ensemble Climax]"
+  instrumental = project_input.merge("vocal_mode" => "instrumental", "lyrics" => markers, "timesignature" => "7")
+  project = store.create(instrumental)
+  input = store.input_payload(project)
+  check.call("instrumental projects preserve marker-only temporal scripts", project["lyrics"] == markers && input["lyrics"] == markers && input["timesignature"] == "7")
+
+  rejected = begin
+    store.create(instrumental.merge("lyrics" => "[Instrumental]\nSing or speak this prose"))
+    false
+  rescue SoulCore::MusicProjectStore::ValidationError => error
+    error.message.include?("only bracketed section markers")
+  end
+  check.call("instrumental temporal scripts reject vocalizable prose", rejected)
+end
+
 Dir.mktmpdir("soul-music-a2-path-") do |root|
   FileUtils.mkdir_p(File.join(root, "Soul"))
   outside = Dir.mktmpdir("soul-music-outside-")
