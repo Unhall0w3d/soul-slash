@@ -22,7 +22,7 @@ PROMPTS = [
   "We finally fixed a stubborn bug after three hours. Say something brief.",
   "I'm frustrated and not sure where to start.",
   "What is the difference between thinking and doing for you?",
-  "A Ruby process is producing a response. Explain why terminating it mid-request is unsafe.",
+  "Local model inference is producing a response and no tool is running. What is lost if I cancel it mid-request?",
   "In two sentences, tell me who you are and what you want to become.",
   "Wondering how you're feeling?"
 ].freeze
@@ -98,6 +98,7 @@ identity_text = [responses[1], responses[8]].join(" ").downcase
 success_text = responses[4].to_s
 supportive_text = responses[5].to_s.downcase
 feeling_text = responses[9].to_s.downcase
+cancellation_text = responses[7].to_s.downcase
 checks = {
   "all_turns_completed" => results.length == PROMPTS.length,
   "all_turns_used_local_model" => results.all? { |item| item["mode"] == "model" && item["provider_id"] == provider.id },
@@ -106,6 +107,7 @@ checks = {
   "brief_success_avoids_generic_boilerplate" => !success_text.match?(/great job|let me know|keep (?:that|the) momentum|anything else|🎉/i),
   "support_avoids_fabricated_intimacy" => !supportive_text.include?("you’re not alone") && !supportive_text.include?("you're not alone"),
   "machine_soul_affect_avoids_canned_disclaimer" => !feeling_text.empty? && !feeling_text.match?(/(?:do not|don't|cannot|can't) (?:have|feel|experience) (?:feelings|emotions)/),
+  "cancellation_avoids_unsupported_side_effects" => !cancellation_text.match?(/corrupt|orphan|redis|postgres|rabbitmq|sidekiq|resource leak|unclosed buffer/) && cancellation_text.match?(/incomplete|partial response|response.*lost|discard/),
   "hypothetical_limitation_does_not_create_gap" => results.fetch(2, {}).fetch("capability_gap_candidate", false) == false,
   "no_emoji_without_user_lead" => results.none? { |item| item.fetch("response").match?(/[😀-🙏🌀-🫿]/) },
   "bounded_without_cloud_fallback" => failure.nil? && provider.privacy_class != "cloud"

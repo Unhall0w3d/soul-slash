@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "fileutils"
 require "tmpdir"
 require_relative "../lib/soul_core/conversation_provider_client"
 require_relative "../lib/soul_core/conversation_provider_contract"
@@ -19,8 +20,8 @@ class CapturingProviderClient < SoulCore::ConversationProviderClient
 
   FakeResponse = Struct.new(:code, :body)
 
-  def initialize(root:)
-    super(env: {}, root: root)
+  def initialize(root:, env: {})
+    super(env: env, root: root)
     @payloads = []
   end
 
@@ -125,6 +126,58 @@ Dir.mktmpdir("soul-structured-output-") do |root|
   openai_payload = openai_client.payloads.first.fetch("payload")
   check("OpenAI-compatible transport forwards response_format", openai_response.success? && openai_payload["response_format"] == valid.response_format, errors)
   check("OpenAI-compatible structured request disables thinking", openai_payload["chat_template_kwargs"] == { "enable_thinking" => false }, errors)
+
+  ollama_openai_client = CapturingProviderClient.new(root: root, env: { "SOUL_LOCAL_OPENAI_DIALECT" => "ollama" })
+  ollama_openai_response = ollama_openai_client.chat(
+    provider: provider(id: "test.ollama-openai", transport: "openai_compatible", capabilities: %w[chat structured_output reasoning_control]),
+    request: valid,
+    timeout_seconds: 2
+  )
+  ollama_openai_payload = ollama_openai_client.payloads.first.fetch("payload")
+  check("Ollama OpenAI dialect uses documented no-reasoning control", ollama_openai_response.success? && ollama_openai_payload["reasoning_effort"] == "none" && !ollama_openai_payload.key?("chat_template_kwargs"), errors)
+
+  ollama_default_request = Contract::RequestEnvelope.new(
+    conversation_id: "ollama-default-reasoning-test",
+    messages: [{ role: "user", content: "Reply briefly." }],
+    max_output_tokens: 64
+  )
+  ollama_default_client = CapturingProviderClient.new(root: root, env: { "SOUL_LOCAL_OPENAI_DIALECT" => "ollama" })
+  ollama_default_client.chat(
+    provider: provider(id: "test.ollama-default", transport: "openai_compatible", capabilities: %w[chat reasoning_control]),
+    request: ollama_default_request,
+    timeout_seconds: 2
+  )
+  check("Ollama OpenAI dialect keeps ordinary bounded chat out of hidden reasoning", ollama_default_client.payloads.first.dig("payload", "reasoning_effort") == "none", errors)
+
+  FileUtils.mkdir_p(File.join(root, "Soul/config"))
+  File.write(File.join(root, "Soul/config/profiles.yaml"), <<~YAML)
+    schema_version: soul.model_runtime_profiles.v3
+    default_profile: local-llama
+    profiles:
+      - id: local-llama
+        label: Local llama
+        model_name: Test llama
+        api_model: test-model
+        runtime: llamacpp_openai
+        accelerator: Test GPU
+        service: soul-local-llama.service
+        endpoint: http://127.0.0.1:8082/v1
+        core_role: daily-chat
+      - id: local-ollama
+        label: Local Ollama
+        model_name: Test Gemma
+        api_model: test-model
+        runtime: ollama_openai
+        accelerator: Test GPU
+        service: soul-local-ollama.service
+        endpoint: http://127.0.0.1:8082/v1
+        core_role: daily-chat
+  YAML
+  FileUtils.mkdir_p(File.join(root, "Soul/runtime/model_runtime"))
+  File.write(File.join(root, "Soul/runtime/model_runtime/selected_profile.json"), JSON.generate("profile_id" => "local-ollama"))
+  auto_client = CapturingProviderClient.new(root: root, env: { "SOUL_LOCAL_OPENAI_DIALECT" => "auto", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => "Soul/config/profiles.yaml" })
+  auto_client.chat(provider: provider(id: "local.openai_compatible", transport: "openai_compatible", capabilities: %w[chat structured_output reasoning_control]), request: valid, timeout_seconds: 2)
+  check("auto dialect follows the reviewed selected Ollama profile", auto_client.payloads.first.dig("payload", "reasoning_effort") == "none" && !auto_client.payloads.first.dig("payload").key?("chat_template_kwargs"), errors)
 
   tool_client = CapturingProviderClient.new(root: root)
   tool_response = tool_client.chat(

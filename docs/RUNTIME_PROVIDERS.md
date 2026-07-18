@@ -97,6 +97,43 @@ make setup-ollama
 
 The setup script checks whether the model exists locally and runs `ollama pull` only if needed.
 
+## Manually selected mixed-runtime profiles
+
+An ignored project-local v3 inventory may expose llama.cpp and Ollama profiles
+through the same loopback OpenAI endpoint and stable API alias. Each record
+declares its runtime, actual model name, API model, accelerator, user service,
+endpoint, and Core role. Copy and adapt:
+
+```text
+Soul/config/model_runtime_profiles.example.yaml
+```
+
+Then set:
+
+```text
+SOUL_MODEL_RUNTIME_PROFILES_FILE=Soul/config/model_runtime_profiles.local.yaml
+SOUL_LOCAL_OPENAI_DIALECT=auto
+```
+
+`auto` follows only the reviewed selected-profile record. It does not inspect
+the network, choose a model, switch a service, or provide automatic failover.
+llama.cpp idleness is checked through `/slots`; Ollama service health and model
+residency are reported separately through `/api/tags` and `/api/ps`. Soul's
+active lease store remains authoritative for in-process work in both cases.
+
+The optional Gemma/Ollama deployment commands create only a static, inactive,
+unenabled loopback user unit:
+
+```bash
+make model-runtime-gemma-plan OLLAMA_SHA256=... GEMMA_MODEL_DIGEST=...
+make model-runtime-gemma-install OLLAMA_SHA256=... GEMMA_MODEL_DIGEST=... \
+  CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT
+make model-runtime-gemma-status
+```
+
+Installation does not start, enable, select, or make Gemma the default Core.
+Runtime changes still use the authenticated dashboard preview/digest gate.
+
 ## Environment variables
 
 Soul/ should read local runtime settings from `.env` when present.

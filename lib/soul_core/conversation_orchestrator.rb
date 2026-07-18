@@ -74,6 +74,7 @@ module SoulCore
     ].freeze
     LOOKUP_EXCLUSIONS = /\b(?:current|currently|latest|today|recent|compare|comparison|difference|relationship|versus|research|sources?|citations?|documentation|proposal|script|code|artifact|report|create|build|write|implement|troubleshoot|security|medical|legal|financial|Soul|yourself)\b/i
     LOOKUP_SELF_REFERENCE = /(?:\b(?:what|who)\s+(?:is|are)\s+you\b|\btell me about your\b|\b(?:for|to) you\b|\byour\b)/i
+    LOOKUP_CONVERSATION_REFERENCE = /\b(?:codename|synthetic project|this (?:conversation|discussion|thread)|our (?:project|conversation|discussion|thread)|we (?:are|were|have|using))\b/i
     RESEARCH_DELIVERABLE = /\b(?:proposal|script|code|artifact|report|file|document)\b/i
 
     INTEREST_CONTROL_PATTERNS = [
@@ -370,6 +371,7 @@ module SoulCore
     def lookup_candidate?(text)
       return false if text.match?(LOOKUP_EXCLUSIONS)
       return false if text.match?(LOOKUP_SELF_REFERENCE)
+      return false if text.match?(LOOKUP_CONVERSATION_REFERENCE)
 
       LOOKUP_PATTERNS.any? { |pattern| text.match?(pattern) }
     end

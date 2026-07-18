@@ -157,7 +157,7 @@ module SoulCore
       when "inbox.deliver" then domain(workspace.deliver(artifact_id: required(parameters, "artifact_id"), chat_id: required(parameters, "chat_id")))
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
-      when "system_status.refresh" then [status_collector.collect, "complete", "none", false]
+      when "system_status.refresh" then [collect_system_status, "complete", "none", false]
       when "model_runtime.status" then domain(model_runtime_control.status)
       when "model_runtime.load.preview" then domain(model_runtime_control.preview(action: "load", profile_id: parameters["profile_id"]))
       when "model_runtime.load.execute" then domain(model_runtime_control.execute(action: "load", profile_id: parameters["profile_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -491,6 +491,33 @@ module SoulCore
 
     def status_collector
       @status_collector ||= HostSystemStatusCollector.new
+    end
+
+    def collect_system_status
+      host = status_collector.collect
+      begin
+        runtime_envelope = model_runtime_control.status
+        runtime = runtime_envelope.fetch("data", {})
+        music = music_generation.resource_inventory
+        host.merge(
+          "core" => {
+            "mode" => "daily",
+            "role" => runtime["core_role"] || "daily-chat",
+            "chat_engine" => {
+              "profile" => runtime["profile"],
+              "model" => runtime["model_name"],
+              "runtime" => runtime["runtime"],
+              "accelerator" => runtime["accelerator"],
+              "service_state" => runtime["service_state"],
+              "model_resident" => runtime.dig("server", "model_resident")
+            }.compact,
+            "music_engine" => music.fetch("engine", {}),
+            "runtime_status" => runtime_envelope.fetch("lifecycle_state", "unknown")
+          }
+        )
+      rescue StandardError => error
+        host.merge("core" => { "mode" => "daily", "runtime_status" => "unavailable", "reason" => error.class.name })
+      end
     end
 
     def model_runtime_control

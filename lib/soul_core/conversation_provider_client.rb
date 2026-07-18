@@ -5,6 +5,7 @@ require "net/http"
 require "uri"
 require_relative "conversation_provider_contract"
 require_relative "model_runtime_lease_store"
+require_relative "model_runtime_profile_registry"
 
 module SoulCore
   class ConversationProviderClient
@@ -12,6 +13,7 @@ module SoulCore
 
     def initialize(env: ENV, root: Dir.pwd, lease_store: nil)
       @env = env
+      @root = File.expand_path(root)
       @lease_store = lease_store || ModelRuntimeLeaseStore.new(root: root)
     end
 
@@ -119,7 +121,9 @@ module SoulCore
       payload["tool_choice"] = request.tool_choice if request.tool_choice
       payload["parallel_tool_calls"] = false if request.tool_choice == "required"
       payload["response_format"] = request.response_format if request.response_format
-      if request.reasoning_mode == "disabled"
+      if %w[local_only local_network].include?(provider.privacy_class) && local_openai_dialect == "ollama"
+        payload["reasoning_effort"] = "none"
+      elsif request.reasoning_mode == "disabled"
         payload["chat_template_kwargs"] = { "enable_thinking" => false }
       end
 
@@ -146,6 +150,16 @@ module SoulCore
           "response_object" => data["object"]
         }
       )
+    end
+
+    def local_openai_dialect
+      configured = @env["SOUL_LOCAL_OPENAI_DIALECT"].to_s
+      return configured unless configured == "auto"
+
+      profile = ModelRuntimeProfileRegistry.new(root: @root, env: @env).selected_profile
+      profile.fetch("runtime") == "ollama_openai" ? "ollama" : "llamacpp"
+    rescue ModelRuntimeProfileRegistry::ConfigurationError
+      "llamacpp"
     end
 
     def ollama_chat(provider, request, timeout_seconds)

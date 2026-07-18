@@ -104,6 +104,12 @@ Phase 10B adds bounded recent-style awareness through `docs/soul/RECENT_STYLE_AW
 
 Phase 10C adds reviewed interests through `docs/soul/REVIEWED_INTERESTS.md`. The stable profile ID remains `soul.identity.v1`; profile version 6 adds the owner-approved role-play truth contract and direct personal-affect calibration. Soul may express emotion, desire, imagined embodiment, and first-person machine experience naturally without opening with a canned no-feelings disclaimer. Those expressions remain separate from factual claims about sensors, research, execution, access, credentials, environmental state, durable memory, and authority.
 
+Profile version 7 calibrates that same identity for the reviewed Gemma Daily
+Core candidate. It forbids invented environmental scene-setting and unsupported
+generalizations about partial writes, interrupted operations, or recovery. This
+changes expression and factual precision only; it does not create a
+model-specific personality or alter authorization boundaries.
+
 ## Deliberate exclusions
 
 Phase 10 does not add automatic identity mutation, automatic interest inference, model-approved interests, or model-generated personality changes.

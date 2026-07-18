@@ -33,7 +33,6 @@ module SoulCore
 
     def status
       return unavailable("model runtime control is disabled") unless enabled?
-      return unavailable("model runtime slots URL must be loopback HTTP") unless slots_uri
 
       configuration
       @lease_store.with_control_lock { success(status_unlocked) }
@@ -49,7 +48,6 @@ module SoulCore
       normalized = normalize_action(action)
       return normalized if normalized.is_a?(Hash)
       return unavailable("model runtime control is disabled") unless enabled?
-      return unavailable("model runtime slots URL must be loopback HTTP") unless slots_uri
 
       configuration
       @lease_store.with_control_lock do
@@ -83,7 +81,6 @@ module SoulCore
       return normalized if normalized.is_a?(Hash)
       return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return unavailable("model runtime control is disabled") unless enabled?
-      return unavailable("model runtime slots URL must be loopback HTTP") unless slots_uri
 
       configuration
       @lease_store.with_control_lock do
@@ -172,10 +169,10 @@ module SoulCore
       conflict = active.length > 1
       uncertain_units = profiles.any? { |profile| profile.fetch("service_state") == "unknown" }
       leases = @lease_store.active_leases_unlocked
-      server = active.one? ? observe_server : offline_server
+      server = active.one? ? observe_server(active.first) : offline_server
       server_processing = [server.fetch("active_slots", 0), server.fetch("processing_requests", 0)].max
       active_work = leases.length + server_processing + server.fetch("deferred_requests", 0)
-      idle_certain = active.one? && !uncertain_units && server["slots_reachable"] && active_work.zero?
+      idle_certain = active.one? && !uncertain_units && server["idle_observable"] && active_work.zero?
 
       projection = base_projection(current).merge(
         "profiles" => profiles.map { |profile| public_profile(profile, nil, selected_id: selected_id, active_ids: active.map { |item| item.fetch("id") }) },
@@ -246,7 +243,7 @@ module SoulCore
 
     def idle_blocker(observation)
       return "active model work must complete or be canceled before the runtime changes" unless observation["active_work_count"].zero?
-      return "llama.cpp slots state is unavailable; safe idle state cannot be established" unless observation["idle_certain"]
+      return "runtime activity state is unavailable; safe idle state cannot be established" unless observation["idle_certain"]
 
       nil
     end
@@ -283,7 +280,11 @@ module SoulCore
         "id" => profile.fetch("id"),
         "label" => profile.fetch("label"),
         "model_name" => profile.fetch("model_name"),
+        "api_model" => profile.fetch("api_model"),
+        "runtime" => profile.fetch("runtime"),
         "accelerator" => profile.fetch("accelerator"),
+        "endpoint" => profile.fetch("endpoint"),
+        "core_role" => profile.fetch("core_role"),
         "service" => profile.fetch("service"),
         "service_state" => profile["service_state"] || observation&.fetch("profiles", [])&.find { |item| item["id"] == profile["id"] }&.fetch("service_state", "unknown") || "unknown",
         "selected" => selected_id == profile.fetch("id"),
@@ -338,12 +339,17 @@ module SoulCore
       }
     end
 
-    def observe_server
-      slots = parse_slots(@http_get.call(slots_uri))
-      metrics = parse_metrics(@http_get.call(metrics_uri))
-      health = parse_health(@http_get.call(health_uri))
+    def observe_server(profile)
+      return observe_ollama_server(profile) if profile.fetch("runtime") == "ollama_openai"
+
+      slots = parse_slots(@http_get.call(profile_uri(profile, "/slots")))
+      metrics = parse_metrics(@http_get.call(profile_uri(profile, "/metrics")))
+      health = parse_health(@http_get.call(profile_uri(profile, "/health")))
       {
+        "runtime" => profile.fetch("runtime"),
+        "endpoint" => profile.fetch("endpoint"),
         "slots_reachable" => !slots.nil?,
+        "idle_observable" => !slots.nil?,
         "health" => health,
         "total_slots" => slots&.length,
         "active_slots" => slots ? slots.count { |slot| slot["is_processing"] == true } : 0,
@@ -353,9 +359,60 @@ module SoulCore
       }
     end
 
+    def observe_ollama_server(profile)
+      tags_response = @http_get.call(profile_uri(profile, "/api/tags"))
+      ps_response = @http_get.call(profile_uri(profile, "/api/ps"))
+      tags = parse_ollama_models(tags_response)
+      resident = parse_ollama_models(ps_response)
+      target = profile.fetch("api_model")
+      {
+        "runtime" => profile.fetch("runtime"),
+        "endpoint" => profile.fetch("endpoint"),
+        "slots_reachable" => false,
+        "idle_observable" => !resident.nil?,
+        "health" => tags.nil? ? "unreachable" : "ready",
+        "total_slots" => nil,
+        "active_slots" => 0,
+        "processing_requests" => 0,
+        "deferred_requests" => 0,
+        "metrics_available" => false,
+        "available_models" => tags || [],
+        "resident_models" => resident || [],
+        "model_available" => !tags.nil? && tags.any? { |model| ollama_model_matches?(model, target) },
+        "model_resident" => !resident.nil? && resident.any? { |model| ollama_model_matches?(model, target) }
+      }
+    end
+
+    def ollama_model_matches?(model, target)
+      candidates = [model["name"], model["model"]].compact
+      candidates.include?(target) || (!target.include?(":") && candidates.include?("#{target}:latest"))
+    end
+
     def offline_server
-      { "slots_reachable" => false, "health" => "offline", "total_slots" => 0, "active_slots" => 0,
+      { "runtime" => nil, "endpoint" => nil, "slots_reachable" => false, "idle_observable" => false,
+        "health" => "offline", "total_slots" => 0, "active_slots" => 0,
         "processing_requests" => 0, "deferred_requests" => 0, "metrics_available" => false }
+    end
+
+    def parse_ollama_models(response)
+      return nil unless response && response.fetch(:status, 0).between?(200, 299)
+
+      value = JSON.parse(response.fetch(:body))
+      rows = value["models"]
+      return nil unless rows.is_a?(Array) && rows.length <= 128
+
+      rows.filter_map do |row|
+        next unless row.is_a?(Hash)
+
+        name = row["name"].to_s.slice(0, 160)
+        model = row["model"].to_s.slice(0, 160)
+        digest = row["digest"].to_s.slice(0, 128)
+        next if name.empty? && model.empty?
+
+        { "name" => name, "model" => model, "digest" => digest }.reject { |_key, item| item.empty? }
+      end
+    rescue JSON::ParserError, KeyError
+      nil
     end
 
     def parse_slots(response)
@@ -458,10 +515,12 @@ module SoulCore
         "profile_label" => profile&.fetch("label", nil),
         "model" => profile&.fetch("model_name", nil),
         "model_name" => profile&.fetch("model_name", nil),
+        "api_model" => profile&.fetch("api_model", nil),
+        "runtime" => profile&.fetch("runtime", nil),
         "accelerator" => profile&.fetch("accelerator", nil),
-        "api_alias" => model,
-        "provider_endpoint" => @env["SOUL_LOCAL_OPENAI_BASE_URL"],
-        "slots_url" => slots_uri&.to_s,
+        "api_alias" => profile&.fetch("api_model", nil) || model,
+        "provider_endpoint" => profile&.fetch("endpoint", nil) || @env["SOUL_LOCAL_OPENAI_BASE_URL"],
+        "core_role" => profile&.fetch("core_role", nil),
         "manual_only" => true,
         "multi_profile" => configuration.fetch("multi_profile")
       }
@@ -488,23 +547,11 @@ module SoulCore
       (@env["SOUL_LOCAL_OPENAI_MODEL"] || @env["SOUL_MODEL_ALIAS"]).to_s.slice(0, 160)
     end
 
-    def slots_uri
-      @slots_uri ||= loopback_uri(@env["SOUL_MODEL_RUNTIME_SLOTS_URL"], required_path: "/slots")
-    end
-
-    def metrics_uri
-      replace_path(slots_uri, "/metrics")
-    end
-
-    def health_uri
-      replace_path(slots_uri, "/health")
-    end
-
-    def replace_path(uri, path)
-      copy = uri.dup
-      copy.path = path
-      copy.query = nil
-      copy
+    def profile_uri(profile, path)
+      uri = URI.parse(profile.fetch("endpoint"))
+      uri.path = path
+      uri.query = nil
+      uri
     end
 
     def loopback_uri(value, required_path:)

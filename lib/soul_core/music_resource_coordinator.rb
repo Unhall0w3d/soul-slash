@@ -55,6 +55,12 @@ module SoulCore
           },
           "cpu-audio" => { "state" => "available" }
         },
+        "engine" => {
+          "model" => "ACE-Step 1.5",
+          "accelerator" => "NVIDIA CUDA",
+          "residency" => lease ? "foreground_active" : "on_demand",
+          "loaded" => !lease.nil?
+        },
         "can_acquire_nvidia_music" => blockers(hardware, lease).empty?,
         "blockers" => blockers(hardware, lease),
         "automatic_preemption" => false,

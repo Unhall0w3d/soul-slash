@@ -92,6 +92,32 @@ def valid_profiles(extra: "")
   YAML
 end
 
+def v3_profiles
+  <<~YAML
+    schema_version: soul.model_runtime_profiles.v3
+    default_profile: nvidia-fallback
+    profiles:
+      - id: nvidia-fallback
+        label: NVIDIA fallback
+        model_name: Qwen3 8B Q4_K_M
+        api_model: soul-local-chat
+        runtime: llamacpp_openai
+        accelerator: NVIDIA CUDA
+        service: llama-server.service
+        endpoint: http://127.0.0.1:8082/v1
+        core_role: daily-chat
+      - id: amd-gemma
+        label: AMD Gemma candidate
+        model_name: Gemma 4 12B Instruct Q4_K_M
+        api_model: soul-local-chat
+        runtime: ollama_openai
+        accelerator: AMD Vulkan
+        service: soul-model-gemma.service
+        endpoint: http://127.0.0.1:8082/v1
+        core_role: daily-chat
+  YAML
+end
+
 puts "Soul Model Runtime Profile Switching verification:"
 
 Dir.mktmpdir("soul-runtime-profiles-") do |root|
@@ -159,6 +185,26 @@ Dir.mktmpdir("soul-runtime-profiles-") do |root|
   check("missing target unit is unavailable and cannot be switched to", missing.dig("data", "profiles").find { |profile| profile["id"] == "amd-quality" }["service_state"] == "unavailable" && blocked_missing["lifecycle_state"] == "blocked_for_human_review", errors)
 end
 
+Dir.mktmpdir("soul-runtime-v3-") do |root|
+  file = write_profiles(root, v3_profiles)
+  runner = ProfileRunner.new("llama-server.service" => "inactive", "soul-model-gemma.service" => "active")
+  http_get = lambda do |uri|
+    case uri.path
+    when "/api/tags" then { status: 200, body: JSON.generate("models" => [{ "name" => "soul-local-chat", "digest" => "a" * 64 }]) }
+    when "/api/ps" then { status: 200, body: JSON.generate("models" => []) }
+    end
+  end
+  env = { "SOUL_MODEL_RUNTIME_CONTROL" => "1", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => file,
+          "SOUL_LOCAL_OPENAI_MODEL" => "soul-local-chat" }
+  service = SoulCore::ModelRuntimeControlService.new(root: root, env: env, runner: runner, http_get: http_get)
+  status = service.status
+  check("v3 status identifies Ollama Daily Core without pretending it has llama slots", status["ok"] && status.dig("data", "runtime") == "ollama_openai" && status.dig("data", "core_role") == "daily-chat" && status.dig("data", "server", "idle_observable") && !status.dig("data", "server", "slots_reachable"), errors)
+  check("Ollama service and model residency are reported separately", status.dig("data", "loaded") && status.dig("data", "server", "model_available") && status.dig("data", "server", "model_resident") == false && status.dig("data", "can_switch"), errors)
+
+  unavailable = SoulCore::ModelRuntimeControlService.new(root: root, env: env, runner: runner, http_get: ->(_uri) { nil }).status
+  check("unreachable Ollama activity observation blocks runtime mutation", unavailable.dig("data", "idle_certain") == false && !unavailable.dig("data", "can_switch"), errors)
+end
+
 Dir.mktmpdir("soul-runtime-switch-failure-") do |root|
   file = write_profiles(root, valid_profiles)
   runner = ProfileRunner.new("llama-server.service" => "active", "soul-model-amd.service" => "inactive")
@@ -208,6 +254,23 @@ Dir.mktmpdir("soul-runtime-profile-validation-") do |root|
   end
 ensure
   FileUtils.rm_f(outside)
+end
+
+Dir.mktmpdir("soul-runtime-v3-validation-") do |root|
+  file = write_profiles(root, v3_profiles)
+  env = { "SOUL_MODEL_RUNTIME_SERVICE" => "llama-server.service", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => file }
+  registry = SoulCore::ModelRuntimeProfileRegistry.new(root: root, env: env)
+  check("v3 profile inventory preserves runtime endpoint API model and Core role", registry.configuration.fetch("profiles").last.slice("runtime", "endpoint", "api_model", "core_role") == { "runtime" => "ollama_openai", "endpoint" => "http://127.0.0.1:8082/v1", "api_model" => "soul-local-chat", "core_role" => "daily-chat" }, errors)
+
+  invalid_v3 = {
+    "v3 rejects unknown runtime" => v3_profiles.sub("runtime: ollama_openai", "runtime: magic"),
+    "v3 rejects non-loopback endpoint" => v3_profiles.sub("http://127.0.0.1:8082/v1", "http://0.0.0.0:8082/v1"),
+    "v3 rejects unknown Core role" => v3_profiles.sub("core_role: daily-chat", "core_role: automatic")
+  }
+  invalid_v3.each do |label, document|
+    write_profiles(root, document)
+    check(label, configuration_error?(SoulCore::ModelRuntimeProfileRegistry.new(root: root, env: env)), errors)
+  end
 end
 
 dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))

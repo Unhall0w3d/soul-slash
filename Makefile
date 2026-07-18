@@ -31,7 +31,7 @@ MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
 MUSIC_REFERENCE_MODEL_CACHE ?=
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -78,6 +78,9 @@ help:
 > @echo "  make model-runtime-amd-install ... CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT"
 > @echo "  make model-runtime-amd-status"
 > @echo "  make model-runtime-amd-uninstall CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT"
+> @echo "  make model-runtime-gemma-plan OLLAMA_SHA256=... GEMMA_MODEL_DIGEST=..."
+> @echo "  make model-runtime-gemma-install ... CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT"
+> @echo "  make model-runtime-gemma-status"
 > @echo "  make model-runtime-startup-plan"
 > @echo "  make model-runtime-startup-install CONFIRM=INSTALL_SELECTED_MODEL_STARTUP"
 > @echo "  make model-runtime-startup-status"
@@ -266,6 +269,7 @@ verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb
 > @ruby scripts/verify-model-runtime-profile-switching.rb
 > @ruby scripts/verify-model-runtime-profile-deployment.rb
+> @ruby scripts/verify-ollama-model-runtime-deployment.rb
 > @ruby scripts/verify-model-runtime-selected-startup.rb
 > @ruby scripts/verify-model-runtime-identity-2e.rb
 
@@ -283,6 +287,21 @@ model-runtime-amd-status:
 model-runtime-amd-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_INACTIVE_AMD_MODEL_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_AMD_MODEL_UNIT; active units are never stopped implicitly."; exit 2; }
 > @ruby scripts/soul-model-runtime-profile uninstall --confirmation "$(CONFIRM)"
+
+model-runtime-gemma-plan:
+> @test -n "$(OLLAMA_SHA256)" -a -n "$(GEMMA_MODEL_DIGEST)" || { echo "OLLAMA_SHA256 and GEMMA_MODEL_DIGEST are required."; exit 2; }
+> @ruby scripts/soul-model-runtime-gemma plan --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(or $(GEMMA_SOURCE_MODEL),gemma4:12b-it-q4_K_M)" --api-model "$(or $(GEMMA_API_MODEL),soul-local-chat)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(or $(GEMMA_PORT),8082)"
+
+model-runtime-gemma-install:
+> @test "$(CONFIRM)" = "INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT" || { echo "Run model-runtime-gemma-plan first, then set CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT."; exit 2; }
+> @ruby scripts/soul-model-runtime-gemma install --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(or $(GEMMA_SOURCE_MODEL),gemma4:12b-it-q4_K_M)" --api-model "$(or $(GEMMA_API_MODEL),soul-local-chat)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(or $(GEMMA_PORT),8082)" --confirmation "$(CONFIRM)"
+
+model-runtime-gemma-status:
+> @ruby scripts/soul-model-runtime-gemma status
+
+model-runtime-gemma-uninstall:
+> @test "$(CONFIRM)" = "REMOVE_INACTIVE_GEMMA_OLLAMA_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_GEMMA_OLLAMA_UNIT; active units are never stopped implicitly."; exit 2; }
+> @ruby scripts/soul-model-runtime-gemma uninstall --confirmation "$(CONFIRM)"
 
 model-runtime-startup-plan:
 > @ruby scripts/soul-model-runtime-startup plan

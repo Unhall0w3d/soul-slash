@@ -852,24 +852,24 @@ async function togglePin() {
 function detailRow(term, description) { const row = document.createElement("div"); const dt = document.createElement("dt"); dt.textContent = term; const dd = document.createElement("dd"); dd.textContent = description; row.append(dt, dd); return row; }
 async function refreshStatus({ automatic = false } = {}) {
   const button = byId("refresh-status"); button.disabled = true; announce("Collecting bounded host status");
-  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("Scope", data.scope || "Bounded host"), detailRow("State", envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Host", "Unavailable"), detailRow("Collected", "Initial collection failed"), detailRow("Scope", "Bounded host"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
+  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const core = data.core || {}; const chat = core.chat_engine || {}; const music = core.music_engine || {}; const chatEngine = [chat.model, chat.runtime?.replaceAll("_", " "), chat.accelerator].filter(Boolean).join(" · ") || "Unavailable"; const musicEngine = [music.model, music.accelerator, music.residency?.replaceAll("_", " ")].filter(Boolean).join(" · ") || "Unavailable"; const details = byId("system-details"); details.replaceChildren(detailRow("Core", core.mode || "daily"), detailRow("Chat engine", chatEngine), detailRow("Music engine", musicEngine), detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("State", core.runtime_status || envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Core", "Unavailable"), detailRow("Chat engine", "Unavailable"), detailRow("Music engine", "Unavailable"), detailRow("Host", "Unavailable"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
 }
 
 function renderModelRuntime(runtime, message = "") {
   state.modelRuntime = runtime; const card = document.querySelector(".runtime-card"); const runtimeState = runtime.state || "unavailable"; card.dataset.state = runtimeState;
   byId("runtime-state-label").textContent = runtimeState.replaceAll("_", " ");
   byId("runtime-details").replaceChildren(
-    detailRow("Profile", runtime.profile_label || runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
-    detailRow("Accelerator", runtime.accelerator || "not configured"), detailRow("API alias", runtime.api_alias || "not configured"),
+    detailRow("Core role", runtime.core_role?.replaceAll("-", " ") || "not configured"), detailRow("Profile", runtime.profile_label || runtime.profile || "not configured"), detailRow("Model", runtime.model || "not configured"),
+    detailRow("Runtime", runtime.runtime?.replaceAll("_", " ") || "not configured"), detailRow("Accelerator", runtime.accelerator || "not configured"), detailRow("API alias", runtime.api_alias || "not configured"),
     detailRow("Service", runtime.service || "control disabled"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
-    detailRow("Server", runtime.server?.health || "unavailable"),
+    detailRow("Server", runtime.server?.health || "unavailable"), detailRow("Resident", runtime.runtime === "ollama_openai" ? (runtime.server?.model_resident ? "model loaded" : "server ready · model on demand") : (runtime.loaded ? "model loaded" : "unloaded")),
     detailRow("At login", runtime.startup ? `${runtime.startup.state || "unknown"} · ${runtime.startup.selected_profile_id || "no selection"}` : "not configured")
   );
   const profiles = byId("runtime-profile-list"); profiles.replaceChildren();
   (runtime.profiles || []).forEach((profile) => {
     const row = document.createElement("div"); row.className = "runtime-profile"; row.classList.toggle("is-active", profile.active === true);
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = profile.label || profile.id;
-    const meta = document.createElement("small"); meta.textContent = [profile.model_name, profile.accelerator, profile.service_state, profile.selected ? "selected at login" : null].filter(Boolean).join(" · "); copy.append(title, meta); row.append(copy);
+    const meta = document.createElement("small"); meta.textContent = [profile.model_name, profile.runtime?.replaceAll("_", " "), profile.accelerator, profile.core_role?.replaceAll("-", " "), profile.service_state, profile.selected ? "selected at login" : null].filter(Boolean).join(" · "); copy.append(title, meta); row.append(copy);
     let action = null; if (!profile.active && profile.service_state === "inactive" && runtime.can_load_profile) action = "load"; else if (!profile.active && profile.service_state === "inactive" && runtime.can_switch) action = "switch";
     if (action) { const button = document.createElement("button"); button.type = "button"; button.className = "runtime-profile-action"; button.textContent = action; button.addEventListener("click", () => previewModelRuntime(action, profile.id)); row.append(button); }
     else { const stateLabel = document.createElement("span"); stateLabel.className = "runtime-profile-state"; stateLabel.textContent = profile.active ? "active" : profile.service_state; row.append(stateLabel); }
@@ -901,8 +901,8 @@ async function previewModelRuntime(action, profileId = null) {
     byId("model-runtime-preview-title").textContent = action === "switch" ? "Transfer the verified inference profile" : (action === "load" ? "Start the selected user service" : "Release model GPU memory");
     byId("model-runtime-preview-details").replaceChildren(
       detailRow("Current", runtime.profile_label || runtime.profile || "not configured"), detailRow("Target", runtime.target_profile?.label || runtime.target_profile?.id || runtime.profile || "not configured"),
-      detailRow("Service", runtime.target_profile?.service || runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
-      detailRow("Slots", runtime.server?.slots_reachable ? `${runtime.server.active_slots} active / ${runtime.server.total_slots} total` : "offline")
+      detailRow("Runtime", runtime.target_profile?.runtime?.replaceAll("_", " ") || runtime.runtime?.replaceAll("_", " ") || "unavailable"), detailRow("Service", runtime.target_profile?.service || runtime.service || "unavailable"), detailRow("Active work", String(runtime.active_work_count ?? 0)),
+      detailRow("Activity probe", runtime.server?.idle_observable ? (runtime.server.slots_reachable ? `${runtime.server.active_slots} active / ${runtime.server.total_slots} slots` : "Ollama residency reachable") : "unavailable")
     );
     byId("model-runtime-confirmation-phrase").textContent = runtime.confirmation_phrase; prefillApprovalGate("model-runtime-confirmation", "execute-model-runtime", runtime.confirmation_phrase);
     byId("execute-model-runtime").textContent = action === "switch" ? "Switch verified model runtime" : `${action === "load" ? "Load" : "Unload"} verified model runtime`;

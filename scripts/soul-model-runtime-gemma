@@ -1,0 +1,32 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/ollama_model_runtime_deployment"
+
+options = { host: "127.0.0.1", port: 8082, device: "0" }
+parser = OptionParser.new do |value|
+  value.banner = "Usage: scripts/soul-model-runtime-gemma COMMAND [options]"
+  value.on("--ollama-sha256 SHA") { |item| options[:expected_ollama_sha256] = item }
+  value.on("--source-model TAG") { |item| options[:source_model] = item }
+  value.on("--api-model ALIAS") { |item| options[:api_model] = item }
+  value.on("--model-digest SHA") { |item| options[:expected_model_digest] = item }
+  value.on("--host HOST") { |item| options[:host] = item }
+  value.on("--port PORT", Integer) { |item| options[:port] = item }
+  value.on("--device ID") { |item| options[:device] = item }
+  value.on("--confirmation PHRASE") { |item| options[:confirmation] = item }
+end
+
+command = ARGV.shift
+parser.parse!(ARGV)
+deployment = SoulCore::OllamaModelRuntimeDeployment.new
+result = case command
+         when "plan" then deployment.plan(**options.except(:confirmation))
+         when "install" then deployment.install(**options)
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else warn(parser); exit(1)
+         end
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (%w[awaiting_input blocked_for_human_review].include?(result.lifecycle_state) ? 2 : 1))

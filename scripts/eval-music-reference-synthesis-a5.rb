@@ -8,6 +8,14 @@ require_relative "../lib/soul_core/conversation_provider_client"
 require_relative "../lib/soul_core/conversation_provider_registry"
 require_relative "../lib/soul_core/music_reference_synthesis_service"
 
+class RecordingConversationProviderClient < SoulCore::ConversationProviderClient
+  attr_reader :last_response
+
+  def chat(**arguments)
+    @last_response = super
+  end
+end
+
 root = File.expand_path("..", __dir__)
 resolver = SoulCore::ConfigurationResolver.new(root: root, process_env: ENV)
 report = resolver.resolve
@@ -17,6 +25,7 @@ provider = SoulCore::ConversationProviderRegistry.new(env: environment).local.fi
 abort "No configured local provider" unless provider
 
 result = nil
+client = nil
 Dir.mktmpdir("soul-reference-synthesis-live-eval") do |temporary|
   store = SoulCore::MusicReferenceLibraryStore.new(root: temporary, id_generator: -> { "abababababababab" })
   store.write_track(
@@ -29,16 +38,16 @@ Dir.mktmpdir("soul-reference-synthesis-live-eval") do |temporary|
     },
     "evidence" => {
       "status" => "extracted", "bpm" => 104.2, "bpm_alternatives" => [52.1], "key" => "A minor",
-      "key_alternatives" => ["C major"], "meter" => nil, "sections" => [],
+      "key_alternatives" => ["C major"], "meter" => "4/4 likely", "sections" => ["restrained opening", "widening refrain", "highest-energy final third"],
       "instrumentation" => ["clean electric guitar likely", "electric bass likely", "acoustic drums likely"],
       "production_traits" => ["moderate dynamic range", "dry transient emphasis"],
       "energy_curve" => ["restrained opening", "gradual mid-song lift", "highest energy in final third"],
-      "vocal_traits" => [], "lyrical_traits" => [],
+      "vocal_traits" => ["single close lead vocal likely"], "lyrical_traits" => ["compact phrases likely"],
       "confidence_notes" => ["meter, vocal delivery, lyrics, and exact section boundaries were not measured"],
-      "extractor_receipt" => { "fixture" => true, "audio_retained" => false }
+      "extractor_receipt" => { "fixture" => true, "audio_retained" => false, "semantic_evidence_version" => 1 }
     }
   )
-  client = SoulCore::ConversationProviderClient.new(env: environment, root: root)
+  client = RecordingConversationProviderClient.new(env: environment, root: root)
   service = SoulCore::MusicReferenceSynthesisService.new(provider_client: client, store: store)
   result = service.draft(reference_id: "ref_1212121212121212", scope: "all", provider: provider)
 end
@@ -48,6 +57,7 @@ puts JSON.pretty_generate(
   "provider" => provider.id, "model" => provider.model,
   "lifecycle_state" => result["lifecycle_state"], "reason" => result["reason"],
   "candidate" => revision&.slice("title", "intent", "caption", "lyrics", "bpm", "keyscale", "timesignature", "exclusions", "rationale"),
-  "automatic_approval" => result.dig("data", "automatic_approval")
+  "automatic_approval" => result.dig("data", "automatic_approval"),
+  "response_excerpt" => (client.last_response&.content.to_s.byteslice(0, 2_000) unless revision)
 )
 abort "Live music reference synthesis eval did not reach human review" unless result["lifecycle_state"] == "blocked_for_human_review" && revision

@@ -145,7 +145,10 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 @keyframes familiar-orbit { to { transform:rotate(360deg); } }
 @keyframes familiar-orbit-reverse { from { transform:rotate(45deg); } to { transform:rotate(-315deg); } }
 @keyframes familiar-pulse { to { opacity:.35; transform:scale(.72); } }
-@media (prefers-reduced-motion:reduce) { .soul-presence *,.message--working .message-body::after { animation:none!important; transition:none!important; } }
+@keyframes system-scan { 0%,100% { opacity:.62; transform:scale(.94); } 48% { opacity:1; transform:scale(1.04); } }
+.system-orbit { top:78px; right:28px; width:62px; height:62px; animation:system-scan 3.6s ease-in-out infinite; }
+.system-orbit::before { inset:8px; }.system-orbit::after { inset:19px; }.system-orbit span { inset:27px; }
+@media (prefers-reduced-motion:reduce) { .soul-presence *,.message--working .message-body::after,.system-orbit { animation:none!important; transition:none!important; } }
 
 @media (max-width:1180px) {
   .app-header { grid-template-columns:1fr auto; }.primary-tabs { grid-row:2; grid-column:1/-1; min-height:44px; justify-content:center; }.tab::after { bottom:-1px; }
