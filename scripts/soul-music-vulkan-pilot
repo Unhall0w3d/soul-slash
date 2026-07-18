@@ -14,7 +14,8 @@ class MusicVulkanPilot
   SETUP_CONFIRMATION = "INSTALL_MUSIC_VULKAN_RUNTIME"
   DOWNLOAD_CONFIRMATION = "DOWNLOAD_MUSIC_VULKAN_MODELS"
   RUN_CONFIRMATION = "RUN_MUSIC_VULKAN_PILOT"
-  DURATIONS = [30, 90, 180].freeze
+  PRODUCTION_DURATIONS = [30, 90, 180].freeze
+  QUALIFICATION_DURATIONS = { 210 => "duration_210_v1" }.freeze
   MAX_MANIFEST_BYTES = 64 * 1024
   MAX_REQUEST_BYTES = 64 * 1024
   MAX_LOG_BYTES = 2 * 1024 * 1024
@@ -112,8 +113,7 @@ class MusicVulkanPilot
     authorize!("run")
     raise "pinned runtime or models are incomplete" unless installed_source? && all_models_valid?
     request = effective_request
-    duration = Integer(request.fetch("duration"))
-    raise "pilot duration must be exactly 30, 90, or 180 seconds" unless DURATIONS.include?(duration)
+    duration = validated_duration!(request)
     prepare_runs!
     run_dir = File.join(@runs_dir, Time.now.utc.strftime("%Y%m%dT%H%M%SZ-#{duration}s-#{SecureRandom.hex(3)}"))
     Dir.mkdir(run_dir, 0o700)
@@ -202,8 +202,10 @@ class MusicVulkanPilot
       { "action" => action, "install_dir" => @install_dir, "models" => @models, "automatic_download" => false }
     when "run"
       request = effective_request
+      duration = validated_duration!(request)
       scope = { "action" => action, "profile" => @profile, "request_sha256" => Digest::SHA256.file(File.expand_path(@options.fetch(:request))).hexdigest,
-        "duration" => request.fetch("duration"), "foreground" => true, "persistent_process" => false }
+        "duration" => duration, "foreground" => true, "persistent_process" => false }
+      scope["qualification"] = request.fetch("qualification") if request.key?("qualification")
       scope["lm_seed_override"] = request.fetch("lm_seed") if @options.key?(:retry_lm_seed)
       scope
     else
@@ -226,7 +228,7 @@ class MusicVulkanPilot
     raise "pilot request must be a regular non-symlink file" unless stat.file? && !stat.symlink? && stat.size <= MAX_REQUEST_BYTES
     data = JSON.parse(File.binread(path, MAX_REQUEST_BYTES))
     required = %w[caption lyrics bpm keyscale timesignature language duration seed]
-    allowed = required + %w[lm_seed]
+    allowed = required + %w[lm_seed qualification]
     raise "pilot request fields are invalid" unless data.is_a?(Hash) && (required - data.keys).empty? && (data.keys - allowed).empty?
     raise "caption is required" unless data["caption"].is_a?(String) && !data["caption"].strip.empty? && data["caption"].bytesize <= 8_000
     raise "lyrics are invalid" unless data["lyrics"].is_a?(String) && data["lyrics"].bytesize <= 20_000
@@ -235,6 +237,26 @@ class MusicVulkanPilot
     data
   rescue Errno::ENOENT, JSON::ParserError, KeyError, ArgumentError, TypeError => error
     raise "invalid pilot request: #{error.message}"
+  end
+
+  def validated_duration!(request)
+    duration = Integer(request.fetch("duration"))
+    qualification = request["qualification"]
+    return duration if PRODUCTION_DURATIONS.include?(duration) && qualification.nil?
+
+    expected = QUALIFICATION_DURATIONS[duration]
+    return duration if expected && qualification == expected
+
+    if PRODUCTION_DURATIONS.include?(duration)
+      raise ArgumentError, "production pilot durations must not carry a qualification marker"
+    end
+    if expected
+      raise ArgumentError, "#{duration}-second qualification requires marker #{expected}"
+    end
+
+    raise ArgumentError, "pilot duration must be exactly 30, 90, or 180 seconds, or an explicitly marked 210-second qualification"
+  rescue KeyError, ArgumentError, TypeError => error
+    raise ArgumentError, "invalid pilot duration: #{error.message}"
   end
 
   def effective_request
