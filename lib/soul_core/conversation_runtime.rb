@@ -851,7 +851,7 @@ module SoulCore
 
       if response.success? && !response.content.to_s.strip.empty?
         emit_progress(progress, "reviewing", "Checking the response for capability gaps and review handoffs.")
-        truth_review = @response_truth_guard.filter(response.content)
+        truth_review = @response_truth_guard.filter(response.content, user_message: text)
         content = truth_review.content
         gap_classification = @capability_gap_classifier.classify(user_message: text, assistant_message: content)
         structured_gap_review = nil
@@ -895,7 +895,8 @@ module SoulCore
             "latency_ms" => response.latency_ms,
             "response_truth_review" => {
               "valid" => truth_review.valid,
-              "removed_unsupported_observations" => truth_review.removed
+              "removed_unsupported_observations" => truth_review.removed,
+              "style_adjustments" => truth_review.style_adjustments
             },
             "capability_gap_classification" => gap_classification,
             "capability_gap_structured_review" => structured_gap_review,

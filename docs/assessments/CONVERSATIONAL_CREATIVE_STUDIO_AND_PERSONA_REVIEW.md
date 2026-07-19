@@ -116,3 +116,28 @@ The morning test conversations remain the intended persona and multi-turn behavi
 - [ ] Soul feels poised, attentive, curious, aesthetically aware, and slightly strange without sleepy scene-setting, Dungeon-Master narration, flattery, or sterile aloofness.
 - [ ] Revision, rejection, binding, export, and publication boundaries are stated honestly.
 - [ ] Operator explicitly approves or requests corrections before commit/merge.
+
+## Post-merge conversational routing regression
+
+The 2026-07-19 transmission `chat_202607191623150400_5da5a5` exposed two related misses:
+
+1. `I'm doing alright, reviewing system status while I check in with you.` matched the unqualified noun phrase `system status` and executed `host.system_status`, although the message was conversational rather than task-shaped.
+2. The prior greeting claimed `I'm processing the day's data` without evidence of background work and emitted an emoji despite no emoji style being established by the Operator.
+
+The candidate repair requires host/runtime status routing to be either an exact short command or an explicit request/question. It also extends the response guard to remove unsupported first-person background activity and unprompted emoji while preserving the remainder of the response.
+
+Deterministic evidence:
+
+```text
+ruby scripts/verify-conversational-creative-workflow.rb       PASS (25 checks)
+ruby scripts/verify-live-persona-contract.rb                  PASS
+ruby scripts/verify-conversational-orchestrator-phase4.rb     PASS
+git diff --check                                              PASS
+```
+
+Human review:
+
+- [ ] Confirm the exact conversational sentence receives an ordinary model response and collects no host evidence.
+- [ ] Confirm `Please check system status` still runs only the bounded host collector.
+- [ ] Confirm a greeting does not claim background monitoring/processing or add an unprompted emoji.
+- [ ] Approve the follow-up candidate before commit, restart, or merge.

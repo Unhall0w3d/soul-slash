@@ -5,6 +5,8 @@ require "tmpdir"
 require_relative "../lib/soul_core/chat_store"
 require_relative "../lib/soul_core/conversation_creative_workflow_service"
 require_relative "../lib/soul_core/conversation_core_workflow_service"
+require_relative "../lib/soul_core/conversation_orchestrator"
+require_relative "../lib/soul_core/conversation_response_truth_guard"
 require_relative "../lib/soul_core/intent_router"
 
 class FakePlanner
@@ -113,6 +115,16 @@ end
 checks = {}
 checks["skill_catalog_requires_explicit_request"] = SoulCore::IntentRouter.new.route("I am working on your skills today").id == "unknown"
 checks["explicit_skill_catalog_still_routes"] = SoulCore::IntentRouter.new.route("What skills do you have?").id == "skill_catalog"
+status_statement = "I'm doing alright, reviewing system status while I check in with you."
+status_router = SoulCore::IntentRouter.new
+status_orchestrator = SoulCore::ConversationOrchestrator.new
+statement_plan = status_orchestrator.plan(message: status_statement, provider_available: true)
+request_plan = status_orchestrator.plan(message: "Please check system status", provider_available: true)
+checks["system_status_mention_remains_conversation"] = status_router.route(status_statement).id == "unknown" && statement_plan.kind == "direct_model" && statement_plan.tool_ids.empty?
+checks["explicit_system_status_request_still_runs_bounded_skill"] = request_plan.kind == "skill_only" && request_plan.tool_ids == ["host.system_status"]
+checks["personified_soul_wellbeing_question_remains_conversation"] = status_orchestrator.plan(message: "How is Soul doing today?", provider_available: true).kind == "direct_model"
+guarded_greeting = SoulCore::ConversationResponseTruthGuard.new.filter("Hello! I'm processing the day's data with quiet efficiency. How are you today? 🌟", user_message: "Hello Soul! How are you doing today?")
+checks["unsupported_background_activity_and_unprompted_emoji_are_removed"] = !guarded_greeting.valid && !guarded_greeting.content.include?("processing") && !guarded_greeting.content.include?("🌟") && guarded_greeting.content.include?("How are you today?") && guarded_greeting.style_adjustments == ["removed unprompted emoji"]
 
 core_control = FakeCore.new
 core_workflow = SoulCore::ConversationCoreWorkflowService.new(core_orchestration: core_control)

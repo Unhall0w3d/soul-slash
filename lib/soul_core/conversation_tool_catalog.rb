@@ -41,7 +41,9 @@ module SoulCore
         evidence_profile: "host_system_status",
         patterns: [
           /\b(?:check|inspect|show|assess)\b.{0,50}\b(?:linux md(?: raid)?|mdraid|\/proc\/mdstat)\b/i,
-          /\b(system status|host status|computer status|machine status)\b/i,
+          /\A\s*(?:system status|host status|computer status|machine status)\s*[?.!]*\s*\z/i,
+          /\b(?:check|inspect|show|assess|review|scan|survey|report|run|give me|tell me)\b.{0,45}\b(?:system status|host status|computer status|machine status)\b/i,
+          /\b(?:what(?:'s| is)|how(?:'s| is))\b.{0,35}\b(?:system|host|computer|machine)\b.{0,20}\b(?:status|health|doing|running)\b/i,
           /\b(?:assess(?:ment)?|inspect|diagnose|audit|check|review|scan|survey)\b.{0,50}\b(?:environment|host|computer|machine|hardware|operating system|os)\b/i,
           /\b(?:environment|host|computer|machine|hardware|operating system|os)\b.{0,50}\b(?:assess(?:ment)?|inspect|diagnose|audit|check|review|scan|survey)\b/i,
           /\bwhat\b.{0,45}\b(?:filesystems?|disks?|drives?|storage devices?|block devices?|hardware)\b.{0,45}\b(?:do i have|are present|are attached|are mounted)\b/i,
