@@ -29,6 +29,7 @@ require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
 require_relative "music_candidate_trim_service"
 require_relative "music_visual_companion_service"
+require_relative "music_publication_package_service"
 require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
@@ -72,6 +73,7 @@ module SoulCore
       music_candidate_disposition_service: nil,
       music_candidate_trim_service: nil,
       music_visual_companion_service: nil,
+      music_publication_package_service: nil,
       music_project_deletion_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
@@ -106,6 +108,7 @@ module SoulCore
       @music_candidate_disposition_service = music_candidate_disposition_service
       @music_candidate_trim_service = music_candidate_trim_service
       @music_visual_companion_service = music_visual_companion_service
+      @music_publication_package_service = music_publication_package_service
       @music_project_deletion_service = music_project_deletion_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
@@ -271,6 +274,9 @@ module SoulCore
       when "music.visuals.loop.execute" then domain(music_visual_companion.loop_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), presentation: parameters["visual_presentation"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "music.visuals.final.preview" then domain(music_visual_companion.final_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
       when "music.visuals.final.execute" then domain(music_visual_companion.final_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.publication.draft" then domain(music_publication_package.draft(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
+      when "music.publication.preview" then domain(music_publication_package.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description")))
+      when "music.publication.execute" then domain(music_publication_package.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "visual.resources.status" then domain(visual_studio.resources)
       when "visual.projects.list" then domain(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)))
       when "visual.projects.create" then domain(visual_studio.create(required(parameters, "visual_project")))
@@ -651,6 +657,10 @@ module SoulCore
 
     def music_visual_companion
       @music_visual_companion_service ||= MusicVisualCompanionService.new(root: @root)
+    end
+
+    def music_publication_package
+      @music_publication_package_service ||= MusicPublicationPackageService.new(root: @root, visual_service: music_visual_companion)
     end
 
     def music_project_deletion

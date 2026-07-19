@@ -641,9 +641,40 @@ function musicVisualLineage(candidate, visual, source) {
     if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare static replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
   } else {
     const note = document.createElement("p"); note.textContent = "Static local companion ready. It remains unpublished and bound to this exact audio digest."; lineage.append(note);
+    const packageButton = document.createElement("button"); packageButton.type = "button"; packageButton.className = "gate-button gate-button--gold"; packageButton.textContent = "Prepare YouTube upload package";
+    packageButton.addEventListener("click", () => draftMusicPublicationPackage(candidate, visual, lineage, packageButton, status)); lineage.append(packageButton);
   }
   const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = "Qualification pending"; const motionNote = document.createElement("small"); motionNote.textContent = "Unavailable until the Visual Studio A3 motion model passes AMD compatibility, integrity, resource, and cleanup gates."; motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
   lineage.append(status); return lineage;
+}
+
+async function draftMusicPublicationPackage(candidate, visual, panel, button, status) {
+  button.disabled = true; status.textContent = "Drafting editable upload metadata from the finished composition…";
+  const identity = { project_id: candidate.project_id, candidate_id: candidate.candidate_id, visual_id: visual.visual_id };
+  try {
+    const envelope = await callSoul("music.publication.draft", identity); lifecycle(envelope); const data = dataOf(envelope);
+    if (!data.description) throw new Error(envelope.errors?.[0]?.message || "Export the kept song before preparing its upload package");
+    const editor = document.createElement("div"); editor.className = "music-publication-editor";
+    const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "YouTube description"; const boundary = document.createElement("small"); boundary.textContent = "editable · local package only"; heading.append(title, boundary);
+    const textarea = document.createElement("textarea"); textarea.rows = 18; textarea.maxLength = 5000; textarea.value = data.description; textarea.setAttribute("aria-label", "Editable YouTube description");
+    const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact upload package";
+    preview.addEventListener("click", () => previewMusicPublicationPackage(identity, textarea, editor, preview, status));
+    const note = document.createElement("p"); note.className = "card-note"; note.textContent = "The package contains the upload-ready MP4, thumbnail, youtube-description.txt sidecar, and private-upload metadata. It does not contact YouTube.";
+    editor.append(heading, textarea, preview, note); button.replaceWith(editor); status.textContent = "Review the wording, links, credits, and lyrics before binding the exact package.";
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+async function previewMusicPublicationPackage(identity, textarea, editor, button, status) {
+  button.disabled = true; status.textContent = "Binding the exact video, thumbnail, and edited description…";
+  try {
+    const description = textarea.value; const envelope = await callSoul("music.publication.preview", { ...identity, description }); lifecycle(envelope); const data = dataOf(envelope);
+    if (envelope.lifecycle_state === "complete" && data.package) { status.textContent = `Upload package already exists at ${data.package.destination}`; return; }
+    if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "YouTube package preview is unavailable");
+    const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
+    const approval = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Export exact upload package"; prefillApprovalGate(approval, execute, data.confirmation_phrase);
+    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Copying the exact reviewed package into the finished-song library…"; try { const result = await callSoul("music.publication.execute", { ...identity, description, confirmation: approval.value, expected_digest: data.expected_digest }); lifecycle(result); const published = dataOf(result).package; if (result.lifecycle_state !== "complete" || !published) throw new Error(result.errors?.[0]?.message || result.lifecycle_state); status.textContent = `YouTube upload package ready at ${published.destination}. Nothing was uploaded or published.`; } catch (error) { status.textContent = error.message; execute.disabled = false; } });
+    const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; label.append(approval); editor.append(scope, label, execute); textarea.disabled = true; button.remove(); status.textContent = "One click exports local upload materials only; YouTube upload and publication remain separate.";
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
 function musicVisualPresentationSettings(visual) {

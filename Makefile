@@ -35,7 +35,7 @@ MUSIC_REFERENCE_MODEL_CACHE ?=
 VISUAL_ROOT ?= $(HOME)/.local/share/soul/visual
 VISUAL_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/visual_studio_models.json
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -63,6 +63,7 @@ help:
 > @echo "  make music-reference-enrichment-install EXPECTED_DIGEST=... CONFIRM=INSTALL_MUSIC_REFERENCE_ENRICHMENT"
 > @echo "  make verify-music-reference-synthesis  Test reference synthesis retry approval and fusion gates"
 > @echo "  make verify-music-lite-edit  Test immutable-source start/end trimming and receipts"
+> @echo "  make verify-music-publication-package  Test local YouTube upload packages"
 > @echo "  make music-projects    List private Music Studio projects"
 > @echo "  make music-resources   Inspect AMD/NVIDIA/CPU Music resource lanes"
 > @echo "  make music-project-create MUSIC_INPUT=/path/project.json"
@@ -205,6 +206,9 @@ visual-model-download:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-model-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "DOWNLOAD_VISUAL_VULKAN_MODELS" || { echo "Exact confirmation DOWNLOAD_VISUAL_VULKAN_MODELS is required."; exit 2; }
 > @ruby scripts/soul-visual-runtime download --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-music-publication-package:
+> @ruby scripts/verify-music-publication-package.rb
 
 music-transcription-plan:
 > @ruby scripts/soul-music-transcription plan --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)"
