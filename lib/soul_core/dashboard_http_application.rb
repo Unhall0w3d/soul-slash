@@ -4,6 +4,7 @@ require "json"
 require "securerandom"
 require "uri"
 require_relative "dashboard_authentication"
+require_relative "dashboard_music_job_manager"
 
 module SoulCore
   class DashboardHttpApplication
@@ -36,7 +37,7 @@ module SoulCore
 
     attr_reader :csrf_token, :authentication
 
-    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil)
+    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil, music_jobs: nil)
       @root = File.expand_path(root)
       @facade = facade
       @bind_host = bind_host
@@ -44,6 +45,7 @@ module SoulCore
       @csrf_token = csrf_token
       @authentication = authentication || DashboardAuthentication.new(root: @root)
       @public_origin = public_origin.to_s.empty? ? nil : normalize_public_origin(public_origin)
+      @music_jobs = music_jobs
     end
 
     def call(method:, target:, headers: {}, body: "")
@@ -77,6 +79,12 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/chat-stream"
       return music_stream(normalized_headers, body) if target == "/api/v1/music-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-stream"
+      return music_job_start(normalized_headers, body) if target == "/api/v1/music-job-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-stream"
+      return music_job_follow(normalized_headers, body) if target == "/api/v1/music-job-follow" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-follow"
+      return music_job_status(normalized_headers, body) if target == "/api/v1/music-job-status" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-status"
       if (match = target.match(%r{\A/api/v1/music/audio/(music_[a-f0-9]{16})/(candidate_[a-f0-9]{16})/(mp3|flac)\z}))
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_audio(normalized_headers, *match.captures)
@@ -158,6 +166,55 @@ module SoulCore
         output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "music stream failed safely: #{error.class}") }) + "\n"
       end
       response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
+    end
+
+    def music_job_start(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+      record = music_jobs.start(request)
+      music_job_stream_response(record.fetch("job_id"))
+    rescue ArgumentError => error
+      json_response(422, error_envelope("music_job_rejected", error.message))
+    end
+
+    def music_job_follow(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+      music_job_stream_response(request.fetch("job_id"))
+    rescue KeyError, ArgumentError => error
+      json_response(422, error_envelope("music_job_rejected", error.message))
+    end
+
+    def music_job_status(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+      project_id = request["project_id"]
+      return json_response(422, error_envelope("music_job_rejected", "project_id is invalid")) unless project_id.to_s.match?(/\Amusic_[a-f0-9]{16}\z/)
+      json_response(200, { "jobs" => music_jobs.active(project_id: project_id) })
+    end
+
+    def music_job_stream_response(job_id)
+      response(200, music_jobs.stream(job_id), "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
+    end
+
+    def authenticated_session_error(headers)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      nil
+    end
+
+    def music_jobs
+      @music_jobs ||= DashboardMusicJobManager.new(root: @root, facade: @facade)
     end
 
     def music_audio(headers, project_id, candidate_id, artifact)

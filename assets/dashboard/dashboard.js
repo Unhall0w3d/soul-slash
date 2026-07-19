@@ -4,6 +4,7 @@ const csrf = document.querySelector('meta[name="soul-csrf"]').content;
 const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel" });
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
+state.musicJobId = null;
 
 function formatBytes(value) {
   const bytes = Number(value); if (!Number.isFinite(bytes) || bytes < 0) return "unavailable";
@@ -34,6 +35,7 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
 }
 
 async function callNdjson(endpoint, operation, parameters = {}, context = {}, onProgress = () => {}) {
+  if (endpoint === "/api/v1/music-stream" && ["music.generation.execute", "music.candidates.revision.execute"].includes(operation)) endpoint = "/api/v1/music-job-stream";
   const response = await fetch(endpoint, {
     method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
@@ -45,12 +47,27 @@ async function callNdjson(endpoint, operation, parameters = {}, context = {}, on
   while (true) {
     const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
     const lines = buffer.split("\n"); buffer = lines.pop() || "";
-    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; });
+    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.record?.job_id) state.musicJobId = event.record.job_id; if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; });
     if (done) break;
   }
-  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") finalEnvelope = event.envelope; }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.record?.job_id) state.musicJobId = event.record.job_id; if (event.type === "result") finalEnvelope = event.envelope; }
   if (!finalEnvelope) throw new Error("Foreground stream ended without a terminal result");
   return finalEnvelope;
+}
+
+async function followMusicJob(jobId, onProgress = () => {}) {
+  const response = await fetch("/api/v1/music-job-follow", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf }, body: JSON.stringify({ job_id: jobId }), cache: "no-store" });
+  if (!response.ok || !response.body) { const failure = await response.json().catch(() => ({})); throw new Error(failure.error?.reason || "Music job follow failed safely"); }
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let finalEnvelope = null;
+  while (true) { const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done }); const lines = buffer.split("\n"); buffer = lines.pop() || ""; lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; }); if (done) break; }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") finalEnvelope = event.envelope; }
+  if (!finalEnvelope) throw new Error("Music job follow ended without a terminal result");
+  return finalEnvelope;
+}
+
+async function activeMusicJobs(projectId) {
+  const response = await fetch("/api/v1/music-job-status", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf }, body: JSON.stringify({ project_id: projectId }), cache: "no-store" });
+  const result = await response.json(); if (!response.ok) throw new Error(result.error?.reason || "Music job status failed safely"); return result.jobs || [];
 }
 
 const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress);
@@ -528,7 +545,26 @@ async function cancelMusicGeneration() {
   try { const preview = await callSoul("music.generation.cancel.preview", { candidate_id: state.musicCandidateId }); const data = dataOf(preview); if (!data.expected_digest) throw new Error(preview.errors?.[0]?.message || "Cancellation is not ready yet"); const phrase = window.prompt(`Cancel only ${state.musicCandidateId}? Type ${data.confirmation_phrase}`); if (phrase !== data.confirmation_phrase) { byId("music-generation-status").textContent = "Cancellation confirmation did not match; generation continues."; return; } const result = await callSoul("music.generation.cancel.execute", { candidate_id: state.musicCandidateId, confirmation: phrase, expected_digest: data.expected_digest }); byId("music-generation-status").textContent = result.lifecycle_state === "canceled" ? "Cancellation signal completed." : (result.errors?.[0]?.message || result.lifecycle_state); } catch (error) { byId("music-generation-status").textContent = error.message; }
 }
 
+async function restoreMusicGeneration(projectId) {
+  try {
+    const job = (await activeMusicJobs(projectId))[0];
+    if (!job || (state.musicGenerating && state.musicJobId === job.job_id)) return;
+    state.musicGenerating = true; state.musicJobId = job.job_id; state.musicCandidateId = job.candidate_id;
+    byId("cancel-music-generation").disabled = false; byId("music-progress").hidden = false;
+    showMusicProgress(job.latest_progress || { stage: "working", message: "Reattached to the active bounded generation job." });
+    const envelope = await followMusicJob(job.job_id, showMusicProgress); lifecycle(envelope);
+    if (state.selectedMusicProject?.project_id === projectId) { byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject({ project_id: projectId }); }
+  } catch (error) { if (state.selectedMusicProject?.project_id === projectId) byId("music-generation-status").textContent = error.message; }
+  finally { state.musicGenerating = false; state.musicJobId = null; byId("cancel-music-generation").disabled = true; byId("music-progress").hidden = true; }
+}
+
+function showMusicProgress(event) {
+  byId("music-progress-stage").textContent = String(event.stage || "working").replaceAll("_", " ");
+  const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) byId("music-progress-message").textContent = line.slice(0, 240);
+}
+
 function renderMusicCandidates(candidates) {
+  if (state.selectedMusicProject?.project_id) restoreMusicGeneration(state.selectedMusicProject.project_id);
   const section = byId("music-candidates"); section.hidden = candidates.length === 0; byId("music-candidate-count").textContent = String(candidates.length); const list = byId("music-candidate-list"); list.replaceChildren();
   const linkedSources = new Set(candidates.map((candidate) => candidate.source_candidate_id).filter(Boolean));
   const newestFirst = candidates.slice().sort((left, right) => String(right.created_at || "").localeCompare(String(left.created_at || "")) || String(right.candidate_id).localeCompare(String(left.candidate_id)));
