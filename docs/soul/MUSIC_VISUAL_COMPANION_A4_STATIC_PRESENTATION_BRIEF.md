@@ -31,8 +31,11 @@ Static settings are part of the exact approval digest:
 
 The resulting frame does not move, displace, pan, zoom, or synthesize an
 environmental effect. The short MP4 is only a reviewable encoding of the chosen
-framing. The full companion repeats that approved static encoding, applies the
-approved fades, binds the exact lossless Music candidate, and remains private.
+framing. The full companion returns to the lossless bound PNG rather than
+re-encoding that short MP4, reapplies the approved framing once, adds restrained
+dark-gradient dithering, encodes H.264 at CRF 16 with the still-image tuning,
+applies the approved fades, binds the exact lossless Music candidate, and
+remains private.
 
 ## Generated-motion boundary
 

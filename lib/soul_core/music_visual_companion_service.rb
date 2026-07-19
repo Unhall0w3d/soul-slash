@@ -212,7 +212,7 @@ module SoulCore
       duration = audio_duration(audio)
       progress&.call({ "stage" => "visual_companion", "message" => "Extending the approved static presentation and binding the exact lossless candidate" })
       output = File.join(directory, ".preview.partial.mp4")
-      render_final(File.join(directory, "loop.mp4"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
+      render_final(File.join(directory, "base.png"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
       File.rename(output, File.join(directory, "preview.mp4"))
       record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS)
       record["stage"] = "preview_ready"
@@ -288,35 +288,43 @@ module SoulCore
       raise MusicProjectStore::ValidationError, "review the rendered loop before creating the full preview" unless record["stage"] == "loop_ready"
       {
         "operation" => "render_music_visual_companion", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
-        "visual_id" => record.fetch("visual_id"), "loop_sha256" => record.dig("artifacts", "loop", "sha256"),
+        "visual_id" => record.fetch("visual_id"), "base_sha256" => record.dig("artifacts", "base", "sha256"),
+        "review_loop_sha256" => record.dig("artifacts", "loop", "sha256"),
         "candidate_audio_sha256" => record.fetch("candidate_audio_sha256"),
-        "presentation" => record.fetch("presentation", DEFAULT_PRESENTATION), "output" => "H.264/AAC MP4", "external_publication" => false
+        "presentation" => record.fetch("presentation", DEFAULT_PRESENTATION),
+        "encoding" => { "video" => "H.264 CRF 16 still-image", "pixel_format" => "yuv420p", "dark_gradient_dither" => "gradfun=1.2:16", "audio" => "AAC 256k" },
+        "output" => "H.264/AAC MP4", "external_publication" => false
       }
     end
 
     def render_loop(input, output, presentation)
       require_tools!
       frames = LOOP_SECONDS * FPS
-      filter = if presentation.fetch("fit") == "cover"
-        "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT}:x=(in_w-out_w)/2:y=(in_h-out_h)/2,format=yuv420p[v]"
-      else
-        matte = presentation.fetch("matte").delete_prefix("#")
-        "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=decrease,pad=#{WIDTH}:#{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x#{matte},format=yuv420p[v]"
-      end
-      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", input, "-t", LOOP_SECONDS.to_s, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-g", frames.to_s, "-keyint_min", frames.to_s, "-sc_threshold", "0", "-movflags", "+faststart", output]
+      filter = "[0:v]#{static_frame_filter(presentation)},format=yuv420p[v]"
+      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", input, "-t", LOOP_SECONDS.to_s, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "16", "-g", frames.to_s, "-keyint_min", frames.to_s, "-sc_threshold", "0", "-movflags", "+faststart", output]
       run_media!(command, output, "visual loop")
     end
 
-    def render_final(loop_path, audio, output, duration, presentation)
+    def render_final(base_image, audio, output, duration, presentation)
       intro = Float(presentation.fetch("intro_fade_seconds"))
       outro = Float(presentation.fetch("outro_fade_seconds"))
       fade_start = [duration - outro, 0].max.round(3)
-      filters = ["[0:v]trim=duration=#{duration}", "setpts=PTS-STARTPTS"]
+      filters = ["[0:v]#{static_frame_filter(presentation)}", "trim=duration=#{duration}", "setpts=PTS-STARTPTS"]
       filters << "fade=t=in:st=0:d=#{intro}" if intro.positive?
       filters << "fade=t=out:st=#{fade_start}:d=#{outro}" if outro.positive?
       filter = "#{filters.join(',')},format=yuv420p[v]"
-      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-stream_loop", "-1", "-i", loop_path, "-i", audio, "-t", duration.to_s, "-filter_complex", filter, "-map", "[v]", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", output]
+      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", base_image, "-i", audio, "-t", duration.to_s, "-filter_complex", filter, "-map", "[v]", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium", "-tune", "stillimage", "-crf", "16", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", output]
       run_media!(command, output, "visual companion")
+    end
+
+    def static_frame_filter(presentation)
+      framing = if presentation.fetch("fit") == "cover"
+        "scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT}:x=(in_w-out_w)/2:y=(in_h-out_h)/2"
+      else
+        matte = presentation.fetch("matte").delete_prefix("#")
+        "scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=decrease,pad=#{WIDTH}:#{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x#{matte}"
+      end
+      "#{framing},gradfun=1.2:16"
     end
 
     def audio_duration(path)
@@ -412,7 +420,7 @@ module SoulCore
       {
         "profile_id" => STATIC_PROFILE_ID, "label" => "Static presentation", "loop_seconds" => LOOP_SECONDS,
         "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264",
-        "creative_effects" => false, "model_inference" => false, "resource_lane" => "cpu-foreground",
+        "creative_effects" => false, "dark_gradient_dither" => "gradfun=1.2:16", "model_inference" => false, "resource_lane" => "cpu-foreground",
         "generated_motion" => "qualification_required"
       }
     end

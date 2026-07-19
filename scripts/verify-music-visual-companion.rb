@@ -81,13 +81,14 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   looped = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), presentation: presentation, confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
   loop = looped.dig("data", "visual", "artifacts", "loop")
   loop_command = runner.commands.find { |command| command.last.end_with?(".mp4") }
-  check.call("one bounded CPU encode holds the still without synthesized effects", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "static_hold" && loop["frame_change_expected"] == false && loop_command.join(" ").include?("force_original_aspect_ratio=decrease") && loop_command.join(" ").include?("pad=1280:720") && !loop_command.join(" ").include?("displace"))
+  check.call("one bounded CPU encode holds the still without synthesized effects", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "static_hold" && loop["frame_change_expected"] == false && loop_command.join(" ").include?("force_original_aspect_ratio=decrease") && loop_command.join(" ").include?("pad=1280:720") && loop_command.join(" ").include?("gradfun=1.2:16") && loop_command.include?("stillimage") && !loop_command.join(" ").include?("displace"))
 
   final_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   rendered = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: final_preview.dig("data", "expected_digest"))
   final = rendered.dig("data", "visual", "artifacts", "preview")
-  final_command = runner.commands.find { |command| command.include?("-stream_loop") }
-  check.call("final render extends the reviewed still and binds exact lossless audio", rendered["lifecycle_state"] == "blocked_for_human_review" && final["duration_seconds"] == 3.0 && final_command.include?(audio) && final_command.join(" ").include?("fade=t=in:st=0:d=1.5") && final_command.join(" ").include?("fade=t=out:st=0:d=3.5"))
+  final_command = runner.commands.find { |command| command.first.end_with?("ffmpeg") && command.include?(audio) }
+  base_image = File.join(store.project_path(project_id), "visuals", visual.fetch("visual_id"), "base.png")
+  check.call("final render uses the lossless still directly and binds exact audio once", rendered["lifecycle_state"] == "blocked_for_human_review" && final["duration_seconds"] == 3.0 && final_command.include?(audio) && final_command.include?(base_image) && !final_command.include?("-stream_loop") && final_command.include?("stillimage") && final_command[final_command.index("-crf") + 1] == "16" && final_command.join(" ").include?("gradfun=1.2:16") && final_command.join(" ").include?("fade=t=in:st=0:d=1.5") && final_command.join(" ").include?("fade=t=out:st=0:d=3.5"))
   check.call("authenticated artifact resolver verifies every stored digest", %w[base loop preview].all? { |kind| File.file?(service.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), artifact: kind)) })
 end
 

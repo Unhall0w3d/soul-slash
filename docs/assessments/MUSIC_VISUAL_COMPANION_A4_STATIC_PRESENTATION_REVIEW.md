@@ -8,6 +8,8 @@ Status: candidate-complete; human dashboard review required
 - contain/cover framing, matte color, and fade controls are digest-bound;
 - the 12-second encoder path contains no displacement or creative effect;
 - the full render extends the approved still and muxes exact candidate audio;
+- the full render returns to the lossless PNG, uses one CRF-16 still-image
+  encode, and applies restrained dark-gradient dithering to reduce banding;
 - generated motion is visible but unavailable pending Visual Studio A3;
 - legacy effect profiles cannot advance.
 
