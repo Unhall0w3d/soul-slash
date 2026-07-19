@@ -110,6 +110,7 @@ check.call("application contract exposes complete A2 operation set", required.al
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes revision review edit deletion and promotion", %w[update-visual-project visual.candidates.review visual.edit.preview visual.candidates.delete.preview visual.promotion.preview preview-visual-project-delete].all? { |value| html.include?(value) || js.include?(value) })
+check.call("Music binding selector reads the canonical generation projection", js.include?('dataOf(envelope).generations || []'))
 check.call("motion remains unavailable in A2", html.include?("Qualification pending") && !operations.key?("visual.motion.execute"))
 
 if failures.empty?
