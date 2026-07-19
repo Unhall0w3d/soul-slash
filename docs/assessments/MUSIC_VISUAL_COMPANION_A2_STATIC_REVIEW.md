@@ -1,6 +1,6 @@
 # Music Visual Companion A2 Static Review
 
-Status: candidate implementation verified; human review pending
+Status: superseded before human render; A3 preserves localized water while locking the camera
 
 ## Implemented
 

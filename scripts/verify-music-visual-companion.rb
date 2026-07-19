@@ -75,7 +75,8 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   loop_preview = service.loop_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   looped = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
   loop = looped.dig("data", "visual", "artifacts", "loop")
-  check.call("one bounded CPU hold preserves a genuinely static frame", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "static_hold" && loop["frame_change_expected"] == false && runner.commands.any? { |command| command.include?("-vf") && !command.join(" ").include?("displace") })
+  loop_command = runner.commands.find { |command| command.last.end_with?(".mp4") }
+  check.call("one bounded CPU loop moves only localized water under a locked camera", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "localized_water_locked_camera" && loop_command.join(" ").include?("displace=edge=mirror") && loop_command.join(" ").include?("x=(in_w-out_w)/2:y=(in_h-out_h)/2") && !loop_command.join(" ").include?("sin(2*PI*t"))
 
   final_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   rendered = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: final_preview.dig("data", "expected_digest"))

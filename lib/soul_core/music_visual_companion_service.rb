@@ -120,16 +120,16 @@ module SoulCore
       scope = loop_scope(record)
       return gate_mismatch("exact visual loop confirmation did not match") unless confirmation == LOOP_CONFIRMATION
       return gate_mismatch("visual loop scope changed; preview again") unless secure_compare(expected_digest, digest(scope))
-      progress&.call({ "stage" => "visual_loop", "message" => "Rendering the bounded #{LOOP_SECONDS}-second static hold" })
+      progress&.call({ "stage" => "visual_loop", "message" => "Rendering bounded localized water motion with a locked camera" })
       directory = visual_path(project_id, visual_id)
       output = File.join(directory, ".loop.partial.mp4")
       render_loop(File.join(directory, "base.png"), output)
       File.rename(output, File.join(directory, "loop.mp4"))
-      record["artifacts"]["loop"] = artifact("loop.mp4", directory).merge("duration_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "motion_profile" => "static_hold", "frame_change_expected" => false)
+      record["artifacts"]["loop"] = artifact("loop.mp4", directory).merge("duration_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "motion_profile" => "localized_water_locked_camera", "frame_change_expected" => true)
       record["stage"] = "loop_ready"
       record["updated_at"] = @clock.call.iso8601
       replace_json(File.join(directory, "visual.json"), record)
-      outcome("blocked_for_human_review", true, "static visual hold rendered; full-preview review required", data: { "visual" => record }, mutation: "music_visual_loop_created")
+      outcome("blocked_for_human_review", true, "locked-camera water loop rendered; full-preview review required", data: { "visual" => record }, mutation: "music_visual_loop_created")
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
     rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
@@ -159,7 +159,7 @@ module SoulCore
       directory = visual_path(project_id, visual_id)
       audio = @store.candidate_artifact_path(project_id, candidate_id, "flac")
       duration = audio_duration(audio)
-      progress&.call({ "stage" => "visual_companion", "message" => "Holding the approved static frame and binding the exact lossless candidate" })
+      progress&.call({ "stage" => "visual_companion", "message" => "Repeating the approved locked-camera water loop and binding the exact lossless candidate" })
       output = File.join(directory, ".preview.partial.mp4")
       render_final(File.join(directory, "loop.mp4"), audio, output, duration)
       File.rename(output, File.join(directory, "preview.mp4"))
@@ -226,8 +226,12 @@ module SoulCore
     def render_loop(input, output)
       require_tools!
       frames = LOOP_SECONDS * FPS
-      filter = "scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT},format=yuv420p"
-      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", input, "-t", LOOP_SECONDS.to_s, "-vf", filter, "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-g", frames.to_s, "-keyint_min", frames.to_s, "-sc_threshold", "0", "-movflags", "+faststart", output]
+      filter = "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT}:x=(in_w-out_w)/2:y=(in_h-out_h)/2,split=2[scene][water_src];" \
+               "[water_src]crop=#{WIDTH}:270:0:450[water];" \
+               "nullsrc=s=#{WIDTH}x270:r=#{FPS}:d=#{LOOP_SECONDS},geq=lum='128+3*sin(2*PI*(Y/H+N/#{frames}))':cb=128:cr=128[xmap];" \
+               "nullsrc=s=#{WIDTH}x270:r=#{FPS}:d=#{LOOP_SECONDS},geq=lum='128+2*sin(2*PI*(2*X/W+N/#{frames}))':cb=128:cr=128[ymap];" \
+               "[water][xmap][ymap]displace=edge=mirror[water_moved];[scene][water_moved]overlay=0:450,format=yuv420p[v]"
+      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", input, "-t", LOOP_SECONDS.to_s, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-g", frames.to_s, "-keyint_min", frames.to_s, "-sc_threshold", "0", "-movflags", "+faststart", output]
       run_media!(command, output, "visual loop")
     end
 
@@ -328,7 +332,7 @@ module SoulCore
     end
 
     def render_profile
-      { "profile_id" => "static-hold-v1", "loop_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264", "model_inference" => false, "resource_lane" => "cpu-foreground" }
+      { "profile_id" => "localized-water-locked-camera-v2", "loop_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264", "model_inference" => false, "resource_lane" => "cpu-foreground" }
     end
 
     def require_tools!

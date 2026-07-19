@@ -1,5 +1,7 @@
 # Music Visual Companion A2 — Static Direction
 
+Superseded by A3 after human clarification: the localized water effect was acceptable; only whole-image camera drift was rejected.
+
 ## Human-approved objective
 
 Replace the rejected simulated camera and water motion with an intentionally static visual companion. Preserve the existing moving render as review evidence and create a new candidate lineage rather than overwriting it.

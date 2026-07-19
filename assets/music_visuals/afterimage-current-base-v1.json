@@ -8,10 +8,10 @@
   "provider": "OpenAI built-in image generation",
   "rights_status": "original",
   "generated_at": "2026-07-18T23:45:00Z",
-  "prompt_summary": "Nocturnal flooded coastal megastructure with cyan water reflections, warm architectural lights, atmospheric depth, and an off-center ring beacon; retained as a static visual companion.",
+  "prompt_summary": "Nocturnal flooded coastal megastructure with cyan water reflections, warm architectural lights, atmospheric depth, and an off-center ring beacon; framed for a locked camera with localized water motion.",
   "animation_intent": [
-    "static frame",
-    "visual fade in",
-    "visual fade out"
+    "locked camera and stationary architecture",
+    "periodic foreground water displacement only",
+    "visual fade in and fade out"
   ]
 }
