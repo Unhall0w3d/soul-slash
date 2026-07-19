@@ -591,6 +591,7 @@ function renderMusicCandidates(candidates) {
 
 function musicVisualCompanionPanel(candidate) {
   const visual = candidate.visuals?.[0]; const source = candidate.visual_sources?.[0]; if (!visual && !source) return null;
+  const staticProfile = visual?.render_profile?.profile_id === "static-hold-v1";
   const panel = document.createElement("section"); panel.className = "music-visual-companion";
   const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Visual Companion"; const badge = document.createElement("small"); badge.textContent = visual ? visual.stage.replaceAll("_", " ") : "approved source available"; heading.append(title, badge); panel.append(heading);
   const status = document.createElement("p"); status.className = "dialog-status";
@@ -601,17 +602,18 @@ function musicVisualCompanionPanel(candidate) {
   }
   const media = document.createElement("div"); media.className = "music-visual-media";
   const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base);
-  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", "Repeated seamless visual loop preview"); media.append(loop); }
+  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual hold preview" : "Retired moving visual loop preview"); media.append(loop); }
   if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "metadata"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Three-minute visual companion with candidate audio"); media.append(preview); }
   panel.append(media);
-  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `Loop ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps · seam PSNR ${Number(visual.artifacts.loop.seam_psnr_db).toFixed(2)} dB` : "Base source is immutable; rendering has not started."; panel.append(metrics);
+  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold" : "Retired motion loop"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Base source is immutable; rendering has not started."; panel.append(metrics);
   if (!visual.artifacts?.loop) {
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview 12-second loop render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "loop", { visual_id: visual.visual_id })); panel.append(button);
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview 12-second static hold"; button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "loop", { visual_id: visual.visual_id })); panel.append(button);
   } else if (!visual.artifacts?.preview) {
-    const note = document.createElement("p"); note.textContent = "Play the loop through several boundaries. Continue only when water motion and the seam remain unobtrusive.";
+    const note = document.createElement("p"); note.textContent = "Confirm the frame remains completely static. The full render adds only bounded visual fades.";
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview three-minute render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "final", { visual_id: visual.visual_id })); panel.append(note, button);
   } else {
-    const note = document.createElement("p"); note.textContent = "Three-minute local preview ready. It remains unpublished and bound to this exact audio digest."; panel.append(note);
+    const note = document.createElement("p"); note.textContent = `${staticProfile ? "Static" : "Retired moving"} three-minute local preview ready. It remains unpublished and bound to this exact audio digest.`; panel.append(note);
+    if (!staticProfile && source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare static replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, panel, replacement, status, "import", { asset_id: source.asset_id })); panel.append(replacement); }
   }
   panel.append(status); return panel;
 }

@@ -19,7 +19,6 @@ class VisualRunner
     argv = command.length == 1 && command.first.is_a?(Array) ? command.first : command
     @commands << argv
     return Result.new(stdout: "3.000\n", stderr: "", status: "ok") if argv.first.end_with?("ffprobe")
-    return Result.new(stdout: "", stderr: "PSNR average:45.540873 min:45.540873 max:45.540873\n", status: "ok") if argv.join(" ").include?("psnr")
     File.binwrite(argv.last, "bounded visual fixture") if argv.last.end_with?(".mp4")
     Result.new(stdout: "", stderr: "", status: "ok")
   end
@@ -76,7 +75,7 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   loop_preview = service.loop_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   looped = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
   loop = looped.dig("data", "visual", "artifacts", "loop")
-  check.call("one bounded CPU loop records immutable artifact and seam evidence", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["seam_psnr_db"] == 45.541 && runner.commands.any? { |command| command.join(" ").include?("displace=edge=mirror") })
+  check.call("one bounded CPU hold preserves a genuinely static frame", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "static_hold" && loop["frame_change_expected"] == false && runner.commands.any? { |command| command.include?("-vf") && !command.join(" ").include?("displace") })
 
   final_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   rendered = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: final_preview.dig("data", "expected_digest"))
