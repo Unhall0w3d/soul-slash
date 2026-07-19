@@ -2,78 +2,53 @@
 
 ## Product shape
 
-The first Soul dashboard is a local, desktop-first interface over the same assistant runtime used by the CLI. It must not implement a second memory model, skill runner, approval system, artifact registry, or safety policy.
+The dashboard is Soul's primary daily interface over the same application, conversation, memory, skill, artifact, approval, policy, and execution core used by the CLI. It must not develop a second assistant brain or duplicate authority rules in browser-only code.
 
-The primary navigation now has three tabs in this order:
-
-```text
-1. Chat
-2. Skill Studio
-3. Self Assessment
-```
-
-Chat is the daily operating surface. Skill Studio is the controlled skill-creation workflow. Shared workspace, system status, approvals, and activity are supporting views rather than separate assistant brains.
-
-Self Assessment is the evidence-and-review surface for Soul's host environment, language/tool versions, local model runtime, capability matrix, and advisory improvement proposals. It is not an autonomous package manager or privileged administration console. The name distinguishes evidence gathering from the future Self Augmentation concept, which would prepare architecture-level proposals through a separate human-reviewed boundary.
-
-### Chat tab
-
-The initial Chat composition should include:
-
-- persistent chat list and resume controls;
-- the active conversation and composer;
-- explicit provider, privacy, task, and failure state;
-- a compact system-status card with host identity, collection time, and manual refresh;
-- a shared-workspace rail or drawer for artifacts attached to the conversation;
-- direct links from completion messages to artifacts, approvals, evidence, and review records.
-
-System status is collected once when the dashboard opens and may be refreshed manually. The interface must not add background polling, watchers, or monitoring services.
-
-### Skill Studio tab
-
-The implemented Skill Studio lifecycle is:
+Current primary navigation is:
 
 ```text
-idea, capability gap, or bounded brief draft
-→ proposal review and exact-revision human Gate 1
-→ isolated, unregistered Beta implementation
-→ required tests and bounded human-invoked diagnostics
-→ exact-tested-revision human Gate 2
-→ separate later promotion and merge decisions
+Chat
+Self Improvement
+  ├─ Skill Studio
+  ├─ Self Assessment
+  └─ Self Augmentation
+Creative Studios
+  ├─ Music Studio
+  └─ Visual Studio
 ```
 
-Skill Studio organizes proposals, Beta candidates, required tests, diagnostics, and production registry summaries. It must not autonomously invoke Codex, apply patches, register generated skills, promote candidates, or treat model output as approval.
+Review Center is a header-level supporting dialog. Core selection, provider/config identity, local connection state, and logout remain visible in the top bar.
 
-Each proposal now shows one deterministic lifecycle stage and the exact skill ID from its Beta manifest. Once that exact ID is present in the production registry, Skill Studio may offer a separately previewed and confirmed closeout that deletes the proposal and superseded Beta copy while preserving the production skill and shared diagnostics.
+## Surface roles
 
-### Self Assessment tab
+### Chat
 
-The tab loads one lightweight read-only environment snapshot when opened. Package update checks, local model assessment, and capability assessment remain explicit foreground actions. Generating advisory improvement proposal packets requires previewing and confirming the exact assessed revision.
+Chat is the default operating surface: persistent transmissions, immediate user-message rendering, model/work progress summaries, active conversation, artifacts, workspace, inbox, system state, runtime state, and explicit model/Core controls.
 
-The initial surface must make the mutation boundary visible: it cannot install, update, downgrade, or remove packages; change services; download models; implement or promote skills; or run privileged commands. Those actions require separately reviewed executors with package-manager-specific recovery and confirmation behavior.
+The Soul portrait is functional presence rather than decoration. Masked/dim represents listening or idle state; unmasked/brighter presentation reflects real thinking, responding, or bounded work. It must not imply model throughput or activity that is not actually occurring.
+
+### Self Improvement
+
+Skill Studio, Self Assessment, and Self Augmentation are grouped because all three concern Soul's capabilities and stewardship, but their authority boundaries remain distinct. Their current operator flows are documented in:
+
+- `docs/guides/SKILL_STUDIO.md`
+- `docs/guides/SELF_ASSESSMENT.md`
+- `docs/guides/SELF_AUGMENTATION.md`
+
+### Creative Studios
+
+Music Studio and Visual Studio are project/candidate workspaces. They preserve exact inputs and lineage, expose resource state, preview consequential operations, and keep machine evidence separate from human artistic judgment.
+
+- `docs/guides/MUSIC_STUDIO.md`
+- `docs/guides/VISUAL_STUDIO.md`
 
 ### Review Center
 
-Phase 12E adds Review Center as a header-level supporting surface, not a fourth primary tab. It unifies redacted pending-approval state and bounded recent execution activity with manual refresh, filters, and record detail. Inspection is not authorization: approval values, private request text, full scope values, execution replay, approval mutation, and history mutation remain unavailable.
+Review Center unifies redacted pending-approval and recent execution evidence. Inspection is not authorization. Approval values, private request text, replay, mutation, and destructive history controls remain unavailable there.
 
-### Shared workspace
+## Configuration and deployment posture
 
-The shared workspace is an artifact- and task-oriented projection of Soul's existing registries. It is not an unrestricted filesystem browser.
-
-Initial workspace items may include:
-
-- attached and recently delivered artifacts;
-- revisions and provenance;
-- implementation task packs;
-- skill briefs and human-review artifacts;
-- pending approvals and blocked-for-review results;
-- deterministic completion and failure summaries.
-
-## Configuration posture
-
-The public repository must contain no operator-specific IP address, hostname, credential, model alias, or workspace path as a required assumption.
-
-Configuration precedence is:
+The public repository contains no required operator-specific IP address, hostname, credential, model path, or workspace path.
 
 ```text
 CLI override
@@ -82,93 +57,71 @@ CLI override
 → tracked safe default
 ```
 
-The dashboard consumes the same typed configuration contract as the CLI. Settings must identify their current source, validation, behavioral effect, privacy or risk impact, and restart requirement. Secrets are redacted and are never returned through general configuration responses.
+`make dashboard` is the foreground development path. The reviewed optional persistent deployment keeps Soul loopback-bound behind Caddy HTTPS on one exact LAN endpoint. Service installation, firewall configuration, client CA trust, and wider exposure remain explicit human operations.
 
-## Visual source
+## Current visual identity
 
-The first visual attempt must draw from:
+Soul is a local machine familiar: precise, curious, collaborative, technically deep, and visibly constrained by human authority. The approved character is an androgynous silver-haired machine soul with an articulated dark mask, indigo-black tailored techno-organic materials, fine bronze-gold construction, and restrained cerulean energy.
 
-- `assets/brand/soul-slash-brand-board.png`
-- `assets/brand/soul-slash-repo-header.png`
-- `assets/brand/soul-slash-supporting-scene.png`
-- `assets/brand/soul-slash-primary-mark.png`
-- `assets/brand/soul-slash-repo-icon.png`
-- `docs/BRANDING.md`
+The interface no longer follows the older purple necromantic grimoire direction. Avoid spellbooks, runes, occult framing, generic robot imagery, and theatrical claims of hidden system activity.
 
-The visual target is an operational instrument with restrained arcane character: trustworthy, local, precise, and alive with system state without becoming theatrical or visually noisy.
-
-## Initial design tokens
-
-The existing brand board supplies the starting palette:
+### Palette
 
 ```text
-Arcanum Violet  #6E3DDF  model activity, active focus, creative drafting
-Spectral Teal    #00E2D6  verified state, connectivity, successful evidence
-Pale Silver      #E6ECF1  primary text and high-contrast marks
-Ember Gold       #FFB14A  human gates, approvals, interface emphasis
-Shadow Ink       #0A0D12  page background
-Necro Slate      #151922  panels, cards, elevated working surfaces
+Abyssal base       #060B11  page depth and low-luminance canvas
+Deep indigo        #101729  layered surfaces and character material
+Cerulean presence  #20C8F2  active, available, verified, and focus state
+Pale blue-gray     #D9E5EA  primary readable text
+Bronze structure   #8E6F3A  frames, separators, and restrained geometry
+Operator amber     #D4AF37  review and human authority
+Destructive red    #FF1744  destructive action and systemic failure
 ```
 
-Typography begins with:
+Violet remains atmospheric material depth, not an action color. Large white surfaces are excluded to protect sustained readability on dark displays.
+
+### Form and composition
+
+- Use dark layered surfaces, asymmetric curves, precise borders, concentric instrumentation, and restrained signal geometry.
+- Favor strong silhouette and clear hierarchy over high-frequency ornament.
+- Keep detailed artwork away from messages, forms, tables, logs, lyrics, and code.
+- Use gold for meaningful Operator attention rather than routine decoration.
+- Retain conventional labels wherever metaphor would obscure behavior.
+- Avoid generic commercial-SaaS cards and flat white panels.
+
+### Typography and legibility
+
+- Display headings use an elegant serif with robust fallbacks.
+- Body and controls use a clean readable sans serif.
+- IDs, code, evidence, and compact status use a monospace face.
+- Secondary utility text must remain at least 11 px at normal zoom.
+- Labels use at least 12 px, supporting text generally 13–14 px, and conversation text 15 px or larger.
+- Ultrawide layouts keep primary conversation content left-oriented within its working region rather than floating in the screen center.
+
+### Motion
+
+The interface may feel alive through finite transitions tied to real tab, focus, message, Core, or task state. It must not use decorative timers, simulated throughput, continuous background polling, or ambient motion that competes with information.
+
+Reduced-motion preferences disable the optional interaction layer. The pulsing system-status instrument must remain restrained and must not be presented as a measurement unless associated data is current.
+
+## Language
+
+Terms such as Operator, transmission, signal, Core, continuity, foundry, survey, and studio are appropriate when their function remains obvious. Soul's voice may be present, but factual labels—model, accelerator, host, lifecycle, privacy, approval, failure, and destructive scope—must stay truthful and direct.
+
+The public project identity is summarized as:
 
 ```text
-Display headings: Cinzel or a compatible open serif
-Body and controls: Inter or a compatible clean sans serif
-Code and identifiers: JetBrains Mono or a compatible monospace
+Conversation · Capability · Creation · Stewardship
 ```
 
-The implementation must use distributable fonts or robust system fallbacks. It must not depend on fonts installed only on the project owner's machine.
+## Human visual review
 
-## Visual restraint
+Passing automated tests does not approve dashboard design. Material changes to navigation, hierarchy, character identity, palette, typography, motion, authority presentation, or creative workflow require human visual inspection.
 
-- Use the primary mark, luminous slash, fine circuits, rings, and sigils as sparse identity accents.
-- Reserve detailed grimoire scenes for onboarding, empty states, an about view, or a restrained header treatment.
-- Do not place high-detail imagery behind message text, tables, forms, logs, or code.
-- Prefer thin borders, quiet layered surfaces, small status glows, and precise geometry over ornamental frames around every component.
-- Use gold for meaningful human attention, not routine decoration.
-- Do not encode lifecycle, risk, or approval state through color alone.
-- Maintain readable contrast, visible keyboard focus, reduced-motion behavior, and usable zoom.
-- Avoid generic commercial-SaaS gloss and avoid turning every control into fantasy decoration.
+Review should consider:
 
-## Visual review posture
-
-The owner approved the initial Chat/Skill Studio direction and the third assessment tab. The July 2026 signal-interface refresh moves the visual language toward Soul's machine-familiar identity: dark technical surfaces, teal operational emphasis, restrained violet, scalable code-native fields, and concise persona-aware terms such as Operator, signal, transmission, continuity, and capability. It deliberately avoids making metaphor obscure product meaning. Material changes to dashboard hierarchy, visual language, or authority boundaries still pause for human review.
-
-The interface type scale treats 11 px as the minimum for secondary utility text at normal dashboard zoom. Labels use at least 12 px, supporting copy generally uses 13–14 px, and conversation content uses 15 px or larger. Teal represents active, available, and verified state; amber represents Operator attention and approval; red represents failure and destructive boundaries. Violet is atmospheric only, not an action color.
-
-Soul may feel responsive through short CSS transitions tied to a real tab, hover, focus, or runtime state. The dashboard does not use timers, polling, infinite ambient animation, or decorative motion that competes with information. Reduced-motion preferences disable the optional interaction animation layer.
-
-## Gilded machine-soul research direction
-
-The later design candidate takes inspiration from the design principles behind Warframe's Orokin and Cephalon technology without copying its named interface, glyphs, assets, or exact layouts. Research sources included:
-
-- Digital Extremes' official [Content Creator Art Style Guide](https://www.warframe.com/en/steamworkshop/content-creator-art-style-guide), particularly its emphasis on sweeping silhouettes, over-the-top whole-form composition, faction distinction, and restraint with high-frequency detail;
-- Digital Extremes' [TennoCon 2025 Art & Animation Deep Dive](https://www.warframe.com/de/news/tennocon-2025-art-animation-of-warframe-deep-dive), including the described approach to machinery that opens as the player approaches and the blending of organic shapes with mechanical detail;
-- the official [Warframe Mission Interface](https://support.warframe.com/hc/en-us/articles/38801911653517-Mission-Interface), used as a reference for peripheral transmissions and semantically consistent status placement;
-- the official [Operator Report: The Void](https://www.warframe.com/en/news/operator-report-the-void-ko), used only as thematic context for spatial depth and luminous energy contained by ancient high technology.
-
-Soul's translation uses abyssal indigo-black as the dominant screen material, metallic gold as structural hierarchy, cerulean as active machine presence, muted pale cyan-gray for readable copy, and crimson only for real destructive or failed state. Porcelain white is deliberately excluded from large digital surfaces because sustained high luminance is unsuitable for the owner's dashboard.
-
-Major containers use asymmetric curves, layered border gradients, orbital nodes, and restrained filigree rather than conventional flat cards. The visual system prioritizes overall silhouette over repeated ornament. Finite `core-unseal`, `inscription-resolve`, and `core-awaken` effects respond to real tab, message, or element appearance. They run only when reduced motion is not requested and do not simulate model throughput or introduce timers.
-
-The following remain future concepts until supported by real product behavior: runtime-reactive throughput visualization, parameter dials, a memory graph/arbor, first-instantiation narrative, and collaborative asset editing effects. Evocative names must not replace truthful CPU, GPU, memory, model, lifecycle, or authorization labels.
-
-The review should cover:
-
-- overall visual tone;
-- information density;
-- navigation and three-tab hierarchy;
-- Chat composition;
-- workspace placement;
-- system-status presentation;
-- typography and palette;
-- use of imagery and motifs;
-- motion and interaction feel;
-- desired additions, removals, or product-direction changes.
-
-Passing automated tests does not approve dashboard design. Human visual review remains the acceptance gate for material interface changes.
-
-## Deployment posture
-
-The dashboard is developed and accepted locally before Proxmox is needed. Initial web execution, when separately approved, is foreground and loopback-only. Persistent service installation and LAN deployment belong to a later human-approved deployment brief.
+- whether the interface feels coherent and alive without becoming noisy;
+- readability at normal zoom and on ultrawide displays;
+- visibility of Core, resource, lifecycle, and authority state;
+- whether metaphor supports rather than hides function;
+- preservation of feature parity and exact human gates;
+- consistency between Chat, Self Improvement, and Creative Studios.

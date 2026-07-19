@@ -262,11 +262,14 @@ The setup script will:
 6. check the `/v1/models` endpoint
 7. write `.env`
 
-Example model:
+Example generic Ollama model:
 
 ```text
 qwen3:8b
 ```
+
+The supported Soul Daily Core is the reviewed Gemma profile described earlier;
+the generic setup path remains useful for clean clones and experiments.
 
 Test:
 
@@ -326,13 +329,16 @@ ruby bin/soul skills
 ruby bin/soul skill system.status
 ```
 
-## 11. Start the foreground dashboard
+## 11. Start the dashboard
 
 ```bash
 make dashboard
 ```
 
-Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, Skill Studio, and Self Assessment. It binds to loopback only, runs in the foreground, and stops with Ctrl+C.
+Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, grouped
+Self Improvement surfaces (Skill Studio, Self Assessment, and Self
+Augmentation), grouped Creative Studios (Music and Visual), and Review Center.
+This command binds to loopback, runs in the foreground, and stops with Ctrl+C.
 
 First-run dashboard access uses the fixed administrator username `admin` and bootstrap password `soul123`. The bootstrap session cannot load dashboard data. Replace it with a private password of 12–128 characters when prompted. Soul stores only the salted derived credential under ignored `Soul/runtime/dashboard_auth/` storage.
 
@@ -352,7 +358,8 @@ ruby bin/soul dashboard --set dashboard.port=4568
 
 Do not commit operator-specific hostnames, addresses, credentials, model aliases, or filesystem paths.
 
-The authenticated dashboard is still loopback-only. Do not widen the bind host for LAN access until the separately reviewed protected-transport phase is complete.
+Do not widen Soul's bind host for LAN access. The reviewed persistent path below
+keeps Soul loopback-only and places Caddy at the explicit HTTPS boundary.
 
 ## 12. Optional persistent LAN dashboard
 
@@ -386,14 +393,14 @@ The reviewed Linux deployment keeps Soul on loopback and uses Caddy for HTTPS on
 
 Soul does not change the firewall, router, DHCP, client trust store, or Internet exposure automatically. Full security boundaries and rollback instructions are in `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`.
 
-## 12. Try intent routing
+## 13. Try intent routing
 
 ```bash
 ruby bin/soul intent "run a file cleanup in Downloads"
 ruby bin/soul intent "restore the last downloads cleanup"
 ```
 
-## 13. Try the cleanup workflow
+## 14. Try the cleanup workflow
 
 Create harmless test fixtures. Avoid protected terms like `soul` or `Aletheia` in the filenames.
 
@@ -432,7 +439,7 @@ Clean up:
 rm -rf ~/Downloads/restore-fixture-file.tmp ~/Downloads/restore-fixture-folder
 ```
 
-## 14. Reflection
+## 15. Reflection
 
 After a successful workflow:
 
@@ -453,7 +460,7 @@ Reject weak or generic candidates:
 ruby bin/soul reflection reject latest --reason "Not useful"
 ```
 
-## 15. Common Make targets
+## 16. Common Make targets
 
 ```text
 make help             Show available targets
@@ -467,11 +474,17 @@ make music-pilot-plan Preview pinned environment and exact checkpoint bytes
 make setup-music      Install only after plan digest and exact confirmation
 make music-model-download  Download verified weights after a separate gate
 make music-pilot-run  Run one foreground 30/90/180-second feasibility pilot
+make music-vulkan-setup-plan  Preview the production AMD Vulkan music runtime
+make music-vulkan-download-plan  Preview exact production music model bytes
 make music-transcription-plan  Preview optional pinned CPU vocal analysis
 make music-transcription-install  Install it after digest and exact confirmation
 make music-reference-tooling-check  Inspect optional URL-analysis tools
 make music-reference-tooling-plan  Preview the pinned local tooling environment
 make music-reference-tooling-install  Install after digest and exact confirmation
+make visual-check     Inspect the optional Visual Studio still-image lane
+make visual-runtime-plan  Preview the pinned Vulkan image runtime
+make visual-model-download-plan  Preview exact FLUX.2 Klein model bytes
+make verify-music-publication-package  Test exact local upload packaging
 make test-runtime     Test configured runtime
 make test-fast        Test FAST/no_think request mode
 make test-think       Test THINK request mode
@@ -481,7 +494,8 @@ make env-show         Show local runtime config
 make fix-mtimes       Touch repo files if ZIP timestamps caused Make clock-skew warnings
 ```
 
-Music setup is optional. Its defaults are the reviewed 8 GiB pair:
+The original CUDA Music pilot remains available as compatibility evidence. Its
+defaults are the reviewed 8 GiB pair:
 `MUSIC_DIT_MODEL=acestep-v15-turbo` and
 `MUSIC_LM_MODEL=acestep-5Hz-lm-0.6B`. Override either with an exact,
 case-sensitive name present in `MUSIC_MODEL_MANIFEST`; unknown names stop
@@ -499,6 +513,26 @@ The plan prints the current digest and distinct confirmation phrases. Setup and
 model download never run as part of `make setup`, and neither starts a service,
 listener, worker, or background process. See
 `docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md` before proceeding.
+
+The current production Music Core uses the separately reviewed AMD Vulkan
+lane. Install it only after reviewing each exact plan:
+
+```bash
+make music-vulkan-setup-plan
+make music-vulkan-setup \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_MUSIC_VULKAN_RUNTIME
+
+make music-vulkan-download-plan
+make music-vulkan-download \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=DOWNLOAD_MUSIC_VULKAN_MODELS
+```
+
+This lane uses the pinned ACE-Step 1.5 4B LM / 2B Turbo Q8_0 model set. Music
+Studio loads it only for one bounded generation and removes successful WAV/LM
+intermediates after publishing validated FLAC and MP3 artifacts. See
+`docs/guides/MUSIC_STUDIO.md` for the current Operator flow.
 
 Vocal analysis is a separate optional install. Its reviewed default is the
 exact `ggml-small.en.bin` filename from `MUSIC_TRANSCRIPTION_MANIFEST`; a
@@ -534,7 +568,27 @@ separate `ANALYZE_MUSIC_REFERENCE` gate retrieves one bounded transient audio
 source, extracts non-expressive evidence, writes a private candidate profile,
 and removes source media and the analysis WAV at every terminal outcome.
 
-## 16. Clock-skew warning after applying overlays
+Visual Studio is also optional and separately gated:
+
+```bash
+make visual-check
+make visual-runtime-plan
+make visual-runtime-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_VISUAL_VULKAN_RUNTIME
+
+make visual-model-download-plan
+make visual-model-download \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=DOWNLOAD_VISUAL_VULKAN_MODELS
+```
+
+The supported production lane generates private local stills with FLUX.2
+Klein, exits after each render, and provides no background server. Generated
+motion targets in the Makefile remain qualification tooling, not a production
+dashboard feature. See `docs/guides/VISUAL_STUDIO.md`.
+
+## 17. Clock-skew warning after applying overlays
 
 If `make` complains that files have modification times in the future, run:
 

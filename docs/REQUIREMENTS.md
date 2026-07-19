@@ -33,8 +33,14 @@ Supported runtime providers:
 - A reviewed self-hosted SearXNG endpoint for optional bounded public-web
   research; narrow DuckDuckGo Instant Answer lookup requires no key, and
   ordinary local conversation does not require either network path
-- `uv`, FFmpeg, and an NVIDIA CUDA GPU for the separately gated Music Studio
-  feasibility pilot. They are not required for conversation or the dashboard.
+- `uv` and FFmpeg for separately gated creative tooling. They are not required
+  for base conversation or the dashboard.
+- A reviewed AMD Vulkan device/runtime for the production Music Studio
+  ACE-Step lane and Visual Studio FLUX.2 still-image lane. Hardware-specific
+  model setup is always separate from base setup.
+- NVIDIA CUDA remains the supported Qwen reserve/chat device for AMD-Free and
+  Music Cores on the owner-reviewed topology. The older NVIDIA Music pilot is
+  retained as compatibility evidence rather than the production path.
 - The separately gated Music Studio vocal-analysis option installs its own
   pinned whisper.cpp command and English model. It uses bounded CPU time only
   when explicitly triggered and does not create a resident process or service.
@@ -45,7 +51,7 @@ Supported runtime providers:
   for an exact-confirmed foreground URL analysis and retain no source audio in
   analysis-only mode.
 
-The Music pilot uses `uv` to create an isolated Python 3.12 environment without
+Optional Music tooling uses `uv` to create isolated environments without
 changing the distribution-managed Python installation. Install `uv` through
 the operating system package manager when available; then run `make
 music-check`. Soul does not bootstrap `uv` by downloading and executing a
@@ -107,13 +113,17 @@ Jinja templates: enabled
 
 These are tested defaults, not universal requirements.
 
-## Current Ollama defaults
+## Current supported Ollama profile
 
 ```text
 Endpoint: http://127.0.0.1:11434/v1
-Example model: qwen3:8b
+API alias: soul-local-chat
+Model: Gemma 4 12B Instruct 2512 Q4_K_M
+Accelerator: AMD Vulkan
 ```
 
-Ollama support should use Ollama model names and `ollama pull`.
+Generic Ollama setup still accepts an explicit Ollama model name and uses
+`ollama pull`; promotion into a supported Core requires a separate acceptance
+review.
 
 Do not assume an arbitrary Hugging Face GGUF URL can be used directly with Ollama without an intentional import/build step.

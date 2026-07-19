@@ -1,6 +1,6 @@
 # Skill Registry Snapshot
 
-Generated: 2026-07-15T13:24:19-04:00
+Generated: 2026-07-19T01:10:04-04:00
 
 Source registry:
 
@@ -13,7 +13,7 @@ This document is a generated documentation snapshot of the active skill registry
 ## Summary
 
 ```text
-skill_count: 14
+skill_count: 16
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -138,6 +138,26 @@ status: unknown
 ```
 
 Read-only weather report with temperature, humidity, air quality, and optional 3-day outlook.
+
+### `web.lookup`
+
+```text
+name: web.lookup
+category: uncategorized
+status: unknown
+```
+
+Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general research backend.
+
+### `web.research`
+
+```text
+name: web.research
+category: uncategorized
+status: unknown
+```
+
+Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
 
 ### `youtube.song_search`
 

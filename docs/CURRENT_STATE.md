@@ -1,184 +1,90 @@
 # Current State
 
-Soul/ is an experimental local-first assistant runtime, not only a model frontend. The current implementation shares one conversation, skill, memory, artifact, approval, and policy core across the CLI and foreground dashboard.
+Soul/ is an experimental local-first assistant runtime and creative workspace. One conversation, memory, skill, artifact, approval, policy, and execution core serves both the CLI and authenticated dashboard.
 
-## Implemented product surfaces
+## Product surfaces
 
 ```text
 Chat
-Skill Studio
-Self Assessment
-Self Augmentation
+Self Improvement
+  ├─ Skill Studio
+  ├─ Self Assessment
+  └─ Self Augmentation
+Creative Studios
+  ├─ Music Studio
+  └─ Visual Studio
+Review Center
 ```
 
-Chat provides persistent multi-turn conversations, immediate accepted-message
-rendering, truthful foreground work summaries, a responsive Soul familiar,
-local/model-backed responses, skill routing, artifacts, workspace metadata,
-inbox delivery, initial host status, and explicit refresh. Narrow orientation
-may use bounded DuckDuckGo Instant Answers; evidence-bearing work uses an
-explicitly configured SearXNG endpoint and selected public HTTPS sources.
+### Chat
 
-The browser dashboard has a single personal administrator boundary. First-run `admin` / `soul123` access is restricted to mandatory password replacement; private dashboard data and controls remain locked until that succeeds. Credentials are salted and derived in ignored local runtime storage. Sessions are bounded to seven days and persist across dashboard restarts using owner-only token digests; raw bearer tokens remain in host-only browser cookies. Sign-ups and additional accounts are unavailable.
+Chat provides persistent multi-turn transmissions, immediate accepted-message rendering, truthful working summaries, local model responses, deterministic capability and skill routing, bounded research, shared artifacts, workspace metadata, inbox delivery, memory controls, system status, and manual model/Core controls.
 
-The dashboard groups Skill Studio, Self Assessment, and Self Augmentation beneath the primary Self Improvement destination. Skill Studio provides separate Proposal, Beta, and Production inventories. Human Gate 1 may prepare an exact proposal-local incomplete Beta workspace and bounded Codex handoff without invoking a model. A human or explicitly invoked Codex task implements and tests that candidate. Human Gate 2 approves an exact tested Beta revision; a separate preview/digest/exact-confirmation operation may then copy its self-contained Ruby entrypoint and atomically add one new production registry entry. Existing skills are never replaced, and no gate promotes automatically.
+The dashboard has one personal administrator boundary. First-run `admin` / `soul123` access is limited to mandatory password replacement. Salted credentials and seven-day session digests remain in ignored owner-only runtime storage. Sign-ups and additional accounts are unavailable.
 
-Self Assessment provides one lightweight read-only environment snapshot when
-opened plus explicit foreground environment, package-update, model-runtime,
-capability, and Storage & Retention assessments. Storage A1 classifies protected
-projects, exports, memory, production models, accepted pilots, legacy runtimes,
-logs, and known temporary residue; it also reports point-in-time dashboard
-memory. Exact cleanup manifests are preview-only and no cleanup executor exists.
-Advisory improvement proposal packets still require preview, digest
-revalidation, and exact confirmation. Self Assessment cannot apply updates,
-delete data, or mutate the host. The internal `self_improvement.*` namespace
-remains stable for compatibility.
+### Self Improvement
 
-## Implemented core capabilities
+- **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
+- **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
+- **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
-- model-backed multi-turn conversation with persistent chat identity;
-- deterministic capability declarations, intent routing, and skill invocation planning;
-- bounded host evidence and follow-up routing;
-- layered conversation memory with review, export, and forget controls;
-- identity, interests, recent-style awareness, and inspectable boundaries;
-- shared artifacts, bounded inspection, creation/revision, and inbox delivery;
-- preview-first conversation clearing by exact title, selected set, or all active chats, plus exact single-conversation delete-and-forget;
-- production skill registry plus isolated Beta candidates and bounded diagnostics;
-- conservative self-skilling intake for genuinely unsupported task requests;
-- environment, model-runtime, capability, storage-retention, and improvement-proposal assessment;
-- portable typed configuration through CLI overrides, process environment, ignored `.env`, and safe defaults.
-- separate bounded `web.lookup` and provenance-preserving `web.research` paths;
-- explicit review-only research reflection candidates with no automatic memory promotion.
+### Creative Studios
 
-Owner-specific shared memory now has an ignored `Soul/private/memory` target
-with compatibility reads for older installations. Cutover is a bounded,
-digest-bound copy-and-verify migration: it retains every legacy source, writes
-no marker until hashes match, and requires a separate human-approved execution.
-The live cutover completed on 2026-07-18: seven files and 6,336 bytes were
-copied and hash-verified before the marker was written. The six tracked files
-are now neutral public seeds; `.public_seed_v1` keeps clean-clone writes private.
+- **Music Studio** stores immutable project briefs and candidate lineage; supports 30-, 90-, and 180-second AMD Vulkan ACE-Step generation; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies.
+- **Visual Studio** provides bounded local FLUX.2 Vulkan still generation, review, guided image edits, candidate/project deletion, and exact binding to a Music candidate.
+- A reviewed still can become a static music companion with framing, matte, fades, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. Nothing uploads or publishes automatically.
 
-## Runtime and deployment boundary
+Generated video remains a qualification track. Historical procedural FFmpeg motion effects are retired from advancement; the supported presentation holds the reviewed frame static. Short model-generated motion is not yet a production feature.
 
-The dashboard is dependency-free static HTML/CSS/JavaScript served by a sequential Ruby foreground loopback process:
+The operator-facing flows are documented in [`docs/guides/`](guides/).
 
-```bash
-ruby bin/soul dashboard
-```
+## Runtime topology
 
-The default command does not install a service, bind to the LAN, poll in the background, or continue after the process stops. An owner-approved optional local deployment candidate now keeps Soul loopback-bound while two explicit user services provide persistent operation and Caddy-managed HTTPS on one exact LAN address. Installation remains preview-first and opt-in; client CA trust and local service behavior require human review. Proxmox, containers, Internet exposure, backups, and recovery remain separate deployment tracks.
+The stable chat API alias is `soul-local-chat`; actual model identity is reported separately.
+
+- **Daily Core:** Gemma 4 12B Instruct Q4_K_M through Ollama/Vulkan on AMD.
+- **AMD-Free Core:** Qwen3 8B Q4_K_M through llama.cpp/CUDA on NVIDIA.
+- **Music Core:** Qwen chat on NVIDIA while ACE-Step 1.5 4B LM / 2B Turbo Q8_0 uses AMD/Vulkan only during bounded music generation.
+
+Core changes are manual and lease-revalidated. Music and image models do not remain resident. No idle-unload timer, automatic Core switch, worker queue, or background polling loop is present.
+
+## Deployment
+
+`make dashboard` runs a foreground loopback development instance. The reviewed optional deployment installs explicit user services for the loopback dashboard and Caddy HTTPS on one exact LAN address. Installation is preview-first, requires a changed administrator password and exact confirmation, and leaves firewall, DHCP, router, and client certificate trust to the Operator.
+
+Proxmox, Internet exposure, multi-user accounts, backup, and disaster recovery remain separate future tracks.
+
+## Memory, artifacts, and deletion
+
+Mutable owner memory lives under ignored `Soul/private/memory/`; tracked memory files are neutral public seeds. Durable promotion remains human-reviewed.
+
+Conversations, skill candidates, music projects, visual projects, reference profiles, logs, and generated artifacts have explicit lifecycle boundaries. Reversible archive/Trash behavior is preferred where appropriate. Permanent deletion exists only for previewed exact scopes and preserves separately exported finished files where the relevant workflow says so.
 
 ## Human authority boundary
 
-Soul may assess, explain, draft, stage, test, and produce review artifacts. It may not treat model output or passing tests as approval.
+Soul may inspect, explain, draft, research, stage, generate, test, and produce evidence. It may not treat model output, passing tests, successful generation, or a machine-heard result as authorization.
 
-Human approval remains required for:
+Human approval remains required for risky or destructive execution, durable memory/rule promotion, skill and augmentation gates, production registration, host mutation, provider/privacy exceptions, service installation, merge, release, upload, and publication.
 
-- risky or destructive execution;
-- durable memory/rule promotion;
-- proposal and Beta gates;
-- system/package mutation;
-- provider/privacy exceptions;
-- merge and release decisions;
-- persistent-service or deployment architecture.
+## Current development focus
 
-## Current development position
+The foundational Conversational Soul milestone is complete. Deployment/Core orchestration, Self Improvement, Music Studio, Visual Studio stills, and local publication packaging are implemented and under owner use.
 
-The Conversational Soul milestone is complete at its Phase 13 stopping point following owner approval on 2026-07-15. Phase 12D.5 was reviewed and merged with bounded Beta workspace preparation and preview-gated Beta-to-production promotion. Phase 13A passes all ten deterministic integrated scenarios through isolated real application/runtime boundaries. Phase 13B completed a bounded local-model run with 20/20 model turns and 6/6 continuity probes, while recording sustained latency as a known weakness. Phase 13C aligns documentation and the aggregate verifier suite. No release or tag has been created; later work begins as a separately approved milestone.
+Near-term work is expected to concentrate on:
 
-The Deployment and Operations milestone has manual, preview-gated Core and
-runtime control with selected-profile login startup. Gemma 4 12B Instruct
-Q4_K_M through Ollama/Vulkan is the supported AMD Daily Core. Qwen3 8B Q4_K_M
-through llama.cpp/CUDA is the NVIDIA reserve used by AMD-Free and Music Cores.
-Ministral 3 14B has been retired from the supported profile inventory and
-startup path; historical bake-off evidence remains. No automatic Core switch,
-idle unload, or reboot is introduced. Runtime identity is reported separately
-from the stable `soul-local-chat` OpenAI-compatible API alias.
+- chat usability, persona fidelity, and dashboard-capability invocation through skills;
+- production hardening and documentation of creative workflows;
+- additional Music Studio refinement based on real generations;
+- measured visual-motion qualification before any production motion path;
+- backup/recovery and broader deployment only under separate review.
 
-AMD-Free and Music Cores share the already-running NVIDIA Qwen chat profile.
-They can transition directly through an idle/lease-revalidated exact intent
-gate that changes only the private Core-selection record; Daily is no longer a
-required intermediate Core and no model service is restarted in that path.
+No release or stable tag has been created.
 
-The original Multi-model and Music Studio A0 direction kept conversation on
-AMD and piloted ACE-Step on NVIDIA. That historical CUDA path remains useful
-compatibility evidence but is no longer the Music Core production path.
-The target product is an iterative project workspace for 2–3 minute songs,
-lyrics, lawful references, candidates, repainting, stems, and creative review.
-A0 installed and ran nothing. The first Music A1 candidate now provides an
-optional `uv` preflight, pinned and preview-gated user-local setup, separately
-confirmed verified model downloads, and a bounded offline foreground pilot.
-The default checkpoint names are exact but publicly overridable through a
-reviewed manifest. After owner approval, the pinned v0.1.8 source and isolated
-Python 3.12 environment were installed user-locally. PyTorch 2.10 CUDA 12.6
-successfully imported ACE-Step and ran synchronized matrix multiplication on
-the GTX 1070 through its compatible `sm_60` cubin. After a second owner
-approval, all 7,709,375,886 bytes across the 25 selected
-checkpoint files passed their pinned size and SHA-256 checks; no partial file
-was retained as a checkpoint. The first 30-second float16 attempt produced NaN
-latents; a second float32 generation succeeded but exposed upstream output
-cleanup. The exact Soul compatibility overlay now honors float32, prevents the
-automatic downloader, retains bounded output, and rejects zero-exit failures.
-The final 30-second candidate is a verified 48 kHz stereo FLAC and passed human
-listening review. The subsequent 90-second candidate also completed as a valid,
-non-silent 48 kHz stereo FLAC in 47.966 seconds of measured wall time, preserved
-AMD chat health, released NVIDIA afterward, and passed human listening review.
-The final 180-second host candidate then completed as a valid 48 kHz stereo
-FLAC in 73.167 seconds of measured wall time, with AMD chat healthy and NVIDIA
-released afterward. The owner accepted its musical quality; Music A1 is
-complete and Music A2 is the next human-gated slice.
+## Primary references
 
-The accepted Music Studio product direction retains a lossless 48 kHz stereo
-FLAC master for every candidate and derives a smaller MP3 listening proxy from
-that exact master. A2 will record both artifacts, hashes, encoder provenance,
-and validation without performing a second model generation.
-
-Music A2 added a deterministic CLI candidate: private typed projects, exact
-generation previews, cross-runtime NVIDIA leases, bounded process-group
-cancellation, strict-offline project-input generation, and atomic linked
-FLAC/MP3 receipts. The live read-only inventory passes with AMD chat healthy,
-NVIDIA fallback inactive, 8,095 MiB free, and no compute process or lease. The
-exactly confirmed `First Signal` live project then produced validated 30-second
-FLAC and MP3 artifacts, released its lease and GPU, and preserved AMD chat. The
-owner accepted the music but heard no lyrics; logs prove the lyrics reached the
-model and were embedded, making this a recorded adherence weakness rather than
-data loss. Music A2 is approved and complete.
-
-Music A3 and bounded follow-on slices now provide the dashboard project
-archive, foreground generation, machine-heard vocal evidence, repeated-section
-alignment, listening review and disposition, Soul-assisted revision drafts,
-lawful URL reference analysis and synthesis, profile fusion, permanent
-project/reference deletion, finished FLAC/MP3 export, and one-generation lite
-front/back trimming. Repaint, extend, stems, publishing, and broader editing
-remain later work.
-
-The reviewed model bake-off promoted Gemma 4 12B Q4_K_M to the sole supported
-AMD Daily profile. The Music Core switches chat to Qwen on NVIDIA and exposes
-the accepted pinned ACE-Step 1.5 4B LM / 2B Turbo Q8_0 pipeline on AMD Vulkan.
-It supports exactly 30, 90, and 180 seconds, uses VAE chunk 256, rejects a
-collapsed LM audio-code plan before synthesis, and may derive a new LM seed for
-at most three attempts inside the already-approved candidate scope. It then
-publishes a validated 48 kHz stereo FLAC master and derived MP3, removes the
-WAV/LM attempt intermediates after success, and stops at human listening review.
-No music model remains resident and no background queue or automatic Core
-switch was added.
-
-Self Assessment now also projects the exact CachyOS core-package reboot request
-relative to current boot time. On this host the July 17 package transaction is
-newer than the July 11 boot, so a reboot is correctly recommended without Soul
-performing or scheduling it.
-
-Detailed references:
-
-- `docs/CONVERSATIONAL_SOUL_ROADMAP.md`
-- `docs/MILESTONES.md`
-- `docs/ARCHITECTURE.md`
-- `docs/INTERACTION_ARCHITECTURE.md`
-- `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`
-- `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
-- `docs/soul/PHASE12E_UNIFIED_REVIEW_CENTER_BRIEF.md`
-- `docs/soul/PHASE13A_INTEGRATED_ACCEPTANCE_HARNESS_BRIEF.md`
-- `docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md`
-- `docs/soul/PHASE13B_LOCAL_MODEL_AND_DASHBOARD_ACCEPTANCE_BRIEF.md`
-- `docs/soul/PHASE13C_CONVERSATIONAL_SOUL_CLOSEOUT_BRIEF.md`
-- `docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md`
-- `docs/soul/HUMAN_REVIEW_GATE.md`
+- [`README.md`](../README.md)
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+- [`docs/ROADMAP.md`](ROADMAP.md)
+- [`docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`](soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md)
+- [`docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`](soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md)
+- [`docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md`](soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md)

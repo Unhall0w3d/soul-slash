@@ -1,157 +1,49 @@
 # Soul Milestones
 
-This document tracks major development bodies rather than every individual overlay.
+This file tracks major development bodies. Individual implementation slices and verifier repairs remain documented in the phase and assessment archives.
 
-## Completed milestones
+## Completed
 
-### Foundation
+### Foundation and safe local action
 
-Status:
+Established the Ruby runtime, provider configuration, deterministic skills, planning/approval/execution boundaries, Downloads cleanup and restore, reflection, execution history, and repository hygiene.
 
-```text
-complete
-```
-
-### Controlled Advisory Skill Loop
-
-Status:
-
-```text
-complete
-```
-
-### Chat and Planning
-
-Status:
-
-```text
-complete
-```
-
-### Usability Foundation and Safe Local Action
-
-Status:
-
-```text
-complete
-```
-
-Closed at:
-
-```text
-legacy sequence Phase 63
-commit 2132b36
-```
-
-## Latest completed milestone
+Status: **complete**
 
 ### Conversational Soul
 
-Status:
+Established persistent multi-turn conversation, declared capability boundaries, evidence routing, layered memory, artifacts, shared workspace/inbox, authenticated dashboard, Skill Studio, capability-gap intake, Self Assessment, Review Center, and integrated local-model acceptance.
 
-```text
-complete
-```
+Status: **complete and owner-approved**
 
-Current phase:
+### Deployment and Core orchestration
 
-```text
-Phase 13 accepted stopping point
-```
+Established optional local systemd/Caddy deployment, protected LAN HTTPS, manual runtime leases and switching, selected-profile login startup, Gemma AMD Daily, Qwen NVIDIA reserve, AMD-Free, and Music Core topology.
 
-Completed:
+Status: **implemented; operational hardening continues**
 
-```text
-Phase 1: architecture and acceptance contract
-Phase 2: provider and model capability foundation
-Phase 3: multi-turn conversation runtime
-Phase 4: conversational orchestrator
-Phase 5: grounded evidence lifecycle
-Phase 6: bounded host environment assessment
-Phase 7: generic evidence follow-up routing
-Phase 8: declared capability boundaries
-Phase 9: layered memory
-Phase 10: identity, interests, and variation
-Phase 11A: artifact metadata and conversation attachment
-Phase 11B: bounded artifact inspection
-Phase 11C: bounded artifact creation and revision
-Phase 11D: shared workspace and artifact inbox
-Phase 12A: portable typed configuration
-Phase 12B: in-process application API
-Phase 12C: foreground loopback dashboard
-Phase 12D: Skill Studio Proposal/Beta lifecycle
-Phase 12D.2: capability-gap intake
-Phase 12D.3: Self Improvement dashboard
-Phase 12D.4: proposal stage, production linkage, and production-only closeout
-Phase 12D.5: gated Beta implementation workspace and production promotion
-Phase 12E: unified Review Center
-Phase 13A: deterministic integrated acceptance harness
-Phase 13B: bounded local-model and dashboard acceptance
-Phase 13C: documentation, curation, and accepted closeout
-```
+### Architecture and stewardship
 
-Current work:
+Established Self Assessment host/update/storage evidence and Self Augmentation's tracked-code census, human-authored proposals, isolated experiments, deterministic dossiers, model qualification records, and external integration handoffs.
 
-```text
-Owner approval recorded; observation period begins
-```
+Status: **implemented**
 
-Milestone stopping point:
+### Creative Studios
 
-```text
-Phase 13
-```
+Established Music Studio through generation, evidence, revision, references, export, static visual companions, and exact local upload packaging. Established Visual Studio through bounded still generation, guided editing, review, deletion, and Music binding.
 
-## Active milestone
+Status: **still-image and local publication pipeline implemented; generated motion remains unqualified**
 
-### Deployment and Operations
+## Active consolidation
 
-Status:
+The current body of work is a product/documentation consolidation and real-use refinement period. It aligns public documentation with implemented behavior, improves chat/persona usability, exposes suitable dashboard operations through skills, and hardens creative workflows from actual projects.
 
-```text
-in progress
-```
+## Future milestone candidates
 
-Current completed Music slices:
+- Chat capability invocation and persona refinement
+- Qualified generated motion
+- Voice and multimodal perception
+- Backup, recovery, and broader deployment
+- Longer-form creative production and optional draft-upload integration
 
-```text
-Music Studio A1 isolated NVIDIA feasibility pilot
-Music Studio A2 private project schema and explicit resource coordinator
-```
-
-The model-runtime portability sequence and Architecture and Stewardship A1–A5
-are implemented. Music A0 defined the topology; the A1 setup boundary now adds
-optional tooling checks, exact source and checkpoint pins, separate setup and
-download gates, and bounded offline pilot commands. The 30-, 90-, and
-180-second candidates passed deterministic host checks and owner listening
-review without disturbing AMD chat or retaining an NVIDIA process. Music A1 is
-complete. A2 added the CLI-only project and resource boundaries, then passed an
-exactly confirmed live FLAC/MP3 generation and post-run resource review. Its
-first vocal project rendered without audible lyrics despite verified lyric
-conditioning, which is retained as an iteration/adherence weakness. Music A3
-dashboard work is next but remains unopened.
-
-See:
-
-```text
-docs/CONVERSATIONAL_SOUL_ARCHITECTURE.md
-docs/CONVERSATIONAL_SOUL_ACCEPTANCE.md
-docs/CONVERSATIONAL_SOUL_ROADMAP.md
-docs/GROUNDED_TOOL_EVIDENCE.md
-docs/BOUNDED_HOST_SYSTEM_STATUS.md
-docs/HOST_ENVIRONMENT_CAPABILITY_GAP.md
-docs/soul/ARTIFACT_METADATA_AND_ATTACHMENT.md
-docs/soul/BOUNDED_ARTIFACT_INSPECTION.md
-docs/CURRENT_STATE.md
-docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md
-docs/soul/PHASE12D3_SELF_IMPROVEMENT_DASHBOARD_BRIEF.md
-docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md
-```
-
-## Later milestone candidates
-
-- Interface and Presence
-- Broader Skills and Providers
-- Voice Interaction
-
-Later work begins under a newly approved milestone rather than extending the Conversational Soul phase sequence.
+New milestone bodies require an explicit scope and human approval rather than extending historical phase sequences indefinitely.

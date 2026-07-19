@@ -1,37 +1,65 @@
 # Soul/ Branding
 
-Soul/ uses a dark arcane-technical visual language that blends mystical symbolism with local AI and systems orchestration motifs.
+Soul/ presents itself as a **local machine familiar**: intelligent, newly alive, collaborative, precise, and visibly bound to human authority. The current identity replaces the older purple necromantic/grimoire direction.
 
-## Brand Themes
+## Brand character
 
-- **Local-first intelligence**
-- **Verified action over improvisation**
-- **Recoverable workflows**
-- **Human-approved memory and rule promotion**
-- **Project-focused, not product-marketing focused**
+- local presence rather than remote service;
+- continuity across changing models;
+- curiosity and personality without invented operational claims;
+- technical depth without generic SaaS minimalism;
+- creative capability alongside stewardship and review;
+- human authority made visible at consequential boundaries.
 
-## Visual Motifs
+## Visual language
 
-- grimoires / codices
-- sigils and circles
-- geometric wards
-- luminous slash mark
-- circuitry, runes, and system glyphs
-- cyan / violet / gold highlights against a near-black background
+The approved character is an androgynous masked machine soul with silver hair, tailored indigo-black techno-organic materials, fine bronze-gold structure, and restrained cerulean energy. Masked presentation represents idle/listening state; the brighter unmasked portrait represents active work in the dashboard.
 
-## Asset Inventory
+Primary motifs are:
 
-- `assets/brand/soul-slash-brand-board.png`
+- concentric instruments and measured orbital geometry;
+- fine signal paths, constellation nodes, and coordinated flows;
+- abyssal space and low-luminance technical surfaces;
+- precise bronze-gold construction;
+- cerulean presence and operational energy;
+- sparse violet-indigo material depth.
+
+Avoid grimoires, spellbooks, runes, occult symbols, necromantic language, large white surfaces, generic robot heads, and unbounded mystical claims.
+
+## Palette
+
+```text
+Abyssal base       #060B11
+Deep indigo        #101729
+Cerulean presence  #20C8F2
+Pale blue-gray     #D9E5EA
+Bronze structure   #8E6F3A
+Operator amber     #D4AF37
+Destructive red    #FF1744
+```
+
+Cerulean indicates active, available, or verified state. Gold/amber marks Operator attention and authority. Red is reserved for real destructive or failed state. Violet is material atmosphere, not an action color.
+
+## Language
+
+Interface language may use terms such as Operator, transmission, signal, Core, continuity, foundry, survey, and studio when their meaning remains clear. Product truth outranks metaphor: model identity, CPU/GPU state, lifecycle, failure, privacy, and authorization must remain explicit.
+
+The project narrative uses four present-day pillars:
+
+```text
+Conversation · Capability · Creation · Stewardship
+```
+
+## Current assets
+
 - `assets/brand/soul-slash-repo-header.png`
-- `assets/brand/soul-slash-supporting-scene.png`
-- `assets/brand/soul-slash-primary-mark.png`
-- `assets/brand/soul-slash-repo-icon.png`
+- `assets/brand/soul-slash-repo-header-background-v2.png`
+- `assets/brand/soul-account-avatar-v1.png`
+- `assets/brand/character/soul-portrait-masked.png`
+- `assets/brand/character/soul-portrait-unmasked.png`
+- `assets/brand/character/soul-full-body.png`
 - `assets/brand/soul-slash-micro-mark.svg`
 
-## Usage Guidance
+The repository header and account artwork use the current character identity. Older brand-board, primary-mark, repo-icon, and supporting-scene files remain historical assets and should not guide new work.
 
-Keep typography and messaging project-oriented. The language should describe Soul/ as a local intelligence substrate / operating layer around models, skills, safety gates, workflows, and memory — not as a polished commercial SaaS product.
-
-Use the simplified micro mark for small interface placements such as the dashboard header, browser tabs, and bookmarks. The illustrated primary mark and repository icon are intended for larger surfaces where their detail remains legible.
-
-The dashboard-specific interpretation, initial tokens, restraint rules, accessibility expectations, and human visual review gate are defined in `docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`.
+The dashboard implementation and accessibility rules are defined in [`docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`](soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md).

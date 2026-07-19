@@ -10,8 +10,10 @@ Human-facing inputs and outputs:
 
 - CLI chat
 - single-shot CLI messages
-- foreground loopback dashboard over the versioned application facade
-- dashboard Chat, Skill Studio, and Self Assessment tabs
+- authenticated dashboard over the versioned application facade
+- Chat plus grouped Self Improvement and Creative Studios navigation
+- Skill Studio, Self Assessment, Self Augmentation, Music Studio, and Visual Studio
+- header-level Review Center and manual Core selection
 - shared workspace and inbox metadata inside Chat
 - future voice input
 - future TTS output
@@ -96,8 +98,13 @@ Current bounded capabilities include:
 - `weather.report`
 - `chats.clear`
 - `chats.forget`
+- bounded lookup and evidence-bearing web research
 - execution-history inspection and controls
 - approval-token management
+- proposal/Beta/production skill lifecycle operations
+- host, runtime, capability, and storage assessment
+- isolated self-augmentation experiment and review operations
+- private music and visual project/candidate operations
 
 Separate Beta candidates are held outside the production registry. They run only after preview and exact human confirmation, with bounded foreground execution and local diagnostic evidence.
 
@@ -149,13 +156,43 @@ Phase 11C adds approval-scoped artifact creation and revision. Phase 11D project
 
 ## Improvement layer
 
-The Self Assessment surface composes existing read-only assessors for the host environment, package managers, language/tool versions, local model runtime, and Soul capability matrix. Its internal application operations retain the `self_improvement.*` namespace for compatibility.
+The Self Improvement navigation groups three distinct authority domains:
+
+- Skill Studio manages bounded capability proposals, isolated Beta candidates, test evidence, and explicit production promotion.
+- Self Assessment composes read-only assessors for the host environment, package managers, language/tool versions, local model runtime, storage/retention, and Soul capability matrix. Its internal operations retain the `self_improvement.*` namespace for compatibility.
+- Self Augmentation prepares architecture-level proposals and exact-scope isolated experiments when a skill cannot solve the limitation. Integration remains external.
 
 Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper checks are explicit foreground requests. Advisory proposal generation requires a preview, exact digest, and human confirmation. Package installation/removal, operating-system updates, service changes, model downloads, implementation, and promotion are not authorized by this layer.
 
+## Core and resource layer
+
+Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while manual Core selection coordinates supported chat and creative resources.
+
+Daily uses Gemma on AMD. AMD-Free and Music use Qwen on NVIDIA. Music generation temporarily leases AMD for ACE-Step Vulkan; still-image generation uses its reviewed Vulkan lane. Core transitions and model controls revalidate active application leases and runtime state. Creative models load for one bounded operation and exit.
+
+No automatic Core switch, always-resident creative model, idle timer, background queue, or unbounded resource poller is part of this layer.
+
+## Creative candidate layer
+
+Music and visual work uses private projects with immutable generation inputs and append-only candidate lineage. A revision creates a successor rather than mutating its source.
+
+```text
+brief
+-> exact preview and digest
+-> bounded generation
+-> validated artifact and receipt
+-> machine evidence where useful
+-> human review
+-> keep, revise, reject, bind, trim, export, or package
+```
+
+Music generation persists a durable job record so the server-side operation can complete if the Operator changes dashboard pages. This is bounded job continuity, not a general background worker: every job has one preapproved candidate scope, terminal lifecycle, timeout/cancellation behavior, and artifact validation.
+
+Visual candidates may be copied into exact Music candidate lineage. Static presentation and final muxing use reviewed artifacts and deterministic media operations. Upload packaging is local only; network upload and publication remain outside the current execution layer.
+
 ## Unified review layer
 
-Phase 12E composes the existing `ApprovalTokenStore` and `ChatExecutionHistory` through the redacted application-facade projections. Review Center is a supporting dashboard dialog over the three primary tabs. It loads on explicit open or refresh, performs no polling, exposes no authorization values or private request messages, and adds no approve, revoke, consume, replay, retry, clear, prune, or export authority.
+Review Center composes the existing `ApprovalTokenStore` and `ChatExecutionHistory` through redacted application-facade projections. It is a supporting dashboard dialog rather than an execution surface. It loads on explicit open or refresh, performs no polling, exposes no authorization values or private request messages, and adds no approve, revoke, consume, replay, retry, clear, prune, or export authority.
 
 ## Reflection layer
 

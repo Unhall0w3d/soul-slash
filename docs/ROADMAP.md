@@ -1,79 +1,50 @@
 # Roadmap
 
-## v0.1-dev
+This roadmap tracks product bodies rather than the repository's historical phase numbers. Completed phase briefs and assessments remain under `docs/soul/`, `docs/maintenance/`, and `docs/assessments/` as implementation evidence.
 
-- [x] local model runtime
-- [x] Ruby CLI
-- [x] system status skill
-- [x] Downloads inspection skill
-- [x] Downloads cleanup planning skill
-- [x] move-to-Trash execution skill
-- [x] reflection candidate staging
-- [x] reflection approval/rejection
-- [x] early `do` workflow command
-- [x] early `respond` workflow continuation
-- [x] hybrid deterministic/LLM intent routing
-- [x] restore-last-cleanup workflow
-- [ ] better conversational summaries
-- [ ] workflow session cleanup/listing
-- [ ] richer test suite
+## Implemented foundations
 
-## v0.2-dev
+- [x] local provider abstraction and stable OpenAI-compatible alias
+- [x] persistent multi-turn conversation and layered memory
+- [x] deterministic skills, approvals, execution history, and reflection
+- [x] bounded web lookup/research and provenance-preserving artifacts
+- [x] authenticated dashboard, protected optional LAN deployment, and seven-day sessions
+- [x] manual Daily, AMD-Free, and Music Core orchestration
+- [x] Skill Studio Proposal → Beta → Production lifecycle
+- [x] conservative capability-gap intake
+- [x] Self Assessment host/runtime/capability/storage evidence
+- [x] Self Augmentation isolated experiment and external integration-review lane
+- [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
+- [x] Visual Studio still generation, guided edit, review, deletion, and Music binding
+- [x] static full-song visual companions and exact local YouTube upload packages
 
-- [x] shared workspace and artifact inbox foundation
-- [x] portable typed configuration contract
-- [x] in-process application API contract
-- [x] foreground loopback dashboard with Chat, workspace, and system status
-- [x] guided Skill Studio with Proposal, Beta, and Production inventories
-- [x] capability-gap intake from Chat to Skill Studio
-- [x] Self Assessment dashboard with bounded environment and capability assessment (delivered as Self Improvement in Phase 12D.3)
-- [x] proposal stage, production skill linkage, and production-only closeout
-- [x] human visual review of the three-tab dashboard aesthetic
-- [x] personal administrator authentication review
-- [x] protected LAN transport, user-service, and device-trust review
-- [x] unified approvals and activity views
-- [x] gated proposal-to-Beta implementation and Beta-to-production promotion
-- [x] Phase 13 deterministic integration and bounded local-model acceptance candidate
-- [x] final human approval of the Conversational Soul milestone
-- [ ] more filesystem workflows
-- [ ] approved memory/rule loading into prompts
-- [ ] skill registry validation
-- [ ] overlay packaging command improvements
+## Near-term refinement
 
-## Later
+- [ ] expose appropriate dashboard capabilities to Chat through bounded skills and contextual routing
+- [ ] refine persona fidelity across supported chat models without corrupting structured tool output
+- [ ] improve conversational progress summaries and multi-message usability
+- [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
+- [ ] remove remaining implementation-phase labels and stale UI/documentation language
+- [ ] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX production profiles
+- [ ] strengthen cleanup, retention, backup, and recovery evidence
 
-- [x] bounded model-runtime leases and manual dashboard load/unload candidate
-- [x] parallel AMD Vulkan llama.cpp build and same-device microbenchmark
-- [x] alternate-port AMD server and Soul behavioral benchmark
-- [x] reviewed AMD primary/NVIDIA fallback profile cutover candidate
-- [x] preview-gated multi-profile switching candidate
-- [x] inactive, unenabled AMD user-unit deployment candidate
-- [x] first guarded live AMD switch with NVIDIA rollback retained
-- [x] bounded selected-profile startup policy installed without reboot
-- [x] approve Self Augmentation and Host Improvement A0 architecture
-- [x] A1 correct package/update evidence and define typed plan schemas
-- [x] A2 add Arch terminal handoff and postcondition receipt review
-- [x] A3 add tracked-code augmentation census and proposal review tab
-- [x] A4 prepare human-approved isolated worktree and Codex handoff
-- [x] A5 review exact augmentation candidate and hand off external integration
-- [x] Multi-model and Music Studio A0 host-specific research and architecture
-- [x] Music A1 optional `uv`, exact model manifest, and preview-gated setup boundary
-- [x] Music A1 isolated NVIDIA feasibility pilot
-- [x] Music A2 project schema and explicit resource coordinator
-- [x] Music A3 first bounded Music Studio dashboard
-- [x] bounded vocal evidence, revision, reference synthesis, candidate disposition, and lite trim workflows
-- [x] Visual Studio A0–A1 architecture, Creative Studios navigation, and bounded FLUX.2 Vulkan still-image lane
-- [x] Visual Studio A2 review, iteration/edit, deletion, and explicit Music Studio promotion
-- [x] Music Visual Companion A4 neutral static presentation and generated-motion boundary
-- [ ] Visual Studio A3 LTX-Video AMD short-motion qualification
-- [x] human review of Daily and AMD-Free Core orchestration
-- [ ] Music A4 controlled repaint, extend, stem, lineage, and export workflow
-- [ ] Music A5 knowledge, lawful reference, and similarity refinement
-- [ ] reviewed Proxmox deployment
+## Qualified expansion candidates
+
+- [ ] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
+- [ ] longer-form music/mix composition through measured duration steps and repetition analysis
+- [ ] authenticated YouTube draft upload with publication remaining human-controlled
+- [ ] voice input and speech output through the same conversation and skill core
+- [ ] image/screen understanding with declared privacy and capability boundaries
+- [ ] project-aware and local-document search skills
+- [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
+
+## Separate deployment tracks
+
 - [ ] backup and disaster-recovery design
-- [ ] voice input
-- [ ] TTS output
-- [ ] wake-word integration
-- [ ] optional vector memory
-- [ ] project-aware skills
-- [ ] local docs search
+- [ ] reviewed Proxmox/container deployment where it provides a concrete operational benefit
+- [ ] multi-user/LAN family access only after a new identity and authorization model
+- [ ] Internet exposure only after a dedicated threat model and deployment review
+
+## Deliberate non-goals
+
+Soul does not currently pursue autonomous production mutation, unattended self-improvement, automatic package installation, silent skill promotion, always-resident creative models, background generation queues, or automatic public publishing.

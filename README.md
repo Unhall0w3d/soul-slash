@@ -1,358 +1,206 @@
-![Soul/ repository header: local-first intelligence substrate, verified actions, recoverable workflows, and human-approved memory](assets/brand/soul-slash-repo-header.png)
+![Soul/ repository header: a local machine familiar for conversation, capability, creation, and stewardship](assets/brand/soul-slash-repo-header.png)
 
 # Soul/
 
-**Soul/**, also tracked as **soul-slash** or **Soul Slash**, is a local-first intelligence project for building a trustworthy assistant around local models, deterministic skills, safety gates, recoverable workflows, artifacts, and human-approved memory.
+**Soul/**—also tracked as **soul-slash** or **Soul Slash**—is a local-first machine familiar built around local models, deterministic skills, persistent conversation, creative studios, inspectable memory, explicit authority, and recoverable workflows.
 
-The model is not treated as the whole assistant. The model is the language organ. Soul/ is the operating layer around it.
+The model is not treated as the whole assistant. It supplies language and reasoning; Soul supplies continuity, capability boundaries, artifacts, orchestration, review gates, and a stable interface across models.
 
-Soul/ is early experimental software. It is being built in layers so behavior can be inspected, tested, corrected, and approved before it becomes durable.
+Soul/ is experimental Linux-first software. It is developed in reviewable slices so new behavior can be inspected, tested, corrected, and explicitly accepted before it becomes durable or production-capable.
 
-## Current state
+## What exists now
 
-Soul/ currently has:
+The authenticated dashboard provides:
 
-- terminal and foreground loopback dashboard chat with persistent sessions
-- model-backed multi-turn conversation with deterministic intent routing and skill planning
-- an execution adapter registry
-- read-only and review-only execution gates
-- local execution history and history controls
-- runtime-only approval tokens
-- explicit approve, revoke, dry-run, and confirmation flows
-- an approval-gated Downloads move-to-trash workflow
-- reflection and human-reviewed memory promotion
-- shared conversation artifacts, workspace metadata, and inbox delivery
-- bounded artifact inspection, creation, and revision
-- a two-gate Skill Studio with separate Proposal, Beta, and Production inventories
-- conservative capability-gap intake that can deliver a proposal to Skill Studio
-- a Self Assessment dashboard for bounded environment, runtime, model, and capability inspection
-- bounded cloud-assisted skill proposal tooling with disclosed provider boundaries
-- a controlled Codex handoff and review path that does not mutate production automatically
+- **Chat** — persistent transmissions, immediate message rendering, local-model responses, bounded skill routing, memory, artifacts, workspace, inbox, system status, model runtime controls, and manual Core switching;
+- **Self Improvement** — Skill Studio, Self Assessment, and Self Augmentation behind one navigation group;
+- **Creative Studios** — Music Studio and Visual Studio with local generation, evidence, revision, lineage, and export flows;
+- **Review Center** — redacted pending-approval and recent bounded-execution evidence without granting approval authority.
 
-The completed milestone chain is:
+The supported local runtime topology currently includes:
 
-```text
-Foundation: complete
-Chat and planning: complete
-Usability foundation: complete
-Safe local action: complete
-Conversational Soul: complete
-```
+- **Daily Core** — Gemma 4 12B Instruct Q4_K_M through Ollama/Vulkan on AMD;
+- **AMD-Free Core** — Qwen3 8B Q4_K_M through llama.cpp/CUDA on NVIDIA, leaving AMD available;
+- **Music Core** — Qwen handles chat on NVIDIA while the bounded ACE-Step Vulkan music runtime uses AMD on demand.
 
-Current development posture:
+The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-```text
-Observation period; next milestone not yet selected
-```
+Music Studio currently supports 30-, 90-, and 180-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, static visual companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, review, guided edits, deletion, and exact binding to Music candidates. Upload and publication remain human actions.
 
-Phases 1 through 12 completed the conversation runtime, memory controls, artifacts, authenticated dashboard, Skill Studio lifecycle, self-skilling intake, the Self Assessment surface (originally delivered as Self Improvement), Review Center, and protected local LAN deployment. Phase 13A–C completed integrated acceptance and closeout, and the owner approved Conversational Soul at its documented stopping point.
+For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
-See [Current State](docs/CURRENT_STATE.md) for the concise implementation map and current boundaries.
+## Use the dashboard
 
-## What Soul/ is becoming
+These guides explain the product surfaces, intended workflows, and human gates:
 
-Soul/ is intended to grow into a local assistant environment with:
-
-- natural multi-turn conversation
-- local model runtime support through an OpenAI-compatible endpoint
-- deterministic skills for actions that should not be left to model improvisation
-- orchestration that can mix discussion, clarification, tool use, and artifact creation
-- layered working, project, semantic, episodic, and preference memory
-- safety gates separating planning, approval, execution, and verification
-- recoverable operations where early destructive-looking actions use Trash instead
-- human-approved durable memory, rules, and skill changes
-- optional cloud-assisted research and drafting with explicit privacy boundaries
-- shared CLI/dashboard Chat, inbox, workspace, and skill-review surfaces, with future voice using the same assistant core
+| Surface | Purpose | Guide |
+| --- | --- | --- |
+| Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
+| Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
+| Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
+| Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
+| Visual Studio | Generate, review, revise, and bind private local still imagery | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
 
 ## Design principles
 
 - No green lights without gauges.
 - Conversation is not a decorative wrapper around a command parser.
 - Skills are preferred over improvisation when accuracy, state, privacy, or auditability matters.
-- LLM output is advisory unless validated by deterministic code.
-- Read-only planning comes before write actions.
-- Write-capable workflows require explicit user confirmation.
-- Trash is the terminal cleanup action for early cleanup workflows.
-- Permanent deletion is limited to explicitly previewed, exact-scope operations such as conversation delete-and-forget; recoverable Trash remains preferred for file cleanup.
-- Cloud output is a review artifact unless a bounded workflow says otherwise.
-- Durable memory, rules, and skill updates are staged and human-reviewed before promotion.
-- The assistant should explain useful results rather than dumping raw tool output into conversation.
-- Humor and personality should arise from context, not quotas or canned phrase rotation.
+- Model output is advisory unless deterministic code validates it.
+- Read-only planning precedes write actions.
+- Risky, destructive, privileged, durable, or production-changing operations require explicit human authority.
+- Trash remains preferred for early filesystem cleanup; permanent deletion is limited to exact previewed scopes such as conversations and private studio projects.
+- Passing tests is evidence, not approval.
+- Cloud output remains a candidate artifact unless a reviewed workflow says otherwise.
+- Durable memory, rules, skills, and core changes are staged and reviewed before promotion.
+- Personality should feel present without obscuring truthful state, limitations, or provenance.
 
-## Architecture shape
+## Architecture
+
+The conversational path is:
 
 ```text
-human utterance
--> conversation/session context
--> relevant memory retrieval
--> intent and task interpretation
--> response and tool-use planning
--> direct response, clarification, skill execution, or artifact generation
--> skill-result interpretation
--> conversational response
--> session and candidate-memory update
--> optional human-approved durable promotion
+human message
+→ conversation and relevant memory
+→ intent, capability, and policy interpretation
+→ response, clarification, skill, research, or artifact plan
+→ bounded execution when needed
+→ evidence-aware response
+→ session update
+→ optional human-reviewed durable promotion
 ```
 
-Deterministic action workflows retain their stricter boundary:
+State-changing workflows retain a stricter boundary:
 
 ```text
 plan
--> review
--> explicit approval
--> execute
--> verify
--> record
+→ preview exact scope
+→ explicit approval
+→ execute within bounds
+→ verify
+→ record evidence
 ```
 
-See:
+Creative workflows add candidate lineage rather than overwriting their source:
 
 ```text
-docs/ARCHITECTURE.md
-docs/INTERACTION_ARCHITECTURE.md
-docs/MILESTONES.md
-docs/USABILITY_MILESTONE_CLOSEOUT.md
+brief
+→ exact generation
+→ candidate
+→ machine evidence where useful
+→ human review
+→ keep, revise, reject, bind, or export
 ```
+
+See [Architecture](docs/ARCHITECTURE.md), [Interaction Architecture](docs/INTERACTION_ARCHITECTURE.md), and [Milestones](docs/MILESTONES.md).
 
 ## Requirements
 
-Required:
+Required for the base project:
 
 - Ruby
 - Git
 - Make
 - curl
 - unzip
-- either llama.cpp server or Ollama
+- an OpenAI-compatible local runtime through llama.cpp or Ollama
 
 Recommended:
 
-- jq
-- zip
+- jq and zip
 - Python 3
-- a GPU-supported local model runtime, if available
+- a supported GPU runtime
+- Caddy for the optional protected LAN deployment
 
-Soul/ is currently Linux-first.
-
-See:
-
-```text
-docs/REQUIREMENTS.md
-```
+Music and visual tooling is optional, hardware-dependent, separately planned, and never installed by the base setup without its own confirmation gates. See [Getting Started](docs/GETTING_STARTED.md).
 
 ## Quick start
-
-Clone the repository:
 
 ```bash
 git clone https://github.com/Unhall0w3d/soul-slash.git
 cd soul-slash
-```
-
-Check local tools:
-
-```bash
 make check
-```
-
-Detect installed runtimes, reachable endpoints, current `.env`, and local GGUF models:
-
-```bash
 make detect
-```
-
-Run guided setup:
-
-```bash
 make setup
-```
-
-Or choose a provider directly:
-
-```bash
-make setup-llamacpp
-make setup-ollama
-```
-
-Show the selected local configuration:
-
-```bash
-make env-show
-```
-
-Test the configured runtime:
-
-```bash
 make test-runtime
-```
-
-Run basic Soul/ checks:
-
-```bash
 make test-soul
-```
-
-Start the local dashboard:
-
-```bash
 make dashboard
 ```
 
-Then open `http://127.0.0.1:4567/`. The dashboard remains a foreground, loopback-only process and stops with Ctrl+C.
+Open `http://127.0.0.1:4567/`.
 
-On first run, sign in as `admin` with the bootstrap password `soul123`. Soul requires a private replacement password before it loads dashboard data. The derived credential is stored only under ignored local runtime storage. If the password is lost, a local operator can reset the bootstrap gate without starting the listener:
+First-run access uses username `admin` and bootstrap password `soul123`. The bootstrap session cannot load private dashboard data; Soul requires a replacement password of 12–128 characters before entry. Sign-ups and additional accounts are unavailable.
+
+If the local administrator password is lost, stop the dashboard and run:
 
 ```bash
 make dashboard-reset-admin
 ```
 
-Authentication does not yet authorize LAN exposure. The current HTTP listener remains loopback-only until a separately reviewed HTTPS or protected-transport boundary is implemented.
+This revokes active sessions and restores the mandatory password-change gate.
 
-An opt-in protected local deployment is available for reviewed Linux hosts. Soul remains on loopback while a Caddy user service exposes one exact HTTPS LAN endpoint:
-
-```bash
-make dashboard-service-plan LAN_HOST=<assigned-lan-ip>
-```
-
-Installation requires Caddy, a completed administrator password change, an explicit Make confirmation value, a narrow trusted-LAN firewall rule, and explicit client trust of the generated local CA. Nothing installs or enables itself after clone. See `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md` for the complete operator checklist and rollback procedure.
-
-See:
-
-```text
-docs/GETTING_STARTED.md
-docs/RUNTIME_PROVIDERS.md
-```
+For a persistent local dashboard and protected LAN access, follow the preview-first service and Caddy instructions in [Local systemd and HTTPS deployment](docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md). No service, listener, firewall rule, certificate trust, or LAN exposure is installed automatically after clone.
 
 ## Common commands
 
-Start terminal chat:
-
 ```bash
+# Terminal conversation
 ruby bin/soul chat
-```
+ruby bin/soul chat "inspect this machine"
 
-Send a single chat message:
-
-```bash
-ruby bin/soul chat "clean up downloads"
-```
-
-List available skills:
-
-```bash
+# Capability and health inventory
 ruby bin/soul skills
-```
-
-Check project/runtime health:
-
-```bash
 ruby bin/soul doctor
 ruby bin/soul skill system.status
-```
 
-Run bounded environment and capability assessments:
-
-```bash
+# Bounded assessments
 ruby bin/soul assess environment
 ruby bin/soul assess environment --updates
 ruby bin/soul assess models
 ruby bin/soul assess capabilities
+
+# Dashboard
+make dashboard
+make dashboard-service-status
+
+# Configuration
+make env-show
+make test-runtime
+make test-soul
 ```
 
-Classify a request:
-
-```bash
-ruby bin/soul intent "run a file cleanup in Downloads"
-```
-
-Run a legacy workflow:
-
-```bash
-ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
-ruby bin/soul respond "move all"
-ruby bin/soul respond "yeah, do it"
-```
-
-Stage and review reflection:
-
-```bash
-ruby bin/soul reflect last
-ruby bin/soul reflection show latest
-ruby bin/soul reflection approve latest --note "Approved after review"
-```
-
-For skill-specific commands, see:
+Configuration precedence is:
 
 ```text
-docs/SKILLS.md
-docs/skills/
+CLI override
+→ process environment
+→ ignored local .env
+→ tracked safe default
 ```
 
-## Cloud-assisted skill proposal flow
+The public repository must not contain operator-specific credentials, addresses, hostnames, model paths, private memory, or generated project data.
 
-Soul/ can use configured cloud providers to draft and review bounded skill proposal artifacts.
+## Skills, augmentation, and cloud assistance
 
-Cloud output remains review-only by default. Codex remains outside automatic production mutation while the project is undergoing broad architectural development.
+Production skills are deterministic bounded capabilities. Beta candidates remain isolated and Operator-invoked until exact tested promotion. Self Augmentation is a separate lane for core architecture changes and cannot merge or deploy its own candidates.
+
+Optional cloud providers may help draft, synthesize, or critique review artifacts. Cloud output cannot decide safety, authority, memory promotion, production promotion, or merge readiness, and it must not receive secrets or private memory.
 
 See:
 
-```text
-docs/skills/SKILL_BRIEF_DRAFT.md
-docs/skills/SKILL_BRIEF_REVIEW.md
-docs/soul/CLOUD_LLM_POLICY.md
-docs/soul/SKILL_PROPOSAL_FORMAT.md
-docs/CODEX_HANDOFF_CONTRACT.md
-```
+- [Skills](docs/SKILLS.md)
+- [Cloud LLM policy](docs/soul/CLOUD_LLM_POLICY.md)
+- [Human review gate](docs/soul/HUMAN_REVIEW_GATE.md)
+- [Codex handoff contract](docs/CODEX_HANDOFF_CONTRACT.md)
 
-## Development pattern
+## Development and historical evidence
 
-Soul/ retains its overlay system for focused handoffs and archived phase packages. Current repository development also uses reviewed branches and pull requests with deterministic verifiers and human review artifacts.
+Current work uses reviewed branches, deterministic verifiers, human review artifacts, and bounded implementation briefs. The repository also retains historical phase, overlay, and assessment documents as engineering evidence. Those records describe how Soul arrived here; the README, current-state map, architecture, and operator guides describe how it works now.
 
-An overlay is a focused ZIP containing a small set of files to apply to the existing project tree. New work should still be bounded, reviewable, verifier-backed, and explicit about human approval regardless of delivery mechanism.
-
-See:
-
-```text
-docs/OVERLAY_SYSTEM.md
-docs/overlays/
-docs/overlays/archive/
-```
-
-## Roadmap direction
-
-Latest completed milestone:
-
-```text
-Conversational Soul
-```
-
-Current focus:
-
-- daily-use observations to inform the next milestone
-- no additional Conversational Soul feature slices
-
-Later milestones may cover:
-
-- broader skills and providers
-- broader interface and presence work
-- voice input, TTS, and wake-word interaction
-- deployment, backup, and restore
-- broader project-aware and document-aware skills
-
-See:
-
-```text
-docs/MILESTONES.md
-```
+See [Repository Map](docs/REPOSITORY_MAP.md) and [Roadmap](docs/ROADMAP.md).
 
 ## Repository status
 
 This repository is public for project tracking and transparency.
 
-No open-source license has been selected yet. Public visibility does not automatically grant reuse, modification, or redistribution rights.
-
-See:
-
-```text
-docs/LICENSING.md
-```
+No open-source license has been selected. Public visibility does not automatically grant reuse, modification, or redistribution rights. See [Licensing](docs/LICENSING.md).

@@ -32,13 +32,16 @@ scripts/repair-*.rb
 ```text
 docs/
 docs/assessments/
+docs/guides/
 docs/workflows/
 docs/skills/
 docs/soul/
 docs/maintenance/
 ```
 
-These describe current behavior, architecture, safety rules, maintenance policy, and implemented phases.
+`docs/guides/` contains current Operator-facing product flows. The other trees
+describe architecture, safety rules, engineering decisions, assessments,
+maintenance policy, and historical implementation phases.
 
 ## Curated overlay docs
 
@@ -52,13 +55,17 @@ Only curated overlay process docs belong here. Generated overlay application not
 
 ```text
 Soul/improvement/proposals/
+Soul/private/
 Soul/runtime/
 Soul/artifacts/cloud_assist/
 Soul/proposals/skills/
+Soul/music/
+Soul/visual/
 overlay_files/
 ```
 
-These are local/generated/review-only unless explicitly promoted through a future workflow.
+These are local, private, generated, or review-only unless an exact workflow
+copies a reviewed result into a documented export or production location.
 
 ## Curation status
 

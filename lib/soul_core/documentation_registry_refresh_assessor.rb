@@ -183,8 +183,13 @@ module SoulCore
     end
 
     def documented_skill_ids(docs)
-      content = docs.values.compact.join("\n")
-      content.scan(/`([a-zA-Z0-9_.:-]+)`/).flatten.uniq.sort
+      # Architecture documentation legitimately names classes, configuration
+      # keys, file extensions, and stable API aliases in inline code. The skill
+      # index and generated registry snapshot are the authoritative surfaces
+      # for skill-ID drift; scanning every backticked token produces false
+      # stale-skill blockers such as `.env` and `soul-local-chat`.
+      content = [docs[SKILLS_DOC_PATH], docs[OUTPUT_DOC_PATH]].compact.join("\n")
+      content.scan(/`([a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+)`/).flatten.uniq.sort
     end
 
     def snapshot_body(report)
