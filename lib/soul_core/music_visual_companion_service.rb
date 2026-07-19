@@ -21,6 +21,11 @@ module SoulCore
     FPS = 30
     COMMAND_TIMEOUT = 600
     MAX_RECORD_BYTES = 128 * 1024
+    STATIC_PROFILE_ID = "static-hold-v2"
+    DEFAULT_PRESENTATION = {
+      "mode" => "static", "fit" => "contain", "matte" => "#060B11",
+      "intro_fade_seconds" => 2.0, "outro_fade_seconds" => 4.0
+    }.freeze
 
     def initialize(root: Dir.pwd, project_store: nil, runner: BoundedCommandRunner.new, source_root: File.join("assets", "music_visuals"), clock: -> { Time.now.utc })
       @root = File.expand_path(root)
@@ -145,34 +150,37 @@ module SoulCore
       FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
     end
 
-    def loop_preview(project_id:, candidate_id:, visual_id:)
+    def loop_preview(project_id:, candidate_id:, visual_id:, presentation: nil)
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual loop already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "loop")
-      scope = loop_scope(record)
-      outcome("blocked_for_human_review", true, "exact visual loop render confirmation required", data: gate(LOOP_CONFIRMATION, scope))
+      normalized = normalize_presentation(presentation)
+      scope = loop_scope(record, normalized)
+      outcome("blocked_for_human_review", true, "exact static presentation confirmation required", data: gate(LOOP_CONFIRMATION, scope))
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
     rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def loop_execute(project_id:, candidate_id:, visual_id:, confirmation:, expected_digest:, progress: nil)
+    def loop_execute(project_id:, candidate_id:, visual_id:, confirmation:, expected_digest:, presentation: nil, progress: nil)
       return missing_gate unless confirmation.to_s.length.positive? && expected_digest.to_s.length.positive?
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual loop already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "loop")
-      scope = loop_scope(record)
+      normalized = normalize_presentation(presentation)
+      scope = loop_scope(record, normalized)
       return gate_mismatch("exact visual loop confirmation did not match") unless confirmation == LOOP_CONFIRMATION
       return gate_mismatch("visual loop scope changed; preview again") unless secure_compare(expected_digest, digest(scope))
-      progress&.call({ "stage" => "visual_loop", "message" => "Rendering bounded localized water motion with a locked camera" })
+      progress&.call({ "stage" => "visual_presentation", "message" => "Encoding one bounded static presentation; no visual effect is being synthesized" })
       directory = visual_path(project_id, visual_id)
       output = File.join(directory, ".loop.partial.mp4")
-      render_loop(File.join(directory, "base.png"), output)
+      render_loop(File.join(directory, "base.png"), output, normalized)
       File.rename(output, File.join(directory, "loop.mp4"))
-      record["artifacts"]["loop"] = artifact("loop.mp4", directory).merge("duration_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "motion_profile" => "localized_water_locked_camera", "frame_change_expected" => true)
+      record["presentation"] = normalized
+      record["artifacts"]["loop"] = artifact("loop.mp4", directory).merge("duration_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "motion_profile" => "static_hold", "frame_change_expected" => false)
       record["stage"] = "loop_ready"
       record["updated_at"] = @clock.call.iso8601
       replace_json(File.join(directory, "visual.json"), record)
-      outcome("blocked_for_human_review", true, "locked-camera water loop rendered; full-preview review required", data: { "visual" => record }, mutation: "music_visual_loop_created")
+      outcome("blocked_for_human_review", true, "static presentation encoded; full-preview review required", data: { "visual" => record }, mutation: "music_visual_loop_created")
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
     rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
@@ -202,9 +210,9 @@ module SoulCore
       directory = visual_path(project_id, visual_id)
       audio = @store.candidate_artifact_path(project_id, candidate_id, "flac")
       duration = audio_duration(audio)
-      progress&.call({ "stage" => "visual_companion", "message" => "Repeating the approved locked-camera water loop and binding the exact lossless candidate" })
+      progress&.call({ "stage" => "visual_companion", "message" => "Extending the approved static presentation and binding the exact lossless candidate" })
       output = File.join(directory, ".preview.partial.mp4")
-      render_final(File.join(directory, "loop.mp4"), audio, output, duration)
+      render_final(File.join(directory, "loop.mp4"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
       File.rename(output, File.join(directory, "preview.mp4"))
       record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS)
       record["stage"] = "preview_ready"
@@ -266,12 +274,13 @@ module SoulCore
       base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
     end
 
-    def loop_scope(record)
+    def loop_scope(record, presentation)
       raise MusicProjectStore::ValidationError, "visual source is not ready" unless record["stage"] == "base_bound"
+      raise MusicProjectStore::ValidationError, "legacy visual effect profiles cannot advance; bind an approved Visual Studio still" unless record.dig("render_profile", "profile_id") == STATIC_PROFILE_ID
       {
-        "operation" => "render_music_visual_loop", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
+        "operation" => "encode_music_visual_static_presentation", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
         "visual_id" => record.fetch("visual_id"), "base_sha256" => record.dig("artifacts", "base", "sha256"),
-        "profile" => render_profile, "timeout_seconds" => COMMAND_TIMEOUT, "automatic_retry" => false
+        "profile" => render_profile, "presentation" => presentation, "timeout_seconds" => COMMAND_TIMEOUT, "automatic_retry" => false
       }
     end
 
@@ -280,26 +289,32 @@ module SoulCore
       {
         "operation" => "render_music_visual_companion", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
         "visual_id" => record.fetch("visual_id"), "loop_sha256" => record.dig("artifacts", "loop", "sha256"),
-        "candidate_audio_sha256" => record.fetch("candidate_audio_sha256"), "intro_fade_seconds" => 2,
-        "outro_fade_seconds" => 4, "output" => "H.264/AAC MP4", "external_publication" => false
+        "candidate_audio_sha256" => record.fetch("candidate_audio_sha256"),
+        "presentation" => record.fetch("presentation", DEFAULT_PRESENTATION), "output" => "H.264/AAC MP4", "external_publication" => false
       }
     end
 
-    def render_loop(input, output)
+    def render_loop(input, output, presentation)
       require_tools!
       frames = LOOP_SECONDS * FPS
-      filter = "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT}:x=(in_w-out_w)/2:y=(in_h-out_h)/2,split=2[scene][water_src];" \
-               "[water_src]crop=#{WIDTH}:270:0:450[water];" \
-               "nullsrc=s=#{WIDTH}x270:r=#{FPS}:d=#{LOOP_SECONDS},geq=lum='128+3*sin(2*PI*(Y/H+N/#{frames}))':cb=128:cr=128[xmap];" \
-               "nullsrc=s=#{WIDTH}x270:r=#{FPS}:d=#{LOOP_SECONDS},geq=lum='128+2*sin(2*PI*(2*X/W+N/#{frames}))':cb=128:cr=128[ymap];" \
-               "[water][xmap][ymap]displace=edge=mirror[water_moved];[scene][water_moved]overlay=0:450,format=yuv420p[v]"
+      filter = if presentation.fetch("fit") == "cover"
+        "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=increase,crop=#{WIDTH}:#{HEIGHT}:x=(in_w-out_w)/2:y=(in_h-out_h)/2,format=yuv420p[v]"
+      else
+        matte = presentation.fetch("matte").delete_prefix("#")
+        "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=decrease,pad=#{WIDTH}:#{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x#{matte},format=yuv420p[v]"
+      end
       command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", FPS.to_s, "-i", input, "-t", LOOP_SECONDS.to_s, "-filter_complex", filter, "-map", "[v]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-g", frames.to_s, "-keyint_min", frames.to_s, "-sc_threshold", "0", "-movflags", "+faststart", output]
       run_media!(command, output, "visual loop")
     end
 
-    def render_final(loop_path, audio, output, duration)
-      fade_start = [duration - 4.0, 0].max.round(3)
-      filter = "[0:v]trim=duration=#{duration},setpts=PTS-STARTPTS,fade=t=in:st=0:d=2,fade=t=out:st=#{fade_start}:d=4,format=yuv420p[v]"
+    def render_final(loop_path, audio, output, duration, presentation)
+      intro = Float(presentation.fetch("intro_fade_seconds"))
+      outro = Float(presentation.fetch("outro_fade_seconds"))
+      fade_start = [duration - outro, 0].max.round(3)
+      filters = ["[0:v]trim=duration=#{duration}", "setpts=PTS-STARTPTS"]
+      filters << "fade=t=in:st=0:d=#{intro}" if intro.positive?
+      filters << "fade=t=out:st=#{fade_start}:d=#{outro}" if outro.positive?
+      filter = "#{filters.join(',')},format=yuv420p[v]"
       command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-stream_loop", "-1", "-i", loop_path, "-i", audio, "-t", duration.to_s, "-filter_complex", filter, "-map", "[v]", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", output]
       run_media!(command, output, "visual companion")
     end
@@ -394,7 +409,26 @@ module SoulCore
     end
 
     def render_profile
-      { "profile_id" => "localized-water-locked-camera-v2", "loop_seconds" => LOOP_SECONDS, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264", "model_inference" => false, "resource_lane" => "cpu-foreground" }
+      {
+        "profile_id" => STATIC_PROFILE_ID, "label" => "Static presentation", "loop_seconds" => LOOP_SECONDS,
+        "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264",
+        "creative_effects" => false, "model_inference" => false, "resource_lane" => "cpu-foreground",
+        "generated_motion" => "qualification_required"
+      }
+    end
+
+    def normalize_presentation(value)
+      data = value.nil? ? DEFAULT_PRESENTATION.dup : value.to_h.transform_keys(&:to_s)
+      raise MusicProjectStore::ValidationError, "visual presentation fields are invalid" unless data.keys.sort == DEFAULT_PRESENTATION.keys.sort
+      raise MusicProjectStore::ValidationError, "only static visual presentation is currently qualified" unless data["mode"] == "static"
+      raise MusicProjectStore::ValidationError, "visual fit must be contain or cover" unless %w[contain cover].include?(data["fit"])
+      raise MusicProjectStore::ValidationError, "visual matte must be a six-digit hex color" unless data["matte"].to_s.match?(/\A#[0-9A-Fa-f]{6}\z/)
+      intro = Float(data["intro_fade_seconds"])
+      outro = Float(data["outro_fade_seconds"])
+      raise MusicProjectStore::ValidationError, "visual fades must each be 0..10 seconds" unless intro.between?(0, 10) && outro.between?(0, 10)
+      data.merge("intro_fade_seconds" => intro, "outro_fade_seconds" => outro)
+    rescue ArgumentError, TypeError
+      raise MusicProjectStore::ValidationError, "visual fade values are invalid"
     end
 
     def require_tools!

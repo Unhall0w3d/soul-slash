@@ -72,16 +72,22 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   visual = bound.dig("data", "visual")
   check.call("reviewed source binds only to its exact candidate and audio digest", sources.one? && wrong["lifecycle_state"] == "blocked_for_human_review" && visual["candidate_audio_sha256"] == audio_sha && visual["stage"] == "base_bound")
 
-  loop_preview = service.loop_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
-  looped = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
+  presentation = { "mode" => "static", "fit" => "contain", "matte" => "#060B11", "intro_fade_seconds" => 1.5, "outro_fade_seconds" => 3.5 }
+  loop_preview = service.loop_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), presentation: presentation)
+  changed_presentation = presentation.merge("fit" => "cover")
+  stale = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), presentation: changed_presentation, confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
+  unavailable_motion = service.loop_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), presentation: presentation.merge("mode" => "generated_motion"))
+  check.call("presentation changes invalidate approval and generated motion remains unavailable", stale["ok"] == false && unavailable_motion["lifecycle_state"] == "awaiting_input" && runner.commands.empty?)
+  looped = service.loop_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), presentation: presentation, confirmation: "RENDER_VISUAL_LOOP", expected_digest: loop_preview.dig("data", "expected_digest"))
   loop = looped.dig("data", "visual", "artifacts", "loop")
   loop_command = runner.commands.find { |command| command.last.end_with?(".mp4") }
-  check.call("one bounded CPU loop moves only localized water under a locked camera", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "localized_water_locked_camera" && loop_command.join(" ").include?("displace=edge=mirror") && loop_command.join(" ").include?("x=(in_w-out_w)/2:y=(in_h-out_h)/2") && !loop_command.join(" ").include?("sin(2*PI*t"))
+  check.call("one bounded CPU encode holds the still without synthesized effects", looped["lifecycle_state"] == "blocked_for_human_review" && loop["duration_seconds"] == 12 && loop["motion_profile"] == "static_hold" && loop["frame_change_expected"] == false && loop_command.join(" ").include?("force_original_aspect_ratio=decrease") && loop_command.join(" ").include?("pad=1280:720") && !loop_command.join(" ").include?("displace"))
 
   final_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"))
   rendered = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: final_preview.dig("data", "expected_digest"))
   final = rendered.dig("data", "visual", "artifacts", "preview")
-  check.call("final render repeats the reviewed loop and binds exact lossless audio", rendered["lifecycle_state"] == "blocked_for_human_review" && final["duration_seconds"] == 3.0 && runner.commands.any? { |command| command.include?("-stream_loop") && command.include?(audio) })
+  final_command = runner.commands.find { |command| command.include?("-stream_loop") }
+  check.call("final render extends the reviewed still and binds exact lossless audio", rendered["lifecycle_state"] == "blocked_for_human_review" && final["duration_seconds"] == 3.0 && final_command.include?(audio) && final_command.join(" ").include?("fade=t=in:st=0:d=1.5") && final_command.join(" ").include?("fade=t=out:st=0:d=3.5"))
   check.call("authenticated artifact resolver verifies every stored digest", %w[base loop preview].all? { |kind| File.file?(service.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), artifact: kind)) })
 end
 
@@ -89,7 +95,7 @@ contract = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_c
 facade = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_facade.rb"))
 http = File.read(File.join(__dir__, "..", "lib", "soul_core", "dashboard_http_application.rb"))
 javascript = File.read(File.join(__dir__, "..", "assets", "dashboard", "dashboard.js"))
-check.call("application and dashboard expose every immutable visual lineage and private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("visuals.forEach") && javascript.include?("Historical review evidence"))
+check.call("application and dashboard expose static presentation and immutable private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute visual_presentation].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("Static visual presentation") && javascript.include?("Generated motion") && javascript.include?("Qualification pending"))
 check.call("visual slice has no image-model service listener or publication path", !File.read(File.join(__dir__, "..", "lib", "soul_core", "music_visual_companion_service.rb")).match?(/youtube|upload|listen|daemon|Thread\.new/))
 
 abort "#{failures.length} visual companion verification(s) failed: #{failures.join(', ')}" unless failures.empty?

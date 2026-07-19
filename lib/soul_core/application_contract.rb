@@ -140,8 +140,8 @@ module SoulCore
       "music.candidates.trim.execute" => %w[project_id candidate_id start_seconds end_seconds confirmation expected_digest],
       "music.visuals.import.preview" => %w[project_id candidate_id asset_id],
       "music.visuals.import.execute" => %w[project_id candidate_id asset_id confirmation expected_digest],
-      "music.visuals.loop.preview" => %w[project_id candidate_id visual_id],
-      "music.visuals.loop.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
+      "music.visuals.loop.preview" => %w[project_id candidate_id visual_id visual_presentation],
+      "music.visuals.loop.execute" => %w[project_id candidate_id visual_id visual_presentation confirmation expected_digest],
       "music.visuals.final.preview" => %w[project_id candidate_id visual_id],
       "music.visuals.final.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
       "visual.resources.status" => [],
@@ -283,7 +283,7 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "start_seconds" || key == "end_seconds"
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
-        elsif key == "filters" || key == "project" || key == "visual_project" || key == "visual_review" || key == "review" || key == "revision"
+        elsif key == "filters" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "args" || key == "chat_ids" || key == "allowed_files"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }

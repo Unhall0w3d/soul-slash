@@ -64,6 +64,7 @@
 - [x] bounded vocal evidence, revision, reference synthesis, candidate disposition, and lite trim workflows
 - [x] Visual Studio A0–A1 architecture, Creative Studios navigation, and bounded FLUX.2 Vulkan still-image lane
 - [x] Visual Studio A2 review, iteration/edit, deletion, and explicit Music Studio promotion
+- [x] Music Visual Companion A4 neutral static presentation and generated-motion boundary
 - [ ] Visual Studio A3 LTX-Video AMD short-motion qualification
 - [x] human review of Daily and AMD-Free Core orchestration
 - [ ] Music A4 controlled repaint, extend, stem, lineage, and export workflow

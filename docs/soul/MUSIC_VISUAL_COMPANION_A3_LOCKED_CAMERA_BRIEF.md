@@ -1,5 +1,9 @@
 # Music Visual Companion A3 — Locked Camera
 
+Superseded by A4 after Visual Studio became the approved creative-image source.
+The localized-water FFmpeg effect remains historical evidence but is no longer
+part of the active companion workflow.
+
 ## Human-approved objective
 
 Preserve the acceptable simulated foreground-water effect and remove only the whole-image movement. Architecture, horizon, framing, and camera remain fixed for the entire companion.

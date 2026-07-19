@@ -620,28 +620,42 @@ function musicVisualCompanionPanel(candidate) {
 }
 
 function musicVisualLineage(candidate, visual, source) {
-  const lockedWaterProfile = visual.render_profile?.profile_id === "localized-water-locked-camera-v2";
+  const staticProfile = visual.render_profile?.profile_id === "static-hold-v2";
   const lineage = document.createElement("section"); lineage.className = "music-visual-lineage";
-  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = lockedWaterProfile ? "Locked-camera water" : (visual.render_profile?.profile_id === "static-hold-v1" ? "Static hold attempt" : "Moving-camera proof"); const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = staticProfile ? "Static visual presentation" : "Historical visual effect"; const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
   const status = document.createElement("p"); status.className = "dialog-status";
   const media = document.createElement("div"); media.className = "music-visual-media";
   const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base);
-  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", lockedWaterProfile ? "Locked-camera localized water preview" : "Retired visual loop preview"); media.append(loop); }
+  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual presentation preview" : "Retired visual effect preview"); media.append(loop); }
   if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "metadata"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Three-minute visual companion with candidate audio"); media.append(preview); }
   lineage.append(media);
-  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${lockedWaterProfile ? "Locked camera · localized water" : "Historical profile"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Base source is immutable; rendering has not started."; lineage.append(metrics);
-  if (lockedWaterProfile && !visual.artifacts?.loop) {
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview locked-camera water loop"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "loop", { visual_id: visual.visual_id })); lineage.append(button);
-  } else if (lockedWaterProfile && !visual.artifacts?.preview) {
-    const note = document.createElement("p"); note.textContent = "Confirm the architecture and framing remain locked while only the foreground water moves.";
+  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold · no synthesized motion" : "Historical effect"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Approved still is immutable; presentation encoding has not started."; lineage.append(metrics);
+  if (staticProfile && !visual.artifacts?.loop) {
+    const settings = musicVisualPresentationSettings(visual); lineage.append(settings.element);
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview static presentation"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "loop", { visual_id: visual.visual_id, visual_presentation: settings.value() })); lineage.append(button);
+  } else if (staticProfile && !visual.artifacts?.preview) {
+    const note = document.createElement("p"); note.textContent = "The frame is held exactly as approved. FFmpeg only handles framing, encoding, fades, and audio muxing.";
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview three-minute render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
-  } else if (!lockedWaterProfile) {
-    const note = document.createElement("p"); note.textContent = "Historical review evidence. Available media remains playable, but this retired profile cannot advance."; lineage.append(note);
-    if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare locked-camera replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
+  } else if (!staticProfile) {
+    const note = document.createElement("p"); note.textContent = "Historical effect evidence remains playable, but retired procedural-motion profiles cannot advance."; lineage.append(note);
+    if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare static replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
   } else {
-    const note = document.createElement("p"); note.textContent = "Locked-camera three-minute local preview ready. It remains unpublished and bound to this exact audio digest."; lineage.append(note);
+    const note = document.createElement("p"); note.textContent = "Static local companion ready. It remains unpublished and bound to this exact audio digest."; lineage.append(note);
   }
+  const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = "Qualification pending"; const motionNote = document.createElement("small"); motionNote.textContent = "Unavailable until the Visual Studio A3 motion model passes AMD compatibility, integrity, resource, and cleanup gates."; motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
   lineage.append(status); return lineage;
+}
+
+function musicVisualPresentationSettings(visual) {
+  const current = visual.presentation || { mode: "static", fit: "contain", matte: "#060B11", intro_fade_seconds: 2, outro_fade_seconds: 4 };
+  const element = document.createElement("div"); element.className = "music-visual-presentation-settings";
+  const mode = document.createElement("label"); mode.textContent = "Presentation"; const modeSelect = document.createElement("select"); const staticOption = document.createElement("option"); staticOption.value = "static"; staticOption.textContent = "Static composition"; modeSelect.append(staticOption); mode.append(modeSelect);
+  const fit = document.createElement("label"); fit.textContent = "Framing"; const fitSelect = document.createElement("select"); [["contain","Contain · preserve full image"],["cover","Cover · crop to frame"]].forEach(([value,text]) => { const option = document.createElement("option"); option.value = value; option.textContent = text; fitSelect.append(option); }); fitSelect.value = current.fit; fit.append(fitSelect);
+  const matte = document.createElement("label"); matte.textContent = "Matte"; const matteInput = document.createElement("input"); matteInput.type = "color"; matteInput.value = current.matte; matte.append(matteInput);
+  const intro = document.createElement("label"); intro.textContent = "Fade in · seconds"; const introInput = document.createElement("input"); introInput.type = "number"; introInput.min = "0"; introInput.max = "10"; introInput.step = ".5"; introInput.value = String(current.intro_fade_seconds); intro.append(introInput);
+  const outro = document.createElement("label"); outro.textContent = "Fade out · seconds"; const outroInput = document.createElement("input"); outroInput.type = "number"; outroInput.min = "0"; outroInput.max = "10"; outroInput.step = ".5"; outroInput.value = String(current.outro_fade_seconds); outro.append(outroInput);
+  element.append(mode, fit, matte, intro, outro);
+  return { element, value: () => ({ mode: "static", fit: fitSelect.value, matte: matteInput.value, intro_fade_seconds: Number(introInput.value), outro_fade_seconds: Number(outroInput.value) }) };
 }
 
 function musicVisualUrl(candidate, visual, artifact) { return `/api/v1/music/visual/${candidate.project_id}/${candidate.candidate_id}/${visual.visual_id}/${artifact}`; }
@@ -653,7 +667,7 @@ async function previewMusicVisualAction(candidate, panel, button, status, kind, 
     const envelope = await callSoul(`music.visuals.${kind}.preview`, base); const data = dataOf(envelope);
     if (envelope.lifecycle_state === "complete") { await selectMusicProject({ project_id: candidate.project_id }); return; }
     if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Visual render preview is unavailable");
-    const gate = document.createElement("div"); gate.className = "music-disposition-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = kind === "import" ? "Bind exact source" : (kind === "loop" ? "Render exact loop" : "Render three-minute companion"); prefillApprovalGate(input, execute, data.confirmation_phrase); execute.addEventListener("click", () => executeMusicVisualAction(candidate, kind, base, data, input.value, execute, status)); label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "final" ? "This creates one local MP4; it does not publish or upload anything." : "One bounded foreground render; no model is loaded.";
+    const gate = document.createElement("div"); gate.className = "music-disposition-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = kind === "import" ? "Bind exact source" : (kind === "loop" ? "Encode exact static preview" : "Render three-minute companion"); prefillApprovalGate(input, execute, data.confirmation_phrase); execute.addEventListener("click", () => executeMusicVisualAction(candidate, kind, base, data, input.value, execute, status)); label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "final" ? "This creates one local MP4; it does not publish or upload anything." : "One bounded foreground encode; no image or motion model is loaded.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
