@@ -28,6 +28,7 @@ require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
 require_relative "music_candidate_trim_service"
+require_relative "music_visual_companion_service"
 require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
@@ -69,6 +70,7 @@ module SoulCore
       music_revision_provider: nil,
       music_candidate_disposition_service: nil,
       music_candidate_trim_service: nil,
+      music_visual_companion_service: nil,
       music_project_deletion_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
@@ -101,6 +103,7 @@ module SoulCore
       @music_revision_provider = music_revision_provider
       @music_candidate_disposition_service = music_candidate_disposition_service
       @music_candidate_trim_service = music_candidate_trim_service
+      @music_visual_companion_service = music_visual_companion_service
       @music_project_deletion_service = music_project_deletion_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
@@ -133,6 +136,10 @@ module SoulCore
 
     def music_artifact_path(project_id:, candidate_id:, artifact:)
       music_generation.artifact_path(project_id: project_id, candidate_id: candidate_id, artifact: artifact)
+    end
+
+    def music_visual_artifact_path(project_id:, candidate_id:, visual_id:, artifact:)
+      music_visual_companion.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: artifact)
     end
 
     private
@@ -251,6 +258,12 @@ module SoulCore
       when "music.candidates.export.execute" then domain(music_candidate_disposition.export_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.candidates.trim.preview" then domain(music_candidate_trim.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), start_seconds: required(parameters, "start_seconds"), end_seconds: required(parameters, "end_seconds")))
       when "music.candidates.trim.execute" then domain(music_candidate_trim.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), start_seconds: required(parameters, "start_seconds"), end_seconds: required(parameters, "end_seconds"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.visuals.import.preview" then domain(music_visual_companion.import_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), asset_id: required(parameters, "asset_id")))
+      when "music.visuals.import.execute" then domain(music_visual_companion.import_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), asset_id: required(parameters, "asset_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "music.visuals.loop.preview" then domain(music_visual_companion.loop_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
+      when "music.visuals.loop.execute" then domain(music_visual_companion.loop_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "music.visuals.final.preview" then domain(music_visual_companion.final_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
+      when "music.visuals.final.execute" then domain(music_visual_companion.final_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -599,6 +612,10 @@ module SoulCore
       @music_candidate_trim_service ||= MusicCandidateTrimService.new(root: @root)
     end
 
+    def music_visual_companion
+      @music_visual_companion_service ||= MusicVisualCompanionService.new(root: @root)
+    end
+
     def music_project_deletion
       @music_project_deletion_service ||= MusicProjectDeletionService.new(root: @root)
     end
@@ -644,6 +661,8 @@ module SoulCore
       return result unless result.fetch("ok", false)
       result.fetch("data").fetch("generations").each do |candidate|
         candidate["analysis"] = music_candidate_analysis.read(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
+        candidate["visual_sources"] = music_visual_companion.available_sources(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
+        candidate["visuals"] = music_visual_companion.inventory(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
       end
       result
     end

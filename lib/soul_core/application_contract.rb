@@ -136,6 +136,12 @@ module SoulCore
       "music.candidates.export.execute" => %w[project_id candidate_id confirmation expected_digest],
       "music.candidates.trim.preview" => %w[project_id candidate_id start_seconds end_seconds],
       "music.candidates.trim.execute" => %w[project_id candidate_id start_seconds end_seconds confirmation expected_digest],
+      "music.visuals.import.preview" => %w[project_id candidate_id asset_id],
+      "music.visuals.import.execute" => %w[project_id candidate_id asset_id confirmation expected_digest],
+      "music.visuals.loop.preview" => %w[project_id candidate_id visual_id],
+      "music.visuals.loop.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
+      "music.visuals.final.preview" => %w[project_id candidate_id visual_id],
+      "music.visuals.final.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze

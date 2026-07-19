@@ -1,0 +1,17 @@
+{
+  "schema_version": "soul.music.visual_source.v1",
+  "asset_id": "afterimage-current-base-v1",
+  "label": "Afterimage Current — flooded nocturne",
+  "image": "afterimage-current-base-v1.png",
+  "project_id": "music_7178899052d93a4e",
+  "candidate_id": "candidate_29ae0cdeac32f154",
+  "provider": "OpenAI built-in image generation",
+  "rights_status": "original",
+  "generated_at": "2026-07-18T23:45:00Z",
+  "prompt_summary": "Nocturnal flooded coastal megastructure with cyan water reflections, warm architectural lights, atmospheric depth, and an off-center ring beacon; composed for localized loop animation.",
+  "animation_intent": [
+    "periodic foreground water displacement",
+    "subtle closed camera drift",
+    "future mist and beacon refinement"
+  ]
+}

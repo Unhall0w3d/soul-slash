@@ -81,6 +81,10 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_audio(normalized_headers, *match.captures)
       end
+      if (match = target.match(%r{\A/api/v1/music/visual/(music_[a-f0-9]{16})/(candidate_[a-f0-9]{16})/(visual_[a-f0-9]{16})/(base|loop|preview)\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return music_visual(normalized_headers, *match.captures)
+      end
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -142,9 +146,9 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       request = JSON.parse(body)
-      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute]
+      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
-        return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts foreground generation, revision generation, candidate analysis, or reference analysis only"))
+        return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts bounded music, analysis, or visual rendering only"))
       end
       stream = Enumerator.new do |output|
         progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
@@ -162,6 +166,23 @@ module SoulCore
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       path = @facade.music_artifact_path(project_id: project_id, candidate_id: candidate_id, artifact: artifact)
       content_type = artifact == "mp3" ? "audio/mpeg" : "audio/flac"
+      size = File.size(path)
+      range = audio_range(headers["range"], size)
+      return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
+      offset, length = range || [0, size]
+      extra = { "Content-Type" => content_type, "Content-Length" => length.to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store", "Accept-Ranges" => "bytes" }
+      extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
+      response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
+    rescue MusicProjectStore::ValidationError, MusicProjectStore::IntegrityError
+      response(404, "Not Found")
+    end
+
+    def music_visual(headers, project_id, candidate_id, visual_id, artifact)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.music_visual_artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: artifact)
+      content_type = artifact == "base" ? "image/png" : "video/mp4"
       size = File.size(path)
       range = audio_range(headers["range"], size)
       return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
