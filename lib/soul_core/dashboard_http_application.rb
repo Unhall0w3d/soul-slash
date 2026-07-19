@@ -93,6 +93,10 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_visual(normalized_headers, *match.captures)
       end
+      if (match = target.match(%r{\A/api/v1/visual/image/(visual_project_[a-f0-9]{16})/(visual_candidate_[a-f0-9]{16})\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return visual_image(normalized_headers, *match.captures)
+      end
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -154,7 +158,7 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       request = JSON.parse(body)
-      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute]
+      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute visual.generation.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
         return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts bounded music, analysis, or visual rendering only"))
       end
@@ -248,6 +252,16 @@ module SoulCore
       extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
       response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
     rescue MusicProjectStore::ValidationError, MusicProjectStore::IntegrityError
+      response(404, "Not Found")
+    end
+
+    def visual_image(headers, project_id, candidate_id)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.visual_artifact_path(project_id: project_id, candidate_id: candidate_id)
+      response(200, FileStream.new(path), "Content-Type" => "image/png", "Content-Length" => File.size(path).to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store")
+    rescue ArgumentError
       response(404, "Not Found")
     end
 

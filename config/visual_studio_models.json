@@ -1,0 +1,51 @@
+{
+  "schema_version": "soul.visual_studio.models.v1",
+  "runtime": {
+    "repository": "https://github.com/leejet/stable-diffusion.cpp.git",
+    "revision": "ea4e566ccffa10f853ecc3f29e74b1820bc91beb",
+    "build": "vulkan"
+  },
+  "profiles": {
+    "flux2-klein-4b-q4": {
+      "label": "FLUX.2 Klein 4B Q4",
+      "accelerator": "AMD Vulkan",
+      "license": "Apache-2.0",
+      "steps": 4,
+      "cfg_scale": 1.0,
+      "offload_to_cpu": true,
+      "files": [
+        {
+          "role": "diffusion_model",
+          "repository": "leejet/FLUX.2-klein-4B-GGUF",
+          "revision": "3b1f5a9dc3abb32238b053aeb3d823c30afdacbd",
+          "filename": "flux-2-klein-4b-Q4_0.gguf",
+          "bytes": 2460378560,
+          "sha256": "d1023499ef3f2f82ff7c50e6778495195c1b6cc34835741778868428111f9ff4"
+        },
+        {
+          "role": "text_encoder",
+          "repository": "unsloth/Qwen3-4B-GGUF",
+          "revision": "22c9fc8a8c7700b76a1789366280a6a5a1ad1120",
+          "filename": "Qwen3-4B-Q4_K_M.gguf",
+          "bytes": 2497281312,
+          "sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a"
+        },
+        {
+          "role": "vae",
+          "repository": "black-forest-labs/FLUX.2-small-decoder",
+          "revision": "a3efc24f613ef42d9428af62fdbd6f5fd8856c4a",
+          "filename": "full_encoder_small_decoder.safetensors",
+          "bytes": 249519092,
+          "sha256": "ea4273f02d1fafbf8e1d1c2cf6018ed8748652eb0bf34f2dd91171f16f15ab62"
+        }
+      ]
+    }
+  },
+  "motion_candidates": {
+    "ltxv-2b-0.9.8-distilled": {
+      "status": "qualification_required",
+      "reason": "Official CUDA-first runtime has not been proven on this Arch Linux RDNA2 host.",
+      "allowed_effects": ["text_to_video", "image_to_video", "keyframe_conditioning"]
+    }
+  }
+}

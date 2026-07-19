@@ -16,7 +16,7 @@ check.call("menu state is explicit, dismissible, and keyboard closable", javascr
 check.call("active nested surface illuminates the parent destination", javascript.include?('classList.toggle("is-active", selfImprovement)') && javascript.include?('setAttribute("aria-current"'))
 check.call("validated URL fragment preserves the active page across refresh", javascript.include?("TAB_LOCATIONS") && javascript.include?("tabFromLocation()") && javascript.include?("window.history.replaceState") && javascript.include?('window.addEventListener("hashchange"') && !javascript.include?("localStorage"))
 check.call("visual language remains part of the existing top bar", css.include?(".tab-menu") && css.include?(".self-improvement-menu") && css.include?("var(--gold)") && css.include?("var(--cyan)"))
-check.call("bootstrap advertises primary and nested surfaces separately", facade.include?('"product_tabs" => ["Chat", "Self Improvement", "Music Studio"]') && facade.include?('"self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"]'))
+check.call("bootstrap advertises primary and nested surfaces separately", facade.include?('"product_tabs" => ["Chat", "Self Improvement", "Creative Studios"]') && facade.include?('"self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"]') && facade.include?('"creative_surfaces" => ["Music Studio", "Visual Studio"]'))
 check.call("navigation adds no polling or unsafe rendering", %w[setInterval setTimeout innerHTML insertAdjacentHTML].none? { |term| javascript.include?(term) })
 
 abort "Self Improvement navigation verification failed: #{failures.join(', ')}" unless failures.empty?

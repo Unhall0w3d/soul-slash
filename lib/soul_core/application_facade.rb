@@ -33,6 +33,7 @@ require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
+require_relative "visual_studio_service"
 
 module SoulCore
   class ApplicationFacade
@@ -75,7 +76,8 @@ module SoulCore
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
       music_reference_synthesis_service: nil,
-      music_reference_synthesis_provider: nil
+      music_reference_synthesis_provider: nil,
+      visual_studio_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -109,6 +111,7 @@ module SoulCore
       @music_reference_analysis_service = music_reference_analysis_service
       @music_reference_synthesis_service = music_reference_synthesis_service
       @music_reference_synthesis_provider = music_reference_synthesis_provider
+      @visual_studio_service = visual_studio_service
     end
 
     def call(request, progress: nil)
@@ -140,6 +143,10 @@ module SoulCore
 
     def music_visual_artifact_path(project_id:, candidate_id:, visual_id:, artifact:)
       music_visual_companion.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: artifact)
+    end
+
+    def visual_artifact_path(project_id:, candidate_id:)
+      visual_studio.artifact_path(project_id: project_id, candidate_id: candidate_id)
     end
 
     private
@@ -264,6 +271,12 @@ module SoulCore
       when "music.visuals.loop.execute" then domain(music_visual_companion.loop_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "music.visuals.final.preview" then domain(music_visual_companion.final_preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
       when "music.visuals.final.execute" then domain(music_visual_companion.final_execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.resources.status" then domain(visual_studio.resources)
+      when "visual.projects.list" then domain(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)))
+      when "visual.projects.create" then domain(visual_studio.create(required(parameters, "visual_project")))
+      when "visual.projects.get" then domain(visual_studio.inspect(project_id: required(parameters, "visual_project_id")))
+      when "visual.generation.preview" then domain(visual_studio.generation_preview(project_id: required(parameters, "visual_project_id")))
+      when "visual.generation.execute" then domain(visual_studio.generation_execute(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -277,7 +290,8 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Self Improvement", "Music Studio"],
+        "product_tabs" => ["Chat", "Self Improvement", "Creative Studios"],
+        "creative_surfaces" => ["Music Studio", "Visual Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
           "ok" => report.fetch("ok"),
@@ -339,6 +353,15 @@ module SoulCore
           "generation_gate" => "preview_digest_and_exact_confirmation",
           "automatic_model_loading" => false,
           "queue" => false
+        },
+        "visual_studio" => {
+          "available" => true,
+          "phase" => "A1",
+          "still_generation" => "FLUX.2 Klein 4B via bounded AMD Vulkan foreground job",
+          "motion_generation" => "qualification_required",
+          "generation_gate" => "preview_digest_and_exact_confirmation",
+          "automatic_model_loading" => false,
+          "promotion_to_music" => "future_explicit_human_gate"
         },
         "unified_operations" => {
           "available" => true,
@@ -598,6 +621,10 @@ module SoulCore
 
     def music_generation
       @music_generation_service ||= MusicGenerationService.new(root: @root)
+    end
+
+    def visual_studio
+      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status })
     end
 
     def music_candidate_analysis

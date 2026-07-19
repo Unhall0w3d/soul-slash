@@ -56,7 +56,13 @@
           <button id="augmentation-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="augmentation-panel"><strong>Self Augmentation</strong><span>Architecture proposals and controlled experiments</span></button>
         </div>
       </div>
-      <button id="music-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="music-panel">Music Studio <span class="phase-tag">A3</span></button>
+      <div id="creative-navigation" class="tab-menu">
+        <button id="creative-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="creative-menu">Creative Studios <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
+        <div id="creative-menu" class="self-improvement-menu" role="menu" aria-label="Creative Studio surfaces" hidden>
+          <button id="music-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="music-panel"><strong>Music Studio</strong><span>Composition, candidates, listening evidence, and visual companions</span></button>
+          <button id="visual-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="visual-panel"><strong>Visual Studio</strong><span>Local still drafts now; motion after measured qualification</span></button>
+        </div>
+      </div>
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
@@ -152,6 +158,25 @@
             <p id="inbox-summary" class="muted">No active conversation.</p>
           </section>
         </aside>
+      </div>
+    </section>
+
+    <section id="visual-panel" class="tab-panel visual-panel" role="tabpanel" aria-labelledby="visual-tab" hidden>
+      <header class="studio-header music-header"><div><p class="eyebrow">Lightform workshop</p><h1>Visual Studio</h1><p>Shape a visual brief, render one private local draft, and retain every candidate for deliberate review.</p></div><div class="studio-boundary"><strong>Bounded local creation</strong><span>Brief → exact preview → Vulkan render → visual review</span><small>No background server, automatic publication, or silent promotion into Music Studio.</small></div></header>
+      <div class="visual-layout">
+        <aside class="visual-projects"><div class="studio-list-heading"><div><p class="eyebrow">Image archive</p><h2>Projects</h2></div><span id="visual-project-count" class="count-badge">0</span></div><button id="new-visual-project" class="gate-button" type="button">New visual</button><div id="visual-project-list" class="studio-list"><p class="muted">Open the workshop to inspect projects.</p></div></aside>
+        <section class="visual-workbench">
+          <form id="visual-project-form" class="music-form visual-form">
+            <div class="studio-detail-heading"><div><p class="eyebrow">Visual brief</p><h2 id="visual-workbench-title">New visual</h2></div><span id="visual-resource-state" class="maturity-chip">Not inspected</span></div>
+            <div class="visual-form-grid"><label>Title<input id="visual-title" maxlength="120" required></label><label>Intent<input id="visual-intent" maxlength="2000" required></label><label>Frame<select id="visual-aspect"><option value="landscape">Landscape · 16:9</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 9:16</option></select></label><label>Seed<input id="visual-seed" type="number" min="0" max="2147483647" value="42" required></label></div>
+            <label>Scene and aesthetic<textarea id="visual-prompt" rows="8" maxlength="8000" required placeholder="A locked-camera nocturnal observatory above dark water, weathered brass instruments, cyan instrument light, painterly cinematic realism, deep indigo shadows, precise atmospheric detail."></textarea></label>
+            <label>Exclude<textarea id="visual-negative" rows="3" maxlength="2000" placeholder="text, watermark, logo, malformed architecture, oversaturated highlights"></textarea></label>
+            <div class="music-actions"><button id="save-visual-project" class="gate-button gate-button--gold" type="submit">Create project</button><button id="refresh-visual-resources" class="gate-button" type="button">Inspect resources</button></div><p id="visual-form-status" class="dialog-status" role="status"></p>
+          </form>
+          <section id="visual-generation-card" class="gate-card" hidden><div><p class="eyebrow">Exact generation boundary</p><h3>Generate one local still</h3><p>FLUX.2 Klein is loaded for this bounded foreground render, then the process exits.</p></div><button id="preview-visual-generation" class="gate-button" type="button">Preview generation</button><div id="visual-generation-confirm" hidden><pre id="visual-generation-scope" class="diagnostic-output"></pre><button id="start-visual-generation" class="gate-button gate-button--gold" type="button" disabled>Generate exact draft</button></div><div id="visual-progress" class="music-progress" hidden><i></i><strong id="visual-progress-stage">Preparing</strong><span id="visual-progress-message">Waiting for the local lane.</span></div><p id="visual-generation-status" class="dialog-status" role="status"></p></section>
+          <section id="visual-candidates" class="music-candidates" hidden><div class="studio-detail-heading"><div><p class="eyebrow">Visual evidence</p><h2>Candidates</h2></div><span id="visual-candidate-count" class="count-badge">0</span></div><div id="visual-candidate-list" class="visual-candidate-grid"></div></section>
+        </section>
+        <aside class="visual-motion-boundary"><p class="eyebrow">Motion lane</p><h2>Generated scenes</h2><strong>Qualification pending</strong><p>LTX-Video 2B is the lead short-motion candidate. It remains unavailable until AMD/RDNA2 compatibility, memory use, output integrity, and process cleanup pass a measured local gate.</p><dl><div><dt>Text to video</dt><dd>Planned</dd></div><div><dt>Image guided</dt><dd>Planned</dd></div><div><dt>Target clip</dt><dd>4–8 sec</dd></div></dl></aside>
       </div>
     </section>
 

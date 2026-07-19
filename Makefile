@@ -32,8 +32,10 @@ MUSIC_REFERENCE_YTDLP_VERSION ?= 2026.7.4
 MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
 MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_enrichment_models.json
 MUSIC_REFERENCE_MODEL_CACHE ?=
+VISUAL_ROOT ?= $(HOME)/.local/share/soul/visual
+VISUAL_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/visual_studio_models.json
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
+.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -52,6 +54,9 @@ help:
 > @echo "  make music-vulkan-setup-plan  Preview the pinned AMD Vulkan ACE-Step runtime"
 > @echo "  make music-vulkan-download-plan  Preview the exact 4B LM / 2B Turbo GGUF set"
 > @echo "  make music-vulkan-run-plan MUSIC_INPUT=/path/request.json  Preview one AMD pilot"
+> @echo "  make visual-check      Inspect the optional bounded FLUX.2 Vulkan lane"
+> @echo "  make visual-runtime-plan  Preview the pinned stable-diffusion.cpp Vulkan build"
+> @echo "  make visual-model-download-plan  Preview exact FLUX.2 Klein model bytes"
 > @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
 > @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
 > @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
@@ -181,6 +186,25 @@ music-vulkan-run:
 
 verify-music-core-vulkan:
 > @ruby scripts/verify-music-core-vulkan-feasibility.rb
+
+visual-check:
+> @ruby scripts/soul-visual-runtime check --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)"
+
+visual-runtime-plan:
+> @ruby scripts/soul-visual-runtime plan --action setup --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)"
+
+visual-runtime-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-runtime-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_VISUAL_VULKAN_RUNTIME" || { echo "Exact confirmation INSTALL_VISUAL_VULKAN_RUNTIME is required."; exit 2; }
+> @ruby scripts/soul-visual-runtime setup --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+visual-model-download-plan:
+> @ruby scripts/soul-visual-runtime plan --action download --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)"
+
+visual-model-download:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-model-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "DOWNLOAD_VISUAL_VULKAN_MODELS" || { echo "Exact confirmation DOWNLOAD_VISUAL_VULKAN_MODELS is required."; exit 2; }
+> @ruby scripts/soul-visual-runtime download --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 music-transcription-plan:
 > @ruby scripts/soul-music-transcription plan --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)"

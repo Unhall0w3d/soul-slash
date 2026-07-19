@@ -19,6 +19,8 @@ module SoulCore
     EXPERIMENT_ID = /\Aexp_[a-f0-9]{16}\z/
     MUSIC_PROJECT_ID = /\Amusic_[a-f0-9]{16}\z/
     MUSIC_CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
+    VISUAL_PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
+    VISUAL_CANDIDATE_ID = /\Avisual_candidate_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
@@ -142,6 +144,12 @@ module SoulCore
       "music.visuals.loop.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
       "music.visuals.final.preview" => %w[project_id candidate_id visual_id],
       "music.visuals.final.execute" => %w[project_id candidate_id visual_id confirmation expected_digest],
+      "visual.resources.status" => [],
+      "visual.projects.list" => %w[limit],
+      "visual.projects.create" => %w[visual_project],
+      "visual.projects.get" => %w[visual_project_id],
+      "visual.generation.preview" => %w[visual_project_id],
+      "visual.generation.execute" => %w[visual_project_id visual_candidate_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -247,6 +255,10 @@ module SoulCore
       return "candidate_id is invalid" if candidate_id && !candidate_id.to_s.match?(MUSIC_CANDIDATE_ID)
       source_candidate_id = parameters["source_candidate_id"]
       return "source_candidate_id is invalid" if source_candidate_id && !source_candidate_id.to_s.match?(MUSIC_CANDIDATE_ID)
+      visual_project_id = parameters["visual_project_id"]
+      return "visual_project_id is invalid" if visual_project_id && !visual_project_id.to_s.match?(VISUAL_PROJECT_ID)
+      visual_candidate_id = parameters["visual_candidate_id"]
+      return "visual_candidate_id is invalid" if visual_candidate_id && !visual_candidate_id.to_s.match?(VISUAL_CANDIDATE_ID)
       chat_ids = parameters["chat_ids"]
       return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 
@@ -259,7 +271,7 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "start_seconds" || key == "end_seconds"
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
-        elsif key == "filters" || key == "project" || key == "review" || key == "revision"
+        elsif key == "filters" || key == "project" || key == "visual_project" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "args" || key == "chat_ids" || key == "allowed_files"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }

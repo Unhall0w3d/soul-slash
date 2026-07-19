@@ -1,0 +1,163 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "etc"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "timeout"
+
+class VisualRuntime
+  SETUP_CONFIRMATION = "INSTALL_VISUAL_VULKAN_RUNTIME"
+  DOWNLOAD_CONFIRMATION = "DOWNLOAD_VISUAL_VULKAN_MODELS"
+
+  def initialize(options)
+    @manifest = JSON.parse(File.binread(options.fetch(:manifest)))
+    @root = File.expand_path(options.fetch(:root))
+    @expected_digest = options[:expected_digest]
+    @confirmation = options[:confirmation]
+    @source = @manifest.fetch("runtime")
+    @profile_id, @profile = @manifest.fetch("profiles").first
+    @source_dir = File.join(@root, "stable-diffusion.cpp")
+    @models_dir = File.join(@root, "models")
+  end
+
+  def check
+    files = @profile.fetch("files").map { |file| file.merge("verified" => verified?(model_path(file), file)) }
+    emit("lifecycle_state" => "complete", "runtime_ready" => executable?(binary), "models_ready" => files.all? { |file| file["verified"] }, "binary" => binary, "profile_id" => @profile_id, "files" => files.map { |file| file.slice("role", "filename", "bytes", "verified") }, "persistent_service" => false, "network_listener" => false)
+  end
+
+  def plan(action)
+    emit(plan_data(action).merge("lifecycle_state" => "blocked_for_human_review"))
+  end
+
+  def setup
+    authorize!("setup", SETUP_CONFIRMATION)
+    require_tools!(%w[git cmake ninja])
+    FileUtils.mkdir_p(@root, mode: 0o700)
+    install_source unless exact_source?
+    run(["git", "submodule", "update", "--init", "--recursive"], timeout: 900, chdir: @source_dir) unless File.file?(File.join(@source_dir, "ggml", "CMakeLists.txt"))
+    build = File.join(@source_dir, "build")
+    FileUtils.mkdir_p(build)
+    run(["cmake", "-S", @source_dir, "-B", build, "-G", "Ninja", "-DSD_VULKAN=ON", "-DSD_BUILD_EXAMPLES=ON", "-DCMAKE_BUILD_TYPE=Release"], timeout: 900)
+    run(["cmake", "--build", build, "--config", "Release", "--target", "sd-cli", "-j", [Etc.nprocessors, 12].min.to_s], timeout: 3600)
+    candidate = [File.join(build, "bin", "sd-cli"), File.join(build, "bin", "Release", "sd-cli")].find { |path| executable?(path) }
+    raise "Vulkan sd-cli was not produced" unless candidate
+    FileUtils.mkdir_p(File.dirname(binary), mode: 0o700)
+    FileUtils.cp(candidate, binary, preserve: false) unless File.expand_path(candidate) == File.expand_path(binary)
+    File.chmod(0o700, binary)
+    emit("lifecycle_state" => "complete", "mutation" => "visual_vulkan_runtime_installed", "binary" => binary, "revision" => revision)
+  rescue StandardError => error
+    emit("lifecycle_state" => "failed", "error" => error.message); exit 1
+  end
+
+  def download
+    authorize!("download", DOWNLOAD_CONFIRMATION)
+    require_tools!(%w[curl])
+    FileUtils.mkdir_p(@models_dir, mode: 0o700)
+    @profile.fetch("files").each do |file|
+      target = model_path(file)
+      next if verified?(target, file)
+      partial = "#{target}.partial"
+      FileUtils.rm_f(partial)
+      url = "https://huggingface.co/#{file.fetch('repository')}/resolve/#{file.fetch('revision')}/#{file.fetch('filename')}"
+      run(["curl", "--fail", "--location", "--retry", "3", "--continue-at", "-", "--output", partial, url], timeout: 14_400)
+      raise "download verification failed for #{file.fetch('filename')}" unless verified?(partial, file)
+      File.rename(partial, target)
+      File.chmod(0o600, target)
+    ensure
+      FileUtils.rm_f(partial) if defined?(partial) && partial && File.exist?(partial) && !verified?(partial, file)
+    end
+    emit("lifecycle_state" => "complete", "mutation" => "visual_vulkan_models_downloaded", "profile_id" => @profile_id, "bytes_verified" => @profile.fetch("files").sum { |file| file.fetch("bytes") })
+  rescue StandardError => error
+    emit("lifecycle_state" => "failed", "error" => error.message); exit 1
+  end
+
+  private
+
+  def plan_data(action)
+    raise "action must be setup or download" unless %w[setup download].include?(action)
+    confirmation = action == "setup" ? SETUP_CONFIRMATION : DOWNLOAD_CONFIRMATION
+    data = { "operation" => "visual_runtime_#{action}", "root" => @root, "profile_id" => @profile_id, "runtime_repository" => @source.fetch("repository"), "runtime_revision" => @source.fetch("revision"), "download_bytes" => action == "download" ? @profile.fetch("files").sum { |file| file.fetch("bytes") } : 0, "confirmation_phrase" => confirmation, "persistent_service" => false, "network_listener" => false, "bounded_foreground_operation" => true }
+    data.merge("expected_digest" => digest(data))
+  end
+
+  def authorize!(action, phrase)
+    expected = plan_data(action).fetch("expected_digest")
+    raise "review the current plan and provide its exact EXPECTED_DIGEST" unless secure_compare(@expected_digest, expected)
+    raise "exact confirmation #{phrase} is required" unless @confirmation == phrase
+  end
+
+  def install_source
+    raise "runtime source exists at an unexpected revision" if File.exist?(@source_dir)
+    partial = "#{@source_dir}.partial-#{Process.pid}"
+    run(["git", "clone", "--filter=blob:none", "--recursive", @source.fetch("repository"), partial], timeout: 900)
+    run(["git", "checkout", "--detach", @source.fetch("revision")], timeout: 120, chdir: partial)
+    raise "runtime revision mismatch" unless revision(partial) == @source.fetch("revision")
+    File.rename(partial, @source_dir)
+  ensure
+    FileUtils.rm_rf(partial) if defined?(partial) && partial && File.exist?(partial)
+  end
+
+  def exact_source? = File.directory?(File.join(@source_dir, ".git")) && revision == @source.fetch("revision")
+  def revision(directory = @source_dir)
+    stdout, status = Open3.capture2("git", "rev-parse", "HEAD", chdir: directory)
+    status.success? ? stdout.strip : ""
+  rescue SystemCallError
+    ""
+  end
+  def binary = File.join(@source_dir, "bin", "sd-cli")
+  def model_path(file) = File.join(@models_dir, file.fetch("filename"))
+  def executable?(path) = File.file?(path) && !File.symlink?(path) && File.executable?(path)
+  def verified?(path, file) = File.file?(path) && !File.symlink?(path) && File.size(path) == file.fetch("bytes") && Digest::SHA256.file(path).hexdigest == file.fetch("sha256")
+
+  def require_tools!(names)
+    missing = names.reject { |name| ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, name)) } }
+    raise "missing required visual runtime tools: #{missing.join(', ')}" unless missing.empty?
+  end
+
+  def run(command, timeout:, chdir: nil)
+    output = +""; status = nil; thread = nil
+    options = { pgroup: true }; options[:chdir] = chdir if chdir
+    Open3.popen2e(*command, **options) do |stdin, stream, wait_thread|
+      thread = wait_thread; stdin.close
+      reader = Thread.new { stream.read }
+      Timeout.timeout(timeout) { status = wait_thread.value }
+      output = Timeout.timeout(5) { reader.value }
+    end
+    raise "command failed: #{command.first}: #{output.byteslice(-4000, 4000)}" unless status.success?
+    output
+  rescue Timeout::Error
+    Process.kill("TERM", -thread.pid) if thread&.alive?
+    sleep 0.2
+    Process.kill("KILL", -thread.pid) if thread&.alive?
+    raise "bounded command timed out: #{command.first}"
+  rescue Errno::ESRCH
+    raise "bounded command timed out: #{command.first}"
+  end
+
+  def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))
+  def secure_compare(left, right) = left.to_s.bytesize == right.bytesize && left.to_s.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
+  def emit(value) = puts(JSON.pretty_generate(value))
+end
+
+options = { manifest: File.expand_path("../config/visual_studio_models.json", __dir__), root: File.join(Dir.home, ".local", "share", "soul", "visual") }
+parser = OptionParser.new do |opts|
+  opts.on("--action ACTION") { |value| options[:action] = value }
+  opts.on("--manifest PATH") { |value| options[:manifest] = value }
+  opts.on("--root PATH") { |value| options[:root] = value }
+  opts.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+  opts.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end
+command = ARGV.shift
+parser.parse!(ARGV)
+runtime = VisualRuntime.new(options)
+case command
+when "check" then runtime.check
+when "plan" then runtime.plan(options.fetch(:action))
+when "setup" then runtime.setup
+when "download" then runtime.download
+else abort "usage: soul-visual-runtime [check|plan|setup|download] [options]"
+end

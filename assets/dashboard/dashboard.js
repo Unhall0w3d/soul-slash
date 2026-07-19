@@ -1,10 +1,11 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel" });
+const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel" });
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
+Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false });
 
 function formatBytes(value) {
   const bytes = Number(value); if (!Number.isFinite(bytes) || bytes < 0) return "unavailable";
@@ -181,18 +182,23 @@ function switchTab(name, { updateLocation = true } = {}) {
   const improvement = name === "improvement";
   const augmentation = name === "augmentation";
   const music = name === "music";
+  const visual = name === "visual";
   const selfImprovement = studio || improvement || augmentation;
+  const creative = music || visual;
   byId("chat-panel").hidden = !chat;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
+  byId("visual-panel").hidden = !visual;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
   byId("augmentation-tab").classList.toggle("is-active", augmentation);
+  byId("creative-tab").classList.toggle("is-active", creative);
   byId("music-tab").classList.toggle("is-active", music);
+  byId("visual-tab").classList.toggle("is-active", visual);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
   byId("studio-tab").classList.toggle("is-active", studio);
@@ -201,19 +207,29 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("studio-tab").setAttribute("aria-current", studio ? "page" : "false");
   byId("improvement-tab").setAttribute("aria-current", improvement ? "page" : "false");
   byId("augmentation-tab").setAttribute("aria-current", augmentation ? "page" : "false");
-  byId("music-tab").setAttribute("aria-selected", String(music));
+  byId("creative-tab").setAttribute("aria-selected", String(creative));
+  byId("music-tab").setAttribute("aria-current", music ? "page" : "false");
+  byId("visual-tab").setAttribute("aria-current", visual ? "page" : "false");
   setSelfImprovementMenu(false);
+  setCreativeMenu(false);
   if (updateLocation && window.location.hash !== TAB_LOCATIONS[name]) window.history.replaceState(null, "", TAB_LOCATIONS[name]);
   if (studio && state.authenticated && !state.studioLoaded) loadSkillStudio();
   if (improvement && state.authenticated && !state.improvementLoaded) loadSelfImprovement();
   if (augmentation && state.authenticated && !state.augmentationLoaded) loadSelfAugmentation();
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
+  if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
 }
 
 function setSelfImprovementMenu(open) {
   byId("self-improvement-menu").hidden = !open;
   byId("self-improvement-tab").setAttribute("aria-expanded", String(open));
   byId("self-improvement-navigation").classList.toggle("is-open", open);
+}
+
+function setCreativeMenu(open) {
+  byId("creative-menu").hidden = !open;
+  byId("creative-tab").setAttribute("aria-expanded", String(open));
+  byId("creative-navigation").classList.toggle("is-open", open);
 }
 
 function renderChatList() {
@@ -1634,6 +1650,77 @@ function openReviewCenter() {
 
 function closeReviewCenter() { byId("review-center").close(); }
 
+function resetVisualForm() {
+  state.selectedVisualProject = null; state.visualPreview = null;
+  byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
+  byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false;
+  byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-form-status").textContent = "";
+  renderVisualProjects();
+}
+
+function renderVisualProjects() {
+  const list = byId("visual-project-list"); list.replaceChildren(); byId("visual-project-count").textContent = String(state.visualProjects.length);
+  if (!state.visualProjects.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No visual projects yet."; list.append(empty); return; }
+  state.visualProjects.forEach((project) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = "studio-item";
+    if (state.selectedVisualProject?.project_id === project.project_id) button.classList.add("is-active");
+    const title = document.createElement("strong"); title.textContent = project.title; const meta = document.createElement("small"); meta.textContent = `${project.aspect_ratio} · seed ${project.seed}`;
+    button.append(title, meta); button.addEventListener("click", () => selectVisualProject(project.project_id)); list.append(button);
+  });
+}
+
+function renderVisualCandidates(project) {
+  const candidates = project.candidates || []; const list = byId("visual-candidate-list"); list.replaceChildren();
+  byId("visual-candidate-count").textContent = String(candidates.length); byId("visual-candidates").hidden = candidates.length === 0;
+  candidates.forEach((candidate) => {
+    const card = document.createElement("article"); card.className = "visual-candidate";
+    const image = document.createElement("img"); image.alt = `${project.title} visual draft`; image.loading = "lazy"; image.src = `/api/v1/visual/image/${project.project_id}/${candidate.candidate_id}`;
+    const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${candidate.elapsed_seconds}s render`; const stateLabel = document.createElement("span"); stateLabel.textContent = "Review required";
+    footer.append(timing, stateLabel); card.append(image, footer); list.append(card);
+  });
+}
+
+async function selectVisualProject(projectId) {
+  try {
+    const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
+    state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
+    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("visual-generation-card").hidden = false; byId("visual-generation-confirm").hidden = true; state.visualPreview = null;
+    renderVisualProjects(); renderVisualCandidates(project);
+  } catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function refreshVisualResources() {
+  try { const envelope = await callSoul("visual.resources.status"); lifecycle(envelope); const data = dataOf(envelope); const label = byId("visual-resource-state"); label.textContent = data.ready ? `${data.profile} ready` : "Runtime attention"; label.classList.toggle("is-ready", data.ready); byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · exact model set verified · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
+  catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function loadVisualStudio() {
+  try { const envelope = await callSoul("visual.projects.list", { limit: 200 }); lifecycle(envelope); state.visualProjects = dataOf(envelope).projects || []; state.visualLoaded = true; renderVisualProjects(); await refreshVisualResources(); }
+  catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function createVisualProject(event) {
+  event.preventDefault(); const visualProject = { title: byId("visual-title").value, intent: byId("visual-intent").value, prompt: byId("visual-prompt").value, negative_prompt: byId("visual-negative").value, aspect_ratio: byId("visual-aspect").value, seed: Number(byId("visual-seed").value) };
+  try { const envelope = await callSoul("visual.projects.create", { visual_project: visualProject }); lifecycle(envelope); const project = dataOf(envelope).project; state.visualProjects.unshift(project); await selectVisualProject(project.project_id); byId("visual-form-status").textContent = "Visual project created."; }
+  catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function previewVisualGeneration() {
+  if (!state.selectedVisualProject) return;
+  try { const envelope = await callSoul("visual.generation.preview", { visual_project_id: state.selectedVisualProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.data?.message || "Visual runtime is not ready"); state.visualPreview = data; byId("visual-generation-scope").textContent = JSON.stringify(data, null, 2); byId("visual-generation-confirm").hidden = false; byId("start-visual-generation").disabled = false; byId("visual-generation-status").textContent = "Clicking generate authorizes this exact local draft."; }
+  catch (error) { byId("visual-generation-status").textContent = error.message; }
+}
+
+async function startVisualGeneration() {
+  if (!state.visualPreview || state.visualGenerating) return; state.visualGenerating = true; byId("start-visual-generation").disabled = true; byId("visual-progress").hidden = false;
+  try {
+    const parameters = { visual_project_id: state.visualPreview.project_id, visual_candidate_id: state.visualPreview.candidate_id, confirmation: state.visualPreview.confirmation_phrase, expected_digest: state.visualPreview.expected_digest };
+    const envelope = await callNdjson("/api/v1/music-stream", "visual.generation.execute", parameters, {}, (event) => { byId("visual-progress-stage").textContent = event.stage || "Working"; byId("visual-progress-message").textContent = event.message || "Local render in progress."; });
+    lifecycle(envelope); byId("visual-generation-status").textContent = "Visual draft generated; review the candidate below."; await selectVisualProject(state.visualPreview.project_id);
+  } catch (error) { byId("visual-generation-status").textContent = error.message; }
+  finally { state.visualGenerating = false; byId("visual-progress").hidden = true; }
+}
+
 async function bootstrap() {
   if (state.bootstrapped) return;
   state.bootstrapped = true;
@@ -1658,14 +1745,22 @@ byId("review-center").addEventListener("close", () => { if (state.reviewOpener i
 byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
+byId("creative-tab").addEventListener("click", () => setCreativeMenu(byId("creative-menu").hidden));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
+byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 window.addEventListener("hashchange", () => { const tab = tabFromLocation(); if (tab) switchTab(tab, { updateLocation: false }); });
-document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
+document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("creative-navigation").contains(event.target)) setCreativeMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
 byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
 byId("core-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCoreMenu(false); byId("core-selector").focus(); } });
+byId("creative-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCreativeMenu(false); byId("creative-tab").focus(); } });
+byId("new-visual-project").addEventListener("click", resetVisualForm);
+byId("visual-project-form").addEventListener("submit", createVisualProject);
+byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
+byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
+byId("start-visual-generation").addEventListener("click", startVisualGeneration);
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
