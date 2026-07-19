@@ -158,7 +158,7 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       request = JSON.parse(body)
-      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute visual.generation.execute]
+      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute visual.generation.execute visual.edit.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
         return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts bounded music, analysis, or visual rendering only"))
       end

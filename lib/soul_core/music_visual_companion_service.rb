@@ -102,6 +102,49 @@ module SoulCore
       FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
     end
 
+    def generated_import_preview(project_id:, candidate_id:, source_project_id:, source_candidate_id:, source_path:, prompt_summary:)
+      scope = generated_import_scope(project_id, candidate_id, source_project_id, source_candidate_id, source_path, prompt_summary)
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Visual Studio candidate is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+      outcome("blocked_for_human_review", true, "exact Visual Studio candidate binding requires approval", data: gate(IMPORT_CONFIRMATION, scope))
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def generated_import_execute(project_id:, candidate_id:, source_project_id:, source_candidate_id:, source_path:, prompt_summary:, confirmation:, expected_digest:)
+      return missing_gate unless confirmation.to_s.length.positive? && expected_digest.to_s.length.positive?
+      scope = generated_import_scope(project_id, candidate_id, source_project_id, source_candidate_id, source_path, prompt_summary)
+      return gate_mismatch("exact Visual Studio candidate confirmation did not match") unless confirmation == IMPORT_CONFIRMATION
+      return gate_mismatch("Visual Studio or Music candidate changed; preview again") unless secure_compare(expected_digest, digest(scope))
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Visual Studio candidate is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+
+      root = visuals_root(project_id, create: true)
+      target = File.join(root, scope.fetch("visual_id"))
+      raise MusicProjectStore::IntegrityError, "visual destination already exists" if File.exist?(target) || File.symlink?(target)
+      staging = File.join(root, ".#{scope.fetch('visual_id')}.partial-#{SecureRandom.hex(4)}")
+      Dir.mkdir(staging, 0o700)
+      FileUtils.cp(source_path, File.join(staging, "base.png"), preserve: false)
+      File.chmod(0o600, File.join(staging, "base.png"))
+      record = scope.merge(
+        "schema_version" => "soul.music.visual.v1", "lifecycle_state" => "blocked_for_human_review",
+        "stage" => "base_bound", "created_at" => @clock.call.iso8601, "updated_at" => @clock.call.iso8601,
+        "render_profile" => render_profile, "artifacts" => { "base" => artifact("base.png", staging) },
+        "human_review_required" => true
+      )
+      write_json(File.join(staging, "visual.json"), record)
+      File.rename(staging, target)
+      outcome("blocked_for_human_review", true, "Visual Studio candidate bound; Music Studio loop review remains required", data: { "visual" => record }, mutation: "music_visual_bound")
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    ensure
+      FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
+    end
+
     def loop_preview(project_id:, candidate_id:, visual_id:)
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual loop already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "loop")
@@ -200,6 +243,25 @@ module SoulCore
         "source_manifest_sha256" => Digest::SHA256.file(File.join(@source_root, "#{asset_id}.json")).hexdigest,
         "source_image_sha256" => Digest::SHA256.file(image).hexdigest, "provider" => source.fetch("provider"),
         "rights_status" => source.fetch("rights_status"), "render_profile_id" => render_profile.fetch("profile_id"), "external_publication" => false
+      }
+      base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
+    end
+
+    def generated_import_scope(project_id, candidate_id, source_project_id, source_candidate_id, source_path, prompt_summary)
+      project, candidate, audio = validate_binding!(project_id, candidate_id)
+      expanded = File.expand_path(source_path.to_s)
+      allowed_root = File.join(@root, "Soul", "visual", "projects")
+      raise MusicProjectStore::ValidationError, "Visual Studio source path is outside the private project archive" unless within?(expanded, allowed_root)
+      raise MusicProjectStore::IntegrityError, "Visual Studio source image is invalid" unless File.file?(expanded) && !File.symlink?(expanded) && File.size(expanded).positive?
+      raise MusicProjectStore::ValidationError, "Visual Studio source identity is invalid" unless source_project_id.to_s.match?(/\Avisual_project_[a-f0-9]{16}\z/) && source_candidate_id.to_s.match?(/\Avisual_candidate_[a-f0-9]{16}\z/)
+      prompt = prompt_summary.to_s.strip
+      raise MusicProjectStore::ValidationError, "visual prompt summary is invalid" unless prompt.length.between?(1, 2_000)
+      base = {
+        "operation" => "bind_visual_studio_candidate", "project_id" => project.fetch("project_id"), "candidate_id" => candidate.fetch("candidate_id"),
+        "candidate_audio_sha256" => Digest::SHA256.file(audio).hexdigest, "source_visual_project_id" => source_project_id,
+        "source_visual_candidate_id" => source_candidate_id, "source_image_sha256" => Digest::SHA256.file(expanded).hexdigest,
+        "provider" => "Soul Visual Studio / FLUX.2 Klein", "rights_status" => "operator_reviewed_local_generation",
+        "prompt_summary" => prompt, "render_profile_id" => render_profile.fetch("profile_id"), "external_publication" => false
       }
       base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
     end

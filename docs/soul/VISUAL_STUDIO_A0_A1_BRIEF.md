@@ -63,7 +63,8 @@ inspectable. Partial generation directories are removed after a terminal result.
 - Private projects: `Soul/visual/projects`, ignored by Git, mode 0700/0600.
 - Runtime and exact models: `~/.local/share/soul/visual`.
 - No Visual Studio candidate enters Music Studio automatically.
-- Promotion/binding into a music candidate remains a future exact human gate.
+- Promotion/binding into a music candidate was excluded from A1 and is supplied
+  by the later A2 exact human gate.
 - No cloud provider, private prompt transmission, service, watcher, queue,
   scheduler, or automatic publication is introduced.
 

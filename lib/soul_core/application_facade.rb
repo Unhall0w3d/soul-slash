@@ -275,8 +275,18 @@ module SoulCore
       when "visual.projects.list" then domain(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)))
       when "visual.projects.create" then domain(visual_studio.create(required(parameters, "visual_project")))
       when "visual.projects.get" then domain(visual_studio.inspect(project_id: required(parameters, "visual_project_id")))
+      when "visual.projects.update" then domain(visual_studio.update(project_id: required(parameters, "visual_project_id"), attributes: required(parameters, "visual_project")))
+      when "visual.projects.delete.preview" then domain(visual_studio.project_delete_preview(project_id: required(parameters, "visual_project_id")))
+      when "visual.projects.delete.execute" then domain(visual_studio.project_delete_execute(project_id: required(parameters, "visual_project_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "visual.generation.preview" then domain(visual_studio.generation_preview(project_id: required(parameters, "visual_project_id")))
       when "visual.generation.execute" then domain(visual_studio.generation_execute(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.candidates.review" then domain(visual_studio.record_review(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), review: required(parameters, "visual_review")))
+      when "visual.candidates.delete.preview" then domain(visual_studio.candidate_delete_preview(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id")))
+      when "visual.candidates.delete.execute" then domain(visual_studio.candidate_delete_execute(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "visual.edit.preview" then domain(visual_studio.edit_preview(project_id: required(parameters, "visual_project_id"), source_candidate_id: required(parameters, "source_visual_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed")))
+      when "visual.edit.execute" then domain(visual_studio.edit_execute(project_id: required(parameters, "visual_project_id"), source_candidate_id: required(parameters, "source_visual_candidate_id"), candidate_id: required(parameters, "visual_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.promotion.preview" then domain(visual_studio.promotion_preview(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id")))
+      when "visual.promotion.execute" then domain(visual_studio.promotion_execute(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -624,7 +634,7 @@ module SoulCore
     end
 
     def visual_studio
-      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status })
+      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion)
     end
 
     def music_candidate_analysis

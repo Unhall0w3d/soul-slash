@@ -5,7 +5,7 @@ const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-pane
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
-Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false });
+Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 
 function formatBytes(value) {
   const bytes = Number(value); if (!Number.isFinite(bytes) || bytes < 0) return "unavailable";
@@ -1651,11 +1651,15 @@ function openReviewCenter() {
 function closeReviewCenter() { byId("review-center").close(); }
 
 function resetVisualForm() {
-  state.selectedVisualProject = null; state.visualPreview = null;
+  state.selectedVisualProject = null; state.visualPreview = null; state.visualProjectDeletePreview = null;
   byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
-  byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false;
-  byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-form-status").textContent = "";
+  byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true;
+  byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
   renderVisualProjects();
+}
+
+function visualProjectInput() {
+  return { title: byId("visual-title").value, intent: byId("visual-intent").value, prompt: byId("visual-prompt").value, negative_prompt: byId("visual-negative").value, aspect_ratio: byId("visual-aspect").value, seed: Number(byId("visual-seed").value) };
 }
 
 function renderVisualProjects() {
@@ -1675,16 +1679,63 @@ function renderVisualCandidates(project) {
   candidates.forEach((candidate) => {
     const card = document.createElement("article"); card.className = "visual-candidate";
     const image = document.createElement("img"); image.alt = `${project.title} visual draft`; image.loading = "lazy"; image.src = `/api/v1/visual/image/${project.project_id}/${candidate.candidate_id}`;
-    const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${candidate.elapsed_seconds}s render`; const stateLabel = document.createElement("span"); stateLabel.textContent = "Review required";
-    footer.append(timing, stateLabel); card.append(image, footer); list.append(card);
+    const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${candidate.elapsed_seconds}s · ${candidate.generation_kind === "image_edit" ? "guided edit" : "text draft"}`; const stateLabel = document.createElement("span"); stateLabel.textContent = candidate.review ? `${candidate.review.disposition} · ${candidate.review.rating}/5` : "Review required";
+    footer.append(timing, stateLabel);
+    const controls = document.createElement("div"); controls.className = "visual-candidate-controls";
+    const rating = document.createElement("select"); rating.ariaLabel = "Visual rating"; [1,2,3,4,5].forEach((value) => { const option = document.createElement("option"); option.value = String(value); option.textContent = `${value} · ${["failed","weak","workable","strong","exceptional"][value - 1]}`; rating.append(option); }); rating.value = String(candidate.review?.rating || 3);
+    const disposition = document.createElement("select"); disposition.ariaLabel = "Visual disposition"; [["keep","Keep"],["revise","Revise"]].forEach(([value,label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; disposition.append(option); }); disposition.value = candidate.review?.disposition || "keep";
+    const notes = document.createElement("textarea"); notes.rows = 3; notes.maxLength = 8000; notes.placeholder = "What worked, what should change, and why."; notes.value = candidate.review?.notes || "";
+    const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "gate-button"; reviewButton.textContent = "Record review";
+    const editButton = document.createElement("button"); editButton.type = "button"; editButton.className = "gate-button"; editButton.textContent = "Revise from this image";
+    const promoteButton = document.createElement("button"); promoteButton.type = "button"; promoteButton.className = "gate-button gate-button--gold"; promoteButton.textContent = "Bind to Music candidate";
+    const deleteButton = document.createElement("button"); deleteButton.type = "button"; deleteButton.className = "danger-button"; deleteButton.textContent = "Delete candidate";
+    const status = document.createElement("p"); status.className = "dialog-status"; status.role = "status";
+    const gate = document.createElement("div"); gate.className = "visual-candidate-gate"; gate.hidden = true;
+    reviewButton.addEventListener("click", async () => { reviewButton.disabled = true; try { const envelope = await callSoul("visual.candidates.review", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, visual_review: { rating: Number(rating.value), disposition: disposition.value, notes: notes.value } }); lifecycle(envelope); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; reviewButton.disabled = false; } });
+    editButton.addEventListener("click", () => renderVisualEditGate(gate, project, candidate, status));
+    promoteButton.addEventListener("click", () => renderVisualPromotionGate(gate, project, candidate, status));
+    deleteButton.addEventListener("click", () => previewVisualCandidateDeletion(gate, project, candidate, status));
+    controls.append(rating, disposition, notes, reviewButton, editButton, promoteButton, deleteButton, gate, status);
+    card.append(image, footer, controls); list.append(card);
   });
+}
+
+function renderVisualEditGate(gate, project, candidate, status) {
+  gate.replaceChildren(); gate.hidden = false;
+  const label = document.createElement("label"); label.textContent = "Image-guided revision"; const instruction = document.createElement("textarea"); instruction.rows = 5; instruction.maxLength = 8000; instruction.placeholder = "Preserve the composition and architecture. Refine the distant horizon, deepen the cyan instrument light, and add subtle low mist."; label.append(instruction);
+  const seedLabel = document.createElement("label"); seedLabel.textContent = "Revision seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
+  const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview guided edit";
+  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.edit.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Edit preview failed safely"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact guided edit"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-guided revision…"; try { const result = await callNdjson("/api/v1/music-stream", "visual.edit.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, visual_candidate_id: scope.candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => { status.textContent = event.message || "Local edit in progress."; }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+  gate.append(label, seedLabel, preview);
+}
+
+async function ensureVisualMusicProjects() {
+  if (state.musicProjects.length) return state.musicProjects;
+  const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope); state.musicProjects = dataOf(envelope).projects || []; return state.musicProjects;
+}
+
+async function renderVisualPromotionGate(gate, project, candidate, status) {
+  gate.replaceChildren(); gate.hidden = false; status.textContent = "Inspecting Music Studio candidates…";
+  try {
+    const projects = await ensureVisualMusicProjects(); if (!projects.length) throw new Error("Create and generate a Music Studio candidate before binding artwork.");
+    const projectSelect = document.createElement("select"); const candidateSelect = document.createElement("select"); const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact binding";
+    projects.forEach((item) => { const option = document.createElement("option"); option.value = item.project_id; option.textContent = item.title; projectSelect.append(option); });
+    const loadCandidates = async () => { candidateSelect.replaceChildren(); const envelope = await callSoul("music.projects.get", { project_id: projectSelect.value }); lifecycle(envelope); const candidates = dataOf(envelope).project?.candidates || []; candidates.forEach((item) => { const option = document.createElement("option"); option.value = item.candidate_id; option.textContent = `${item.candidate_id.slice(-8)} · ${item.created_at || "candidate"}`; candidateSelect.append(option); }); preview.disabled = candidates.length === 0; };
+    projectSelect.addEventListener("change", loadCandidates); preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.promotion.preview", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, project_id: projectSelect.value, candidate_id: candidateSelect.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) { status.textContent = envelope.data?.message || "This exact image may already be bound."; return; } const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Bind exact visual companion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.promotion.execute", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, project_id: projectSelect.value, candidate_id: candidateSelect.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); status.textContent = "Bound to the exact Music candidate. Continue loop review in Music Studio."; } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+    gate.append(projectSelect, candidateSelect, preview); await loadCandidates(); status.textContent = "Choose the exact composition candidate to receive this still.";
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function previewVisualCandidateDeletion(gate, project, candidate, status) {
+  gate.replaceChildren(); gate.hidden = false;
+  try { const envelope = await callSoul("visual.candidates.delete.preview", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact candidate"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.candidates.delete.execute", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; }
 }
 
 async function selectVisualProject(projectId) {
   try {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
     state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
-    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("visual-generation-card").hidden = false; byId("visual-generation-confirm").hidden = true; state.visualPreview = null;
+    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
     renderVisualProjects(); renderVisualCandidates(project);
   } catch (error) { byId("visual-form-status").textContent = error.message; }
 }
@@ -1700,9 +1751,28 @@ async function loadVisualStudio() {
 }
 
 async function createVisualProject(event) {
-  event.preventDefault(); const visualProject = { title: byId("visual-title").value, intent: byId("visual-intent").value, prompt: byId("visual-prompt").value, negative_prompt: byId("visual-negative").value, aspect_ratio: byId("visual-aspect").value, seed: Number(byId("visual-seed").value) };
+  event.preventDefault(); const visualProject = visualProjectInput();
   try { const envelope = await callSoul("visual.projects.create", { visual_project: visualProject }); lifecycle(envelope); const project = dataOf(envelope).project; state.visualProjects.unshift(project); await selectVisualProject(project.project_id); byId("visual-form-status").textContent = "Visual project created."; }
   catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function updateVisualProject() {
+  if (!state.selectedVisualProject) return;
+  try { const envelope = await callSoul("visual.projects.update", { visual_project_id: state.selectedVisualProject.project_id, visual_project: visualProjectInput() }); lifecycle(envelope); await loadVisualStudio(); await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-form-status").textContent = "Revised brief saved. Existing candidate inputs remain immutable."; }
+  catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function previewVisualProjectDeletion() {
+  if (!state.selectedVisualProject) return;
+  try { const envelope = await callSoul("visual.projects.delete.preview", { visual_project_id: state.selectedVisualProject.project_id }); lifecycle(envelope); state.visualProjectDeletePreview = dataOf(envelope); byId("visual-project-delete-scope").textContent = JSON.stringify(state.visualProjectDeletePreview, null, 2); byId("visual-project-delete-confirm").hidden = false; byId("visual-project-delete-status").textContent = "Clicking delete authorizes only this exact inventoried project."; }
+  catch (error) { byId("visual-project-delete-status").textContent = error.message; }
+}
+
+async function executeVisualProjectDeletion() {
+  if (!state.selectedVisualProject || !state.visualProjectDeletePreview) return;
+  const projectId = state.selectedVisualProject.project_id; const scope = state.visualProjectDeletePreview;
+  try { const envelope = await callSoul("visual.projects.delete.execute", { visual_project_id: projectId, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(envelope); state.visualProjects = state.visualProjects.filter((item) => item.project_id !== projectId); resetVisualForm(); byId("visual-form-status").textContent = "Visual project permanently deleted."; }
+  catch (error) { byId("visual-project-delete-status").textContent = error.message; }
 }
 
 async function previewVisualGeneration() {
@@ -1758,9 +1828,12 @@ byId("core-navigation").addEventListener("keydown", (event) => { if (event.key =
 byId("creative-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCreativeMenu(false); byId("creative-tab").focus(); } });
 byId("new-visual-project").addEventListener("click", resetVisualForm);
 byId("visual-project-form").addEventListener("submit", createVisualProject);
+byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
 byId("start-visual-generation").addEventListener("click", startVisualGeneration);
+byId("preview-visual-project-delete").addEventListener("click", previewVisualProjectDeletion);
+byId("execute-visual-project-delete").addEventListener("click", executeVisualProjectDeletion);
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
