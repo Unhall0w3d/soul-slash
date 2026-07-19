@@ -297,7 +297,77 @@ function messageArticle(record, { pending = false, working = false } = {}) {
   const article = document.createElement("article"); const role = record.role === "user" ? "user" : "assistant"; article.className = `message message--${role}`;
   if (pending) article.classList.add("message--pending"); if (working) article.classList.add("message--working");
   const label = document.createElement("div"); label.className = "message-label"; label.textContent = role === "user" ? (pending ? "You · sending" : "You") : "Soul /";
-  const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body); return article;
+  const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body);
+  const runtime = record.metadata?.runtime || {};
+  renderMessageAttachments(article, Array.isArray(runtime.attachments) ? runtime.attachments : []);
+  renderMessageActions(article, Array.isArray(runtime.actions) ? runtime.actions : []);
+  return article;
+}
+
+function safeLocalArtifactUrl(value, kind) {
+  const text = String(value || "");
+  const patterns = {
+    audio: /^\/api\/v1\/music\/audio\/music_[a-f0-9]{16}\/candidate_[a-f0-9]{16}\/(?:mp3|flac)$/,
+    image: /^\/api\/v1\/visual\/image\/visual_project_[a-f0-9]{16}\/visual_candidate_[a-f0-9]{16}$/,
+    video: /^\/api\/v1\/music\/visual\/music_[a-f0-9]{16}\/candidate_[a-f0-9]{16}\/visual_[a-f0-9]{16}\/(?:loop|preview)$/
+  };
+  return patterns[kind]?.test(text) ? text : null;
+}
+
+function renderMessageAttachments(article, attachments) {
+  if (!attachments.length) return;
+  const region = document.createElement("div"); region.className = "message-attachments";
+  attachments.forEach((attachment) => {
+    const item = document.createElement("section"); item.className = "message-attachment";
+    const title = document.createElement("strong"); title.textContent = attachment.title || "Creative candidate"; item.append(title);
+    if (attachment.kind === "audio") {
+      const source = safeLocalArtifactUrl(attachment.player_url, "audio"); const lossless = safeLocalArtifactUrl(attachment.lossless_url, "audio");
+      if (source) { const player = document.createElement("audio"); player.controls = true; player.preload = "metadata"; player.src = source; item.append(player); }
+      if (lossless) { const link = document.createElement("a"); link.href = lossless; link.textContent = "Open lossless FLAC"; link.target = "_blank"; link.rel = "noopener"; item.append(link); }
+    } else if (attachment.kind === "image") {
+      const source = safeLocalArtifactUrl(attachment.image_url, "image");
+      if (source) { const picture = document.createElement("img"); picture.src = source; picture.alt = attachment.title || "Soul visual candidate"; picture.loading = "lazy"; item.append(picture); }
+    } else if (attachment.kind === "video") {
+      const source = safeLocalArtifactUrl(attachment.video_url, "video");
+      if (source) { const player = document.createElement("video"); player.controls = true; player.preload = "metadata"; player.src = source; item.append(player); }
+    }
+    if (item.childElementCount > 1) region.append(item);
+  });
+  if (region.childElementCount) article.append(region);
+}
+
+function renderMessageActions(article, actions) {
+  const safe = actions.filter((action) => {
+    if (!/^[a-f0-9]{64}$/.test(action.expected_digest || "")) return false;
+    if (action.operation === "chats.creative.execute") return /^creative_[a-f0-9]{16}$/.test(action.flow_id || "") && /^chat_[A-Za-z0-9_.-]+$/.test(action.chat_id || "");
+    if (action.operation === "core.activate.execute") return ["daily", "amd-free", "music"].includes(action.core_id) && /^[A-Za-z0-9_.-]+$/.test(action.target_profile_id || "");
+    return false;
+  });
+  if (!safe.length) return;
+  const region = document.createElement("div"); region.className = "message-actions";
+  safe.forEach((action) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = action.label || "Continue exact creative workflow";
+    const status = document.createElement("small"); status.className = "message-action-status";
+    button.addEventListener("click", async () => {
+      button.disabled = true; status.textContent = action.operation === "core.activate.execute" ? "Core transfer accepted…" : "Creative workflow accepted…";
+      try {
+        if (action.operation === "core.activate.execute") {
+          status.textContent = "Revalidating active work and Core state…";
+          const envelope = await callSoul(action.operation, { core_id: action.core_id, target_profile_id: action.target_profile_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest });
+          lifecycle(envelope); status.textContent = envelope.errors?.[0]?.message || dataOf(envelope).reason || "Core activation complete.";
+          if (envelope.lifecycle_state !== "complete") { button.disabled = false; return; }
+          await refreshCores({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshStatus({ automatic: true });
+          return;
+        }
+        const envelope = await callNdjson("/api/v1/music-job-stream", action.operation, { chat_id: action.chat_id, flow_id: action.flow_id, action_id: action.action_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest }, { current_chat_id: action.chat_id }, (event) => { status.textContent = event.message || "Bounded creative work in progress…"; });
+        lifecycle(envelope); status.textContent = envelope.errors?.[0]?.message || dataOf(envelope).reason || "Creative workflow reached a review gate.";
+        if (state.activeChat?.id === action.chat_id) await selectChat(state.activeChat);
+        await refreshCores({ automatic: true }); await refreshModelRuntime({ automatic: true });
+      } catch (error) { status.textContent = error.message || "Creative workflow failed safely."; button.disabled = false; }
+    });
+    region.append(button, status);
+  });
+  article.append(region);
 }
 
 function renderMessages(records, noChat = false) {

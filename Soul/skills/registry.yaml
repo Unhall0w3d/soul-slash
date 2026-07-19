@@ -29,6 +29,49 @@ skills:
     writes_files: true
     expected_output: json
     verifier: schema_basic
+  creative.music_production:
+    internal_handler: conversation_creative_workflow
+    category: creative_studios
+    status: available
+    description: Gather a music brief through chat, require user-supplied intent, duration, mode, and rights status, draft optional fields, and advance bounded Core-aware local generation through exact human action gates.
+    risk: write_local_state_and_bounded_generation
+    requires_approval: true
+    confirmation_phrase: START_CREATIVE_WORKFLOW
+    writes_files: true
+    expected_output: application_envelope
+    verifier: conversation_creative_workflow
+  creative.visual_production:
+    internal_handler: conversation_creative_workflow
+    category: creative_studios
+    status: available
+    description: Gather or draft a visual brief through chat and advance one bounded Core-aware local still generation with an exact human action gate and authenticated image result.
+    risk: write_local_state_and_bounded_generation
+    requires_approval: true
+    confirmation_phrase: START_CREATIVE_WORKFLOW
+    writes_files: true
+    expected_output: application_envelope
+    verifier: conversation_creative_workflow
+  creative.companion_production:
+    internal_handler: conversation_creative_workflow
+    category: creative_studios
+    status: partial
+    description: Coordinate reviewed music and visual candidates, including new or existing sources, then advance explicit binding, static companion rendering, export, and local upload-package gates.
+    risk: write_local_state_and_bounded_generation
+    requires_approval: true
+    confirmation_phrase: START_CREATIVE_WORKFLOW
+    writes_files: true
+    expected_output: application_envelope
+    verifier: conversation_creative_workflow
+  cores.activate:
+    internal_handler: core_orchestration
+    category: runtime_control
+    status: available
+    description: Preview and activate one configured Core without rebooting while preserving active-work, lease, digest, and exact click-approval checks.
+    risk: runtime_mutation
+    requires_approval: true
+    writes_files: true
+    expected_output: application_envelope
+    verifier: core_orchestration
   downloads.inspect:
     path: Soul/skills/downloads/inspect.rb
     language: ruby

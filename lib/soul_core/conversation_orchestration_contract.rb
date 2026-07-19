@@ -16,6 +16,8 @@ module SoulCore
       research_reflection
       web_lookup
       web_research
+      creative_workflow
+      core_control
       deterministic_fallback
     ].freeze
 

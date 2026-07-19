@@ -8,10 +8,13 @@ require "tmpdir"
 require_relative "../lib/soul_core/music_generation_service"
 
 failures = []
+schema = JSON.parse(File.read(File.expand_path("../config/music_project_schema.json", __dir__)))
 check = lambda do |label, condition|
   puts "- #{label}: #{condition ? 'ok' : 'FAILED'}"
   failures << label unless condition
 end
+
+check.call("published project schema exposes only reviewed duration presets", schema.dig("properties", "target_duration_seconds", "enum") == [30, 90, 180, 600])
 
 FakeResult = Struct.new(:stdout, :stderr, :exit_status, :status, :truncated, keyword_init: true) do
   def success? = status == "ok"
@@ -170,7 +173,7 @@ Dir.mktmpdir("soul-music-a2-") do |root|
   unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 45))
   embedded_metadata = service.create_project(project_input.merge("caption" => "Energetic melodic rock at 110 BPM in D minor and 4/4 time with clear drums and guitars."))
   oversized_caption = service.create_project(project_input.merge("caption" => "a" * 513))
-  check.call("project schema rejects missing rights, unknown fields, unsupported duration, embedded metadata, and oversized runtime captions without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, or 180") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && oversized_caption["reason"].include?("512-character") && !File.exist?(File.join(root, "Soul", "music", "projects")))
+  check.call("project schema rejects missing rights, unknown fields, unsupported duration, embedded metadata, and oversized runtime captions without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, 180, or 600") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && oversized_caption["reason"].include?("512-character") && !File.exist?(File.join(root, "Soul", "music", "projects")))
 
   created = service.create_project(project_input)
   project = created.dig("data", "project")
@@ -248,10 +251,10 @@ Dir.mktmpdir("soul-music-a2-") do |root|
 end
 
 Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
-  ids = %w[7777777777777777 8888888888888888 9999999999999999]
+  ids = %w[7777777777777777 8888888888888888 9999999999999999 aaaaaaaaaaaaaaaa]
   store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift }, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
-  projects = [30, 90, 180].map { |duration| store.create(project_input.merge("target_duration_seconds" => duration)) }
-  check.call("all three supported duration presets create projects", projects.map { |item| item.fetch("target_duration_seconds") } == [30, 90, 180])
+  projects = [30, 90, 180, 600].map { |duration| store.create(project_input.merge("target_duration_seconds" => duration)) }
+  check.call("all four supported duration presets create projects", projects.map { |item| item.fetch("target_duration_seconds") } == [30, 90, 180, 600])
   project = projects.first
   record_path = File.join(store.project_path(project.fetch("project_id")), "project.json")
   legacy = JSON.parse(File.read(record_path)).merge("target_duration_seconds" => 45)

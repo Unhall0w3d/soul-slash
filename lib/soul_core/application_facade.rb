@@ -11,6 +11,8 @@ require_relative "configuration_resolver"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
+require_relative "conversation_creative_workflow_service"
+require_relative "conversation_core_workflow_service"
 require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
@@ -162,6 +164,7 @@ module SoulCore
       when "chats.messages" then domain(chats_messages(parameters))
       when "chats.create" then domain(chats_create(parameters))
       when "chats.send" then domain(chats_send(parameters, context, request_id, progress: progress))
+      when "chats.creative.execute" then domain(conversation_creative_workflow.execute(chat_id: required(parameters, "chat_id"), flow_id: required(parameters, "flow_id"), action_id: parameters["action_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "chats.pin" then domain(chat_flag(parameters, true))
       when "chats.unpin" then domain(chat_flag(parameters, false))
       when "chats.clear.preview" then domain(conversation_clear_service.preview(mode: required(parameters, "mode"), title: parameters["title"], chat_ids: parameters["chat_ids"]))
@@ -493,7 +496,7 @@ module SoulCore
           "risk" => definition["risk"],
           "requires_approval" => definition["requires_approval"] == true,
           "writes_files" => definition["writes_files"] == true,
-          "available" => !definition["path"].to_s.empty?
+          "available" => !definition["path"].to_s.empty? || !definition["internal_handler"].to_s.empty?
         }
       end
       { "records" => records, "count" => records.length, "limit" => limit, "read_only" => true }
@@ -545,7 +548,10 @@ module SoulCore
 
       report, resolver = resolved_configuration
       raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
-      @conversation_runtime ||= ConversationRuntime.new(root: @root, store: chat_store, env: resolver.effective_environment)
+      @conversation_runtime ||= ConversationRuntime.new(root: @root, store: chat_store, env: resolver.effective_environment,
+        creative_workflow_service: conversation_creative_workflow,
+        core_workflow_service: conversation_core_workflow,
+        identity_compact_resolver: -> { %w[amd-free music].include?(core_orchestration.status.dig("data", "active_core_id")) })
     end
 
     def chat_service
@@ -641,6 +647,22 @@ module SoulCore
 
     def visual_studio
       @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion)
+    end
+
+    def conversation_creative_workflow
+      report, resolver = resolved_configuration
+      raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
+      env = resolver.effective_environment
+      @conversation_creative_workflow ||= ConversationCreativeWorkflowService.new(
+        root: @root, chat_store: chat_store,
+        provider_client: ConversationProviderClient.new(env: env, root: @root),
+        music_generation: music_generation, visual_studio: visual_studio,
+        core_orchestration: core_orchestration
+      )
+    end
+
+    def conversation_core_workflow
+      @conversation_core_workflow ||= ConversationCoreWorkflowService.new(core_orchestration: core_orchestration)
     end
 
     def music_candidate_analysis

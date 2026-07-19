@@ -16,8 +16,10 @@ Daily Core keeps Gemma on AMD and leaves NVIDIA available. Music Core is an
 explicit, previewed Core transition: Qwen becomes chat on NVIDIA and ACE-Step
 claims AMD only for a foreground generation. The music model exits when the
 operation terminates. AMD-Free keeps Qwen chat and leaves AMD to the Operator.
-Music never triggers an automatic Core switch; Soul does not decide to evict a
-chat engine.
+Music never triggers an unapproved Core switch. A visible conversational
+generation action may include the exact Music Core transition authorized by the
+same click; Soul revalidates active work and does not independently decide to
+evict a chat engine.
 
 No always-running small routing model is justified yet. Deterministic Ruby
 routing is faster, inspectable, and already authoritative. A specialist earns a

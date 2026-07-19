@@ -32,6 +32,7 @@ module SoulCore
       "chats.messages" => %w[chat_id limit],
       "chats.create" => %w[title],
       "chats.send" => %w[chat_id message],
+      "chats.creative.execute" => %w[chat_id flow_id action_id confirmation expected_digest],
       "chats.pin" => %w[chat_id],
       "chats.unpin" => %w[chat_id],
       "chats.clear.preview" => %w[mode title chat_ids],

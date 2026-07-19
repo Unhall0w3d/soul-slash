@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-15T13:24:20-04:00
+Generated: 2026-07-19T03:35:42-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-14
+20
 ```
 
 ## Skills
@@ -89,6 +89,78 @@ Example ways the owner might ask for this:
 
 - test cloud providers
 - check provider connectivity
+
+### Cores Activate
+
+```text
+id: cores.activate
+category: runtime_control
+status: available
+risk: approval_required
+confirmation_required: true
+```
+
+Preview and activate one configured Core without rebooting while preserving active-work, lease, digest, and exact click-approval checks.
+
+Example ways the owner might ask for this:
+
+- switch to Music Core
+- activate AMD-Free Core
+- prepare this first and ask before changing anything
+
+### Creative Companion Production
+
+```text
+id: creative.companion_production
+category: creative_studios
+status: partial
+risk: approval_required
+confirmation_required: true
+```
+
+Coordinate reviewed music and visual candidates, including new or existing sources, then advance explicit binding, static companion rendering, export, and local upload-package gates.
+
+Example ways the owner might ask for this:
+
+- make a song and image, then prepare the video
+- use this kept image with that kept song
+- prepare this first and ask before changing anything
+
+### Creative Music Production
+
+```text
+id: creative.music_production
+category: creative_studios
+status: available
+risk: approval_required
+confirmation_required: true
+```
+
+Gather a music brief through chat, require user-supplied intent, duration, mode, and rights status, draft optional fields, and advance bounded Core-aware local generation through exact human action gates.
+
+Example ways the owner might ask for this:
+
+- make a song
+- help me compose a local music candidate
+- prepare this first and ask before changing anything
+
+### Creative Visual Production
+
+```text
+id: creative.visual_production
+category: creative_studios
+status: available
+risk: approval_required
+confirmation_required: true
+```
+
+Gather or draft a visual brief through chat and advance one bounded Core-aware local still generation with an exact human action gate and authenticated image result.
+
+Example ways the owner might ask for this:
+
+- make an image
+- create cover artwork with me
+- prepare this first and ask before changing anything
 
 ### Downloads Cleanup Plan
 
@@ -228,6 +300,40 @@ Example ways the owner might ask for this:
 
 - get the weather
 - what is the weather report
+
+### Web Lookup
+
+```text
+id: web.lookup
+category: uncategorized
+status: unknown
+risk: network_or_provider_check
+confirmation_required: false
+```
+
+Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general research backend.
+
+Example ways the owner might ask for this:
+
+- use web lookup
+- run web.lookup
+
+### Web Research
+
+```text
+id: web.research
+category: uncategorized
+status: unknown
+risk: network_or_provider_check
+confirmation_required: false
+```
+
+Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
+
+Example ways the owner might ask for this:
+
+- use web research
+- run web.research
 
 ### Youtube Song Search
 

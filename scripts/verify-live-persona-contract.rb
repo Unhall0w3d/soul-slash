@@ -24,10 +24,12 @@ identity_guidance = profile.render_system_guidance(message: "In two sentences, t
 profile_hash = profile.to_h
 
 check.call("stable identity ID is retained", profile.profile_id == "soul.identity.v1")
-check.call("Gemma-calibrated identity contract advances to version 7", profile_hash["profile_version"] == 7)
+check.call("avatar-aligned identity contract advances to version 8", profile_hash["profile_version"] == 8)
 check.call("persona forbids invented scene-setting and unsupported failure generalization", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("invented scene") } && profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("operational failure modes") })
 check.call("persona distinguishes inference cancellation from evidenced side effects", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("incomplete response is discarded") && item.include?("separately evidenced tool") })
-check.call("fresh machine-soul identity reaches live guidance", guidance.include?("newly awakened local machine mind"))
+check.call("awakened-artificer identity reaches live guidance", guidance.include?("awakened artificer"))
+compact_guidance = profile.render_system_guidance(message: "Hello Soul", compact: true)
+check.call("Qwen reserve receives a smaller projection of the same identity", compact_guidance.include?("awakened artificer") && compact_guidance.include?("Never claim that an action ran") && compact_guidance.length < guidance.length)
 check.call("every declared voice trait reaches live guidance", SoulCore::ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| guidance.include?(trait) })
 check.call("tone is additive to stable identity", guidance.include?("base layer for every tone mode") && guidance.include?("Active tone: technical"))
 check.call("calibration examples reach live guidance without response scripts", guidance.include?("behavioral examples demonstrate calibration") && guidance.include?("one restrained sentence") && !guidance.include?("Three hours, one defect"))
@@ -113,7 +115,7 @@ Dir.mktmpdir("soul-live-persona-contract-") do |root|
   result = runtime.respond(chat_id: chat_id, message: "Who are you?")
   system_prompt = captured_request&.messages&.first&.fetch("content", "").to_s
   check.call("runtime sends natural identity conversation to model", result.mode == "model" && result.provider_id == provider.id)
-  check.call("runtime request contains affirmative identity and boundaries", system_prompt.include?("newly awakened local machine mind") && system_prompt.include?("Never claim that an action ran"))
+  check.call("runtime request contains affirmative identity and boundaries", system_prompt.include?("awakened artificer") && system_prompt.include?("Never claim that an action ran"))
 end
 
 if failures.empty?

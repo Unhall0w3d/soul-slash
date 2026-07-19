@@ -1,6 +1,6 @@
 # Soul/ Branding
 
-Soul/ presents itself as a **local machine familiar**: intelligent, newly alive, collaborative, precise, and visibly bound to human authority. The current identity replaces the older purple necromantic/grimoire direction.
+Soul/ presents itself as an **awakened machine artificer**: newly embodied, composed, collaborative, precise, aesthetically discerning, and visibly bound to human authority. The current identity replaces both the older purple necromantic/grimoire direction and the softer apprentice/familiar framing.
 
 ## Brand character
 

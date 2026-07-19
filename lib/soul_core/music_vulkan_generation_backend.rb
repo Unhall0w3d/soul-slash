@@ -10,7 +10,7 @@ module SoulCore
     MAX_ENRICHED_BYTES = 2 * 1024 * 1024
     SUPPORTED_SCHEMA = "soul.music_vulkan.models.v1"
 
-    Result = Struct.new(:status, :stdout, :stderr, :exit_status, :wav_path, :lm_attempts, :code_health, keyword_init: true) do
+    Result = Struct.new(:status, :stdout, :stderr, :exit_status, :wav_path, :lm_attempts, :code_health, :boundary_adjustment, keyword_init: true) do
       def success? = status == "ok"
     end
 
@@ -75,6 +75,7 @@ module SoulCore
       seed = Integer(input.fetch("lm_seed", input.fetch("seed", -1))) & MAX_LM_SEED
       selected = nil
       health = nil
+      boundary_adjustment = nil
       last = nil
 
       Integer(@profile.fetch("max_lm_attempts")).times do |index|
@@ -90,35 +91,42 @@ module SoulCore
         enriched = File.join(attempt, "request0.json")
         raise "ACE-Step LM did not produce exactly one bounded enriched request" unless File.file?(enriched) && !File.symlink?(enriched) && File.size(enriched).between?(1, MAX_ENRICHED_BYTES)
         document = JSON.parse(File.binread(enriched, MAX_ENRICHED_BYTES))
+        document, boundary_adjustment = normalize_synthesis_boundary(document, Integer(input.fetch("duration")))
         health = audio_code_health(document.fetch("audio_codes"), Integer(input.fetch("duration")))
-        attempts << { "attempt" => number, "lm_seed" => seed, "code_health" => health }
+        attempt_record = { "attempt" => number, "lm_seed" => seed, "code_health" => health }
+        attempt_record["boundary_adjustment"] = boundary_adjustment if boundary_adjustment
+        attempts << attempt_record
         unless health.fetch("degenerate")
           selected = File.join(staging, "selected-request.json")
-          FileUtils.cp(enriched, selected, preserve: false)
-          File.chmod(0o600, selected)
+          if boundary_adjustment
+            File.write(selected, JSON.pretty_generate(document) + "\n", mode: "wx", perm: 0o600)
+          else
+            FileUtils.cp(enriched, selected, preserve: false)
+            File.chmod(0o600, selected)
+          end
           break
         end
         seed = next_lm_seed(seed, input, number)
       end
 
       unless selected
-        return Result.new(status: "blocked", stdout: output, stderr: "three consecutive LM audio-code plans degenerated; synthesis was not started", exit_status: nil, lm_attempts: attempts, code_health: health)
+        return Result.new(status: "blocked", stdout: output, stderr: "three consecutive LM audio-code plans degenerated; synthesis was not started", exit_status: nil, lm_attempts: attempts, code_health: health, boundary_adjustment: boundary_adjustment)
       end
 
       last = execute.call([binary("ace-synth"), "--models", @models_dir, "--vae-chunk", Integer(@profile.fetch("vae_chunk")).to_s, "--request", selected], Integer(input.fetch("duration")) + 900, env, staging)
       output << last.stdout.to_s << last.stderr.to_s
-      return failed(last, output, attempts, health) unless last.success?
+      return failed(last, output, attempts, health, boundary_adjustment) unless last.success?
       wavs = Dir.glob(File.join(staging, "*.wav")).select { |path| File.file?(path) && !File.symlink?(path) && File.size(path).positive? }
       raise "ACE-Step Vulkan generation did not produce exactly one WAV" unless wavs.one?
-      Result.new(status: "ok", stdout: output, stderr: "", exit_status: last.exit_status, wav_path: wavs.first, lm_attempts: attempts, code_health: health)
+      Result.new(status: "ok", stdout: output, stderr: "", exit_status: last.exit_status, wav_path: wavs.first, lm_attempts: attempts, code_health: health, boundary_adjustment: boundary_adjustment)
     rescue StandardError => error
-      Result.new(status: "failed", stdout: output.to_s, stderr: error.message, exit_status: nil, lm_attempts: attempts || [], code_health: health)
+      Result.new(status: "failed", stdout: output.to_s, stderr: error.message, exit_status: nil, lm_attempts: attempts || [], code_health: health, boundary_adjustment: boundary_adjustment)
     end
 
     private
 
-    def failed(result, output, attempts, health = nil)
-      Result.new(status: result.status, stdout: output, stderr: result.stderr.to_s, exit_status: result.exit_status, lm_attempts: attempts, code_health: health)
+    def failed(result, output, attempts, health = nil, boundary_adjustment = nil)
+      Result.new(status: result.status, stdout: output, stderr: result.stderr.to_s, exit_status: result.exit_status, lm_attempts: attempts, code_health: health, boundary_adjustment: boundary_adjustment)
     end
 
     def binary(name) = File.join(@install_dir, "build", name)
@@ -152,6 +160,18 @@ module SoulCore
       }
     rescue ArgumentError
       raise "LM audio-code plan is malformed"
+    end
+
+    def normalize_synthesis_boundary(document, duration)
+      return [document, nil] unless duration == 600
+      codes = document.fetch("audio_codes").to_s.split(",")
+      return [document, nil] unless codes.length == 3_001
+
+      [document.merge("audio_codes" => codes.first(3_000).join(",")), {
+        "reason" => "ACE-Step 600-second LM plan includes one terminal code beyond the 15000-latent synthesis ceiling",
+        "source_code_count" => 3_001, "synthesis_code_count" => 3_000,
+        "removed_terminal_codes" => 1, "target_duration_seconds" => 600
+      }]
     end
 
     def next_lm_seed(current, input, attempt)

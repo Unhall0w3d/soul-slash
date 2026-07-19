@@ -119,7 +119,8 @@ record(
   "branding document is canonical",
   File.file?(branding_doc) &&
     branding_text.include?("# Soul/ Branding") &&
-    branding_text.include?("assets/brand/soul-slash-primary-mark.png")
+    branding_text.include?("assets/brand/soul-slash-repo-header.png") &&
+    branding_text.include?("assets/brand/character/soul-portrait-unmasked.png")
 )
 
 stdout, stderr, status = capture("git", "diff", "--check")

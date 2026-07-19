@@ -10,7 +10,7 @@ module SoulCore
   class DashboardMusicJobManager
     JOB_ID = /\Ajob_[a-f0-9]{16}\z/
     ACTIVE_STATES = %w[accepted running].freeze
-    OPERATIONS = %w[music.generation.execute music.candidates.revision.execute].freeze
+    OPERATIONS = %w[music.generation.execute music.candidates.revision.execute chats.creative.execute].freeze
     MAX_RECORDS = 100
 
     def initialize(root:, facade:, clock: -> { Time.now }, id_generator: -> { SecureRandom.hex(8) })
@@ -32,8 +32,15 @@ module SoulCore
       parameters = request.fetch("parameters", {})
       project_id = parameters["project_id"].to_s
       candidate_id = parameters["candidate_id"].to_s
-      raise ArgumentError, "music job project_id is invalid" unless project_id.match?(/\Amusic_[a-f0-9]{16}\z/)
-      raise ArgumentError, "music job candidate_id is invalid" unless candidate_id.match?(/\Acandidate_[a-f0-9]{16}\z/)
+      chat_id = parameters["chat_id"].to_s
+      flow_id = parameters["flow_id"].to_s
+      if operation == "chats.creative.execute"
+        raise ArgumentError, "creative job chat_id is invalid" unless chat_id.match?(/\Achat_[A-Za-z0-9_.-]+\z/)
+        raise ArgumentError, "creative job flow_id is invalid" unless flow_id.match?(/\Acreative_[a-f0-9]{16}\z/)
+      else
+        raise ArgumentError, "music job project_id is invalid" unless project_id.match?(/\Amusic_[a-f0-9]{16}\z/)
+        raise ArgumentError, "music job candidate_id is invalid" unless candidate_id.match?(/\Acandidate_[a-f0-9]{16}\z/)
+      end
 
       digest = Digest::SHA256.hexdigest(JSON.generate(request.slice("operation", "parameters", "context")))
       record = nil
@@ -46,7 +53,8 @@ module SoulCore
         now = @clock.call.iso8601
         record = {
           "schema_version" => "soul.dashboard.music_job.v1", "job_id" => "job_#{@id_generator.call}",
-          "operation" => operation, "project_id" => project_id, "candidate_id" => candidate_id,
+          "operation" => operation, "project_id" => project_id.empty? ? nil : project_id, "candidate_id" => candidate_id.empty? ? nil : candidate_id,
+          "chat_id" => chat_id.empty? ? nil : chat_id, "flow_id" => flow_id.empty? ? nil : flow_id,
           "request_digest" => digest, "status" => "accepted", "lifecycle_state" => "awaiting_input",
           "latest_progress" => { "stage" => "accepted", "message" => "Generation accepted by the bounded dashboard worker" },
           "created_at" => now, "updated_at" => now, "result" => nil
@@ -184,7 +192,7 @@ module SoulCore
     end
 
     def public_record(record)
-      record.slice("job_id", "operation", "project_id", "candidate_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
+      record.slice("job_id", "operation", "project_id", "candidate_id", "chat_id", "flow_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
     end
 
     def safe_progress(event)

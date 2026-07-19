@@ -49,7 +49,7 @@ module SoulCore
 
     RULES = [
       ["identity", "Soul identity", /\b(who are you|what are you|what is soul|explain yourself|your personality)\b/i, nil, "none", false, 0.95, "The request asks Soul to explain itself."],
-      ["skill_catalog", "Skill catalog", /\b(what skills|list skills|skills do you have|what can you do|capabilities)\b/i, "assistant-skill-catalog", "read_only", false, 0.93, "The request asks for available skills or capabilities."],
+      ["skill_catalog", "Skill catalog", /(?:\b(?:what|which)\s+(?:skills|capabilities)\s+(?:(?:do\s+)?you\s+have|are\s+(?:available|registered)|can\s+you\s+use)\b|\b(?:list|show)\s+(?:your\s+|available\s+|registered\s+)?(?:skills|capabilities)\b|\b(?:take\s+a\s+look\s+at|check)\s+what\s+(?:skills|capabilities)\s+you\s+have\b|\bskill\s+catalog\b|\bwhat\s+can\s+you\s+do\??\s*\z)/i, "assistant-skill-catalog", "read_only", false, 0.93, "The request explicitly asks for the available skill catalog."],
       ["execution_history_summary", "Execution history summary", /\b(execution history summary|history summary|summarize execution history|summarize history)\b/i, "execution.history.summary", "read_only", false, 0.9, "The request asks for a summary of local chat execution history."],
       ["repo_status", "Repository/runtime status", /\b(repo|repository|doctor|runtime|health|status|curation|ruby runtime)\b/i, "system.status", "read_only", false, 0.78, "The request appears to ask about project or runtime condition."],
       ["pending_work", "Pending work / next build step", /\b(next|pending|todo|to do|build next|what should we build|roadmap|phase)\b/i, nil, "planning", false, 0.82, "The request asks about upcoming work or planning."],

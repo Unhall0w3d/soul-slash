@@ -17,7 +17,7 @@ module SoulCore
     DEFAULT_DIRECTORY = File.join("Soul", "music", "projects")
     MAX_PROJECTS = 1_000
     MAX_PROJECT_BYTES = 64 * 1024
-    SUPPORTED_DURATIONS = [30, 90, 180].freeze
+    SUPPORTED_DURATIONS = [30, 90, 180, 600].freeze
     STRING_LIMITS = { "title" => 120, "intent" => 2_000, "caption" => 8_000, "lyrics" => 20_000, "keyscale" => 40 }.freeze
     REQUIRED_INPUTS = %w[title intent target_duration_seconds vocal_mode rights_status caption lyrics bpm keyscale timesignature language seed].freeze
 
@@ -292,9 +292,9 @@ module SoulCore
       bpm = Integer(data["bpm"])
       seed = Integer(data["seed"])
       if supported_duration_only
-        raise ValidationError, "target duration must be 30, 90, or 180 seconds" unless SUPPORTED_DURATIONS.include?(duration)
+        raise ValidationError, "target duration must be 30, 90, 180, or 600 seconds" unless SUPPORTED_DURATIONS.include?(duration)
       else
-        raise ValidationError, "legacy target duration must be 10..180 seconds" unless (10..180).cover?(duration)
+        raise ValidationError, "legacy target duration must be 10..600 seconds" unless (10..600).cover?(duration)
       end
       raise ValidationError, "bpm must be 30..300" unless (30..300).cover?(bpm)
       raise ValidationError, "seed must be 0..2147483647" unless (0..2_147_483_647).cover?(seed)

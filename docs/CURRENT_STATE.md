@@ -18,7 +18,7 @@ Review Center
 
 ### Chat
 
-Chat provides persistent multi-turn transmissions, immediate accepted-message rendering, truthful working summaries, local model responses, deterministic capability and skill routing, bounded research, shared artifacts, workspace metadata, inbox delivery, memory controls, system status, and manual model/Core controls.
+Chat provides persistent multi-turn transmissions, immediate accepted-message rendering, truthful working summaries, local model responses, deterministic capability and skill routing, bounded research, shared artifacts, workspace metadata, inbox delivery, memory controls, system status, and manual model/Core controls. Explicit music, visual, or combined creative requests can enter a per-conversation bounded workflow: Soul preserves user-required decisions, drafts visible optional fields, presents an exact Core-aware generation action, and returns authenticated audio/image candidates for human review. Merely mentioning skills or creative work does not invoke the catalog or start generation.
 
 The dashboard has one personal administrator boundary. First-run `admin` / `soul123` access is limited to mandatory password replacement. Salted credentials and seven-day session digests remain in ignored owner-only runtime storage. Sign-ups and additional accounts are unavailable.
 
@@ -30,7 +30,7 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 ### Creative Studios
 
-- **Music Studio** stores immutable project briefs and candidate lineage; supports 30-, 90-, and 180-second AMD Vulkan ACE-Step generation; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies.
+- **Music Studio** stores immutable project briefs and candidate lineage; supports exact 30-second, 90-second, 3-minute, and 10-minute AMD Vulkan ACE-Step generation; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies.
 - **Visual Studio** provides bounded local FLUX.2 Vulkan still generation, review, guided image edits, candidate/project deletion, and exact binding to a Music candidate.
 - A reviewed still can become a static music companion with framing, matte, fades, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. Nothing uploads or publishes automatically.
 
@@ -46,7 +46,7 @@ The stable chat API alias is `soul-local-chat`; actual model identity is reporte
 - **AMD-Free Core:** Qwen3 8B Q4_K_M through llama.cpp/CUDA on NVIDIA.
 - **Music Core:** Qwen chat on NVIDIA while ACE-Step 1.5 4B LM / 2B Turbo Q8_0 uses AMD/Vulkan only during bounded music generation.
 
-Core changes are manual and lease-revalidated. Music and image models do not remain resident. No idle-unload timer, automatic Core switch, worker queue, or background polling loop is present.
+Core changes are click-authorized and lease-revalidated. A reviewed conversational creative action may include its exact required Core transition; model text cannot initiate one and no failover occurs on its own. Music and image models do not remain resident. No idle-unload timer, unattended Core switch, worker queue, or background polling loop is present.
 
 ## Deployment
 

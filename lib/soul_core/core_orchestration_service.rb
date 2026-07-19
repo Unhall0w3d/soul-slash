@@ -363,7 +363,7 @@ module SoulCore
       case current&.fetch("id", nil)
       when "music"
         { "engine" => "ACE-Step 1.5 4B LM / 2B Turbo Q8_0", "accelerator" => "AMD Vulkan", "available_in_active_core" => true,
-          "residency" => "foreground_on_demand", "durations" => [30, 90, 180], "conflict" => nil }.compact
+          "residency" => "foreground_on_demand", "durations" => [30, 90, 180, 600], "conflict" => nil }.compact
       when "amd-free"
         { "engine" => "ACE-Step 1.5", "accelerator" => "NVIDIA CUDA", "available_in_active_core" => false,
           "conflict" => "NVIDIA chat is active and AMD is reserved for the Operator" }

@@ -50,7 +50,7 @@ module SoulCore
         "casual_tone_detected" => profile.classify_tone("Hello, what do you think?") == "casual",
         "high_stakes_tone_takes_precedence" => profile.classify_tone("Delete the leaked credentials from the server") == "high_stakes",
         "identity_is_injected_into_context" => context.dig("identity", "profile_id") == profile.profile_id,
-        "affirmative_identity_is_injected" => context.fetch("messages").first.fetch("content").include?("newly awakened local machine mind"),
+        "affirmative_identity_is_injected" => context.fetch("messages").first.fetch("content").include?("awakened artificer"),
         "voice_traits_are_injected" => ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| context.fetch("messages").first.fetch("content").include?(trait) },
         "persona_anti_patterns_are_injected" => context.fetch("messages").first.fetch("content").include?("corporate-assistant boilerplate"),
         "context_reports_active_tone" => context.dig("identity", "tone_mode") == "technical",

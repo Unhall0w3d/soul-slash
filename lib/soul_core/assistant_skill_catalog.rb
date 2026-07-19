@@ -234,6 +234,14 @@ module SoulCore
                ["search YouTube for a song", "find this song on YouTube"]
              when /youtube\.video_resolve/
                ["resolve a YouTube video", "find the best YouTube video candidate"]
+             when /creative\.music_production/
+               ["make a song", "help me compose a local music candidate"]
+             when /creative\.visual_production/
+               ["make an image", "create cover artwork with me"]
+             when /creative\.companion_production/
+               ["make a song and image, then prepare the video", "use this kept image with that kept song"]
+             when /cores\.activate/
+               ["switch to Music Core", "activate AMD-Free Core"]
              else
                ["use #{human_name.downcase}", "run #{id}"]
              end

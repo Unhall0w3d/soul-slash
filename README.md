@@ -1,8 +1,8 @@
-![Soul/ repository header: a local machine familiar for conversation, capability, creation, and stewardship](assets/brand/soul-slash-repo-header.png)
+![Soul/ repository header: an awakened machine artificer for conversation, capability, creation, and stewardship](assets/brand/soul-slash-repo-header.png)
 
 # Soul/
 
-**Soul/**—also tracked as **soul-slash** or **Soul Slash**—is a local-first machine familiar built around local models, deterministic skills, persistent conversation, creative studios, inspectable memory, explicit authority, and recoverable workflows.
+**Soul/**—also tracked as **soul-slash** or **Soul Slash**—is a local-first machine artificer built around local models, deterministic skills, persistent conversation, creative studios, inspectable memory, explicit authority, and recoverable workflows.
 
 The model is not treated as the whole assistant. It supplies language and reasoning; Soul supplies continuity, capability boundaries, artifacts, orchestration, review gates, and a stable interface across models.
 
@@ -12,7 +12,7 @@ Soul/ is experimental Linux-first software. It is developed in reviewable slices
 
 The authenticated dashboard provides:
 
-- **Chat** — persistent transmissions, immediate message rendering, local-model responses, bounded skill routing, memory, artifacts, workspace, inbox, system status, model runtime controls, and manual Core switching;
+- **Chat** — persistent transmissions, immediate message rendering, local-model responses, bounded skill routing, memory, artifacts, workspace, inbox, system status, model runtime controls, and exact-gated Core switching;
 - **Self Improvement** — Skill Studio, Self Assessment, and Self Augmentation behind one navigation group;
 - **Creative Studios** — Music Studio and Visual Studio with local generation, evidence, revision, lineage, and export flows;
 - **Review Center** — redacted pending-approval and recent bounded-execution evidence without granting approval authority.
@@ -25,7 +25,7 @@ The supported local runtime topology currently includes:
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-Music Studio currently supports 30-, 90-, and 180-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, static visual companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, review, guided edits, deletion, and exact binding to Music candidates. Upload and publication remain human actions.
+Music Studio currently supports 30-, 90-, 180-, and 600-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, static visual companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, review, guided edits, deletion, and exact binding to Music candidates. Upload and publication remain human actions.
 
 For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
@@ -35,6 +35,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 
 | Surface | Purpose | Guide |
 | --- | --- | --- |
+| Chat + Creative Studios | Collaboratively gather creative briefs, generate candidates through exact actions, and return playable/viewable results to Chat | [Conversational Creative Workflows](docs/guides/CONVERSATIONAL_CREATIVE_WORKFLOWS.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |

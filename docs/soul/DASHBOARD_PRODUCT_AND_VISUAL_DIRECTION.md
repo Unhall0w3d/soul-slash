@@ -61,7 +61,7 @@ CLI override
 
 ## Current visual identity
 
-Soul is a local machine familiar: precise, curious, collaborative, technically deep, and visibly constrained by human authority. The approved character is an androgynous silver-haired machine soul with an articulated dark mask, indigo-black tailored techno-organic materials, fine bronze-gold construction, and restrained cerulean energy.
+Soul is an awakened machine artificer: poised, precise, curious, collaborative, aesthetically discerning, technically deep, and visibly constrained by human authority. The approved character is an androgynous silver-haired machine soul with an articulated dark mask, indigo-black tailored techno-organic materials, fine bronze-gold construction, and restrained cerulean energy.
 
 The interface no longer follows the older purple necromantic grimoire direction. Avoid spellbooks, runes, occult framing, generic robot imagery, and theatrical claims of hidden system activity.
 

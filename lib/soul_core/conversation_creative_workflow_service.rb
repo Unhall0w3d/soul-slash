@@ -1,0 +1,441 @@
+# frozen_string_literal: true
+
+require "digest"
+require "json"
+require "securerandom"
+require "time"
+require_relative "conversation_creative_flow_store"
+require_relative "conversation_creative_planner"
+require_relative "conversation_creative_review_planner"
+
+module SoulCore
+  class ConversationCreativeWorkflowService
+    EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
+
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, flow_store: nil, planner: nil, review_planner: nil, clock: -> { Time.now.utc })
+      @root = File.expand_path(root)
+      @chat_store = chat_store
+      @music_generation = music_generation
+      @visual_studio = visual_studio
+      @core_orchestration = core_orchestration
+      @flow_store = flow_store || ConversationCreativeFlowStore.new(root: @root, clock: clock)
+      @planner = planner || ConversationCreativePlanner.new(provider_client: provider_client)
+      @review_planner = review_planner || ConversationCreativeReviewPlanner.new(provider_client: provider_client)
+      @clock = clock
+    end
+
+    def candidate_message?(chat_id:, message:)
+      @planner.cancel?(message) || @planner.explicit_request?(message) || !@flow_store.active(chat_id).nil?
+    end
+
+    def plan(chat_id:, message:, provider:, progress: nil)
+      if @planner.cancel?(message)
+        canceled = @flow_store.cancel(chat_id)
+        return nil unless canceled
+        return result("Creative workflow canceled. No generation, binding, export, or Core transition was started.", "creative_canceled", canceled)
+      end
+
+      prior = @flow_store.active(chat_id)
+      return nil unless prior || @planner.explicit_request?(message)
+      return plan_review(prior, message, provider, progress) if prior && prior["stage"] == "generated"
+      progress&.call({ "state" => "planning", "summary" => "Shaping the creative brief without inventing required choices." })
+      messages = @chat_store.messages(chat_id, limit: 12, scan_limit: 10_000)
+      messages << { "role" => "user", "content" => message.to_s } unless messages.last&.dig("content") == message.to_s
+      drafted = @planner.draft(provider: provider, chat_id: chat_id, messages: messages, prior: prior)
+      return failure_result(drafted.fetch("reason"), prior) unless drafted.fetch("ok")
+      plan = drafted.fetch("plan")
+      return nil unless plan.fetch("related")
+
+      flow = prior || new_flow(chat_id, plan.fetch("kind"))
+      flow["kind"] = plan.fetch("kind")
+      flow["plan"] = plan
+      missing = @planner.missing_required(plan)
+      if missing.any?
+        flow["lifecycle_state"] = "awaiting_input"
+        flow["stage"] = "brief"
+        flow["missing_required"] = missing
+        flow["pending_action"] = nil
+        @flow_store.write(flow)
+        question = plan["next_question"].to_s.strip
+        question = "I still need your #{missing.first}." if question.empty?
+        return result(render_brief(flow, question: question), "creative_awaiting_input", flow)
+      end
+
+      validate_ready_plan!(plan)
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "ready"
+      flow["missing_required"] = []
+      flow["pending_action"] = build_action(flow)
+      @flow_store.write(flow)
+      result(render_brief(flow), "creative_ready", flow, actions: [flow.fetch("pending_action")])
+    rescue ArgumentError => error
+      failure_result(error.message, prior)
+    rescue StandardError => error
+      failure_result("creative workflow planning failed safely: #{error.class}", prior)
+    end
+
+    def execute(chat_id:, flow_id:, action_id: nil, confirmation:, expected_digest:, progress: nil)
+      flow = @flow_store.read(flow_id: flow_id, chat_id: chat_id)
+      return domain("awaiting_input", false, "creative workflow was not found") unless flow
+      if flow["pending_action"].nil? && flow["last_action_id"] == action_id.to_s && flow["result_message_id"]
+        message = @chat_store.message(chat_id, flow.fetch("result_message_id"))
+        return domain(flow.fetch("lifecycle_state"), true, "creative workflow action already completed", data: { "flow" => public_flow(flow), "assistant_message" => message, "idempotent_replay" => true })
+      end
+      if flow["stage"] == "generated" && flow["result_message_id"] && flow["pending_action"].nil?
+        message = @chat_store.message(chat_id, flow.fetch("result_message_id"))
+        return domain("blocked_for_human_review", true, "creative workflow result already exists", data: { "flow" => public_flow(flow), "assistant_message" => message, "idempotent_replay" => true })
+      end
+      action = flow["pending_action"]
+      return domain("blocked_for_human_review", false, "creative workflow has no executable action") unless action
+      return domain("blocked_for_human_review", false, "exact creative workflow confirmation did not match") unless confirmation == EXECUTE_CONFIRMATION
+      return domain("blocked_for_human_review", false, "creative workflow changed; review it again") unless secure_compare(expected_digest, action.fetch("expected_digest")) && secure_compare(expected_digest, action_digest(flow))
+      return domain("blocked_for_human_review", false, "creative workflow action changed; review it again") unless action_id.to_s.empty? || action_id.to_s == action.fetch("action_id")
+
+      return execute_review(flow) if action.fetch("action_id") == "creative_review"
+
+      progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
+      core = ensure_creative_core(flow)
+      return append_terminal(flow, core, "Core transition did not complete; no creative generation was started") unless core.fetch("ok")
+
+      attachments = []
+      generated = {}
+      if new_music?(flow)
+        progress&.call({ "stage" => "music_project", "message" => "Creating the reviewed music brief." })
+        music = generate_music(flow, progress)
+        return append_terminal(flow, music, "Music generation stopped safely", attachments: attachments, generated: generated) unless music.fetch("ok")
+        generated["music"] = music.fetch("data")
+        attachments << music_attachment(music.fetch("data"))
+      elsif needs_music?(flow)
+        resolved = resolve_existing_music(flow.dig("plan", "existing_music_title"))
+        return append_terminal(flow, resolved, "The existing music source could not be resolved", attachments: attachments, generated: generated) unless resolved.fetch("ok")
+        generated["music"] = resolved.fetch("data")
+        attachments << music_attachment(resolved.fetch("data"))
+      end
+
+      if new_visual?(flow)
+        progress&.call({ "stage" => "visual_project", "message" => "Creating the reviewed visual brief." })
+        visual = generate_visual(flow, progress)
+        return append_terminal(flow, visual, "Visual generation stopped safely", attachments: attachments, generated: generated) unless visual.fetch("ok")
+        generated["visual"] = visual.fetch("data")
+        attachments << visual_attachment(visual.fetch("data"))
+      elsif needs_visual?(flow)
+        resolved = resolve_existing_visual(flow.dig("plan", "existing_visual_title"))
+        return append_terminal(flow, resolved, "The existing visual source could not be resolved", attachments: attachments, generated: generated) unless resolved.fetch("ok")
+        generated["visual"] = resolved.fetch("data")
+        attachments << visual_attachment(resolved.fetch("data"))
+      end
+
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "generated"
+      flow["pending_action"] = nil
+      flow["generated"] = generated
+      content = generated_content(flow, generated)
+      message = append_assistant(chat_id, content, flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_generate"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "creative candidates generated; human review required", data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments }, mutation: "creative_candidates_generated")
+    rescue ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "creative workflow execution failed safely: #{error.class}")
+    end
+
+    private
+
+    def plan_review(flow, message, provider, progress)
+      progress&.call({ "state" => "reviewing", "summary" => "Translating your listening and visual evidence into the exact review fields." })
+      drafted = @review_planner.draft(provider: provider, chat_id: flow.fetch("chat_id"), message: message, flow: public_flow(flow))
+      return failure_result(drafted.fetch("reason"), flow) unless drafted.fetch("ok")
+      review = drafted.fetch("review")
+      return nil unless review.fetch("related")
+      missing = review_missing(flow, review)
+      flow["review_draft"] = review
+      if missing.any?
+        flow["lifecycle_state"] = "awaiting_input"
+        flow["pending_action"] = nil
+        @flow_store.write(flow)
+        question = review["next_question"].to_s.strip
+        question = "I still need #{missing.first} for the exact review." if question.empty?
+        return result("I have the review direction, but #{missing.join(', ')} is still missing.\n\n#{question}", "creative_review_awaiting_input", flow)
+      end
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_review_action(flow)
+      @flow_store.write(flow)
+      result(render_review(flow), "creative_review_ready", flow, actions: [flow.fetch("pending_action")])
+    end
+
+    def review_missing(flow, review)
+      missing = []
+      music = flow.dig("generated", "music")
+      visual = flow.dig("generated", "visual")
+      if music && !music["existing"]
+        missing << "music disposition" if review["music_disposition"].empty?
+        missing << "music rating" unless review["music_rating"].between?(1, 5)
+        %w[musical_quality prompt_adherence vocal_adherence lyric_adherence].each { |key| missing << key.tr("_", " ") if review[key].empty? }
+      end
+      if visual && !visual["existing"]
+        missing << "visual disposition" if review["visual_disposition"].empty?
+        missing << "visual rating" unless review["visual_rating"].between?(1, 5)
+      end
+      missing
+    end
+
+    def build_review_action(flow)
+      { "action_id" => "creative_review", "operation" => "chats.creative.execute", "label" => "Record exact candidate review",
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => "write_local_review_state" }
+    end
+
+    def render_review(flow)
+      review = flow.fetch("review_draft")
+      lines = ["I translated your evidence into this review."]
+      if flow.dig("generated", "music") && !flow.dig("generated", "music", "existing")
+        lines.concat(["", "Music: #{review['music_disposition']} · #{review['music_rating']}/5",
+          "Quality / prompt / vocals / lyrics: #{review['musical_quality']} / #{review['prompt_adherence']} / #{review['vocal_adherence']} / #{review['lyric_adherence']}",
+          "Notes: #{review['music_notes']}"])
+      end
+      if flow.dig("generated", "visual") && !flow.dig("generated", "visual", "existing")
+        lines.concat(["", "Visual: #{review['visual_disposition']} · #{review['visual_rating']}/5", "Notes: #{review['visual_notes']}"])
+      end
+      lines << "\nClicking the action records exactly this review. It does not bind, render, export, or publish."
+      lines.join("\n")
+    end
+
+    def execute_review(flow)
+      review = flow.fetch("review_draft")
+      mutations = []
+      music = flow.dig("generated", "music")
+      if music && !music["existing"]
+        recorded = @music_generation.record_review(project_id: music.dig("project", "project_id"), candidate_id: music.dig("candidate", "candidate_id"), review: {
+          "rating" => review.fetch("music_rating"), "disposition" => review.fetch("music_disposition"),
+          "musical_quality" => review.fetch("musical_quality"), "prompt_adherence" => review.fetch("prompt_adherence"),
+          "vocal_adherence" => review.fetch("vocal_adherence"), "lyric_adherence" => review.fetch("lyric_adherence"), "notes" => review.fetch("music_notes")
+        })
+        return append_terminal(flow, recorded, "Music review could not be recorded") unless recorded.fetch("ok")
+        mutations << "music review"
+      end
+      visual = flow.dig("generated", "visual")
+      if visual && !visual["existing"]
+        recorded = @visual_studio.record_review(project_id: visual.dig("project", "project_id"), candidate_id: visual.dig("candidate", "candidate_id"), review: {
+          "rating" => review.fetch("visual_rating"), "disposition" => review.fetch("visual_disposition"), "notes" => review.fetch("visual_notes")
+        })
+        return append_terminal(flow, recorded, "Visual review could not be recorded") unless recorded.fetch("ok")
+        mutations << "visual review"
+      end
+      flow["lifecycle_state"] = review.values_at("music_disposition", "visual_disposition").include?("revise") ? "blocked_for_human_review" : "complete"
+      flow["stage"] = "reviewed"
+      flow["pending_action"] = nil
+      message = append_assistant(flow.fetch("chat_id"), "Recorded #{mutations.join(' and ')}. The candidates remain in their studio lineage.#{flow['lifecycle_state'] == 'complete' ? '' : ' Revision remains a separate, review-bounded next step.'}", flow, current_attachments(flow))
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_review"
+      @flow_store.write(flow)
+      domain(flow.fetch("lifecycle_state"), true, "creative review recorded", data: { "flow" => public_flow(flow), "assistant_message" => message }, mutation: "creative_reviews_recorded")
+    end
+
+    def new_flow(chat_id, kind)
+      now = @clock.call.iso8601
+      { "schema_version" => ConversationCreativeFlowStore::SCHEMA, "flow_id" => "creative_#{SecureRandom.hex(8)}", "chat_id" => chat_id,
+        "kind" => kind, "stage" => "brief", "lifecycle_state" => "awaiting_input", "plan" => {}, "missing_required" => [],
+        "pending_action" => nil, "generated" => {}, "created_at" => now, "updated_at" => now }
+    end
+
+    def build_action(flow)
+      { "action_id" => "creative_generate", "operation" => "chats.creative.execute", "label" => action_label(flow),
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => "write_local_state_and_bounded_generation" }
+    end
+
+    def action_digest(flow)
+      scope = { "operation" => "conversation_creative_generate", "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"),
+        "kind" => flow.fetch("kind"), "plan" => flow.fetch("plan"), "flow_digest" => @flow_store.digest(flow) }
+      Digest::SHA256.hexdigest(JSON.generate(scope))
+    end
+
+    def action_label(flow)
+      case flow.fetch("kind")
+      when "music" then "Create project and generate song"
+      when "visual" then "Create project and generate image"
+      else "Create projects and generate candidates"
+      end
+    end
+
+    def render_brief(flow, question: nil)
+      plan = flow.fetch("plan")
+      lines = ["I have the creative thread."]
+      if %w[music combined].include?(flow.fetch("kind"))
+        lines.concat(["", "Song", "Title: #{value(plan['title'])}", "Intent: #{value(plan['music_intent'])}",
+          "Duration: #{plan['duration_seconds'].to_i.positive? ? "#{plan['duration_seconds']} seconds" : 'needed'}",
+          "Mode: #{value(plan['vocal_mode'])}", "Rights: #{value(plan['rights_status'])}",
+          "BPM / Key / Time: #{plan['bpm'].to_i.positive? ? plan['bpm'] : 'draft pending'} / #{value(plan['keyscale'])} / #{value(plan['timesignature'])}",
+          "Sound and Structure: #{value(plan['caption'])}"])
+      end
+      if %w[visual combined].include?(flow.fetch("kind"))
+        lines.concat(["", "Visual", "Title: #{value(plan['visual_title'])}", "Intent: #{value(plan['visual_intent'])}",
+          "Frame: #{value(plan['aspect_ratio'])}", "Scene and aesthetic: #{value(plan['visual_prompt'])}"])
+      end
+      lines << "\n#{question}" if question
+      lines << "\nReview the visible brief. The action below authorizes the exact Core-aware local generation; model text alone cannot start it." unless question
+      lines.join("\n")
+    end
+
+    def validate_ready_plan!(plan)
+      if %w[music combined].include?(plan.fetch("kind")) && plan["existing_music_title"].to_s.empty?
+        raise ArgumentError, "creative music title is incomplete" if plan["title"].to_s.strip.empty?
+        raise ArgumentError, "creative Sound and Structure is incomplete" unless plan["caption"].to_s.length.between?(20, 512)
+        raise ArgumentError, "creative BPM is incomplete" unless plan["bpm"].between?(30, 300)
+        raise ArgumentError, "creative key is incomplete" if plan["keyscale"].to_s.strip.empty?
+        raise ArgumentError, "creative time is incomplete" unless %w[2 3 4 5 6 7 9 12].include?(plan["timesignature"])
+      end
+      if %w[visual combined].include?(plan.fetch("kind")) && plan["existing_visual_title"].to_s.empty?
+        raise ArgumentError, "creative visual title is incomplete" if plan["visual_title"].to_s.strip.empty?
+        raise ArgumentError, "creative visual prompt is incomplete" if plan["visual_prompt"].to_s.length < 20
+        raise ArgumentError, "creative frame is incomplete" unless %w[landscape square portrait].include?(plan["aspect_ratio"])
+      end
+    end
+
+    def ensure_creative_core(flow)
+      target_core_id = needs_music?(flow) ? "music" : "amd-free"
+      status = @core_orchestration.status
+      return status unless status.fetch("ok")
+      return status if status.dig("data", "active_core_id") == target_core_id
+      preview = @core_orchestration.preview(core_id: target_core_id)
+      return preview unless preview.fetch("ok")
+      data = preview.fetch("data")
+      @core_orchestration.execute(core_id: target_core_id, target_profile_id: data.dig("target_core", "target_profile", "id") || data.dig("target_profile", "id"),
+        confirmation: data.fetch("confirmation_phrase"), expected_digest: data.fetch("expected_digest"))
+    end
+
+    def generate_music(flow, progress)
+      plan = flow.fetch("plan")
+      created = @music_generation.create_project({ "title" => plan.fetch("title"), "intent" => plan.fetch("music_intent"),
+        "target_duration_seconds" => plan.fetch("duration_seconds"), "vocal_mode" => plan.fetch("vocal_mode"), "rights_status" => plan.fetch("rights_status"),
+        "caption" => plan.fetch("caption"), "lyrics" => plan.fetch("vocal_mode") == "instrumental" ? "" : plan.fetch("lyrics"),
+        "bpm" => plan.fetch("bpm"), "keyscale" => plan.fetch("keyscale"), "timesignature" => plan.fetch("timesignature"),
+        "language" => "en", "seed" => plan.fetch("seed") })
+      return created unless created.fetch("ok")
+      project = created.dig("data", "project")
+      preview = @music_generation.generation_preview(project_id: project.fetch("project_id"))
+      return preview unless preview.fetch("ok")
+      gate = preview.fetch("data")
+      generated = @music_generation.generation_execute(project_id: project.fetch("project_id"), candidate_id: gate.fetch("candidate_id"),
+        confirmation: gate.fetch("confirmation_phrase"), expected_digest: gate.fetch("expected_digest"), progress: progress)
+      return generated unless generated.fetch("ok")
+      success({ "project" => project, "candidate" => generated.dig("data", "candidate") })
+    end
+
+    def generate_visual(flow, progress)
+      plan = flow.fetch("plan")
+      created = @visual_studio.create({ "title" => plan.fetch("visual_title"), "intent" => plan.fetch("visual_intent"),
+        "prompt" => plan.fetch("visual_prompt"), "negative_prompt" => plan.fetch("negative_prompt"),
+        "aspect_ratio" => plan.fetch("aspect_ratio"), "seed" => plan.fetch("visual_seed") })
+      return created unless created.fetch("ok")
+      project = created.dig("data", "project")
+      preview = @visual_studio.generation_preview(project_id: project.fetch("project_id"))
+      return preview unless preview.fetch("ok")
+      gate = preview.fetch("data")
+      generated = @visual_studio.generation_execute(project_id: project.fetch("project_id"), candidate_id: gate.fetch("candidate_id"),
+        confirmation: gate.fetch("confirmation_phrase"), expected_digest: gate.fetch("expected_digest"), progress: progress)
+      return generated unless generated.fetch("ok")
+      success({ "project" => project, "candidate" => generated.dig("data", "candidate") })
+    end
+
+    def resolve_existing_music(title)
+      listing = @music_generation.list_projects(limit: 200)
+      return listing unless listing.fetch("ok")
+      project = exact_title(Array(listing.dig("data", "projects")), title)
+      return domain("awaiting_input", false, "no exact Music Studio project matches #{title.inspect}") unless project
+      inspected = @music_generation.inspect_project(project_id: project.fetch("project_id"))
+      return inspected unless inspected.fetch("ok")
+      candidate = Array(inspected.dig("data", "generations")).find { |item| item.dig("review", "disposition") == "keep" }
+      return domain("awaiting_input", false, "#{title.inspect} has no kept music candidate") unless candidate
+      success({ "project" => project, "candidate" => candidate, "existing" => true })
+    end
+
+    def resolve_existing_visual(title)
+      listing = @visual_studio.list(limit: 200)
+      return listing unless listing.fetch("ok")
+      project = exact_title(Array(listing.dig("data", "projects")), title)
+      return domain("awaiting_input", false, "no exact Visual Studio project matches #{title.inspect}") unless project
+      inspected = @visual_studio.inspect(project_id: project.fetch("project_id"))
+      return inspected unless inspected.fetch("ok")
+      full = inspected.dig("data", "project")
+      candidate = Array(full["candidates"]).find { |item| item.dig("review", "disposition") == "keep" }
+      return domain("awaiting_input", false, "#{title.inspect} has no kept visual candidate") unless candidate
+      success({ "project" => full, "candidate" => candidate, "existing" => true })
+    end
+
+    def exact_title(records, title)
+      matches = records.select { |item| item["title"].to_s.casecmp?(title.to_s.strip) }
+      matches.one? ? matches.first : nil
+    end
+
+    def music_attachment(data)
+      project = data.fetch("project"); candidate = data.fetch("candidate")
+      { "kind" => "audio", "title" => project.fetch("title"), "project_id" => project.fetch("project_id"), "candidate_id" => candidate.fetch("candidate_id"),
+        "player_url" => "/api/v1/music/audio/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}/mp3",
+        "lossless_url" => "/api/v1/music/audio/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}/flac" }
+    end
+
+    def visual_attachment(data)
+      project = data.fetch("project"); candidate = data.fetch("candidate")
+      { "kind" => "image", "title" => project.fetch("title"), "project_id" => project.fetch("project_id"), "candidate_id" => candidate.fetch("candidate_id"),
+        "image_url" => "/api/v1/visual/image/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}" }
+    end
+
+    def current_attachments(flow)
+      generated = flow.fetch("generated", {})
+      [].tap do |attachments|
+        attachments << music_attachment(generated.fetch("music")) if generated["music"]
+        attachments << visual_attachment(generated.fetch("visual")) if generated["visual"]
+      end
+    end
+
+    def generated_content(flow, generated)
+      lines = ["The bounded creative pass is complete."]
+      lines << "Music candidate: #{generated.dig('music', 'project', 'title')}" if generated["music"]
+      lines << "Visual candidate: #{generated.dig('visual', 'project', 'title')}" if generated["visual"]
+      lines << "Both remain candidates. Listen or inspect them here, then tell me what to keep, revise, or reject. I will not bind, render, export, or package them before that review."
+      lines.join("\n")
+    end
+
+    def append_terminal(flow, outcome, prefix, attachments: [], generated: {})
+      flow["lifecycle_state"] = outcome.fetch("lifecycle_state", "failed")
+      flow["stage"] = "failed"
+      flow["pending_action"] = nil
+      flow["generated"] = generated
+      reason = outcome["reason"] || outcome.dig("data", "reason") || "bounded dependency did not complete"
+      message = append_assistant(flow.fetch("chat_id"), "#{prefix}: #{reason}.", flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      @flow_store.write(flow)
+      domain(flow.fetch("lifecycle_state"), false, reason, data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments })
+    end
+
+    def append_assistant(chat_id, content, flow, attachments)
+      @chat_store.add_message(chat_id, role: "assistant", content: content, metadata: {
+        "responder" => "conversation_creative_workflow", "runtime" => { "creative_workflow" => public_flow(flow), "attachments" => attachments }
+      })
+    end
+
+    def result(content, mode, flow, actions: [])
+      { "content" => content, "mode" => mode, "metadata" => { "creative_workflow" => public_flow(flow), "actions" => actions } }
+    end
+
+    def failure_result(reason, flow)
+      result("The creative path stopped safely: #{reason}", "creative_failed", flow || { "flow_id" => nil, "stage" => "failed", "lifecycle_state" => "failed" })
+    end
+
+    def public_flow(flow)
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "created_at", "updated_at")
+    end
+
+    def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))
+    def needs_visual?(flow) = %w[visual combined].include?(flow.fetch("kind"))
+    def new_music?(flow) = needs_music?(flow) && flow.dig("plan", "existing_music_title").to_s.empty?
+    def new_visual?(flow) = needs_visual?(flow) && flow.dig("plan", "existing_visual_title").to_s.empty?
+    def value(item) = item.to_s.strip.empty? ? "to be drafted" : item
+    def secure_compare(left, right) = left.to_s.bytesize == right.to_s.bytesize && left.to_s.bytes.zip(right.to_s.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
+    def success(data) = domain("complete", true, "complete", data: data)
+    def domain(state, ok, reason, data: {}, mutation: "none") = { "ok" => ok, "lifecycle_state" => state, "reason" => reason, "data" => data, "mutation" => mutation }
+  end
+end

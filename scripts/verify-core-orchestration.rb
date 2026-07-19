@@ -155,7 +155,7 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   restored = cores.execute(core_id: "daily", target_profile_id: "amd-gemma", confirmation: return_preview.dig("data", "confirmation_phrase"), expected_digest: return_preview.dig("data", "expected_digest"))
   music_preview = cores.preview(core_id: "music")
   music = cores.execute(core_id: "music", target_profile_id: "nvidia-fallback", confirmation: music_preview.dig("data", "confirmation_phrase"), expected_digest: music_preview.dig("data", "expected_digest"))
-  check.call("Music Core reuses reserve chat and exposes the promoted Vulkan engine", restored["ok"] && music["ok"] && music.dig("data", "active_core_id") == "music" && music.dig("data", "music_lane", "accelerator") == "AMD Vulkan" && music.dig("data", "music_lane", "durations") == [30, 90, 180] && !music.dig("data", "music_lane").key?("candidate"))
+  check.call("Music Core reuses reserve chat and exposes the promoted Vulkan engine", restored["ok"] && music["ok"] && music.dig("data", "active_core_id") == "music" && music.dig("data", "music_lane", "accelerator") == "AMD Vulkan" && music.dig("data", "music_lane", "durations") == [30, 90, 180, 600] && !music.dig("data", "music_lane").key?("candidate"))
 
   facade = SoulCore::ApplicationFacade.new(root:, process_env: {}, core_orchestration_service: cores, model_runtime_control_service: runtime)
   facade_status = facade.call(request("core.status"))

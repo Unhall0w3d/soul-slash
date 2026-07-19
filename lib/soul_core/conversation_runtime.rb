@@ -7,6 +7,8 @@ require_relative "capability_gap_classifier"
 require_relative "capability_gap_intake_service"
 require_relative "conversation_artifact_creation_service"
 require_relative "conversation_context_builder"
+require_relative "conversation_creative_workflow_service"
+require_relative "conversation_core_workflow_service"
 require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_contract"
 require_relative "conversation_evidence_followup_router"
@@ -67,7 +69,10 @@ module SoulCore
       structured_capability_gap_classifier: nil,
       capability_gap_intake_service: nil,
       web_research_service: nil,
-      research_reflection_service: nil
+      research_reflection_service: nil,
+      creative_workflow_service: nil,
+      core_workflow_service: nil,
+      identity_compact_resolver: nil
     )
       @root = File.expand_path(root)
       @store = store
@@ -92,6 +97,9 @@ module SoulCore
       @capability_gap_intake_service = capability_gap_intake_service || CapabilityGapIntakeService.new(root: @root)
       @web_research_service = web_research_service || WebResearchService.new(env: env)
       @research_reflection_service = research_reflection_service || ConversationResearchReflectionService.new(root: @root, provider_client: @provider_client)
+      @creative_workflow_service = creative_workflow_service
+      @core_workflow_service = core_workflow_service
+      @identity_compact_resolver = identity_compact_resolver
       @response_truth_guard = ConversationResponseTruthGuard.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
@@ -113,6 +121,14 @@ module SoulCore
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
       provider = selected_provider
+      if @core_workflow_service&.candidate_message?(message: text)
+        core = @core_workflow_service.plan(message: text)
+        return bounded_workflow_result(chat_id, text, core, provider, kind: "core_control", reason: "an explicit Core transfer uses the existing exact runtime gate")
+      end
+      if @creative_workflow_service&.candidate_message?(chat_id: chat_id, message: text)
+        creative = @creative_workflow_service.plan(chat_id: chat_id, message: text, provider: provider, progress: progress)
+        return bounded_workflow_result(chat_id, text, creative, provider, kind: "creative_workflow", reason: "an explicit or active creative workflow is handled by the bounded studio planner") if creative
+      end
       emit_progress(progress, "context", "Reading the active transmission and reviewed context.")
       recent_evidence = @evidence_store.recent(chat_id, limit: 5)
       emit_progress(progress, "planning", "Selecting the bounded path for this request.")
@@ -161,6 +177,21 @@ module SoulCore
     end
 
     private
+
+    def bounded_workflow_result(chat_id, text, workflow, provider, kind:, reason:)
+      content = workflow.fetch("content")
+      mode = workflow.fetch("mode")
+      metadata = workflow.fetch("metadata", {})
+      context = safe_context(chat_id, provider: provider)
+      decision = ConversationOrchestrationContract::Decision.new(
+        kind: kind, reason: reason,
+        tools: [], requires_model: kind == "creative_workflow", synthesize: false, max_steps: 1, flags: { kind => true }
+      )
+      record_state(chat_id: chat_id, user_message: text, assistant_message: content, mode: mode,
+        provider_id: provider&.id, context: context, decision: decision)
+      Result.new(content: content, mode: mode, provider_id: provider&.id,
+        metadata: metadata.merge("orchestration" => decision.to_h, "context" => context_stats(context)))
+    end
 
     def emit_progress(progress, state, summary)
       progress&.call({ "state" => state, "summary" => summary })
@@ -1171,10 +1202,13 @@ module SoulCore
     end
 
     def safe_context(chat_id, provider: nil)
-      @context_builder.build(
-        chat_id: chat_id,
-        provider_privacy_class: provider&.privacy_class
-      )
+      options = { chat_id: chat_id, provider_privacy_class: provider&.privacy_class }
+      parameters = @context_builder.method(:build).parameters
+      options[:provider_model] = provider&.model if parameters.any? { |kind, name| name == :provider_model || kind == :keyrest }
+      if parameters.any? { |kind, name| name == :compact_identity || kind == :keyrest }
+        options[:compact_identity] = @identity_compact_resolver&.call == true
+      end
+      @context_builder.build(**options)
     rescue StandardError
       {
         "messages" => [],

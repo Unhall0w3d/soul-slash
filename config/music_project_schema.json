@@ -9,7 +9,7 @@
     "project_id": {"type": "string", "pattern": "^music_[a-f0-9]{16}$"},
     "title": {"type": "string", "minLength": 1, "maxLength": 120},
     "intent": {"type": "string", "minLength": 1, "maxLength": 2000},
-    "target_duration_seconds": {"type": "integer", "minimum": 10, "maximum": 180},
+    "target_duration_seconds": {"type": "integer", "enum": [30, 90, 180, 600]},
     "vocal_mode": {"enum": ["vocal", "instrumental"]},
     "rights_status": {"enum": ["original", "licensed", "public_domain"]},
     "caption": {"type": "string", "minLength": 1, "maxLength": 8000},

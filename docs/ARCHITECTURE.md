@@ -166,11 +166,11 @@ Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper
 
 ## Core and resource layer
 
-Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while manual Core selection coordinates supported chat and creative resources.
+Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while exact-gated Core selection coordinates supported chat and creative resources. A reviewed conversational creative action may include the required Core transition in its visible scope.
 
 Daily uses Gemma on AMD. AMD-Free and Music use Qwen on NVIDIA. Music generation temporarily leases AMD for ACE-Step Vulkan; still-image generation uses its reviewed Vulkan lane. Core transitions and model controls revalidate active application leases and runtime state. Creative models load for one bounded operation and exit.
 
-No automatic Core switch, always-resident creative model, idle timer, background queue, or unbounded resource poller is part of this layer.
+No model-initiated or unattended Core switch, always-resident creative model, idle timer, background queue, or unbounded resource poller is part of this layer.
 
 ## Creative candidate layer
 

@@ -14,8 +14,10 @@ class MusicVulkanPilot
   SETUP_CONFIRMATION = "INSTALL_MUSIC_VULKAN_RUNTIME"
   DOWNLOAD_CONFIRMATION = "DOWNLOAD_MUSIC_VULKAN_MODELS"
   RUN_CONFIRMATION = "RUN_MUSIC_VULKAN_PILOT"
-  PRODUCTION_DURATIONS = [30, 90, 180].freeze
-  QUALIFICATION_DURATIONS = { 210 => "duration_210_v1" }.freeze
+  PRODUCTION_DURATIONS = [30, 90, 180, 600].freeze
+  QUALIFICATION_DURATIONS = {
+    210 => "duration_210_v1"
+  }.freeze
   MAX_MANIFEST_BYTES = 64 * 1024
   MAX_REQUEST_BYTES = 64 * 1024
   MAX_LOG_BYTES = 2 * 1024 * 1024
@@ -133,6 +135,7 @@ class MusicVulkanPilot
     lm_seed = Integer(request.fetch("lm_seed", -1)) & MAX_LM_SEED
     enriched = nil
     code_health = nil
+    boundary_adjustment = nil
     lm = nil
     max_lm_attempts.times do |index|
       attempt_number = index + 1
@@ -144,12 +147,19 @@ class MusicVulkanPilot
       attempt_output = File.join(attempt_dir, "request0.json")
       raise "ACE-Step LM did not produce exactly one enriched request" unless File.file?(attempt_output) && File.size(attempt_output).between?(1, 2 * 1024 * 1024)
       enriched_request = JSON.parse(File.binread(attempt_output, 2 * 1024 * 1024))
+      enriched_request, boundary_adjustment = normalize_synthesis_boundary(enriched_request, duration)
       code_health = audio_code_health(enriched_request.fetch("audio_codes"), duration)
-      lm_attempts << { "attempt" => attempt_number, "lm_seed" => lm_seed, "code_health" => code_health }
+      lm_attempt = { "attempt" => attempt_number, "lm_seed" => lm_seed, "code_health" => code_health }
+      lm_attempt["boundary_adjustment"] = boundary_adjustment if boundary_adjustment
+      lm_attempts << lm_attempt
       unless code_health.fetch("degenerate")
         enriched = File.join(run_dir, "selected-request.json")
-        FileUtils.cp(attempt_output, enriched, preserve: false)
-        File.chmod(0o600, enriched)
+        if boundary_adjustment
+          File.write(enriched, JSON.pretty_generate(enriched_request) + "\n", mode: "wx", perm: 0o600)
+        else
+          FileUtils.cp(attempt_output, enriched, preserve: false)
+          File.chmod(0o600, enriched)
+        end
         break
       end
       lm_seed = next_lm_seed(lm_seed, attempt_number)
@@ -171,6 +181,7 @@ class MusicVulkanPilot
     emit("ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "Vulkan pilot completed; human listening review required",
       "run_dir" => run_dir, "wall_seconds" => (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(2),
       "audio" => audio, "code_health" => code_health, "lm_attempts" => lm_attempts,
+      "boundary_adjustment" => boundary_adjustment,
       "lm_exit_status" => lm, "synth_exit_status" => synth, "persistent_process" => false)
   rescue Interrupt
     emit("ok" => false, "lifecycle_state" => "canceled", "reason" => "pilot canceled")
@@ -254,7 +265,8 @@ class MusicVulkanPilot
       raise ArgumentError, "#{duration}-second qualification requires marker #{expected}"
     end
 
-    raise ArgumentError, "pilot duration must be exactly 30, 90, or 180 seconds, or an explicitly marked 210-second qualification"
+    supported = QUALIFICATION_DURATIONS.keys.sort.join(" or ")
+    raise ArgumentError, "pilot duration must be exactly 30, 90, 180, or 600 seconds, or an explicitly marked #{supported}-second qualification"
   rescue KeyError, ArgumentError, TypeError => error
     raise ArgumentError, "invalid pilot duration: #{error.message}"
   end
@@ -330,6 +342,22 @@ class MusicVulkanPilot
     }
   rescue ArgumentError
     raise "LM audio-code plan is malformed"
+  end
+
+  def normalize_synthesis_boundary(document, duration)
+    return [document, nil] unless duration == 600
+    codes = document.fetch("audio_codes").to_s.split(",")
+    return [document, nil] unless codes.length == 3_001
+
+    normalized = document.merge("audio_codes" => codes.first(3_000).join(","))
+    adjustment = {
+      "reason" => "ACE-Step 600-second LM plan includes one terminal code beyond the 15000-latent synthesis ceiling",
+      "source_code_count" => 3_001,
+      "synthesis_code_count" => 3_000,
+      "removed_terminal_codes" => 1,
+      "target_duration_seconds" => 600
+    }
+    [normalized, adjustment]
   end
 
   def next_lm_seed(current, attempt_number)

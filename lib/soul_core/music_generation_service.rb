@@ -336,6 +336,7 @@ module SoulCore
           "chat_engine_preserved" => true,
           "lm_attempts" => generation.respond_to?(:lm_attempts) ? generation.lm_attempts : nil,
           "code_health" => generation.respond_to?(:code_health) ? generation.code_health : nil,
+          "boundary_adjustment" => generation.respond_to?(:boundary_adjustment) ? generation.boundary_adjustment : nil,
           "automatic_model_load" => false,
           "automatic_model_unload" => false
         },
@@ -541,6 +542,7 @@ module SoulCore
       payload = { "schema_version" => "soul.music.generation_failure.v1", "lifecycle_state" => state, "reason" => reason || "music generation #{result.status}", "exit_status" => result.exit_status, "recorded_at" => @clock.call.iso8601, "lease_id" => lease.fetch("lease_id") }
       payload["lm_attempts"] = result.lm_attempts if result.respond_to?(:lm_attempts) && result.lm_attempts
       payload["code_health"] = result.code_health if result.respond_to?(:code_health) && result.code_health
+      payload["boundary_adjustment"] = result.boundary_adjustment if result.respond_to?(:boundary_adjustment) && result.boundary_adjustment
       File.write(File.join(staging, "failure.json"), JSON.pretty_generate(payload) + "\n", mode: "w", perm: 0o600)
       File.write(File.join(staging, "failure.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(0, MAX_LOG_BYTES), mode: "w", perm: 0o600)
       outcome(state, false, payload.fetch("reason"), data: { "quarantine_path" => staging, "exit_status" => result.exit_status }, mutation: "music_candidate_quarantined")

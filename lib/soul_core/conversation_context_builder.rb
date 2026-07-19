@@ -30,6 +30,7 @@ module SoulCore
       - Do not dump long code, raw logs, or link collections unless requested.
       - Do not claim that a skill, file operation, command, search, or external action ran.
       - Explicit deterministic skills and approvals are handled outside this model call.
+      - Mentioning a skill, capability, studio, dashboard feature, or ongoing development work is not a request to list or invoke it. Respond to conversational meaning unless the user explicitly asks for an action.
       - Ask one focused clarification only when the missing information blocks a useful answer.
       - For this project, shell examples must be compatible with zsh.
       - Never reveal hidden reasoning. Give conclusions and useful explanations.
@@ -65,7 +66,7 @@ module SoulCore
       @max_memory_records = positive_integer(max_memory_records, DEFAULT_MEMORY_RECORDS)
     end
 
-    def build(chat_id:, provider_privacy_class: nil)
+    def build(chat_id:, provider_privacy_class: nil, provider_model: nil, compact_identity: nil)
       chat = @store.chat(chat_id)
       raise ArgumentError, "Unknown chat id: #{chat_id}" unless chat
 
@@ -108,7 +109,11 @@ module SoulCore
       style = @style_analyzer.analyze(messages: all_messages)
 
       system_content = SYSTEM_PROMPT.dup
-      system_content << "\n#{@identity_profile.render_system_guidance(message: current_query&.fetch('content', '').to_s)}\n"
+      compact_identity = compact_identity == true || provider_model.to_s.match?(/qwen/i)
+      identity_options = { message: current_query&.fetch("content", "").to_s }
+      identity_parameters = @identity_profile.method(:render_system_guidance).parameters
+      identity_options[:compact] = compact_identity if identity_parameters.any? { |kind, name| name == :compact || kind == :keyrest }
+      system_content << "\n#{@identity_profile.render_system_guidance(**identity_options)}\n"
       recent_style_guidance = @style_analyzer.render_system_guidance(style)
       system_content << "\n#{recent_style_guidance}\n" unless recent_style_guidance.empty?
       stored_summary = sanitize_approval_tokens(chat["summary"].to_s).strip
@@ -181,6 +186,7 @@ module SoulCore
           "profile_version" => identity.fetch("profile_version"),
           "tone_mode" => identity.fetch("tone_mode"),
           "tone_label" => identity.fetch("tone_label"),
+          "compact_model_calibration" => compact_identity,
           "automatic_identity_mutation" => identity.fetch("automatic_identity_mutation")
         },
         "style" => {
