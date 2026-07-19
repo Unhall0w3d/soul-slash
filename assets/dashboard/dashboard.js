@@ -590,32 +590,42 @@ function renderMusicCandidates(candidates) {
 }
 
 function musicVisualCompanionPanel(candidate) {
-  const visual = candidate.visuals?.[0]; const source = candidate.visual_sources?.[0]; if (!visual && !source) return null;
-  const lockedWaterProfile = visual?.render_profile?.profile_id === "localized-water-locked-camera-v2";
+  const visuals = candidate.visuals || []; const source = candidate.visual_sources?.[0]; if (!visuals.length && !source) return null;
   const panel = document.createElement("section"); panel.className = "music-visual-companion";
-  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Visual Companion"; const badge = document.createElement("small"); badge.textContent = visual ? visual.stage.replaceAll("_", " ") : "approved source available"; heading.append(title, badge); panel.append(heading);
-  const status = document.createElement("p"); status.className = "dialog-status";
-  if (!visual) {
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "Visual Companion"; const badge = document.createElement("small"); badge.textContent = visuals.length ? `${visuals.length} visual version${visuals.length === 1 ? "" : "s"}` : "approved source available"; heading.append(title, badge); panel.append(heading);
+  if (!visuals.length) {
+    const status = document.createElement("p"); status.className = "dialog-status";
     const note = document.createElement("p"); note.textContent = `${source.label}. Bind this reviewed source to the exact candidate audio before any rendering.`;
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview visual binding";
     button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "import", { asset_id: source.asset_id })); panel.append(note, button, status); return panel;
   }
+  visuals.forEach((visual) => panel.append(musicVisualLineage(candidate, visual, source)));
+  return panel;
+}
+
+function musicVisualLineage(candidate, visual, source) {
+  const lockedWaterProfile = visual.render_profile?.profile_id === "localized-water-locked-camera-v2";
+  const lineage = document.createElement("section"); lineage.className = "music-visual-lineage";
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = lockedWaterProfile ? "Locked-camera water" : (visual.render_profile?.profile_id === "static-hold-v1" ? "Static hold attempt" : "Moving-camera proof"); const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
+  const status = document.createElement("p"); status.className = "dialog-status";
   const media = document.createElement("div"); media.className = "music-visual-media";
   const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base);
   if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", lockedWaterProfile ? "Locked-camera localized water preview" : "Retired visual loop preview"); media.append(loop); }
   if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "metadata"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Three-minute visual companion with candidate audio"); media.append(preview); }
-  panel.append(media);
-  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${lockedWaterProfile ? "Locked camera · localized water" : "Retired visual profile"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Base source is immutable; rendering has not started."; panel.append(metrics);
-  if (!visual.artifacts?.loop) {
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview locked-camera water loop"; button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "loop", { visual_id: visual.visual_id })); panel.append(button);
-  } else if (!visual.artifacts?.preview) {
+  lineage.append(media);
+  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${lockedWaterProfile ? "Locked camera · localized water" : "Historical profile"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Base source is immutable; rendering has not started."; lineage.append(metrics);
+  if (lockedWaterProfile && !visual.artifacts?.loop) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview locked-camera water loop"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "loop", { visual_id: visual.visual_id })); lineage.append(button);
+  } else if (lockedWaterProfile && !visual.artifacts?.preview) {
     const note = document.createElement("p"); note.textContent = "Confirm the architecture and framing remain locked while only the foreground water moves.";
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview three-minute render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, panel, button, status, "final", { visual_id: visual.visual_id })); panel.append(note, button);
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview three-minute render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
+  } else if (!lockedWaterProfile) {
+    const note = document.createElement("p"); note.textContent = "Historical review evidence. Available media remains playable, but this retired profile cannot advance."; lineage.append(note);
+    if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare locked-camera replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
   } else {
-    const note = document.createElement("p"); note.textContent = `${lockedWaterProfile ? "Locked-camera" : "Retired-profile"} three-minute local preview ready. It remains unpublished and bound to this exact audio digest.`; panel.append(note);
-    if (!lockedWaterProfile && source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare locked-camera replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, panel, replacement, status, "import", { asset_id: source.asset_id })); panel.append(replacement); }
+    const note = document.createElement("p"); note.textContent = "Locked-camera three-minute local preview ready. It remains unpublished and bound to this exact audio digest."; lineage.append(note);
   }
-  panel.append(status); return panel;
+  lineage.append(status); return lineage;
 }
 
 function musicVisualUrl(candidate, visual, artifact) { return `/api/v1/music/visual/${candidate.project_id}/${candidate.candidate_id}/${visual.visual_id}/${artifact}`; }

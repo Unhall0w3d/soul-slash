@@ -89,7 +89,7 @@ contract = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_c
 facade = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_facade.rb"))
 http = File.read(File.join(__dir__, "..", "lib", "soul_core", "dashboard_http_application.rb"))
 javascript = File.read(File.join(__dir__, "..", "assets", "dashboard", "dashboard.js"))
-check.call("application and dashboard expose bounded visual gates and private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("Visual Companion"))
+check.call("application and dashboard expose every immutable visual lineage and private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("visuals.forEach") && javascript.include?("Historical review evidence"))
 check.call("visual slice has no image-model service listener or publication path", !File.read(File.join(__dir__, "..", "lib", "soul_core", "music_visual_companion_service.rb")).match?(/youtube|upload|listen|daemon|Thread\.new/))
 
 abort "#{failures.length} visual companion verification(s) failed: #{failures.join(', ')}" unless failures.empty?

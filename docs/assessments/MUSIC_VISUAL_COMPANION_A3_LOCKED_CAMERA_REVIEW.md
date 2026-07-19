@@ -8,6 +8,7 @@ Status: candidate implementation verified; human review pending
 - Existing periodic displacement retained only on the foreground water band.
 - New profile-bound lineage; moving-camera and static-hold attempts remain historical evidence.
 - Dashboard wording and replacement action describe the exact effect.
+- Every immutable visual lineage remains visible and playable; newer partial attempts no longer hide completed historical previews.
 
 ## Deterministic verification
 
