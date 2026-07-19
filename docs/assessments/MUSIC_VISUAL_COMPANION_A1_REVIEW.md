@@ -1,6 +1,6 @@
 # Music Visual Companion A1 Review
 
-Status: candidate implementation verified; human loop and three-minute preview review pending
+Status: candidate implementation verified; loop approved; three-minute preview review pending
 
 ## Implemented
 
@@ -36,7 +36,12 @@ Status: candidate implementation verified; human loop and three-minute preview r
 - Source image: 1,970,412 bytes; SHA-256 `e0acee944e4b21c9f7e5f480c46518646aecf6695ae017a1f8e3a6718c044ba2`
 - Loop: 12 seconds, 1280×720, 30 fps, 1,784,951 bytes
 - First-to-last-frame PSNR: 45.541 dB
-- Three-minute preview: deliberately not rendered before human loop review
+- Loop review: approved by the human architect on 2026-07-18
+- Three-minute preview: 179.6 seconds, 1280×720, 30 fps, 29,544,418 bytes
+- Preview codecs: H.264 video and AAC audio; average container bitrate 1,316,009 bits/s
+- Preview SHA-256: `a1ba00f87370a52570c8f4e7b5a32af60db89aaa3edd230078f32a91639a8d3a`
+- Candidate audio SHA-256: `dae4f08056ba4d27a21885257de8f7ad56352ab4663a440a7713e9571ef9d77f`
+- Preview stage: `preview_ready`; external publication remains disabled
 
 ## Local LLM evaluation
 
@@ -57,8 +62,8 @@ None. A1 performs no LLM call.
 
 ## Human review checklist
 
-- [ ] Play the twelve-second loop across at least three boundaries.
-- [ ] Confirm the water motion reads as intentional and the seam is unobtrusive.
+- [x] Play the twelve-second loop across at least three boundaries.
+- [x] Confirm the water motion reads as intentional and the seam is unobtrusive.
 - [ ] Review the complete three-minute preview for repetition fatigue.
 - [ ] Confirm fade timing supports the music.
 - [ ] Record refinements before increasing source-loop or mix duration.
