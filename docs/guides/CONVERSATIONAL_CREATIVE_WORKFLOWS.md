@@ -30,13 +30,32 @@ explicit request
 → Operator feedback
 → visible exact review action
 → recorded studio review and lineage
+→ explicit revision request when disposition is revise
+→ visible Soul-drafted revision input
+→ exact linked revision action
+→ new authenticated audio candidate and another human review
 ```
 
 The generation click is the authorization; the UI does not require retyping its prefilled confirmation phrase. A changed brief or stale digest is rejected. Repeating a completed action is idempotent and does not create duplicate candidates or reviews.
 
+## Revision loop
+
+When a recorded music review says `revise`, the originating chat retains that
+exact candidate as active task context. An explicit request such as `Draft the
+revision and let me review it` asks Soul to translate the stored human review
+and available machine-heard evidence through the same bounded revision drafter
+used by Music Studio. Soul displays the revised Sound and Structure, BPM, key,
+time, preserved lyrics, rationale, and derived changes. Only the exact action
+click starts the linked candidate generation. The result returns to Chat with
+MP3 playback and a FLAC link, then re-enters the normal review loop.
+
+Mentioning revision does not draft or execute it. Soul cannot alter the four
+required project decisions, rewrite intended lyrics, or treat its draft as
+approval.
+
 ## Present boundary
 
-Candidate creation and review are chat-native. Revision generation, destructive rejection, music/visual binding, full companion rendering, final audio export, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
+Candidate creation, review, and one reviewed music-revision loop are chat-native. Destructive rejection, visual guided revision, music/visual binding, full companion rendering, final audio export, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 

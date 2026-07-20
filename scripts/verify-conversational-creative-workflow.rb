@@ -40,9 +40,11 @@ class FakeCore
 end
 
 class FakeReviewPlanner
+  attr_accessor :music_disposition
+  def initialize(music_disposition: "keep") = (@music_disposition = music_disposition)
   def draft(**)
     { "ok" => true, "review" => {
-      "related" => true, "music_disposition" => "keep", "music_rating" => 4,
+      "related" => true, "music_disposition" => @music_disposition, "music_rating" => 4,
       "musical_quality" => "passed", "prompt_adherence" => "partial",
       "vocal_adherence" => "passed", "lyric_adherence" => "passed",
       "music_notes" => "The groove is coherent; the brass payoff arrives a little late.",
@@ -54,21 +56,57 @@ class FakeReviewPlanner
 end
 
 class FakeMusic
-  attr_reader :created, :reviews
-  def initialize = (@created = []; @reviews = [])
+  attr_reader :created, :reviews, :revisions
+  def initialize = (@created = []; @reviews = []; @revisions = [])
   def create_project(attributes)
     @created << attributes
     ok("project" => attributes.merge("project_id" => "music_1111111111111111"))
   end
   def generation_preview(project_id:) = ok("candidate_id" => "candidate_2222222222222222", "confirmation_phrase" => "START_MUSIC_GENERATION", "expected_digest" => "b" * 64)
-  def generation_execute(**) = ok("candidate" => { "candidate_id" => "candidate_2222222222222222" })
+  def generation_execute(**) = ok("candidate" => candidate("candidate_2222222222222222"))
   def record_review(project_id:, candidate_id:, review:)
     @reviews << review.merge("project_id" => project_id, "candidate_id" => candidate_id)
     ok("review" => review)
   end
   def list_projects(limit:) = ok("projects" => [])
+  def inspect_project(project_id:)
+    project = @created.last.merge("project_id" => project_id)
+    review = @reviews.reverse.find { |item| item["candidate_id"] == "candidate_2222222222222222" }
+    ok("project" => project, "generations" => [candidate("candidate_2222222222222222").merge("review" => review)])
+  end
+  def revision_preview(project_id:, source_candidate_id:, revision:)
+    @revision_preview = { "project_id" => project_id, "source_candidate_id" => source_candidate_id, "revision" => revision }
+    ok("candidate_id" => "candidate_5555555555555555", "confirmation_phrase" => "START_MUSIC_GENERATION", "expected_digest" => "d" * 64)
+  end
+  def revision_execute(**attributes)
+    @revisions << attributes
+    ok("candidate" => candidate("candidate_5555555555555555").merge("source_candidate_id" => attributes.fetch(:source_candidate_id)))
+  end
   private
+  def candidate(candidate_id)
+    { "candidate_id" => candidate_id, "generation_input" => {
+      "caption" => "Technical guitar and liquid breakbeats interlock, gather brass color, then resolve with a deliberate final cadence.",
+      "lyrics" => "", "bpm" => 110, "keyscale" => "D minor", "timesignature" => "4"
+    } }
+  end
   def ok(data) = { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "ok", "data" => data, "mutation" => "test" }
+end
+
+class FakeRevisionDrafter
+  attr_reader :calls
+  def initialize = (@calls = [])
+  def draft(**attributes)
+    @calls << attributes
+    { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "drafted", "data" => {
+      "revision" => {
+        "caption" => "Technical guitars interlock more clearly over liquid breakbeats, with patient counterpoint, controlled brass escalation, and a deliberate resolved ending.",
+        "lyrics" => "", "bpm" => 112, "keyscale" => "D minor", "timesignature" => "4"
+      },
+      "rationale" => "Preserve the successful arc while making the guitar dialogue and ending more explicit.",
+      "changes" => ["Replace Sound and Structure with the proposed materially revised arrangement.", "Change tempo from 110 BPM to 112 BPM."],
+      "packet_digest" => "e" * 64
+    } }
+  end
 end
 
 class FakeVisual
@@ -145,8 +183,11 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   chat = store.create_chat
   planner = FakePlanner.new(plan)
   core = FakeCore.new; music = FakeMusic.new; visual = FakeVisual.new
+  review_planner = FakeReviewPlanner.new
+  revision_drafter = FakeRevisionDrafter.new
   service = SoulCore::ConversationCreativeWorkflowService.new(root: root, chat_store: store, provider_client: Object.new,
-    music_generation: music, visual_studio: visual, core_orchestration: core, planner: planner, review_planner: FakeReviewPlanner.new)
+    music_generation: music, visual_studio: visual, core_orchestration: core, planner: planner,
+    review_planner: review_planner, revision_drafter: revision_drafter)
 
   checks["mention_is_not_initial_invocation"] = service.candidate_message?(chat_id: chat.fetch("id"), message: "I am working on music skills") == false
   ready = service.plan(chat_id: chat.fetch("id"), message: "Make a song and image", provider: Object.new)
@@ -193,6 +234,37 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   visual_result = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_action.fetch("flow_id"), action_id: visual_action.fetch("action_id"),
     confirmation: visual_action.fetch("confirmation_phrase"), expected_digest: visual_action.fetch("expected_digest"))
   checks["visual_only_uses_amd_free_core"] = visual_result["ok"] && core.active == "amd-free"
+
+  revision_chat = store.create_chat
+  planner.plan = plan(kind: "music", supplied: %w[music_intent duration_seconds vocal_mode rights_status])
+  review_planner.music_disposition = "revise"
+  revision_ready = service.plan(chat_id: revision_chat.fetch("id"), message: "Create a song", provider: Object.new)
+  generation_action = revision_ready.dig("metadata", "actions", 0)
+  service.execute(chat_id: revision_chat.fetch("id"), flow_id: generation_action.fetch("flow_id"), action_id: generation_action.fetch("action_id"),
+    confirmation: generation_action.fetch("confirmation_phrase"), expected_digest: generation_action.fetch("expected_digest"))
+  review_ready = service.plan(chat_id: revision_chat.fetch("id"), message: "Revise it. The guitars need clearer counterpoint and the ending should resolve naturally.", provider: Object.new)
+  review_action = review_ready.dig("metadata", "actions", 0)
+  recorded = service.execute(chat_id: revision_chat.fetch("id"), flow_id: review_action.fetch("flow_id"), action_id: review_action.fetch("action_id"),
+    confirmation: review_action.fetch("confirmation_phrase"), expected_digest: review_action.fetch("expected_digest"))
+  checks["revise_review_keeps_flow_active"] = recorded["ok"] && recorded["lifecycle_state"] == "blocked_for_human_review"
+  checks["revision_discussion_does_not_draft_or_execute"] = service.plan(chat_id: revision_chat.fetch("id"), message: "The revision feature seems useful.", provider: Object.new).nil? && revision_drafter.calls.empty? && music.revisions.empty?
+
+  proposed = service.plan(chat_id: revision_chat.fetch("id"), message: "Draft the revision and let me review it.", provider: Object.new)
+  revision_action = proposed.dig("metadata", "actions", 0)
+  revision_scope = proposed.dig("metadata", "creative_workflow", "revision_draft", "revision")
+  checks["explicit_revision_request_returns_exact_action"] = proposed["mode"] == "creative_music_revision_ready" && revision_action["action_id"] == "creative_music_revision" && revision_scope["lyrics"] == ""
+  stale_revision = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
+    confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
+  checks["stale_revision_action_mutates_nothing"] = !stale_revision["ok"] && music.revisions.empty?
+
+  revised = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
+    confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: revision_action.fetch("expected_digest"))
+  checks["exact_revision_returns_linked_audio_candidate"] = revised["ok"] && revised["lifecycle_state"] == "blocked_for_human_review" &&
+    revised.dig("data", "attachments", 0, "candidate_id") == "candidate_5555555555555555" && music.revisions.one? &&
+    music.revisions.first.fetch(:source_candidate_id) == "candidate_2222222222222222"
+  revision_replay = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
+    confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: revision_action.fetch("expected_digest"))
+  checks["revision_action_is_idempotent"] = revision_replay.dig("data", "idempotent_replay") == true && music.revisions.one?
 end
 
 failed = checks.reject { |_name, value| value }

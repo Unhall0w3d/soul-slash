@@ -7,12 +7,13 @@ require "time"
 require_relative "conversation_creative_flow_store"
 require_relative "conversation_creative_planner"
 require_relative "conversation_creative_review_planner"
+require_relative "music_revision_draft_service"
 
 module SoulCore
   class ConversationCreativeWorkflowService
     EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
 
-    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, flow_store: nil, planner: nil, review_planner: nil, clock: -> { Time.now.utc })
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @chat_store = chat_store
       @music_generation = music_generation
@@ -21,6 +22,7 @@ module SoulCore
       @flow_store = flow_store || ConversationCreativeFlowStore.new(root: @root, clock: clock)
       @planner = planner || ConversationCreativePlanner.new(provider_client: provider_client)
       @review_planner = review_planner || ConversationCreativeReviewPlanner.new(provider_client: provider_client)
+      @revision_drafter = revision_drafter || MusicRevisionDraftService.new(provider_client: provider_client)
       @clock = clock
     end
 
@@ -38,6 +40,7 @@ module SoulCore
       prior = @flow_store.active(chat_id)
       return nil unless prior || @planner.explicit_request?(message)
       return plan_review(prior, message, provider, progress) if prior && prior["stage"] == "generated"
+      return plan_music_revision(prior, message, provider, progress) if prior && prior["stage"] == "reviewed"
       progress&.call({ "state" => "planning", "summary" => "Shaping the creative brief without inventing required choices." })
       messages = @chat_store.messages(chat_id, limit: 12, scan_limit: 10_000)
       messages << { "role" => "user", "content" => message.to_s } unless messages.last&.dig("content") == message.to_s
@@ -92,6 +95,7 @@ module SoulCore
       return domain("blocked_for_human_review", false, "creative workflow action changed; review it again") unless action_id.to_s.empty? || action_id.to_s == action.fetch("action_id")
 
       return execute_review(flow) if action.fetch("action_id") == "creative_review"
+      return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
       core = ensure_creative_core(flow)
@@ -142,6 +146,115 @@ module SoulCore
     end
 
     private
+
+    def plan_music_revision(flow, message, provider, progress)
+      return nil unless music_revision_eligible?(flow) && explicit_revision_request?(message)
+
+      progress&.call({ "state" => "planning", "summary" => "Translating the recorded review into one bounded music revision." })
+      music = flow.dig("generated", "music")
+      inspected = @music_generation.inspect_project(project_id: music.dig("project", "project_id"))
+      return failure_result(inspected.fetch("reason", "music project could not be inspected"), flow) unless inspected.fetch("ok")
+      candidate = Array(inspected.dig("data", "generations")).find { |item| item["candidate_id"] == music.dig("candidate", "candidate_id") }
+      return failure_result("the reviewed music candidate no longer exists", flow) unless candidate
+
+      drafted = @revision_drafter.draft(
+        project: inspected.dig("data", "project"), candidate: candidate,
+        analysis: candidate["analysis"], provider: provider
+      )
+      return failure_result(drafted.fetch("reason", "music revision drafting did not complete"), flow) unless drafted.fetch("ok")
+
+      data = drafted.fetch("data")
+      flow["revision_draft"] = {
+        "source_candidate_id" => candidate.fetch("candidate_id"),
+        "revision" => data.fetch("revision"),
+        "rationale" => data.fetch("rationale"),
+        "changes" => data.fetch("changes"),
+        "packet_digest" => data["packet_digest"]
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_music_revision_action(flow)
+      @flow_store.write(flow)
+      result(render_music_revision(flow), "creative_music_revision_ready", flow, actions: [flow.fetch("pending_action")])
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("music revision planning failed safely: #{error.class}", flow)
+    end
+
+    def music_revision_eligible?(flow)
+      flow.dig("review_draft", "music_disposition") == "revise" &&
+        flow.dig("generated", "music") && !flow.dig("generated", "music", "existing")
+    end
+
+    def explicit_revision_request?(message)
+      text = message.to_s.strip
+      text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:draft|generate|make|produce|retry|revise|start|try)\b.*\b(?:revision|revised|candidate|song|track|it|again)\b/i) ||
+        text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?let(?:'s| us)\s+(?:revise|retry|try\s+again|generate\s+(?:the\s+)?revision)\b/i)
+    end
+
+    def build_music_revision_action(flow)
+      { "action_id" => "creative_music_revision", "operation" => "chats.creative.execute", "label" => "Generate exact revised candidate",
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => "bounded_music_revision_generation" }
+    end
+
+    def render_music_revision(flow)
+      draft = flow.fetch("revision_draft")
+      revision = draft.fetch("revision")
+      plan = flow.fetch("plan")
+      [
+        "I shaped the recorded evidence into this proposed revision.", "",
+        "Song: #{plan['title']}",
+        "Intent: #{plan['music_intent']}",
+        "Duration / Mode / Rights: #{plan['duration_seconds']} seconds / #{plan['vocal_mode']} / #{plan['rights_status']}",
+        "BPM / Key / Time: #{revision['bpm']} / #{revision['keyscale']} / #{revision['timesignature']}",
+        "Sound and Structure: #{revision['caption']}", "",
+        "Lyrics and section markers (preserved):", revision['lyrics'].to_s, "",
+        "Why this revision: #{draft['rationale']}",
+        "Changes: #{Array(draft['changes']).join(' ')}", "",
+        "Review the complete input. Clicking the action revalidates Music Core and authorizes only this exact linked revision candidate."
+      ].join("\n")
+    end
+
+    def execute_music_revision(flow, progress)
+      draft = flow.fetch("revision_draft")
+      music = flow.dig("generated", "music")
+      progress&.call({ "stage" => "core", "message" => "Revalidating Music Core for the exact revision." })
+      core = ensure_creative_core(flow)
+      return core unless core.fetch("ok")
+
+      project_id = music.dig("project", "project_id")
+      source_candidate_id = draft.fetch("source_candidate_id")
+      revision = draft.fetch("revision")
+      preview = @music_generation.revision_preview(project_id: project_id, source_candidate_id: source_candidate_id, revision: revision)
+      return preview unless preview.fetch("ok")
+      gate = preview.fetch("data")
+      progress&.call({ "stage" => "music_revision", "message" => "Generating the exact linked revision candidate." })
+      generated = @music_generation.revision_execute(
+        project_id: project_id, source_candidate_id: source_candidate_id,
+        candidate_id: gate.fetch("candidate_id"), revision: revision,
+        confirmation: gate.fetch("confirmation_phrase"), expected_digest: gate.fetch("expected_digest"), progress: progress
+      )
+      return generated unless generated.fetch("ok")
+
+      flow["generated"]["music"]["candidate"] = generated.dig("data", "candidate")
+      flow.delete("revision_draft")
+      flow.delete("review_draft")
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "generated"
+      flow["pending_action"] = nil
+      attachments = [music_attachment(flow.dig("generated", "music"))]
+      message = append_assistant(flow.fetch("chat_id"), "The revised music candidate is ready. Listen here, then give me the next keep, revise, or reject review.", flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_music_revision"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "revised music candidate generated; human review required",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments }, mutation: "music_revision_candidate_generated")
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "music revision execution failed safely: #{error.class}")
+    end
 
     def plan_review(flow, message, provider, progress)
       progress&.call({ "state" => "reviewing", "summary" => "Translating your listening and visual evidence into the exact review fields." })
@@ -426,7 +539,7 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "created_at", "updated_at")
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "created_at", "updated_at")
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))
