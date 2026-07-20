@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-19T23:07:20-04:00
+Generated: 2026-07-19T23:23:11-04:00
 
 Source registry:
 
@@ -136,7 +136,7 @@ risk: approval_required
 confirmation_required: true
 ```
 
-Gather a music brief through chat, preserve user-required decisions, generate and review a candidate, and translate a recorded revise disposition into one exact Core-aware linked revision through human action gates.
+Gather a music brief through chat, preserve user-required decisions, generate and review candidates, translate recorded revision feedback, and prepare exact kept-song export or rejected-candidate deletion gates.
 
 Example ways the owner might ask for this:
 

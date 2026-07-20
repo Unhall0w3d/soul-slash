@@ -109,6 +109,36 @@ class FakeRevisionDrafter
   end
 end
 
+class FakeMusicDisposition
+  attr_reader :export_executions, :reject_executions
+  def initialize = (@export_executions = []; @reject_executions = [])
+  def export_preview(project_id:, candidate_id:)
+    ok("confirmation_phrase" => "EXPORT_FINISHED_SONG", "expected_digest" => "f" * 64, "preview_scope" => {
+      "operation" => "export_finished_song", "project_id" => project_id, "candidate_id" => candidate_id,
+      "destination" => "/home/operator/Music/soul-music/signal-loom", "files" => %w[master.flac listening.mp3 song.json song-info.md],
+      "overwrite" => false, "external_publication" => false
+    })
+  end
+  def export_execute(**attributes)
+    @export_executions << attributes
+    complete({ "export" => { "destination" => "/home/operator/Music/soul-music/signal-loom" } }, mutation: "finished_song_exported")
+  end
+  def reject_preview(project_id:, candidate_id:)
+    ok("confirmation_phrase" => "DELETE_REJECTED_CANDIDATE", "expected_digest" => "1" * 64, "preview_scope" => {
+      "operation" => "delete_rejected_music_candidate", "project_id" => project_id, "candidate_id" => candidate_id,
+      "deletes" => %w[FLAC MP3 candidate_input vocal_analysis current_review], "retains" => ["small rejection receipt"],
+      "descendant_candidate_ids" => [], "external_export_deleted" => false
+    })
+  end
+  def reject_execute(**attributes)
+    @reject_executions << attributes
+    complete({ "rejection" => { "candidate_id" => attributes.fetch(:candidate_id) } }, mutation: "music_candidate_deleted")
+  end
+  private
+  def ok(data) = { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "previewed", "data" => data, "mutation" => "none" }
+  def complete(data, mutation:) = { "ok" => true, "lifecycle_state" => "complete", "reason" => "complete", "data" => data, "mutation" => mutation }
+end
+
 class FakeVisual
   attr_reader :created, :reviews
   def initialize = (@created = []; @reviews = [])
@@ -185,9 +215,10 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   core = FakeCore.new; music = FakeMusic.new; visual = FakeVisual.new
   review_planner = FakeReviewPlanner.new
   revision_drafter = FakeRevisionDrafter.new
+  music_disposition = FakeMusicDisposition.new
   service = SoulCore::ConversationCreativeWorkflowService.new(root: root, chat_store: store, provider_client: Object.new,
     music_generation: music, visual_studio: visual, core_orchestration: core, planner: planner,
-    review_planner: review_planner, revision_drafter: revision_drafter)
+    review_planner: review_planner, revision_drafter: revision_drafter, music_disposition: music_disposition)
 
   checks["mention_is_not_initial_invocation"] = service.candidate_message?(chat_id: chat.fetch("id"), message: "I am working on music skills") == false
   ready = service.plan(chat_id: chat.fetch("id"), message: "Make a song and image", provider: Object.new)
@@ -214,10 +245,24 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   checks["review_action_identity_is_bound"] = !wrong_action["ok"] && music.reviews.empty? && visual.reviews.empty?
   reviewed = service.execute(chat_id: chat.fetch("id"), flow_id: review_action.fetch("flow_id"), action_id: review_action.fetch("action_id"),
     confirmation: review_action.fetch("confirmation_phrase"), expected_digest: review_action.fetch("expected_digest"))
-  checks["exact_reviews_are_recorded"] = reviewed["ok"] && reviewed["lifecycle_state"] == "complete" && music.reviews.one? && visual.reviews.one?
+  checks["exact_reviews_are_recorded"] = reviewed["ok"] && reviewed["lifecycle_state"] == "blocked_for_human_review" && music.reviews.one? && visual.reviews.one?
   reviewed_replay = service.execute(chat_id: chat.fetch("id"), flow_id: review_action.fetch("flow_id"), action_id: review_action.fetch("action_id"),
     confirmation: review_action.fetch("confirmation_phrase"), expected_digest: review_action.fetch("expected_digest"))
   checks["review_execution_is_idempotent"] = reviewed_replay.dig("data", "idempotent_replay") == true && music.reviews.one? && visual.reviews.one?
+
+  checks["export_discussion_does_not_prepare_or_execute"] = service.plan(chat_id: chat.fetch("id"), message: "Export seems useful for finished work later.", provider: Object.new).nil? && music_disposition.export_executions.empty?
+  export_ready = service.plan(chat_id: chat.fetch("id"), message: "Export the kept song.", provider: Object.new)
+  export_action = export_ready.dig("metadata", "actions", 0)
+  checks["kept_candidate_prepares_exact_export_action"] = export_ready["mode"] == "creative_music_export_ready" && export_action["action_id"] == "creative_music_export" && export_ready["content"].include?("Overwrite: forbidden")
+  stale_export = service.execute(chat_id: chat.fetch("id"), flow_id: export_action.fetch("flow_id"), action_id: export_action.fetch("action_id"),
+    confirmation: export_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
+  checks["stale_export_action_mutates_nothing"] = !stale_export["ok"] && music_disposition.export_executions.empty?
+  exported = service.execute(chat_id: chat.fetch("id"), flow_id: export_action.fetch("flow_id"), action_id: export_action.fetch("action_id"),
+    confirmation: export_action.fetch("confirmation_phrase"), expected_digest: export_action.fetch("expected_digest"))
+  checks["exact_export_completes_without_publication"] = exported["ok"] && exported["lifecycle_state"] == "complete" && exported.dig("data", "attachments", 0, "kind") == "audio" && music_disposition.export_executions.one?
+  export_replay = service.execute(chat_id: chat.fetch("id"), flow_id: export_action.fetch("flow_id"), action_id: export_action.fetch("action_id"),
+    confirmation: export_action.fetch("confirmation_phrase"), expected_digest: export_action.fetch("expected_digest"))
+  checks["export_action_is_idempotent"] = export_replay.dig("data", "idempotent_replay") == true && music_disposition.export_executions.one?
 
   second = store.create_chat
   planner.plan = plan(kind: "music", supplied: %w[duration_seconds vocal_mode rights_status])
@@ -265,6 +310,40 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   revision_replay = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
     confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: revision_action.fetch("expected_digest"))
   checks["revision_action_is_idempotent"] = revision_replay.dig("data", "idempotent_replay") == true && music.revisions.one?
+
+  reject_chat = store.create_chat
+  planner.plan = plan(kind: "music", supplied: %w[music_intent duration_seconds vocal_mode rights_status])
+  review_planner.music_disposition = "reject"
+  reject_ready = service.plan(chat_id: reject_chat.fetch("id"), message: "Create a song", provider: Object.new)
+  reject_generation = reject_ready.dig("metadata", "actions", 0)
+  service.execute(chat_id: reject_chat.fetch("id"), flow_id: reject_generation.fetch("flow_id"), action_id: reject_generation.fetch("action_id"),
+    confirmation: reject_generation.fetch("confirmation_phrase"), expected_digest: reject_generation.fetch("expected_digest"))
+  reject_review = service.plan(chat_id: reject_chat.fetch("id"), message: "Reject it. The musical identity does not match the brief.", provider: Object.new)
+  reject_review_action = reject_review.dig("metadata", "actions", 0)
+  service.execute(chat_id: reject_chat.fetch("id"), flow_id: reject_review_action.fetch("flow_id"), action_id: reject_review_action.fetch("action_id"),
+    confirmation: reject_review_action.fetch("confirmation_phrase"), expected_digest: reject_review_action.fetch("expected_digest"))
+  checks["deletion_discussion_does_not_prepare_or_execute"] = service.plan(chat_id: reject_chat.fetch("id"), message: "Deleting rejected songs is appropriately serious.", provider: Object.new).nil? && music_disposition.reject_executions.empty?
+  rejection_ready = service.plan(chat_id: reject_chat.fetch("id"), message: "Delete the rejected candidate.", provider: Object.new)
+  rejection_action = rejection_ready.dig("metadata", "actions", 0)
+  checks["rejected_candidate_prepares_exact_deletion_action"] = rejection_ready["mode"] == "creative_music_reject_ready" && rejection_action["action_id"] == "creative_music_reject" && rejection_ready["content"].include?("small rejection receipt")
+  rejected = service.execute(chat_id: reject_chat.fetch("id"), flow_id: rejection_action.fetch("flow_id"), action_id: rejection_action.fetch("action_id"),
+    confirmation: rejection_action.fetch("confirmation_phrase"), expected_digest: rejection_action.fetch("expected_digest"))
+  checks["exact_rejection_removes_active_audio_candidate"] = rejected["ok"] && rejected["lifecycle_state"] == "complete" && rejected.dig("data", "flow", "generated", "music").nil? && music_disposition.reject_executions.one?
+
+  supersede_chat = store.create_chat
+  review_planner.music_disposition = "keep"
+  first_ready = service.plan(chat_id: supersede_chat.fetch("id"), message: "Create a song", provider: Object.new)
+  first_action = first_ready.dig("metadata", "actions", 0)
+  service.execute(chat_id: supersede_chat.fetch("id"), flow_id: first_action.fetch("flow_id"), action_id: first_action.fetch("action_id"),
+    confirmation: first_action.fetch("confirmation_phrase"), expected_digest: first_action.fetch("expected_digest"))
+  first_review = service.plan(chat_id: supersede_chat.fetch("id"), message: "Keep it. This candidate matches the brief.", provider: Object.new)
+  first_review_action = first_review.dig("metadata", "actions", 0)
+  service.execute(chat_id: supersede_chat.fetch("id"), flow_id: first_review_action.fetch("flow_id"), action_id: first_review_action.fetch("action_id"),
+    confirmation: first_review_action.fetch("confirmation_phrase"), expected_digest: first_review_action.fetch("expected_digest"))
+  mismatch = service.plan(chat_id: supersede_chat.fetch("id"), message: "Delete the kept candidate.", provider: Object.new)
+  checks["kept_candidate_cannot_prepare_rejection"] = mismatch["mode"] == "creative_music_disposition_mismatch" && music_disposition.reject_executions.one?
+  second_ready = service.plan(chat_id: supersede_chat.fetch("id"), message: "Create another song", provider: Object.new)
+  checks["new_creative_request_supersedes_unconsumed_disposition_flow"] = second_ready["mode"] == "creative_ready" && second_ready.dig("metadata", "creative_workflow", "flow_id") != first_action.fetch("flow_id")
 end
 
 failed = checks.reject { |_name, value| value }

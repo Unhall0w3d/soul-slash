@@ -33,7 +33,7 @@ skills:
     internal_handler: conversation_creative_workflow
     category: creative_studios
     status: available
-    description: Gather a music brief through chat, preserve user-required decisions, generate and review a candidate, and translate a recorded revise disposition into one exact Core-aware linked revision through human action gates.
+    description: Gather a music brief through chat, preserve user-required decisions, generate and review candidates, translate recorded revision feedback, and prepare exact kept-song export or rejected-candidate deletion gates.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW

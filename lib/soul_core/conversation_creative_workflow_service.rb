@@ -13,10 +13,11 @@ module SoulCore
   class ConversationCreativeWorkflowService
     EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
 
-    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, clock: -> { Time.now.utc })
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @chat_store = chat_store
       @music_generation = music_generation
+      @music_disposition = music_disposition
       @visual_studio = visual_studio
       @core_orchestration = core_orchestration
       @flow_store = flow_store || ConversationCreativeFlowStore.new(root: @root, clock: clock)
@@ -40,7 +41,17 @@ module SoulCore
       prior = @flow_store.active(chat_id)
       return nil unless prior || @planner.explicit_request?(message)
       return plan_review(prior, message, provider, progress) if prior && prior["stage"] == "generated"
-      return plan_music_revision(prior, message, provider, progress) if prior && prior["stage"] == "reviewed"
+      if prior && prior["stage"] == "reviewed"
+        followup = plan_music_post_review(prior, message, provider, progress)
+        return followup if followup
+        return nil unless @planner.explicit_request?(message)
+
+        prior["lifecycle_state"] = "complete"
+        prior["stage"] = "superseded"
+        prior["pending_action"] = nil
+        @flow_store.write(prior)
+        prior = nil
+      end
       progress&.call({ "state" => "planning", "summary" => "Shaping the creative brief without inventing required choices." })
       messages = @chat_store.messages(chat_id, limit: 12, scan_limit: 10_000)
       messages << { "role" => "user", "content" => message.to_s } unless messages.last&.dig("content") == message.to_s
@@ -96,6 +107,7 @@ module SoulCore
 
       return execute_review(flow) if action.fetch("action_id") == "creative_review"
       return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
+      return execute_music_disposition(flow) if %w[creative_music_export creative_music_reject].include?(action.fetch("action_id"))
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
       core = ensure_creative_core(flow)
@@ -146,6 +158,124 @@ module SoulCore
     end
 
     private
+
+    def plan_music_post_review(flow, message, provider, progress)
+      revision = plan_music_revision(flow, message, provider, progress)
+      return revision if revision
+      return nil unless flow.dig("generated", "music") && !flow.dig("generated", "music", "existing")
+
+      disposition = flow.dig("review_draft", "music_disposition")
+      return plan_music_export(flow) if disposition == "keep" && explicit_export_request?(message)
+      return plan_music_rejection(flow) if disposition == "reject" && explicit_rejection_request?(message)
+      return result("That candidate is recorded as kept, so rejection is unavailable until its review changes.", "creative_music_disposition_mismatch", flow) if disposition == "keep" && explicit_rejection_request?(message)
+      return result("That candidate is recorded as rejected, so export is unavailable until its review changes.", "creative_music_disposition_mismatch", flow) if disposition == "reject" && explicit_export_request?(message)
+
+      nil
+    end
+
+    def plan_music_export(flow)
+      return failure_result("music disposition service is unavailable", flow) unless @music_disposition
+      music = flow.dig("generated", "music")
+      preview = @music_disposition.export_preview(project_id: music.dig("project", "project_id"), candidate_id: music.dig("candidate", "candidate_id"))
+      if preview.fetch("ok") && preview.fetch("lifecycle_state") == "complete"
+        flow["lifecycle_state"] = "complete"
+        flow["stage"] = "exported"
+        @flow_store.write(flow)
+        destination = preview.dig("data", "export", "destination")
+        return result("The kept song is already exported#{destination ? " to #{destination}" : ''}. No duplicate files were created.", "creative_music_export_complete", flow)
+      end
+      return failure_result(preview.fetch("reason", "music export preview did not complete"), flow) unless preview.fetch("ok")
+      prepare_music_disposition_action(flow, "export", preview.fetch("data"))
+    end
+
+    def plan_music_rejection(flow)
+      return failure_result("music disposition service is unavailable", flow) unless @music_disposition
+      music = flow.dig("generated", "music")
+      preview = @music_disposition.reject_preview(project_id: music.dig("project", "project_id"), candidate_id: music.dig("candidate", "candidate_id"))
+      return failure_result(preview.fetch("reason", "music rejection preview did not complete"), flow) unless preview.fetch("ok")
+      prepare_music_disposition_action(flow, "reject", preview.fetch("data"))
+    end
+
+    def prepare_music_disposition_action(flow, kind, preview)
+      flow["disposition_action"] = {
+        "kind" => kind, "confirmation_phrase" => preview.fetch("confirmation_phrase"),
+        "downstream_digest" => preview.fetch("expected_digest"), "preview_scope" => preview.fetch("preview_scope")
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_music_disposition_action(flow, kind)
+      @flow_store.write(flow)
+      result(render_music_disposition(flow), "creative_music_#{kind}_ready", flow, actions: [flow.fetch("pending_action")])
+    end
+
+    def build_music_disposition_action(flow, kind)
+      { "action_id" => "creative_music_#{kind}", "operation" => "chats.creative.execute",
+        "label" => kind == "export" ? "Export exact finished song" : "Permanently remove rejected candidate",
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => kind == "export" ? "write_finished_song_export" : "permanent_candidate_delete" }
+    end
+
+    def render_music_disposition(flow)
+      action = flow.fetch("disposition_action")
+      scope = action.fetch("preview_scope")
+      if action.fetch("kind") == "export"
+        ["The kept candidate is ready for its exact local export gate.", "Destination: #{scope['destination']}",
+          "Files: #{Array(scope['files']).join(', ')}", "Overwrite: #{scope['overwrite'] ? 'allowed' : 'forbidden'}",
+          "External publication: #{scope['external_publication'] ? 'included' : 'not included'}", "",
+          "Clicking the action authorizes only this exact finished-song export."].join("\n")
+      else
+        ["The rejected candidate is ready for its separate permanent-deletion gate.",
+          "Deletes: #{Array(scope['deletes']).join(', ')}", "Retains: #{Array(scope['retains']).join(', ')}",
+          "Descendant candidates: #{Array(scope['descendant_candidate_ids']).join(', ').then { |value| value.empty? ? 'none' : value }}",
+          "External export deleted: #{scope['external_export_deleted'] ? 'yes' : 'no'}", "",
+          "Clicking the action authorizes only this exact candidate-owned deletion."].join("\n")
+      end
+    end
+
+    def execute_music_disposition(flow)
+      return domain("blocked_for_human_review", false, "music disposition service is unavailable") unless @music_disposition
+      stored = flow.fetch("disposition_action")
+      music = flow.dig("generated", "music")
+      attributes = {
+        project_id: music.dig("project", "project_id"), candidate_id: music.dig("candidate", "candidate_id"),
+        confirmation: stored.fetch("confirmation_phrase"), expected_digest: stored.fetch("downstream_digest")
+      }
+      outcome = if stored.fetch("kind") == "export"
+        @music_disposition.export_execute(**attributes)
+      else
+        @music_disposition.reject_execute(**attributes)
+      end
+      return outcome unless outcome.fetch("ok")
+
+      kind = stored.fetch("kind")
+      flow.delete("disposition_action")
+      flow["pending_action"] = nil
+      flow["lifecycle_state"] = "complete"
+      flow["stage"] = kind == "export" ? "exported" : "rejected"
+      flow["generated"].delete("music") if kind == "reject"
+      attachments = kind == "export" ? [music_attachment(music)] : []
+      content = if kind == "export"
+        "The kept song is exported locally to #{outcome.dig('data', 'export', 'destination')}. Nothing was uploaded or published."
+      else
+        "The rejected music candidate and its owned audio, input, analysis, and current review were deleted. Its small rejection receipt remains."
+      end
+      message = append_assistant(flow.fetch("chat_id"), content, flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_music_#{kind}"
+      @flow_store.write(flow)
+      domain("complete", true, "music #{kind} completed", data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, kind => outcome.fetch("data") }, mutation: outcome.fetch("mutation", "none"))
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "music disposition execution failed safely: #{error.class}")
+    end
+
+    def explicit_export_request?(message)
+      message.to_s.strip.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:export|finish|finalize|save)\b.*\b(?:song|track|candidate|music|it)\b/i)
+    end
+
+    def explicit_rejection_request?(message)
+      message.to_s.strip.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:delete|discard|purge|reject|remove)\b.*\b(?:song|track|candidate|music|it)\b/i)
+    end
 
     def plan_music_revision(flow, message, provider, progress)
       return nil unless music_revision_eligible?(flow) && explicit_revision_request?(message)
@@ -336,10 +466,18 @@ module SoulCore
         return append_terminal(flow, recorded, "Visual review could not be recorded") unless recorded.fetch("ok")
         mutations << "visual review"
       end
-      flow["lifecycle_state"] = review.values_at("music_disposition", "visual_disposition").include?("revise") ? "blocked_for_human_review" : "complete"
+      music_followup = music && !music["existing"] && %w[keep revise reject].include?(review["music_disposition"])
+      visual_followup = visual && !visual["existing"] && review["visual_disposition"] == "revise"
+      flow["lifecycle_state"] = music_followup || visual_followup ? "blocked_for_human_review" : "complete"
       flow["stage"] = "reviewed"
       flow["pending_action"] = nil
-      message = append_assistant(flow.fetch("chat_id"), "Recorded #{mutations.join(' and ')}. The candidates remain in their studio lineage.#{flow['lifecycle_state'] == 'complete' ? '' : ' Revision remains a separate, review-bounded next step.'}", flow, current_attachments(flow))
+      followup = case review["music_disposition"]
+      when "keep" then " Export remains a separate exact next step."
+      when "reject" then " Permanent removal remains a separate exact next step."
+      when "revise" then " Revision remains a separate, review-bounded next step."
+      else flow["lifecycle_state"] == "complete" ? "" : " A separate review-bounded next step remains."
+      end
+      message = append_assistant(flow.fetch("chat_id"), "Recorded #{mutations.join(' and ')}. The candidates remain in their studio lineage.#{followup}", flow, current_attachments(flow))
       flow["result_message_id"] = message.fetch("id")
       flow["last_action_id"] = "creative_review"
       @flow_store.write(flow)
@@ -539,7 +677,7 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "created_at", "updated_at")
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "disposition_action", "created_at", "updated_at")
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))

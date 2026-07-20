@@ -34,6 +34,8 @@ explicit request
 → visible Soul-drafted revision input
 → exact linked revision action
 → new authenticated audio candidate and another human review
+→ explicit kept-song export or rejected-candidate deletion request
+→ exact disposition preview and separate action
 ```
 
 The generation click is the authorization; the UI does not require retyping its prefilled confirmation phrase. A changed brief or stale digest is rejected. Repeating a completed action is idempotent and does not create duplicate candidates or reviews.
@@ -55,7 +57,9 @@ approval.
 
 ## Present boundary
 
-Candidate creation, review, and one reviewed music-revision loop are chat-native. Destructive rejection, visual guided revision, music/visual binding, full companion rendering, final audio export, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
+Candidate creation, review, a reviewed music-revision loop, kept-song export, and rejected-music-candidate deletion are chat-native. Export and rejection still reuse the exact Music Studio preview, digest, integrity, destination, receipt, and deletion protections. Recording `keep` does not export, and recording `reject` does not delete; an explicit request and separate action click are required.
+
+Visual guided revision/deletion, music/visual binding, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 
