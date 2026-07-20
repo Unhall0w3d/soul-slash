@@ -3,6 +3,7 @@
 require "json"
 require "securerandom"
 require_relative "conversation_provider_contract"
+require_relative "conversation_request_shape"
 
 module SoulCore
   class ConversationCreativePlanner
@@ -65,7 +66,9 @@ module SoulCore
 
     def explicit_request?(message)
       text = message.to_s
-      text.match?(ACTION_PATTERN) && (text.match?(MUSIC_PATTERN) || text.match?(VISUAL_PATTERN) || text.match?(VIDEO_PATTERN))
+      ConversationRequestShape.new.action_request?(text) &&
+        text.match?(ACTION_PATTERN) &&
+        (text.match?(MUSIC_PATTERN) || text.match?(VISUAL_PATTERN) || text.match?(VIDEO_PATTERN))
     end
 
     def cancel?(message) = message.to_s.match?(CANCEL_PATTERN)

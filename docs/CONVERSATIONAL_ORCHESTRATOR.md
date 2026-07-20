@@ -78,6 +78,17 @@ Tool selection requires subject-specific patterns or a mapped deterministic inte
 
 No tool use is a valid orchestration result.
 
+Invocation also requires a deterministic request shape. Soul distinguishes an
+action request, an informational question, a terse explicit request, and
+ordinary conversational context before domain-specific routing. Thus `I'm
+reviewing system status` remains conversation while `Check system status` runs
+the bounded collector. Asking whether an unavailable capability is supported
+returns declared capability information; only a task-shaped request to use it
+may enter the existing human-reviewed capability-gap lane.
+
+Request shape does not authorize an operation, select a model capability, or
+replace downstream validation and exact approval gates.
+
 ## Failure behavior
 
 If a deterministic skill succeeds but synthesis fails or violates grounding:

@@ -5,6 +5,7 @@ require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_followup_router"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
+require_relative "conversation_request_shape"
 require_relative "conversation_tool_catalog"
 require_relative "intent_router"
 
@@ -148,7 +149,9 @@ module SoulCore
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
       artifact_decision = @artifact_policy.classify(text)
+      request_shape = ConversationRequestShape.new.classify(text)
       flags = {
+        "request_shape" => request_shape.to_h,
         "memory_requested" => MEMORY_PATTERNS.any? { |pattern| text.match?(pattern) },
         "artifact_requested" => artifact_decision.artifact?,
         "artifact_decision" => artifact_decision.to_h,
@@ -166,7 +169,7 @@ module SoulCore
         )
       end
 
-      if RESEARCH_PATTERNS.any? { |pattern| text.match?(pattern) }
+      if request_shape.action_request? && RESEARCH_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "web_research",
           reason: "the request explicitly requires current public-web evidence before synthesis",
@@ -193,7 +196,7 @@ module SoulCore
         )
       end
 
-      if artifact_decision.required? || text.match?(ARTIFACT_REVISION_REQUEST)
+      if artifact_decision.required? || (request_shape.action_request? && text.match?(ARTIFACT_REVISION_REQUEST))
         return decision(
           kind: "artifact_creation_preview",
           reason: "an explicit artifact deliverable requires bounded preview before any file write",
@@ -247,7 +250,7 @@ module SoulCore
         )
       end
 
-      if CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+      if request_shape.request? && CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "deterministic_passthrough",
           reason: "approval, mutation, registry, or history control remains deterministic",

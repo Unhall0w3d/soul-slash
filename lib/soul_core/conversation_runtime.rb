@@ -29,6 +29,7 @@ module SoulCore
   class ConversationRuntime
     Contract = ConversationProviderContract
     EvidenceContract = ConversationEvidenceContract
+    EMPTY_RESPONSE_RETRY_LIMIT = 1
 
     Result = Struct.new(
       :content,
@@ -847,7 +848,7 @@ module SoulCore
         orchestration: decision
       )
       emit_progress(progress, "synthesizing", "The local model is shaping the response.")
-      response = provider_response(provider, request)
+      response, empty_response_retries = provider_response_with_empty_retry(provider, request, progress: progress)
 
       if response.success? && !response.content.to_s.strip.empty?
         emit_progress(progress, "reviewing", "Checking the response for capability gaps and review handoffs.")
@@ -893,6 +894,7 @@ module SoulCore
             "finish_reason" => response.finish_reason,
             "usage" => response.usage,
             "latency_ms" => response.latency_ms,
+            "empty_response_retries" => empty_response_retries,
             "response_truth_review" => {
               "valid" => truth_review.valid,
               "removed_unsupported_observations" => truth_review.removed,
@@ -906,7 +908,7 @@ module SoulCore
         )
       end
 
-      deterministic_fallback(
+      fallback = deterministic_fallback(
         chat_id: chat_id,
         message: text,
         reason: provider_error_reason(response),
@@ -914,6 +916,8 @@ module SoulCore
         context: context,
         decision: decision
       )
+      fallback.metadata["empty_response_retries"] = empty_response_retries
+      fallback
     end
 
     def build_request(chat_id:, provider:, context:, orchestration:, evidence: [])
@@ -1027,6 +1031,17 @@ module SoulCore
         request: request,
         timeout_seconds: float_env("SOUL_CONVERSATION_TIMEOUT_SECONDS", 120.0)
       )
+    end
+
+    def provider_response_with_empty_retry(provider, request, progress: nil)
+      response = provider_response(provider, request)
+      retries = 0
+      while response.success? && response.content.to_s.strip.empty? && retries < EMPTY_RESPONSE_RETRY_LIMIT
+        retries += 1
+        emit_progress(progress, "synthesizing", "The local model returned no text; retrying once in the foreground.")
+        response = provider_response(provider, request)
+      end
+      [response, retries]
     end
 
     def render_gap_intake(result)

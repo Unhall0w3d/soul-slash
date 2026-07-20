@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "conversation_request_shape"
+
 module SoulCore
   class ConversationArtifactDecisionPolicy
     Result = Struct.new(:mode, :reason, :signals, keyword_init: true) do
@@ -36,7 +38,11 @@ module SoulCore
       signals << "large_prompt" if text.length >= 1_200 || text.lines.length >= 20
 
       if signals.include?("creation_verb") && signals.include?("artifact_noun")
-        return result("artifact_required", "the user explicitly requested a deliverable", signals)
+        if ConversationRequestShape.new.action_request?(text)
+          return result("artifact_required", "the user explicitly requested a deliverable", signals)
+        end
+
+        return result("chat", "a deliverable was mentioned without an explicit creation request", signals)
       end
 
       if signals.include?("artifact_noun") && signals.include?("long_form_cue") && signals.include?("large_prompt")

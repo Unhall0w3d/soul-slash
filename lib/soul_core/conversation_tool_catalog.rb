@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "conversation_request_shape"
+
 module SoulCore
   class ConversationToolCatalog
     ToolDefinition = Struct.new(
@@ -126,6 +128,8 @@ module SoulCore
 
     def match(message)
       text = message.to_s
+      return [] unless ConversationRequestShape.new.request?(text)
+
       definitions.select { |tool| tool.matches?(text) }
     end
 

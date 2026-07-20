@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "conversation_request_shape"
+
 module SoulCore
   class ConversationCapabilityRegistry
     VALID_STATUSES = %w[available conditional unavailable].freeze
@@ -342,6 +344,7 @@ module SoulCore
     def resolve(message)
       text = message.to_s.strip
       return unmatched("the capability request is empty") if text.empty?
+      return unmatched("the capability was mentioned without an explicit request") unless ConversationRequestShape.new.request?(text)
 
       if CATALOG_PATTERNS.any? { |pattern| text.match?(pattern) }
         return Resolution.new(
@@ -355,10 +358,10 @@ module SoulCore
       capability = definitions.find { |definition| definition.matches?(text) }
       return unmatched("the message does not match a declared capability") unless capability
 
-      kind = if capability.unavailable?
-               "capability_gap"
-             elsif support_question?(text)
+      kind = if support_question?(text)
                "capability_info"
+             elsif capability.unavailable?
+               "capability_gap"
              else
                "available_action"
              end

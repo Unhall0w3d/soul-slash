@@ -1,6 +1,8 @@
 
 # frozen_string_literal: true
 
+require_relative "conversation_request_shape"
+
 module SoulCore
   class IntentRouter
     class Result
@@ -80,6 +82,9 @@ module SoulCore
       return unknown("The message is empty.") if text.empty?
 
       rule = RULES.find { |candidate| text.match?(candidate.fetch(:regex)) }
+      if rule && rule.fetch(:skill_id) && !ConversationRequestShape.new.request?(text)
+        return unknown("A capability was mentioned without an explicit request.")
+      end
       rule ? from_rule(rule) : unknown("No deterministic Phase 45+ rule matched this message.")
     end
 
