@@ -42,18 +42,26 @@ module SoulCore
 
       prior = @flow_store.active(chat_id)
       return nil unless prior || @planner.explicit_request?(message)
-      return plan_review(prior, message, provider, progress) if prior && prior["stage"] == "generated"
+      if prior && prior["stage"] == "generated"
+        binding = plan_companion_binding(prior, message)
+        return binding if binding
+        return plan_review(prior, message, provider, progress)
+      end
       if prior && prior["stage"] == "reviewed"
         followup = plan_music_post_review(prior, message, provider, progress)
         return followup if followup
         followup = plan_visual_revision(prior, message, provider, progress)
         return followup if followup
+        followup = plan_companion_binding(prior, message)
+        return followup if followup
         return nil unless @planner.explicit_request?(message)
 
-        prior["lifecycle_state"] = "complete"
-        prior["stage"] = "superseded"
-        prior["pending_action"] = nil
-        @flow_store.write(prior)
+        supersede(prior)
+        prior = nil
+      end
+      if prior && prior["stage"] == "bound"
+        return nil unless @planner.explicit_request?(message)
+        supersede(prior)
         prior = nil
       end
       progress&.call({ "state" => "planning", "summary" => "Shaping the creative brief without inventing required choices." })
@@ -112,6 +120,7 @@ module SoulCore
       return execute_review(flow) if action.fetch("action_id") == "creative_review"
       return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
       return execute_visual_revision(flow, progress) if action.fetch("action_id") == "creative_visual_revision"
+      return execute_companion_binding(flow) if action.fetch("action_id") == "creative_companion_bind"
       return execute_music_disposition(flow) if %w[creative_music_export creative_music_reject].include?(action.fetch("action_id"))
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
@@ -176,6 +185,103 @@ module SoulCore
       return result("That candidate is recorded as rejected, so export is unavailable until its review changes.", "creative_music_disposition_mismatch", flow) if disposition == "reject" && explicit_export_request?(message)
 
       nil
+    end
+
+    def plan_companion_binding(flow, message)
+      return nil unless companion_binding_eligible?(flow) && explicit_binding_request?(message)
+
+      music = flow.dig("generated", "music")
+      visual = flow.dig("generated", "visual")
+      preview = @visual_studio.promotion_preview(
+        project_id: visual.dig("project", "project_id"), candidate_id: visual.dig("candidate", "candidate_id"),
+        music_project_id: music.dig("project", "project_id"), music_candidate_id: music.dig("candidate", "candidate_id")
+      )
+      return failure_result(preview.fetch("reason", "companion binding preview did not complete"), flow) unless preview.fetch("ok")
+      if preview.fetch("lifecycle_state") == "complete"
+        flow["generated"]["companion"] = preview.dig("data", "visual")
+        flow["stage"] = "bound"
+        flow["lifecycle_state"] = "blocked_for_human_review"
+        flow["pending_action"] = nil
+        @flow_store.write(flow)
+        return result("That exact image is already bound to the selected song. No duplicate copy was created; static presentation remains a separate step.", "creative_companion_bound", flow)
+      end
+
+      gate = preview.fetch("data")
+      flow["companion_action"] = {
+        "confirmation_phrase" => gate.fetch("confirmation_phrase"), "downstream_digest" => gate.fetch("expected_digest"),
+        "preview_scope" => gate.fetch("preview_scope")
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_companion_binding_action(flow)
+      @flow_store.write(flow)
+      result(render_companion_binding(flow), "creative_companion_binding_ready", flow, actions: [flow.fetch("pending_action")])
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("companion binding planning failed safely: #{error.class}", flow)
+    end
+
+    def companion_binding_eligible?(flow)
+      music = flow.dig("generated", "music")
+      visual = flow.dig("generated", "visual")
+      return false unless music && visual
+      music_kept = music["existing"] || flow.dig("review_draft", "music_disposition") == "keep"
+      visual_kept = visual["existing"] || flow.dig("review_draft", "visual_disposition") == "keep"
+      music_kept && visual_kept
+    end
+
+    def explicit_binding_request?(message)
+      text = message.to_s.strip
+      text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:bind|attach|connect|link|pair|use)\b.*\b(?:them|together|music|song|track|visual|image|picture|art|artwork|companion|candidate)\b/i)
+    end
+
+    def build_companion_binding_action(flow)
+      { "action_id" => "creative_companion_bind", "operation" => "chats.creative.execute", "label" => "Bind exact reviewed visual to song",
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => "copy_reviewed_visual_into_music_lineage" }
+    end
+
+    def render_companion_binding(flow)
+      scope = flow.dig("companion_action", "preview_scope")
+      [
+        "The reviewed song and image are ready for one exact lineage binding.", "",
+        "Music: #{flow.dig('generated', 'music', 'project', 'title')}",
+        "Music candidate: #{scope['candidate_id']}",
+        "Visual: #{flow.dig('generated', 'visual', 'project', 'title')}",
+        "Visual candidate: #{scope['source_visual_candidate_id']}",
+        "Bound visual identity: #{scope['visual_id']}",
+        "External publication: #{scope['external_publication'] ? 'included' : 'not included'}", "",
+        "Clicking the action authorizes only this exact source-preserving copy into the music candidate's visual lineage. It does not render or export a video."
+      ].join("\n")
+    end
+
+    def execute_companion_binding(flow)
+      stored = flow.fetch("companion_action")
+      music = flow.dig("generated", "music")
+      visual = flow.dig("generated", "visual")
+      outcome = @visual_studio.promotion_execute(
+        project_id: visual.dig("project", "project_id"), candidate_id: visual.dig("candidate", "candidate_id"),
+        music_project_id: music.dig("project", "project_id"), music_candidate_id: music.dig("candidate", "candidate_id"),
+        confirmation: stored.fetch("confirmation_phrase"), expected_digest: stored.fetch("downstream_digest")
+      )
+      return outcome unless outcome.fetch("ok")
+
+      flow["generated"]["companion"] = outcome.dig("data", "visual")
+      flow.delete("companion_action")
+      flow["pending_action"] = nil
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "bound"
+      attachments = current_attachments(flow)
+      message = append_assistant(flow.fetch("chat_id"), "The exact reviewed image is now bound to the song's visual lineage. No video was rendered or exported; static presentation remains a separate reviewed step.", flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_companion_bind"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "reviewed visual bound to music candidate; presentation review remains",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, "companion" => outcome.dig("data", "visual") }, mutation: "music_visual_bound")
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "companion binding failed safely: #{error.class}")
     end
 
     def plan_music_export(flow)
@@ -578,7 +684,8 @@ module SoulCore
       end
       music_followup = music && !music["existing"] && %w[keep revise reject].include?(review["music_disposition"])
       visual_followup = visual && !visual["existing"] && review["visual_disposition"] == "revise"
-      flow["lifecycle_state"] = music_followup || visual_followup ? "blocked_for_human_review" : "complete"
+      companion_followup = companion_binding_eligible?(flow)
+      flow["lifecycle_state"] = music_followup || visual_followup || companion_followup ? "blocked_for_human_review" : "complete"
       flow["stage"] = "reviewed"
       flow["pending_action"] = nil
       followup = case review["music_disposition"]
@@ -587,6 +694,7 @@ module SoulCore
       when "revise" then " Revision remains a separate, review-bounded next step."
       else flow["lifecycle_state"] == "complete" ? "" : " A separate review-bounded next step remains."
       end
+      followup += " Exact companion binding remains a separate next step." if companion_followup
       message = append_assistant(flow.fetch("chat_id"), "Recorded #{mutations.join(' and ')}. The candidates remain in their studio lineage.#{followup}", flow, current_attachments(flow))
       flow["result_message_id"] = message.fetch("id")
       flow["last_action_id"] = "creative_review"
@@ -599,6 +707,13 @@ module SoulCore
       { "schema_version" => ConversationCreativeFlowStore::SCHEMA, "flow_id" => "creative_#{SecureRandom.hex(8)}", "chat_id" => chat_id,
         "kind" => kind, "stage" => "brief", "lifecycle_state" => "awaiting_input", "plan" => {}, "missing_required" => [],
         "pending_action" => nil, "generated" => {}, "created_at" => now, "updated_at" => now }
+    end
+
+    def supersede(flow)
+      flow["lifecycle_state"] = "complete"
+      flow["stage"] = "superseded"
+      flow["pending_action"] = nil
+      @flow_store.write(flow)
     end
 
     def build_action(flow)
@@ -787,7 +902,7 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "created_at", "updated_at")
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "companion_action", "created_at", "updated_at")
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))

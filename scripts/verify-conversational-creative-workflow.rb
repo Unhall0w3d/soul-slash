@@ -59,8 +59,9 @@ class FakeReviewPlanner
 end
 
 class FakeMusic
+  attr_accessor :listed_projects
   attr_reader :created, :reviews, :revisions
-  def initialize = (@created = []; @reviews = []; @revisions = [])
+  def initialize = (@created = []; @reviews = []; @revisions = []; @listed_projects = [])
   def create_project(attributes)
     @created << attributes
     ok("project" => attributes.merge("project_id" => "music_1111111111111111"))
@@ -71,7 +72,7 @@ class FakeMusic
     @reviews << review.merge("project_id" => project_id, "candidate_id" => candidate_id)
     ok("review" => review)
   end
-  def list_projects(limit:) = ok("projects" => [])
+  def list_projects(limit:) = ok("projects" => @listed_projects)
   def inspect_project(project_id:)
     project = @created.last.merge("project_id" => project_id)
     review = @reviews.reverse.find { |item| item["candidate_id"] == "candidate_2222222222222222" }
@@ -156,8 +157,9 @@ class FakeMusicDisposition
 end
 
 class FakeVisual
-  attr_reader :created, :reviews, :edits
-  def initialize = (@created = []; @reviews = []; @edits = [])
+  attr_accessor :listed_projects
+  attr_reader :created, :reviews, :edits, :bindings, :binding_previews
+  def initialize = (@created = []; @reviews = []; @edits = []; @bindings = []; @binding_previews = []; @listed_projects = [])
   def create(attributes)
     @created << attributes
     ok("project" => attributes.merge("project_id" => "visual_project_3333333333333333", "candidates" => []))
@@ -168,7 +170,7 @@ class FakeVisual
     @reviews << review.merge("project_id" => project_id, "candidate_id" => candidate_id)
     ok("review" => review)
   end
-  def list(limit:) = ok("projects" => [])
+  def list(limit:) = ok("projects" => @listed_projects)
   def inspect(project_id:)
     project = @created.last.merge("project_id" => project_id)
     candidates = ["visual_candidate_4444444444444444", "visual_candidate_6666666666666666"].filter_map do |candidate_id|
@@ -185,6 +187,18 @@ class FakeVisual
   def edit_execute(**attributes)
     @edits << attributes
     ok("candidate" => { "candidate_id" => "visual_candidate_6666666666666666", "kind" => "image_edit", "source_candidate_id" => attributes.fetch(:source_candidate_id), "seed" => attributes.fetch(:seed) })
+  end
+  def promotion_preview(project_id:, candidate_id:, music_project_id:, music_candidate_id:)
+    @binding_previews << { project_id: project_id, candidate_id: candidate_id, music_project_id: music_project_id, music_candidate_id: music_candidate_id }
+    ok("confirmation_phrase" => "BIND_VISUAL_COMPANION", "expected_digest" => "7" * 64, "preview_scope" => {
+      "operation" => "bind_visual_studio_candidate", "project_id" => music_project_id, "candidate_id" => music_candidate_id,
+      "source_visual_project_id" => project_id, "source_visual_candidate_id" => candidate_id,
+      "visual_id" => "visual_7777777777777777", "external_publication" => false
+    })
+  end
+  def promotion_execute(**attributes)
+    @bindings << attributes
+    ok("visual" => { "visual_id" => "visual_7777777777777777", "stage" => "base_bound", "human_review_required" => true })
   end
   private
   def ok(data) = { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "ok", "data" => data, "mutation" => "test" }
@@ -299,6 +313,66 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   export_replay = service.execute(chat_id: chat.fetch("id"), flow_id: export_action.fetch("flow_id"), action_id: export_action.fetch("action_id"),
     confirmation: export_action.fetch("confirmation_phrase"), expected_digest: export_action.fetch("expected_digest"))
   checks["export_action_is_idempotent"] = export_replay.dig("data", "idempotent_replay") == true && music_disposition.export_executions.one?
+
+  binding_chat = store.create_chat
+  planner.plan = plan
+  review_planner.music_disposition = "keep"
+  review_planner.visual_disposition = "keep"
+  binding_ready = service.plan(chat_id: binding_chat.fetch("id"), message: "Make a song and image", provider: Object.new)
+  binding_generation = binding_ready.dig("metadata", "actions", 0)
+  service.execute(chat_id: binding_chat.fetch("id"), flow_id: binding_generation.fetch("flow_id"), action_id: binding_generation.fetch("action_id"),
+    confirmation: binding_generation.fetch("confirmation_phrase"), expected_digest: binding_generation.fetch("expected_digest"))
+  binding_review = service.plan(chat_id: binding_chat.fetch("id"), message: "Keep both candidates. They belong together.", provider: Object.new)
+  binding_review_action = binding_review.dig("metadata", "actions", 0)
+  service.execute(chat_id: binding_chat.fetch("id"), flow_id: binding_review_action.fetch("flow_id"), action_id: binding_review_action.fetch("action_id"),
+    confirmation: binding_review_action.fetch("confirmation_phrase"), expected_digest: binding_review_action.fetch("expected_digest"))
+  checks["binding_discussion_does_not_prepare_or_execute"] = service.plan(chat_id: binding_chat.fetch("id"), message: "Binding visuals to music is useful.", provider: Object.new).nil? && visual.bindings.empty?
+  binding_proposed = service.plan(chat_id: binding_chat.fetch("id"), message: "Bind them together.", provider: Object.new)
+  binding_action = binding_proposed.dig("metadata", "actions", 0)
+  checks["kept_candidates_prepare_exact_binding_action"] = binding_proposed["mode"] == "creative_companion_binding_ready" &&
+    binding_action["action_id"] == "creative_companion_bind" && binding_proposed["content"].include?("External publication: not included")
+  stale_binding = service.execute(chat_id: binding_chat.fetch("id"), flow_id: binding_action.fetch("flow_id"), action_id: binding_action.fetch("action_id"),
+    confirmation: binding_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
+  checks["stale_binding_mutates_nothing"] = !stale_binding["ok"] && visual.bindings.empty?
+  bound = service.execute(chat_id: binding_chat.fetch("id"), flow_id: binding_action.fetch("flow_id"), action_id: binding_action.fetch("action_id"),
+    confirmation: binding_action.fetch("confirmation_phrase"), expected_digest: binding_action.fetch("expected_digest"))
+  checks["exact_binding_preserves_source_identities_without_render"] = bound["ok"] && bound.dig("data", "flow", "stage") == "bound" &&
+    bound.dig("data", "companion", "stage") == "base_bound" && visual.bindings.one? &&
+    visual.bindings.first.values_at(:project_id, :candidate_id, :music_project_id, :music_candidate_id) == [
+      "visual_project_3333333333333333", "visual_candidate_4444444444444444", "music_1111111111111111", "candidate_2222222222222222"
+    ]
+  binding_replay = service.execute(chat_id: binding_chat.fetch("id"), flow_id: binding_action.fetch("flow_id"), action_id: binding_action.fetch("action_id"),
+    confirmation: binding_action.fetch("confirmation_phrase"), expected_digest: binding_action.fetch("expected_digest"))
+  checks["binding_action_is_idempotent"] = binding_replay.dig("data", "idempotent_replay") == true && visual.bindings.one?
+
+  existing_chat = store.create_chat
+  music.listed_projects = [{ "project_id" => "music_1111111111111111", "title" => "Archive Song" }]
+  visual.listed_projects = [{ "project_id" => "visual_project_3333333333333333", "title" => "Archive Image" }]
+  planner.plan = plan.merge("existing_music_title" => "Archive Song", "existing_visual_title" => "Archive Image")
+  existing_ready = service.plan(chat_id: existing_chat.fetch("id"), message: "Create a companion from the existing song and image", provider: Object.new)
+  existing_action = existing_ready.dig("metadata", "actions", 0)
+  existing_generated = service.execute(chat_id: existing_chat.fetch("id"), flow_id: existing_action.fetch("flow_id"), action_id: existing_action.fetch("action_id"),
+    confirmation: existing_action.fetch("confirmation_phrase"), expected_digest: existing_action.fetch("expected_digest"))
+  existing_binding = service.plan(chat_id: existing_chat.fetch("id"), message: "Bind the existing song and image.", provider: Object.new)
+  checks["exact_existing_kept_sources_can_reach_binding_without_rereview"] = existing_generated["ok"] &&
+    existing_generated.dig("data", "flow", "generated", "music", "existing") && existing_generated.dig("data", "flow", "generated", "visual", "existing") &&
+    existing_binding["mode"] == "creative_companion_binding_ready"
+
+  ineligible_chat = store.create_chat
+  planner.plan = plan
+  review_planner.music_disposition = "reject"
+  review_planner.visual_disposition = "keep"
+  ineligible_ready = service.plan(chat_id: ineligible_chat.fetch("id"), message: "Make a song and image", provider: Object.new)
+  ineligible_generation = ineligible_ready.dig("metadata", "actions", 0)
+  service.execute(chat_id: ineligible_chat.fetch("id"), flow_id: ineligible_generation.fetch("flow_id"), action_id: ineligible_generation.fetch("action_id"),
+    confirmation: ineligible_generation.fetch("confirmation_phrase"), expected_digest: ineligible_generation.fetch("expected_digest"))
+  ineligible_review = service.plan(chat_id: ineligible_chat.fetch("id"), message: "Reject the song and keep the image.", provider: Object.new)
+  ineligible_review_action = ineligible_review.dig("metadata", "actions", 0)
+  service.execute(chat_id: ineligible_chat.fetch("id"), flow_id: ineligible_review_action.fetch("flow_id"), action_id: ineligible_review_action.fetch("action_id"),
+    confirmation: ineligible_review_action.fetch("confirmation_phrase"), expected_digest: ineligible_review_action.fetch("expected_digest"))
+  previews_before_ineligible_request = visual.binding_previews.length
+  checks["rejected_candidate_cannot_prepare_companion_binding"] = service.plan(chat_id: ineligible_chat.fetch("id"), message: "Bind them together.", provider: Object.new).nil? &&
+    visual.binding_previews.length == previews_before_ineligible_request
 
   second = store.create_chat
   planner.plan = plan(kind: "music", supplied: %w[duration_seconds vocal_mode rights_status])

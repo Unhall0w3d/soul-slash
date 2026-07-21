@@ -55,7 +55,7 @@ skills:
     internal_handler: conversation_creative_workflow
     category: creative_studios
     status: partial
-    description: Coordinate reviewed music and visual candidates, including new or existing sources, then advance explicit binding, static companion rendering, export, and local upload-package gates.
+    description: Coordinate reviewed music and visual candidates, including new or existing sources, and advance one exact chat-native lineage binding; static presentation, rendering, export, and upload-package gates remain separate Studio steps.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW

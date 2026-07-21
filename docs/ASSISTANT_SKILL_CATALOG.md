@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-20T21:49:28-04:00
+Generated: 2026-07-20T22:30:56-04:00
 
 Source registry:
 
@@ -118,7 +118,7 @@ risk: approval_required
 confirmation_required: true
 ```
 
-Coordinate reviewed music and visual candidates, including new or existing sources, then advance explicit binding, static companion rendering, export, and local upload-package gates.
+Coordinate reviewed music and visual candidates, including new or existing sources, and advance one exact chat-native lineage binding; static presentation, rendering, export, and upload-package gates remain separate Studio steps.
 
 Example ways the owner might ask for this:
 

@@ -34,6 +34,9 @@ explicit request
 → visible Soul-drafted revision input
 → exact linked revision action
 → new authenticated audio or image candidate and another human review
+→ explicit request to bind one kept image to one kept song
+→ exact source-preserving companion-binding action
+→ bound base image in the music candidate's visual lineage
 → explicit kept-song export or rejected-candidate deletion request
 → exact disposition preview and separate action
 ```
@@ -69,9 +72,9 @@ or image to select the intended bounded path.
 
 ## Present boundary
 
-Candidate creation, review, reviewed music and visual revision loops, kept-song export, and rejected-music-candidate deletion are chat-native. Export and rejection still reuse the exact Music Studio preview, digest, integrity, destination, receipt, and deletion protections. Recording `keep` does not export, and recording `reject` does not delete; an explicit request and separate action click are required.
+Candidate creation, review, reviewed music and visual revision loops, exact companion binding, kept-song export, and rejected-music-candidate deletion are chat-native. Binding accepts newly generated candidates only after both have recorded `keep` reviews; exact existing sources already resolve only to kept candidates. It reuses Visual Studio's promotion preview and execution digest, copies the immutable still into the exact Music candidate's visual lineage, and stops at `base_bound`. Recording `keep` does not bind or export, and recording `reject` does not delete; each mutation requires an explicit request and separate action click.
 
-Visual deletion, music/visual binding, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
+Visual deletion, static-presentation encoding and review, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 
