@@ -33,7 +33,7 @@ explicit request
 → explicit revision request when disposition is revise
 → visible Soul-drafted revision input
 → exact linked revision action
-→ new authenticated audio candidate and another human review
+→ new authenticated audio or image candidate and another human review
 → explicit kept-song export or rejected-candidate deletion request
 → exact disposition preview and separate action
 ```
@@ -55,11 +55,23 @@ Mentioning revision does not draft or execute it. Soul cannot alter the four
 required project decisions, rewrite intended lyrics, or treat its draft as
 approval.
 
+When a recorded visual review says `revise`, the same conversational boundary
+applies. Soul translates the stored human notes and source-project metadata
+through the configured local provider into one visible image-guided edit
+instruction, seed, and rationale. Soul does not claim to see the source pixels.
+Only the exact action passes the immutable source image and reviewed instruction
+to Visual Studio's existing guided-edit preview and execution path. The linked
+image returns to Chat and re-enters the keep-or-revise review loop.
+
+If a combined workflow has both music and visual candidates marked `revise`, a
+generic request such as `revise it` does not guess. The Operator names the song
+or image to select the intended bounded path.
+
 ## Present boundary
 
-Candidate creation, review, a reviewed music-revision loop, kept-song export, and rejected-music-candidate deletion are chat-native. Export and rejection still reuse the exact Music Studio preview, digest, integrity, destination, receipt, and deletion protections. Recording `keep` does not export, and recording `reject` does not delete; an explicit request and separate action click are required.
+Candidate creation, review, reviewed music and visual revision loops, kept-song export, and rejected-music-candidate deletion are chat-native. Export and rejection still reuse the exact Music Studio preview, digest, integrity, destination, receipt, and deletion protections. Recording `keep` does not export, and recording `reject` does not delete; an explicit request and separate action click are required.
 
-Visual guided revision/deletion, music/visual binding, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
+Visual deletion, music/visual binding, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 

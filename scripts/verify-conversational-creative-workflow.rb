@@ -40,16 +40,19 @@ class FakeCore
 end
 
 class FakeReviewPlanner
-  attr_accessor :music_disposition
-  def initialize(music_disposition: "keep") = (@music_disposition = music_disposition)
+  attr_accessor :music_disposition, :visual_disposition
+  def initialize(music_disposition: "keep", visual_disposition: "keep")
+    @music_disposition = music_disposition
+    @visual_disposition = visual_disposition
+  end
   def draft(**)
     { "ok" => true, "review" => {
       "related" => true, "music_disposition" => @music_disposition, "music_rating" => 4,
       "musical_quality" => "passed", "prompt_adherence" => "partial",
       "vocal_adherence" => "passed", "lyric_adherence" => "passed",
       "music_notes" => "The groove is coherent; the brass payoff arrives a little late.",
-      "visual_disposition" => "keep", "visual_rating" => 5,
-      "visual_notes" => "The image carries the intended poised, luminous atmosphere.",
+      "visual_disposition" => @visual_disposition, "visual_rating" => 5,
+      "visual_notes" => "Preserve the poised figure and cerulean light, but deepen the surrounding void and add distant suspended architecture.",
       "next_question" => ""
     } }
   end
@@ -109,6 +112,19 @@ class FakeRevisionDrafter
   end
 end
 
+class FakeVisualRevisionDrafter
+  attr_reader :calls
+  def initialize = (@calls = [])
+  def draft(**attributes)
+    @calls << attributes
+    { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "drafted", "data" => {
+      "instruction" => "Preserve the poised figure and cerulean illumination while deepening the surrounding abyss and adding subtle distant suspended architecture without text or symbols.",
+      "seed" => 424_242, "rationale" => "The edit retains the successful subject and palette while applying the Operator's requested environmental depth.",
+      "packet_digest" => "9" * 64
+    } }
+  end
+end
+
 class FakeMusicDisposition
   attr_reader :export_executions, :reject_executions
   def initialize = (@export_executions = []; @reject_executions = [])
@@ -140,8 +156,8 @@ class FakeMusicDisposition
 end
 
 class FakeVisual
-  attr_reader :created, :reviews
-  def initialize = (@created = []; @reviews = [])
+  attr_reader :created, :reviews, :edits
+  def initialize = (@created = []; @reviews = []; @edits = [])
   def create(attributes)
     @created << attributes
     ok("project" => attributes.merge("project_id" => "visual_project_3333333333333333", "candidates" => []))
@@ -153,6 +169,23 @@ class FakeVisual
     ok("review" => review)
   end
   def list(limit:) = ok("projects" => [])
+  def inspect(project_id:)
+    project = @created.last.merge("project_id" => project_id)
+    candidates = ["visual_candidate_4444444444444444", "visual_candidate_6666666666666666"].filter_map do |candidate_id|
+      next if candidate_id.end_with?("6666666666666666") && @edits.empty?
+      review = @reviews.reverse.find { |item| item["candidate_id"] == candidate_id }
+      { "candidate_id" => candidate_id, "kind" => candidate_id.end_with?("6666666666666666") ? "image_edit" : "text_to_image", "seed" => 84, "review" => review }
+    end
+    ok("project" => project.merge("candidates" => candidates))
+  end
+  def edit_preview(project_id:, source_candidate_id:, instruction:, seed:)
+    @edit_preview = { "project_id" => project_id, "source_candidate_id" => source_candidate_id, "instruction" => instruction, "seed" => seed }
+    ok("candidate_id" => "visual_candidate_6666666666666666", "confirmation_phrase" => "GENERATE_VISUAL_EDIT", "expected_digest" => "8" * 64)
+  end
+  def edit_execute(**attributes)
+    @edits << attributes
+    ok("candidate" => { "candidate_id" => "visual_candidate_6666666666666666", "kind" => "image_edit", "source_candidate_id" => attributes.fetch(:source_candidate_id), "seed" => attributes.fetch(:seed) })
+  end
   private
   def ok(data) = { "ok" => true, "lifecycle_state" => "blocked_for_human_review", "reason" => "ok", "data" => data, "mutation" => "test" }
 end
@@ -215,10 +248,12 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   core = FakeCore.new; music = FakeMusic.new; visual = FakeVisual.new
   review_planner = FakeReviewPlanner.new
   revision_drafter = FakeRevisionDrafter.new
+  visual_revision_drafter = FakeVisualRevisionDrafter.new
   music_disposition = FakeMusicDisposition.new
   service = SoulCore::ConversationCreativeWorkflowService.new(root: root, chat_store: store, provider_client: Object.new,
     music_generation: music, visual_studio: visual, core_orchestration: core, planner: planner,
-    review_planner: review_planner, revision_drafter: revision_drafter, music_disposition: music_disposition)
+    review_planner: review_planner, revision_drafter: revision_drafter, visual_revision_drafter: visual_revision_drafter,
+    music_disposition: music_disposition)
 
   checks["mention_is_not_initial_invocation"] = service.candidate_message?(chat_id: chat.fetch("id"), message: "I am working on music skills") == false
   ready = service.plan(chat_id: chat.fetch("id"), message: "Make a song and image", provider: Object.new)
@@ -249,6 +284,7 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   reviewed_replay = service.execute(chat_id: chat.fetch("id"), flow_id: review_action.fetch("flow_id"), action_id: review_action.fetch("action_id"),
     confirmation: review_action.fetch("confirmation_phrase"), expected_digest: review_action.fetch("expected_digest"))
   checks["review_execution_is_idempotent"] = reviewed_replay.dig("data", "idempotent_replay") == true && music.reviews.one? && visual.reviews.one?
+  checks["kept_visual_does_not_offer_revision"] = service.plan(chat_id: chat.fetch("id"), message: "Draft the visual revision.", provider: Object.new).nil? && visual_revision_drafter.calls.empty?
 
   checks["export_discussion_does_not_prepare_or_execute"] = service.plan(chat_id: chat.fetch("id"), message: "Export seems useful for finished work later.", provider: Object.new).nil? && music_disposition.export_executions.empty?
   export_ready = service.plan(chat_id: chat.fetch("id"), message: "Export the kept song.", provider: Object.new)
@@ -280,7 +316,32 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
     confirmation: visual_action.fetch("confirmation_phrase"), expected_digest: visual_action.fetch("expected_digest"))
   checks["visual_only_uses_amd_free_core"] = visual_result["ok"] && core.active == "amd-free"
 
+  review_planner.visual_disposition = "revise"
+  visual_review = service.plan(chat_id: visual_chat.fetch("id"), message: "Revise the image. Preserve the figure, but deepen the void and add distant architecture.", provider: Object.new)
+  visual_review_action = visual_review.dig("metadata", "actions", 0)
+  visual_recorded = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_review_action.fetch("flow_id"), action_id: visual_review_action.fetch("action_id"),
+    confirmation: visual_review_action.fetch("confirmation_phrase"), expected_digest: visual_review_action.fetch("expected_digest"))
+  checks["visual_revise_review_keeps_flow_active"] = visual_recorded["ok"] && visual_recorded["lifecycle_state"] == "blocked_for_human_review"
+  checks["visual_revision_discussion_does_not_draft_or_execute"] = service.plan(chat_id: visual_chat.fetch("id"), message: "Visual revision is useful when an image is close.", provider: Object.new).nil? && visual_revision_drafter.calls.empty? && visual.edits.empty?
+  visual_proposed = service.plan(chat_id: visual_chat.fetch("id"), message: "Draft the visual revision and let me review it.", provider: Object.new)
+  visual_revision_action = visual_proposed.dig("metadata", "actions", 0)
+  checks["explicit_visual_revision_returns_visible_exact_action"] = visual_proposed["mode"] == "creative_visual_revision_ready" &&
+    visual_revision_action["action_id"] == "creative_visual_revision" && visual_proposed["content"].include?("Source candidate: visual_candidate_4444444444444444") &&
+    visual_proposed["content"].include?("Seed: 424242")
+  stale_visual_revision = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_revision_action.fetch("flow_id"), action_id: visual_revision_action.fetch("action_id"),
+    confirmation: visual_revision_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
+  checks["stale_visual_revision_mutates_nothing"] = !stale_visual_revision["ok"] && visual.edits.empty?
+  visual_revised = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_revision_action.fetch("flow_id"), action_id: visual_revision_action.fetch("action_id"),
+    confirmation: visual_revision_action.fetch("confirmation_phrase"), expected_digest: visual_revision_action.fetch("expected_digest"))
+  checks["exact_visual_revision_returns_linked_image"] = visual_revised["ok"] && visual_revised["lifecycle_state"] == "blocked_for_human_review" &&
+    visual_revised.dig("data", "attachments", 0, "candidate_id") == "visual_candidate_6666666666666666" && visual.edits.one? &&
+    visual.edits.first.fetch(:source_candidate_id) == "visual_candidate_4444444444444444"
+  visual_revision_replay = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_revision_action.fetch("flow_id"), action_id: visual_revision_action.fetch("action_id"),
+    confirmation: visual_revision_action.fetch("confirmation_phrase"), expected_digest: visual_revision_action.fetch("expected_digest"))
+  checks["visual_revision_action_is_idempotent"] = visual_revision_replay.dig("data", "idempotent_replay") == true && visual.edits.one?
+
   revision_chat = store.create_chat
+  review_planner.visual_disposition = "keep"
   planner.plan = plan(kind: "music", supplied: %w[music_intent duration_seconds vocal_mode rights_status])
   review_planner.music_disposition = "revise"
   revision_ready = service.plan(chat_id: revision_chat.fetch("id"), message: "Create a song", provider: Object.new)

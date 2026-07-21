@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-19T23:23:11-04:00
+Generated: 2026-07-20T21:49:28-04:00
 
 Source registry:
 
@@ -154,7 +154,7 @@ risk: approval_required
 confirmation_required: true
 ```
 
-Gather or draft a visual brief through chat and advance one bounded Core-aware local still generation with an exact human action gate and authenticated image result.
+Gather or draft a visual brief through chat, generate and review a local still, and translate a recorded revise review into one exact source-preserving guided edit with an authenticated image result.
 
 Example ways the owner might ask for this:
 

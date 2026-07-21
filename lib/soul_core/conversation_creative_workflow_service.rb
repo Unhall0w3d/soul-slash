@@ -7,13 +7,14 @@ require "time"
 require_relative "conversation_creative_flow_store"
 require_relative "conversation_creative_planner"
 require_relative "conversation_creative_review_planner"
+require_relative "conversation_visual_revision_planner"
 require_relative "music_revision_draft_service"
 
 module SoulCore
   class ConversationCreativeWorkflowService
     EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
 
-    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, clock: -> { Time.now.utc })
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @chat_store = chat_store
       @music_generation = music_generation
@@ -24,6 +25,7 @@ module SoulCore
       @planner = planner || ConversationCreativePlanner.new(provider_client: provider_client)
       @review_planner = review_planner || ConversationCreativeReviewPlanner.new(provider_client: provider_client)
       @revision_drafter = revision_drafter || MusicRevisionDraftService.new(provider_client: provider_client)
+      @visual_revision_drafter = visual_revision_drafter || ConversationVisualRevisionPlanner.new(provider_client: provider_client)
       @clock = clock
     end
 
@@ -43,6 +45,8 @@ module SoulCore
       return plan_review(prior, message, provider, progress) if prior && prior["stage"] == "generated"
       if prior && prior["stage"] == "reviewed"
         followup = plan_music_post_review(prior, message, provider, progress)
+        return followup if followup
+        followup = plan_visual_revision(prior, message, provider, progress)
         return followup if followup
         return nil unless @planner.explicit_request?(message)
 
@@ -107,6 +111,7 @@ module SoulCore
 
       return execute_review(flow) if action.fetch("action_id") == "creative_review"
       return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
+      return execute_visual_revision(flow, progress) if action.fetch("action_id") == "creative_visual_revision"
       return execute_music_disposition(flow) if %w[creative_music_export creative_music_reject].include?(action.fetch("action_id"))
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
@@ -278,7 +283,7 @@ module SoulCore
     end
 
     def plan_music_revision(flow, message, provider, progress)
-      return nil unless music_revision_eligible?(flow) && explicit_revision_request?(message)
+      return nil unless music_revision_eligible?(flow) && explicit_music_revision_request?(flow, message)
 
       progress&.call({ "state" => "planning", "summary" => "Translating the recorded review into one bounded music revision." })
       music = flow.dig("generated", "music")
@@ -318,8 +323,15 @@ module SoulCore
 
     def explicit_revision_request?(message)
       text = message.to_s.strip
-      text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:draft|generate|make|produce|retry|revise|start|try)\b.*\b(?:revision|revised|candidate|song|track|it|again)\b/i) ||
+      text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:draft|edit|generate|make|produce|retry|revise|start|try)\b.*\b(?:revision|revised|candidate|song|track|visual|image|picture|artwork|it|again)\b/i) ||
         text.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?let(?:'s| us)\s+(?:revise|retry|try\s+again|generate\s+(?:the\s+)?revision)\b/i)
+    end
+
+    def explicit_music_revision_request?(flow, message)
+      return false unless explicit_revision_request?(message)
+      text = message.to_s
+      return true if text.match?(/\b(?:music|song|track|audio)\b/i)
+      !visual_revision_eligible?(flow)
     end
 
     def build_music_revision_action(flow)
@@ -384,6 +396,104 @@ module SoulCore
       domain("awaiting_input", false, error.message)
     rescue StandardError => error
       domain("failed", false, "music revision execution failed safely: #{error.class}")
+    end
+
+    def plan_visual_revision(flow, message, provider, progress)
+      return nil unless visual_revision_eligible?(flow) && explicit_visual_revision_request?(flow, message)
+
+      progress&.call({ "state" => "planning", "summary" => "Translating the recorded visual review into one bounded guided edit." })
+      visual = flow.dig("generated", "visual")
+      inspected = @visual_studio.inspect(project_id: visual.dig("project", "project_id"))
+      return failure_result(inspected.fetch("reason", "visual project could not be inspected"), flow) unless inspected.fetch("ok")
+      project = inspected.dig("data", "project")
+      candidate = Array(project["candidates"]).find { |item| item["candidate_id"] == visual.dig("candidate", "candidate_id") }
+      return failure_result("the reviewed visual candidate no longer exists", flow) unless candidate
+
+      drafted = @visual_revision_drafter.draft(project: project, candidate: candidate, provider: provider)
+      return failure_result(drafted.fetch("reason", "visual revision drafting did not complete"), flow) unless drafted.fetch("ok")
+      data = drafted.fetch("data")
+      flow["visual_revision_draft"] = {
+        "source_candidate_id" => candidate.fetch("candidate_id"), "instruction" => data.fetch("instruction"),
+        "seed" => data.fetch("seed"), "rationale" => data.fetch("rationale"), "packet_digest" => data["packet_digest"]
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_visual_revision_action(flow)
+      @flow_store.write(flow)
+      result(render_visual_revision(flow), "creative_visual_revision_ready", flow, actions: [flow.fetch("pending_action")])
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("visual revision planning failed safely: #{error.class}", flow)
+    end
+
+    def visual_revision_eligible?(flow)
+      flow.dig("review_draft", "visual_disposition") == "revise" &&
+        flow.dig("generated", "visual") && !flow.dig("generated", "visual", "existing")
+    end
+
+    def explicit_visual_revision_request?(flow, message)
+      return false unless explicit_revision_request?(message)
+      text = message.to_s
+      return true if text.match?(/\b(?:visual|image|picture|art|artwork)\b/i)
+      !music_revision_eligible?(flow)
+    end
+
+    def build_visual_revision_action(flow)
+      { "action_id" => "creative_visual_revision", "operation" => "chats.creative.execute", "label" => "Generate exact guided visual revision",
+        "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow), "risk" => "bounded_visual_revision_generation" }
+    end
+
+    def render_visual_revision(flow)
+      draft = flow.fetch("visual_revision_draft")
+      visual = flow.dig("generated", "visual")
+      [
+        "I shaped the recorded visual evidence into this proposed guided edit.", "",
+        "Visual: #{visual.dig('project', 'title')}", "Source candidate: #{draft['source_candidate_id']}",
+        "Edit instruction: #{draft['instruction']}", "Seed: #{draft['seed']}",
+        "Why this revision: #{draft['rationale']}", "",
+        "Review the complete edit. Clicking the action revalidates the creative Core and authorizes only this exact linked image-guided revision."
+      ].join("\n")
+    end
+
+    def execute_visual_revision(flow, progress)
+      draft = flow.fetch("visual_revision_draft")
+      visual = flow.dig("generated", "visual")
+      progress&.call({ "stage" => "core", "message" => "Revalidating the creative Core for the exact visual revision." })
+      core = ensure_creative_core(flow)
+      return core unless core.fetch("ok")
+
+      project_id = visual.dig("project", "project_id")
+      source_candidate_id = draft.fetch("source_candidate_id")
+      preview = @visual_studio.edit_preview(project_id: project_id, source_candidate_id: source_candidate_id,
+        instruction: draft.fetch("instruction"), seed: draft.fetch("seed"))
+      return preview unless preview.fetch("ok")
+      gate = preview.fetch("data")
+      progress&.call({ "stage" => "visual_revision", "message" => "Generating the exact linked guided visual revision." })
+      generated = @visual_studio.edit_execute(
+        project_id: project_id, source_candidate_id: source_candidate_id, candidate_id: gate.fetch("candidate_id"),
+        instruction: draft.fetch("instruction"), seed: draft.fetch("seed"), confirmation: gate.fetch("confirmation_phrase"),
+        expected_digest: gate.fetch("expected_digest"), progress: progress
+      )
+      return generated unless generated.fetch("ok")
+
+      flow["generated"]["visual"]["candidate"] = generated.dig("data", "candidate")
+      flow.delete("visual_revision_draft")
+      flow.delete("review_draft")
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "generated"
+      flow["pending_action"] = nil
+      attachments = [visual_attachment(flow.dig("generated", "visual"))]
+      message = append_assistant(flow.fetch("chat_id"), "The guided visual revision is ready. Inspect it here, then give me the next keep or revise review.", flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_visual_revision"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "revised visual candidate generated; human review required",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments }, mutation: "visual_revision_candidate_generated")
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "visual revision execution failed safely: #{error.class}")
     end
 
     def plan_review(flow, message, provider, progress)
@@ -677,7 +787,7 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "disposition_action", "created_at", "updated_at")
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "created_at", "updated_at")
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))
