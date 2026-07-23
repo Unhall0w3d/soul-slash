@@ -168,7 +168,12 @@ Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper
 
 Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while exact-gated Core selection coordinates supported chat and creative resources. A reviewed conversational creative action may include the required Core transition in its visible scope.
 
-Daily uses Gemma on AMD. AMD-Free and Music use Qwen on NVIDIA. Music generation temporarily leases AMD for ACE-Step Vulkan; still-image generation uses its reviewed Vulkan lane. Core transitions and model controls revalidate active application leases and runtime state. Creative models load for one bounded operation and exit.
+Daily uses Gemma on AMD. AMD-Free and Music use Qwen on NVIDIA. Music generation
+temporarily leases AMD for ACE-Step Vulkan; still, image-guided motion, and
+native-video generation use their reviewed Vulkan lanes under the same
+exclusive creative-resource boundary. Core transitions and model controls
+revalidate active application leases and runtime state. Creative models load
+for one bounded operation and exit.
 
 No model-initiated or unattended Core switch, always-resident creative model, idle timer, background queue, or unbounded resource poller is part of this layer.
 
@@ -188,7 +193,11 @@ brief
 
 Music generation persists a durable job record so the server-side operation can complete if the Operator changes dashboard pages. This is bounded job continuity, not a general background worker: every job has one preapproved candidate scope, terminal lifecycle, timeout/cancellation behavior, and artifact validation.
 
-Visual candidates may be copied into exact Music candidate lineage. Static presentation and final muxing use reviewed artifacts and deterministic media operations. Upload packaging is local only; network upload and publication remain outside the current execution layer.
+Visual candidates may be copied into exact Music candidate lineage. Static
+presentation or repetition of one accepted short motion candidate and final
+muxing use reviewed artifacts and deterministic media operations. Upload
+packaging is local only; network upload and publication remain outside the
+current execution layer.
 
 ## Unified review layer
 

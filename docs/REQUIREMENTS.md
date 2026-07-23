@@ -36,8 +36,9 @@ Supported runtime providers:
 - `uv` and FFmpeg for separately gated creative tooling. They are not required
   for base conversation or the dashboard.
 - A reviewed AMD Vulkan device/runtime for the production Music Studio
-  ACE-Step lane and Visual Studio FLUX.2 still-image lane. Hardware-specific
-  model setup is always separate from base setup.
+  ACE-Step lane and Visual Studio FLUX.2 still, Wan image-motion, and FastWan
+  native-video lanes. Hardware-specific model setup is always separate from
+  base setup.
 - NVIDIA CUDA remains the supported Qwen reserve/chat device for AMD-Free and
   Music Cores on the owner-reviewed topology. The older NVIDIA Music pilot is
   retained as compatibility evidence rather than the production path.
@@ -56,6 +57,12 @@ changing the distribution-managed Python installation. Install `uv` through
 the operating system package manager when available; then run `make
 music-check`. Soul does not bootstrap `uv` by downloading and executing a
 remote installer.
+
+Creative model defaults are integrity-bound manifests rather than loose
+filenames. A local override must provide the exact repository, immutable
+revision, case-sensitive filename, byte size, SHA-256 digest, and compatible
+runtime parameters. `config/model_overrides.example.mk` documents the ignored
+`Makefile.local` override surface.
 
 ## Optional web knowledge paths
 

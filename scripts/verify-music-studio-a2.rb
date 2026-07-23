@@ -63,6 +63,25 @@ class A2Runner
   end
 end
 
+class A2AmdRunner
+  def run(*command, **_options)
+    joined = command.join(" ")
+    return result("active\n") if joined.include?("llama-server.service")
+    return result("inactive\n", "failed") if joined.include?("soul-model-gemma.service")
+    return result("AMD Radeon RX 6900 XT (RADV NAVI21)\n") if joined.include?("vulkaninfo --summary")
+    return result('{"status":"ok"}') if joined.include?("curl")
+    return result("7900\n") if joined.include?("nvidia-smi --query-gpu=memory.free")
+    return result("") if joined.include?("nvidia-smi --query-compute-apps")
+    result("")
+  end
+
+  private
+
+  def result(stdout, status = "ok")
+    FakeResult.new(stdout: stdout, stderr: "", exit_status: status == "ok" ? 0 : 3, status: status, truncated: false)
+  end
+end
+
 class A2Coordinator
   attr_reader :attached, :released
 
@@ -326,6 +345,29 @@ Dir.mktmpdir("soul-music-a2-lease-") do |root|
   runner.fallback_state = "active"
   blocked_inventory = SoulCore::MusicResourceCoordinator.new(root: root, directory: File.join("Soul", "runtime", "music-blocked"), runner: runner, process_start: ->(pid) { starts[pid] }).inventory
   check.call("active NVIDIA fallback blocks music without stopping it", !blocked_inventory["can_acquire_nvidia_music"] && blocked_inventory["blockers"].include?("NVIDIA fallback service is active"))
+end
+
+Dir.mktmpdir("soul-amd-studio-lease-") do |root|
+  selection = File.join(root, "Soul", "runtime", "model_runtime")
+  FileUtils.mkdir_p(selection)
+  File.write(File.join(selection, "core_selection.json"), JSON.generate("active_core_id" => "music"))
+  lease_store = SoulCore::ModelRuntimeLeaseStore.new(root: root)
+  visual_lease = lease_store.acquire_exclusive(
+    provider_id: "amd-visual", model_id: "fastwan-fixture", request_id: "motion_fixture",
+    resource_group: "amd-vulkan-generation", ttl_seconds: 120
+  )
+  coordinator = SoulCore::MusicResourceCoordinator.new(root: root, lane: "amd-music", runner: A2AmdRunner.new, model_lease_store: lease_store)
+  begin
+    coordinator.acquire(project_id: "music_1111111111111111", candidate_id: "candidate_2222222222222222", input_digest: "a" * 64)
+    visual_blocked_music = false
+  rescue SoulCore::MusicResourceCoordinator::Busy => error
+    visual_blocked_music = error.message.include?("AMD generation resource is occupied")
+  end
+  lease_store.release(visual_lease.fetch("lease_id"))
+  music_lease = coordinator.acquire(project_id: "music_1111111111111111", candidate_id: "candidate_2222222222222222", input_digest: "a" * 64)
+  shared = lease_store.active_leases.find { |lease| lease["lease_id"] == music_lease["model_runtime_lease_id"] }
+  coordinator.release(music_lease.fetch("lease_id"))
+  check.call("active Visual work blocks real AMD Music acquisition without queueing", visual_blocked_music && shared&.fetch("resource_group") == "amd-vulkan-generation" && lease_store.active_leases.empty?)
 end
 
 source = File.read(File.join(__dir__, "soul-music-studio"))

@@ -15,7 +15,7 @@ Expose the existing Music A2 project and generation core through a themed dashbo
 
 ## Request concurrency and termination
 
-The existing loopback dashboard service may serve at most eight request-scoped threads so a cancellation request can reach a foreground generation stream. Excess connections receive `429`. Threads are tracked, sockets are closed on server shutdown, and the server joins request threads before returning. This is bounded request handling inside the already-approved dashboard service, not a background queue.
+The existing loopback dashboard service may serve at most 48 request-scoped threads so an Operator action can reach a foreground generation stream alongside bounded audio and video traffic from the Music and Visual Studios. A transient burst waits at most two seconds for a request slot before receiving `429`; the hard concurrency ceiling is never exceeded. Inactive media controls do not preload their files. Threads are tracked, sockets are closed on server shutdown, and the server joins request threads before returning. This is bounded request handling inside the already-approved dashboard service, not a background job queue.
 
 Generation output is drained through a bounded wait with a fixed deadline. Music Job Continuity A1 supersedes A3's request-lifetime coupling: client abandonment no longer terminates an accepted generation. Server shutdown, timeout, explicit cancellation, or task completion still terminates the exact owned process group, releases its lease, and leaves either a published candidate or inspectable failure evidence.
 

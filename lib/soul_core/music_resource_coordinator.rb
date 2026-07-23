@@ -78,7 +78,14 @@ module SoulCore
     def acquire(project_id:, candidate_id:, input_digest:, ttl_seconds: LEASE_TTL_SECONDS)
       raise IntegrityError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
       raise IntegrityError, "input_digest is invalid" unless input_digest.to_s.match?(/\A[a-f0-9]{64}\z/)
-      cross_lease = @model_lease_store.acquire(provider_id: @lane, model_id: @lane == "amd-music" ? "ace-step-1.5-vulkan-4b" : "ace-step-1.5", request_id: candidate_id, conversation_id: project_id, ttl_seconds: ttl_seconds)
+      cross_lease = if @lane == "amd-music"
+        @model_lease_store.acquire_exclusive(
+          provider_id: @lane, model_id: "ace-step-1.5-vulkan-4b", request_id: candidate_id,
+          conversation_id: project_id, resource_group: "amd-vulkan-generation", ttl_seconds: ttl_seconds
+        )
+      else
+        @model_lease_store.acquire(provider_id: @lane, model_id: "ace-step-1.5", request_id: candidate_id, conversation_id: project_id, ttl_seconds: ttl_seconds)
+      end
       record = with_lock do
         hardware = observe_hardware
         active = active_lease_unlocked(cleanup_stale: true)
@@ -106,6 +113,8 @@ module SoulCore
         record
       end
       record
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      raise Busy, "AMD generation resource is occupied: #{error.message}"
     rescue StandardError
       @model_lease_store.release(cross_lease["lease_id"]) if defined?(cross_lease) && cross_lease
       raise

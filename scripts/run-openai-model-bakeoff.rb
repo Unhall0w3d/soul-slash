@@ -195,7 +195,7 @@ begin
       calls = data.dig("choices", 0, "message", "tool_calls") || []
       result["tool_selection"] = { "http_status" => response.code.to_i, "latency_ms" => latency, "count" => calls.length, "names" => calls.filter_map { |call| call.dig("function", "name") }, "executed" => false }
 
-      image_path = File.expand_path("../assets/brand/soul-slash-primary-mark.png", __dir__)
+      image_path = File.expand_path("../assets/brand/character/soul-portrait-unmasked.png", __dir__)
       image = Base64.strict_encode64(File.binread(image_path))
       response, latency = post_json(endpoint, {
         "model" => options.fetch(:model), "messages" => [{ "role" => "user", "content" => [

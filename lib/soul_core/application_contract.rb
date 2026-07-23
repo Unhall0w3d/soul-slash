@@ -21,6 +21,7 @@ module SoulCore
     MUSIC_CANDIDATE_ID = /\Acandidate_[a-f0-9]{16}\z/
     VISUAL_PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
     VISUAL_CANDIDATE_ID = /\Avisual_candidate_[a-f0-9]{16}\z/
+    MOTION_CANDIDATE_ID = /\Amotion_candidate_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
     INTERFACES = %w[cli dashboard_test internal dashboard].freeze
 
@@ -164,6 +165,17 @@ module SoulCore
       "visual.edit.execute" => %w[visual_project_id source_visual_candidate_id visual_candidate_id instruction seed confirmation expected_digest],
       "visual.promotion.preview" => %w[visual_project_id visual_candidate_id project_id candidate_id],
       "visual.promotion.execute" => %w[visual_project_id visual_candidate_id project_id candidate_id confirmation expected_digest],
+      "visual.motion.preview" => %w[visual_project_id source_visual_candidate_id instruction seed],
+      "visual.motion.execute" => %w[visual_project_id source_visual_candidate_id motion_candidate_id instruction seed confirmation expected_digest],
+      "visual.native_motion.preview" => %w[visual_project_id instruction seed duration_seconds],
+      "visual.native_motion.execute" => %w[visual_project_id motion_candidate_id instruction seed duration_seconds confirmation expected_digest],
+      "visual.native_motion.revision.preview" => %w[visual_project_id source_motion_candidate_id instruction seed duration_seconds],
+      "visual.native_motion.revision.execute" => %w[visual_project_id source_motion_candidate_id motion_candidate_id instruction seed duration_seconds confirmation expected_digest],
+      "visual.motion.review" => %w[visual_project_id motion_candidate_id visual_review],
+      "visual.motion.delete.preview" => %w[visual_project_id motion_candidate_id],
+      "visual.motion.delete.execute" => %w[visual_project_id motion_candidate_id confirmation expected_digest],
+      "visual.motion.promotion.preview" => %w[visual_project_id motion_candidate_id project_id candidate_id],
+      "visual.motion.promotion.execute" => %w[visual_project_id motion_candidate_id project_id candidate_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze
@@ -275,6 +287,10 @@ module SoulCore
       return "visual_candidate_id is invalid" if visual_candidate_id && !visual_candidate_id.to_s.match?(VISUAL_CANDIDATE_ID)
       source_visual_candidate_id = parameters["source_visual_candidate_id"]
       return "source_visual_candidate_id is invalid" if source_visual_candidate_id && !source_visual_candidate_id.to_s.match?(VISUAL_CANDIDATE_ID)
+      motion_candidate_id = parameters["motion_candidate_id"]
+      return "motion_candidate_id is invalid" if motion_candidate_id && !motion_candidate_id.to_s.match?(MOTION_CANDIDATE_ID)
+      source_motion_candidate_id = parameters["source_motion_candidate_id"]
+      return "source_motion_candidate_id is invalid" if source_motion_candidate_id && !source_motion_candidate_id.to_s.match?(MOTION_CANDIDATE_ID)
       chat_ids = parameters["chat_ids"]
       return "chat_ids contains an invalid chat ID" if chat_ids.is_a?(Array) && chat_ids.any? { |chat_id| !chat_id.to_s.match?(CHAT_ID) }
 

@@ -15,8 +15,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Self Assessment host/runtime/capability/storage evidence
 - [x] Self Augmentation isolated experiment and external integration-review lane
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
-- [x] Visual Studio still generation, guided edit, review, deletion, and Music binding
-- [x] static full-song visual companions and exact local YouTube upload packages
+- [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
+- [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
 
 ## Near-term refinement
 
@@ -25,12 +25,13 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] improve conversational progress summaries and multi-message usability
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [ ] remove remaining implementation-phase labels and stale UI/documentation language
-- [ ] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX production profiles
+- [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [ ] strengthen cleanup, retention, backup, and recovery evidence
 
 ## Qualified expansion candidates
 
-- [ ] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
+- [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
+- [ ] qualify longer or higher-fidelity motion only when measured output justifies its runtime and resource cost
 - [ ] longer-form music/mix composition through measured duration steps and repetition analysis
 - [ ] authenticated YouTube draft upload with publication remaining human-controlled
 - [ ] voice input and speech output through the same conversation and skill core

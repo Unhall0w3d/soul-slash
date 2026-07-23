@@ -14,6 +14,7 @@ module SoulCore
 
     class LockUnavailable < StandardError; end
     class IntegrityError < StandardError; end
+    class ResourceBusy < StandardError; end
 
     def initialize(root: Dir.pwd, directory: DEFAULT_DIRECTORY, clock: -> { Time.now })
       @root = File.expand_path(root)
@@ -39,25 +40,24 @@ module SoulCore
     def acquire(provider_id:, model_id:, request_id:, conversation_id: nil, ttl_seconds: DEFAULT_TTL_SECONDS)
       with_control_lock do
         active_leases_unlocked
-        now = @clock.call
-        record = {
-          "lease_id" => SecureRandom.hex(16),
-          "pid" => Process.pid,
-          "process_start" => process_start(Process.pid),
-          "provider_id" => safe_identifier(provider_id),
-          "model_id" => safe_identifier(model_id),
-          "request_id" => safe_identifier(request_id),
-          "conversation_id" => safe_identifier(conversation_id),
-          "started_at" => now.iso8601,
-          "expires_at" => (now + Integer(ttl_seconds)).iso8601
-        }
-        path = lease_path(record.fetch("lease_id"))
-        File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
-          file.write(JSON.generate(record) + "\n")
-          file.flush
-          file.fsync
+        write_record(provider_id: provider_id, model_id: model_id, request_id: request_id, conversation_id: conversation_id, ttl_seconds: ttl_seconds)
+      end
+    end
+
+    def acquire_exclusive(provider_id:, model_id:, request_id:, resource_group:, conversation_id: nil, ttl_seconds: DEFAULT_TTL_SECONDS)
+      group = safe_identifier(resource_group)
+      raise IntegrityError, "exclusive resource group is required" if group.empty?
+
+      with_control_lock do
+        active = active_leases_unlocked
+        conflict = active.find { |lease| lease["resource_group"] == group }
+        if conflict
+          raise ResourceBusy, "#{group} is occupied by #{conflict.fetch('provider_id')} request #{conflict.fetch('request_id')}"
         end
-        record
+        write_record(
+          provider_id: provider_id, model_id: model_id, request_id: request_id,
+          conversation_id: conversation_id, ttl_seconds: ttl_seconds, resource_group: group
+        )
       end
     end
 
@@ -105,7 +105,7 @@ module SoulCore
           FileUtils.rm_f(path)
           nil
         else
-          record.slice("lease_id", "pid", "provider_id", "model_id", "request_id", "conversation_id", "started_at", "expires_at")
+          record.slice("lease_id", "pid", "provider_id", "model_id", "request_id", "conversation_id", "resource_group", "started_at", "expires_at")
         end
       rescue JSON::ParserError, ArgumentError, Errno::ENOENT => error
         raise IntegrityError, "invalid model runtime lease: #{error.class}"
@@ -113,6 +113,29 @@ module SoulCore
     end
 
     private
+
+    def write_record(provider_id:, model_id:, request_id:, conversation_id:, ttl_seconds:, resource_group: nil)
+      now = @clock.call
+      record = {
+        "lease_id" => SecureRandom.hex(16),
+        "pid" => Process.pid,
+        "process_start" => process_start(Process.pid),
+        "provider_id" => safe_identifier(provider_id),
+        "model_id" => safe_identifier(model_id),
+        "request_id" => safe_identifier(request_id),
+        "conversation_id" => safe_identifier(conversation_id),
+        "resource_group" => resource_group,
+        "started_at" => now.iso8601,
+        "expires_at" => (now + Integer(ttl_seconds)).iso8601
+      }.compact
+      path = lease_path(record.fetch("lease_id"))
+      File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(JSON.generate(record) + "\n")
+        file.flush
+        file.fsync
+      end
+      record
+    end
 
     def prepare_directories
       FileUtils.mkdir_p(@leases_directory, mode: 0o700)

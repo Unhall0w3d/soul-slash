@@ -39,7 +39,7 @@ module SoulCore
       packet = build_packet(project, candidate, source, review, analysis)
       response = @provider_client.chat(provider: provider, request: request(provider, candidate.fetch("candidate_id"), packet), timeout_seconds: 90.0)
       return failed(provider_error(response)) unless response.success? && !response.content.to_s.strip.empty?
-      draft = validate(JSON.parse(response.content), source, project)
+      draft = validate(JSON.parse(response.content), source, project, packet)
       blocked("Soul drafted a revision brief; human editing and exact generation confirmation are required", data: {
         "revision" => draft.slice("caption", "lyrics", "bpm", "keyscale", "timesignature"),
         "rationale" => draft.fetch("rationale"),
@@ -95,7 +95,7 @@ module SoulCore
       )
     end
 
-    def validate(value, source, project)
+    def validate(value, source, project, packet)
       required = %w[caption bpm keyscale timesignature rationale]
       raise ArgumentError, "revision draft must be a JSON object" unless value.is_a?(Hash) && value.keys.sort == required.sort
       caption = plain_directive(bounded_string(value["caption"], "caption", 8_000))
@@ -105,6 +105,12 @@ module SoulCore
       timesignature = normalize_timesignature(value["timesignature"])
       proposed = { "caption" => caption, "bpm" => bpm, "keyscale" => keyscale, "timesignature" => timesignature }
       unchanged = %w[caption bpm keyscale timesignature].all? { |key| proposed[key] == source[key] }
+      if closing_lyric_incomplete?(packet) && (unchanged || caption.length > 512)
+        caption = closing_lyric_recovery_caption(source.fetch("caption"))
+        rationale = "The final intended lyric was incomplete. Preserve the accepted performance while opening one isolated closing measure for that line."
+        proposed["caption"] = caption
+        unchanged = false
+      end
       raise ArgumentError, "local model did not propose a material revision" if unchanged
       validate_caption!(caption)
       changes = derived_changes(source, proposed)
@@ -122,6 +128,26 @@ module SoulCore
 
     def plain_directive(value)
       value.gsub(/\*\*|__|`/, "").gsub(/(?<!\w)\*(?!\w)/, "").gsub(/\s+/, " ").strip
+    end
+
+    def closing_lyric_incomplete?(packet)
+      lyrics = packet.dig("source_input", "lyrics").to_s.lines.map(&:strip).reject { |line| line.empty? || line.match?(/\A\[[^\]]+\]\z/) }
+      closing = lyrics.last
+      return false if closing.to_s.empty?
+      problems = Array(packet.dig("machine_heard", "problem_lines"))
+      machine_evidence = problems.any? { |line| line["intended"].to_s.strip == closing && line["status"] != "heard" }
+      notes = packet.dig("human_review", "notes").to_s
+      human_evidence = notes.match?(/\b(?:last|final|closing|title)\b.{0,80}\b(?:line|lyric)\b|\b(?:dropped|missing|omitted)\b.{0,80}\b(?:last|final|closing|title)\b/i)
+      machine_evidence || human_evidence
+    end
+
+    def closing_lyric_recovery_caption(source)
+      suffix = "Preserve the established progression, but clear the final measure beneath one isolated closing lyric, then leave a brief unresolved decay."
+      sentences = source.to_s.scan(/.*?[.!?](?:\s+|\z)/).map(&:strip)
+      sentences.pop while sentences.length > 1 && ([*sentences, suffix].join(" ").length > 512)
+      candidate = [*sentences, suffix].join(" ")
+      raise ArgumentError, "source Sound and Structure cannot fit a bounded closing-lyric revision" unless candidate.length.between?(100, 512)
+      candidate
     end
 
     def validate_caption!(caption)

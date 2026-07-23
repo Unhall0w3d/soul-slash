@@ -11,10 +11,12 @@ module SoulCore
     HEADER_COUNT_LIMIT = 64
     BODY_LIMIT = 128 * 1024
     READ_TIMEOUT = 5
-    # Browser audio controls issue bounded range requests alongside ordinary API
-    # and asset traffic. Keep a hard ceiling while allowing one Music Studio page
-    # to load its visible candidates without starving an Operator action.
-    MAX_CONCURRENT_REQUESTS = 24
+    # Browser audio/video controls issue bounded range requests alongside ordinary
+    # API, asset, and foreground render-stream traffic. Keep a hard ceiling while
+    # allowing the Studios to expose reviewed media without starving an Operator
+    # action or its terminal render result.
+    MAX_CONCURRENT_REQUESTS = 48
+    REQUEST_SLOT_WAIT_SECONDS = 2.0
 
     STATUS_TEXT = {
       200 => "OK", 206 => "Partial Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
@@ -34,6 +36,7 @@ module SoulCore
       @output = output
       @stopping = false
       @request_mutex = Mutex.new
+      @request_available = ConditionVariable.new
       @request_threads = {}
     end
 
@@ -129,7 +132,12 @@ module SoulCore
 
     def reserve_request(client)
       @request_mutex.synchronize do
-        return false if @request_threads.length >= MAX_CONCURRENT_REQUESTS
+        deadline = monotonic_now + REQUEST_SLOT_WAIT_SECONDS
+        while @request_threads.length >= MAX_CONCURRENT_REQUESTS
+          remaining = deadline - monotonic_now
+          return false if @stopping || remaining <= 0
+          @request_available.wait(@request_mutex, remaining)
+        end
         @request_threads[client.object_id] = { client: client, thread: nil }
         true
       end
@@ -143,8 +151,13 @@ module SoulCore
     end
 
     def release_request(client)
-      @request_mutex.synchronize { @request_threads.delete(client.object_id) }
+      @request_mutex.synchronize do
+        @request_threads.delete(client.object_id)
+        @request_available.broadcast
+      end
     end
+
+    def monotonic_now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
     def close_active_clients
       clients = @request_mutex.synchronize { @request_threads.values.map { |entry| entry[:client] } }

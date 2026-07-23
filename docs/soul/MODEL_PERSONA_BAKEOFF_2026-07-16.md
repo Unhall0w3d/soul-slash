@@ -222,7 +222,7 @@ Before any endpoint or service change:
 ## Commands run
 
 ```text
-sha256sum /home/bhones/ai_models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf
+sha256sum /path/to/models/Ministral-3-14B-Instruct-2512-Q4_K_M.gguf
 llama-bench -m <Ministral GGUF> -p 512 -n 128 -r 3 -ngl 999 -dev Vulkan0 -fa on -t 8 -o md
 llama-cli -m <Ministral GGUF> -dev Vulkan0 -ngl 999 --single-turn <bounded persona prompts>
 llama-cli -m <Ministral GGUF> -dev Vulkan0 -ngl 999 --single-turn --json-schema <bounded schema and prompt>

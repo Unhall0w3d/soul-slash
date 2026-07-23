@@ -38,6 +38,13 @@ such as missing opening lines, lyric drift, vocal separation, timing, dynamics,
 instrumentation, or section structure. Its draft is advice, not evidence that a
 change will work.
 
+When the single model response is unchanged or exceeds the 512-character limit,
+and the bounded human or machine evidence specifically shows that the final
+intended lyric is incomplete, code may replace the response with one
+deterministic closing-measure adjustment. It preserves the source lyrics,
+changes only Sound and Structure, remains editable, and does not start audio.
+There is no second model request or automatic generation attempt.
+
 ## Execution and privacy boundary
 
 - Drafting uses only a configured `local_only` or `local_network` provider.

@@ -58,18 +58,18 @@ make dashboard-service-plan
 make dashboard-service-install
 make dashboard-service-uninstall
 scripts/soul-dashboard-service plan --lan-host <assigned-ip> --https-port 8443
-scripts/soul-dashboard-service install --lan-host 192.168.124.238 --https-port 8443 --confirmation INSTALL_SOUL_LAN_SERVICES
+scripts/soul-dashboard-service install --lan-host <assigned-ip> --https-port 8443 --confirmation INSTALL_SOUL_LAN_SERVICES
 scripts/soul-dashboard-service status
-curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt https://192.168.124.238:8443/
-curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt -H 'Origin: https://192.168.124.238:8443' -H 'Content-Type: application/json' -H 'X-Soul-CSRF: <page-token>' --data '<private-call>' https://192.168.124.238:8443/api/v1/call
+curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt https://<assigned-ip>:8443/
+curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt -H 'Origin: https://<assigned-ip>:8443' -H 'Content-Type: application/json' -H 'X-Soul-CSRF: <page-token>' --data '<private-call>' https://<assigned-ip>:8443/api/v1/call
 curl http://127.0.0.1:4567/
-curl --connect-timeout 3 http://192.168.124.238:4567/
-openssl s_client -connect 192.168.124.238:8443 -CAfile ~/.local/share/caddy/pki/authorities/local/root.crt -verify_return_error
+curl --connect-timeout 3 http://<assigned-ip>:4567/
+openssl s_client -connect <assigned-ip>:8443 -CAfile ~/.local/share/caddy/pki/authorities/local/root.crt -verify_return_error
 ```
 
 The 2026-07-16 refresh-health repair was applied through the same confirmed
 installer. Live verification then reported both status operations `complete`,
-host `maven`, model runtime `loaded`, service `active`, server health `ready`,
+the reviewed host, model runtime `loaded`, service `active`, server health `ready`,
 and idle state certain. Dashboard, proxy, and AMD model services were active;
 certificate-validated LAN HTTPS returned HTTP 200 on the unchanged exact
 address and port.
@@ -158,15 +158,15 @@ Primary documentation reviewed:
 - [x] Generated Caddyfile validates with installed Caddy `2.11.4`.
 - [x] Both user services install, enable, and become active.
 - [x] Soul remains reachable only on loopback port `4567`; direct LAN connection is refused.
-- [x] Caddy listens on exact address `192.168.124.238` and TCP port `8443`.
-- [x] Local HTTPS responds with a verified Caddy chain whose leaf SAN is exactly `192.168.124.238`.
+- [x] Caddy listens on the reviewed assigned address and TCP port `8443`.
+- [x] Local HTTPS responds with a verified Caddy chain whose leaf SAN is exactly the assigned address.
 - [x] The public root CA is installed on a selected client device.
 - [x] The client browser reports a trusted HTTPS connection without bypassing a warning.
 - [x] Anonymous LAN access stays blurred and private application calls return `authentication_required` with HTTP 401.
 - [x] Administrator login works over HTTPS and the cookie is `Secure`.
 - [x] Logout and service restart behave as documented.
 - [x] No router, public Internet, wildcard bind, or plaintext LAN endpoint was created by this deployment.
-- [x] UFW permits TCP `8443` only from the local `192.168.124.0/24` network to the exact dashboard address.
+- [x] UFW permits TCP `8443` only from the reviewed trusted LAN network to the exact dashboard address.
 - [x] Uninstall/rollback boundary is understood before merge.
 
 ## Human review outcome

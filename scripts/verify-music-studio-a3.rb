@@ -76,6 +76,23 @@ Dir.mktmpdir("soul-music-a3") do |root|
   check.call("authenticated music stream emits progress and one terminal result", stream.status == 200 && events.lines.count == 2 && events.include?('"type":"progress"') && events.include?('"type":"result"'))
 end
 
+burst_server = SoulCore::DashboardServer.new(host: "127.0.0.1", port: 0, application: Object.new)
+occupied_clients = Array.new(SoulCore::DashboardServer::MAX_CONCURRENT_REQUESTS) { Object.new }
+occupied_clients.each { |client| raise "request fixture did not reserve" unless burst_server.send(:reserve_request, client) }
+released_client = occupied_clients.shift
+releaser = Thread.new do
+  IO.select(nil, nil, nil, 0.05)
+  burst_server.send(:release_request, released_client)
+end
+burst_client = Object.new
+started_waiting = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+burst_accepted = burst_server.send(:reserve_request, burst_client)
+burst_wait = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_waiting
+releaser.join
+check.call("transient request burst waits boundedly for a released slot", burst_accepted && burst_wait >= 0.025 && burst_wait < SoulCore::DashboardServer::REQUEST_SLOT_WAIT_SECONDS)
+burst_server.send(:release_request, burst_client)
+occupied_clients.each { |client| burst_server.send(:release_request, client) }
+
 runner = SoulCore::MusicGenerationService::ForegroundProcessRunner.new
 child_pid = nil
 started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
@@ -95,11 +112,14 @@ http_source = File.read(File.expand_path("../lib/soul_core/dashboard_http_applic
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
-check.call("dashboard concurrency is capped for browser media traffic and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 24") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
+check.call("dashboard concurrency is capped with bounded burst absorption and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 48") && server_source.include?("REQUEST_SLOT_WAIT_SECONDS = 2.0") && server_source.include?("@request_available.wait") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
 check.call("music stream and authenticated audio routes are explicit", http_source.include?("/api/v1/music-stream") && http_source.include?("/api/v1/music/audio/"))
 check.call("Music Studio exposes preview progress cancel playback and review", %w[music-panel preview-music-generation music-progress cancel-music-generation music-candidates].all? { |id| html.include?(id) } && js.include?("music.candidates.review"))
+check.call("initial and revision generation share one live status treatment", html.include?("class=\"generation-progress\"") && css.include?(".generation-progress") && js.include?("createGenerationProgress") && js.include?("showGenerationProgress(progress, event)"))
 check.call("Music Studio exposes only the four reviewed duration presets", html.scan(/<option value="(30|90|180|600)">/).flatten == %w[30 90 180 600] && html.include?('<option value="600">10 minutes</option>'))
 check.call("candidate cards expose persisted generation timing", js.include?("generated in") && js.include?("flac_derivation_seconds") && js.include?("mp3_derivation_seconds") && js.include?("total_seconds"))
+check.call("a mistaken keep can be re-marked revise with review history preserved", js.include?("Re-mark as revise") && js.include?("preserving the prior keep review") && js.include?('disposition: "revise"'))
+check.call("inactive media does not eagerly consume request slots", js.scan('preload = "none"').length >= 5 && !js.include?('preload = "metadata"'))
 check.call("composition archive uses the available desktop column and stays bounded on narrow screens", css.include?(".music-projects>#music-project-list { flex:1 1 auto; min-height:240px; max-height:none; }") && css.include?(".music-projects>#music-project-list { min-height:0; max-height:360px; }"))
 check.call("browser adds no timer queue or remote dependency", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, js].any? { |source| source.match?(%r{https?://}) })
 check.call("A3 brief explicitly excludes queues and automatic model loading", File.read(File.expand_path("../docs/soul/MUSIC_STUDIO_A3_DASHBOARD_BRIEF.md", __dir__)).include?("There is no job queue") && File.read(File.expand_path("../docs/soul/MUSIC_STUDIO_A3_DASHBOARD_BRIEF.md", __dir__)).include?("never loads, unloads"))

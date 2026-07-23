@@ -31,6 +31,22 @@ Recommended tools:
 - zip
 - Python 3
 
+Inspect the supported model defaults and local override points:
+
+```bash
+make defaults-show
+```
+
+For persistent machine-local substitutions, copy the tracked example to the
+ignored local include:
+
+```bash
+cp config/model_overrides.example.mk Makefile.local
+```
+
+Edit `Makefile.local`, never the public defaults, for exact local model choices.
+One-off `make VARIABLE=value target` assignments take precedence over both.
+
 ## 3. Choose a runtime provider
 
 Soul/ uses a local model runtime through an OpenAI-compatible API.
@@ -262,14 +278,16 @@ The setup script will:
 6. check the `/v1/models` endpoint
 7. write `.env`
 
-Example generic Ollama model:
+Default reviewed Ollama model:
 
 ```text
-qwen3:8b
+gemma4:12b-it-q4_K_M
 ```
 
-The supported Soul Daily Core is the reviewed Gemma profile described earlier;
-the generic setup path remains useful for clean clones and experiments.
+Use `OLLAMA_MODEL=<exact-tag>` on the Make invocation or in ignored
+`Makefile.local` to select another installed tag. The supported Soul Daily Core
+remains the reviewed Gemma profile described earlier; another tag is a local
+experiment until separately accepted.
 
 Test:
 
@@ -466,6 +484,8 @@ ruby bin/soul reflection reject latest --reason "Not useful"
 make help             Show available targets
 make check            Check required/recommended local tools only
 make detect           Detect runtimes, endpoints, config, and local GGUF models
+make defaults-show    Show supported model defaults and override points
+make supported-stack-check  Inspect every supported creative runtime lane
 make setup            Guided runtime setup
 make setup-llamacpp   Configure llama.cpp provider
 make setup-ollama     Configure Ollama provider
@@ -484,6 +504,10 @@ make music-reference-tooling-install  Install after digest and exact confirmatio
 make visual-check     Inspect the optional Visual Studio still-image lane
 make visual-runtime-plan  Preview the pinned Vulkan image runtime
 make visual-model-download-plan  Preview exact FLUX.2 Klein model bytes
+make visual-motion-check  Inspect the Wan 2.2 image-guided motion lane
+make visual-native-check  Inspect the FastWan 2.2 native-video lane
+make visual-motion-model-download-plan  Preview exact Wan model bytes
+make visual-native-model-download-plan  Preview exact FastWan model bytes
 make verify-music-publication-package  Test exact local upload packaging
 make test-runtime     Test configured runtime
 make test-fast        Test FAST/no_think request mode
@@ -513,6 +537,15 @@ The plan prints the current digest and distinct confirmation phrases. Setup and
 model download never run as part of `make setup`, and neither starts a service,
 listener, worker, or background process. See
 `docs/soul/MUSIC_STUDIO_A1_SETUP_BRIEF.md` before proceeding.
+
+The production creative lanes use signed-off JSON manifests. Their Make
+variables are `MUSIC_VULKAN_MANIFEST`, `VISUAL_MODEL_MANIFEST`,
+`VISUAL_MOTION_MANIFEST`, `VISUAL_NATIVE_MANIFEST`, and
+`MUSIC_TRANSCRIPTION_MANIFEST`. A custom model is supplied through a complete
+custom manifest containing its repository, immutable revision, exact
+case-sensitive filename, byte size, SHA-256, and compatible runtime profile.
+Soul intentionally does not accept an arbitrary creative-model filename alone:
+doing so would discard integrity and compatibility evidence.
 
 The current production Music Core uses the separately reviewed AMD Vulkan
 lane. Install it only after reviewing each exact plan:
@@ -583,10 +616,38 @@ make visual-model-download \
   CONFIRM=DOWNLOAD_VISUAL_VULKAN_MODELS
 ```
 
-The supported production lane generates private local stills with FLUX.2
-Klein, exits after each render, and provides no background server. Generated
-motion targets in the Makefile remain qualification tooling, not a production
-dashboard feature. See `docs/guides/VISUAL_STUDIO.md`.
+The supported still lane generates private local imagery with FLUX.2 Klein.
+The reviewed Wan 2.2 image-guided lane and FastWan 2.2 native text-to-video lane
+create short immutable motion candidates. Each renderer exits after its
+bounded operation; none creates a background model server. Install and download
+each lane only through its separate preview digest and exact confirmation:
+
+```bash
+make visual-motion-runtime-plan
+make visual-motion-runtime-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_VISUAL_MOTION_VULKAN_RUNTIME
+make visual-motion-model-download-plan
+make visual-motion-model-download \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=DOWNLOAD_VISUAL_MOTION_MODELS
+
+make visual-native-runtime-plan
+make visual-native-runtime-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_VISUAL_MOTION_VULKAN_RUNTIME
+make visual-native-model-download-plan
+make visual-native-model-download \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=DOWNLOAD_VISUAL_MOTION_MODELS
+```
+
+The native lane offers 4-, 8-, and 12-second 832×480 studies delivered at
+24 fps. The 12-second profile bounds inference to 193 frames at 16 fps and
+performs one local optical-interpolation pass to deliver 289 frames at 24 fps.
+An accepted short scene may be repeated to the song duration; Soul does not
+claim that repeated presentation is unique long-form generation. See
+`docs/guides/VISUAL_STUDIO.md`.
 
 ## 17. Clock-skew warning after applying overlays
 

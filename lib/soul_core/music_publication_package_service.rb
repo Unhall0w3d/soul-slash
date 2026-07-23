@@ -5,6 +5,7 @@ require "fileutils"
 require "json"
 require "securerandom"
 require "time"
+require_relative "bounded_command_runner"
 require_relative "music_project_store"
 require_relative "music_visual_companion_service"
 
@@ -14,11 +15,13 @@ module SoulCore
     MAX_DESCRIPTION = 5_000
     MAX_RECORD_BYTES = 8 * 1024 * 1024
 
-    def initialize(root: Dir.pwd, export_root: File.join(Dir.home, "Music", "soul-music"), project_store: nil, visual_service: nil, clock: -> { Time.now.utc })
+    def initialize(root: Dir.pwd, export_root: File.join(Dir.home, "Music", "soul-music"), project_store: nil, visual_service: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @export_root = File.expand_path(export_root)
       @store = project_store || MusicProjectStore.new(root: @root)
       @visuals = visual_service || MusicVisualCompanionService.new(root: @root, project_store: @store)
+      @runner = runner
+      @ffmpeg = @runner.which("ffmpeg")
       @clock = clock
     end
 
@@ -72,9 +75,14 @@ module SoulCore
       staging = File.join(export_destination, ".youtube.partial-#{SecureRandom.hex(6)}")
       Dir.mkdir(staging, 0o700)
       video = @visuals.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: "preview")
-      thumbnail = @visuals.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: "base")
       copy_verified(video, File.join(staging, "video.mp4"), scope.fetch("video_sha256"))
-      copy_verified(thumbnail, File.join(staging, "thumbnail.png"), scope.fetch("thumbnail_sha256"))
+      thumbnail_destination = File.join(staging, "thumbnail.png")
+      if context.dig("visual", "artifacts", "base")
+        thumbnail = @visuals.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: "base")
+        copy_verified(thumbnail, thumbnail_destination, scope.fetch("thumbnail_sha256"))
+      else
+        render_motion_thumbnail(video, thumbnail_destination)
+      end
       write_private(File.join(staging, "youtube-description.txt"), text.end_with?("\n") ? text : "#{text}\n")
       upload = {
         "schema_version" => "soul.music.youtube_upload.v1",
@@ -163,10 +171,18 @@ module SoulCore
     end
 
     def genre_influence(caption)
-      first = caption.to_s.split(/[.!?]\s|\n/, 2).first.to_s.strip
-      candidate = first.split(/\s+with\s+/i, 2).first.to_s.strip
+      first = caption.to_s.gsub(/\s+/, " ").split(/[.!?](?:\s|$)/, 2).first.to_s.strip
+      colon_clause = first.split(/\s*:\s*/, 2)
+      candidate = if colon_clause.length > 1 && colon_clause.first.length >= 4
+                    colon_clause.first
+                  else
+                    first.split(/\s+(?:with|featuring|built around|driven by)\s+/i, 2).first.to_s.strip
+                  end
       candidate = first if candidate.length < 4
-      candidate.slice(0, 120)
+      return candidate if candidate.length <= 160
+
+      shortened = candidate.slice(0, 159).sub(/\s+\S*\z/, "").strip
+      "#{shortened.empty? ? candidate.slice(0, 159) : shortened}…"
     end
 
     def time_label(value)
@@ -178,14 +194,13 @@ module SoulCore
       project = context.fetch("project")
       visual = context.fetch("visual")
       export_destination = context.fetch("export_destination")
-      {
+      scope = {
         "operation" => "export_youtube_upload_package",
         "project_id" => project.fetch("project_id"),
         "candidate_id" => visual.fetch("candidate_id"),
         "visual_id" => visual.fetch("visual_id"),
         "finished_export_scope_digest" => context.fetch("export").fetch("scope_digest"),
         "video_sha256" => visual.dig("artifacts", "preview", "sha256"),
-        "thumbnail_sha256" => visual.dig("artifacts", "base", "sha256"),
         "description_sha256" => Digest::SHA256.hexdigest(description),
         "destination" => File.join(export_destination, "youtube"),
         "files" => %w[video.mp4 thumbnail.png youtube-description.txt upload.json],
@@ -195,6 +210,26 @@ module SoulCore
         "api_upload_performed" => false,
         "external_publication" => false
       }
+      if visual.dig("artifacts", "base")
+        scope["thumbnail_sha256"] = visual.dig("artifacts", "base", "sha256")
+      else
+        scope["thumbnail_derivation"] = "reviewed-preview-frame-v1"
+        scope["thumbnail_source_sha256"] = visual.dig("artifacts", "preview", "sha256")
+        scope["thumbnail_frame_seconds"] = 1.0
+      end
+      scope
+    end
+
+    def render_motion_thumbnail(video, destination)
+      raise MusicProjectStore::IntegrityError, "ffmpeg is required to derive the reviewed motion thumbnail" unless @ffmpeg
+      result = @runner.run(
+        @ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-ss", "1.0", "-i", video,
+        "-frames:v", "1", "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2:color=0x060B11,format=rgb24",
+        destination, timeout_seconds: 30, max_output_bytes: 32 * 1024
+      )
+      valid = result.success? && File.file?(destination) && !File.symlink?(destination) && File.size(destination).positive?
+      raise MusicProjectStore::IntegrityError, "reviewed motion thumbnail derivation failed safely" unless valid
+      File.chmod(0o600, destination)
     end
 
     def validate_description(value)

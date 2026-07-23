@@ -90,13 +90,26 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   base_image = File.join(store.project_path(project_id), "visuals", visual.fetch("visual_id"), "base.png")
   check.call("final render uses the lossless still directly and binds exact audio once", rendered["lifecycle_state"] == "blocked_for_human_review" && final["duration_seconds"] == 3.0 && final_command.include?(audio) && final_command.include?(base_image) && !final_command.include?("-stream_loop") && final_command.include?("stillimage") && final_command[final_command.index("-crf") + 1] == "16" && final_command.join(" ").include?("gradfun=1.2:16") && final_command.join(" ").include?("fade=t=in:st=0:d=1.5") && final_command.join(" ").include?("fade=t=out:st=0:d=3.5"))
   check.call("authenticated artifact resolver verifies every stored digest", %w[base loop preview].all? { |kind| File.file?(service.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual.fetch("visual_id"), artifact: kind)) })
+
+  motion_root = File.join(root, "Soul", "visual", "projects", "visual_project_#{'6' * 16}", "motions", "motion_candidate_#{'7' * 16}")
+  FileUtils.mkdir_p(motion_root)
+  motion_path = File.join(motion_root, "motion.webm")
+  File.binwrite(motion_path, "reviewed generated motion fixture")
+  motion_receipt = { "video_sha256" => Digest::SHA256.file(motion_path).hexdigest, "duration_seconds" => 4.125, "width" => 832, "height" => 480, "fps" => 8 }
+  motion_preview = service.generated_motion_import_preview(project_id: project_id, candidate_id: candidate_id, source_project_id: "visual_project_#{'6' * 16}", source_motion_id: "motion_candidate_#{'7' * 16}", source_path: motion_path, prompt_summary: "Restrained coherent atmospheric motion.", source_receipt: motion_receipt)
+  motion_bound = service.generated_motion_import_execute(project_id: project_id, candidate_id: candidate_id, source_project_id: "visual_project_#{'6' * 16}", source_motion_id: "motion_candidate_#{'7' * 16}", source_path: motion_path, prompt_summary: "Restrained coherent atmospheric motion.", source_receipt: motion_receipt, confirmation: "BIND_VISUAL_COMPANION", expected_digest: motion_preview.dig("data", "expected_digest"))
+  motion_visual = motion_bound.dig("data", "visual")
+  full_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual.fetch("visual_id"))
+  full = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: full_preview.dig("data", "expected_digest"))
+  motion_command = runner.commands.reverse.find { |command| command.first.end_with?("ffmpeg") && command.include?(motion_path.sub(%r{/[^/]+\z}, "/not-used")) == false && command.include?("-stream_loop") }
+  check.call("reviewed generated motion binds directly to the full-duration mux gate", motion_bound["lifecycle_state"] == "blocked_for_human_review" && motion_visual["stage"] == "loop_ready" && full["lifecycle_state"] == "blocked_for_human_review" && full.dig("data", "visual", "artifacts", "preview", "fps") == 8 && full.dig("data", "visual", "artifacts", "preview", "render_seconds").is_a?(Numeric) && motion_command && motion_command[motion_command.index("-stream_loop") + 1] == "-1")
 end
 
 contract = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_contract.rb"))
 facade = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_facade.rb"))
 http = File.read(File.join(__dir__, "..", "lib", "soul_core", "dashboard_http_application.rb"))
 javascript = File.read(File.join(__dir__, "..", "assets", "dashboard", "dashboard.js"))
-check.call("application and dashboard expose static presentation and immutable private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute visual_presentation].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("Static visual presentation") && javascript.include?("Generated motion") && javascript.include?("Qualification pending"))
+check.call("application and dashboard expose static presentation and immutable private media", %w[music.visuals.import.preview music.visuals.loop.execute music.visuals.final.execute visual_presentation].all? { |operation| contract.include?(operation) && facade.include?(operation) } && http.include?("/api/v1/music/visual/") && javascript.include?("Static visual presentation") && javascript.include?("Generated motion") && javascript.include?("Available in Visual Studio"))
 check.call("visual slice has no image-model service listener or publication path", !File.read(File.join(__dir__, "..", "lib", "soul_core", "music_visual_companion_service.rb")).match?(/youtube|upload|listen|daemon|Thread\.new/))
 
 abort "#{failures.length} visual companion verification(s) failed: #{failures.join(', ')}" unless failures.empty?

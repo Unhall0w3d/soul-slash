@@ -30,9 +30,13 @@ Status: **implemented**
 
 ### Creative Studios
 
-Established Music Studio through generation, evidence, revision, references, export, static visual companions, and exact local upload packaging. Established Visual Studio through bounded still generation, guided editing, review, deletion, and Music binding.
+Established Music Studio through generation, evidence, revision, references,
+export, reviewed visual companions, and exact local upload packaging.
+Established Visual Studio through bounded still generation, guided editing,
+Wan image-guided motion, FastWan native text-to-video, review, revision,
+deletion, and Music binding.
 
-Status: **still-image and local publication pipeline implemented; generated motion remains unqualified**
+Status: **still, short generated-motion, and local publication pipelines implemented**
 
 ## Active consolidation
 
@@ -41,7 +45,7 @@ The current body of work is a product/documentation consolidation and real-use r
 ## Future milestone candidates
 
 - Chat capability invocation and persona refinement
-- Qualified generated motion
+- Longer and higher-fidelity generated motion after measured local qualification
 - Voice and multimodal perception
 - Backup, recovery, and broader deployment
 - Longer-form creative production and optional draft-upload integration

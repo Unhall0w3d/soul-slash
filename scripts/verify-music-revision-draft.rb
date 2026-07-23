@@ -104,6 +104,24 @@ unchanged_client = RevisionDraftClient.new(JSON.generate(
 unchanged = SoulCore::MusicRevisionDraftService.new(provider_client: unchanged_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
 check.call("seed-only or otherwise unchanged model advice fails before any generation", unchanged["lifecycle_state"] == "awaiting_input" && unchanged["reason"].include?("material revision") && unchanged["mutation"] == "none")
 
+closing_source = source.merge(
+  "caption" => "Progressive alternative metal with ritual drums, snarling bass, downtuned guitars, industrial scrape, and raw male vocals rising from restraint to eruption. Open on a dying drone, drive through asymmetric riff cycles, hollow out the middle, then rebuild faster and heavier before an abrupt unresolved cutoff.",
+  "lyrics" => "[Final Escalation]\nThe pressure taught the dark to bite\n[Cutoff]\nThe weight remembered"
+)
+closing_candidate = candidate.merge("generation_input" => closing_source, "review" => review.merge("notes" => "Nearly exact, but the final title line was dropped."))
+closing_analysis = analysis.merge("alignment" => { "sequence_recall" => 0.95, "lines" => [{ "status" => "partial", "intended" => "The weight remembered", "sequence_recall" => 0.5 }] })
+unchanged_closing = JSON.generate(
+  "caption" => closing_source["caption"], "bpm" => closing_source["bpm"], "keyscale" => closing_source["keyscale"], "timesignature" => closing_source["timesignature"],
+  "rationale" => "Preserve the accepted candidate."
+)
+closing_client = RevisionDraftClient.new(unchanged_closing)
+closing = SoulCore::MusicRevisionDraftService.new(provider_client: closing_client).draft(project: project, candidate: closing_candidate, analysis: closing_analysis, provider: provider)
+check.call("an isolated missing final lyric gets one bounded material caption adjustment", closing_client.calls.one? && closing["lifecycle_state"] == "blocked_for_human_review" && closing.dig("data", "revision", "caption").length <= 512 && closing.dig("data", "revision", "caption").include?("isolated closing lyric") && closing.dig("data", "revision", "lyrics") == closing_source["lyrics"] && closing.dig("data", "changes") == ["Replace Sound and Structure with the proposed materially revised arrangement."])
+
+oversized_closing_client = RevisionDraftClient.new(JSON.generate(JSON.parse(unchanged_closing).merge("caption" => "Overwritten arrangement " * 40)))
+oversized_closing = SoulCore::MusicRevisionDraftService.new(provider_client: oversized_closing_client).draft(project: project, candidate: closing_candidate, analysis: closing_analysis, provider: provider)
+check.call("over-limit final-lyric advice is compressed without a second model request", oversized_closing_client.calls.one? && oversized_closing["lifecycle_state"] == "blocked_for_human_review" && oversized_closing.dig("data", "revision", "caption").length <= 512)
+
 invalid_client = RevisionDraftClient.new("```json\n#{valid_draft}\n```")
 invalid = SoulCore::MusicRevisionDraftService.new(provider_client: invalid_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
 check.call("Markdown-wrapped JSON fails closed", invalid["lifecycle_state"] == "failed" && invalid["reason"].include?("invalid revision JSON"))

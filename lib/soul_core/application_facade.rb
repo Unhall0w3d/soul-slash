@@ -154,6 +154,10 @@ module SoulCore
       visual_studio.artifact_path(project_id: project_id, candidate_id: candidate_id)
     end
 
+    def visual_motion_artifact_path(project_id:, motion_id:)
+      visual_studio.motion_artifact_path(project_id: project_id, motion_id: motion_id)
+    end
+
     private
 
     def dispatch(operation, parameters, context, request_id, progress: nil)
@@ -296,6 +300,17 @@ module SoulCore
       when "visual.edit.execute" then domain(visual_studio.edit_execute(project_id: required(parameters, "visual_project_id"), source_candidate_id: required(parameters, "source_visual_candidate_id"), candidate_id: required(parameters, "visual_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "visual.promotion.preview" then domain(visual_studio.promotion_preview(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id")))
       when "visual.promotion.execute" then domain(visual_studio.promotion_execute(project_id: required(parameters, "visual_project_id"), candidate_id: required(parameters, "visual_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "visual.motion.preview" then domain(visual_studio.motion_preview(project_id: required(parameters, "visual_project_id"), source_candidate_id: required(parameters, "source_visual_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed")))
+      when "visual.motion.execute" then domain(visual_studio.motion_execute(project_id: required(parameters, "visual_project_id"), source_candidate_id: required(parameters, "source_visual_candidate_id"), motion_id: required(parameters, "motion_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.native_motion.preview" then domain(visual_studio.native_motion_preview(project_id: required(parameters, "visual_project_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), duration_seconds: parameters.fetch("duration_seconds", "4")))
+      when "visual.native_motion.execute" then domain(visual_studio.native_motion_execute(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), duration_seconds: parameters.fetch("duration_seconds", "4"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.native_motion.revision.preview" then domain(visual_studio.native_motion_revision_preview(project_id: required(parameters, "visual_project_id"), source_motion_id: required(parameters, "source_motion_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), duration_seconds: required(parameters, "duration_seconds")))
+      when "visual.native_motion.revision.execute" then domain(visual_studio.native_motion_revision_execute(project_id: required(parameters, "visual_project_id"), source_motion_id: required(parameters, "source_motion_candidate_id"), motion_id: required(parameters, "motion_candidate_id"), instruction: required(parameters, "instruction"), seed: required(parameters, "seed"), duration_seconds: required(parameters, "duration_seconds"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.motion.review" then domain(visual_studio.motion_review(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), review: required(parameters, "visual_review")))
+      when "visual.motion.delete.preview" then domain(visual_studio.motion_delete_preview(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id")))
+      when "visual.motion.delete.execute" then domain(visual_studio.motion_delete_execute(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "visual.motion.promotion.preview" then domain(visual_studio.motion_promotion_preview(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id")))
+      when "visual.motion.promotion.execute" then domain(visual_studio.motion_promotion_execute(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else

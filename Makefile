@@ -6,10 +6,19 @@ SHELL := /usr/bin/env bash
 # Generic public dispatcher. Local runtime values belong in .env.
 
 PROJECT_ROOT := $(CURDIR)
+LOCAL_MAKEFILE ?= $(PROJECT_ROOT)/Makefile.local
+-include $(LOCAL_MAKEFILE)
+
 ENV_FILE ?= $(PROJECT_ROOT)/.env
 LAN_HOST ?=
 DASHBOARD_HTTPS_PORT ?= 8443
 CONFIRM ?=
+LLAMACPP_MODEL_FILE ?= Qwen3-8B-Q4_K_M.gguf
+LLAMACPP_MODEL_URL ?= https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf?download=true
+OLLAMA_MODEL ?= gemma4:12b-it-q4_K_M
+GEMMA_SOURCE_MODEL ?= $(OLLAMA_MODEL)
+GEMMA_API_MODEL ?= soul-local-chat
+GEMMA_PORT ?= 8082
 AMD_SERVER ?=
 AMD_MODEL ?=
 AMD_SERVER_SHA256 ?=
@@ -34,8 +43,13 @@ MUSIC_REFERENCE_ENRICHMENT_MANIFEST ?= $(PROJECT_ROOT)/config/music_reference_en
 MUSIC_REFERENCE_MODEL_CACHE ?=
 VISUAL_ROOT ?= $(HOME)/.local/share/soul/visual
 VISUAL_MODEL_MANIFEST ?= $(PROJECT_ROOT)/config/visual_studio_models.json
+VISUAL_MOTION_ROOT ?= $(HOME)/.local/share/soul/visual-motion
+VISUAL_MOTION_MANIFEST ?= $(PROJECT_ROOT)/config/visual_motion_models.json
+VISUAL_MOTION_INPUT ?=
+VISUAL_NATIVE_ROOT ?= $(HOME)/.local/share/soul/visual-native
+VISUAL_NATIVE_MANIFEST ?= $(PROJECT_ROOT)/config/visual_native_models.json
 
-.PHONY: help check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
+.PHONY: help defaults-show supported-stack-check check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run visual-native-check visual-native-runtime-plan visual-native-runtime-install visual-native-model-download-plan visual-native-model-download verify-visual-motion-qualification verify-visual-native-video music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -44,6 +58,8 @@ help:
 > @echo "  make check             Check required/recommended local tools only"
 > @echo "  make detect            Detect runtime binaries, endpoints, .env, and local models"
 > @echo "  make setup             Detect providers and guide setup"
+> @echo "  make defaults-show     Show public model/runtime defaults and override points"
+> @echo "  make supported-stack-check  Inspect all supported creative runtime lanes"
 > @echo "  make setup-llamacpp    Configure llama.cpp server provider"
 > @echo "  make setup-ollama      Configure Ollama provider"
 > @echo "  make music-check       Check optional Music pilot tools (including uv)"
@@ -57,6 +73,12 @@ help:
 > @echo "  make visual-check      Inspect the optional bounded FLUX.2 Vulkan lane"
 > @echo "  make visual-runtime-plan  Preview the pinned stable-diffusion.cpp Vulkan build"
 > @echo "  make visual-model-download-plan  Preview exact FLUX.2 Klein model bytes"
+> @echo "  make visual-motion-check  Inspect the isolated Wan 2.2 motion qualification lane"
+> @echo "  make visual-motion-runtime-plan  Preview the pinned motion Vulkan build"
+> @echo "  make visual-motion-model-download-plan  Preview exact Wan 2.2 pilot model bytes"
+> @echo "  make visual-motion-pilot-plan VISUAL_MOTION_INPUT=/path/request.json"
+> @echo "  make visual-native-check  Inspect the optional FastWan text-to-video lane"
+> @echo "  make visual-native-model-download-plan  Preview exact FastWan model bytes"
 > @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
 > @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
 > @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
@@ -115,6 +137,22 @@ help:
 > @echo "  docs/RUNTIME_PROVIDERS.md"
 > @echo "  docs/REQUIREMENTS.md"
 
+defaults-show:
+> @echo "Soul/ supported defaults (override on the command line or in ignored Makefile.local)"
+> @echo "  NVIDIA chat GGUF:       $(LLAMACPP_MODEL_FILE)"
+> @echo "  AMD chat Ollama tag:    $(OLLAMA_MODEL)"
+> @echo "  Stable API alias:       $(GEMMA_API_MODEL)"
+> @echo "  Music manifest:         $(MUSIC_VULKAN_MANIFEST)"
+> @echo "  Still-image manifest:   $(VISUAL_MODEL_MANIFEST)"
+> @echo "  Image-motion manifest:  $(VISUAL_MOTION_MANIFEST)"
+> @echo "  Native-video manifest:  $(VISUAL_NATIVE_MANIFEST)"
+> @echo "  Transcription model:    $(MUSIC_TRANSCRIPTION_MODEL)"
+> @echo
+> @echo "Model manifests bind repository, revision, exact filename, size, and SHA-256."
+> @echo "Use a reviewed custom manifest to substitute creative models safely."
+
+supported-stack-check: check music-vulkan-check visual-check visual-motion-check visual-native-check
+
 chmod-scripts:
 > @chmod +x scripts/soul-*.sh
 
@@ -132,10 +170,10 @@ setup: chmod-scripts
 > @scripts/soul-runtime-detect.sh --setup
 
 setup-llamacpp: chmod-scripts
-> @scripts/soul-setup-llamacpp.sh
+> @SOUL_MODEL_FILE="$(LLAMACPP_MODEL_FILE)" SOUL_MODEL_URL="$(LLAMACPP_MODEL_URL)" scripts/soul-setup-llamacpp.sh
 
 setup-ollama: chmod-scripts
-> @scripts/soul-setup-ollama.sh
+> @SOUL_OLLAMA_MODEL="$(OLLAMA_MODEL)" scripts/soul-setup-ollama.sh
 
 music-check:
 > @ruby scripts/soul-music-pilot check --manifest "$(MUSIC_LEGACY_MANIFEST)" --root "$(MUSIC_ROOT)" --dit-model "$(MUSIC_DIT_MODEL)" --lm-model "$(MUSIC_LM_MODEL)"
@@ -206,6 +244,59 @@ visual-model-download:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-model-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "DOWNLOAD_VISUAL_VULKAN_MODELS" || { echo "Exact confirmation DOWNLOAD_VISUAL_VULKAN_MODELS is required."; exit 2; }
 > @ruby scripts/soul-visual-runtime download --manifest "$(VISUAL_MODEL_MANIFEST)" --root "$(VISUAL_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+visual-motion-check:
+> @ruby scripts/soul-visual-motion-runtime check --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)"
+
+visual-motion-runtime-plan:
+> @ruby scripts/soul-visual-motion-runtime plan --action setup --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)"
+
+visual-motion-runtime-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-motion-runtime-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_VISUAL_MOTION_VULKAN_RUNTIME" || { echo "Exact confirmation INSTALL_VISUAL_MOTION_VULKAN_RUNTIME is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime setup --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+visual-motion-model-download-plan:
+> @ruby scripts/soul-visual-motion-runtime plan --action download --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)"
+
+visual-motion-model-download:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-motion-model-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "DOWNLOAD_VISUAL_MOTION_MODELS" || { echo "Exact confirmation DOWNLOAD_VISUAL_MOTION_MODELS is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime download --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+visual-motion-pilot-plan:
+> @test -n "$(VISUAL_MOTION_INPUT)" || { echo "VISUAL_MOTION_INPUT=/path/request.json is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime plan --action run --request "$(VISUAL_MOTION_INPUT)" --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)"
+
+visual-motion-pilot-run:
+> @test -n "$(VISUAL_MOTION_INPUT)" -a -n "$(EXPECTED_DIGEST)" || { echo "VISUAL_MOTION_INPUT and EXPECTED_DIGEST are required."; exit 2; }
+> @test "$(CONFIRM)" = "RUN_VISUAL_MOTION_PILOT" || { echo "Exact confirmation RUN_VISUAL_MOTION_PILOT is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime run --request "$(VISUAL_MOTION_INPUT)" --manifest "$(VISUAL_MOTION_MANIFEST)" --root "$(VISUAL_MOTION_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-visual-motion-qualification:
+> @ruby scripts/verify-visual-motion-qualification.rb
+
+visual-native-check:
+> @ruby scripts/soul-visual-motion-runtime check --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)"
+
+visual-native-runtime-plan:
+> @ruby scripts/soul-visual-motion-runtime plan --action setup --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)"
+
+visual-native-runtime-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-native-runtime-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_VISUAL_MOTION_VULKAN_RUNTIME" || { echo "Exact confirmation INSTALL_VISUAL_MOTION_VULKAN_RUNTIME is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime setup --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+visual-native-model-download-plan:
+> @ruby scripts/soul-visual-motion-runtime plan --action download --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)"
+
+visual-native-model-download:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run visual-native-model-download-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "DOWNLOAD_VISUAL_MOTION_MODELS" || { echo "Exact confirmation DOWNLOAD_VISUAL_MOTION_MODELS is required."; exit 2; }
+> @ruby scripts/soul-visual-motion-runtime download --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-visual-native-video:
+> @ruby scripts/verify-visual-studio-native-video.rb
 
 verify-music-publication-package:
 > @ruby scripts/verify-music-publication-package.rb
@@ -360,11 +451,11 @@ model-runtime-amd-uninstall:
 
 model-runtime-gemma-plan:
 > @test -n "$(OLLAMA_SHA256)" -a -n "$(GEMMA_MODEL_DIGEST)" || { echo "OLLAMA_SHA256 and GEMMA_MODEL_DIGEST are required."; exit 2; }
-> @ruby scripts/soul-model-runtime-gemma plan --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(or $(GEMMA_SOURCE_MODEL),gemma4:12b-it-q4_K_M)" --api-model "$(or $(GEMMA_API_MODEL),soul-local-chat)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(or $(GEMMA_PORT),8082)"
+> @ruby scripts/soul-model-runtime-gemma plan --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(GEMMA_SOURCE_MODEL)" --api-model "$(GEMMA_API_MODEL)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(GEMMA_PORT)"
 
 model-runtime-gemma-install:
 > @test "$(CONFIRM)" = "INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT" || { echo "Run model-runtime-gemma-plan first, then set CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT."; exit 2; }
-> @ruby scripts/soul-model-runtime-gemma install --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(or $(GEMMA_SOURCE_MODEL),gemma4:12b-it-q4_K_M)" --api-model "$(or $(GEMMA_API_MODEL),soul-local-chat)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(or $(GEMMA_PORT),8082)" --confirmation "$(CONFIRM)"
+> @ruby scripts/soul-model-runtime-gemma install --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(GEMMA_SOURCE_MODEL)" --api-model "$(GEMMA_API_MODEL)" --model-digest "$(GEMMA_MODEL_DIGEST)" --port "$(GEMMA_PORT)" --confirmation "$(CONFIRM)"
 
 model-runtime-gemma-status:
 > @ruby scripts/soul-model-runtime-gemma status

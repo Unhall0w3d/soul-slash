@@ -79,7 +79,7 @@ install or verify it.
 ```text
 scripts/soul-model-runtime-startup plan
 scripts/soul-model-runtime-startup install --confirmation INSTALL_SELECTED_MODEL_STARTUP
-scripts/soul-model-runtime-start-selected --root /home/bhones/Projects/soul
+scripts/soul-model-runtime-start-selected --root /path/to/soul-slash
 systemd-analyze --user verify ~/.config/systemd/user/soul-model-runtime-selected.service
 systemctl --user start soul-model-runtime-selected.service
 make verify-model-runtime-controls

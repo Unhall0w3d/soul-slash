@@ -13,7 +13,9 @@ Companion into a local, upload-ready package. The package is an additive
 ## Package
 
 - `video.mp4` — exact reviewed H.264/AAC companion;
-- `thumbnail.png` — exact approved base visual;
+- `thumbnail.png` — exact approved base visual for a still companion, or one
+  deterministic frame derived locally from the exact reviewed full-motion
+  preview when no static base exists;
 - `youtube-description.txt` — editable human-reviewed description sidecar;
 - `upload.json` — title, category 10, private visibility, not-made-for-kids,
   synthetic-media disclosure, and explicit human-publication state.
@@ -21,6 +23,9 @@ Companion into a local, upload-ready package. The package is an additive
 The proposed description contains genre influence, intent, BPM, key, time,
 intended lyrics when present, the Soul/ repository, NOC Thoughts, a local
 generative/human-review disclosure, and a mode-appropriate Soul/ credit.
+Genre influence is taken from the caption's complete leading genre clause,
+using a colon or instrumentation transition as the semantic boundary rather
+than cutting the text at an arbitrary character position.
 
 ## Authority and lifecycle
 
@@ -33,6 +38,10 @@ leaves no partial package.
 
 No OAuth credential, Google account, network request, YouTube upload, channel
 mutation, scheduling, or publication is included.
+
+Generated-motion thumbnail derivation is part of the exact package scope. It
+uses ffmpeg at a fixed one-second timestamp, performs no model inference, and
+cannot substitute a different video or silently select another frame.
 
 ## Future authenticated upload boundary
 

@@ -25,13 +25,13 @@ The selection is based on primary project material:
 - [FLUX.2 Klein](https://github.com/black-forest-labs/flux2) provides a current unified generation/editing family with an Apache-2.0 4B variant.
 - [Z-Image](https://github.com/Tongyi-MAI/Z-Image) is the comparison candidate: its 6B Turbo variant targets 16 GB consumer devices, but its released Turbo lane is generation-focused and the dedicated editing checkpoint is not yet the cleaner first boundary.
 
-## Motion decision
+## Motion decision (superseded by A3 research)
 
-[LTX-Video 2B distilled](https://github.com/Lightricks/LTX-Video) is the lead
-short-motion candidate because it supports text-to-video, image-to-video,
-keyframes, extension, and CPU offload. It is **not** advertised as ready. Its
-official local path is CUDA-first, while this lane must run on Arch Linux and an
-RDNA2 RX 6900 XT. A later qualification must measure:
+The original LTX-Video 2B choice was a research placeholder. Visual Studio A3
+selects Wan 2.2 TI2V 5B Q4 for the measured pilot because current
+`stable-diffusion.cpp` supports Wan 2.2 through Vulkan and the current LTX
+family is no longer the prudent 16 GiB first target. It is **not** advertised as
+ready. A3 must measure:
 
 - successful AMD execution without hidden CUDA substitution;
 - peak VRAM/RAM and effect on the active Core;
@@ -40,9 +40,9 @@ RDNA2 RX 6900 XT. A later qualification must measure:
 - whether native execution or an explicitly approved ComfyUI workflow is the
   more maintainable boundary.
 
-Wan2.2 TI2V-5B and HunyuanVideo 1.5 are excluded from this host lane: their
-official memory/platform requirements are not a prudent fit for the 16 GB AMD
-card. Wan2.1 1.3B remains a lower-quality fallback only if LTX cannot qualify.
+The official Wan Python path targets larger cards. A3 therefore treats the Q4
+Vulkan/CPU-offload path as an experiment, not a production capability. See
+`VISUAL_STUDIO_A3_MOTION_QUALIFICATION_BRIEF.md`.
 
 ## Bounded lifecycle
 

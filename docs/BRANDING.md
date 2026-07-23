@@ -60,6 +60,9 @@ Conversation · Capability · Creation · Stewardship
 - `assets/brand/character/soul-full-body.png`
 - `assets/brand/soul-slash-micro-mark.svg`
 
-The repository header and account artwork use the current character identity. Older brand-board, primary-mark, repo-icon, and supporting-scene files remain historical assets and should not guide new work.
+The repository header and account artwork use the current character identity.
+Older brand-board, primary-mark, repo-icon, Skill Studio, and supporting-scene
+files were retired and removed; historical documents may still name them as
+evidence of the prior direction.
 
 The dashboard implementation and accessibility rules are defined in [`docs/soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md`](soul/DASHBOARD_PRODUCT_AND_VISUAL_DIRECTION.md).

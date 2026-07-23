@@ -14,10 +14,7 @@ module SoulCore
       "/assets/dashboard.css" => ["assets/dashboard/dashboard.css", "text/css; charset=utf-8"],
       "/assets/dashboard.js" => ["assets/dashboard/dashboard.js", "text/javascript; charset=utf-8"],
       "/brand/micro-mark.svg" => ["assets/brand/soul-slash-micro-mark.svg", "image/svg+xml"],
-      "/brand/primary-mark.png" => ["assets/brand/soul-slash-primary-mark.png", "image/png"],
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
-      "/brand/supporting-scene.png" => ["assets/brand/soul-slash-supporting-scene.png", "image/png"],
-      "/brand/skill-studio.png" => ["assets/brand/soul-slash-skill-studio.png", "image/png"],
       "/brand/character/soul-full-body.png" => ["assets/brand/character/soul-full-body.png", "image/png"],
       "/brand/character/soul-portrait-unmasked.png" => ["assets/brand/character/soul-portrait-unmasked.png", "image/png"],
       "/brand/character/soul-portrait-masked.png" => ["assets/brand/character/soul-portrait-masked.png", "image/png"]
@@ -97,6 +94,10 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return visual_image(normalized_headers, *match.captures)
       end
+      if (match = target.match(%r{\A/api/v1/visual/motion/(visual_project_[a-f0-9]{16})/(motion_candidate_[a-f0-9]{16})\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return visual_motion(normalized_headers, *match.captures)
+      end
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -158,7 +159,7 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       request = JSON.parse(body)
-      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute visual.generation.execute visual.edit.execute]
+      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute visual.generation.execute visual.edit.execute visual.motion.execute visual.native_motion.execute visual.native_motion.revision.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
         return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts bounded music, analysis, or visual rendering only"))
       end
@@ -243,7 +244,13 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       path = @facade.music_visual_artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: artifact)
-      content_type = artifact == "base" ? "image/png" : "video/mp4"
+      content_type = if artifact == "base"
+        "image/png"
+      elsif File.extname(path) == ".webm"
+        "video/webm"
+      else
+        "video/mp4"
+      end
       size = File.size(path)
       range = audio_range(headers["range"], size)
       return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
@@ -261,6 +268,22 @@ module SoulCore
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       path = @facade.visual_artifact_path(project_id: project_id, candidate_id: candidate_id)
       response(200, FileStream.new(path), "Content-Type" => "image/png", "Content-Length" => File.size(path).to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store")
+    rescue ArgumentError
+      response(404, "Not Found")
+    end
+
+    def visual_motion(headers, project_id, motion_id)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.visual_motion_artifact_path(project_id: project_id, motion_id: motion_id)
+      size = File.size(path)
+      range = audio_range(headers["range"], size)
+      return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
+      offset, length = range || [0, size]
+      extra = { "Content-Type" => "video/webm", "Content-Length" => length.to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store", "Accept-Ranges" => "bytes" }
+      extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
+      response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
     rescue ArgumentError
       response(404, "Not Found")
     end

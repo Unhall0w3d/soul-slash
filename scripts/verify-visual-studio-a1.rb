@@ -65,7 +65,7 @@ html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("Creative Studios groups Music and Visual Studio", %w[creative-navigation creative-tab creative-menu music-tab visual-tab visual-panel].all? { |id| html.include?(id) })
 check.call("dashboard performs create preview execute and review", %w[visual.projects.create visual.generation.preview visual.generation.execute visual-candidate-list].all? { |value| js.include?(value) || html.include?(value) })
-check.call("motion remains an explicit qualification boundary", html.include?("Qualification pending") && JSON.parse(File.read(File.expand_path("../config/visual_studio_models.json", __dir__))).dig("motion_candidates", "ltxv-2b-0.9.8-distilled", "status") == "qualification_required")
+check.call("A1 motion qualification boundary is explicitly superseded", html.include?("Qualified locally") && File.file?(File.expand_path("../config/visual_motion_models.json", __dir__)))
 
 if failures.empty?
   puts "PASS: #{checks} Visual Studio A1 checks"

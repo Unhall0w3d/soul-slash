@@ -25,7 +25,7 @@ The supported local runtime topology currently includes:
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-Music Studio currently supports 30-, 90-, 180-, and 600-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, static visual companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, review, guided edits, deletion, and exact binding to Music candidates. Upload and publication remain human actions.
+Music Studio currently supports 30-, 90-, 180-, and 600-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study; upload and publication remain human actions.
 
 For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
@@ -40,7 +40,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
 | Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
-| Visual Studio | Generate, review, revise, and bind private local still imagery | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
+| Visual Studio | Generate, review, revise, and bind private local imagery or short motion scenes | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
 
 ## Design principles
 
@@ -122,6 +122,7 @@ git clone https://github.com/Unhall0w3d/soul-slash.git
 cd soul-slash
 make check
 make detect
+make defaults-show
 make setup
 make test-runtime
 make test-soul
@@ -178,6 +179,13 @@ CLI override
 → ignored local .env
 → tracked safe default
 ```
+
+The Makefile defaults to the currently reviewed Gemma/Qwen/ACE-Step/FLUX/Wan
+stack. To retain machine-local model substitutions, copy
+`config/model_overrides.example.mk` to ignored `Makefile.local`, or pass the
+same variables for one invocation. Creative model substitutions use complete
+reviewed manifests—not unverified loose filenames—so repository revision,
+filename, byte size, SHA-256, and runtime bounds remain coupled.
 
 The public repository must not contain operator-specific credentials, addresses, hostnames, model paths, private memory, or generated project data.
 

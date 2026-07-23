@@ -22,6 +22,21 @@ class PublicationVisualFixture
   end
 end
 
+PublicationResult = Struct.new(:status) do
+  def success? = status == "ok"
+end
+
+class PublicationRunner
+  attr_reader :commands
+  def initialize = (@commands = [])
+  def which(name) = "/usr/bin/#{name}"
+  def run(*command, **_options)
+    @commands << command
+    File.binwrite(command.last, "derived thumbnail fixture")
+    PublicationResult.new("ok")
+  end
+end
+
 failures = []
 check = lambda do |label, condition|
   puts "- #{label}: #{condition ? 'ok' : 'FAILED'}"
@@ -62,6 +77,9 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   draft = service.draft(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id)
   description = draft.dig("data", "description")
   check.call("instrumental description includes metadata links disclosure and truthful credit", draft["lifecycle_state"] == "complete" && description.start_with?("Liquid drum and bass | A luminous nocturnal current.") && description.include?("BPM: 174") && description.include?("https://github.com/Unhall0w3d/soul-slash") && description.include?("https://nocthoughts.com/") && description.include?("Created locally with generative models and human review.") && !description.include?("Lyrics created"))
+  foreboding_genre = service.send(:genre_influence, "Funeral doom fused with dark ambient and restrained industrial noise: downtuned baritone guitars, sub-bass drones, distant floor toms, bowed metal, and low male bass vocals.")
+  check.call("colon-delimited genre identity remains complete", foreboding_genre == "Funeral doom fused with dark ambient and restrained industrial noise")
+  check.call("instrument-led captions retain their concise genre identity", service.send(:genre_influence, "Liquid drum and bass with warm sub-bass and restrained Rhodes chords.") == "Liquid drum and bass")
 
   preview = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   wrong = service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description, confirmation: "WRONG", expected_digest: preview.dig("data", "expected_digest"))
@@ -74,6 +92,27 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   check.call("upload metadata defaults to private human publication", upload.values_at("category_id", "privacy_status", "made_for_kids", "contains_synthetic_media", "api_upload_performed", "human_publication_required") == ["10", "private", false, true, false, true])
   replay = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   check.call("identical package replay is idempotent", replay["lifecycle_state"] == "complete" && replay.dig("data", "idempotent_replay") == true)
+
+  motion_destination = File.join(export_root, "afterimage-motion-fixture")
+  FileUtils.mkdir_p(motion_destination)
+  %w[master.flac listening.mp3 song.json song-info.md].each { |name| File.binwrite(File.join(motion_destination, name), "motion fixture #{name}") }
+  File.write(File.join(exports, "#{candidate_id}.json"), JSON.generate({ "schema_version" => "soul.music.finished_export.v1", "project_id" => project_id, "candidate_id" => candidate_id, "destination" => motion_destination, "scope_digest" => "b" * 64 }))
+  motion_visual_id = "visual_#{'4' * 16}"
+  motion_visual = {
+    "project_id" => project_id, "candidate_id" => candidate_id, "visual_id" => motion_visual_id,
+    "source_kind" => "generated_motion", "stage" => "preview_ready",
+    "artifacts" => { "preview" => { "sha256" => Digest::SHA256.file(video).hexdigest } }
+  }
+  motion_runner = PublicationRunner.new
+  motion_service = SoulCore::MusicPublicationPackageService.new(
+    root: root, export_root: export_root, project_store: store,
+    visual_service: PublicationVisualFixture.new(motion_visual, nil, video), runner: motion_runner,
+    clock: -> { Time.utc(2026, 7, 19, 5, 2) }
+  )
+  motion_preview = motion_service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual_id, description: description)
+  motion_complete = motion_service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual_id, description: description, confirmation: "EXPORT_YOUTUBE_PACKAGE", expected_digest: motion_preview.dig("data", "expected_digest"))
+  motion_thumbnail = File.join(motion_destination, "youtube", "thumbnail.png")
+  check.call("generated motion package derives one deterministic thumbnail without requiring base.png", motion_preview.dig("data", "preview_scope", "thumbnail_derivation") == "reviewed-preview-frame-v1" && motion_complete["lifecycle_state"] == "complete" && File.file?(motion_thumbnail) && motion_runner.commands.one? && motion_runner.commands.first.each_cons(2).include?(["-ss", "1.0"]))
 end
 
 contract = File.binread(File.expand_path("../lib/soul_core/application_contract.rb", __dir__))

@@ -23,7 +23,7 @@ docs/overlays/README_PUBLIC_MAKEFILE_RUNTIME_SETUP.md
 The Makefile no longer assumes:
 
 - a specific user home directory
-- `/home/bhones`
+- an operator-specific absolute home path
 - `/usr/local/bin/llama-server`
 - NVIDIA-only hardware
 - a systemd user service

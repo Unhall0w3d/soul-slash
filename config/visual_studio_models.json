@@ -42,10 +42,11 @@
     }
   },
   "motion_candidates": {
-    "ltxv-2b-0.9.8-distilled": {
+    "wan2.2-ti2v-5b-q4": {
       "status": "qualification_required",
-      "reason": "Official CUDA-first runtime has not been proven on this Arch Linux RDNA2 host.",
-      "allowed_effects": ["text_to_video", "image_to_video", "keyframe_conditioning"]
+      "reason": "The separate pinned stable-diffusion.cpp Vulkan lane must pass the RX 6900 XT image-to-video pilot before dashboard enablement.",
+      "allowed_effects": ["image_to_video"],
+      "qualification_manifest": "config/visual_motion_models.json"
     }
   }
 }

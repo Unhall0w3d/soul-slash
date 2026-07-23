@@ -150,6 +150,50 @@ module SoulCore
       FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
     end
 
+    def generated_motion_import_preview(project_id:, candidate_id:, source_project_id:, source_motion_id:, source_path:, prompt_summary:, source_receipt:)
+      scope = generated_motion_import_scope(project_id, candidate_id, source_project_id, source_motion_id, source_path, prompt_summary, source_receipt)
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Visual Studio motion candidate is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+      outcome("blocked_for_human_review", true, "exact reviewed motion binding requires approval", data: gate(IMPORT_CONFIRMATION, scope))
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def generated_motion_import_execute(project_id:, candidate_id:, source_project_id:, source_motion_id:, source_path:, prompt_summary:, source_receipt:, confirmation:, expected_digest:)
+      return missing_gate unless confirmation.to_s.length.positive? && expected_digest.to_s.length.positive?
+      scope = generated_motion_import_scope(project_id, candidate_id, source_project_id, source_motion_id, source_path, prompt_summary, source_receipt)
+      return gate_mismatch("exact reviewed motion confirmation did not match") unless confirmation == IMPORT_CONFIRMATION
+      return gate_mismatch("Visual Studio motion or Music candidate changed; preview again") unless secure_compare(expected_digest, digest(scope))
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Visual Studio motion candidate is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+
+      root = visuals_root(project_id, create: true)
+      target = File.join(root, scope.fetch("visual_id"))
+      raise MusicProjectStore::IntegrityError, "visual destination already exists" if File.exist?(target) || File.symlink?(target)
+      staging = File.join(root, ".#{scope.fetch('visual_id')}.partial-#{SecureRandom.hex(4)}")
+      Dir.mkdir(staging, 0o700)
+      FileUtils.cp(source_path, File.join(staging, "loop.webm"), preserve: false)
+      File.chmod(0o600, File.join(staging, "loop.webm"))
+      record = scope.merge(
+        "schema_version" => "soul.music.visual.v1", "source_kind" => "generated_motion", "lifecycle_state" => "blocked_for_human_review",
+        "stage" => "loop_ready", "created_at" => @clock.call.iso8601, "updated_at" => @clock.call.iso8601,
+        "render_profile" => motion_render_profile(source_receipt),
+        "artifacts" => { "loop" => artifact("loop.webm", staging).merge("duration_seconds" => source_receipt.fetch("duration_seconds"), "width" => source_receipt.fetch("width"), "height" => source_receipt.fetch("height"), "fps" => source_receipt.fetch("fps"), "motion_profile" => "wan2.2-ti2v", "frame_change_expected" => true) },
+        "human_review_required" => true
+      )
+      write_json(File.join(staging, "visual.json"), record)
+      File.rename(staging, target)
+      outcome("blocked_for_human_review", true, "reviewed motion bound; full-duration Music Studio preview remains gated", data: { "visual" => record }, mutation: "music_visual_motion_bound")
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    ensure
+      FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
+    end
+
     def loop_preview(project_id:, candidate_id:, visual_id:, presentation: nil)
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual loop already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "loop")
@@ -193,7 +237,7 @@ module SoulCore
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual companion preview already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "preview")
       scope = final_scope(record)
-      outcome("blocked_for_human_review", true, "exact three-minute visual render confirmation required", data: gate(FINAL_CONFIRMATION, scope))
+      outcome("blocked_for_human_review", true, "exact full-duration visual render confirmation required", data: gate(FINAL_CONFIRMATION, scope))
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
     rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
@@ -212,13 +256,20 @@ module SoulCore
       duration = audio_duration(audio)
       progress&.call({ "stage" => "visual_companion", "message" => "Extending the approved static presentation and binding the exact lossless candidate" })
       output = File.join(directory, ".preview.partial.mp4")
-      render_final(File.join(directory, "base.png"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
+      render_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      if record["source_kind"] == "generated_motion"
+        render_motion_final(File.join(directory, "loop.webm"), audio, output, duration)
+      else
+        render_final(File.join(directory, "base.png"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
+      end
+      render_seconds = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - render_started).round(3)
       File.rename(output, File.join(directory, "preview.mp4"))
-      record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => WIDTH, "height" => HEIGHT, "fps" => FPS)
+      preview_fps = record["source_kind"] == "generated_motion" ? record.dig("render_profile", "fps") : FPS
+      record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => WIDTH, "height" => HEIGHT, "fps" => preview_fps, "render_seconds" => render_seconds)
       record["stage"] = "preview_ready"
       record["updated_at"] = @clock.call.iso8601
       replace_json(File.join(directory, "visual.json"), record)
-      outcome("blocked_for_human_review", true, "three-minute visual companion ready for human review", data: { "visual" => record }, mutation: "music_visual_preview_created")
+      outcome("blocked_for_human_review", true, "full-duration visual companion ready for human review", data: { "visual" => record }, mutation: "music_visual_preview_created")
     rescue MusicProjectStore::ValidationError => error
       outcome("awaiting_input", false, error.message)
     rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
@@ -229,7 +280,11 @@ module SoulCore
 
     def artifact_path(project_id:, candidate_id:, visual_id:, artifact:)
       record = read_visual(project_id, candidate_id, visual_id)
-      filename = { "base" => "base.png", "loop" => "loop.mp4", "preview" => "preview.mp4" }[artifact.to_s]
+      filename = if record["source_kind"] == "generated_motion" && artifact.to_s == "loop"
+        "loop.webm"
+      else
+        { "base" => "base.png", "loop" => "loop.mp4", "preview" => "preview.mp4" }[artifact.to_s]
+      end
       raise MusicProjectStore::ValidationError, "visual artifact is invalid" unless filename && record.dig("artifacts", artifact.to_s)
       path = File.join(visual_path(project_id, visual_id), filename)
       raise MusicProjectStore::IntegrityError, "visual artifact is missing" unless File.file?(path) && !File.symlink?(path)
@@ -274,6 +329,26 @@ module SoulCore
       base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
     end
 
+    def generated_motion_import_scope(project_id, candidate_id, source_project_id, source_motion_id, source_path, prompt_summary, source_receipt)
+      project, candidate, audio = validate_binding!(project_id, candidate_id)
+      expanded = File.expand_path(source_path.to_s)
+      allowed_root = File.join(@root, "Soul", "visual", "projects")
+      raise MusicProjectStore::ValidationError, "Visual Studio motion path is outside the private project archive" unless within?(expanded, allowed_root)
+      raise MusicProjectStore::IntegrityError, "Visual Studio motion is invalid" unless File.file?(expanded) && !File.symlink?(expanded) && File.size(expanded).positive?
+      raise MusicProjectStore::ValidationError, "Visual Studio motion identity is invalid" unless source_project_id.to_s.match?(/\Avisual_project_[a-f0-9]{16}\z/) && source_motion_id.to_s.match?(/\Amotion_candidate_[a-f0-9]{16}\z/)
+      prompt = prompt_summary.to_s.strip
+      raise MusicProjectStore::ValidationError, "motion prompt summary is invalid" unless prompt.length.between?(1, 2_000)
+      raise MusicProjectStore::IntegrityError, "motion receipt digest changed" unless secure_compare(source_receipt.fetch("video_sha256"), Digest::SHA256.file(expanded).hexdigest)
+      base = {
+        "operation" => "bind_visual_studio_motion", "project_id" => project.fetch("project_id"), "candidate_id" => candidate.fetch("candidate_id"),
+        "candidate_audio_sha256" => Digest::SHA256.file(audio).hexdigest, "source_visual_project_id" => source_project_id,
+        "source_motion_candidate_id" => source_motion_id, "source_video_sha256" => Digest::SHA256.file(expanded).hexdigest,
+        "provider" => "Soul Visual Studio / Wan 2.2 TI2V", "rights_status" => "operator_reviewed_local_generation",
+        "prompt_summary" => prompt, "render_profile_id" => "generated-motion-v1", "external_publication" => false
+      }
+      base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
+    end
+
     def loop_scope(record, presentation)
       raise MusicProjectStore::ValidationError, "visual source is not ready" unless record["stage"] == "base_bound"
       raise MusicProjectStore::ValidationError, "legacy visual effect profiles cannot advance; bind an approved Visual Studio still" unless record.dig("render_profile", "profile_id") == STATIC_PROFILE_ID
@@ -288,13 +363,23 @@ module SoulCore
       raise MusicProjectStore::ValidationError, "review the rendered loop before creating the full preview" unless record["stage"] == "loop_ready"
       {
         "operation" => "render_music_visual_companion", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
-        "visual_id" => record.fetch("visual_id"), "base_sha256" => record.dig("artifacts", "base", "sha256"),
+        "visual_id" => record.fetch("visual_id"), "source_sha256" => record.dig("artifacts", record["source_kind"] == "generated_motion" ? "loop" : "base", "sha256"),
         "review_loop_sha256" => record.dig("artifacts", "loop", "sha256"),
         "candidate_audio_sha256" => record.fetch("candidate_audio_sha256"),
         "presentation" => record.fetch("presentation", DEFAULT_PRESENTATION),
-        "encoding" => { "video" => "H.264 CRF 16 still-image", "pixel_format" => "yuv420p", "dark_gradient_dither" => "gradfun=1.2:16", "audio" => "AAC 256k" },
+        "encoding" => record["source_kind"] == "generated_motion" ?
+          { "video" => "H.264 CRF 16 repeated reviewed motion", "pixel_format" => "yuv420p", "audio" => "AAC 256k" } :
+          { "video" => "H.264 CRF 16 still-image", "pixel_format" => "yuv420p", "dark_gradient_dither" => "gradfun=1.2:16", "audio" => "AAC 256k" },
         "output" => "H.264/AAC MP4", "external_publication" => false
       }
+    end
+
+    def render_motion_final(loop_video, audio, output, duration)
+      require_tools!
+      filter = "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=decrease,pad=#{WIDTH}:#{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x060B11,format=yuv420p[v]"
+      command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-stream_loop", "-1", "-i", loop_video, "-i", audio, "-t", duration.to_s,
+        "-filter_complex", filter, "-map", "[v]", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", output]
+      run_media!(command, output, "generated-motion visual companion")
     end
 
     def render_loop(input, output, presentation)
@@ -422,6 +507,15 @@ module SoulCore
         "width" => WIDTH, "height" => HEIGHT, "fps" => FPS, "renderer" => "ffmpeg/libx264",
         "creative_effects" => false, "dark_gradient_dither" => "gradfun=1.2:16", "model_inference" => false, "resource_lane" => "cpu-foreground",
         "generated_motion" => "qualification_required"
+      }
+    end
+
+    def motion_render_profile(receipt)
+      {
+        "profile_id" => "generated-motion-v1", "label" => "Reviewed Wan motion", "loop_seconds" => receipt.fetch("duration_seconds"),
+        "width" => receipt.fetch("width"), "height" => receipt.fetch("height"), "fps" => receipt.fetch("fps"),
+        "renderer" => "Wan 2.2 TI2V / stable-diffusion.cpp Vulkan", "creative_effects" => true,
+        "model_inference" => true, "resource_lane" => "amd-foreground", "generated_motion" => "human_reviewed"
       }
     end
 

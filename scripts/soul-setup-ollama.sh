@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 soul_load_env
 
 default_base="${SOUL_OPENAI_BASE_URL:-http://127.0.0.1:11434/v1}"
-default_model="${SOUL_OLLAMA_MODEL:-${SOUL_MODEL_ALIAS:-qwen3:8b}}"
+default_model="${SOUL_OLLAMA_MODEL:-gemma4:12b-it-q4_K_M}"
 
 printf 'Soul/ Ollama setup\n'
 printf '\n'

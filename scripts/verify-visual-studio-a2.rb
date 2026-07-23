@@ -40,6 +40,22 @@ class VisualA2Companion
   end
 end
 
+class CountingVisualA2Service < SoulCore::VisualStudioService
+  attr_reader :sha256_calls
+
+  def initialize(**arguments)
+    @sha256_calls = 0
+    super
+  end
+
+  private
+
+  def file_sha256(path)
+    @sha256_calls += 1
+    super
+  end
+end
+
 Dir.mktmpdir("soul-visual-a2-") do |root|
   runtime = File.join(root, "runtime")
   source = File.join(runtime, "stable-diffusion.cpp", "bin")
@@ -104,14 +120,48 @@ Dir.mktmpdir("soul-visual-a2-") do |root|
   check.call("exact project deletion removes only inventoried archive", exact_project_delete["lifecycle_state"] == "complete" && service.inspect(project_id: project_id)["ok"] == false)
 end
 
+Dir.mktmpdir("soul-visual-resource-cache-") do |root|
+  runtime = File.join(root, "runtime")
+  binary_directory = File.join(runtime, "stable-diffusion.cpp", "bin")
+  models = File.join(runtime, "models")
+  FileUtils.mkdir_p(binary_directory)
+  FileUtils.mkdir_p(models)
+  binary = File.join(binary_directory, "sd-cli")
+  File.write(binary, "#!/bin/sh\n")
+  File.chmod(0o700, binary)
+  model_files = { "diffusion_model" => "diff.gguf", "text_encoder" => "text.gguf", "vae" => "vae.safetensors" }.map do |role, name|
+    path = File.join(models, name)
+    File.binwrite(path, "#{role}-fixture")
+    { "role" => role, "repository" => "test/models", "revision" => "b" * 40, "filename" => name, "bytes" => File.size(path), "sha256" => Digest::SHA256.file(path).hexdigest }
+  end
+  manifest = File.join(root, "manifest.json")
+  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => {}, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "steps" => 4, "cfg_scale" => 1.0, "files" => model_files } }, "motion_candidates" => {} }))
+  service = CountingVisualA2Service.new(root: root, visual_root: File.join(root, "Soul", "visual", "projects"), runtime_root: runtime, manifest_path: manifest)
+
+  first = service.resources
+  first_call_count = service.sha256_calls
+  second = service.resources
+  check.call("first resource inspection verifies every pinned model", first.dig("data", "models_ready") && first_call_count == model_files.length)
+  check.call("unchanged resource inspection reuses in-process verification", second.dig("data", "models_ready") && service.sha256_calls == first_call_count)
+
+  changed = model_files.first
+  changed_path = File.join(models, changed.fetch("filename"))
+  original = File.binread(changed_path)
+  replacement = original.sub(original[0], original[0] == "x" ? "y" : "x")
+  File.binwrite(changed_path, replacement)
+  invalidated = service.resources
+  check.call("changed model identity invalidates cached verification", service.sha256_calls == first_call_count + 1 && invalidated.dig("data", "models_ready") == false && invalidated.dig("data", "missing_roles") == [changed.fetch("role")])
+end
+
 operations = SoulCore::ApplicationContract::OPERATIONS
 required = %w[visual.projects.update visual.projects.delete.preview visual.projects.delete.execute visual.candidates.review visual.candidates.delete.preview visual.candidates.delete.execute visual.edit.preview visual.edit.execute visual.promotion.preview visual.promotion.execute]
 check.call("application contract exposes complete A2 operation set", required.all? { |operation| operations.key?(operation) })
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes revision review edit deletion and promotion", %w[update-visual-project visual.candidates.review visual.edit.preview visual.candidates.delete.preview visual.promotion.preview preview-visual-project-delete].all? { |value| html.include?(value) || js.include?(value) })
+check.call("slow visual actions expose immediate bounded progress", ["Verifying the pinned visual runtime and model files", "Saving the revised brief", "Revalidating the exact visual project"].all? { |message| js.include?(message) } && %w[refresh-visual-resources update-visual-project preview-visual-generation].all? { |id| js.include?(%Q{byId("#{id}")}) })
 check.call("Music binding selector reads the canonical generation projection", js.include?('dataOf(envelope).generations || []'))
-check.call("motion remains unavailable in A2", html.include?("Qualification pending") && !operations.key?("visual.motion.execute"))
+check.call("A2 motion boundary is explicitly superseded by the reviewed A4 lane", html.include?("Qualified locally") && operations.key?("visual.motion.execute"))
 
 if failures.empty?
   puts "PASS: #{checks} Visual Studio A2 checks"

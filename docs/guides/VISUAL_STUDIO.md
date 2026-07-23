@@ -1,14 +1,14 @@
 # Visual Studio
 
-Visual Studio is Soul's private local still-image workshop. It records a visual brief, generates immutable candidates through a bounded Vulkan lane, supports guided revisions and review, and can bind one exact image to one Music Studio candidate.
+Visual Studio is Soul's private local image and short-scene workshop. It records a visual brief, generates immutable still or motion candidates through bounded Vulkan lanes, supports guided revisions and review, and can bind one exact accepted visual to one Music Studio candidate.
 
 Open it from **Creative Studios → Visual Studio**.
 
 ## Current production boundary
 
-The supported lane is local still generation with the reviewed FLUX.2 Klein Vulkan profile. The model is loaded for one foreground render and exits afterward. There is no resident image server, automatic publication, or silent promotion into Music Studio.
+The supported still lane uses the reviewed FLUX.2 Klein Vulkan profile. Image-guided motion uses Wan 2.2; native text-to-video uses the distilled FastWan 2.2 profile. Each model is loaded for one foreground render and exits afterward. There is no resident image server, automatic publication, or silent promotion into Music Studio.
 
-Generated motion remains a qualification track rather than a production feature. Historical FFmpeg motion-effect experiments remain evidence only; the accepted music companion presentation currently holds the reviewed image static and uses FFmpeg only for framing, fades, encoding, and audio muxing.
+Both motion paths currently produce a short 832×480 study. Native text-to-video offers four-, eight-, and twelve-second studies at 24 fps. Runtime varies with the chosen duration and decoder placement; the 1,050-second hard timeout is authoritative. After review and binding, Music Studio repeats the exact accepted clip to the song duration and muxes it with the exact audio. Soul does not represent this as several minutes of unique generated footage.
 
 ## Create a visual project
 
@@ -34,6 +34,14 @@ visual brief
 → keep, revise, delete, or bind to music
 ```
 
+## Generate a native scene
+
+The **Native scene direction** panel does not read a source image. Describe how the scene and camera evolve over time, not merely what one frame contains. Choose a four-, eight-, or twelve-second study. Preview binds the direction, seed, duration-specific FastWan profile, dimensions, frame count, 24 fps output, estimated runtime, and three-step schedule. **Generate exact native scene** starts one foreground render with a 17½-minute hard timeout.
+
+The result enters the normal motion candidate list. Diffusion remains on AMD Vulkan; native video decoding uses bounded VAE tiling on CPU so the complete study does not require one device-sized Vulkan buffer. Four- and eight-second studies are generated directly at 24 fps. The twelve-second profile bounds model work to 193 frames at 16 fps, then performs one local optical-interpolation pass to produce the 289-frame, 24 fps review artifact. Review it for camera coherence, geometry stability, interpolation artifacts, flicker, banding, pacing, and its likely loop boundary. Only a `keep` review unlocks Music binding.
+
+The existing **Create motion study** action remains the image-guided route and requires a kept still.
+
 ## Review a candidate
 
 Each candidate records its generation kind, elapsed time, immutable input, and image artifact. Review it with a 1–5 rating, a keep/revise disposition, and notes explaining what worked and what should change.
@@ -41,6 +49,8 @@ Each candidate records its generation kind, elapsed time, immutable input, and i
 ### Guided revision
 
 **Image-guided revision** starts from one exact candidate. Describe the change while naming what must remain invariant—for example, preserve composition and architecture while changing atmosphere or a distant element. A new seed and exact preview bind the edit. The source candidate remains intact.
+
+For a native scene, record a `revise` motion review. **Revise native scene** then preloads those review notes as the next chronological scene direction. You may edit the direction, choose four, eight, or twelve seconds, and preview the exact new seed and profile before rendering. The revision is a new immutable candidate linked to its source; it does not overwrite the prior clip.
 
 ### Delete a candidate
 
@@ -69,3 +79,5 @@ Avoid asking one candidate to reconcile many incompatible aesthetics. Use guided
 - [`docs/soul/VISUAL_STUDIO_A0_A1_BRIEF.md`](../soul/VISUAL_STUDIO_A0_A1_BRIEF.md)
 - [`docs/soul/VISUAL_STUDIO_A2_BRIEF.md`](../soul/VISUAL_STUDIO_A2_BRIEF.md)
 - [`docs/soul/MUSIC_VISUAL_COMPANION_A4_STATIC_PRESENTATION_BRIEF.md`](../soul/MUSIC_VISUAL_COMPANION_A4_STATIC_PRESENTATION_BRIEF.md)
+- [`docs/soul/VISUAL_STUDIO_A4_GENERATED_MOTION_BRIEF.md`](../soul/VISUAL_STUDIO_A4_GENERATED_MOTION_BRIEF.md)
+- [`docs/soul/VISUAL_STUDIO_A5_NATIVE_VIDEO_BRIEF.md`](../soul/VISUAL_STUDIO_A5_NATIVE_VIDEO_BRIEF.md)

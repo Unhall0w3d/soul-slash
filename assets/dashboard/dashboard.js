@@ -43,7 +43,12 @@ async function callNdjson(endpoint, operation, parameters = {}, context = {}, on
     body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
     cache: "no-store"
   });
-  if (!response.ok || !response.body) { const failure = await response.json().catch(() => ({})); throw new Error(failure.error?.reason || "Chat stream failed safely"); }
+  if (!response.ok || !response.body) {
+    const failure = await response.json().catch(() => ({}));
+    if (response.status === 401 || failure.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
+    if (response.status === 403 && failure.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed; preview the exact action again"); }
+    throw new Error(failure.error?.reason || "Chat stream failed safely");
+  }
   const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let finalEnvelope = null;
   while (true) {
     const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
@@ -155,6 +160,31 @@ function lifecycle(envelope) {
   byId("mutation-state").textContent = `mutation ${envelope.meta?.mutation || "none"}`;
   return value;
 }
+
+function requireLifecycle(envelope, accepted, fallback) {
+  const value = lifecycle(envelope);
+  if (!accepted.includes(value)) throw new Error(envelope.errors?.[0]?.message || fallback);
+  return value;
+}
+
+function createGenerationProgress() {
+  const progress = document.createElement("div"); progress.className = "generation-progress"; progress.hidden = true; progress.setAttribute("role", "status"); progress.setAttribute("aria-live", "polite");
+  const signal = document.createElement("i"); signal.setAttribute("aria-hidden", "true");
+  const stage = document.createElement("strong"); stage.dataset.generationStage = ""; stage.textContent = "Preparing";
+  const message = document.createElement("span"); message.dataset.generationMessage = ""; message.textContent = "Waiting for the local lane.";
+  progress.append(signal, stage, message); return progress;
+}
+
+function showGenerationProgress(progress, event = {}) {
+  if (!progress) return;
+  progress.hidden = false;
+  const stage = progress.querySelector("[data-generation-stage]"); const message = progress.querySelector("[data-generation-message]");
+  if (stage) stage.textContent = String(event.stage || "working").replaceAll("_", " ");
+  const line = String(event.message || "").trim().split("\n").filter(Boolean).pop();
+  if (message) message.textContent = (line || "Bounded local generation remains in progress.").slice(0, 240);
+}
+
+function hideGenerationProgress(progress) { if (progress) progress.hidden = true; }
 
 function setSoulActivity(activityState, summary) {
   const presence = byId("soul-presence"); if (!presence) return;
@@ -322,14 +352,14 @@ function renderMessageAttachments(article, attachments) {
     const title = document.createElement("strong"); title.textContent = attachment.title || "Creative candidate"; item.append(title);
     if (attachment.kind === "audio") {
       const source = safeLocalArtifactUrl(attachment.player_url, "audio"); const lossless = safeLocalArtifactUrl(attachment.lossless_url, "audio");
-      if (source) { const player = document.createElement("audio"); player.controls = true; player.preload = "metadata"; player.src = source; item.append(player); }
+      if (source) { const player = document.createElement("audio"); player.controls = true; player.preload = "none"; player.src = source; item.append(player); }
       if (lossless) { const link = document.createElement("a"); link.href = lossless; link.textContent = "Open lossless FLAC"; link.target = "_blank"; link.rel = "noopener"; item.append(link); }
     } else if (attachment.kind === "image") {
       const source = safeLocalArtifactUrl(attachment.image_url, "image");
       if (source) { const picture = document.createElement("img"); picture.src = source; picture.alt = attachment.title || "Soul visual candidate"; picture.loading = "lazy"; item.append(picture); }
     } else if (attachment.kind === "video") {
       const source = safeLocalArtifactUrl(attachment.video_url, "video");
-      if (source) { const player = document.createElement("video"); player.controls = true; player.preload = "metadata"; player.src = source; item.append(player); }
+      if (source) { const player = document.createElement("video"); player.controls = true; player.preload = "none"; player.src = source; item.append(player); }
     }
     if (item.childElementCount > 1) region.append(item);
   });
@@ -621,9 +651,9 @@ async function previewMusicGeneration() {
 }
 
 async function startMusicGeneration() {
-  if (!state.musicPreview || state.musicGenerating) return; state.musicGenerating = true; byId("start-music-generation").disabled = true; byId("cancel-music-generation").disabled = false; byId("music-progress").hidden = false;
+  if (!state.musicPreview || state.musicGenerating) return; state.musicGenerating = true; byId("start-music-generation").disabled = true; byId("cancel-music-generation").disabled = false; showGenerationProgress(byId("music-progress"), { stage: "preparing", message: "Engaging the bounded Music Core." });
   const params = { project_id: state.selectedMusicProject.project_id, candidate_id: state.musicPreview.candidate_id, confirmation: byId("music-generation-confirmation").value, expected_digest: state.musicPreview.expected_digest };
-  try { const envelope = await callNdjson("/api/v1/music-stream", "music.generation.execute", params, {}, (event) => { byId("music-progress-stage").textContent = (event.stage || "working").replaceAll("_", " "); const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) byId("music-progress-message").textContent = line.slice(0, 240); }); lifecycle(envelope); byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject(state.selectedMusicProject); } catch (error) { byId("music-generation-status").textContent = error.message; } finally { state.musicGenerating = false; byId("cancel-music-generation").disabled = true; byId("music-progress").hidden = true; }
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.generation.execute", params, {}, (event) => showGenerationProgress(byId("music-progress"), event)); lifecycle(envelope); byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject(state.selectedMusicProject); } catch (error) { byId("music-generation-status").textContent = error.message; } finally { state.musicGenerating = false; byId("cancel-music-generation").disabled = true; hideGenerationProgress(byId("music-progress")); }
 }
 
 async function cancelMusicGeneration() {
@@ -636,18 +666,15 @@ async function restoreMusicGeneration(projectId) {
     const job = (await activeMusicJobs(projectId))[0];
     if (!job || (state.musicGenerating && state.musicJobId === job.job_id)) return;
     state.musicGenerating = true; state.musicJobId = job.job_id; state.musicCandidateId = job.candidate_id;
-    byId("cancel-music-generation").disabled = false; byId("music-progress").hidden = false;
+    byId("cancel-music-generation").disabled = false;
     showMusicProgress(job.latest_progress || { stage: "working", message: "Reattached to the active bounded generation job." });
     const envelope = await followMusicJob(job.job_id, showMusicProgress); lifecycle(envelope);
     if (state.selectedMusicProject?.project_id === projectId) { byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject({ project_id: projectId }); }
   } catch (error) { if (state.selectedMusicProject?.project_id === projectId) byId("music-generation-status").textContent = error.message; }
-  finally { state.musicGenerating = false; state.musicJobId = null; byId("cancel-music-generation").disabled = true; byId("music-progress").hidden = true; }
+  finally { state.musicGenerating = false; state.musicJobId = null; byId("cancel-music-generation").disabled = true; hideGenerationProgress(byId("music-progress")); }
 }
 
-function showMusicProgress(event) {
-  byId("music-progress-stage").textContent = String(event.stage || "working").replaceAll("_", " ");
-  const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) byId("music-progress-message").textContent = line.slice(0, 240);
-}
+function showMusicProgress(event) { showGenerationProgress(byId("music-progress"), event); }
 
 function renderMusicCandidates(candidates) {
   if (state.selectedMusicProject?.project_id) restoreMusicGeneration(state.selectedMusicProject.project_id);
@@ -662,7 +689,7 @@ function renderMusicCandidates(candidates) {
     const audioSeconds = candidate.artifacts?.flac?.duration_seconds?.toFixed?.(1) || "—"; const generationSeconds = candidate.timings?.total_seconds?.toFixed?.(1); const timingLabel = generationSeconds ? ` · generated in ${generationSeconds}s` : "";
     const meta = document.createElement("small"); meta.textContent = `${audioSeconds}s audio${timingLabel} · ${older ? "older version" : (candidate.generation_kind === "revision" ? "revision" : "original")} · ${candidate.review ? candidate.review.disposition : "awaiting review"}`;
     heading.append(title, meta);
-    const audio = document.createElement("audio"); audio.controls = true; audio.preload = "metadata"; audio.src = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`;
+    const audio = document.createElement("audio"); audio.controls = true; audio.preload = "none"; audio.src = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/mp3`;
     const details = document.createElement("div"); details.className = "music-candidate-details"; details.hidden = older;
     const download = document.createElement("a"); download.href = `/api/v1/music/audio/${candidate.project_id}/${candidate.candidate_id}/flac`; download.textContent = "Open lossless FLAC"; download.target = "_blank";
     const analysis = musicAnalysisPanel(candidate);
@@ -691,22 +718,26 @@ function musicVisualCompanionPanel(candidate) {
 
 function musicVisualLineage(candidate, visual, source) {
   const staticProfile = visual.render_profile?.profile_id === "static-hold-v2";
+  const generatedMotion = visual.source_kind === "generated_motion";
   const lineage = document.createElement("section"); lineage.className = "music-visual-lineage";
-  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = staticProfile ? "Static visual presentation" : "Historical visual effect"; const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = staticProfile ? "Static visual presentation" : (generatedMotion ? "Generated motion companion" : "Historical visual effect"); const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
   const status = document.createElement("p"); status.className = "dialog-status";
   const media = document.createElement("div"); media.className = "music-visual-media";
-  const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base);
-  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "metadata"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual presentation preview" : "Retired visual effect preview"); media.append(loop); }
-  if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "metadata"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Three-minute visual companion with candidate audio"); media.append(preview); }
+  if (!generatedMotion) { const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base); }
+  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "none"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual presentation preview" : "Retired visual effect preview"); media.append(loop); }
+  if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "none"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Full-duration visual companion with candidate audio"); media.append(preview); }
   lineage.append(media);
-  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold · no synthesized motion" : "Historical effect"} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Approved still is immutable; presentation encoding has not started."; lineage.append(metrics);
+  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold · no synthesized motion" : (generatedMotion ? "Reviewed generated motion" : "Historical effect")} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Approved still is immutable; presentation encoding has not started."; lineage.append(metrics);
   if (staticProfile && !visual.artifacts?.loop) {
     const settings = musicVisualPresentationSettings(visual); lineage.append(settings.element);
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview static presentation"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "loop", { visual_id: visual.visual_id, visual_presentation: settings.value() })); lineage.append(button);
   } else if (staticProfile && !visual.artifacts?.preview) {
     const note = document.createElement("p"); note.textContent = "The frame is held exactly as approved. FFmpeg only handles framing, encoding, fades, and audio muxing.";
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview three-minute render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
-  } else if (!staticProfile) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview full-duration render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
+  } else if (generatedMotion && !visual.artifacts?.preview) {
+    const note = document.createElement("p"); note.textContent = "The exact reviewed motion study will repeat to the candidate duration and be muxed with the exact lossless audio. No new inference occurs.";
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview full-duration motion render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
+  } else if (!staticProfile && !generatedMotion) {
     const note = document.createElement("p"); note.textContent = "Historical effect evidence remains playable, but retired procedural-motion profiles cannot advance."; lineage.append(note);
     if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare static replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
   } else {
@@ -714,7 +745,7 @@ function musicVisualLineage(candidate, visual, source) {
     const packageButton = document.createElement("button"); packageButton.type = "button"; packageButton.className = "gate-button gate-button--gold"; packageButton.textContent = "Prepare YouTube upload package";
     packageButton.addEventListener("click", () => draftMusicPublicationPackage(candidate, visual, lineage, packageButton, status)); lineage.append(packageButton);
   }
-  const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = "Qualification pending"; const motionNote = document.createElement("small"); motionNote.textContent = "Unavailable until the Visual Studio A3 motion model passes AMD compatibility, integrity, resource, and cleanup gates."; motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
+  const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = generatedMotion ? "Bound and reviewed" : "Available in Visual Studio"; const motionNote = document.createElement("small"); motionNote.textContent = generatedMotion ? "This exact Wan motion study remains tied to the reviewed source still and candidate audio digest." : "Keep a still in Visual Studio to create and review a bounded Wan motion study."; motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
   lineage.append(status); return lineage;
 }
 
@@ -768,7 +799,7 @@ async function previewMusicVisualAction(candidate, panel, button, status, kind, 
     const envelope = await callSoul(`music.visuals.${kind}.preview`, base); const data = dataOf(envelope);
     if (envelope.lifecycle_state === "complete") { await selectMusicProject({ project_id: candidate.project_id }); return; }
     if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Visual render preview is unavailable");
-    const gate = document.createElement("div"); gate.className = "music-disposition-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = kind === "import" ? "Bind exact source" : (kind === "loop" ? "Encode exact static preview" : "Render three-minute companion"); prefillApprovalGate(input, execute, data.confirmation_phrase); execute.addEventListener("click", () => executeMusicVisualAction(candidate, kind, base, data, input.value, execute, status)); label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "final" ? "This creates one local MP4; it does not publish or upload anything." : "One bounded foreground encode; no image or motion model is loaded.";
+    const gate = document.createElement("div"); gate.className = "music-disposition-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; const input = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = kind === "import" ? "Bind exact source" : (kind === "loop" ? "Encode exact static preview" : "Render full-duration companion"); prefillApprovalGate(input, execute, data.confirmation_phrase); execute.addEventListener("click", () => executeMusicVisualAction(candidate, kind, base, data, input.value, execute, status)); label.append(input); gate.append(scope, label, execute); button.replaceWith(gate); status.textContent = kind === "final" ? "This creates one local MP4; it does not publish or upload anything." : "One bounded foreground encode; no image or motion model is loaded.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
@@ -788,8 +819,21 @@ function musicDispositionPanel(candidate) {
     const button = document.createElement("button"); button.type = "button"; button.className = "danger-button"; button.textContent = "Preview permanent candidate deletion";
     button.addEventListener("click", () => previewMusicDisposition(candidate, "reject", panel, button, status)); panel.append(button, status);
   } else if (candidate.review.disposition === "keep") {
+    const actions = document.createElement("div"); actions.className = "music-actions";
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview finished-song export";
-    button.addEventListener("click", () => previewMusicDisposition(candidate, "export", panel, button, status)); panel.append(button, status);
+    button.addEventListener("click", () => previewMusicDisposition(candidate, "export", panel, button, status));
+    const revise = document.createElement("button"); revise.type = "button"; revise.className = "gate-button"; revise.textContent = "Re-mark as revise";
+    revise.addEventListener("click", async () => {
+      revise.disabled = true; status.textContent = "Recording a corrected disposition while preserving the prior keep review…";
+      try {
+        const review = { ...candidate.review, disposition: "revise" };
+        ["schema_version", "project_id", "candidate_id", "reviewed_at"].forEach((key) => delete review[key]);
+        const envelope = await callSoul("music.candidates.review", { project_id: candidate.project_id, candidate_id: candidate.candidate_id, review });
+        lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state);
+        await selectMusicProject({ project_id: candidate.project_id });
+      } catch (error) { status.textContent = error.message; revise.disabled = false; }
+    });
+    actions.append(button, revise); panel.append(actions, status);
   } else {
     status.textContent = "Revision evidence is retained here until a linked candidate is generated."; panel.append(status);
   }
@@ -917,7 +961,7 @@ function prepareMusicRevision(candidate, panel, launch, status, draft) {
 }
 
 function musicRevisionGate(sourceCandidate, revision, preview, status) {
-  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); prefillApprovalGate(input, start, preview.confirmation_phrase); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded Music Core revision pass…"; const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; } finally { state.musicGenerating = false; cancel.disabled = true; } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions); return gate;
+  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; const progress = createGenerationProgress(); input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); prefillApprovalGate(input, start, preview.confirmation_phrase); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded Music Core revision pass…"; showGenerationProgress(progress, { stage: "preparing", message: "Binding review evidence to the revised candidate." }); const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => showGenerationProgress(progress, event)); lifecycle(envelope); if (!dataOf(envelope).candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; } finally { state.musicGenerating = false; cancel.disabled = true; hideGenerationProgress(progress); } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions, progress); return gate;
 }
 
 async function cancelRevisionGeneration(candidateId, status) {
@@ -1770,6 +1814,7 @@ function resetVisualForm() {
   byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
   byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true;
   byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
+  byId("preview-native-motion").disabled = true; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "Select or create a visual project first.";
   renderVisualProjects();
 }
 
@@ -1789,8 +1834,8 @@ function renderVisualProjects() {
 }
 
 function renderVisualCandidates(project) {
-  const candidates = project.candidates || []; const list = byId("visual-candidate-list"); list.replaceChildren();
-  byId("visual-candidate-count").textContent = String(candidates.length); byId("visual-candidates").hidden = candidates.length === 0;
+  const candidates = project.candidates || []; const motions = project.motions || []; const list = byId("visual-candidate-list"); list.replaceChildren();
+  byId("visual-candidate-count").textContent = String(candidates.length + motions.length); byId("visual-candidates").hidden = candidates.length === 0 && motions.length === 0;
   candidates.forEach((candidate) => {
     const card = document.createElement("article"); card.className = "visual-candidate";
     const image = document.createElement("img"); image.alt = `${project.title} visual draft`; image.loading = "lazy"; image.src = `/api/v1/visual/image/${project.project_id}/${candidate.candidate_id}`;
@@ -1803,16 +1848,76 @@ function renderVisualCandidates(project) {
     const reviewButton = document.createElement("button"); reviewButton.type = "button"; reviewButton.className = "gate-button"; reviewButton.textContent = "Record review";
     const editButton = document.createElement("button"); editButton.type = "button"; editButton.className = "gate-button"; editButton.textContent = "Revise from this image";
     const promoteButton = document.createElement("button"); promoteButton.type = "button"; promoteButton.className = "gate-button gate-button--gold"; promoteButton.textContent = "Bind to Music candidate";
+    const motionButton = document.createElement("button"); motionButton.type = "button"; motionButton.className = "gate-button gate-button--gold"; motionButton.textContent = "Create motion study"; motionButton.disabled = candidate.review?.disposition !== "keep";
     const deleteButton = document.createElement("button"); deleteButton.type = "button"; deleteButton.className = "danger-button"; deleteButton.textContent = "Delete candidate";
     const status = document.createElement("p"); status.className = "dialog-status"; status.role = "status";
     const gate = document.createElement("div"); gate.className = "visual-candidate-gate"; gate.hidden = true;
     reviewButton.addEventListener("click", async () => { reviewButton.disabled = true; try { const envelope = await callSoul("visual.candidates.review", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, visual_review: { rating: Number(rating.value), disposition: disposition.value, notes: notes.value } }); lifecycle(envelope); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; reviewButton.disabled = false; } });
     editButton.addEventListener("click", () => renderVisualEditGate(gate, project, candidate, status));
     promoteButton.addEventListener("click", () => renderVisualPromotionGate(gate, project, candidate, status));
+    motionButton.addEventListener("click", () => renderVisualMotionGate(gate, project, candidate, status));
     deleteButton.addEventListener("click", () => previewVisualCandidateDeletion(gate, project, candidate, status));
-    controls.append(rating, disposition, notes, reviewButton, editButton, promoteButton, deleteButton, gate, status);
+    controls.append(rating, disposition, notes, reviewButton, editButton, motionButton, promoteButton, deleteButton, gate, status);
     card.append(image, footer, controls); list.append(card);
   });
+  motions.forEach((motion) => list.append(renderVisualMotionCandidate(project, motion)));
+}
+
+function renderVisualMotionCandidate(project, motion) {
+  const card = document.createElement("article"); card.className = "visual-candidate visual-motion-candidate";
+  const video = document.createElement("video"); video.controls = true; video.loop = true; video.muted = true; video.preload = "none"; video.src = `/api/v1/visual/motion/${project.project_id}/${motion.motion_candidate_id}`; video.setAttribute("aria-label", `${project.title} generated motion study`);
+  const footer = document.createElement("footer"); const timing = document.createElement("span"); const isNative = ["text_to_video", "text_to_video_revision"].includes(motion.generation_kind); const kind = isNative ? (motion.generation_kind === "text_to_video_revision" ? "native scene revision" : "native scene") : "image-guided motion"; const duration = Number(motion.duration_seconds); const durationLabel = Number.isFinite(duration) && Math.abs(duration - Math.round(duration)) < 0.1 ? String(Math.round(duration)) : String(motion.duration_seconds); timing.textContent = `${durationLabel}s ${kind} · ${motion.elapsed_seconds}s render`; const stateLabel = document.createElement("span"); stateLabel.textContent = motion.review ? `${motion.review.disposition} · ${motion.review.rating}/5` : "Motion review required"; footer.append(timing, stateLabel);
+  const controls = document.createElement("div"); controls.className = "visual-candidate-controls";
+  const rating = document.createElement("select"); [1,2,3,4,5].forEach((value) => { const option = document.createElement("option"); option.value = String(value); option.textContent = `${value} · ${["failed","weak","workable","strong","exceptional"][value - 1]}`; rating.append(option); }); rating.value = String(motion.review?.rating || 3);
+  const disposition = document.createElement("select"); [["keep","Keep"],["revise","Revise"]].forEach(([value,label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; disposition.append(option); }); disposition.value = motion.review?.disposition || "keep";
+  const notes = document.createElement("textarea"); notes.rows = 3; notes.maxLength = 8000; notes.placeholder = "Motion stability, fidelity, pacing, and visible artifacts."; notes.value = motion.review?.notes || "";
+  const review = document.createElement("button"); review.type = "button"; review.className = "gate-button"; review.textContent = "Record motion review";
+  const revise = document.createElement("button"); revise.type = "button"; revise.className = "gate-button"; revise.textContent = "Revise native scene"; revise.disabled = !isNative || motion.review?.disposition !== "revise"; revise.hidden = !isNative;
+  const bind = document.createElement("button"); bind.type = "button"; bind.className = "gate-button gate-button--gold"; bind.textContent = "Bind motion to Music"; bind.disabled = motion.review?.disposition !== "keep";
+  const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger-button"; remove.textContent = "Delete motion study";
+  const gate = document.createElement("div"); gate.className = "visual-candidate-gate"; gate.hidden = true; const status = document.createElement("p"); status.className = "dialog-status";
+  review.addEventListener("click", async () => { review.disabled = true; try { const envelope = await callSoul("visual.motion.review", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id, visual_review: { rating: Number(rating.value), disposition: disposition.value, notes: notes.value } }); lifecycle(envelope); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; review.disabled = false; } });
+  revise.addEventListener("click", () => renderNativeMotionRevisionGate(gate, project, motion, status));
+  bind.addEventListener("click", () => renderVisualMotionPromotionGate(gate, project, motion, status));
+  remove.addEventListener("click", async () => { remove.disabled = true; try { const envelope = await callSoul("visual.motion.delete.preview", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact motion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.motion.delete.execute", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; remove.disabled = false; } });
+  controls.append(rating, disposition, notes, review, revise, bind, remove, gate, status); card.append(video, footer, controls); return card;
+}
+
+function renderNativeMotionRevisionGate(gate, project, motion, status) {
+  gate.replaceChildren(); gate.hidden = false;
+  const label = document.createElement("label"); label.textContent = "Revised native scene direction"; const instruction = document.createElement("textarea"); instruction.rows = 8; instruction.maxLength = 8000; instruction.value = motion.review?.notes || motion.instruction || ""; label.append(instruction);
+  const seedLabel = document.createElement("label"); seedLabel.textContent = "Revision seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
+  const durationLabel = document.createElement("label"); durationLabel.textContent = "Duration"; const duration = document.createElement("select"); [["4","4 seconds"],["8","8 seconds"],["12","12 seconds"]].forEach(([value, text]) => { const option = document.createElement("option"); option.value = value; option.textContent = text; duration.append(option); }); duration.value = Number(motion.duration_seconds) >= 11 ? "12" : (Number(motion.duration_seconds) >= 7 ? "8" : "4"); durationLabel.append(duration);
+  const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button gate-button--gold"; preview.textContent = "Preview native revision";
+  const progress = createGenerationProgress();
+  preview.addEventListener("click", async () => {
+    preview.disabled = true; status.textContent = "Verifying the exact native-scene revision…";
+    try {
+      const envelope = await callSoul("visual.native_motion.revision.preview", { visual_project_id: project.project_id, source_motion_candidate_id: motion.motion_candidate_id, instruction: instruction.value, seed: seed.value, duration_seconds: duration.value }); lifecycle(envelope); const scope = dataOf(envelope);
+      if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Native-scene revision preview failed safely");
+      const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2);
+      const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact native revision";
+      execute.addEventListener("click", async () => {
+        execute.disabled = true; status.textContent = "Generating the approved native-scene revision…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging FastWan for the revised scene." });
+        try {
+          const result = await callNdjson("/api/v1/music-stream", "visual.native_motion.revision.execute", { visual_project_id: project.project_id, source_motion_candidate_id: motion.motion_candidate_id, motion_candidate_id: scope.motion_candidate_id, instruction: instruction.value, seed: seed.value, duration_seconds: duration.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event));
+          requireLifecycle(result, ["blocked_for_human_review"], "Native-scene revision failed safely"); await selectVisualProject(project.project_id); status.textContent = "Native-scene revision generated. Review the new candidate below.";
+        } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); }
+      });
+      gate.append(summary, execute, progress); status.textContent = "The exact revised direction, seed, duration, and model are ready for approval.";
+    } catch (error) { status.textContent = error.message; preview.disabled = false; }
+  });
+  gate.append(label, seedLabel, durationLabel, preview, progress);
+}
+
+function renderVisualMotionGate(gate, project, candidate, status) {
+  gate.replaceChildren(); gate.hidden = false;
+  const label = document.createElement("label"); label.textContent = "Motion direction"; const instruction = document.createElement("textarea"); instruction.rows = 5; instruction.maxLength = 2000; instruction.value = "Locked camera. Preserve the exact composition, subject geometry, lighting, and color palette. Add restrained, physically coherent ambient motion within the scene. No zoom, pan, cuts, or new objects."; label.append(instruction);
+  const seedLabel = document.createElement("label"); seedLabel.textContent = "Motion seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
+  const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview motion generation";
+  const progress = createGenerationProgress();
+  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.motion.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Motion runtime is not ready"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact motion study"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-to-video study…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging Wan for the exact image-guided study." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.motion.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, motion_candidate_id: scope.motion_candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Motion generation failed safely"); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+  gate.append(label, seedLabel, preview, progress);
 }
 
 function renderVisualEditGate(gate, project, candidate, status) {
@@ -1820,8 +1925,9 @@ function renderVisualEditGate(gate, project, candidate, status) {
   const label = document.createElement("label"); label.textContent = "Image-guided revision"; const instruction = document.createElement("textarea"); instruction.rows = 5; instruction.maxLength = 8000; instruction.placeholder = "Preserve the composition and architecture. Refine the distant horizon, deepen the cyan instrument light, and add subtle low mist."; label.append(instruction);
   const seedLabel = document.createElement("label"); seedLabel.textContent = "Revision seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview guided edit";
-  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.edit.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Edit preview failed safely"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact guided edit"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-guided revision…"; try { const result = await callNdjson("/api/v1/music-stream", "visual.edit.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, visual_candidate_id: scope.candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => { status.textContent = event.message || "Local edit in progress."; }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
-  gate.append(label, seedLabel, preview);
+  const progress = createGenerationProgress();
+  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.edit.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Edit preview failed safely"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact guided edit"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-guided revision…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging the visual runtime for the guided revision." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.edit.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, visual_candidate_id: scope.candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Guided visual revision failed safely"); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+  gate.append(label, seedLabel, preview, progress);
 }
 
 async function ensureVisualMusicProjects() {
@@ -1841,6 +1947,19 @@ async function renderVisualPromotionGate(gate, project, candidate, status) {
   } catch (error) { status.textContent = error.message; }
 }
 
+async function renderVisualMotionPromotionGate(gate, project, motion, status) {
+  gate.replaceChildren(); gate.hidden = false; status.textContent = "Inspecting Music Studio candidates…";
+  try {
+    const projects = await ensureVisualMusicProjects(); if (!projects.length) throw new Error("Create and generate a Music Studio candidate before binding motion.");
+    const projectSelect = document.createElement("select"); const candidateSelect = document.createElement("select"); const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact motion binding";
+    projects.forEach((item) => { const option = document.createElement("option"); option.value = item.project_id; option.textContent = item.title; projectSelect.append(option); });
+    const loadCandidates = async () => { candidateSelect.replaceChildren(); const envelope = await callSoul("music.projects.get", { project_id: projectSelect.value }); lifecycle(envelope); const candidates = dataOf(envelope).generations || []; candidates.forEach((item) => { const option = document.createElement("option"); option.value = item.candidate_id; option.textContent = `${item.candidate_id.slice(-8)} · ${item.created_at || "candidate"}`; candidateSelect.append(option); }); preview.disabled = candidates.length === 0; };
+    projectSelect.addEventListener("change", loadCandidates);
+    preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.motion.promotion.preview", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id, project_id: projectSelect.value, candidate_id: candidateSelect.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) { status.textContent = "This exact motion may already be bound."; return; } const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Bind exact reviewed motion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.motion.promotion.execute", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id, project_id: projectSelect.value, candidate_id: candidateSelect.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); status.textContent = "Motion bound. Create the full-duration preview in Music Studio."; } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+    gate.append(projectSelect, candidateSelect, preview); await loadCandidates(); status.textContent = "Choose the exact composition candidate to receive this reviewed motion.";
+  } catch (error) { status.textContent = error.message; }
+}
+
 async function previewVisualCandidateDeletion(gate, project, candidate, status) {
   gate.replaceChildren(); gate.hidden = false;
   try { const envelope = await callSoul("visual.candidates.delete.preview", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact candidate"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.candidates.delete.execute", { visual_project_id: project.project_id, visual_candidate_id: candidate.candidate_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.append(summary, execute); } catch (error) { status.textContent = error.message; }
@@ -1851,13 +1970,33 @@ async function selectVisualProject(projectId) {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
     state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
     byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
+    byId("preview-native-motion").disabled = false; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "Text-to-video creates a new scene without reading a still candidate.";
     renderVisualProjects(); renderVisualCandidates(project);
   } catch (error) { byId("visual-form-status").textContent = error.message; }
 }
 
+async function previewNativeMotion() {
+  const project = state.selectedVisualProject; if (!project) return;
+  const button = byId("preview-native-motion"); const status = byId("visual-native-motion-status"); const confirm = byId("visual-native-motion-confirm");
+  const instruction = byId("visual-native-motion-instruction").value; const seed = byId("visual-native-motion-seed").value; const durationSeconds = byId("visual-native-motion-duration").value;
+  button.disabled = true; status.textContent = "Verifying the native-video runtime, exact model, Core, and scene direction…"; confirm.hidden = true; confirm.replaceChildren();
+  try {
+    const envelope = await callSoul("visual.native_motion.preview", { visual_project_id: project.project_id, instruction, seed, duration_seconds: durationSeconds }); lifecycle(envelope); const scope = dataOf(envelope);
+    if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Native-video runtime is not ready");
+    const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2);
+    const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact native scene";
+    const progress = createGenerationProgress();
+    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Generating a bounded scene directly from text…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging FastWan for the exact native scene." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.native_motion.execute", { visual_project_id: project.project_id, motion_candidate_id: scope.motion_candidate_id, instruction, seed, duration_seconds: durationSeconds, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Native scene generation failed safely"); await selectVisualProject(project.project_id); status.textContent = "Native scene generated. Review it below before binding it to music."; } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } });
+    confirm.append(summary, execute, progress); confirm.hidden = false; status.textContent = "The exact scene direction, seed, model, duration, and output envelope are ready for approval.";
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
 async function refreshVisualResources() {
-  try { const envelope = await callSoul("visual.resources.status"); lifecycle(envelope); const data = dataOf(envelope); const label = byId("visual-resource-state"); label.textContent = data.ready ? `${data.profile} ready` : "Runtime attention"; label.classList.toggle("is-ready", data.ready); byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · exact model set verified · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
+  const button = byId("refresh-visual-resources"); button.disabled = true; byId("visual-form-status").textContent = "Verifying the pinned visual runtime and model files… the first pass may take several seconds.";
+  try { const envelope = await callSoul("visual.resources.status"); lifecycle(envelope); const data = dataOf(envelope); const native = data.native_motion || {}; const label = byId("visual-resource-state"); label.textContent = data.ready && native.ready ? "Still + native video ready" : (data.ready ? `${data.profile} ready` : "Runtime attention"); label.classList.toggle("is-ready", data.ready && native.ready); byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · still verified · native video ${native.ready ? `${native.profile} verified` : `attention (${(native.missing_roles || []).join(", ") || native.core?.reason || "runtime"})`} · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
   catch (error) { byId("visual-form-status").textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function loadVisualStudio() {
@@ -1873,8 +2012,10 @@ async function createVisualProject(event) {
 
 async function updateVisualProject() {
   if (!state.selectedVisualProject) return;
+  const button = byId("update-visual-project"); button.disabled = true; byId("visual-form-status").textContent = "Saving the revised brief…";
   try { const envelope = await callSoul("visual.projects.update", { visual_project_id: state.selectedVisualProject.project_id, visual_project: visualProjectInput() }); lifecycle(envelope); await loadVisualStudio(); await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-form-status").textContent = "Revised brief saved. Existing candidate inputs remain immutable."; }
   catch (error) { byId("visual-form-status").textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function previewVisualProjectDeletion() {
@@ -1892,18 +2033,20 @@ async function executeVisualProjectDeletion() {
 
 async function previewVisualGeneration() {
   if (!state.selectedVisualProject) return;
+  const button = byId("preview-visual-generation"); button.disabled = true; byId("visual-generation-status").textContent = "Revalidating the exact visual project, Core, runtime, and pinned models…";
   try { const envelope = await callSoul("visual.generation.preview", { visual_project_id: state.selectedVisualProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.data?.message || "Visual runtime is not ready"); state.visualPreview = data; byId("visual-generation-scope").textContent = JSON.stringify(data, null, 2); byId("visual-generation-confirm").hidden = false; byId("start-visual-generation").disabled = false; byId("visual-generation-status").textContent = "Clicking generate authorizes this exact local draft."; }
   catch (error) { byId("visual-generation-status").textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 async function startVisualGeneration() {
-  if (!state.visualPreview || state.visualGenerating) return; state.visualGenerating = true; byId("start-visual-generation").disabled = true; byId("visual-progress").hidden = false;
+  if (!state.visualPreview || state.visualGenerating) return; state.visualGenerating = true; byId("start-visual-generation").disabled = true; showGenerationProgress(byId("visual-progress"), { stage: "preparing", message: "Engaging the bounded visual runtime." });
   try {
     const parameters = { visual_project_id: state.visualPreview.project_id, visual_candidate_id: state.visualPreview.candidate_id, confirmation: state.visualPreview.confirmation_phrase, expected_digest: state.visualPreview.expected_digest };
-    const envelope = await callNdjson("/api/v1/music-stream", "visual.generation.execute", parameters, {}, (event) => { byId("visual-progress-stage").textContent = event.stage || "Working"; byId("visual-progress-message").textContent = event.message || "Local render in progress."; });
-    lifecycle(envelope); byId("visual-generation-status").textContent = "Visual draft generated; review the candidate below."; await selectVisualProject(state.visualPreview.project_id);
+    const envelope = await callNdjson("/api/v1/music-stream", "visual.generation.execute", parameters, {}, (event) => showGenerationProgress(byId("visual-progress"), event));
+    requireLifecycle(envelope, ["blocked_for_human_review"], "Visual draft generation failed safely"); byId("visual-generation-status").textContent = "Visual draft generated; review the candidate below."; await selectVisualProject(state.visualPreview.project_id);
   } catch (error) { byId("visual-generation-status").textContent = error.message; }
-  finally { state.visualGenerating = false; byId("visual-progress").hidden = true; }
+  finally { state.visualGenerating = false; hideGenerationProgress(byId("visual-progress")); }
 }
 
 async function bootstrap() {
@@ -1946,6 +2089,7 @@ byId("visual-project-form").addEventListener("submit", createVisualProject);
 byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
+byId("preview-native-motion").addEventListener("click", previewNativeMotion);
 byId("start-visual-generation").addEventListener("click", startVisualGeneration);
 byId("preview-visual-project-delete").addEventListener("click", previewVisualProjectDeletion);
 byId("execute-visual-project-delete").addEventListener("click", executeVisualProjectDeletion);

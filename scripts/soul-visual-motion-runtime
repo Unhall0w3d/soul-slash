@@ -1,0 +1,386 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "etc"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "timeout"
+require "uri"
+
+class VisualMotionRuntime
+  SETUP_CONFIRMATION = "INSTALL_VISUAL_MOTION_VULKAN_RUNTIME"
+  DOWNLOAD_CONFIRMATION = "DOWNLOAD_VISUAL_MOTION_MODELS"
+  RUN_CONFIRMATION = "RUN_VISUAL_MOTION_PILOT"
+  PROMPT_LIMIT = 2_000
+  NEGATIVE_LIMIT = 1_000
+  DOWNLOAD_CHUNK_BYTES = 256 * 1024 * 1024
+
+  def initialize(options)
+    @manifest_path = regular_path!(options.fetch(:manifest), "manifest")
+    @manifest = JSON.parse(File.binread(@manifest_path))
+    @root = File.expand_path(options.fetch(:root))
+    raise "runtime root must not be a symlink" if File.symlink?(@root)
+    @expected_digest = options[:expected_digest]
+    @confirmation = options[:confirmation]
+    @request_path = options[:request] && regular_path!(options[:request], "request")
+    @source = @manifest.fetch("runtime")
+    @profile_id, @profile = @manifest.fetch("profiles").first
+    @source_dir = File.join(@root, "source", "stable-diffusion.cpp")
+    @models_dir = File.join(@root, "models")
+    @binary_override = options[:runner] && regular_executable!(options[:runner], "runner")
+    @probe = options[:probe] || "ffprobe"
+  end
+
+  def check
+    files = model_files.map { |file| file.merge("verified" => verified?(model_path(file), file)) }
+    emit(
+      "lifecycle_state" => "complete",
+      "runtime_ready" => executable?(binary),
+      "models_ready" => files.all? { |file| file.fetch("verified") },
+      "binary" => binary,
+      "profile_id" => @profile_id,
+      "profile" => profile_projection,
+      "files" => files.map { |file| file.slice("role", "filename", "bytes", "verified") },
+      "persistent_service" => false,
+      "network_listener" => false
+    )
+  end
+
+  def plan(action)
+    emit(plan_data(action).merge("lifecycle_state" => "blocked_for_human_review"))
+  rescue StandardError => error
+    fail_with(error)
+  end
+
+  def setup
+    authorize!("setup", SETUP_CONFIRMATION)
+    require_tools!(%w[git cmake ninja])
+    build_dependencies = {
+      "vulkan-headers" => "/usr/include/vulkan/vulkan.h",
+      "spirv-headers" => "/usr/include/spirv/unified1/spirv.h"
+    }
+    missing = build_dependencies.reject { |_package, path| File.file?(path) }.keys
+    raise "missing required Arch build dependencies: #{missing.join(', ')}" unless missing.empty?
+    prepare_root!
+    install_source unless exact_source?
+    unless File.file?(File.join(@source_dir, "ggml", "CMakeLists.txt"))
+      run_command(["git", "submodule", "update", "--init", "--recursive"], timeout: 900, chdir: @source_dir)
+    end
+    build_dir = File.join(@source_dir, "build-motion")
+    FileUtils.mkdir_p(build_dir, mode: 0o700)
+    run_command(["cmake", "-S", @source_dir, "-B", build_dir, "-G", "Ninja", "-DSD_VULKAN=ON", "-DSD_BUILD_EXAMPLES=ON", "-DCMAKE_BUILD_TYPE=Release"], timeout: 900)
+    run_command(["cmake", "--build", build_dir, "--config", "Release", "--target", "sd-cli", "-j", [Etc.nprocessors, 12].min.to_s], timeout: 3600)
+    candidate = [File.join(build_dir, "bin", "sd-cli"), File.join(build_dir, "bin", "Release", "sd-cli")].find { |path| executable?(path) }
+    raise "Vulkan sd-cli was not produced" unless candidate
+    FileUtils.mkdir_p(File.dirname(installed_binary), mode: 0o700)
+    FileUtils.cp(candidate, installed_binary, preserve: false)
+    File.chmod(0o700, installed_binary)
+    emit("lifecycle_state" => "complete", "mutation" => "visual_motion_vulkan_runtime_installed", "binary" => installed_binary, "revision" => revision)
+  rescue Interrupt
+    emit("lifecycle_state" => "canceled", "error" => "visual motion runtime setup canceled"); exit 130
+  rescue StandardError => error
+    fail_with(error)
+  end
+
+  def download
+    authorize!("download", DOWNLOAD_CONFIRMATION)
+    require_tools!(%w[curl])
+    prepare_root!
+    FileUtils.mkdir_p(@models_dir, mode: 0o700)
+    model_files.each do |file|
+      target = model_path(file)
+      next if verified?(target, file)
+      remote = file.fetch("remote_path", file.fetch("filename")).split("/").map { |part| URI.encode_www_form_component(part).gsub("+", "%20") }.join("/")
+      url = file["source_url"] || "https://huggingface.co/#{file.fetch('repository')}/resolve/#{file.fetch('revision')}/#{remote}"
+      partial = download_in_verified_chunks(target, file, url)
+      raise "download verification failed for #{file.fetch('filename')}" unless verified?(partial, file)
+      File.rename(partial, target)
+      File.chmod(0o600, target)
+    end
+    emit("lifecycle_state" => "complete", "mutation" => "visual_motion_models_downloaded", "profile_id" => @profile_id, "bytes_verified" => model_files.sum { |file| file.fetch("bytes") })
+  rescue Interrupt
+    emit("lifecycle_state" => "canceled", "error" => "visual motion model download canceled"); exit 130
+  rescue StandardError => error
+    fail_with(error)
+  end
+
+  def run
+    authorize!("run", RUN_CONFIRMATION)
+    raise "motion runtime is not ready" unless executable?(binary)
+    raise "motion model files are not ready" unless model_files.all? { |file| verified?(model_path(file), file) }
+    require_tools!([@probe]) unless @probe.include?(File::SEPARATOR)
+    plan = plan_data("run")
+    run_id = "motion_#{plan.fetch('expected_digest')[0, 16]}"
+    runs_dir = File.join(@root, "runs")
+    final_dir = File.join(runs_dir, run_id)
+    partial_dir = "#{final_dir}.partial-#{Process.pid}"
+    raise "pilot output already exists for this exact plan" if File.exist?(final_dir)
+    FileUtils.mkdir_p(runs_dir, mode: 0o700)
+    FileUtils.mkdir_p(partial_dir, mode: 0o700)
+    output = File.join(partial_dir, "pilot.webm")
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    command = render_command(request_data, output)
+    log = run_command(command, timeout: Integer(@profile.fetch("timeout_seconds")))
+    evidence = probe_video(output)
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    receipt = plan.merge(
+      "lifecycle_state" => "blocked_for_human_review",
+      "run_id" => run_id,
+      "output_filename" => "pilot.webm",
+      "output_path" => File.join(final_dir, "pilot.webm"),
+      "receipt_path" => File.join(final_dir, "receipt.json"),
+      "output_sha256" => Digest::SHA256.file(output).hexdigest,
+      "output_bytes" => File.size(output),
+      "elapsed_seconds" => elapsed.round(3),
+      "video" => evidence,
+      "renderer_log_tail" => log.byteslice(-8_000, 8_000).to_s
+    )
+    File.binwrite(File.join(partial_dir, "receipt.json"), JSON.pretty_generate(receipt) + "\n")
+    File.chmod(0o600, output)
+    File.chmod(0o600, File.join(partial_dir, "receipt.json"))
+    File.rename(partial_dir, final_dir)
+    emit(receipt)
+  rescue Interrupt
+    FileUtils.rm_rf(partial_dir) if defined?(partial_dir) && partial_dir
+    emit("lifecycle_state" => "canceled", "error" => "visual motion pilot canceled"); exit 130
+  rescue StandardError => error
+    FileUtils.rm_rf(partial_dir) if defined?(partial_dir) && partial_dir
+    fail_with(error)
+  end
+
+  private
+
+  def plan_data(action)
+    raise "action must be setup, download, or run" unless %w[setup download run].include?(action)
+    confirmation = { "setup" => SETUP_CONFIRMATION, "download" => DOWNLOAD_CONFIRMATION, "run" => RUN_CONFIRMATION }.fetch(action)
+    data = {
+      "operation" => "visual_motion_runtime_#{action}",
+      "root" => @root,
+      "profile_id" => @profile_id,
+      "runtime_repository" => @source.fetch("repository"),
+      "runtime_revision" => @source.fetch("revision"),
+      "download_bytes" => action == "download" ? model_files.sum { |file| file.fetch("bytes") } : 0,
+      "confirmation_phrase" => confirmation,
+      "persistent_service" => false,
+      "network_listener" => false,
+      "bounded_foreground_operation" => true
+    }
+    if action == "run"
+      request = request_data
+      data["request"] = request.slice("prompt", "negative_prompt", "seed")
+      data["source_image"] = request.fetch("source_image")
+      data["source_image_sha256"] = Digest::SHA256.file(request.fetch("source_image")).hexdigest
+      data["profile"] = profile_projection
+      data["model_sha256"] = model_files.to_h { |file| [file.fetch("role"), file.fetch("sha256")] }
+    end
+    data.merge("expected_digest" => digest(data))
+  end
+
+  def request_data
+    raise "--request is required for run" unless @request_path
+    data = JSON.parse(File.binread(@request_path))
+    prompt = data.fetch("prompt").to_s.strip
+    negative = data.fetch("negative_prompt", "").to_s.strip
+    seed = Integer(data.fetch("seed"))
+    raise "prompt must contain 1..#{PROMPT_LIMIT} characters" unless (1..PROMPT_LIMIT).cover?(prompt.length)
+    raise "negative_prompt must contain at most #{NEGATIVE_LIMIT} characters" if negative.length > NEGATIVE_LIMIT
+    raise "seed must be within 0..2147483647" unless (0..2_147_483_647).cover?(seed)
+    source = regular_path!(data.fetch("source_image"), "source image")
+    raise "source image must be PNG, JPEG, or WebP" unless %w[.png .jpg .jpeg .webp].include?(File.extname(source).downcase)
+    { "source_image" => source, "prompt" => prompt, "negative_prompt" => negative, "seed" => seed }
+  rescue KeyError, ArgumentError => error
+    raise "invalid motion request: #{error.message}"
+  end
+
+  def render_command(request, output)
+    files = model_files.to_h { |file| [file.fetch("role"), model_path(file)] }
+    decoder_role = @profile.fetch("decoder_role", "vae")
+    decoder_flag = decoder_role == "tae" ? "--tae" : "--vae"
+    command = [binary, "-M", "vid_gen", "--diffusion-model", files.fetch("diffusion_model"), decoder_flag, files.fetch(decoder_role), "--t5xxl", files.fetch("text_encoder"),
+     "-p", request.fetch("prompt"), "-n", request.fetch("negative_prompt"), "--seed", request.fetch("seed").to_s,
+     "--cfg-scale", @profile.fetch("cfg_scale").to_s, "--steps", @profile.fetch("steps").to_s,
+     "--sampling-method", @profile.fetch("sampling_method"), "-W", @profile.fetch("width").to_s, "-H", @profile.fetch("height").to_s,
+     "--video-frames", @profile.fetch("frames").to_s, "--fps", @profile.fetch("fps").to_s,
+     "--flow-shift", @profile.fetch("flow_shift").to_s, "--diffusion-fa", "--offload-to-cpu"]
+    command.concat(["--backend", "vae=#{@profile.fetch('vae_backend')}"]) if decoder_role == "vae" && @profile["vae_backend"]
+    command.concat(["-i", request.fetch("source_image"), "-o", output])
+    command
+  end
+
+  def probe_video(path)
+    raise "renderer did not produce a regular video" unless File.file?(path) && !File.symlink?(path) && File.size(path).positive?
+    stdout, stderr, status = Open3.capture3(@probe, "-v", "error", "-show_entries", "stream=codec_type,width,height,avg_frame_rate,nb_frames,duration:format=duration", "-of", "json", path)
+    raise "ffprobe failed: #{stderr.byteslice(-1000, 1000)}" unless status.success?
+    data = JSON.parse(stdout)
+    stream = Array(data["streams"]).find { |entry| entry["codec_type"] == "video" }
+    raise "output has no video stream" unless stream
+    raise "output dimensions are not #{@profile.fetch('width')}x#{@profile.fetch('height')}" unless stream["width"] == @profile.fetch("width") && stream["height"] == @profile.fetch("height")
+    duration = (stream["duration"] || data.dig("format", "duration")).to_f
+    expected = @profile.fetch("frames").to_f / @profile.fetch("fps")
+    raise "output duration #{duration} is outside the pilot boundary" unless duration.between?(expected - 0.75, expected + 0.75)
+    { "width" => stream["width"], "height" => stream["height"], "duration_seconds" => duration, "average_frame_rate" => stream["avg_frame_rate"], "frames" => stream["nb_frames"] }
+  rescue JSON::ParserError => error
+    raise "ffprobe returned invalid JSON: #{error.message}"
+  end
+
+  def profile_projection
+    @profile.slice("label", "accelerator", "mode", "width", "height", "frames", "fps", "steps", "cfg_scale", "flow_shift", "sampling_method", "decoder_role", "vae_backend", "timeout_seconds")
+  end
+
+  def authorize!(action, phrase)
+    expected = plan_data(action).fetch("expected_digest")
+    raise "review the current plan and provide its exact EXPECTED_DIGEST" unless secure_compare(@expected_digest, expected)
+    raise "exact confirmation #{phrase} is required" unless @confirmation == phrase
+  end
+
+  def prepare_root!
+    FileUtils.mkdir_p(@root, mode: 0o700)
+    raise "runtime root must not be a symlink" if File.symlink?(@root)
+  end
+
+  def install_source
+    raise "runtime source exists at an unexpected revision" if File.exist?(@source_dir)
+    FileUtils.mkdir_p(File.dirname(@source_dir), mode: 0o700)
+    partial = "#{@source_dir}.partial-#{Process.pid}"
+    run_command(["git", "clone", "--filter=blob:none", "--recursive", @source.fetch("repository"), partial], timeout: 900)
+    run_command(["git", "checkout", "--detach", @source.fetch("revision")], timeout: 120, chdir: partial)
+    raise "runtime revision mismatch" unless revision(partial) == @source.fetch("revision")
+    File.rename(partial, @source_dir)
+  ensure
+    FileUtils.rm_rf(partial) if defined?(partial) && partial && File.exist?(partial)
+  end
+
+  def run_command(command, timeout:, chdir: nil)
+    output = +""; status = nil; wait_thread = nil; reader = nil; stream = nil
+    options = { pgroup: true }; options[:chdir] = chdir if chdir
+    stdin, stream, wait_thread = Open3.popen2e(*command, **options)
+    stdin.close
+    reader = Thread.new { stream.read }
+    Timeout.timeout(timeout) { status = wait_thread.value }
+    output = Timeout.timeout(10) { reader.value }
+    raise "command failed: #{command.first}: #{tail(output, 4_000)}" unless status.success?
+    output
+  rescue Timeout::Error
+    terminate_group(wait_thread)
+    raise "bounded command timed out: #{command.first}"
+  rescue Interrupt
+    terminate_group(wait_thread)
+    raise
+  ensure
+    reader&.kill if reader&.alive?
+    stream&.close unless stream&.closed?
+  end
+
+  def download_in_verified_chunks(target, file, url)
+    partial = "#{target}.partial"
+    expected_bytes = file.fetch("bytes")
+    if File.exist?(partial) && (!File.file?(partial) || File.symlink?(partial) || File.size(partial) > expected_bytes)
+      FileUtils.rm_f(partial)
+    end
+    File.binwrite(partial, "") unless File.exist?(partial)
+    File.chmod(0o600, partial)
+    while File.size(partial) < expected_bytes
+      chunk = nil
+      begin
+        first = File.size(partial)
+        last = [first + DOWNLOAD_CHUNK_BYTES, expected_bytes].min - 1
+        chunk = "#{partial}.chunk-#{first}-#{last}"
+        FileUtils.rm_f(chunk)
+        run_command(["curl", "--fail", "--location", "--retry", "3", "--range", "#{first}-#{last}", "--output", chunk, url], timeout: 14_400)
+        chunk_bytes = last - first + 1
+        unless File.file?(chunk) && !File.symlink?(chunk) && File.size(chunk) == chunk_bytes
+          raise "range download returned an unexpected byte count for #{file.fetch('filename')} at #{first}-#{last}"
+        end
+        File.open(partial, "ab", 0o600) do |destination|
+          File.open(chunk, "rb") { |source| IO.copy_stream(source, destination) }
+          destination.flush
+          destination.fsync
+        end
+        FileUtils.rm_f(chunk)
+      ensure
+        FileUtils.rm_f(chunk) if chunk && File.exist?(chunk)
+      end
+    end
+    partial
+  end
+
+  def terminate_group(thread)
+    return unless thread
+    process_group = -thread.pid
+    Process.kill("TERM", process_group)
+    sleep 0.2
+    Process.kill("KILL", process_group)
+    thread.join(2)
+  rescue Errno::ESRCH
+    nil
+  end
+
+  def exact_source? = File.directory?(File.join(@source_dir, ".git")) && revision == @source.fetch("revision")
+  def revision(directory = @source_dir)
+    stdout, status = Open3.capture2("git", "rev-parse", "HEAD", chdir: directory)
+    status.success? ? stdout.strip : ""
+  rescue SystemCallError
+    ""
+  end
+  def binary = @binary_override || installed_binary
+  def installed_binary = File.join(@root, "bin", "sd-cli")
+  def model_files = @profile.fetch("files")
+  def model_path(file) = File.join(@models_dir, file.fetch("filename"))
+  def executable?(path) = File.file?(path) && !File.symlink?(path) && File.executable?(path)
+  def verified?(path, file) = File.file?(path) && !File.symlink?(path) && File.size(path) == file.fetch("bytes") && Digest::SHA256.file(path).hexdigest == file.fetch("sha256")
+
+  def regular_path!(path, label)
+    expanded = File.expand_path(path)
+    raise "#{label} must be a regular non-symlink file" unless File.file?(expanded) && !File.symlink?(expanded)
+    expanded
+  end
+
+  def regular_executable!(path, label)
+    expanded = regular_path!(path, label)
+    raise "#{label} must be executable" unless File.executable?(expanded)
+    expanded
+  end
+
+  def require_tools!(names)
+    missing = names.reject { |name| ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, name)) } }
+    raise "missing required visual motion tools: #{missing.join(', ')}" unless missing.empty?
+  end
+
+  def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))
+  def tail(value, limit) = value.bytesize > limit ? value.byteslice(value.bytesize - limit, limit) : value
+  def secure_compare(left, right) = left.to_s.bytesize == right.bytesize && left.to_s.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
+  def emit(value) = puts(JSON.pretty_generate(value))
+  def fail_with(error)
+    emit("lifecycle_state" => "failed", "error" => error.message)
+    exit 1
+  end
+end
+
+options = {
+  manifest: File.expand_path("../config/visual_motion_models.json", __dir__),
+  root: File.join(Dir.home, ".local", "share", "soul", "visual-motion")
+}
+parser = OptionParser.new do |opts|
+  opts.on("--action ACTION") { |value| options[:action] = value }
+  opts.on("--manifest PATH") { |value| options[:manifest] = value }
+  opts.on("--root PATH") { |value| options[:root] = value }
+  opts.on("--request PATH") { |value| options[:request] = value }
+  opts.on("--runner PATH") { |value| options[:runner] = value }
+  opts.on("--probe PATH") { |value| options[:probe] = value }
+  opts.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+  opts.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end
+command = ARGV.shift
+parser.parse!(ARGV)
+runtime = VisualMotionRuntime.new(options)
+case command
+when "check" then runtime.check
+when "plan" then runtime.plan(options.fetch(:action))
+when "setup" then runtime.setup
+when "download" then runtime.download
+when "run" then runtime.run
+else abort "usage: soul-visual-motion-runtime [check|plan|setup|download|run] [options]"
+end

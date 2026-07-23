@@ -6,11 +6,13 @@ require "json"
 require "securerandom"
 require "time"
 require_relative "bounded_command_runner"
+require_relative "model_runtime_lease_store"
 
 module SoulCore
   class VisualStudioService
     PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
     CANDIDATE_ID = /\Avisual_candidate_[a-f0-9]{16}\z/
+    MOTION_ID = /\Amotion_candidate_[a-f0-9]{16}\z/
     CREATE_FIELDS = %w[title intent prompt negative_prompt aspect_ratio seed].freeze
     ASPECTS = { "landscape" => [1024, 576], "square" => [768, 768], "portrait" => [576, 1024] }.freeze
     CONFIRMATION = "GENERATE_VISUAL_DRAFT"
@@ -18,20 +20,30 @@ module SoulCore
     DELETE_CANDIDATE_CONFIRMATION = "DELETE_VISUAL_CANDIDATE"
     DELETE_PROJECT_CONFIRMATION = "DELETE_VISUAL_PROJECT"
     PROMOTION_CONFIRMATION = "BIND_VISUAL_COMPANION"
+    MOTION_CONFIRMATION = "GENERATE_VISUAL_MOTION"
+    NATIVE_MOTION_CONFIRMATION = "GENERATE_NATIVE_VIDEO"
+    DELETE_MOTION_CONFIRMATION = "DELETE_VISUAL_MOTION"
     MAX_PROJECTS = 500
     MAX_RECORD_BYTES = 128 * 1024
     TIMEOUT_SECONDS = 900
 
-    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil)
+    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, motion_runtime_root: nil, motion_manifest_path: nil, native_runtime_root: nil, native_manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil, generation_lease_store: nil)
       @root = File.expand_path(root)
       @visual_root = File.expand_path(visual_root || File.join(@root, "Soul", "visual", "projects"))
       @runtime_root = File.expand_path(runtime_root || File.join(Dir.home, ".local", "share", "soul", "visual"))
       @manifest_path = File.expand_path(manifest_path || File.join(@root, "config", "visual_studio_models.json"))
+      @motion_runtime_root = File.expand_path(motion_runtime_root || File.join(Dir.home, ".local", "share", "soul", "visual-motion"))
+      @motion_manifest_path = File.expand_path(motion_manifest_path || File.join(@root, "config", "visual_motion_models.json"))
+      @native_runtime_root = File.expand_path(native_runtime_root || File.join(Dir.home, ".local", "share", "soul", "visual-native"))
+      @native_manifest_path = File.expand_path(native_manifest_path || File.join(@root, "config", "visual_native_models.json"))
       @runner = runner
       @clock = clock
       @id_generator = id_generator
       @core_status = core_status
       @music_visual_companion = music_visual_companion
+      @generation_lease_store = generation_lease_store || ModelRuntimeLeaseStore.new(root: @root)
+      @verification_mutex = Mutex.new
+      @verification_cache = {}
       raise ArgumentError, "visual project root must remain inside the repository" unless within?(@visual_root, @root)
     end
 
@@ -45,7 +57,7 @@ module SoulCore
       outcome("complete", true, "visual resources inspected", data: {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
         "runtime_ready" => executable?(binary), "models_ready" => missing.empty?, "ready" => ready,
-        "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => manifest.fetch("motion_candidates")
+        "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => motion_resources(core), "native_motion" => native_motion_resources(core)
       })
     rescue KeyError, JSON::ParserError, SystemCallError => error
       outcome("failed", false, "visual resource manifest failed safely: #{error.class}")
@@ -152,9 +164,13 @@ module SoulCore
       scope = { "operation" => "visual_generation", "project_id" => project.fetch("project_id"), "candidate_id" => candidate_id, "project_digest" => digest(project), "profile_id" => resource.fetch("profile_id"), "width" => dimensions(project).first, "height" => dimensions(project).last }
       raise "exact visual approval did not match" unless confirmation == CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Visual runtime or exact model files are not ready" unless resource["ready"]
-      render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: project.fetch("prompt"), seed: project.fetch("seed"), source_path: nil, kind: "text_to_image", progress: progress)
+      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS) do
+        render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: project.fetch("prompt"), seed: project.fetch("seed"), source_path: nil, kind: "text_to_image", progress: progress)
+      end
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      outcome("blocked_for_human_review", false, "AMD generation resource is occupied: #{error.message}")
     rescue StandardError => error
       outcome("failed", false, error.message)
     ensure
@@ -187,9 +203,13 @@ module SoulCore
       scope = edit_scope(project, source, candidate_id, edit_instruction, edit_seed, resource.fetch("profile_id"))
       raise "exact visual edit approval did not match" unless confirmation == EDIT_CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Visual runtime or exact model files are not ready" unless resource["ready"]
-      render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: edit_instruction, seed: edit_seed, source_path: artifact_path(project_id: project_id, candidate_id: source_candidate_id), kind: "image_edit", progress: progress)
+      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS) do
+        render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: edit_instruction, seed: edit_seed, source_path: artifact_path(project_id: project_id, candidate_id: source_candidate_id), kind: "image_edit", progress: progress)
+      end
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      outcome("blocked_for_human_review", false, "AMD generation resource is occupied: #{error.message}")
     rescue StandardError => error
       outcome("failed", false, error.message)
     end
@@ -252,6 +272,188 @@ module SoulCore
       companion.generated_import_execute(project_id: music_project_id, candidate_id: music_candidate_id, source_project_id: project_id, source_candidate_id: candidate_id, source_path: artifact_path(project_id: project_id, candidate_id: candidate_id), prompt_summary: project.fetch("prompt"), confirmation: confirmation, expected_digest: expected_digest)
     end
 
+    def motion_preview(project_id:, source_candidate_id:, instruction:, seed:)
+      project = read_project(project_id)
+      source = reviewed_still!(project_id, source_candidate_id)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = motion_resources(visual_core_status)
+      return outcome("blocked_for_human_review", false, "Visual motion runtime or exact model files are not ready", data: resource) unless resource["ready"]
+      motion_id = "motion_candidate_#{@id_generator.call}"
+      scope = motion_scope(project, source, motion_id, motion_instruction, motion_seed, resource)
+      outcome("blocked_for_human_review", true, "exact image-to-video generation requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => MOTION_CONFIRMATION))
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def motion_execute(project_id:, source_candidate_id:, motion_id:, instruction:, seed:, confirmation:, expected_digest:, progress: nil)
+      project = read_project(project_id)
+      source = reviewed_still!(project_id, source_candidate_id)
+      raise ArgumentError, "motion_candidate_id is invalid" unless motion_id.to_s.match?(MOTION_ID)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = motion_resources(visual_core_status)
+      scope = motion_scope(project, source, motion_id, motion_instruction, motion_seed, resource)
+      raise "exact visual motion approval did not match" unless confirmation == MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
+      raise "Visual motion runtime or exact model files are not ready" unless resource["ready"]
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS * 4) do
+        render_motion(project: project, source: source, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
+      end
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      outcome("blocked_for_human_review", false, "AMD generation resource is occupied: #{error.message}")
+    rescue StandardError => error
+      outcome("failed", false, error.message)
+    end
+
+    def native_motion_preview(project_id:, instruction:, seed:, duration_seconds: 4)
+      project = read_project(project_id)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = native_motion_resources(visual_core_status, duration_seconds: duration_seconds)
+      return outcome("blocked_for_human_review", false, "Native video runtime or exact model files are not ready", data: resource) unless resource["ready"]
+      motion_id = "motion_candidate_#{@id_generator.call}"
+      scope = native_motion_scope(project, motion_id, motion_instruction, motion_seed, resource)
+      outcome("blocked_for_human_review", true, "exact text-to-video generation requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => NATIVE_MOTION_CONFIRMATION))
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def native_motion_execute(project_id:, motion_id:, instruction:, seed:, confirmation:, expected_digest:, duration_seconds: 4, progress: nil)
+      project = read_project(project_id)
+      raise ArgumentError, "motion_candidate_id is invalid" unless motion_id.to_s.match?(MOTION_ID)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = native_motion_resources(visual_core_status, duration_seconds: duration_seconds)
+      scope = native_motion_scope(project, motion_id, motion_instruction, motion_seed, resource)
+      raise "exact native video approval did not match" unless confirmation == NATIVE_MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
+      raise "Native video runtime or exact model files are not ready" unless resource["ready"]
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds")) do
+        render_native_motion(project: project, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
+      end
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      outcome("blocked_for_human_review", false, "AMD generation resource is occupied: #{error.message}")
+    rescue StandardError => error
+      outcome("failed", false, error.message)
+    end
+
+    def native_motion_revision_preview(project_id:, source_motion_id:, instruction:, seed:, duration_seconds:)
+      project = read_project(project_id)
+      source = revisable_native_motion!(project_id, source_motion_id)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = native_motion_resources(visual_core_status, duration_seconds: duration_seconds)
+      return outcome("blocked_for_human_review", false, "Native video runtime or exact model files are not ready", data: resource) unless resource["ready"]
+      motion_id = "motion_candidate_#{@id_generator.call}"
+      scope = native_motion_scope(project, motion_id, motion_instruction, motion_seed, resource).merge(
+        "generation_kind" => "text_to_video_revision",
+        "source_motion_candidate_id" => source.fetch("motion_candidate_id")
+      )
+      outcome("blocked_for_human_review", true, "exact native-video revision requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => NATIVE_MOTION_CONFIRMATION))
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def native_motion_revision_execute(project_id:, source_motion_id:, motion_id:, instruction:, seed:, duration_seconds:, confirmation:, expected_digest:, progress: nil)
+      project = read_project(project_id)
+      source = revisable_native_motion!(project_id, source_motion_id)
+      raise ArgumentError, "motion_candidate_id is invalid" unless motion_id.to_s.match?(MOTION_ID)
+      motion_instruction = validate_edit_instruction!(instruction)
+      motion_seed = validate_seed!(seed)
+      resource = native_motion_resources(visual_core_status, duration_seconds: duration_seconds)
+      scope = native_motion_scope(project, motion_id, motion_instruction, motion_seed, resource).merge(
+        "generation_kind" => "text_to_video_revision",
+        "source_motion_candidate_id" => source.fetch("motion_candidate_id")
+      )
+      raise "exact native-video revision approval did not match" unless confirmation == NATIVE_MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
+      raise "Native video runtime or exact model files are not ready" unless resource["ready"]
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds")) do
+        render_native_motion(project: project, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
+      end
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue ModelRuntimeLeaseStore::ResourceBusy => error
+      outcome("blocked_for_human_review", false, "AMD generation resource is occupied: #{error.message}")
+    rescue StandardError => error
+      outcome("failed", false, error.message)
+    end
+
+    def motion_review(project_id:, motion_id:, review:)
+      motion = read_motion(project_id, motion_id)
+      data = stringify_keys(review)
+      raise ArgumentError, "motion review fields are invalid" unless data.keys.sort == %w[disposition notes rating].sort
+      rating = Integer(data.fetch("rating"))
+      raise ArgumentError, "rating must be 1..5" unless (1..5).cover?(rating)
+      raise ArgumentError, "motion disposition must be keep or revise" unless %w[keep revise].include?(data.fetch("disposition"))
+      notes = data.fetch("notes")
+      raise ArgumentError, "review notes must be valid text under 8000 characters" unless notes.is_a?(String) && notes.valid_encoding? && notes.length <= 8_000
+      record = data.merge("schema_version" => "soul.visual.motion.review.v1", "project_id" => project_id, "motion_candidate_id" => motion_id, "rating" => rating, "reviewed_at" => @clock.call.iso8601)
+      path = File.join(motion_dir(project_id, motion_id), "review.json")
+      if File.exist?(path)
+        history = File.join(motion_dir(project_id, motion_id), "review-history")
+        FileUtils.mkdir_p(history, mode: 0o700)
+        previous = File.binread(path, MAX_RECORD_BYTES)
+        FileUtils.mv(path, File.join(history, "#{Digest::SHA256.hexdigest(previous)[0, 16]}.json"))
+      end
+      write_json(path, record)
+      outcome("complete", true, "visual motion review recorded", data: { "review" => record }, mutation: "visual_motion_review_recorded")
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("failed", false, error.message)
+    end
+
+    def motion_delete_preview(project_id:, motion_id:)
+      motion = read_motion(project_id, motion_id)
+      path = motion_dir(project_id, motion_id)
+      scope = { "operation" => "delete_visual_motion", "project_id" => project_id, "motion_candidate_id" => motion_id, "candidate_digest" => digest(motion), "archive_digest" => directory_digest(path), "bytes" => directory_bytes(path) }
+      outcome("blocked_for_human_review", true, "exact visual motion deletion requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => DELETE_MOTION_CONFIRMATION))
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    end
+
+    def motion_delete_execute(project_id:, motion_id:, confirmation:, expected_digest:)
+      preview = motion_delete_preview(project_id: project_id, motion_id: motion_id)
+      scope = preview.fetch("data").reject { |key, _| %w[expected_digest confirmation_phrase].include?(key) }
+      raise "exact visual motion deletion did not match" unless confirmation == DELETE_MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
+      FileUtils.rm_rf(motion_dir(project_id, motion_id))
+      outcome("complete", true, "visual motion permanently deleted", data: scope, mutation: "visual_motion_deleted")
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def motion_promotion_preview(project_id:, motion_id:, music_project_id:, music_candidate_id:)
+      companion = require_music_companion!
+      project = read_project(project_id)
+      motion = reviewed_motion!(project_id, motion_id)
+      companion.generated_motion_import_preview(project_id: music_project_id, candidate_id: music_candidate_id, source_project_id: project_id, source_motion_id: motion_id, source_path: motion_artifact_path(project_id: project_id, motion_id: motion_id), prompt_summary: motion.fetch("instruction"), source_receipt: motion)
+    end
+
+    def motion_promotion_execute(project_id:, motion_id:, music_project_id:, music_candidate_id:, confirmation:, expected_digest:)
+      companion = require_music_companion!
+      read_project(project_id)
+      motion = reviewed_motion!(project_id, motion_id)
+      companion.generated_motion_import_execute(project_id: music_project_id, candidate_id: music_candidate_id, source_project_id: project_id, source_motion_id: motion_id, source_path: motion_artifact_path(project_id: project_id, motion_id: motion_id), prompt_summary: motion.fetch("instruction"), source_receipt: motion, confirmation: confirmation, expected_digest: expected_digest)
+    end
+
+    def motion_artifact_path(project_id:, motion_id:)
+      read_motion(project_id, motion_id)
+      path = File.join(motion_dir(project_id, motion_id), "motion.webm")
+      raise ArgumentError, "visual motion artifact does not exist" unless File.file?(path) && !File.symlink?(path) && File.size(path).positive?
+      path
+    end
+
     def artifact_path(project_id:, candidate_id:)
       read_project(project_id)
       raise ArgumentError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
@@ -262,9 +464,24 @@ module SoulCore
 
     private
 
+    def with_amd_generation_lease(project_id:, request_id:, model_id:, timeout_seconds:)
+      lease = @generation_lease_store.acquire_exclusive(
+        provider_id: "amd-visual", model_id: model_id, request_id: request_id,
+        conversation_id: project_id, resource_group: "amd-vulkan-generation",
+        ttl_seconds: Integer(timeout_seconds) + 120
+      )
+      yield
+    ensure
+      @generation_lease_store.release(lease["lease_id"]) if defined?(lease) && lease
+    end
+
     def runtime_binary = File.join(@runtime_root, "stable-diffusion.cpp", "bin", "sd-cli")
+    def motion_runtime_binary = File.join(@motion_runtime_root, "bin", "sd-cli")
+    def native_runtime_binary = File.join(@native_runtime_root, "bin", "sd-cli")
     def models_dir = File.join(@runtime_root, "models")
     def model_path(file) = File.join(models_dir, file.fetch("filename"))
+    def motion_model_path(file) = File.join(@motion_runtime_root, "models", file.fetch("filename"))
+    def native_model_path(file) = File.join(@native_runtime_root, "models", file.fetch("filename"))
     def executable?(path) = File.file?(path) && !File.symlink?(path) && File.executable?(path)
     def read_manifest = JSON.parse(File.binread(@manifest_path, MAX_RECORD_BYTES))
     def dimensions(project) = ASPECTS.fetch(project.fetch("aspect_ratio"))
@@ -324,6 +541,226 @@ module SoulCore
       FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
     end
 
+    def motion_resources(core)
+      manifest = JSON.parse(File.binread(@motion_manifest_path, MAX_RECORD_BYTES))
+      profile_id, profile = manifest.fetch("profiles").first
+      missing = profile.fetch("files").reject { |file| verified_file?(motion_model_path(file), file) }
+      ready = executable?(motion_runtime_binary) && missing.empty? && core.fetch("allowed")
+      {
+        "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "runtime_ready" => executable?(motion_runtime_binary), "models_ready" => missing.empty?, "ready" => ready,
+        "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core,
+        "width" => profile.fetch("width"), "height" => profile.fetch("height"), "frames" => profile.fetch("frames"), "fps" => profile.fetch("fps")
+      }
+    rescue KeyError, JSON::ParserError, SystemCallError
+      { "ready" => false, "runtime_ready" => false, "models_ready" => false, "missing_roles" => ["manifest"], "core" => core }
+    end
+
+    def native_motion_resources(core, duration_seconds: 4)
+      manifest = JSON.parse(File.binread(@native_manifest_path, MAX_RECORD_BYTES))
+      duration = validate_native_duration!(duration_seconds)
+      profile_id, profile = manifest.fetch("profiles").find { |_id, record| Integer(record.fetch("duration_seconds", 4)) == duration }
+      raise KeyError, "native duration profile is unavailable" unless profile
+      native_missing = profile.fetch("files").reject { |file| verified_file?(native_model_path(file), file) }
+      shared_manifest = JSON.parse(File.binread(@motion_manifest_path, MAX_RECORD_BYTES))
+      shared_records = shared_manifest.fetch("profiles").values.first.fetch("files").to_h { |file| [file.fetch("filename"), file] }
+      shared_missing = profile.fetch("shared_files").filter_map do |role, filename|
+        record = shared_records[filename]
+        { "role" => role, "filename" => filename } unless record && verified_file?(motion_model_path(record), record)
+      end
+      delivery_missing = []
+      delivery_missing << { "role" => "frame_interpolator", "filename" => "ffmpeg" } if profile["generation_fps"] && !executable?(@runner.which("ffmpeg").to_s)
+      ready = executable?(native_runtime_binary) && native_missing.empty? && shared_missing.empty? && delivery_missing.empty? && core.fetch("allowed")
+      {
+        "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "runtime_ready" => executable?(native_runtime_binary) && delivery_missing.empty?, "models_ready" => native_missing.empty? && shared_missing.empty?, "ready" => ready,
+        "missing_roles" => native_missing.map { |file| file.fetch("role") } + shared_missing.map { |file| file.fetch("role") } + delivery_missing.map { |file| file.fetch("role") }, "core" => core,
+        "width" => profile.fetch("width"), "height" => profile.fetch("height"), "frames" => profile.fetch("frames"), "fps" => profile.fetch("fps"),
+        "generation_frames" => profile.fetch("generation_frames", profile.fetch("frames")), "generation_fps" => profile.fetch("generation_fps", profile.fetch("fps")),
+        "delivery_method" => profile.fetch("delivery_method", "native"),
+        "steps" => profile.fetch("steps"), "timeout_seconds" => profile.fetch("timeout_seconds"),
+        "reference_runtime_seconds" => profile.fetch("reference_runtime_seconds", nil)
+      }
+    rescue KeyError, JSON::ParserError, SystemCallError
+      { "ready" => false, "runtime_ready" => false, "models_ready" => false, "missing_roles" => ["manifest"], "core" => core }
+    end
+
+    def motion_scope(project, source, motion_id, instruction, seed, resource)
+      source_path = artifact_path(project_id: project.fetch("project_id"), candidate_id: source.fetch("candidate_id"))
+      {
+        "operation" => "visual_image_to_video", "project_id" => project.fetch("project_id"),
+        "source_candidate_id" => source.fetch("candidate_id"), "source_image_sha256" => Digest::SHA256.file(source_path).hexdigest,
+        "motion_candidate_id" => motion_id, "project_digest" => digest(project), "instruction" => instruction, "seed" => seed,
+        "profile_id" => resource.fetch("profile_id"), "width" => resource.fetch("width"), "height" => resource.fetch("height"),
+        "frames" => resource.fetch("frames"), "fps" => resource.fetch("fps"), "automatic_retry" => false, "external_publication" => false
+      }
+    end
+
+    def native_motion_scope(project, motion_id, instruction, seed, resource)
+      {
+        "operation" => "visual_text_to_video", "generation_kind" => "text_to_video", "project_id" => project.fetch("project_id"),
+        "motion_candidate_id" => motion_id, "project_digest" => digest(project), "instruction" => instruction, "seed" => seed,
+        "profile_id" => resource.fetch("profile_id"), "width" => resource.fetch("width"), "height" => resource.fetch("height"),
+        "frames" => resource.fetch("frames"), "fps" => resource.fetch("fps"), "steps" => resource.fetch("steps"),
+        "generation_frames" => resource.fetch("generation_frames"), "generation_fps" => resource.fetch("generation_fps"),
+        "delivery_method" => resource.fetch("delivery_method"),
+        "estimated_runtime_seconds" => resource["reference_runtime_seconds"],
+        "automatic_retry" => false, "external_publication" => false
+      }
+    end
+
+    def motion_command(source_path, output, instruction, seed)
+      manifest = JSON.parse(File.binread(@motion_manifest_path, MAX_RECORD_BYTES))
+      profile = manifest.fetch("profiles").values.first
+      files = profile.fetch("files").to_h { |file| [file.fetch("role"), motion_model_path(file)] }
+      [motion_runtime_binary, "-M", "vid_gen", "--diffusion-model", files.fetch("diffusion_model"), "--tae", files.fetch(profile.fetch("decoder_role")), "--t5xxl", files.fetch("text_encoder"),
+       "-p", instruction, "-n", "camera movement, zoom, pan, geometry drift, flicker, text, watermark, malformed structure", "--seed", seed.to_s,
+       "--cfg-scale", profile.fetch("cfg_scale").to_s, "--steps", profile.fetch("steps").to_s, "--sampling-method", profile.fetch("sampling_method"),
+       "-W", profile.fetch("width").to_s, "-H", profile.fetch("height").to_s, "--video-frames", profile.fetch("frames").to_s, "--fps", profile.fetch("fps").to_s,
+       "--flow-shift", profile.fetch("flow_shift").to_s, "--diffusion-fa", "--offload-to-cpu", "-i", source_path, "-o", output]
+    end
+
+    def native_motion_command(output, instruction, seed, profile_id)
+      manifest = JSON.parse(File.binread(@native_manifest_path, MAX_RECORD_BYTES))
+      profile = manifest.fetch("profiles").fetch(profile_id)
+      diffusion = native_model_path(profile.fetch("files").find { |file| file.fetch("role") == "diffusion_model" })
+      shared = profile.fetch("shared_files")
+      [native_runtime_binary, "-M", "vid_gen", "--diffusion-model", diffusion,
+       "--tae", File.join(@motion_runtime_root, "models", shared.fetch("tae")),
+       "--t5xxl", File.join(@motion_runtime_root, "models", shared.fetch("text_encoder")),
+       "-p", instruction, "-n", "text, watermark, logo, malformed geometry, flicker, duplication, rapid cuts, bright daylight, people",
+       "--seed", seed.to_s, "--cfg-scale", profile.fetch("cfg_scale").to_s, "--steps", profile.fetch("steps").to_s,
+       "--sampling-method", profile.fetch("sampling_method"), "--scheduler", profile.fetch("scheduler"),
+       "-W", profile.fetch("width").to_s, "-H", profile.fetch("height").to_s,
+       "--video-frames", profile.fetch("generation_frames", profile.fetch("frames")).to_s,
+       "--fps", profile.fetch("generation_fps", profile.fetch("fps")).to_s,
+       "--flow-shift", profile.fetch("flow_shift").to_s, "--diffusion-fa", "--offload-to-cpu",
+       "--backend", "vae=cpu", "--vae-tiling", "-o", output]
+    end
+
+    def native_motion_delivery_command(input, output, resource)
+      [
+        @runner.which("ffmpeg") || "ffmpeg", "-y", "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-i", input,
+        "-vf", "minterpolate=fps=#{resource.fetch("fps")}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1",
+        "-an", "-c:v", "libvpx-vp9", "-deadline", "good", "-cpu-used", "2", "-crf", "18", "-b:v", "0",
+        "-pix_fmt", "yuv420p", output
+      ]
+    end
+
+    def render_native_motion(project:, motion_id:, scope:, resource:, instruction:, seed:, progress:)
+      root = File.join(project_dir(project.fetch("project_id")), "motions")
+      FileUtils.mkdir_p(root, mode: 0o700)
+      target = motion_dir(project.fetch("project_id"), motion_id)
+      raise "visual motion candidate already exists" if File.exist?(target) || File.symlink?(target)
+      staging = "#{target}.partial-#{SecureRandom.hex(4)}"
+      Dir.mkdir(staging, 0o700)
+      output = File.join(staging, "motion.webm")
+      interpolation = resource.fetch("generation_fps") != resource.fetch("fps")
+      generated_output = interpolation ? File.join(staging, "motion.generated.webm") : output
+      progress&.call("stage" => "native_motion_rendering", "message" => "FastWan is synthesizing one bounded native scene from text alone.")
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      result = @runner.run(native_motion_command(generated_output, instruction, seed, resource.fetch("profile_id")), timeout_seconds: resource.fetch("timeout_seconds"), env: { "VK_LOADER_DEBUG" => "none" }, max_output_bytes: 512 * 1024)
+      log = result.stdout.to_s + result.stderr.to_s
+      raise "native video renderer failed safely" unless result.success? && valid_video?(generated_output)
+      if interpolation
+        progress&.call("stage" => "native_motion_interpolation", "message" => "The bounded 16 fps scene is being interpolated to the 24 fps review artifact.")
+        delivery = @runner.run(native_motion_delivery_command(generated_output, output, resource), timeout_seconds: 180, max_output_bytes: 256 * 1024)
+        log << "\n--- bounded frame interpolation ---\n" << delivery.stdout.to_s << delivery.stderr.to_s
+        raise "native video frame interpolation failed safely" unless delivery.success? && valid_video?(output)
+        FileUtils.rm_f(generated_output)
+      end
+      elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)
+      File.write(File.join(staging, "generation.log"), log.byteslice(-512 * 1024, 512 * 1024).to_s, mode: "wb", perm: 0o600)
+      receipt = scope.merge(
+        "schema_version" => "soul.visual.motion_candidate.v1", "lifecycle_state" => "blocked_for_human_review",
+        "created_at" => @clock.call.iso8601, "elapsed_seconds" => elapsed, "video_sha256" => Digest::SHA256.file(output).hexdigest,
+        "video_bytes" => File.size(output), "duration_seconds" => (resource.fetch("frames") - 1).to_f / resource.fetch("fps"), "human_review_required" => true
+      )
+      write_json(File.join(staging, "candidate.json"), receipt)
+      File.rename(staging, target)
+      progress&.call("stage" => "complete", "message" => "Native scene awaits your review.")
+      outcome("blocked_for_human_review", true, "native video generated; human review required", data: { "motion" => receipt }, mutation: "visual_native_motion_generated")
+    ensure
+      FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
+    end
+
+    def render_motion(project:, source:, motion_id:, scope:, resource:, instruction:, seed:, progress:)
+      root = File.join(project_dir(project.fetch("project_id")), "motions")
+      FileUtils.mkdir_p(root, mode: 0o700)
+      target = motion_dir(project.fetch("project_id"), motion_id)
+      raise "visual motion candidate already exists" if File.exist?(target) || File.symlink?(target)
+      staging = "#{target}.partial-#{SecureRandom.hex(4)}"
+      Dir.mkdir(staging, 0o700)
+      output = File.join(staging, "motion.webm")
+      source_path = artifact_path(project_id: project.fetch("project_id"), candidate_id: source.fetch("candidate_id"))
+      progress&.call("stage" => "motion_rendering", "message" => "Wan is synthesizing one bounded four-second motion study from the reviewed still.")
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      result = @runner.run(motion_command(source_path, output, instruction, seed), timeout_seconds: TIMEOUT_SECONDS * 4, env: { "VK_LOADER_DEBUG" => "none" }, max_output_bytes: 512 * 1024)
+      elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)
+      File.write(File.join(staging, "generation.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(-512 * 1024, 512 * 1024).to_s, mode: "wb", perm: 0o600)
+      raise "visual motion renderer failed safely" unless result.success? && valid_video?(output)
+      receipt = scope.merge(
+        "schema_version" => "soul.visual.motion_candidate.v1", "lifecycle_state" => "blocked_for_human_review",
+        "created_at" => @clock.call.iso8601, "elapsed_seconds" => elapsed, "video_sha256" => Digest::SHA256.file(output).hexdigest,
+        "video_bytes" => File.size(output), "duration_seconds" => resource.fetch("frames").to_f / resource.fetch("fps"), "human_review_required" => true
+      )
+      write_json(File.join(staging, "candidate.json"), receipt)
+      File.rename(staging, target)
+      progress&.call("stage" => "complete", "message" => "Motion study awaits your review.")
+      outcome("blocked_for_human_review", true, "visual motion generated; human review required", data: { "motion" => receipt }, mutation: "visual_motion_generated")
+    ensure
+      FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
+    end
+
+    def read_motion(project_id, motion_id)
+      read_project(project_id)
+      raise ArgumentError, "motion_candidate_id is invalid" unless motion_id.to_s.match?(MOTION_ID)
+      path = File.join(motion_dir(project_id, motion_id), "candidate.json")
+      raise ArgumentError, "visual motion candidate does not exist" unless File.file?(path) && !File.symlink?(path) && File.size(path) <= MAX_RECORD_BYTES
+      record = JSON.parse(File.binread(path, MAX_RECORD_BYTES))
+      raise ArgumentError, "visual motion candidate identity does not match" unless record["project_id"] == project_id && record["motion_candidate_id"] == motion_id
+      record
+    rescue JSON::ParserError
+      raise ArgumentError, "visual motion candidate record is invalid"
+    end
+
+    def reviewed_still!(project_id, candidate_id)
+      candidate = read_candidate(project_id, candidate_id)
+      review_path = File.join(candidate_dir(project_id, candidate_id), "review.json")
+      raise ArgumentError, "keep the exact still before generating motion" unless File.file?(review_path) && !File.symlink?(review_path)
+      review = JSON.parse(File.binread(review_path, MAX_RECORD_BYTES))
+      raise ArgumentError, "keep the exact still before generating motion" unless review["disposition"] == "keep"
+      candidate
+    rescue JSON::ParserError
+      raise ArgumentError, "visual still review is invalid"
+    end
+
+    def reviewed_motion!(project_id, motion_id)
+      motion = read_motion(project_id, motion_id)
+      review_path = File.join(motion_dir(project_id, motion_id), "review.json")
+      raise ArgumentError, "keep the exact motion candidate before binding it" unless File.file?(review_path) && !File.symlink?(review_path)
+      review = JSON.parse(File.binread(review_path, MAX_RECORD_BYTES))
+      raise ArgumentError, "keep the exact motion candidate before binding it" unless review["disposition"] == "keep"
+      motion
+    rescue JSON::ParserError
+      raise ArgumentError, "visual motion review is invalid"
+    end
+
+    def revisable_native_motion!(project_id, motion_id)
+      motion = read_motion(project_id, motion_id)
+      unless %w[text_to_video text_to_video_revision].include?(motion["generation_kind"])
+        raise ArgumentError, "only a native scene can enter the native revision lane"
+      end
+      review_path = File.join(motion_dir(project_id, motion_id), "review.json")
+      raise ArgumentError, "record a revise review before drafting a native scene revision" unless File.file?(review_path) && !File.symlink?(review_path)
+      review = JSON.parse(File.binread(review_path, MAX_RECORD_BYTES))
+      raise ArgumentError, "record a revise review before drafting a native scene revision" unless review["disposition"] == "revise"
+      motion
+    rescue JSON::ParserError
+      raise ArgumentError, "visual motion review is invalid"
+    end
+
     def read_project(id)
       raise ArgumentError, "project_id is invalid" unless id.to_s.match?(PROJECT_ID)
       path = File.join(project_dir(id), "project.json")
@@ -356,7 +793,16 @@ module SoulCore
       rescue JSON::ParserError
         nil
       end.sort_by { |item| item.fetch("created_at") }.reverse
-      project.merge("candidates" => candidates)
+      motions_root = File.join(project_dir(project.fetch("project_id")), "motions")
+      motions = safe_children(motions_root).grep(MOTION_ID).filter_map do |id|
+        motion = read_motion(project.fetch("project_id"), id)
+        review_path = File.join(motions_root, id, "review.json")
+        motion["review"] = JSON.parse(File.binread(review_path, MAX_RECORD_BYTES)) if File.file?(review_path) && !File.symlink?(review_path) && File.size(review_path) <= MAX_RECORD_BYTES
+        motion
+      rescue ArgumentError, JSON::ParserError
+        nil
+      end.sort_by { |item| item.fetch("created_at") }.reverse
+      project.merge("candidates" => candidates, "motions" => motions)
     end
 
     def prepare_root!
@@ -366,6 +812,7 @@ module SoulCore
     end
     def project_dir(id) = File.join(@visual_root, id.to_s)
     def candidate_dir(project_id, candidate_id) = File.join(project_dir(project_id), "generations", candidate_id.to_s)
+    def motion_dir(project_id, motion_id) = File.join(project_dir(project_id), "motions", motion_id.to_s)
     def safe_children(path) = File.directory?(path) && !File.symlink?(path) ? Dir.children(path) : []
 
     def edit_scope(project, source, candidate_id, instruction, seed, profile_id)
@@ -390,6 +837,14 @@ module SoulCore
       seed
     rescue TypeError, ArgumentError
       raise ArgumentError, "seed must be an integer from 0..2147483647"
+    end
+
+    def validate_native_duration!(value)
+      duration = Integer(value)
+      raise ArgumentError, "native scene duration must be 4, 8, or 12 seconds" unless [4, 8, 12].include?(duration)
+      duration
+    rescue TypeError, ArgumentError
+      raise ArgumentError, "native scene duration must be 4, 8, or 12 seconds"
     end
 
     def directory_bytes(path)
@@ -424,11 +879,38 @@ module SoulCore
     end
 
     def verified_file?(path, record)
-      File.file?(path) && !File.symlink?(path) && File.size(path) == record.fetch("bytes") && Digest::SHA256.file(path).hexdigest == record.fetch("sha256")
+      expected_size = record.fetch("bytes")
+      expected_sha256 = record.fetch("sha256")
+      identity = verification_identity(path, expected_size, expected_sha256)
+      return false unless identity
+
+      @verification_mutex.synchronize do
+        identity = verification_identity(path, expected_size, expected_sha256)
+        return false unless identity
+        cached = @verification_cache[path]
+        return cached.fetch("verified") if cached && cached.fetch("identity") == identity
+
+        verified = file_sha256(path) == expected_sha256
+        final_identity = verification_identity(path, expected_size, expected_sha256)
+        return false unless final_identity == identity
+        @verification_cache[path] = { "identity" => identity, "verified" => verified }
+        verified
+      end
     rescue SystemCallError
       false
     end
+
+    def verification_identity(path, expected_size, expected_sha256)
+      stat = File.lstat(path)
+      return nil unless stat.file? && !stat.symlink? && stat.size == expected_size
+      [expected_sha256, stat.dev, stat.ino, stat.size, stat.mtime.to_r.to_s, stat.ctime.to_r.to_s]
+    rescue SystemCallError
+      nil
+    end
+
+    def file_sha256(path) = Digest::SHA256.file(path).hexdigest
     def valid_png?(path) = File.file?(path) && !File.symlink?(path) && File.size(path) > 1024 && File.binread(path, 8) == "\x89PNG\r\n\x1a\n".b
+    def valid_video?(path) = File.file?(path) && !File.symlink?(path) && File.size(path) > 1024
     def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))
     def secure_compare(left, right) = left.to_s.bytesize == right.bytesize && left.to_s.bytes.zip(right.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
     def within?(path, root) = path == root || path.start_with?(root + File::SEPARATOR)

@@ -31,10 +31,14 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 ### Creative Studios
 
 - **Music Studio** stores immutable project briefs and candidate lineage; supports exact 30-second, 90-second, 3-minute, and 10-minute AMD Vulkan ACE-Step generation; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies.
-- **Visual Studio** provides bounded local FLUX.2 Vulkan still generation, review, guided image edits, candidate/project deletion, and exact binding to a Music candidate.
-- A reviewed still can become a static music companion with framing, matte, fades, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. Nothing uploads or publishes automatically.
+- **Visual Studio** provides bounded local FLUX.2 Vulkan still generation, review, guided image edits, Wan 2.2 image-guided motion, FastWan 2.2 native text-to-video, immutable revision lineage, candidate/project deletion, and exact binding to a Music candidate.
+- A reviewed still or short generated-motion candidate can become a music companion with framing, matte, fades, repetition where needed, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. Nothing uploads or publishes automatically.
 
-Generated video remains a qualification track. Historical procedural FFmpeg motion effects are retired from advancement; the supported presentation holds the reviewed frame static. Short model-generated motion is not yet a production feature.
+Historical procedural camera movement is retired. The current generated-motion
+lanes are explicit, short, review-gated candidates: image-guided Wan output is a
+fixed resource-oriented study, while native FastWan output supports 4, 8, or 12
+seconds at a delivered 24 fps. Longer companions repeat one accepted scene and
+are labeled accordingly.
 
 The operator-facing flows are documented in [`docs/guides/`](guides/).
 
@@ -68,14 +72,14 @@ Human approval remains required for risky or destructive execution, durable memo
 
 ## Current development focus
 
-The foundational Conversational Soul milestone is complete. Deployment/Core orchestration, Self Improvement, Music Studio, Visual Studio stills, and local publication packaging are implemented and under owner use.
+The foundational Conversational Soul milestone is complete. Deployment/Core orchestration, Self Improvement, Music Studio, Visual Studio still and short-motion lanes, and local publication packaging are implemented and under owner use.
 
 Near-term work is expected to concentrate on:
 
 - chat usability, persona fidelity, and dashboard-capability invocation through skills;
 - production hardening and documentation of creative workflows;
 - additional Music Studio refinement based on real generations;
-- measured visual-motion qualification before any production motion path;
+- motion-quality refinement based on reviewed image-guided and native scenes;
 - backup/recovery and broader deployment only under separate review.
 
 No release or stable tag has been created.

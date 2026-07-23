@@ -63,12 +63,11 @@ module SoulCore
       checks["dashboard_document_and_head_are_allowlisted"] = document.status == 200 && head.status == 200 && head.body.empty? && document.body.include?("Soul/") && document.body.include?("fixture-csrf-token")
 
       static_responses = DashboardHttpApplication::STATIC_ROUTES.keys.map { |route| app.call(method: "GET", target: route, headers: get_headers) }
-      skill_studio_asset = DashboardHttpApplication::STATIC_ROUTES["/brand/skill-studio.png"]
       character_assets = DashboardHttpApplication::STATIC_ROUTES.select { |route, _value| route.start_with?("/brand/character/") }
       checks["exact_static_allowlist_serves_only_approved_assets"] =
         static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } &&
-        DashboardHttpApplication::STATIC_ROUTES.length == 10 &&
-        skill_studio_asset == ["assets/brand/soul-slash-skill-studio.png", "image/png"] &&
+        DashboardHttpApplication::STATIC_ROUTES.length == 7 &&
+        %w[/brand/primary-mark.png /brand/supporting-scene.png /brand/skill-studio.png].none? { |route| DashboardHttpApplication::STATIC_ROUTES.key?(route) } &&
         character_assets.length == 3 && character_assets.values.all? { |path, content_type| path.start_with?("assets/brand/character/") && content_type == "image/png" }
 
       rejected_targets = ["/../.env", "/%2e%2e/.env", "/assets/../.env", "/assets/dashboard.js?x=1", "/unknown.png"]
@@ -143,7 +142,7 @@ module SoulCore
       forbidden_server = %w[fork( daemon( Process.spawn systemd cron launchd inotify]
       checks["foreground_server_has_only_bounded_request_workers"] =
         forbidden_server.none? { |needle| [server, command].any? { |source| source.include?(needle) } } &&
-        server.include?("MAX_CONCURRENT_REQUESTS = 24") && server.include?("close_and_join_requests")
+        server.include?("MAX_CONCURRENT_REQUESTS = 48") && server.include?("close_and_join_requests")
 
       checks["listener_rejects_non_loopback_before_bind"] = !DashboardServer.loopback?("0.0.0.0") && !DashboardServer.loopback?("192.168.1.10") && DashboardServer.loopback?("127.0.0.1") && raises_argument? { DashboardServer.new(host: "0.0.0.0", port: 4567, application: app) }
 

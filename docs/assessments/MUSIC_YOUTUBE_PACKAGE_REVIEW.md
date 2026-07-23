@@ -7,7 +7,10 @@ Status: candidate-complete; owner review required
 - deterministic editable YouTube-description draft;
 - exact additive local package gate;
 - upload-ready MP4, thumbnail, description sidecar, and future upload metadata;
+- deterministic thumbnail extraction from an exact reviewed motion preview when
+  the companion has no static `base.png`;
 - truthful instrumental/vocal credit selection;
+- semantic genre-clause extraction without partial words or cut-off lists;
 - explicit private, synthetic-media, no-upload, and human-publication fields;
 - Music Studio controls after a full Visual Companion is ready.
 
@@ -44,9 +47,12 @@ existing `youtube/` directory. External upload/publication remains unavailable.
 
 ## Known weaknesses
 
-- the genre influence is deterministically derived from the first composition
-  caption phrase and may benefit from human editing;
+- the genre influence is deterministically derived from the leading genre
+  clause and may still benefit from human editing for unusually structured
+  captions;
 - YouTube API upload is intentionally absent;
+- the default generated-motion thumbnail is the frame at one second; later
+  thumbnail selection remains a separate human-reviewed enhancement;
 - a new unaudited Google API project cannot support later manual publication of
   its API-uploaded video without completing Google's audit requirements.
 

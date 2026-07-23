@@ -63,7 +63,7 @@ models_url = base_url.sub(%r{/?$}, "") + "/models"
 os_release = read_file("/etc/os-release")
 kernel = run_cmd(["uname", "-a"])
 memory = run_cmd(["free", "-h"])
-disk = run_cmd(["df", "-h", ENV.fetch("HOME", "/home/bhones")])
+disk = run_cmd(["df", "-h", ENV.fetch("HOME", Dir.home)])
 gpu = run_cmd(["nvidia-smi", "--query-gpu=name,memory.total,memory.used,power.draw", "--format=csv,noheader"])
 service = run_cmd(["systemctl", "--user", "is-active", "llama-server.service"])
 service_status = run_cmd(["systemctl", "--user", "status", "llama-server.service", "--no-pager"])
