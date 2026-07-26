@@ -19,11 +19,13 @@ module SoulCore
       "music" => "Music Core"
     }.freeze
 
-    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, music_visual_companion: nil, publication_package: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
       @chat_store = chat_store
       @music_generation = music_generation
       @music_disposition = music_disposition
+      @music_visual_companion = music_visual_companion
+      @publication_package = publication_package
       @visual_studio = visual_studio
       @core_orchestration = core_orchestration
       @flow_store = flow_store || ConversationCreativeFlowStore.new(root: @root, clock: clock)
@@ -64,7 +66,9 @@ module SoulCore
         supersede(prior)
         prior = nil
       end
-      if prior && prior["stage"] == "bound"
+      if prior && %w[bound presented rendered].include?(prior["stage"])
+        followup = plan_companion_output(prior, message)
+        return followup if followup
         return nil unless @planner.explicit_request?(message)
         supersede(prior)
         prior = nil
@@ -127,6 +131,9 @@ module SoulCore
       return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
       return execute_visual_revision(flow, progress) if action.fetch("action_id") == "creative_visual_revision"
       return execute_companion_binding(flow) if action.fetch("action_id") == "creative_companion_bind"
+      return execute_companion_presentation(flow, progress) if action.fetch("action_id") == "creative_companion_presentation"
+      return execute_companion_final(flow, progress) if action.fetch("action_id") == "creative_companion_final"
+      return execute_publication_package(flow) if action.fetch("action_id") == "creative_publication_package"
       return execute_music_disposition(flow) if %w[creative_music_export creative_music_reject].include?(action.fetch("action_id"))
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
@@ -290,19 +297,325 @@ module SoulCore
       domain("failed", false, "companion binding failed safely: #{error.class}")
     end
 
-    def plan_music_export(flow)
+    def plan_companion_output(flow, message)
+      if explicit_publication_request?(message) || explicit_publication_continue?(flow, message)
+        flow["completion_target"] = "publication"
+        return plan_publication_path(flow)
+      end
+      return plan_music_export(flow, resume_stage: flow.fetch("stage")) if explicit_export_request?(message)
+      return plan_companion_render(flow, target: "video") if explicit_companion_render_request?(message)
+      return plan_companion_render(flow, target: flow["completion_target"]) if explicit_video_continue?(flow, message)
+
+      nil
+    end
+
+    def plan_publication_path(flow)
+      return plan_companion_render(flow, target: "publication") unless flow["stage"] == "rendered"
+      return failure_result("finished-song export service is unavailable", flow) unless @music_disposition
+
+      music = flow.dig("generated", "music")
+      export = @music_disposition.export_preview(
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id")
+      )
+      return failure_result(export.fetch("reason", "music export preview did not complete"), flow) unless export.fetch("ok")
+      unless export.fetch("lifecycle_state") == "complete"
+        return prepare_music_disposition_action(
+          flow, "export", export.fetch("data"),
+          resume_stage: "rendered", package_after_export: true
+        )
+      end
+
+      flow["outputs"] ||= {}
+      flow["outputs"]["music_export"] = export.dig("data", "export")
+      @flow_store.write(flow)
+      plan_publication_package(flow)
+    end
+
+    def plan_companion_render(flow, target:)
+      return failure_result("music visual companion service is unavailable", flow) unless @music_visual_companion
+      companion = flow.dig("generated", "companion")
+      return failure_result("the reviewed visual is not bound to this music candidate", flow) unless companion
+      flow["completion_target"] = target if %w[video publication].include?(target)
+
+      if companion.dig("artifacts", "preview")
+        flow["stage"] = "rendered"
+        flow["outputs"] ||= {}
+        flow["outputs"]["visual_render"] = companion.dig("artifacts", "preview")
+        @flow_store.write(flow)
+        return target == "publication" ? plan_publication_path(flow) :
+          result("The full-duration companion is already rendered. No duplicate file was created.", "creative_companion_render_complete", flow)
+      end
+
+      music = flow.dig("generated", "music")
+      attributes = {
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id"),
+        visual_id: companion.fetch("visual_id")
+      }
+      if companion["stage"] == "base_bound"
+        preview = @music_visual_companion.loop_preview(**attributes, presentation: nil)
+        return failure_result(preview.fetch("reason", "static presentation preview did not complete"), flow) unless preview.fetch("ok")
+        return prepare_companion_render_action(flow, "presentation", preview.fetch("data"))
+      end
+      if companion["stage"] == "loop_ready"
+        preview = @music_visual_companion.final_preview(**attributes)
+        return failure_result(preview.fetch("reason", "full-duration render preview did not complete"), flow) unless preview.fetch("ok")
+        return prepare_companion_render_action(flow, "final", preview.fetch("data"))
+      end
+
+      failure_result("the bound visual is not ready for a supported render step", flow)
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("companion render planning failed safely: #{error.class}", flow)
+    end
+
+    def prepare_companion_render_action(flow, kind, preview)
+      flow["companion_render_action"] = {
+        "kind" => kind,
+        "confirmation_phrase" => preview.fetch("confirmation_phrase"),
+        "downstream_digest" => preview.fetch("expected_digest"),
+        "preview_scope" => preview.fetch("preview_scope")
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_companion_render_action(flow, kind)
+      @flow_store.write(flow)
+      mode = kind == "presentation" ? "creative_companion_presentation_ready" : "creative_companion_final_ready"
+      result(render_companion_render(flow), mode, flow, actions: [flow.fetch("pending_action")])
+    end
+
+    def build_companion_render_action(flow, kind)
+      {
+        "action_id" => kind == "presentation" ? "creative_companion_presentation" : "creative_companion_final",
+        "operation" => "chats.creative.execute",
+        "label" => kind == "presentation" ? "Encode exact static review loop" : "Render exact full-duration companion",
+        "flow_id" => flow.fetch("flow_id"),
+        "chat_id" => flow.fetch("chat_id"),
+        "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow),
+        "risk" => "bounded_local_media_encode"
+      }
+    end
+
+    def render_companion_render(flow)
+      action = flow.fetch("companion_render_action")
+      scope = action.fetch("preview_scope")
+      if action.fetch("kind") == "presentation"
+        [
+          "The reviewed still needs one static presentation before the full song render.",
+          "Duration: #{scope.dig('profile', 'duration_seconds') || scope['duration_seconds'] || 12} seconds",
+          "Motion synthesis: none",
+          "External publication: not included",
+          "",
+          "Clicking the action authorizes only this exact local presentation encode."
+        ].join("\n")
+      else
+        [
+          "The reviewed visual loop is ready to be repeated across the exact candidate audio.",
+          "Output: #{scope['output']}",
+          "External publication: #{scope['external_publication'] ? 'included' : 'not included'}",
+          "",
+          "Clicking the action authorizes only this exact full-duration local render."
+        ].join("\n")
+      end
+    end
+
+    def execute_companion_presentation(flow, progress)
+      return domain("blocked_for_human_review", false, "music visual companion service is unavailable") unless @music_visual_companion
+      stored = flow.fetch("companion_render_action")
+      music = flow.dig("generated", "music")
+      companion = flow.dig("generated", "companion")
+      outcome = @music_visual_companion.loop_execute(
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id"),
+        visual_id: companion.fetch("visual_id"),
+        presentation: nil,
+        confirmation: stored.fetch("confirmation_phrase"),
+        expected_digest: stored.fetch("downstream_digest"),
+        progress: progress
+      )
+      return outcome unless outcome.fetch("ok")
+
+      updated = outcome.dig("data", "visual")
+      flow["generated"]["companion"] = updated
+      flow.delete("companion_render_action")
+      flow["pending_action"] = nil
+      flow["stage"] = "presented"
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      attachments = [companion_video_attachment(flow, updated, "loop")]
+      content = "The exact static presentation is ready for review. Ask me to render the full-duration companion#{flow['completion_target'] == 'publication' ? ' or continue the publication workflow' : ''} when it looks right."
+      message = append_assistant(flow.fetch("chat_id"), content, flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_companion_presentation"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "static presentation encoded; full-duration render remains gated",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, "companion" => updated },
+        mutation: outcome.fetch("mutation", "music_visual_loop_created"))
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "static presentation execution failed safely: #{error.class}")
+    end
+
+    def execute_companion_final(flow, progress)
+      return domain("blocked_for_human_review", false, "music visual companion service is unavailable") unless @music_visual_companion
+      stored = flow.fetch("companion_render_action")
+      music = flow.dig("generated", "music")
+      companion = flow.dig("generated", "companion")
+      outcome = @music_visual_companion.final_execute(
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id"),
+        visual_id: companion.fetch("visual_id"),
+        confirmation: stored.fetch("confirmation_phrase"),
+        expected_digest: stored.fetch("downstream_digest"),
+        progress: progress
+      )
+      return outcome unless outcome.fetch("ok")
+
+      updated = outcome.dig("data", "visual")
+      flow["generated"]["companion"] = updated
+      flow.delete("companion_render_action")
+      flow["pending_action"] = nil
+      flow["stage"] = "rendered"
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["outputs"] ||= {}
+      flow["outputs"]["visual_render"] = updated.dig("artifacts", "preview")
+      attachments = [companion_video_attachment(flow, updated, "preview")]
+      content = "The full-duration companion is ready for review. Nothing was uploaded or published.#{flow['completion_target'] == 'publication' ? ' Ask me to continue the publication workflow when it looks right.' : ''}"
+      message = append_assistant(flow.fetch("chat_id"), content, flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_companion_final"
+      @flow_store.write(flow)
+      domain("blocked_for_human_review", true, "full-duration companion rendered; publication remains separate",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, "companion" => updated },
+        mutation: outcome.fetch("mutation", "music_visual_preview_created"))
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "full-duration companion execution failed safely: #{error.class}")
+    end
+
+    def plan_publication_package(flow)
+      return failure_result("publication package service is unavailable", flow) unless @publication_package
+      music = flow.dig("generated", "music")
+      companion = flow.dig("generated", "companion")
+      attributes = {
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id"),
+        visual_id: companion.fetch("visual_id")
+      }
+      draft = @publication_package.draft(**attributes)
+      return failure_result(draft.fetch("reason", "publication description draft did not complete"), flow) unless draft.fetch("ok")
+      description = draft.dig("data", "description").to_s
+      preview = @publication_package.preview(**attributes, description: description)
+      return failure_result(preview.fetch("reason", "publication package preview did not complete"), flow) unless preview.fetch("ok")
+      if preview.fetch("lifecycle_state") == "complete"
+        flow["lifecycle_state"] = "complete"
+        flow["stage"] = "packaged"
+        flow["outputs"] ||= {}
+        flow["outputs"]["publication_package"] = preview.dig("data", "package")
+        @flow_store.write(flow)
+        return result("The exact local upload package already exists. No duplicate files were created and nothing was uploaded.", "creative_publication_complete", flow)
+      end
+
+      data = preview.fetch("data")
+      flow["publication_action"] = {
+        "description" => description,
+        "confirmation_phrase" => data.fetch("confirmation_phrase"),
+        "downstream_digest" => data.fetch("expected_digest"),
+        "preview_scope" => data.fetch("preview_scope")
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["pending_action"] = build_publication_action(flow)
+      @flow_store.write(flow)
+      result(render_publication(flow), "creative_publication_ready", flow, actions: [flow.fetch("pending_action")])
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("publication planning failed safely: #{error.class}", flow)
+    end
+
+    def build_publication_action(flow)
+      {
+        "action_id" => "creative_publication_package",
+        "operation" => "chats.creative.execute",
+        "label" => "Export exact local YouTube package",
+        "flow_id" => flow.fetch("flow_id"),
+        "chat_id" => flow.fetch("chat_id"),
+        "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow),
+        "risk" => "write_local_publication_package"
+      }
+    end
+
+    def render_publication(flow)
+      action = flow.fetch("publication_action")
+      scope = action.fetch("preview_scope")
+      [
+        "The local YouTube package is ready for exact review.",
+        "Destination: #{scope['destination']}",
+        "Upload performed: no",
+        "Publication performed: no",
+        "",
+        "Description",
+        action.fetch("description"),
+        "",
+        "Clicking the action exports only this exact local package."
+      ].join("\n")
+    end
+
+    def execute_publication_package(flow)
+      return domain("blocked_for_human_review", false, "publication package service is unavailable") unless @publication_package
+      stored = flow.fetch("publication_action")
+      music = flow.dig("generated", "music")
+      companion = flow.dig("generated", "companion")
+      outcome = @publication_package.execute(
+        project_id: music.dig("project", "project_id"),
+        candidate_id: music.dig("candidate", "candidate_id"),
+        visual_id: companion.fetch("visual_id"),
+        description: stored.fetch("description"),
+        confirmation: stored.fetch("confirmation_phrase"),
+        expected_digest: stored.fetch("downstream_digest")
+      )
+      return outcome unless outcome.fetch("ok")
+
+      package = outcome.dig("data", "package")
+      flow.delete("publication_action")
+      flow["pending_action"] = nil
+      flow["stage"] = "packaged"
+      flow["lifecycle_state"] = "complete"
+      flow["outputs"] ||= {}
+      flow["outputs"]["publication_package"] = package
+      content = "The local YouTube upload package is ready at #{package['destination']}. Nothing was uploaded or published."
+      message = append_assistant(flow.fetch("chat_id"), content, flow, [])
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_publication_package"
+      @flow_store.write(flow)
+      domain("complete", true, "local publication package exported",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "package" => package },
+        mutation: outcome.fetch("mutation", "youtube_upload_package_exported"))
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "publication package execution failed safely: #{error.class}")
+    end
+
+    def plan_music_export(flow, resume_stage: nil)
       return failure_result("music disposition service is unavailable", flow) unless @music_disposition
       music = flow.dig("generated", "music")
       preview = @music_disposition.export_preview(project_id: music.dig("project", "project_id"), candidate_id: music.dig("candidate", "candidate_id"))
       if preview.fetch("ok") && preview.fetch("lifecycle_state") == "complete"
-        flow["lifecycle_state"] = "complete"
-        flow["stage"] = "exported"
+        flow["outputs"] ||= {}
+        flow["outputs"]["music_export"] = preview.dig("data", "export")
+        flow["lifecycle_state"] = resume_stage ? "blocked_for_human_review" : "complete"
+        flow["stage"] = resume_stage || "exported"
         @flow_store.write(flow)
         destination = preview.dig("data", "export", "destination")
         return result("The kept song is already exported#{destination ? " to #{destination}" : ''}. No duplicate files were created.", "creative_music_export_complete", flow)
       end
       return failure_result(preview.fetch("reason", "music export preview did not complete"), flow) unless preview.fetch("ok")
-      prepare_music_disposition_action(flow, "export", preview.fetch("data"))
+      prepare_music_disposition_action(flow, "export", preview.fetch("data"), resume_stage: resume_stage)
     end
 
     def plan_music_rejection(flow)
@@ -313,10 +626,11 @@ module SoulCore
       prepare_music_disposition_action(flow, "reject", preview.fetch("data"))
     end
 
-    def prepare_music_disposition_action(flow, kind, preview)
+    def prepare_music_disposition_action(flow, kind, preview, resume_stage: nil, package_after_export: false)
       flow["disposition_action"] = {
         "kind" => kind, "confirmation_phrase" => preview.fetch("confirmation_phrase"),
-        "downstream_digest" => preview.fetch("expected_digest"), "preview_scope" => preview.fetch("preview_scope")
+        "downstream_digest" => preview.fetch("expected_digest"), "preview_scope" => preview.fetch("preview_scope"),
+        "resume_stage" => resume_stage, "package_after_export" => package_after_export
       }
       flow["lifecycle_state"] = "blocked_for_human_review"
       flow["pending_action"] = build_music_disposition_action(flow, kind)
@@ -335,10 +649,12 @@ module SoulCore
       action = flow.fetch("disposition_action")
       scope = action.fetch("preview_scope")
       if action.fetch("kind") == "export"
-        ["The kept candidate is ready for its exact local export gate.", "Destination: #{scope['destination']}",
+        lines = ["The kept candidate is ready for its exact local export gate.", "Destination: #{scope['destination']}",
           "Files: #{Array(scope['files']).join(', ')}", "Overwrite: #{scope['overwrite'] ? 'allowed' : 'forbidden'}",
           "External publication: #{scope['external_publication'] ? 'included' : 'not included'}", "",
-          "Clicking the action authorizes only this exact finished-song export."].join("\n")
+          "Clicking the action authorizes only this exact finished-song export."]
+        lines << "The local upload package remains a separate exact step." if action["package_after_export"]
+        lines.join("\n")
       else
         ["The rejected candidate is ready for its separate permanent-deletion gate.",
           "Deletes: #{Array(scope['deletes']).join(', ')}", "Retains: #{Array(scope['retains']).join(', ')}",
@@ -364,14 +680,22 @@ module SoulCore
       return outcome unless outcome.fetch("ok")
 
       kind = stored.fetch("kind")
+      resume_stage = stored["resume_stage"]
+      package_after_export = stored["package_after_export"]
       flow.delete("disposition_action")
       flow["pending_action"] = nil
-      flow["lifecycle_state"] = "complete"
-      flow["stage"] = kind == "export" ? "exported" : "rejected"
+      resumable_export = kind == "export" && !resume_stage.to_s.empty?
+      flow["lifecycle_state"] = resumable_export ? "blocked_for_human_review" : "complete"
+      flow["stage"] = resumable_export ? resume_stage : (kind == "export" ? "exported" : "rejected")
+      if kind == "export"
+        flow["outputs"] ||= {}
+        flow["outputs"]["music_export"] = outcome.dig("data", "export")
+      end
       flow["generated"].delete("music") if kind == "reject"
       attachments = kind == "export" ? [music_attachment(music)] : []
       content = if kind == "export"
-        "The kept song is exported locally to #{outcome.dig('data', 'export', 'destination')}. Nothing was uploaded or published."
+        suffix = package_after_export ? " Ask me to continue the publication workflow when you are ready." : ""
+        "The kept song is exported locally to #{outcome.dig('data', 'export', 'destination')}. Nothing was uploaded or published.#{suffix}"
       else
         "The rejected music candidate and its owned audio, input, analysis, and current review were deleted. Its small rejection receipt remains."
       end
@@ -379,7 +703,7 @@ module SoulCore
       flow["result_message_id"] = message.fetch("id")
       flow["last_action_id"] = "creative_music_#{kind}"
       @flow_store.write(flow)
-      domain("complete", true, "music #{kind} completed", data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, kind => outcome.fetch("data") }, mutation: outcome.fetch("mutation", "none"))
+      domain(flow.fetch("lifecycle_state"), true, "music #{kind} completed", data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, kind => outcome.fetch("data") }, mutation: outcome.fetch("mutation", "none"))
     rescue KeyError, ArgumentError => error
       domain("awaiting_input", false, error.message)
     rescue StandardError => error
@@ -392,6 +716,28 @@ module SoulCore
 
     def explicit_rejection_request?(message)
       message.to_s.strip.match?(/\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:delete|discard|purge|reject|remove)\b.*\b(?:song|track|candidate|music|it)\b/i)
+    end
+
+    def explicit_companion_render_request?(message)
+      message.to_s.strip.match?(
+        /\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:build|create|encode|make|prepare|render)\b.*\b(?:video|visual companion|full[- ]duration companion|presentation)\b/i
+      )
+    end
+
+    def explicit_publication_request?(message)
+      message.to_s.strip.match?(
+        /\A(?:okay[, ]+|ok[, ]+|alright[, ]+)?(?:please\s+)?(?:build|create|export|make|prepare)\b.*\b(?:youtube|upload|publication)\b.*\b(?:package|files?|bundle)?\b/i
+      )
+    end
+
+    def explicit_publication_continue?(flow, message)
+      flow["completion_target"] == "publication" &&
+        message.to_s.strip.match?(/\A(?:please\s+)?continue\s+(?:the\s+)?publication\s+workflow[.!]*\z/i)
+    end
+
+    def explicit_video_continue?(flow, message)
+      flow["completion_target"] == "video" &&
+        message.to_s.strip.match?(/\A(?:please\s+)?continue\s+(?:the\s+)?(?:video|companion)\s+workflow[.!]*\z/i)
     end
 
     def plan_music_revision(flow, message, provider, progress)
@@ -936,6 +1282,21 @@ module SoulCore
         "image_url" => "/api/v1/visual/image/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}" }
     end
 
+    def companion_video_attachment(flow, companion, artifact)
+      music = flow.dig("generated", "music")
+      project = music.fetch("project")
+      candidate = music.fetch("candidate")
+      {
+        "kind" => "video",
+        "title" => "#{project.fetch('title')} · #{artifact == 'preview' ? 'full companion' : 'review loop'}",
+        "project_id" => project.fetch("project_id"),
+        "candidate_id" => candidate.fetch("candidate_id"),
+        "visual_id" => companion.fetch("visual_id"),
+        "video_url" => "/api/v1/music/visual/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}/#{companion.fetch('visual_id')}/#{artifact}",
+        "note" => artifact == "preview" ? "Local full-duration render; not uploaded or published." : "Local review loop; full-duration rendering remains separate."
+      }
+    end
+
     def current_attachments(flow)
       generated = flow.fetch("generated", {})
       [].tap do |attachments|
@@ -979,7 +1340,13 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "core_requirement", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "companion_action", "created_at", "updated_at")
+      flow.slice(
+        "flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required",
+        "plan", "core_requirement", "generated", "outputs", "completion_target",
+        "revision_draft", "visual_revision_draft", "disposition_action",
+        "companion_action", "companion_render_action", "publication_action",
+        "created_at", "updated_at"
+      )
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))

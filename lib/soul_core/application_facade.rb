@@ -725,7 +725,8 @@ module SoulCore
         root: @root, chat_store: chat_store,
         provider_client: ConversationProviderClient.new(env: env, root: @root),
         music_generation: music_generation, visual_studio: visual_studio,
-        core_orchestration: core_orchestration, music_disposition: music_candidate_disposition
+        core_orchestration: core_orchestration, music_disposition: music_candidate_disposition,
+        music_visual_companion: music_visual_companion, publication_package: music_publication_package
       )
     end
 

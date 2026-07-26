@@ -49,7 +49,8 @@ checks["visual_guide_discloses_partial_companion_boundary"] =
   guide.match?(visual_request) &&
   visual.include?("Availability: partial") &&
   visual.include?("clear visual intent") &&
-  visual.include?("Native motion, full-duration rendering, export, and publication packaging retain their Studio gates")
+  visual.include?("post-binding local companion output are Chat-capable") &&
+  visual.include?("Native motion generation, visual deletion, and external publication remain Studio or human operations")
 
 tracker = guide.respond("What can I ask you to do in Project Timeline?")
 checks["timeline_guide_uses_shared_ledger_contract"] =

@@ -62,8 +62,14 @@ explicit request
 → explicit request to bind one kept image to one kept song
 → exact source-preserving companion-binding action
 → bound base image in the music candidate's visual lineage
-→ explicit kept-song export or rejected-candidate deletion request
-→ exact disposition preview and separate action
+→ explicit companion-video or local upload-package request
+→ exact static-presentation action when the source is a still
+→ human review, then explicit continuation
+→ exact full-duration companion-render action
+→ human review, then explicit publication-workflow continuation
+→ exact kept-song export action when the finished-song folder is absent
+→ visible deterministic package description and exact local-package action
+→ local upload-ready package; no upload or external publication
 ```
 
 The generation click is the authorization; the UI does not require retyping its prefilled confirmation phrase. A changed brief or stale digest is rejected. Repeating a completed action is idempotent and does not create duplicate candidates or reviews.
@@ -113,11 +119,31 @@ If a combined workflow has both music and visual candidates marked `revise`, a
 generic request such as `revise it` does not guess. The Operator names the song
 or image to select the intended bounded path.
 
+## Companion rendering and local publication package
+
+After an exact kept-song/kept-image binding, Chat can continue through the
+existing local Studio gates. A still first receives one exact static
+presentation encode for review. A reviewed generated-motion companion already
+has a loop and proceeds directly to the full-duration render gate. Soul never
+automatically advances from one gate to the next: the Operator reviews the
+result and explicitly asks to continue.
+
+The full-duration result returns as an authenticated MP4 player in Chat. If the
+Operator asks for a local YouTube package, Soul next verifies the kept song has
+its finished-song export, preserving that as a separate exact action when it is
+missing. Soul then shows the deterministic title, description, destination, and
+package scope before the final local export action. The resulting package is
+upload-ready, but Soul does not sign in to YouTube, upload, schedule, or
+publish it.
+
+Repeating a completed render or package action returns the existing result
+without duplicating files.
+
 ## Present boundary
 
-Candidate creation, review, reviewed music and visual revision loops, exact companion binding, kept-song export, and rejected-music-candidate deletion are chat-native. Binding accepts newly generated candidates only after both have recorded `keep` reviews; exact existing sources already resolve only to kept candidates. It reuses Visual Studio's promotion preview and execution digest, copies the immutable still into the exact Music candidate's visual lineage, and stops at `base_bound`. Recording `keep` does not bind or export, and recording `reject` does not delete; each mutation requires an explicit request and separate action click.
+Candidate creation, review, reviewed music and visual revision loops, exact companion binding, static-presentation encoding, full-duration companion rendering, kept-song export, rejected-music-candidate deletion, and local upload-package export are chat-native. Binding accepts newly generated candidates only after both have recorded `keep` reviews; exact existing sources already resolve only to kept candidates. Each step reuses the owning Studio service's preview, digest, and execution contract. Recording `keep` does not bind or export, and one completed gate never authorizes the next; each mutation requires an explicit request and separate action click.
 
-Visual deletion, static-presentation encoding and review, full companion rendering, upload-package export, and external publication retain their dedicated Studio gates. Soul can preserve the candidate lineage and direct the Operator to the appropriate Studio surface, but it must not claim those later operations occurred from conversation alone.
+Native text-to-video and image-to-video generation, visual-project deletion, fine trimming, and external publication remain dedicated Studio or human operations. Soul can describe those boundaries and preserve candidate lineage, but it must not claim they occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 

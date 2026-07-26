@@ -29,9 +29,9 @@ module SoulCore
         "label" => "Visual Studio",
         "aliases" => ["visual studio", "visual", "image", "artwork"],
         "skills" => %w[creative.visual_production creative.companion_production],
-        "summary" => "Gather or draft a visual brief, generate and review a still, revise it, and coordinate reviewed visual companions.",
+        "summary" => "Gather or draft a visual brief, generate and review a still, revise it, and carry a reviewed music-and-visual companion through local rendering and package export.",
         "inputs" => "Required for a new visual: a clear visual intent. Soul may propose title, prompt, exclusions, aspect ratio, and seed.",
-        "boundary" => "Still generation is Chat-capable. Native motion, full-duration rendering, export, and publication packaging retain their Studio gates."
+        "boundary" => "Still generation and post-binding local companion output are Chat-capable through the same exact Studio gates. Native motion generation, visual deletion, and external publication remain Studio or human operations."
       },
       {
         "id" => "project_timeline",
