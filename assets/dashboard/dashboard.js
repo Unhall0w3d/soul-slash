@@ -2,13 +2,13 @@
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
 const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel" });
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
 state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
-Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
+Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
@@ -931,7 +931,8 @@ async function loadMusicStudio() {
   try {
     const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope);
     state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicReferenceStatus(); await refreshMusicResources();
-    if (state.musicProjects.length) await selectMusicProject(state.musicProjects[0]);
+    const first = state.musicProjects.find((project) => (project.release_state || "active") === state.musicProjectView);
+    if (first) await selectMusicProject(first);
   } catch (error) { state.musicLoaded = false; byId("music-form-status").textContent = error.message; }
 }
 
@@ -1099,13 +1100,17 @@ async function approveMusicReferenceSynthesis() {
 }
 
 function renderMusicProjects() {
-  byId("music-project-count").textContent = String(state.musicProjects.length); const list = byId("music-project-list"); list.replaceChildren();
-  if (!state.musicProjects.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "No compositions yet."; list.append(p); return; }
-  state.musicProjects.forEach((project) => { const button = document.createElement("button"); button.type = "button"; button.className = `studio-item${state.selectedMusicProject?.project_id === project.project_id ? " is-active" : ""}`; const title = document.createElement("strong"); title.textContent = project.title; const meta = document.createElement("small"); meta.textContent = `${project.target_duration_seconds}s · ${project.vocal_mode} · ${project.bpm} BPM`; button.append(title, meta); button.addEventListener("click", () => selectMusicProject(project)); list.append(button); });
+  const active = state.musicProjects.filter((project) => (project.release_state || "active") === "active"); const released = state.musicProjects.filter((project) => project.release_state === "released"); const visible = state.musicProjectView === "released" ? released : active;
+  byId("music-folder-active").textContent = `Active · ${active.length}`; byId("music-folder-released").textContent = `Released · ${released.length}`; byId("music-folder-active").classList.toggle("is-active", state.musicProjectView === "active"); byId("music-folder-released").classList.toggle("is-active", state.musicProjectView === "released");
+  byId("music-project-count").textContent = String(visible.length); const list = byId("music-project-list"); list.replaceChildren();
+  if (!visible.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = state.musicProjectView === "released" ? "No released compositions." : "No active compositions."; list.append(p); return; }
+  visible.forEach((project) => { const button = document.createElement("button"); button.type = "button"; button.className = `studio-item${state.selectedMusicProject?.project_id === project.project_id ? " is-active" : ""}`; const title = document.createElement("strong"); title.textContent = project.title; const meta = document.createElement("small"); meta.textContent = `${project.target_duration_seconds}s · ${project.vocal_mode} · ${project.bpm} BPM`; button.append(title, meta); button.addEventListener("click", () => selectMusicProject(project)); list.append(button); });
 }
 
+function setMusicProjectView(view) { state.musicProjectView = view; state.selectedMusicProject = null; resetMusicForm(); }
+
 function resetMusicForm() {
-  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); syncMusicCompositionMode(); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
+  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); syncMusicCompositionMode(); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-release").hidden = true; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
 }
 
 async function createMusicProject(event) {
@@ -1114,7 +1119,13 @@ async function createMusicProject(event) {
 }
 
 async function selectMusicProject(project) {
-  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); syncMusicCompositionMode(); byId("save-music-project").hidden = true; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); syncMusicCompositionMode(); byId("save-music-project").hidden = true; const release = byId("music-project-release"); release.hidden = false; release.textContent = p.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+}
+
+async function toggleMusicProjectRelease() {
+  const project = state.selectedMusicProject; if (!project) return; const released = project.release_state === "released"; const button = byId("music-project-release"); button.disabled = true;
+  try { const envelope = await callSoul(released ? "music.projects.restore" : "music.projects.release", { project_id: project.project_id }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); state.musicLoaded = false; resetMusicForm(); await loadMusicStudio(); byId("music-form-status").textContent = released ? "Composition restored to Active. IDs and bindings were preserved." : "Composition moved to Released. IDs and bindings were preserved."; }
+  catch (error) { byId("music-form-status").textContent = error.message; } finally { button.disabled = false; }
 }
 
 async function previewMusicProjectDelete() {
@@ -2515,7 +2526,7 @@ function closeReviewCenter() { byId("review-center").close(); }
 function resetVisualForm() {
   state.selectedVisualProject = null; state.visualPreview = null; state.visualProjectDeletePreview = null;
   byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
-  byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true;
+  byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true; byId("visual-project-release").hidden = true;
   byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
   byId("preview-native-motion").disabled = true; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "Select or create a visual project first.";
   renderVisualProjects();
@@ -2526,15 +2537,19 @@ function visualProjectInput() {
 }
 
 function renderVisualProjects() {
-  const list = byId("visual-project-list"); list.replaceChildren(); byId("visual-project-count").textContent = String(state.visualProjects.length);
-  if (!state.visualProjects.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No visual projects yet."; list.append(empty); return; }
-  state.visualProjects.forEach((project) => {
+  const active = state.visualProjects.filter((project) => (project.release_state || "active") === "active"); const released = state.visualProjects.filter((project) => project.release_state === "released"); const visible = state.visualProjectView === "released" ? released : active;
+  byId("visual-folder-active").textContent = `Active · ${active.length}`; byId("visual-folder-released").textContent = `Released · ${released.length}`; byId("visual-folder-active").classList.toggle("is-active", state.visualProjectView === "active"); byId("visual-folder-released").classList.toggle("is-active", state.visualProjectView === "released");
+  const list = byId("visual-project-list"); list.replaceChildren(); byId("visual-project-count").textContent = String(visible.length);
+  if (!visible.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = state.visualProjectView === "released" ? "No released visual projects." : "No active visual projects."; list.append(empty); return; }
+  visible.forEach((project) => {
     const button = document.createElement("button"); button.type = "button"; button.className = "studio-item";
     if (state.selectedVisualProject?.project_id === project.project_id) button.classList.add("is-active");
     const title = document.createElement("strong"); title.textContent = project.title; const meta = document.createElement("small"); meta.textContent = `${project.aspect_ratio} · seed ${project.seed}`;
     button.append(title, meta); button.addEventListener("click", () => selectVisualProject(project.project_id)); list.append(button);
   });
 }
+
+function setVisualProjectView(view) { state.visualProjectView = view; state.selectedVisualProject = null; resetVisualForm(); }
 
 function renderVisualCandidates(project) {
   const candidates = project.candidates || []; const motions = project.motions || []; const list = byId("visual-candidate-list"); list.replaceChildren();
@@ -2674,10 +2689,16 @@ async function selectVisualProject(projectId) {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
     state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
     byId("visual-native-motion-instruction").value = project.prompt; byId("visual-native-motion-seed").value = String(project.seed);
-    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
+    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; const release = byId("visual-project-release"); release.hidden = false; release.textContent = project.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
     byId("preview-native-motion").disabled = false; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "The stored scene prompt is prefilled as an editable text-to-video direction; no still candidate is read.";
     renderVisualProjects(); renderVisualCandidates(project);
   } catch (error) { byId("visual-form-status").textContent = error.message; }
+}
+
+async function toggleVisualProjectRelease() {
+  const project = state.selectedVisualProject; if (!project) return; const released = project.release_state === "released"; const button = byId("visual-project-release"); button.disabled = true;
+  try { const envelope = await callSoul(released ? "visual.projects.restore" : "visual.projects.release", { visual_project_id: project.project_id }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); await loadVisualStudio(); resetVisualForm(); byId("visual-form-status").textContent = released ? "Visual project restored to Active. IDs and bindings were preserved." : "Visual project moved to Released. IDs and bindings were preserved."; }
+  catch (error) { byId("visual-form-status").textContent = error.message; } finally { button.disabled = false; }
 }
 
 async function previewNativeMotion() {
@@ -2824,6 +2845,9 @@ byId("self-improvement-navigation").addEventListener("keydown", (event) => { if 
 byId("core-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCoreMenu(false); byId("core-selector").focus(); } });
 byId("creative-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCreativeMenu(false); byId("creative-tab").focus(); } });
 byId("new-visual-project").addEventListener("click", resetVisualForm);
+byId("visual-folder-active").addEventListener("click", () => setVisualProjectView("active"));
+byId("visual-folder-released").addEventListener("click", () => setVisualProjectView("released"));
+byId("visual-project-release").addEventListener("click", toggleVisualProjectRelease);
 byId("visual-project-form").addEventListener("submit", createVisualProject);
 byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
@@ -2834,6 +2858,9 @@ byId("start-visual-generation").addEventListener("click", startVisualGeneration)
 byId("preview-visual-project-delete").addEventListener("click", previewVisualProjectDeletion);
 byId("execute-visual-project-delete").addEventListener("click", executeVisualProjectDeletion);
 byId("new-music-project").addEventListener("click", resetMusicForm);
+byId("music-folder-active").addEventListener("click", () => setMusicProjectView("active"));
+byId("music-folder-released").addEventListener("click", () => setMusicProjectView("released"));
+byId("music-project-release").addEventListener("click", toggleMusicProjectRelease);
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("music-vocal-mode").addEventListener("change", syncMusicCompositionMode);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
