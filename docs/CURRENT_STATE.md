@@ -114,6 +114,13 @@ explicit note as a candidate through an exact review gate. Obsidian is an
 optional human surface rather than a dependency. The vault is never watched,
 automatically synchronized, or treated as approved memory.
 
+Local Project and Document Search unifies bounded lexical retrieval across
+repository documentation, the configured Knowledge Vault, and canonical Music
+and Visual project briefs. Results retain source adapters, canonical
+references, exact searched-text digests, excerpts, and freshness metadata.
+Search creates no index or memory, reads no arbitrary filesystem roots, and
+does not treat retrieved text as authority.
+
 Knowledge Reflection deterministically classifies one explicit structured
 candidate before storage. Reviewed durable project knowledge may receive an
 exact vault-note preview; preferences route to shared-memory review, Studio

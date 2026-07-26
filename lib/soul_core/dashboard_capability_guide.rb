@@ -10,8 +10,8 @@ module SoulCore
         "id" => "chat",
         "label" => "Chat",
         "aliases" => %w[chat conversation transmission],
-        "skills" => %w[system.status weather.report web.lookup web.research knowledge.vault.search],
-        "summary" => "Conversation, bounded research, weather, system status, and reviewed knowledge access.",
+        "skills" => %w[system.status weather.report web.lookup web.research knowledge.vault.search local.search],
+        "summary" => "Conversation, bounded public research, local project/document search, weather, system status, and reviewed knowledge access.",
         "inputs" => "Ask naturally. Explicit action wording is required before Soul invokes a capability.",
         "boundary" => "A topical mention remains conversation; it does not run a skill."
       },

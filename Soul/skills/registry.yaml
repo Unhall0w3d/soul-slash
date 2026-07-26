@@ -128,6 +128,16 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: knowledge_vault_a0
+  local.search:
+    internal_handler: local_search
+    category: knowledge
+    status: available
+    description: Search reviewed repository documentation, Knowledge Vault notes, and canonical Music and Visual project briefs in one bounded source-attributed foreground read.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: application_envelope
+    verifier: local_search_a1
   knowledge.vault.initialize:
     internal_handler: knowledge_vault
     category: knowledge

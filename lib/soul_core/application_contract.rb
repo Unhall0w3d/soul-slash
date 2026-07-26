@@ -76,6 +76,7 @@ module SoulCore
       "knowledge_vault.memory_import.execute" => %w[relative_path layer confirmation expected_digest],
       "knowledge_vault.reflection.preview" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags],
       "knowledge_vault.reflection.execute" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags confirmation expected_digest],
+      "local_search.search" => %w[query limit sources],
       "invocations.list" => %w[category query],
       "skills.list" => %w[limit],
       "skill_studio.proposals.list" => %w[limit],
@@ -324,7 +325,7 @@ module SoulCore
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
         elsif key == "filters" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
-        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags"
+        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)

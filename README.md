@@ -41,6 +41,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Voice Presence | Open a visible local “Hey Soul” wake window for bounded spoken turns | [Voice Presence](docs/guides/VOICE_PRESENCE.md) |
 | Picture Understanding | Attach one local PNG or JPEG to Chat and ask Soul what it can observe | [Picture Understanding](docs/guides/PICTURE_UNDERSTANDING.md) |
 | Knowledge Vault | Share a portable Markdown knowledge surface with Soul and optionally open it in Obsidian | [Knowledge Vault](docs/guides/KNOWLEDGE_VAULT.md) |
+| Local Search | Search reviewed documentation, Knowledge Vault notes, and canonical Music/Visual briefs with source citations | [Local Project and Document Search](docs/guides/LOCAL_SEARCH.md) |
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
