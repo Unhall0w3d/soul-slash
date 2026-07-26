@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-26T01:00:40-04:00
+Generated: 2026-07-26T01:19:22-04:00
 
 Source registry:
 
@@ -130,7 +130,7 @@ required_core: dynamic_by_generation_operation
 core_transition_authority: exact_action_click
 ```
 
-Coordinate reviewed music and visual candidates, including new or existing sources, and advance one exact chat-native lineage binding; static presentation, rendering, export, and upload-package gates remain separate Studio steps.
+Coordinate reviewed music and visual candidates through exact lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; native motion generation and external publication remain outside this chat workflow.
 
 Example ways the owner might ask for this:
 

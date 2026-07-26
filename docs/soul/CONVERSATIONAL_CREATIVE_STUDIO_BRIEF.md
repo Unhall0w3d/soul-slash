@@ -45,6 +45,12 @@ The first execution stage creates immutable studio projects and bounded
 candidates. Human music and visual review remains authoritative before export,
 binding, final rendering, or publication packaging.
 
+After both candidates are kept and exactly bound, Chat may reuse the existing
+static-presentation, full-duration render, finished-song export, and local
+upload-package services. Each remains its own digest-bound action and stops for
+human review. Native motion generation, visual deletion, and external
+publication remain outside the conversational workflow.
+
 ## Core transitions
 
 Creative generation requires Music Core (NVIDIA chat, AMD creative lane). The
