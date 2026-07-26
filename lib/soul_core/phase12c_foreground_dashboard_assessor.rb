@@ -64,11 +64,25 @@ module SoulCore
 
       static_responses = DashboardHttpApplication::STATIC_ROUTES.keys.map { |route| app.call(method: "GET", target: route, headers: get_headers) }
       character_assets = DashboardHttpApplication::STATIC_ROUTES.select { |route, _value| route.start_with?("/brand/character/") }
+      notification_assets = DashboardHttpApplication::STATIC_ROUTES.select { |route, _value| route.start_with?("/notifications/") }
+      required_static_routes = %w[
+        /assets/dashboard.css
+        /assets/dashboard.js
+        /brand/micro-mark.svg
+        /brand/repo-header.png
+      ]
+      assets_root = File.join(@root, "assets")
+      bounded_assets = DashboardHttpApplication::STATIC_ROUTES.values.all? do |relative_path, _content_type|
+        path = File.expand_path(relative_path, @root)
+        path.start_with?("#{assets_root}#{File::SEPARATOR}") && File.file?(path) && !File.symlink?(path)
+      end
       checks["exact_static_allowlist_serves_only_approved_assets"] =
         static_responses.all? { |response| response.status == 200 && response.headers["Cache-Control"] == "no-store" } &&
-        DashboardHttpApplication::STATIC_ROUTES.length == 7 &&
+        required_static_routes.all? { |route| DashboardHttpApplication::STATIC_ROUTES.key?(route) } &&
+        bounded_assets &&
         %w[/brand/primary-mark.png /brand/supporting-scene.png /brand/skill-studio.png].none? { |route| DashboardHttpApplication::STATIC_ROUTES.key?(route) } &&
-        character_assets.length == 3 && character_assets.values.all? { |path, content_type| path.start_with?("assets/brand/character/") && content_type == "image/png" }
+        character_assets.length == 3 && character_assets.values.all? { |path, content_type| path.start_with?("assets/brand/character/") && content_type == "image/png" } &&
+        notification_assets.length >= 4 && notification_assets.values.all? { |path, content_type| path.start_with?("assets/notifications/") && content_type == "audio/wav" }
 
       rejected_targets = ["/../.env", "/%2e%2e/.env", "/assets/../.env", "/assets/dashboard.js?x=1", "/unknown.png"]
       checks["traversal_query_confusion_and_unknown_paths_fail_closed"] = rejected_targets.all? { |target| app.call(method: "GET", target: target, headers: get_headers).status == 404 }

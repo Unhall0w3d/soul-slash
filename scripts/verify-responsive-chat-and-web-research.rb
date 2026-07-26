@@ -389,6 +389,8 @@ wrong_operation = app.call(method: "POST", target: "/api/v1/chat-stream", header
 check.call("stream preserves authentication, CSRF, and operation boundaries", unauthenticated.status == 401 && no_csrf.status == 403 && wrong_operation.status == 422)
 
 class DisconnectingClient
+  attr_reader :writes
+
   def initialize(fail_after:)
     @fail_after = fail_after
     @writes = 0
@@ -409,8 +411,23 @@ disconnect_stream = Enumerator.new do |output|
 end
 server = SoulCore::DashboardServer.allocate
 response = SoulCore::DashboardHttpApplication::Response.new(status: 200, headers: { "Connection" => "close" }, body: disconnect_stream)
-server.send(:write_stream_response, DisconnectingClient.new(fail_after: 5), response)
-check.call("client disconnect does not abandon the accepted foreground exchange", completed_after_disconnect)
+disconnecting_client = DisconnectingClient.new(fail_after: 5)
+server.send(:write_stream_response, disconnecting_client, response)
+check.call("client disconnect does not abandon the accepted foreground exchange", completed_after_disconnect && disconnecting_client.writes == 5)
+
+body_started_after_header_disconnect = false
+header_disconnect_stream = Enumerator.new do |output|
+  body_started_after_header_disconnect = true
+  output << "should not run\n"
+end
+header_disconnect_response = SoulCore::DashboardHttpApplication::Response.new(status: 200, headers: { "Connection" => "close" }, body: header_disconnect_stream)
+header_disconnect_raised = begin
+  server.send(:write_stream_response, DisconnectingClient.new(fail_after: 1), header_disconnect_response)
+  false
+rescue SoulCore::DashboardServer::ClientDisconnected
+  true
+end
+check.call("header disconnect aborts before foreground work begins", header_disconnect_raised && !body_started_after_header_disconnect)
 
 js = File.read("assets/dashboard/dashboard.js")
 css = File.read("assets/dashboard/dashboard.css")
@@ -421,7 +438,8 @@ check.call("browser appends the pending exchange before awaiting the stream", ap
 check.call("composer remains draftable and busy Enter does not interrupt", js.include?("draft was not sent") && !js.include?("message-input\").disabled = busy"))
 check.call("responsive UI remains free of timers and background transports", %w[setTimeout setInterval WebSocket EventSource].none? { |term| js.include?(term) })
 check.call("Soul familiar is state-driven and reduced-motion aware", html.include?("soul-presence") && css.include?("data-state") && css.include?("prefers-reduced-motion"))
-check.call("stale restart-bound CSRF tokens recover through one page reload", js.scan('envelope.error?.code === "csrf"').length == 2 && js.scan("window.location.reload()").length >= 4)
+csrf_recovery_lines = js.lines.select { |line| line.include?('response.status === 403') && line.include?('error?.code === "csrf"') }
+check.call("stale restart-bound CSRF tokens recover through one page reload", !csrf_recovery_lines.empty? && csrf_recovery_lines.all? { |line| line.include?("window.location.reload()") })
 check.call("wide-screen conversation messages remain readable and left anchored", css.include?(".message { max-width:920px; margin:0 0 29px; }") && !css.include?(".message { max-width:820px; margin:0 auto 29px; }"))
 
 if failures.empty?

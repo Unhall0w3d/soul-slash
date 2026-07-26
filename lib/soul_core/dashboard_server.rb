@@ -240,12 +240,20 @@ module SoulCore
       client.write("HTTP/1.1 #{response.status} #{STATUS_TEXT.fetch(response.status, 'Response')}\r\n")
       headers.each { |key, value| client.write("#{key}: #{value}\r\n") }
       client.write("\r\n")
+      connected = true
       response.body.each do |chunk|
         bytes = chunk.to_s
         next if bytes.empty?
-        client.write(fixed_length ? bytes : "#{bytes.bytesize.to_s(16)}\r\n#{bytes}\r\n")
+
+        if connected
+          begin
+            client.write(fixed_length ? bytes : "#{bytes.bytesize.to_s(16)}\r\n#{bytes}\r\n")
+          rescue IOError, Errno::EPIPE
+            connected = false
+          end
+        end
       end
-      client.write("0\r\n\r\n") unless fixed_length
+      client.write("0\r\n\r\n") if connected && !fixed_length
     rescue IOError, Errno::EPIPE
       raise ClientDisconnected
     end
