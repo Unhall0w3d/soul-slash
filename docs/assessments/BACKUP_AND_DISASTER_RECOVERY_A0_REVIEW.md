@@ -53,9 +53,10 @@ installation, service, timer, prune policy, or backup execution is approved.
 
 The SanDisk provides 111.8 GiB usable capacity and is a suitable first local
 repository candidate. Its existing personal data copy matches across 2,569
-files and 4,099,426,963 bytes. The NTFS source remains mounted read-only and
-unchanged. SMART health, final filesystem choice, unmount, partitioning, and
-formatting remain pending explicit review.
+files and 4,099,426,963 bytes; all entries also pass the retained SHA-256
+manifest. The NTFS source remains mounted read-only and unchanged. SMART
+health, final filesystem choice, unmount, partitioning, and formatting remain
+pending explicit review.
 
 ## Local LLM evaluation
 

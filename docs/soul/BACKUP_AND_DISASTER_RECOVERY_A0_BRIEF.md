@@ -242,6 +242,8 @@ NTFS partition with 5.7 GiB used and 106.1 GiB free.
 The three personal data trees on the device were copied into an owner-only
 recovery directory on the primary home filesystem. A checksum-mode rsync
 comparison reported no differences across 2,569 files and 4,099,426,963 bytes.
+An owner-only relative SHA-256 manifest was then generated and all 2,569
+entries verified successfully.
 The Windows recycle bin, empty recovery directory, and volume metadata were
 intentionally not migrated. The source SSD remains unchanged pending health
 review and a separate destructive confirmation.
