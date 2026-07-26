@@ -5,6 +5,8 @@ require_relative "configuration_resolver"
 require_relative "dashboard_authentication"
 require_relative "dashboard_http_application"
 require_relative "dashboard_server"
+require_relative "voice_transcription_service"
+require_relative "voice_synthesis_service"
 
 module SoulCore
   class DashboardCommand
@@ -34,7 +36,29 @@ module SoulCore
       port = settings.find { |setting| setting.fetch("key") == "dashboard.port" }.fetch("value")
       public_origin = settings.find { |setting| setting.fetch("key") == "dashboard.public_origin" }.fetch("value")
       facade = ApplicationFacade.new(root: @root, process_env: resolver.effective_environment)
-      application = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: host, port: port, public_origin: public_origin)
+      voice_options = { root: @root }
+      voice_root = resolver.effective_environment["SOUL_VOICE_TRANSCRIPTION_ROOT"].to_s
+      voice_manifest = resolver.effective_environment["SOUL_VOICE_TRANSCRIPTION_MANIFEST"].to_s
+      voice_model = resolver.effective_environment["SOUL_VOICE_TRANSCRIPTION_MODEL"].to_s
+      voice_options[:music_root] = voice_root unless voice_root.empty?
+      voice_options[:manifest_path] = voice_manifest unless voice_manifest.empty?
+      voice_options[:model_name] = voice_model unless voice_model.empty?
+      voice_transcription = VoiceTranscriptionService.new(**voice_options)
+      synthesis_options = { root: @root, process_env: resolver.effective_environment }
+      synthesis_root = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_ROOT"].to_s
+      synthesis_manifest = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_MANIFEST"].to_s
+      synthesis_voice = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_VOICE"].to_s
+      synthesis_speed = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_SPEED"].to_s
+      expressive_root = resolver.effective_environment["SOUL_VOICE_EXPRESSIVE_ROOT"].to_s
+      expressive_manifest = resolver.effective_environment["SOUL_VOICE_EXPRESSIVE_MANIFEST"].to_s
+      synthesis_options[:runtime_root] = synthesis_root unless synthesis_root.empty?
+      synthesis_options[:manifest_path] = synthesis_manifest unless synthesis_manifest.empty?
+      synthesis_options[:voice_name] = synthesis_voice unless synthesis_voice.empty?
+      synthesis_options[:speed] = synthesis_speed unless synthesis_speed.empty?
+      synthesis_options[:expressive_root] = expressive_root unless expressive_root.empty?
+      synthesis_options[:expressive_manifest_path] = expressive_manifest unless expressive_manifest.empty?
+      voice_synthesis = VoiceSynthesisService.new(**synthesis_options)
+      application = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: host, port: port, public_origin: public_origin, voice_transcription: voice_transcription, voice_synthesis: voice_synthesis)
       lifecycle = DashboardServer.new(host: host, port: port, application: application, max_requests: max_requests, output: @output).run
       @output.puts "Dashboard stopped: #{lifecycle}."
       0

@@ -108,7 +108,7 @@ module SoulCore
         claims: Array(data["claims"]),
         not_collected: Array(data["not_collected"]),
         source: {
-          "kind" => "bounded_host_collector",
+          "kind" => data["source_kind"] || "bounded_host_collector",
           "assessment" => data["assessment"],
           "commands" => Array(data["commands"]),
           "verification" => data["verification"] || {}

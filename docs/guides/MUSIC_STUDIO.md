@@ -21,9 +21,14 @@ Required creative decisions are:
 
 The current form also records title, BPM, key, meter, seed, sound and structure, and—when vocal—lyrics with section markers.
 
-The **Sound and structure** field is limited to 512 characters. Describe one coherent sonic identity: genre, principal instruments, mood, texture, and broad progression. Put BPM, key, meter, and detailed lyric/section order in their dedicated fields. Compatible constraints generally work better than a long list of competing genres and micro-directions.
+The **Sound and structure** field is limited to 512 characters. Describe one coherent sonic identity: genre, principal instruments, mood, texture, and broad progression. Put BPM, key, and meter in their dedicated fields. Compatible constraints generally work better than a long list of competing genres and micro-directions.
 
-Instrumental mode uses the runtime's dedicated no-vocal condition. Do not add placeholder lyrics to an instrumental project.
+For vocal projects, exact section timing belongs with the lyrics and section
+markers. Instrumental projects have no independent temporal-script channel:
+their lyrics editor is disabled and concise broad or second-based movement
+timing belongs in **Sound and structure**. Instrumental mode always sends the
+runtime's exact trained `[Instrumental]` no-vocal condition. Do not add
+placeholder lyrics or section markers to an instrumental project.
 
 ## Generate a candidate
 

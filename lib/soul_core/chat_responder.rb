@@ -8,6 +8,9 @@ require_relative "conversation_style_controls"
 require_relative "conversation_identity_controls"
 require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
+require_relative "knowledge_vault_chat_controls"
+require_relative "project_tracker_chat_controls"
+require_relative "dashboard_capability_guide"
 require_relative "conversation_tool_catalog"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
@@ -29,6 +32,9 @@ module SoulCore
       @style_controls = ConversationStyleControls.new(root: @root)
       @memory_controls = ConversationMemoryControls.new(root: @root)
       @memory_maintenance_controls = ConversationMemoryMaintenanceControls.new(root: @root)
+      @knowledge_vault_controls = KnowledgeVaultChatControls.new(root: @root)
+      @project_tracker_controls = ProjectTrackerChatControls.new(root: @root)
+      @dashboard_capability_guide = DashboardCapabilityGuide.new(root: @root)
       @router = IntentRouter.new
       @planner = SkillInvocationPlanner.new(router: @router)
       @history = ChatExecutionHistory.new(root: @root)
@@ -52,6 +58,9 @@ module SoulCore
       return @style_controls.respond(text, chat_id: chat_id) if @style_controls.match?(text)
       return @memory_maintenance_controls.respond(text, chat_id: chat_id) if @memory_maintenance_controls.match?(text)
       return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
+      return @knowledge_vault_controls.respond(text, chat_id: chat_id) if @knowledge_vault_controls.match?(text)
+      return @project_tracker_controls.respond(text, chat_id: chat_id) if @project_tracker_controls.match?(text)
+      return @dashboard_capability_guide.respond(text) if @dashboard_capability_guide.match?(text)
       return approve_downloads_cleanup if lower.match?(/\b(approve downloads cleanup preview|approve cleanup preview)\b/)
       return list_pending_approvals if lower.match?(/\b(pending approvals|show approvals|list approvals)\b/)
       return revoke_approval(lower) if lower.match?(/\brevoke approval\b/)

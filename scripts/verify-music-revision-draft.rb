@@ -72,7 +72,7 @@ check.call("Soul produces one clean sonic caption and code preserves lyrics", re
 check.call("one bounded local request uses strict structured output and no tools", client.calls.length == 1 && client.calls.first.fetch(:timeout_seconds) == 90.0 && request.max_output_tokens == 5_000 && request.response_format == SoulCore::MusicRevisionDraftService::RESPONSE_FORMAT && request.reasoning_mode == "disabled" && request.tools.empty? && request.privacy_requirement == "local_only")
 check.call("drafting packet carries exact source plus human and machine evidence", packet.dig("source_input", "caption") == source["caption"] && packet.dig("human_review", "notes") == review["notes"] && packet.dig("machine_heard", "route") == "revision_recommended" && packet["digest"].match?(/\A[a-f0-9]{64}\z/))
 check.call("drafting packet binds the authoritative repeated section sequence", packet["required_section_sequence"] == ["Verse 1"] && packet.dig("project", "target_duration_seconds") == 180)
-check.call("revision prompt separates sonic caption from metadata and temporal script", request.messages.first.fetch("content").include?("overall sonic portrait only") && request.messages.first.fetch("content").include?("dedicated metadata or the preserved lyrics script"))
+check.call("vocal revision prompt separates sonic caption from metadata and temporal script", request.messages.first.fetch("content").include?("overall sonic portrait only") && request.messages.first.fetch("content").include?("For a vocal project") && request.messages.first.fetch("content").include?("preserved lyrics script"))
 
 check.call("review summary is reconstructed from exact materially changed fields", result.dig("data", "changes") == ["Replace Sound and Structure with the proposed materially revised arrangement.", "Change tempo from 120 BPM to 116 BPM."])
 
@@ -92,6 +92,15 @@ metadata_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).
 metadata = SoulCore::MusicRevisionDraftService.new(provider_client: metadata_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)
 check.call("exact section timing is rejected from the sonic caption", over_budget["lifecycle_state"] == "awaiting_input" && over_budget["reason"].include?("temporal section changes"))
 check.call("BPM key and meter are rejected from the sonic caption", metadata["lifecycle_state"] == "awaiting_input" && metadata["reason"].include?("dedicated field"))
+
+instrumental_source = source.merge("lyrics" => "[Instrumental]")
+instrumental_project = project.merge("vocal_mode" => "instrumental")
+instrumental_candidate = candidate.merge("generation_input" => instrumental_source)
+instrumental_timing = "Industrial breakcore opens with a clipped pursuit for 30 seconds, fractures into half-time metallic percussion for 24 seconds, then rebuilds through transformed cowbell, detuned guitar, serrated bass, and interlocking breaks before a hard final cutoff."
+instrumental_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("caption" => instrumental_timing)))
+instrumental_revision = SoulCore::MusicRevisionDraftService.new(provider_client: instrumental_client).draft(project: instrumental_project, candidate: instrumental_candidate, analysis: nil, provider: provider)
+instrumental_prompt = instrumental_client.calls.first.fetch(:request).messages.first.fetch("content")
+check.call("instrumental revision may schedule movements without weakening the no-vocal input", instrumental_revision["lifecycle_state"] == "blocked_for_human_review" && instrumental_revision.dig("data", "revision", "lyrics") == "[Instrumental]" && instrumental_prompt.include?("exact trained no-vocal token"))
 
 fragment_client = RevisionDraftClient.new(JSON.generate(JSON.parse(valid_draft).merge("caption" => "Revised noir arrangement. Key revisions: (1) Intro: Expand to include the full")))
 fragment = SoulCore::MusicRevisionDraftService.new(provider_client: fragment_client).draft(project: project, candidate: candidate, analysis: analysis, provider: provider)

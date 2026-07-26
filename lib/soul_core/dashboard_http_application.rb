@@ -1,10 +1,16 @@
 # frozen_string_literal: true
 
 require "json"
+require "base64"
 require "securerandom"
 require "uri"
 require_relative "dashboard_authentication"
 require_relative "dashboard_music_job_manager"
+require_relative "voice_transcription_service"
+require_relative "voice_synthesis_service"
+require_relative "voice_presence_launch_service"
+require_relative "picture_understanding_service"
+require_relative "screen_capture_service"
 
 module SoulCore
   class DashboardHttpApplication
@@ -17,15 +23,29 @@ module SoulCore
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
       "/brand/character/soul-full-body.png" => ["assets/brand/character/soul-full-body.png", "image/png"],
       "/brand/character/soul-portrait-unmasked.png" => ["assets/brand/character/soul-portrait-unmasked.png", "image/png"],
-      "/brand/character/soul-portrait-masked.png" => ["assets/brand/character/soul-portrait-masked.png", "image/png"]
+      "/brand/character/soul-portrait-masked.png" => ["assets/brand/character/soul-portrait-masked.png", "image/png"],
+      "/notifications/cue-submit.wav" => ["assets/notifications/cue-submit.wav", "audio/wav"],
+      "/notifications/cue-wake.wav" => ["assets/notifications/cue-wake.wav", "audio/wav"],
+      "/notifications/cue-complete.wav" => ["assets/notifications/cue-complete.wav", "audio/wav"],
+      "/notifications/cue-attention.wav" => ["assets/notifications/cue-attention.wav", "audio/wav"],
+      "/notifications/f3-chat-ready.wav" => ["assets/notifications/f3-chat-ready.wav", "audio/wav"],
+      "/notifications/m3-chat-ready.wav" => ["assets/notifications/m3-chat-ready.wav", "audio/wav"],
+      "/notifications/f3-music-ready.wav" => ["assets/notifications/f3-music-ready.wav", "audio/wav"],
+      "/notifications/m3-music-ready.wav" => ["assets/notifications/m3-music-ready.wav", "audio/wav"],
+      "/notifications/f3-visual-ready.wav" => ["assets/notifications/f3-visual-ready.wav", "audio/wav"],
+      "/notifications/m3-visual-ready.wav" => ["assets/notifications/m3-visual-ready.wav", "audio/wav"],
+      "/notifications/f3-lyrics-ready.wav" => ["assets/notifications/f3-lyrics-ready.wav", "audio/wav"],
+      "/notifications/m3-lyrics-ready.wav" => ["assets/notifications/m3-lyrics-ready.wav", "audio/wav"],
+      "/notifications/f3-attention.wav" => ["assets/notifications/f3-attention.wav", "audio/wav"],
+      "/notifications/m3-attention.wav" => ["assets/notifications/m3-attention.wav", "audio/wav"]
     }.freeze
 
     SECURITY_HEADERS = {
-      "Content-Security-Policy" => "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "Content-Security-Policy" => "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       "X-Content-Type-Options" => "nosniff",
       "X-Frame-Options" => "DENY",
       "Referrer-Policy" => "no-referrer",
-      "Permissions-Policy" => "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      "Permissions-Policy" => "camera=(), microphone=(self), geolocation=(), payment=(), usb=()",
       "Connection" => "close"
     }.freeze
 
@@ -34,7 +54,7 @@ module SoulCore
 
     attr_reader :csrf_token, :authentication
 
-    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil, music_jobs: nil)
+    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil, music_jobs: nil, voice_transcription: nil, voice_synthesis: nil, voice_presence: nil, picture_understanding: nil, screen_capture: nil)
       @root = File.expand_path(root)
       @facade = facade
       @bind_host = bind_host
@@ -43,6 +63,11 @@ module SoulCore
       @authentication = authentication || DashboardAuthentication.new(root: @root)
       @public_origin = public_origin.to_s.empty? ? nil : normalize_public_origin(public_origin)
       @music_jobs = music_jobs
+      @voice_transcription = voice_transcription
+      @voice_synthesis = voice_synthesis
+      @voice_presence = voice_presence
+      @picture_understanding = picture_understanding
+      @screen_capture = screen_capture
     end
 
     def call(method:, target:, headers: {}, body: "")
@@ -82,6 +107,28 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-follow"
       return music_job_status(normalized_headers, body) if target == "/api/v1/music-job-status" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-status"
+      return voice_status(normalized_headers) if target == "/api/v1/voice/status" && method == "GET"
+      return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/voice/status"
+      return voice_transcribe(normalized_headers, body) if target == "/api/v1/voice/transcribe" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/voice/transcribe"
+      return voice_synthesis_status(normalized_headers) if target == "/api/v1/voice/synthesis/status" && method == "GET"
+      return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/voice/synthesis/status"
+      return voice_synthesize(normalized_headers, body) if target == "/api/v1/voice/synthesize" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/voice/synthesize"
+      return voice_synthesize_stream(normalized_headers, body) if target == "/api/v1/voice/synthesize-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/voice/synthesize-stream"
+      return voice_presence_status(normalized_headers) if target == "/api/v1/voice/presence/status" && method == "GET"
+      return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/voice/presence/status"
+      return voice_presence_launch(normalized_headers, body) if target == "/api/v1/voice/presence/launch" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/voice/presence/launch"
+      return picture_stream(normalized_headers, body) if target == "/api/v1/perception/picture-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/perception/picture-stream"
+      return screen_capture(normalized_headers, body) if target == "/api/v1/perception/screen-capture" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/perception/screen-capture"
+      if (match = target.match(%r{\A/api/v1/perception/image/(chat_[A-Za-z0-9_.-]+)/([0-9a-f]{64})\.(png|jpg)\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return perception_image(normalized_headers, *match.captures)
+      end
       if (match = target.match(%r{\A/api/v1/music/audio/(music_[a-f0-9]{16})/(candidate_[a-f0-9]{16})/(mp3|flac)\z}))
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_audio(normalized_headers, *match.captures)
@@ -220,6 +267,166 @@ module SoulCore
 
     def music_jobs
       @music_jobs ||= DashboardMusicJobManager.new(root: @root, facade: @facade)
+    end
+
+    def voice_status(headers)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      json_response(200, voice_transcription.status)
+    end
+
+    def voice_transcribe(headers, body)
+      boundary_error = binary_mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      json_response(200, voice_transcription.transcribe(audio_bytes: body, content_type: headers["content-type"]))
+    end
+
+    def voice_transcription
+      @voice_transcription ||= VoiceTranscriptionService.new(root: @root)
+    end
+
+    def voice_synthesis_status(headers)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      json_response(200, voice_synthesis.status)
+    end
+
+    def voice_synthesize(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      request = JSON.parse(body)
+      result = voice_synthesis.synthesize(text: request["text"], voice_name: request["voice"], quality: request["quality"] || "responsive")
+      unless result.fetch("ok")
+        status = result.fetch("lifecycle_state") == "awaiting_input" ? 422 : 503
+        return json_response(status, error_envelope("voice_synthesis", result.fetch("message")))
+      end
+
+      response(
+        200,
+        result.fetch("audio"),
+        "Content-Type" => result.fetch("content_type"),
+        "Content-Disposition" => "inline; filename=\"soul-voice.wav\"",
+        "Cache-Control" => "private, no-store",
+        "X-Soul-Voice" => result.fetch("voice")
+      )
+    end
+
+    def voice_synthesize_stream(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+
+      stream = Enumerator.new do |output|
+        progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
+        result = voice_synthesis.synthesize(
+          text: request["text"], voice_name: request["voice"],
+          quality: request["quality"] || "expressive", on_progress: progress
+        )
+        payload = if result.fetch("ok")
+          result.except("audio").merge("audio_base64" => Base64.strict_encode64(result.fetch("audio")))
+        else
+          result
+        end
+        output << JSON.generate({ "type" => "result", "result" => payload }) + "\n"
+      rescue StandardError => error
+        output << JSON.generate({ "type" => "result", "result" => { "ok" => false, "lifecycle_state" => "failed", "message" => "voice stream failed safely: #{error.class}" } }) + "\n"
+      end
+      response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "private, no-store")
+    end
+
+    def voice_synthesis
+      @voice_synthesis ||= VoiceSynthesisService.new(root: @root)
+    end
+
+    def voice_presence_status(headers)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      json_response(200, voice_presence.status)
+    end
+
+    def voice_presence_launch(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      request = JSON.parse(body)
+      return json_response(422, error_envelope("voice_presence", "action must be launch")) unless request["action"] == "launch"
+      result = voice_presence.launch
+      json_response(result["ok"] ? 200 : 503, result)
+    end
+
+    def voice_presence
+      @voice_presence ||= VoicePresenceLaunchService.new(root: @root)
+    end
+
+    def picture_stream(headers, body)
+      boundary_error = picture_mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+
+      stream = Enumerator.new do |output|
+        progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
+        result = picture_understanding.analyze(
+          chat_id: request["chat_id"], question: request["question"],
+          image_base64: request["image_base64"], media_type: request["media_type"],
+          filename: request["filename"], retain: request["retain"] == true,
+          request_id: request["request_id"], on_progress: progress
+        )
+        output << JSON.generate({ "type" => "result", "result" => result }) + "\n"
+      rescue StandardError => error
+        output << JSON.generate({ "type" => "result", "result" => { "ok" => false, "lifecycle_state" => "failed", "reason" => "picture stream failed safely: #{error.class}", "mutation" => "none" } }) + "\n"
+      end
+      response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "private, no-store")
+    end
+
+    def perception_image(headers, chat_id, digest, extension)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      path = picture_understanding.retained_artifact_path(chat_id: chat_id, digest: digest, extension: extension)
+      response(
+        200, File.binread(path),
+        "Content-Type" => extension == "png" ? "image/png" : "image/jpeg",
+        "Content-Disposition" => "inline; filename=\"#{digest}.#{extension}\"",
+        "Cache-Control" => "private, no-store"
+      )
+    rescue Errno::ENOENT, ArgumentError
+      response(404, "Not Found")
+    end
+
+    def picture_understanding
+      @picture_understanding ||= PictureUnderstandingService.new(root: @root)
+    end
+
+    def screen_capture(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      request = JSON.parse(body)
+      result = screen_capture_service.capture(mode: request["mode"])
+      json_response(result["ok"] ? 200 : 422, result)
+    rescue JSON::ParserError
+      json_response(400, error_envelope("invalid_json", "screen capture request must be valid JSON"))
+    end
+
+    def screen_capture_service
+      @screen_capture ||= ScreenCaptureService.new(root: @root)
     end
 
     def music_audio(headers, project_id, candidate_id, artifact)
@@ -377,6 +584,29 @@ module SoulCore
       return json_response(403, auth_error("origin", "same-origin request required")) unless valid_origin?(headers["origin"])
       return json_response(403, auth_error("csrf", "valid CSRF token required")) unless secure_compare(headers["x-soul-csrf"], @csrf_token)
       return json_response(413, auth_error("body_too_large", "request body exceeds 128 KiB")) if body.bytesize > 128 * 1024
+
+      nil
+    end
+
+    def binary_mutation_boundary_error(headers, body)
+      media_type = headers["content-type"].to_s.split(";", 2).first.strip.downcase
+      unless VoiceTranscriptionService::CONTENT_TYPES.key?(media_type)
+        return json_response(415, auth_error("content_type", "Content-Type must be a supported audio recording"))
+      end
+      return json_response(403, auth_error("origin", "same-origin request required")) unless valid_origin?(headers["origin"])
+      return json_response(403, auth_error("csrf", "valid CSRF token required")) unless secure_compare(headers["x-soul-csrf"], @csrf_token)
+      if body.bytesize > VoiceTranscriptionService::MAX_UPLOAD_BYTES
+        return json_response(413, auth_error("body_too_large", "recording exceeds the bounded upload limit"))
+      end
+
+      nil
+    end
+
+    def picture_mutation_boundary_error(headers, body)
+      return json_response(415, auth_error("content_type", "Content-Type must be application/json")) unless headers["content-type"].to_s.split(";", 2).first.strip.downcase == "application/json"
+      return json_response(403, auth_error("origin", "same-origin request required")) unless valid_origin?(headers["origin"])
+      return json_response(403, auth_error("csrf", "valid CSRF token required")) unless secure_compare(headers["x-soul-csrf"], @csrf_token)
+      return json_response(413, auth_error("body_too_large", "picture request exceeds the bounded upload limit")) if body.bytesize > PictureUnderstandingService::MAX_REQUEST_BODY_BYTES
 
       nil
     end

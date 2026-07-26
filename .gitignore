@@ -30,6 +30,7 @@ Soul/reflection/approved/*.json
 Soul/reflection/approved/*.md
 Soul/reflection/rejected/*.json
 Soul/reflection/rejected/*.md
+Soul/reflection/knowledge_pending/
 Soul/memory/conversation_memory.jsonl
 Soul/memory/exports/*.json
 

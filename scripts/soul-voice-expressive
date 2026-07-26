@@ -1,0 +1,128 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "securerandom"
+
+CONFIRMATION = "INSTALL_SOUL_EXPRESSIVE_VOICE"
+options = {
+  root: ENV.fetch("SOUL_VOICE_EXPRESSIVE_ROOT", File.join(Dir.home, ".local", "share", "soul", "voice", "expressive")),
+  manifest: ENV.fetch("SOUL_VOICE_EXPRESSIVE_MANIFEST", File.expand_path("../config/voice_expressive_models.json", __dir__)),
+  requirements: ENV.fetch("SOUL_VOICE_EXPRESSIVE_REQUIREMENTS", File.expand_path("../config/voice_expressive_requirements.txt", __dir__))
+}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--manifest PATH") { |value| options[:manifest] = value }
+  parser.on("--requirements PATH") { |value| options[:requirements] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+def executable(name)
+  ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }.find { |path| File.executable?(path) && !File.directory?(path) }
+end
+
+def validate_install(root, manifest)
+  python = File.join(root, ".venv", "bin", "python")
+  model_dir = File.join(root, "chatterbox-original")
+  problems = []
+  problems << "isolated expressive Python is missing" unless File.executable?(python)
+  manifest.fetch("assets").each do |relative, receipt|
+    path = File.join(model_dir, relative)
+    unless File.file?(path) && !File.symlink?(path)
+      problems << "missing #{relative}"
+      next
+    end
+    problems << "size mismatch #{relative}" unless File.size(path) == receipt.fetch("bytes")
+    problems << "digest mismatch #{relative}" unless Digest::SHA256.file(path).hexdigest == receipt.fetch("sha256")
+  end
+  if problems.empty?
+    checks = {
+      "chatterbox-tts" => manifest.dig("runtime", "package_version"),
+      "onnxruntime" => manifest.dig("runtime", "onnxruntime_version"),
+      "setuptools" => manifest.dig("runtime", "setuptools_version")
+    }
+    script = 'from importlib.metadata import version; import sys; print("|".join(version(name) for name in sys.argv[1:]))'
+    output, status = Open3.capture2e(python, "-c", script, *checks.keys)
+    problems << "expressive package versions do not match" unless status.success? && output.strip == checks.values.join("|")
+  end
+  [problems, python, model_dir]
+end
+
+begin
+  manifest = JSON.parse(File.binread(options.fetch(:manifest), 256 * 1024))
+  raise "unsupported expressive synthesis manifest" unless manifest["schema_version"] == "soul.voice_expressive.models.v1"
+  root = File.expand_path(options.fetch(:root))
+  requirements = File.expand_path(options.fetch(:requirements))
+  plan = {
+    "operation" => "voice_expressive_install",
+    "install_dir" => root,
+    "runtime" => manifest.fetch("runtime"),
+    "requirements_sha256" => Digest::SHA256.file(requirements).hexdigest,
+    "asset_count" => manifest.fetch("assets").length,
+    "asset_bytes" => manifest.fetch("assets").values.sum { |receipt| receipt.fetch("bytes") },
+    "confirmation_phrase" => CONFIRMATION,
+    "persistent_service" => false,
+    "network_listener" => false,
+    "resident_process" => false,
+    "automatic_playback" => false,
+    "automatic_install" => false
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+  problems, python, model_dir = validate_install(root, manifest)
+
+  if action == "check"
+    emit(
+      "lifecycle_state" => problems.empty? ? "complete" : "blocked_for_human_review",
+      "available" => problems.empty?,
+      "install_dir" => root,
+      "runtime" => plan.fetch("runtime"),
+      "problems" => problems,
+      "resident_process" => false
+    )
+  end
+  emit(plan.merge("lifecycle_state" => "blocked_for_human_review")) if action == "plan"
+
+  raise "action must be check, plan, or install" unless action == "install"
+  raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+  raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+  emit("lifecycle_state" => "complete", "install_dir" => root, "already_valid" => true, "resident_process" => false) if problems.empty?
+  raise "install directory exists but is not valid; inspect it rather than overwriting" if File.exist?(root) || File.symlink?(root)
+
+  uv = executable("uv")
+  raise "uv is required; install it through the operating system package manager" unless uv
+  staging = "#{root}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+  FileUtils.mkdir_p(staging, mode: 0o700)
+  venv = File.join(staging, ".venv")
+  environment = { "UV_PYTHON_DOWNLOADS" => "never" }
+  system(environment, uv, "--no-config", "venv", "--python", manifest.dig("runtime", "python"), venv) or raise "uv could not create the isolated expressive runtime"
+  python = File.join(venv, "bin", "python")
+  system(environment, uv, "--no-config", "pip", "install", "--python", python, "--requirement", requirements) or raise "pinned expressive package installation failed"
+  model_dir = File.join(staging, "chatterbox-original")
+  download = [
+    "from huggingface_hub import snapshot_download",
+    "snapshot_download(repo_id=#{manifest.dig('runtime', 'repository').inspect}, revision=#{manifest.dig('runtime', 'revision').inspect}, local_dir=#{model_dir.inspect}, allow_patterns=#{manifest.fetch('assets').keys.inspect})"
+  ].join("; ")
+  system(environment, python, "-c", download) or raise "pinned expressive model download failed"
+  installed_problems, = validate_install(staging, manifest)
+  raise installed_problems.join("; ") unless installed_problems.empty?
+  FileUtils.mkdir_p(File.dirname(root), mode: 0o700)
+  File.rename(staging, root)
+  emit("lifecycle_state" => "complete", "install_dir" => root, "already_valid" => false, "resident_process" => false)
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial environment removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end

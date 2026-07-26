@@ -62,6 +62,7 @@ module SoulCore
         File.unlink(file.fetch("absolute_path"))
         completed["deleted_files"] << file.fetch("kind")
       end
+      cleanup_empty_perception_directory(chat_id)
 
       success(
         data.except("owned_files").merge(
@@ -137,6 +138,7 @@ module SoulCore
           File.unlink(file.fetch("absolute_path"))
           completed["deleted_files"] << { "chat_id" => chat_id, "kind" => file.fetch("kind") }
         end
+        cleanup_empty_perception_directory(chat_id)
       end
 
       deleted_chat_ids = data.fetch("conversations").map { |item| item.dig("chat", "id") }
@@ -326,7 +328,26 @@ module SoulCore
         ["conversation_state", File.join(@root, "Soul/runtime/conversation_state", "#{safe}.json")],
         ["grounded_evidence", File.join(@root, "Soul/runtime/conversation_evidence", "#{safe}.jsonl")],
         ["metadata", File.join(@root, ChatStore::DEFAULT_ROOT, "#{safe}.json")]
-      ]
+      ] + perception_owned_paths(safe)
+    end
+
+    def perception_owned_paths(chat_id)
+      directory = File.join(@root, "Soul/private/perception/retained", chat_id)
+      return [] unless File.exist?(directory) || File.symlink?(directory)
+      return [["perception_image_directory", directory]] unless File.directory?(directory) && !File.symlink?(directory)
+
+      entries = Dir.children(directory)
+      raise RuntimeError, "conversation-owned perception image count exceeds #{MAX_LINKS}" if entries.length > MAX_LINKS
+      entries.sort.map do |name|
+        raise RuntimeError, "conversation-owned perception image name is unsafe" unless name.match?(/\A[0-9a-f]{64}\.(?:png|jpg)\z/)
+
+        ["perception_image:#{name}", File.join(directory, name)]
+      end
+    end
+
+    def cleanup_empty_perception_directory(chat_id)
+      directory = File.join(@root, "Soul/private/perception/retained", chat_id.to_s.gsub(/[^a-zA-Z0-9_.-]/, "_"))
+      Dir.rmdir(directory) if File.directory?(directory) && !File.symlink?(directory) && Dir.empty?(directory)
     end
 
     def memory_store

@@ -1,0 +1,53 @@
+{
+  "schema_version": "soul.voice_presence.models.v1",
+  "runtime": {
+    "name": "sherpa-onnx",
+    "package_version": "1.13.4",
+    "python": "3.14",
+    "release": "kws-zipformer-zh-en-3M-2025-12-20",
+    "archive_root": "sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20",
+    "archive_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2",
+    "archive_bytes": 32885699,
+    "archive_sha256": "68447f4fbc67e70eee3a93961f36e81e98f47aef73ce7e7ca00885c6cd3616a6"
+  },
+  "assets": {
+    "encoder.onnx": {
+      "source": "encoder-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "bytes": 4600657,
+      "sha256": "2ca84d6bfe73e1ea3c9c49f600f7cad1c9ddd423c53c906b8bfe802444dd78d5"
+    },
+    "decoder.onnx": {
+      "source": "decoder-epoch-13-avg-2-chunk-8-left-64.onnx",
+      "bytes": 759829,
+      "sha256": "63a22dd60f40fff082ac3e09afa507f6787da36df76ded2fbe145fa233e22c21"
+    },
+    "joiner.onnx": {
+      "source": "joiner-epoch-13-avg-2-chunk-8-left-64.int8.onnx",
+      "bytes": 86629,
+      "sha256": "190d4067b4cc20b72a42a1916e69d92052000fb7051a427ebb1bc72a69207dc1"
+    },
+    "tokens.txt": {
+      "source": "tokens.txt",
+      "bytes": 1928,
+      "sha256": "2d3f32311f9b692b964da3c90e830258d3e78e013cb0c992dbfb15cd5a1a71b0"
+    }
+  },
+  "keyword": {
+    "phrase": "Hey Soul",
+    "tokens": "HH EY1 S OW1 L",
+    "boosting_score": 2.0,
+    "trigger_threshold": 0.25,
+    "symbol": "HEY_SOUL"
+  },
+  "capture": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "wake_chunk_milliseconds": 10,
+    "speech_start_timeout_seconds": 4.0,
+    "followup_speech_start_timeout_seconds": 5.0,
+    "maximum_utterance_seconds": 30.0,
+    "trailing_silence_seconds": 1.2,
+    "minimum_utterance_seconds": 0.35,
+    "speech_rms_threshold": 420
+  }
+}

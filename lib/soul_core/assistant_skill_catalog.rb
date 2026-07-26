@@ -174,6 +174,8 @@ module SoulCore
         "status" => (data["status"] || data[:status] || "unknown").to_s,
         "risk" => risk,
         "confirmation_required" => confirmation_required,
+        "required_core" => (data["required_core"] || data[:required_core] || "none").to_s,
+        "core_transition_authority" => (data["core_transition_authority"] || data[:core_transition_authority] || "not_applicable").to_s,
         "example_utterances" => examples_for(id.to_s, human_name, risk)
       }
     end
@@ -198,8 +200,7 @@ module SoulCore
       return "network_or_provider_check" if data["network_access"] == true || data[:network_access] == true
       return "network_or_provider_check" if id.match?(/cloud\.providers\.test|skill\.brief\.draft/)
       return "review_only" if id.match?(/skill\.brief\.review/)
-      return "read_only" if declared == "read_only"
-      return "low" if declared == "low"
+      return declared unless declared.empty?
 
       infer_risk(id, description)
     end
@@ -242,6 +243,10 @@ module SoulCore
                ["make a song and image, then prepare the video", "use this kept image with that kept song"]
              when /cores\.activate/
                ["switch to Music Core", "activate AMD-Free Core"]
+             when /project\.timeline\.inspect/
+               ["show project timeline", "what is next on the project timeline"]
+             when /project\.timeline\.update/
+               ["mark timeline item <ID> as needs review", "add timeline item: <structured fields>"]
              else
                ["use #{human_name.downcase}", "run #{id}"]
              end
@@ -283,6 +288,8 @@ module SoulCore
         lines << "status: #{skill['status']}"
         lines << "risk: #{skill['risk']}"
         lines << "confirmation_required: #{skill['confirmation_required']}"
+        lines << "required_core: #{skill['required_core']}"
+        lines << "core_transition_authority: #{skill['core_transition_authority']}"
         lines << "```"
         lines << ""
         lines << (skill["description"].empty? ? "No description is currently available." : skill["description"])

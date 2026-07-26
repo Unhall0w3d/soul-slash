@@ -10,6 +10,19 @@ It uses Open-Meteo endpoints:
 
 No API key is required for the default Open-Meteo flow.
 
+## Chat and voice behavior
+
+The dashboard conversation runtime maps natural requests such as “How is the
+weather today?” to this existing skill. If `SOUL_WEATHER_LOCATION` is
+configured, a brief read-only report runs immediately without an approval
+gate. It includes current conditions, temperature, humidity, wind
+speed/direction when available, and air quality when available, then offers a
+3-day outlook.
+
+An explicit location such as “Show the weather in London, UK” overrides Home
+for that invocation. If neither an explicit nor configured location exists,
+Soul asks for one and returns `awaiting_input`.
+
 ## Conversational location behavior
 
 If a weather request includes an explicit location, Soul/ uses that location immediately:

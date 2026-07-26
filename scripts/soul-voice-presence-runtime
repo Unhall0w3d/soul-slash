@@ -1,0 +1,180 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "securerandom"
+
+CONFIRMATION = "INSTALL_SOUL_VOICE_PRESENCE"
+PROJECT_ROOT = File.expand_path("..", __dir__)
+options = {
+  root: ENV.fetch("SOUL_VOICE_PRESENCE_ROOT", File.join(Dir.home, ".local", "share", "soul", "voice", "presence")),
+  manifest: ENV.fetch("SOUL_VOICE_PRESENCE_MANIFEST", File.join(PROJECT_ROOT, "config", "voice_presence_models.json")),
+  requirements: ENV.fetch("SOUL_VOICE_PRESENCE_REQUIREMENTS", File.join(PROJECT_ROOT, "config", "voice_presence_requirements.txt")),
+  desktop_entry: File.join(Dir.home, ".local", "share", "applications", "soul-voice-presence.desktop")
+}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--manifest PATH") { |value| options[:manifest] = value }
+  parser.on("--requirements PATH") { |value| options[:requirements] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+def executable(name)
+  ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }
+    .find { |path| File.executable?(path) && !File.directory?(path) }
+end
+
+def validate(root, manifest)
+  problems = []
+  python = File.join(root, ".venv", "bin", "python")
+  model = File.join(root, "model")
+  problems << "isolated wake runtime is missing" unless File.executable?(python)
+  manifest.fetch("assets").each do |relative, receipt|
+    path = File.join(model, relative)
+    unless File.file?(path) && !File.symlink?(path)
+      problems << "wake asset is missing: #{relative}"
+      next
+    end
+    problems << "wake asset size differs: #{relative}" unless File.size(path) == receipt.fetch("bytes")
+    problems << "wake asset digest differs: #{relative}" unless Digest::SHA256.file(path).hexdigest == receipt.fetch("sha256")
+  end
+  keyword_path = File.join(model, "keywords.txt")
+  expected_keyword = manifest.fetch("keyword")
+  keyword_line = "#{expected_keyword.fetch('tokens')} :#{expected_keyword.fetch('boosting_score')} ##{expected_keyword.fetch('trigger_threshold')} @#{expected_keyword.fetch('symbol')}\n"
+  problems << "reviewed wake phrase file differs" unless File.file?(keyword_path) && File.binread(keyword_path) == keyword_line
+  if File.executable?(python)
+    output, status = Open3.capture2e(python, "-c", "from importlib.metadata import version; print(version('sherpa-onnx'))")
+    problems << "sherpa-onnx version differs" unless status.success? && output.strip == manifest.dig("runtime", "package_version")
+  end
+  problems
+end
+
+begin
+  manifest_path = File.expand_path(options.fetch(:manifest))
+  requirements = File.expand_path(options.fetch(:requirements))
+  root = File.expand_path(options.fetch(:root))
+  manifest = JSON.parse(File.binread(manifest_path, 256 * 1024))
+  raise "unsupported voice-presence manifest" unless manifest["schema_version"] == "soul.voice_presence.models.v1"
+  host_missing = %w[uv curl tar pw-record pw-play ffmpeg ffprobe].reject { |command| executable(command) }
+  begin
+    require "open3"
+    _, pyside_status = Open3.capture2e("python3", "-c", "import PySide6")
+    host_missing << "python3/PySide6" unless pyside_status.success?
+  rescue Errno::ENOENT
+    host_missing << "python3/PySide6"
+  end
+  plan = {
+    "operation" => "voice_presence_install",
+    "install_dir" => root,
+    "desktop_entry" => options.fetch(:desktop_entry),
+    "runtime" => manifest.fetch("runtime"),
+    "asset_count" => manifest.fetch("assets").length,
+    "requirements_sha256" => Digest::SHA256.file(requirements).hexdigest,
+    "keyword" => manifest.fetch("keyword"),
+    "host_missing" => host_missing,
+    "confirmation_phrase" => CONFIRMATION,
+    "persistent_while_window_open" => true,
+    "system_service" => false,
+    "network_listener" => false,
+    "survives_window_close" => false
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+  problems = validate(root, manifest)
+  if action == "check"
+    emit(
+      "lifecycle_state" => host_missing.empty? && problems.empty? ? "complete" : "blocked_for_human_review",
+      "available" => host_missing.empty? && problems.empty?,
+      "host_missing" => host_missing,
+      "problems" => problems,
+      "install_dir" => root,
+      "window_controls_residency" => true
+    )
+  end
+  emit(plan.merge("lifecycle_state" => "blocked_for_human_review")) if action == "plan"
+  raise "action must be check, plan, or install" unless action == "install"
+  raise "required host dependencies are missing: #{host_missing.join(', ')}" unless host_missing.empty?
+  raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+  raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+  if problems.empty?
+    emit("lifecycle_state" => "complete", "available" => true, "already_valid" => true, "install_dir" => root)
+  end
+  if File.directory?(root) && problems == ["reviewed wake phrase file differs"]
+    keyword = manifest.fetch("keyword")
+    keyword_path = File.join(root, "model", "keywords.txt")
+    temporary_keyword = "#{keyword_path}.#{Process.pid}.tmp"
+    File.binwrite(
+      temporary_keyword,
+      "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n",
+      mode: "wx", perm: 0o600
+    )
+    File.rename(temporary_keyword, keyword_path)
+    updated_problems = validate(root, manifest)
+    raise updated_problems.join("; ") unless updated_problems.empty?
+    emit("lifecycle_state" => "complete", "available" => true, "already_valid" => false, "configuration_updated" => true, "install_dir" => root)
+  end
+  raise "install directory exists but is not valid; inspect it rather than overwriting" if File.exist?(root) || File.symlink?(root)
+
+  staging = "#{root}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+  archive = File.join(staging, "model.tar.bz2")
+  extracted = File.join(staging, "extracted")
+  FileUtils.mkdir_p(extracted, mode: 0o700)
+  environment = { "UV_PYTHON_DOWNLOADS" => "never" }
+  system(environment, executable("uv"), "--no-config", "venv", "--python", manifest.dig("runtime", "python"), File.join(staging, ".venv")) or raise "uv could not create the isolated wake runtime"
+  system(environment, executable("uv"), "--no-config", "pip", "install", "--python", File.join(staging, ".venv", "bin", "python"), "--requirement", requirements) or raise "pinned wake runtime installation failed"
+  system(executable("curl"), "--location", "--fail", "--silent", "--show-error", "--output", archive, manifest.dig("runtime", "archive_url")) or raise "wake model download failed"
+  raise "wake archive size differs" unless File.size(archive) == manifest.dig("runtime", "archive_bytes")
+  raise "wake archive digest differs" unless Digest::SHA256.file(archive).hexdigest == manifest.dig("runtime", "archive_sha256")
+  system(executable("tar"), "-xjf", archive, "-C", extracted) or raise "wake model extraction failed"
+  source_root = File.join(extracted, manifest.dig("runtime", "archive_root"))
+  raise "wake archive layout differs" unless File.directory?(source_root) && !File.symlink?(source_root)
+  model_root = File.join(staging, "model")
+  FileUtils.mkdir_p(model_root, mode: 0o700)
+  manifest.fetch("assets").each do |relative, receipt|
+    FileUtils.cp(File.join(source_root, receipt.fetch("source")), File.join(model_root, relative))
+  end
+  keyword = manifest.fetch("keyword")
+  File.binwrite(
+    File.join(model_root, "keywords.txt"),
+    "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n",
+    mode: "wx", perm: 0o600
+  )
+  FileUtils.rm_rf(extracted)
+  FileUtils.rm_f(archive)
+  installed_problems = validate(staging, manifest)
+  raise installed_problems.join("; ") unless installed_problems.empty?
+  FileUtils.mkdir_p(File.dirname(root), mode: 0o700)
+  File.rename(staging, root)
+
+  desktop = <<~DESKTOP
+    [Desktop Entry]
+    Type=Application
+    Version=1.0
+    Name=Soul Voice Presence
+    Comment=Visible local wake-word and voice conversation surface
+    Exec=#{File.join(PROJECT_ROOT, "scripts", "soul-voice-presence")}
+    Icon=#{File.join(PROJECT_ROOT, "assets", "brand", "soul-account-avatar-150.png")}
+    Terminal=false
+    Categories=AudioVideo;Utility;
+    StartupNotify=true
+  DESKTOP
+  FileUtils.mkdir_p(File.dirname(options.fetch(:desktop_entry)), mode: 0o700)
+  File.binwrite(options.fetch(:desktop_entry), desktop, mode: "w", perm: 0o600)
+  emit("lifecycle_state" => "complete", "available" => true, "already_valid" => false, "install_dir" => root, "desktop_entry" => options.fetch(:desktop_entry))
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial runtime removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end

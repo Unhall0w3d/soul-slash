@@ -1,0 +1,12 @@
+{
+  "title": "Core Runtime Decision",
+  "body": "The reviewed Daily Core uses Gemma on AMD while Qwen remains the NVIDIA fallback.",
+  "knowledge_kind": "decision",
+  "evidence_status": "repository_documentation",
+  "source_reference": "repo:docs/CURRENT_STATE.md",
+  "target_relative_path": null,
+  "tags": [
+    "models",
+    "runtime"
+  ]
+}

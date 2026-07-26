@@ -7,6 +7,7 @@ require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
 require_relative "conversation_request_shape"
 require_relative "conversation_tool_catalog"
+require_relative "dashboard_capability_guide"
 require_relative "intent_router"
 
 module SoulCore
@@ -67,6 +68,12 @@ module SoulCore
       /\A\s*(?:please\s+)?reflect on (?:this|the) (?:research|work|troubleshooting|conversation)(?:\s+and propose memory candidates?)?\s*[?.!]*\z/i,
       /\A\s*(?:create|draft|prepare) (?:a\s+)?research reflection(?: candidate)?\s*[?.!]*\z/i
     ].freeze
+    KNOWLEDGE_REFLECTION_PATTERNS = [
+      /\A\s*(?:please\s+)?reflect (?:on )?(?:this|the) conversation for (?:(?:durable|reusable) knowledge|the knowledge vault|knowledge vault material)\s*[?.!]*\z/i,
+      /\A\s*(?:create|draft|prepare) (?:a\s+)?knowledge vault reflection(?: candidate)? from (?:this|the) conversation\s*[?.!]*\z/i
+    ].freeze
+    KNOWLEDGE_REFLECTION_CONTROL_PATTERN =
+      /\AWRITE_KNOWLEDGE_VAULT_NOTE\s+knref_[0-9]{8}T[0-9]{6}Z_[a-f0-9]{10}\s+[a-f0-9]{64}\z/
     LOOKUP_PATTERNS = [
       /\A\s*(?:who|what)\s+(?:is|was|are|were)\s+.{2,160}[?.!]*\s*\z/i,
       /\A\s*(?:briefly\s+)?(?:define|explain)\s+.{2,160}[?.!]*\s*\z/i,
@@ -115,13 +122,31 @@ module SoulCore
       /\A\s*propose\s+memory(?:\s+as)?\s+(?:project|preference|episodic|semantic)\s*[:\-]/i
     ].freeze
 
+    KNOWLEDGE_VAULT_CONTROL_PATTERNS = [
+      /\A\s*(?:show\s+|check\s+)?knowledge\s+vault\s+status\s*[?.!]*\z/i,
+      /\A\s*search\s+(?:the\s+)?knowledge\s+vault\s+(?:for\s+)?.+\z/i
+    ].freeze
+    PROJECT_TRACKER_CONTROL_PATTERNS = [
+      /\A\s*(?:show|list|open)\s+(?:the\s+)?(?:project\s+timeline|implementation\s+tracker)\s*[?.!]*\z/i,
+      /\A\s*what(?:'s|\s+is)\s+(?:next|on\s+the\s+project\s+timeline)\s*[?.!]*\z/i,
+      /\A\s*(?:show|inspect)\s+(?:project\s+)?timeline\s+item\s+.+?\s*[?.!]*\z/i,
+      /\A\s*(?:mark|set)\s+timeline\s+item\s+.+?\s+(?:as|to)\s+(?:planned|in[\s_-]*progress|blocked|needs[\s_-]*review|validated|done|deferred)\s*[?.!]*\z/i,
+      /\A\s*update\s+timeline\s+item\s+.+?\s+(?:notes?|implementation|technologies|interfaces|commands|references)\s*:\s*.+\z/im,
+      /\A\s*add\s+timeline\s+item\s*:\s*.+\z/im
+    ].freeze
+
+    DASHBOARD_CAPABILITY_GUIDE_PATTERNS = DashboardCapabilityGuide::REQUEST_PATTERNS
+
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
     ].freeze
 
+    AFFIRMATIVE_FOLLOWUP_PATTERN = /\A\s*(?:yes|yeah|yep|sure|please|go ahead|show me|do it)\s*[.!]*\s*\z/i
+
     INTENT_TOOL_MAP = {
       "skill_catalog" => "assistant-skill-catalog",
       "repo_status" => "system.status",
+      "weather_request" => "weather.report",
       "downloads_inspect" => "downloads.inspect",
       "downloads_cleanup_plan" => "downloads.cleanup_plan"
     }.freeze
@@ -157,6 +182,25 @@ module SoulCore
         "artifact_decision" => artifact_decision.to_h,
         "recent_evidence_ids" => Array(recent_evidence).map { |record| record["evidence_id"] }
       }
+
+      if text.match?(KNOWLEDGE_REFLECTION_CONTROL_PATTERN)
+        return decision(
+          kind: "knowledge_reflection_control",
+          reason: "an exact candidate ID and preview digest may invoke the existing deterministic Knowledge Vault write gate",
+          flags: flags.merge("knowledge_reflection_control" => true)
+        )
+      end
+
+      if KNOWLEDGE_REFLECTION_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "knowledge_reflection",
+          reason: "an explicit request may draft one local review-only reusable-knowledge candidate",
+          requires_model: true,
+          synthesize: false,
+          max_steps: 1,
+          flags: flags.merge("knowledge_reflection" => true)
+        )
+      end
 
       if RESEARCH_REFLECTION_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
@@ -250,6 +294,30 @@ module SoulCore
         )
       end
 
+      if KNOWLEDGE_VAULT_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "explicit Knowledge Vault status and search remain bounded deterministic reads",
+          flags: flags.merge("knowledge_vault_control" => true)
+        )
+      end
+
+      if PROJECT_TRACKER_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "explicit Project Timeline reads and edits use one bounded owner-local ledger",
+          flags: flags.merge("project_tracker_control" => true)
+        )
+      end
+
+      if request_shape.request? && DASHBOARD_CAPABILITY_GUIDE_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "an explicit discoverability question uses the read-only registry-backed Dashboard capability guide",
+          flags: flags.merge("dashboard_capability_guide" => true)
+        )
+      end
+
       if request_shape.request? && CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
         return decision(
           kind: "deterministic_passthrough",
@@ -267,6 +335,17 @@ module SoulCore
           kind: "evidence_followup",
           reason: followup.reason,
           flags: flags.merge("evidence_followup" => followup.to_h)
+        )
+      end
+
+      if weather_detail_followup?(text, recent_evidence)
+        weather = @tool_catalog.find("weather.report")
+        return decision(
+          kind: "skill_only",
+          reason: "an affirmative reply continues the most recent bounded weather report with its offered 3-day outlook",
+          tools: [weather],
+          max_steps: 1,
+          flags: flags.merge("weather_detail_followup" => true)
         )
       end
 
@@ -377,6 +456,14 @@ module SoulCore
       return false if text.match?(LOOKUP_CONVERSATION_REFERENCE)
 
       LOOKUP_PATTERNS.any? { |pattern| text.match?(pattern) }
+    end
+
+    def weather_detail_followup?(text, recent_evidence)
+      return false unless text.match?(AFFIRMATIVE_FOLLOWUP_PATTERN)
+
+      Array(recent_evidence).reverse.any? do |record|
+        record["evidence_profile"] == "weather_report" && record["status"] == "ok"
+      end
     end
 
     def matched_tools(text, intent)

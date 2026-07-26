@@ -23,7 +23,7 @@ module SoulCore
     VISUAL_CANDIDATE_ID = /\Avisual_candidate_[a-f0-9]{16}\z/
     MOTION_CANDIDATE_ID = /\Amotion_candidate_[a-f0-9]{16}\z/
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
-    INTERFACES = %w[cli dashboard_test internal dashboard].freeze
+    INTERFACES = %w[cli dashboard_test internal dashboard voice_presence].freeze
 
     OPERATIONS = {
       "application.bootstrap" => [],
@@ -50,6 +50,9 @@ module SoulCore
       "inbox.mark_seen" => %w[chat_id delivery_id],
       "inbox.dismiss" => %w[chat_id delivery_id],
       "system_status.refresh" => [],
+      "project_tracker.snapshot" => [],
+      "project_tracker.items.create" => %w[item],
+      "project_tracker.items.update" => %w[item_id item expected_revision],
       "core.status" => [],
       "core.activate.preview" => %w[core_id],
       "core.activate.execute" => %w[core_id target_profile_id confirmation expected_digest],
@@ -63,6 +66,16 @@ module SoulCore
       "configuration.show" => [],
       "configuration.explain" => %w[key],
       "configuration.validate" => [],
+      "knowledge_vault.status" => [],
+      "knowledge_vault.search" => %w[query limit],
+      "knowledge_vault.initialize.preview" => [],
+      "knowledge_vault.initialize.execute" => %w[confirmation expected_digest],
+      "knowledge_vault.memory_export.preview" => [],
+      "knowledge_vault.memory_export.execute" => %w[confirmation expected_digest],
+      "knowledge_vault.memory_import.preview" => %w[relative_path layer],
+      "knowledge_vault.memory_import.execute" => %w[relative_path layer confirmation expected_digest],
+      "knowledge_vault.reflection.preview" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags],
+      "knowledge_vault.reflection.execute" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags confirmation expected_digest],
       "skills.list" => %w[limit],
       "skill_studio.proposals.list" => %w[limit],
       "skill_studio.proposals.get" => %w[proposal_id],
@@ -305,7 +318,7 @@ module SoulCore
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
         elsif key == "filters" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
-        elsif key == "args" || key == "chat_ids" || key == "allowed_files"
+        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)

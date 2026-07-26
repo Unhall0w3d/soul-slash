@@ -48,6 +48,7 @@
     </a>
     <nav class="primary-tabs" aria-label="Primary" role="tablist">
       <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
+      <button id="timeline-tab" class="tab" type="button" role="tab" aria-selected="false" aria-controls="timeline-panel">Project Timeline</button>
       <div id="self-improvement-navigation" class="tab-menu">
         <button id="self-improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="self-improvement-menu">Self Improvement <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="self-improvement-menu" class="self-improvement-menu" role="menu" aria-label="Self Improvement surfaces" hidden>
@@ -66,6 +67,8 @@
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
+      <button id="voice-presence-launch" class="status-chip voice-presence-launch" type="button" title="Open the visible local Hey Soul window"><i></i><span>Voice Presence</span></button>
+      <button id="notification-mode" class="status-chip notification-mode" type="button" title="Change local notification delivery"><i></i><span>Alerts Voice</span></button>
       <div id="core-navigation" class="core-navigation">
         <button id="core-selector" class="status-chip core-selector" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="core-menu"><i></i><span id="core-label">Core —</span><span class="core-caret" aria-hidden="true">◇</span></button>
         <div id="core-menu" class="core-menu" role="menu" aria-label="Configured Cores" hidden><p>Inspecting configured Cores…</p></div>
@@ -115,11 +118,20 @@
           </div>
           <form id="composer" class="composer">
             <label for="message-input">Message Soul</label>
+            <div id="picture-attachment" class="picture-attachment" hidden>
+              <img id="picture-attachment-preview" alt="Selected local picture preview">
+              <div><strong id="picture-attachment-name">Selected picture</strong><span id="picture-attachment-meta"></span><label><input id="picture-attachment-retain" type="checkbox"> Keep this picture with the conversation</label></div>
+              <button id="picture-attachment-remove" type="button" aria-label="Remove selected picture">Remove</button>
+            </div>
             <div class="composer-row">
               <textarea id="message-input" name="message" rows="2" maxlength="65536" placeholder="Choose or create a conversation to begin…" disabled required></textarea>
+              <input id="picture-input" type="file" accept="image/png,image/jpeg" hidden>
+              <button id="attach-picture" class="voice-button" type="button" aria-label="Attach a local picture" disabled><span aria-hidden="true">◇</span><span>Picture</span></button>
+              <button id="capture-screen" class="voice-button" type="button" aria-label="Capture one screen preview" disabled><span aria-hidden="true">▣</span><span>Screen</span></button>
+              <button id="record-voice" class="voice-button" type="button" aria-label="Start push-to-talk recording" aria-pressed="false" disabled><span aria-hidden="true">◉</span><span>Speak</span></button>
               <button id="send-message" class="send-button" type="submit" disabled><span>Send</span><span aria-hidden="true">↗</span></button>
             </div>
-            <div class="composer-meta"><span id="composer-hint">No conversation selected</span><span>Enter to send · Shift+Enter for newline</span></div>
+            <div class="composer-meta"><span id="composer-hint">No conversation selected</span><label class="voice-profile-control" for="voice-output-profile">Voice <select id="voice-output-profile"><option value="F3">Feminine · F3</option><option value="M3">Masculine · M3</option></select></label><label class="voice-profile-control" for="voice-output-quality">Delivery <select id="voice-output-quality"><option value="responsive">Responsive</option><option value="expressive">Expressive</option></select></label><span>Enter to send · Shift+Enter for newline</span></div>
           </form>
         </section>
 
@@ -161,6 +173,64 @@
       </div>
     </section>
 
+    <section id="timeline-panel" class="tab-panel timeline-panel" role="tabpanel" aria-labelledby="timeline-tab" hidden>
+      <header class="studio-header timeline-header">
+        <div><p class="eyebrow">Construction ledger</p><h1>Project Timeline</h1><p>One shared implementation map for active work, pending review, deferred ideas, and completed features.</p></div>
+        <div class="studio-boundary"><strong>Explicit state only</strong><span>Plan → implement → review → validate</span><small>Soul and the Operator share this ledger. Passing tests never changes status automatically.</small></div>
+      </header>
+      <div class="timeline-summary" aria-label="Project timeline summary">
+        <div><span id="timeline-total">0</span><small>Total items</small></div>
+        <div><span id="timeline-active">0</span><small>In progress</small></div>
+        <div><span id="timeline-review">0</span><small>Needs review</small></div>
+        <div><span id="timeline-blocked">0</span><small>Blocked</small></div>
+        <div><span id="timeline-done">0</span><small>Validated / done</small></div>
+      </div>
+      <div class="timeline-toolbar">
+        <label for="timeline-status-filter">Status <select id="timeline-status-filter"><option value="all">All states</option><option value="active">Active roadmap</option><option value="implemented">Implemented inventory</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="needs_review">Needs review</option><option value="validated">Validated</option><option value="done">Done</option><option value="deferred">Deferred</option></select></label>
+        <button id="new-timeline-item" class="gate-button" type="button">New timeline item</button>
+        <button id="refresh-timeline" class="refresh-button" type="button">Refresh</button>
+        <p id="timeline-status" role="status" aria-live="polite">Open this page to load owner-local project state.</p>
+      </div>
+      <div class="timeline-layout">
+        <div id="timeline-board" class="timeline-board">
+          <section><header><span>01</span><h2>Now</h2><small>Active work and immediate review</small></header><div id="timeline-now" class="timeline-column"></div></section>
+          <section><header><span>02</span><h2>Next</h2><small>Cleanly queued follow-on work</small></header><div id="timeline-next" class="timeline-column"></div></section>
+          <section><header><span>03</span><h2>Later</h2><small>Qualified expansion</small></header><div id="timeline-later" class="timeline-column"></div></section>
+          <section><header><span>04</span><h2>Backlog</h2><small>Retained without implied priority</small></header><div id="timeline-backlog" class="timeline-column"></div></section>
+        </div>
+        <section id="timeline-inventory" class="timeline-inventory" hidden>
+          <header><div><p class="eyebrow">Implemented foundation</p><h2>Completed feature inventory</h2></div><p>Validated and completed capabilities, independent of roadmap horizon.</p></header>
+          <div id="timeline-implemented-items" class="timeline-inventory-list"></div>
+        </section>
+        <form id="timeline-editor" class="timeline-editor" hidden>
+          <div class="card-heading"><div><p class="eyebrow">Ledger entry</p><h2 id="timeline-editor-title">Edit timeline item</h2></div><button id="close-timeline-editor" class="icon-button" type="button" aria-label="Close timeline editor">×</button></div>
+          <input id="timeline-item-id" type="hidden">
+          <input id="timeline-item-revision" type="hidden">
+          <label for="timeline-item-title">Title</label><input id="timeline-item-title" maxlength="160" required>
+          <div class="timeline-editor-grid">
+            <label for="timeline-item-area">Area<input id="timeline-item-area" maxlength="80" required></label>
+            <label for="timeline-item-horizon">Horizon<select id="timeline-item-horizon"><option value="now">Now</option><option value="next">Next</option><option value="later">Later</option><option value="backlog">Backlog</option><option value="archive">Implemented inventory</option></select></label>
+            <label for="timeline-item-status">Status<select id="timeline-item-status"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="blocked">Blocked</option><option value="needs_review">Needs review</option><option value="validated">Validated</option><option value="done">Done</option><option value="deferred">Deferred</option></select></label>
+            <label for="timeline-item-priority">Priority<select id="timeline-item-priority"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          </div>
+          <label for="timeline-item-summary">Summary</label><textarea id="timeline-item-summary" rows="4" maxlength="2000" required></textarea>
+          <fieldset class="timeline-detail-fields">
+            <legend>Implementation record</legend>
+            <label for="timeline-item-implementation">What was or will be implemented</label><textarea id="timeline-item-implementation" rows="5" maxlength="5000"></textarea>
+            <label for="timeline-item-technologies">Models, languages, and technologies</label><textarea id="timeline-item-technologies" rows="3" maxlength="2000"></textarea>
+            <label for="timeline-item-interfaces">Interfaces and surfaces</label><textarea id="timeline-item-interfaces" rows="3" maxlength="2000"></textarea>
+            <label for="timeline-item-commands">Commands and invocation syntax</label><textarea id="timeline-item-commands" rows="4" maxlength="4000"></textarea>
+            <label for="timeline-item-references">Associated documentation and references</label><textarea id="timeline-item-references" rows="3" maxlength="3000"></textarea>
+          </fieldset>
+          <label for="timeline-item-acceptance">Acceptance</label><textarea id="timeline-item-acceptance" rows="4" maxlength="3000" required></textarea>
+          <label for="timeline-item-notes">Notes</label><textarea id="timeline-item-notes" rows="4" maxlength="4000"></textarea>
+          <label for="timeline-item-source">Source</label><input id="timeline-item-source" maxlength="240" required>
+          <button id="save-timeline-item" class="gate-button gate-button--gold" type="submit">Save timeline item</button>
+          <p id="timeline-editor-status" class="dialog-status" role="status"></p>
+        </form>
+      </div>
+    </section>
+
     <section id="visual-panel" class="tab-panel visual-panel" role="tabpanel" aria-labelledby="visual-tab" hidden>
       <header class="studio-header music-header"><div><p class="eyebrow">Lightform workshop</p><h1>Visual Studio</h1><p>Shape a visual brief, render one private local draft, and retain every candidate for deliberate review.</p></div><div class="studio-boundary"><strong>Bounded local creation</strong><span>Brief → exact preview → Vulkan render → visual review</span><small>No background server, automatic publication, or silent promotion into Music Studio.</small></div></header>
       <div class="visual-layout">
@@ -189,7 +259,7 @@
           <form id="music-project-form" class="music-form">
             <div class="studio-detail-heading"><div><p class="eyebrow">Creative brief</p><h2 id="music-workbench-title">New composition</h2></div><span id="music-resource-state" class="maturity-chip">Not inspected</span></div>
             <div class="music-form-grid"><label>Title<input id="music-title" maxlength="120" required></label><label>Intent<input id="music-intent" maxlength="2000" required></label><label>Duration<select id="music-duration"><option value="30">30 seconds</option><option value="90">90 seconds</option><option value="180">3 minutes</option><option value="600">10 minutes</option></select></label><label>Mode<select id="music-vocal-mode"><option value="vocal">Vocal</option><option value="instrumental">Instrumental</option></select></label><label>Rights status<select id="music-rights"><option value="original">Original material</option><option value="licensed">Licensed material</option><option value="public_domain">Public domain</option></select></label><label>BPM<input id="music-bpm" type="number" min="30" max="300" value="110" required></label><label>Key<input id="music-key" maxlength="40" value="C minor" required></label><label>Time<input id="music-time" value="4" pattern="2|3|4|5|6|7|9|12" required></label><label>Seed<input id="music-seed" type="number" min="0" max="2147483647" value="42" required></label></div>
-            <label>Sound and structure<textarea id="music-caption" rows="5" maxlength="512" required placeholder="Example: Liquid drum and bass with warm sub-bass, crisp rolling breaks, airy pads, and restrained electric-piano harmony. Keep the groove fluid and melodic, build through subtle textural variation, and finish cleanly."></textarea></label><p class="field-guidance">Describe one coherent sonic identity with genre, instruments, mood, texture, and broad progression. Keep instructions compatible and under 512 characters. Instrumental mode uses the runtime's dedicated no-vocal token; section markers below apply to vocal projects.</p><label>Lyrics and section markers<textarea id="music-lyrics" rows="9" maxlength="20000" placeholder="[Intro]\n\n[Verse 1 - rhythmic male vocal]\nOne lyric line at a time\n\n[Instrumental]\n\n[Outro]"></textarea></label>
+            <label>Sound and structure<textarea id="music-caption" rows="5" maxlength="512" required placeholder="Example: Liquid drum and bass with warm sub-bass, crisp rolling breaks, airy pads, and restrained electric-piano harmony. Keep the groove fluid and melodic, build through subtle textural variation, and finish cleanly."></textarea></label><p id="music-caption-guidance" class="field-guidance">Describe one coherent sonic identity with genre, instruments, mood, texture, and broad progression. Keep instructions compatible and under 512 characters.</p><label><span id="music-lyrics-label">Lyrics and section markers</span><textarea id="music-lyrics" rows="9" maxlength="20000" placeholder="[Intro]\n\n[Verse 1 - rhythmic male vocal]\nOne lyric line at a time\n\n[Instrumental]\n\n[Outro]"></textarea></label>
             <div class="music-actions"><button id="save-music-project" class="gate-button gate-button--gold" type="submit">Create project</button><button id="refresh-music-resources" class="gate-button" type="button">Inspect resources</button></div><p id="music-form-status" class="dialog-status" role="status"></p>
           </form>
           <section id="music-project-delete-card" class="gate-card" hidden><div><p class="eyebrow">Composition archive</p><h3>Delete this project</h3><p>Permanently removes this composition and its archive-owned candidates, audio, inputs, logs, transcription, and reviews. Finished exports in <code>~/Music/soul-music</code> remain untouched.</p></div><button id="preview-music-project-delete" class="danger-button" type="button">Preview project deletion</button><div id="music-project-delete-confirm" hidden><pre id="music-project-delete-scope" class="diagnostic-output"></pre><label for="music-project-delete-confirmation">Type <code>DELETE_MUSIC_PROJECT</code></label><input id="music-project-delete-confirmation" autocomplete="off" spellcheck="false"><button id="execute-music-project-delete" class="danger-button" type="button" disabled>Delete exact project</button></div><p id="music-project-delete-status" class="dialog-status" role="status"></p></section>
@@ -511,6 +581,26 @@
         <button id="execute-model-runtime" class="danger-button" type="button" disabled>Apply model runtime change</button>
       </div>
       <p id="model-runtime-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
+    </form>
+  </dialog>
+
+  <dialog id="screen-capture-dialog" class="clear-dialog screen-capture-dialog" aria-labelledby="screen-capture-title">
+    <form method="dialog">
+      <div class="dialog-heading">
+        <div><p class="eyebrow">One-shot perception</p><h2 id="screen-capture-title">Capture a screen preview</h2></div>
+        <button id="close-screen-capture-dialog" class="quiet-button" value="cancel" type="submit">Close</button>
+      </div>
+      <p class="dialog-copy">One deliberate capture is staged locally and shown in Chat before Gemma sees it. Opening this panel captures nothing.</p>
+      <fieldset class="screen-capture-scopes">
+        <legend>Capture scope</legend>
+        <label><input type="radio" name="screen-capture-mode" value="monitor" checked><span><strong>Current monitor</strong><small>The monitor focused when you press Capture.</small></span></label>
+        <label><input type="radio" name="screen-capture-mode" value="active_window"><span><strong>Active window</strong><small>The exact active-window geometry at capture time.</small></span></label>
+        <label><input type="radio" name="screen-capture-mode" value="region"><span><strong>Select region</strong><small>Choose one region through the desktop selector.</small></span></label>
+      </fieldset>
+      <div class="dialog-actions">
+        <button id="execute-screen-capture" class="primary-button" type="button">Capture preview</button>
+      </div>
+      <p id="screen-capture-status" class="dialog-copy" aria-live="polite">No pixels have been captured.</p>
     </form>
   </dialog>
   <div id="live-status" class="sr-only" role="status" aria-live="polite"></div>

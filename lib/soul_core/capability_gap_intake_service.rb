@@ -22,6 +22,10 @@ module SoulCore
       its make need please run should that the their them then there these they this to use want
       what when where which with would you your soul
     ].freeze
+    GENERIC_COVERAGE_WORDS = %w[
+      active available bounded configured current explicit local must operation operations
+      proposal provide same skill studio using while without
+    ].freeze
 
     def initialize(root: Dir.pwd, clock: -> { Time.now }, skill_registry: nil, skill_studio: nil, artifact_store: nil, inbox_store: nil)
       @root = File.expand_path(root)
@@ -99,7 +103,7 @@ module SoulCore
 
     def coverage_match?(request_tokens, candidate)
       candidate_tokens = tokens(candidate)
-      overlap = request_tokens & candidate_tokens
+      overlap = (request_tokens & candidate_tokens) - GENERIC_COVERAGE_WORDS
       overlap.length >= 2 || overlap.any? { |token| token.length >= 9 }
     end
 

@@ -36,6 +36,10 @@ module SoulCore
         message: "What about dinner tonight?",
         evidence_records: evidence
       )
+      long_new_request_with_pronouns = router.route(
+        message: "Create a new bounded proposal. It should validate the current desktop and must not change any existing service.",
+        evidence_records: evidence
+      )
       rendered = router.render(selection: disk_followup)
 
       verification = {
@@ -53,6 +57,7 @@ module SoulCore
           skill_followup.record&.dig("tool_id") == "assistant-skill-catalog",
         "unrelated_messages_do_not_hijack_recent_evidence" => !unrelated.matched?,
         "unmatched_followup_terms_do_not_hijack_recent_evidence" => !unrelated_followup.matched?,
+        "long_new_requests_do_not_become_pronoun_followups" => !long_new_request_with_pronouns.matched?,
         "deterministic_rendering_includes_evidence_identity" =>
           rendered.include?("Evidence ID: ev_host") &&
           rendered.include?("Block device nvme0n1"),
@@ -87,7 +92,8 @@ module SoulCore
           "smart_followup" => smart_followup.to_h,
           "skill_followup" => skill_followup.to_h,
           "unrelated" => unrelated.to_h,
-          "unrelated_followup" => unrelated_followup.to_h
+          "unrelated_followup" => unrelated_followup.to_h,
+          "long_new_request_with_pronouns" => long_new_request_with_pronouns.to_h
         },
         "blockers" => blockers
       }

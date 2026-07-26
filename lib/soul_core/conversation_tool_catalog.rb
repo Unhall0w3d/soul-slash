@@ -79,6 +79,20 @@ module SoulCore
         ]
       ),
       ToolDefinition.new(
+        id: "creative.archive.inspect",
+        label: "Creative Studio archive",
+        risk_class: "read_only",
+        canonical_message: "inspect creative studio archive",
+        synthesis_allowed: true,
+        scope: "Bounded read-only Music Studio and Visual Studio projects, briefs, lineage, and explicitly requested existing visual evidence",
+        evidence_profile: "creative_archive",
+        patterns: [
+          /\b(?:inspect|review|show|open|read|refer to|compare|describe|analy[sz]e|evaluate|list)\b.{0,100}\b(?:visual|music|creative)(?:\s+studio)?\b.{0,60}\b(?:projects?|briefs?|candidates?|archive|compositions?)\b/i,
+          /\b(?:visual|music|creative)(?:\s+studio)?\b.{0,60}\b(?:projects?|briefs?|candidates?|archive|compositions?)\b.{0,100}\b(?:inspect|review|show|open|read|compare|describe|analy[sz]e|evaluate|list)\b/i,
+          /\b(?:visual_project|music)_[a-f0-9]{16}\b/i
+        ]
+      ),
+      ToolDefinition.new(
         id: "downloads.inspect",
         label: "Downloads inspection",
         risk_class: "read_only",
@@ -105,6 +119,18 @@ module SoulCore
         ]
       ),
       ToolDefinition.new(
+        id: "weather.report",
+        label: "Current weather",
+        risk_class: "read_only",
+        canonical_message: "what is the weather today?",
+        synthesis_allowed: false,
+        scope: "Current conditions from the configured Open-Meteo provider, with an optional 3-day outlook",
+        evidence_profile: "weather_report",
+        patterns: [
+          /\b(?:weather|forecast|temperature|rain|snow|storm|3[- ]day outlook)\b/i
+        ]
+      ),
+      ToolDefinition.new(
         id: "execution.history.summary",
         label: "Execution history summary",
         risk_class: "read_only",
@@ -128,6 +154,8 @@ module SoulCore
 
     def match(message)
       text = message.to_s
+      archive = definitions.select { |tool| tool.id == "creative.archive.inspect" && tool.matches?(text) }
+      return archive unless archive.empty?
       return [] unless ConversationRequestShape.new.request?(text)
 
       definitions.select { |tool| tool.matches?(text) }

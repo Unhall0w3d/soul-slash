@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-20T22:30:56-04:00
+Generated: 2026-07-26T01:00:40-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-20
+29
 ```
 
 ## Skills
@@ -28,6 +28,8 @@ category: uncategorized
 status: unknown
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Preview and archive active conversations by exact title or all conversations so they leave the active list without deleting transcripts.
@@ -46,6 +48,8 @@ category: uncategorized
 status: unknown
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Permanently delete one exact local conversation and logically forget shared memories derived from it.
@@ -64,6 +68,8 @@ category: uncategorized
 status: unknown
 risk: read_only
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 List configured cloud LLM providers without making network calls.
@@ -81,6 +87,8 @@ category: uncategorized
 status: unknown
 risk: network_or_provider_check
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Run bounded smoke tests for configured cloud LLM providers.
@@ -98,6 +106,8 @@ category: runtime_control
 status: available
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Preview and activate one configured Core without rebooting while preserving active-work, lease, digest, and exact click-approval checks.
@@ -116,6 +126,8 @@ category: creative_studios
 status: partial
 risk: approval_required
 confirmation_required: true
+required_core: dynamic_by_generation_operation
+core_transition_authority: exact_action_click
 ```
 
 Coordinate reviewed music and visual candidates, including new or existing sources, and advance one exact chat-native lineage binding; static presentation, rendering, export, and upload-package gates remain separate Studio steps.
@@ -134,6 +146,8 @@ category: creative_studios
 status: available
 risk: approval_required
 confirmation_required: true
+required_core: music
+core_transition_authority: exact_action_click
 ```
 
 Gather a music brief through chat, preserve user-required decisions, generate and review candidates, translate recorded revision feedback, and prepare exact kept-song export or rejected-candidate deletion gates.
@@ -152,6 +166,8 @@ category: creative_studios
 status: available
 risk: approval_required
 confirmation_required: true
+required_core: amd-free
+core_transition_authority: exact_action_click
 ```
 
 Gather or draft a visual brief through chat, generate and review a local still, and translate a recorded revise review into one exact source-preserving guided edit with an authenticated image result.
@@ -162,6 +178,25 @@ Example ways the owner might ask for this:
 - create cover artwork with me
 - prepare this first and ask before changing anything
 
+### Dashboard Capabilities Inspect
+
+```text
+id: dashboard.capabilities.inspect
+category: project_coordination
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Explain which Dashboard surfaces currently have bounded conversational mappings, their required inputs, Core needs, and retained human gates without invoking them.
+
+Example ways the owner might ask for this:
+
+- use dashboard capabilities inspect
+- run dashboard.capabilities.inspect
+
 ### Downloads Cleanup Plan
 
 ```text
@@ -170,6 +205,8 @@ category: uncategorized
 status: unknown
 risk: read_only
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Read-only human-oriented cleanup plan based on downloads.inspect.
@@ -187,6 +224,8 @@ category: uncategorized
 status: unknown
 risk: read_only
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Read-only Downloads inspection and cleanup-candidate planning.
@@ -204,6 +243,8 @@ category: uncategorized
 status: unknown
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan.
@@ -222,6 +263,8 @@ category: uncategorized
 status: unknown
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Approval-gated restore of the latest successful Downloads cleanup from Trash.
@@ -232,6 +275,163 @@ Example ways the owner might ask for this:
 - undo the last cleanup
 - prepare this first and ask before changing anything
 
+### Knowledge Vault Conversation Reflect
+
+```text
+id: knowledge.vault.conversation_reflect
+category: knowledge
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Explicitly inspect one bounded local conversation, draft one review-only reusable-knowledge candidate, and offer the existing exact Knowledge Vault write gate only when deterministic policy permits it.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault conversation reflect
+- run knowledge.vault.conversation_reflect
+- prepare this first and ask before changing anything
+
+### Knowledge Vault Initialize
+
+```text
+id: knowledge.vault.initialize
+category: knowledge
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Create the reviewed portable starter structure in one configured external Markdown vault without overwriting conflicting files.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault initialize
+- run knowledge.vault.initialize
+- prepare this first and ask before changing anything
+
+### Knowledge Vault Memory Export
+
+```text
+id: knowledge.vault.memory_export
+category: knowledge
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Project approved canonical Soul memory into a clearly marked generated Markdown index without changing canonical memory.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault memory export
+- run knowledge.vault.memory_export
+- prepare this first and ask before changing anything
+
+### Knowledge Vault Memory Import
+
+```text
+id: knowledge.vault.memory_import
+category: knowledge
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Import one explicitly selected bounded Markdown note as a candidate in Soul's existing shared memory ledger.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault memory import
+- run knowledge.vault.memory_import
+- prepare this first and ask before changing anything
+
+### Knowledge Vault Reflect
+
+```text
+id: knowledge.vault.reflect
+category: knowledge
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Classify one explicit durable-knowledge candidate, report its correct canonical destination, and prepare an exact reviewed Markdown note or update only when it belongs in the Knowledge Vault.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault reflect
+- run knowledge.vault.reflect
+- prepare this first and ask before changing anything
+
+### Knowledge Vault Search
+
+```text
+id: knowledge.vault.search
+category: knowledge
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Search one configured external Markdown vault through a bounded foreground read that treats note content as untrusted context.
+
+Example ways the owner might ask for this:
+
+- use knowledge vault search
+- run knowledge.vault.search
+
+### Project Timeline Inspect
+
+```text
+id: project.timeline.inspect
+category: project_coordination
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Read the shared owner-local implementation ledger, including explicit horizons, states, priorities, and review criteria.
+
+Example ways the owner might ask for this:
+
+- show project timeline
+- what is next on the project timeline
+
+### Project Timeline Update
+
+```text
+id: project.timeline.update
+category: project_coordination
+status: available
+risk: write_local_state
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Create or revise one explicitly named implementation-ledger item through the Dashboard editor or an unmistakable timeline-item Chat command.
+
+Example ways the owner might ask for this:
+
+- mark timeline item <ID> as needs review
+- add timeline item: <structured fields>
+
 ### Skill Brief Draft
 
 ```text
@@ -240,6 +440,8 @@ category: uncategorized
 status: unknown
 risk: network_or_provider_check
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Draft a review-only Soul/ skill proposal using a configured cloud provider.
@@ -257,6 +459,8 @@ category: uncategorized
 status: unknown
 risk: approval_required
 confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Review a Soul/ skill proposal and write a review-only artifact.
@@ -275,6 +479,8 @@ category: uncategorized
 status: unknown
 risk: read_only
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Read-only local system and Soul runtime status check.
@@ -292,6 +498,8 @@ category: uncategorized
 status: unknown
 risk: network_or_provider_check
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Read-only weather report with temperature, humidity, air quality, and optional 3-day outlook.
@@ -309,6 +517,8 @@ category: uncategorized
 status: unknown
 risk: network_or_provider_check
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general research backend.
@@ -326,6 +536,8 @@ category: uncategorized
 status: unknown
 risk: network_or_provider_check
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
@@ -343,6 +555,8 @@ category: uncategorized
 status: unknown
 risk: low
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Open a YouTube search for a requested song in the default Linux browser after confirmation.
@@ -360,6 +574,8 @@ category: uncategorized
 status: unknown
 risk: low
 confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
 ```
 
 Resolve a song/search query to a YouTube video candidate using the official YouTube Data API.

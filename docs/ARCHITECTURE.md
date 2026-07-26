@@ -15,10 +15,28 @@ Human-facing inputs and outputs:
 - Skill Studio, Self Assessment, Self Augmentation, Music Studio, and Visual Studio
 - header-level Review Center and manual Core selection
 - shared workspace and inbox metadata inside Chat
-- future voice input
-- future TTS output
+- explicit Chat push-to-talk through bounded local CPU transcription
+- explicit per-message Chat speech through bounded local CPU synthesis
 
 Every interface should use the same assistant runtime. Voice and web clients must not grow separate brains.
+
+Voice Input A0 adds no second conversation path. Browser audio enters one
+authenticated, same-origin, CSRF-protected route with independent size and
+duration bounds, is normalized through FFmpeg, and is transcribed by the same
+pinned CPU whisper.cpp runtime used for music evidence. The temporary audio and
+raw recognition output are removed before an editable transcript is returned.
+Only a later explicit Send turns that draft into an ordinary conversation
+message. Voice therefore inherits the existing intent, skill, Core, memory, and
+confirmation boundaries instead of bypassing them.
+
+Voice Output A0 likewise creates no second assistant path. An eligible completed
+Soul message enters one authenticated, same-origin, CSRF-protected route after
+an explicit Speak click. A pinned Supertonic 3 process loads on CPU, writes one
+request-private WAV, returns its bytes with private no-store headers, and exits.
+Temporary text/audio are removed before return. The browser permits one active
+playback, revokes its object URL at every terminal outcome, and stops on
+navigation or logout. There is no TTS server, automatic narration, GPU lease,
+conversation mutation, or memory write.
 
 ## Conversation layer
 
@@ -105,6 +123,9 @@ Current bounded capabilities include:
 - host, runtime, capability, and storage assessment
 - isolated self-augmentation experiment and review operations
 - private music and visual project/candidate operations
+- bounded Knowledge Vault search, reviewed memory bridges, deterministic
+  knowledge-destination reflection, and explicit local conversation-to-note
+  proposal planning
 
 Separate Beta candidates are held outside the production registry. They run only after preview and exact human confirmation, with bounded foreground execution and local diagnostic evidence.
 
@@ -166,7 +187,7 @@ Automatic tab-open work is limited to one lightweight read-only snapshot. Deeper
 
 ## Core and resource layer
 
-Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while exact-gated Core selection coordinates supported chat and creative resources. A reviewed conversational creative action may include the required Core transition in its visible scope.
+Soul separates stable application identity from physical model identity. The `soul-local-chat` alias remains constant while exact-gated Core selection coordinates supported chat and creative resources. A reviewed conversational creative action includes a deterministic Core preflight in its visible scope: active Core, operation-required Core, transfer decision, and reason. The server binds that requirement into the workflow/action digest. One Operator click may authorize the disclosed Core transition and bounded creative operation together; execution revalidates the requirement and delegates the transfer to `CoreOrchestrationService`.
 
 Daily uses Gemma on AMD. AMD-Free and Music use Qwen on NVIDIA. Music generation
 temporarily leases AMD for ACE-Step Vulkan; still, image-guided motion, and
@@ -251,6 +272,20 @@ The tracked `Soul/memory/.public_seed_v1` marker tells a clean clone to read
 those neutral defaults while directing every mutable write to private storage.
 
 Future durable memory must retain provenance, confidence, editability, and promotion status.
+
+### Optional external knowledge surface
+
+`SOUL_KNOWLEDGE_VAULT_PATH` may point to an external directory of ordinary
+Markdown notes. The vault is a human-readable research, decision, and project
+surface; it is not another canonical memory store. Obsidian may open the same
+directory, but Soul reads the files directly through bounded foreground
+operations.
+
+Approved memory can be explicitly projected into a marked generated note.
+Conversely, one selected concise note can be imported only as a candidate in
+the shared append-only memory ledger. The existing separate approval,
+supersession, and forgetting controls remain authoritative. No watcher,
+resident index, automatic Git action, or automatic memory promotion is used.
 
 ## Policy and audit layer
 

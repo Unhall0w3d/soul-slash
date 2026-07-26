@@ -274,18 +274,25 @@ module SoulCore
           missing: ["model_capability_registry", "task_router_policy"]
         ),
         "vision_screen_understanding" => capability(
-          status: "missing",
-          detail: "Soul cannot yet capture screenshots, invoke a vision model, or reason over screen contents.",
-          provides: [],
-          current_support: [],
-          missing: ["screenshot_capture_skill", "vision_model_runtime", "vision_workflow_handler"]
+          status: "partial",
+          detail: "Chat can analyze one explicit local PNG or JPEG through the Daily Core with bounded validation and retention. Soul cannot yet capture a monitor, window, or region.",
+          provides: ["explicit_picture_attachment", "local_picture_understanding", "ephemeral_image_cleanup", "optional_conversation_retention"],
+          current_support: ["PictureUnderstandingService", "LocalVisionClient", "Gemma 4 multimodal projector"],
+          missing: ["screenshot_capture_skill", "screen_workflow_handler", "voice_perception_routing"]
         ),
         "speech_to_text" => capability(
-          status: "missing",
-          detail: "Soul does not yet have a local audio transcription capability.",
-          provides: [],
-          current_support: [],
-          missing: ["audio_capture", "stt_runtime", "transcription_skill"]
+          status: "available",
+          detail: "Chat provides explicit push-to-talk capture and bounded local CPU transcription when the optional pinned whisper.cpp runtime is installed.",
+          provides: ["dashboard_audio_capture", "local_stt", "editable_transcript", "ephemeral_audio_cleanup"],
+          current_support: ["VoiceTranscriptionService", "DashboardHttpApplication", "whisper.cpp"],
+          missing: []
+        ),
+        "text_to_speech" => capability(
+          status: "available",
+          detail: "Eligible completed Soul messages provide explicit bounded local CPU synthesis and disposable browser playback when the optional pinned Supertonic runtime is installed.",
+          provides: ["local_tts", "explicit_message_playback", "ephemeral_audio_cleanup"],
+          current_support: ["VoiceSynthesisService", "DashboardHttpApplication", "Supertonic 3"],
+          missing: []
         )
       }
     end

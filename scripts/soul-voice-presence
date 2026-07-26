@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+RUNTIME="${SOUL_VOICE_PRESENCE_ROOT:-$HOME/.local/share/soul/voice/presence}"
+MANIFEST="${SOUL_VOICE_PRESENCE_MANIFEST:-$PROJECT_ROOT/config/voice_presence_models.json}"
+SOURCE="${SOUL_VOICE_PRESENCE_SOURCE:-effect_output.soul-rnnoise}"
+STATE_ROOT="${SOUL_VOICE_PRESENCE_STATE_ROOT:-$HOME/.local/state/soul/voice-presence}"
+
+mkdir -p -m 700 "$STATE_ROOT"
+exec 9>"$STATE_ROOT/run.lock"
+if ! flock -n 9; then
+  echo "Soul Voice Presence is already open." >&2
+  exit 3
+fi
+
+while true; do
+  if python3 "$PROJECT_ROOT/scripts/soul-voice-presence-app.py" \
+    --project-root "$PROJECT_ROOT" \
+    --runtime "$RUNTIME" \
+    --manifest "$MANIFEST" \
+    --source "$SOURCE" \
+    --worker-python "$RUNTIME/.venv/bin/python" \
+    --worker "$PROJECT_ROOT/scripts/soul-voice-presence-worker.py" \
+    --bridge "$PROJECT_ROOT/scripts/soul-voice-presence-bridge" \
+    --masked "$PROJECT_ROOT/assets/brand/character/soul-portrait-masked.png" \
+    --unmasked "$PROJECT_ROOT/assets/brand/character/soul-portrait-unmasked.png" \
+    --icon "$PROJECT_ROOT/assets/brand/soul-account-avatar-150.png" \
+    --state-root "$STATE_ROOT" \
+    --notification-wake "$PROJECT_ROOT/assets/notifications/cue-wake.wav"; then
+    status=0
+  else
+    status=$?
+  fi
+  [[ "$status" -eq 75 ]] || exit "$status"
+done

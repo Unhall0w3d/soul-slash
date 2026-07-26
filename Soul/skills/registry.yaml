@@ -9,6 +9,36 @@ skills:
     writes_files: false
     expected_output: json
     verifier: schema_basic
+  project.timeline.inspect:
+    internal_handler: project_tracker
+    category: project_coordination
+    status: available
+    description: Read the shared owner-local implementation ledger, including explicit horizons, states, priorities, and review criteria.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: application_envelope
+    verifier: project_timeline_a1
+  project.timeline.update:
+    internal_handler: project_tracker
+    category: project_coordination
+    status: available
+    description: Create or revise one explicitly named implementation-ledger item through the Dashboard editor or an unmistakable timeline-item Chat command.
+    risk: write_local_state
+    requires_approval: false
+    writes_files: true
+    expected_output: application_envelope
+    verifier: project_timeline_a1
+  dashboard.capabilities.inspect:
+    internal_handler: dashboard_capability_guide
+    category: project_coordination
+    status: available
+    description: Explain which Dashboard surfaces currently have bounded conversational mappings, their required inputs, Core needs, and retained human gates without invoking them.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: conversation_result
+    verifier: dashboard_capability_guide_a1
   chats.clear:
     path: Soul/skills/chats/clear.rb
     language: ruby
@@ -40,6 +70,8 @@ skills:
     writes_files: true
     expected_output: application_envelope
     verifier: conversation_creative_workflow
+    required_core: music
+    core_transition_authority: exact_action_click
   creative.visual_production:
     internal_handler: conversation_creative_workflow
     category: creative_studios
@@ -51,6 +83,8 @@ skills:
     writes_files: true
     expected_output: application_envelope
     verifier: conversation_creative_workflow
+    required_core: amd-free
+    core_transition_authority: exact_action_click
   creative.companion_production:
     internal_handler: conversation_creative_workflow
     category: creative_studios
@@ -62,6 +96,8 @@ skills:
     writes_files: true
     expected_output: application_envelope
     verifier: conversation_creative_workflow
+    required_core: dynamic_by_generation_operation
+    core_transition_authority: exact_action_click
   cores.activate:
     internal_handler: core_orchestration
     category: runtime_control
@@ -72,6 +108,71 @@ skills:
     writes_files: true
     expected_output: application_envelope
     verifier: core_orchestration
+  knowledge.vault.search:
+    internal_handler: knowledge_vault
+    category: knowledge
+    status: available
+    description: Search one configured external Markdown vault through a bounded foreground read that treats note content as untrusted context.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: application_envelope
+    verifier: knowledge_vault_a0
+  knowledge.vault.initialize:
+    internal_handler: knowledge_vault
+    category: knowledge
+    status: available
+    description: Create the reviewed portable starter structure in one configured external Markdown vault without overwriting conflicting files.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: INITIALIZE_KNOWLEDGE_VAULT
+    writes_files: true
+    expected_output: application_envelope
+    verifier: knowledge_vault_a0
+  knowledge.vault.memory_export:
+    internal_handler: knowledge_vault
+    category: knowledge
+    status: available
+    description: Project approved canonical Soul memory into a clearly marked generated Markdown index without changing canonical memory.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: EXPORT_APPROVED_MEMORY_TO_VAULT
+    writes_files: true
+    expected_output: application_envelope
+    verifier: knowledge_vault_a0
+  knowledge.vault.memory_import:
+    internal_handler: knowledge_vault
+    category: knowledge
+    status: available
+    description: Import one explicitly selected bounded Markdown note as a candidate in Soul's existing shared memory ledger.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: IMPORT_VAULT_NOTE_AS_MEMORY_CANDIDATE
+    writes_files: true
+    expected_output: application_envelope
+    verifier: knowledge_vault_a0
+  knowledge.vault.reflect:
+    internal_handler: knowledge_vault
+    category: knowledge
+    status: available
+    description: Classify one explicit durable-knowledge candidate, report its correct canonical destination, and prepare an exact reviewed Markdown note or update only when it belongs in the Knowledge Vault.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: WRITE_KNOWLEDGE_VAULT_NOTE
+    writes_files: true
+    expected_output: application_envelope
+    verifier: knowledge_vault_a1
+  knowledge.vault.conversation_reflect:
+    internal_handler: conversation_runtime
+    category: knowledge
+    status: available
+    description: Explicitly inspect one bounded local conversation, draft one review-only reusable-knowledge candidate, and offer the existing exact Knowledge Vault write gate only when deterministic policy permits it.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_phrase: WRITE_KNOWLEDGE_VAULT_NOTE
+    writes_files: true
+    expected_output: conversation_result
+    verifier: knowledge_reflection_a2
   downloads.inspect:
     path: Soul/skills/downloads/inspect.rb
     language: ruby

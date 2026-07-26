@@ -353,9 +353,12 @@ ruby bin/soul skill system.status
 make dashboard
 ```
 
-Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, grouped
-Self Improvement surfaces (Skill Studio, Self Assessment, and Self
-Augmentation), grouped Creative Studios (Music and Visual), and Review Center.
+Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, the shared
+Project Timeline, grouped Self Improvement surfaces (Skill Studio, Self
+Assessment, and Self Augmentation), grouped Creative Studios (Music and
+Visual), and Review Center. Project Timeline initializes its ignored
+owner-local working ledger from the neutral public seed on first use; see
+`docs/guides/PROJECT_TIMELINE.md`.
 This command binds to loopback, runs in the foreground, and stops with Ctrl+C.
 
 First-run dashboard access uses the fixed administrator username `admin` and bootstrap password `soul123`. The bootstrap session cannot load dashboard data. Replace it with a private password of 12–128 characters when prompted. Soul stores only the salted derived credential under ignored `Soul/runtime/dashboard_auth/` storage.
@@ -498,6 +501,11 @@ make music-vulkan-setup-plan  Preview the production AMD Vulkan music runtime
 make music-vulkan-download-plan  Preview exact production music model bytes
 make music-transcription-plan  Preview optional pinned CPU vocal analysis
 make music-transcription-install  Install it after digest and exact confirmation
+make voice-transcription-check  Verify Chat push-to-talk dependencies
+make voice-transcription-plan  Preview the shared pinned CPU transcription install
+make voice-synthesis-check  Verify bounded local Chat speech dependencies
+make voice-synthesis-plan  Preview the pinned Supertonic 3 install
+make voice-synthesis-audition  Render the reviewed feminine/masculine comparisons
 make music-reference-tooling-check  Inspect optional URL-analysis tools
 make music-reference-tooling-plan  Preview the pinned local tooling environment
 make music-reference-tooling-install  Install after digest and exact confirmation
@@ -583,6 +591,48 @@ memory after transcription, failure, cancellation, timeout, or an abandoned
 dashboard stream. Machine-heard OK leads to human testing. Machine-heard BAD
 leads to an Operator-triggered revision attempt. Neither result is approval.
 
+Chat push-to-talk shares this exact runtime. It additionally requires a current
+browser with `getUserMedia` and `MediaRecorder`, system `ffmpeg`/`ffprobe`, and
+a secure browser context. Loopback HTTP is accepted by browsers; an iPhone or
+other LAN client should use the reviewed Caddy HTTPS origin and trust its local
+CA. Check or install the shared runtime through the voice-named aliases:
+
+```bash
+make voice-transcription-check
+make voice-transcription-plan
+make voice-transcription-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION
+```
+
+The recording is limited to sixty seconds and eight MiB, transcribed on CPU,
+inserted as an editable unsent composer draft, and deleted with its normalized
+WAV and raw recognition output before the request returns. See
+`docs/guides/VOICE_INPUT.md` for use and portable override details.
+
+Chat speech output is a separate optional local install. Its default is
+Supertonic 3 package `1.3.1`, model revision
+`724fb5abbf5502583fb520898d45929e62f02c0b`, and feminine voice profile `F3`.
+The code is MIT licensed; the model weights use OpenRAIL-M. Review and run:
+
+```bash
+make voice-synthesis-check
+make voice-synthesis-plan
+make voice-synthesis-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_SOUL_VOICE_SYNTHESIS
+```
+
+The installer uses an already installed Python 3.12 through `uv`, creates an
+isolated user-local environment, verifies the pinned asset digests, and exits.
+It does not create a TTS service. Each explicit per-message **Speak** click
+starts one bounded CPU process; **Stop**, navigation, logout, or natural
+completion disposes browser playback. The Chat selector hot-swaps between the
+curated `F3` and provisional `M3` profiles per request without restarting or
+changing Cores. Compare `F1`/`F3`/`F5` and `M1`/`M3`/`M5` with
+`make voice-synthesis-audition`. See
+`docs/guides/VOICE_OUTPUT.md` for selection, retention, and portable overrides.
+
 YouTube reference analysis is another optional, separately reviewed path. It
 uses system yt-dlp when available and a project-local Python 3.14 environment
 for exact default `essentia==2.1b6.dev1438`. If yt-dlp is unavailable, the same
@@ -649,7 +699,92 @@ An accepted short scene may be repeated to the song duration; Soul does not
 claim that repeated presentation is unique long-form generation. See
 `docs/guides/VISUAL_STUDIO.md`.
 
-## 17. Clock-skew warning after applying overlays
+## 17. Optional visible Voice Presence
+
+After the bounded Chat microphone and responsive voice runtimes work, install
+the local **Hey Soul** wake surface:
+
+```bash
+make voice-presence-plan
+make voice-presence-install \
+  EXPECTED_DIGEST=<digest-from-plan> \
+  CONFIRM=INSTALL_SOUL_VOICE_PRESENCE
+make voice-presence-launch
+```
+
+The window is the consent boundary: it opens the microphone path, shows
+listening/thinking/speaking state through Soul's portrait, and closes every
+child process when dismissed. It creates no system service. See
+`docs/guides/VOICE_PRESENCE.md` for dependencies, authority, privacy, and
+portable source overrides.
+
+On Hyprland, one-shot screen understanding uses `grim` and `slurp`. Install
+`tesseract` to add bounded literal-label corroboration for monitor/window
+requests. OCR is optional and never becomes a resident process.
+
+## 18. Optional Markdown Knowledge Vault
+
+Soul can share one external directory of ordinary Markdown with the Operator.
+Obsidian is optional: it can open the directory as a vault, while Soul reads
+the files directly through bounded foreground operations.
+
+Keep the personal path in the ignored `.env`:
+
+```dotenv
+SOUL_KNOWLEDGE_VAULT_PATH=~/Knowledge/soul-vault
+```
+
+Then inspect and initialize the portable structure:
+
+```bash
+make knowledge-vault-status
+make knowledge-vault-init-preview
+make knowledge-vault-init \
+  EXPECTED_DIGEST=<digest-from-preview> \
+  CONFIRM=INITIALIZE_KNOWLEDGE_VAULT
+```
+
+Knowledge Reflection does not silently mine conversations or decide that
+something should become durable. For one explicit structured candidate, it
+first reports whether the material belongs in the vault, the shared-memory
+review flow, a Studio archive, the current conversation only, or nowhere.
+Vault-eligible material receives a complete Markdown preview and duplicate
+inventory before any write:
+
+```bash
+cp config/knowledge_reflection.example.json /tmp/soul-knowledge-candidate.json
+# Edit the copy with the reviewed title, body, kind, evidence, and provenance.
+
+make knowledge-vault-reflection-preview \
+  KNOWLEDGE_REFLECTION_INPUT=/tmp/soul-knowledge-candidate.json
+```
+
+Only after reviewing that exact output:
+
+```bash
+make knowledge-vault-reflection-execute \
+  KNOWLEDGE_REFLECTION_INPUT=/tmp/soul-knowledge-candidate.json \
+  EXPECTED_DIGEST=<digest-from-preview> \
+  CONFIRM=WRITE_KNOWLEDGE_VAULT_NOTE
+```
+
+Preferences, raw conversation, transient state, unverified claims, Studio
+candidate evidence, and likely secrets cannot be redirected into the vault by
+this gate. See `docs/guides/KNOWLEDGE_VAULT.md` for the full destination policy,
+note-update flow, and runtime boundaries.
+
+From Chat, the explicit request `Reflect on this conversation for reusable
+knowledge.` may ask the configured local model for one candidate. Soul shows
+the deterministic destination and, only for eligible vault material, the full
+Markdown plus an exact `WRITE_KNOWLEDGE_VAULT_NOTE <candidate_id>
+<preview_digest>` command. Casual discussion never invokes this planner.
+
+No watcher, resident index, automatic synchronization, or automatic memory
+promotion is installed. See
+`docs/guides/KNOWLEDGE_VAULT.md` for bounded search, reviewed memory projection,
+candidate import, Obsidian, and optional private Git use.
+
+## 19. Clock-skew warning after applying overlays
 
 If `make` complains that files have modification times in the future, run:
 

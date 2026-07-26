@@ -47,7 +47,17 @@ module SoulCore
         setting("model_runtime.profiles_file", "SOUL_MODEL_RUNTIME_PROFILES_FILE", :string, "", effect: "Selects an ignored project-local YAML inventory of one to four manually controlled runtime profiles.", risk: "Profile files accept only IDs, labels, and narrowly allowlisted systemd user-service names."),
         setting("dashboard.bind_host", "SOUL_DASHBOARD_BIND_HOST", :loopback_host, "127.0.0.1", effect: "Defines the inert bind host reserved for the future foreground dashboard.", risk: "Phase 12 accepts loopback only."),
         setting("dashboard.port", "SOUL_DASHBOARD_PORT", :integer, 4567, range: 1..65_535, effect: "Defines the inert port reserved for the future foreground dashboard."),
-        setting("dashboard.public_origin", "SOUL_DASHBOARD_PUBLIC_ORIGIN", :https_origin, "", allow_empty: true, effect: "Allows one exact HTTPS reverse-proxy origin while Soul remains loopback-bound.", risk: "Enables secure remote browser authority only; does not widen the Soul listener.")
+        setting("dashboard.public_origin", "SOUL_DASHBOARD_PUBLIC_ORIGIN", :https_origin, "", allow_empty: true, effect: "Allows one exact HTTPS reverse-proxy origin while Soul remains loopback-bound.", risk: "Enables secure remote browser authority only; does not widen the Soul listener."),
+        setting("voice.transcription.runtime_root", "SOUL_VOICE_TRANSCRIPTION_ROOT", :string, "", effect: "Overrides the user-local root containing Soul's pinned foreground transcription runtime."),
+        setting("voice.transcription.manifest", "SOUL_VOICE_TRANSCRIPTION_MANIFEST", :string, "", effect: "Overrides the repository transcription manifest used by Chat push-to-talk."),
+        setting("voice.transcription.model", "SOUL_VOICE_TRANSCRIPTION_MODEL", :string, "ggml-small.en.bin", effect: "Selects one exact model filename declared by the transcription manifest."),
+        setting("voice.synthesis.runtime_root", "SOUL_VOICE_SYNTHESIS_ROOT", :string, "", effect: "Overrides the user-local root containing Soul's pinned foreground synthesis runtime."),
+        setting("voice.synthesis.manifest", "SOUL_VOICE_SYNTHESIS_MANIFEST", :string, "", effect: "Overrides the repository synthesis manifest used by Chat message playback."),
+        setting("voice.synthesis.voice", "SOUL_VOICE_SYNTHESIS_VOICE", :enum, "F3", values: %w[F1 F2 F3 F4 F5 M1 M2 M3 M4 M5], effect: "Selects one exact default voice profile declared by the synthesis manifest."),
+        setting("voice.synthesis.speed", "SOUL_VOICE_SYNTHESIS_SPEED", :float, 1.0, range: 0.7..2.0, effect: "Controls the bounded local speaking-rate multiplier."),
+        setting("voice.synthesis.expressive_root", "SOUL_VOICE_EXPRESSIVE_ROOT", :string, "", effect: "Overrides the user-local root containing the pinned Chatterbox expressive runtime."),
+        setting("voice.synthesis.expressive_manifest", "SOUL_VOICE_EXPRESSIVE_MANIFEST", :string, "", effect: "Overrides the repository manifest for bounded expressive speech."),
+        setting("knowledge_vault.path", "SOUL_KNOWLEDGE_VAULT_PATH", :string, "", effect: "Selects an optional external Markdown knowledge vault shared with the human's preferred editor.", risk: "The vault may contain private project knowledge; no content is sent over the network or promoted into memory automatically.")
       ]
       raise "configuration schema exceeds #{MAX_SETTINGS} settings" if definitions.length > MAX_SETTINGS
 

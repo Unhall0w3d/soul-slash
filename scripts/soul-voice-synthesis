@@ -1,0 +1,137 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "securerandom"
+require "tmpdir"
+
+CONFIRMATION = "INSTALL_SOUL_VOICE_SYNTHESIS"
+options = {
+  root: ENV.fetch("SOUL_VOICE_SYNTHESIS_ROOT", File.join(Dir.home, ".local", "share", "soul", "voice", "runtime")),
+  manifest: ENV.fetch("SOUL_VOICE_SYNTHESIS_MANIFEST", File.expand_path("../config/voice_synthesis_models.json", __dir__)),
+  requirements: File.expand_path("../config/voice_synthesis_requirements.txt", __dir__),
+  project_root: File.expand_path("..", __dir__)
+}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--manifest PATH") { |value| options[:manifest] = value }
+  parser.on("--requirements PATH") { |value| options[:requirements] = value }
+  parser.on("--expected-digest SHA256") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+  parser.on("--output PATH") { |value| options[:output] = value }
+end.parse!
+action = ARGV.shift
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+def executable(name)
+  ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }.find { |path| File.executable?(path) && !File.directory?(path) }
+end
+
+def validate_install(root, manifest)
+  python = File.join(root, ".venv", "bin", "python")
+  problems = []
+  problems << "isolated Python is missing" unless File.executable?(python)
+  model_dir = File.join(root, "supertonic-3")
+  manifest.fetch("assets").each do |relative, expected|
+    path = File.join(model_dir, relative)
+    unless File.file?(path) && !File.symlink?(path)
+      problems << "missing #{relative}"
+      next
+    end
+    problems << "digest mismatch #{relative}" unless Digest::SHA256.file(path).hexdigest == expected
+  end
+  if problems.empty?
+    output, status = Open3.capture2e(python, "-c", 'from importlib.metadata import version; print(version("supertonic"))')
+    problems << "Supertonic package version does not match" unless status.success? && output.strip == manifest.dig("runtime", "package_version")
+  end
+  [problems, python, model_dir]
+end
+
+begin
+  manifest = JSON.parse(File.binread(options.fetch(:manifest), 256 * 1024))
+  raise "unsupported synthesis manifest" unless manifest["schema_version"] == "soul.voice_synthesis.models.v1"
+  root = File.expand_path(options.fetch(:root))
+  requirements = File.expand_path(options.fetch(:requirements))
+  plan = {
+    "operation" => "voice_synthesis_install",
+    "install_dir" => root,
+    "runtime" => manifest.fetch("runtime").slice("name", "release", "package", "package_version", "python", "repository", "revision", "code_license", "model_license", "cpu_only"),
+    "requirements_sha256" => Digest::SHA256.file(requirements).hexdigest,
+    "asset_count" => manifest.fetch("assets").length,
+    "confirmation_phrase" => CONFIRMATION,
+    "persistent_service" => false,
+    "network_listener" => false,
+    "resident_process" => false,
+    "automatic_playback" => false,
+    "automatic_install" => false
+  }
+  plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
+  problems, python, model_dir = validate_install(root, manifest)
+
+  if action == "check"
+    emit(
+      "lifecycle_state" => problems.empty? ? "complete" : "blocked_for_human_review",
+      "available" => problems.empty?,
+      "install_dir" => root,
+      "runtime" => plan.fetch("runtime"),
+      "voices" => manifest.fetch("voices").keys,
+      "problems" => problems,
+      "resident_process" => false
+    )
+  end
+  emit(plan.merge("lifecycle_state" => "blocked_for_human_review")) if action == "plan"
+
+  if action == "audition"
+    raise problems.join("; ") unless problems.empty?
+    output_dir = File.expand_path(options[:output] || File.join(Dir.tmpdir, "soul-voice-audition"))
+    FileUtils.mkdir_p(output_dir, mode: 0o700)
+    sample = "Good evening, Operator. I am awake. The path is clear, and I am ready when you are. We can take this carefully, or we can see what the machine is capable of."
+    runner = File.join(options.fetch(:project_root), "scripts", "soul-voice-synthesis-runner.py")
+    voices = %w[F1 F3 F5 M1 M3 M5]
+    voices.each do |voice|
+      input = File.join(output_dir, ".#{voice}.txt")
+      File.binwrite(input, sample, mode: "w", perm: 0o600)
+      destination = File.join(output_dir, "soul-#{voice.downcase}.wav")
+      system(python, runner, "--model-dir", model_dir, "--input", input, "--output", destination, "--voice", voice, "--language", "en", "--steps", "10", "--speed", "1.0") or raise "audition failed for #{voice}"
+      FileUtils.rm_f(input)
+    end
+    emit("lifecycle_state" => "complete", "output_dir" => output_dir, "voices" => voices, "retained_for_human_review" => true)
+  end
+
+  raise "action must be check, plan, install, or audition" unless action == "install"
+  raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
+  raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
+  emit("lifecycle_state" => "complete", "install_dir" => root, "already_valid" => true, "resident_process" => false) if problems.empty?
+  raise "install directory exists but is not valid; inspect it rather than overwriting" if File.exist?(root) || File.symlink?(root)
+
+  uv = executable("uv")
+  raise "uv is required; install it through the operating system package manager" unless uv
+  staging = "#{root}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
+  FileUtils.mkdir_p(staging, mode: 0o700)
+  venv = File.join(staging, ".venv")
+  environment = { "UV_PYTHON_DOWNLOADS" => "never", "SUPERTONIC_CACHE_DIR" => File.join(staging, "supertonic-3") }
+  system(environment, uv, "--no-config", "venv", "--python", manifest.dig("runtime", "python"), venv) or raise "uv could not create the isolated runtime from an installed Python"
+  python = File.join(venv, "bin", "python")
+  system(environment, uv, "--no-config", "pip", "install", "--python", python, "--requirement", requirements) or raise "pinned synthesis package installation failed"
+  supertonic = File.join(venv, "bin", "supertonic")
+  system(environment, supertonic, "download") or raise "pinned synthesis model download failed"
+  installed_problems, = validate_install(staging, manifest)
+  raise installed_problems.join("; ") unless installed_problems.empty?
+  FileUtils.mkdir_p(File.dirname(root), mode: 0o700)
+  File.rename(staging, root)
+  emit("lifecycle_state" => "complete", "install_dir" => root, "already_valid" => false, "resident_process" => false)
+rescue Interrupt
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial environment removed" }, 2)
+rescue StandardError => error
+  FileUtils.rm_rf(staging) if defined?(staging) && staging
+  emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
+end

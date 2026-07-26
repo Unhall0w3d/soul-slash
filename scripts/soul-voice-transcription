@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/voice_transcription_service"
+
+options = {
+  root: File.expand_path("..", __dir__),
+  runtime_root: File.join(Dir.home, ".local", "share", "soul", "music"),
+  manifest: File.expand_path("../config/music_transcription_models.json", __dir__),
+  model: nil
+}
+
+command = ARGV.shift
+until ARGV.empty?
+  argument = ARGV.shift
+  case argument
+  when "--root" then options[:runtime_root] = ARGV.shift or abort "--root requires a path"
+  when "--manifest" then options[:manifest] = ARGV.shift or abort "--manifest requires a path"
+  when "--model" then options[:model] = ARGV.shift or abort "--model requires an exact manifest filename"
+  else abort "unknown argument #{argument}"
+  end
+end
+
+abort "Usage: scripts/soul-voice-transcription check [--root PATH] [--manifest PATH] [--model EXACT_FILENAME]" unless command == "check"
+
+service = SoulCore::VoiceTranscriptionService.new(
+  root: options.fetch(:root),
+  music_root: options.fetch(:runtime_root),
+  manifest_path: options.fetch(:manifest),
+  model_name: options[:model]
+)
+status = service.status
+puts JSON.pretty_generate(status)
+exit(status["ok"] ? 0 : 1)

@@ -16,7 +16,7 @@ module SoulCore
       Adapter.new(skill_id:"execution.history.summary", label:"Execution history summary", risk:"read_only", enabled:true, kind:"internal", internal_handler:"execution_history_summary", description:"Summarizes local execution history."),
       Adapter.new(skill_id:"downloads.inspect", label:"Downloads inspection", risk:"read_only", enabled:true, kind:"internal", internal_handler:"downloads_inspect", description:"Summarizes Downloads metadata without filenames."),
       Adapter.new(skill_id:"downloads.cleanup_plan", label:"Downloads cleanup preview", risk:"review_only", enabled:true, kind:"internal", internal_handler:"downloads_cleanup_plan", description:"Builds a non-mutating cleanup preview.", notes:"Preview-only. No files are moved or deleted."),
-      Adapter.new(skill_id:"weather.report", label:"Weather report", risk:"read_only", enabled:false, kind:"missing", description:"Weather through configured provider.", notes:"Needs provider/location design."),
+      Adapter.new(skill_id:"weather.report", label:"Weather report", risk:"read_only", enabled:true, kind:"command", command:["ruby","Soul/skills/weather/report.rb"], description:"Current weather and optional 3-day outlook through Open-Meteo."),
       Adapter.new(skill_id:"cloud.providers.list", label:"Cloud provider list", risk:"network_or_provider_check", enabled:false, kind:"missing", description:"List configured providers.", notes:"Boundary design pending."),
       Adapter.new(skill_id:"youtube.song_search", label:"YouTube song search", risk:"read_only", enabled:false, kind:"missing", description:"Resolve song/video lookup.", notes:"Needs network/provider adapter.")
     ].freeze
