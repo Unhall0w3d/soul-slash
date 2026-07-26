@@ -39,6 +39,16 @@ skills:
     writes_files: false
     expected_output: conversation_result
     verifier: dashboard_capability_guide_a1
+  dashboard.invocations.inspect:
+    internal_handler: invocation_catalog
+    category: project_coordination
+    status: available
+    description: Read the curated invocation guide, including required inputs, Core needs, approval behavior, outputs, and retained authority boundaries, without invoking anything.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: application_envelope
+    verifier: invocation_catalog_a1
   chats.clear:
     path: Soul/skills/chats/clear.rb
     language: ruby

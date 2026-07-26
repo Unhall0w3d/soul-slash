@@ -9,6 +9,7 @@ require_relative "conversation_request_shape"
 require_relative "conversation_tool_catalog"
 require_relative "dashboard_capability_guide"
 require_relative "intent_router"
+require_relative "invocation_catalog_service"
 
 module SoulCore
   class ConversationOrchestrator
@@ -136,6 +137,7 @@ module SoulCore
     ].freeze
 
     DASHBOARD_CAPABILITY_GUIDE_PATTERNS = DashboardCapabilityGuide::REQUEST_PATTERNS
+    INVOCATION_CATALOG_PATTERNS = InvocationCatalogService::REQUEST_PATTERNS
 
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
@@ -307,6 +309,14 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "explicit Project Timeline reads and edits use one bounded owner-local ledger",
           flags: flags.merge("project_tracker_control" => true)
+        )
+      end
+
+      if request_shape.request? && INVOCATION_CATALOG_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "an explicit discoverability question uses the curated read-only invocation catalog",
+          flags: flags.merge("invocation_catalog" => true)
         )
       end
 

@@ -9,6 +9,7 @@ require_relative "chat_execution_history"
 require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "knowledge_vault_service"
+require_relative "invocation_catalog_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
@@ -86,7 +87,8 @@ module SoulCore
       music_reference_synthesis_service: nil,
       music_reference_synthesis_provider: nil,
       visual_studio_service: nil,
-      knowledge_vault_service: nil
+      knowledge_vault_service: nil,
+      invocation_catalog_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -124,6 +126,7 @@ module SoulCore
       @music_reference_synthesis_provider = music_reference_synthesis_provider
       @visual_studio_service = visual_studio_service
       @knowledge_vault_service = knowledge_vault_service
+      @invocation_catalog_service = invocation_catalog_service
     end
 
     def call(request, progress: nil)
@@ -238,6 +241,7 @@ module SoulCore
           confirmation: parameters["confirmation"],
           expected_digest: parameters["expected_digest"]
         ))
+      when "invocations.list" then [invocation_catalog.list(category: parameters["category"], query: parameters["query"]), "complete", "none", false]
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
       when "skill_studio.proposals.list" then domain(skill_studio.proposals(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
       when "skill_studio.proposals.get" then domain(skill_studio.proposal(proposal_id: required(parameters, "proposal_id")))
@@ -556,6 +560,10 @@ module SoulCore
         }
       end
       { "records" => records, "count" => records.length, "limit" => limit, "read_only" => true }
+    end
+
+    def invocation_catalog
+      @invocation_catalog_service ||= InvocationCatalogService.new(root: @root, registry: skill_registry)
     end
 
     def approvals_pending(parameters)

@@ -10,6 +10,7 @@ state.pictureAttachment = null;
 state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
+Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
 const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
 const NOTIFICATION_MODES = ["voice", "cues", "muted"];
@@ -87,6 +88,83 @@ function formatBytes(value) {
   const units = ["B", "KiB", "MiB", "GiB", "TiB"]; let amount = bytes; let unit = 0;
   while (amount >= 1024 && unit < units.length - 1) { amount /= 1024; unit += 1; }
   return `${amount >= 10 || unit === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
+}
+
+function invocationDetailRow(term, value) {
+  const row = document.createElement("div");
+  const dt = document.createElement("dt"); dt.textContent = term;
+  const dd = document.createElement("dd"); dd.textContent = value;
+  row.append(dt, dd); return row;
+}
+
+function renderInvocationDetail(record) {
+  state.selectedInvocation = record;
+  const detail = byId("invocation-detail"); detail.replaceChildren();
+  const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = `${record.category} · ${record.status}`;
+  const heading = document.createElement("h3"); heading.textContent = record.label;
+  const summary = document.createElement("p"); summary.className = "invocation-summary"; summary.textContent = record.summary;
+  const facts = document.createElement("dl"); facts.className = "invocation-facts";
+  facts.append(
+    invocationDetailRow("Required", record.required_inputs?.length ? record.required_inputs.join(" · ") : "No required fields"),
+    invocationDetailRow("Optional", record.optional_inputs?.length ? record.optional_inputs.join(" · ") : "None"),
+    invocationDetailRow("Core", record.core),
+    invocationDetailRow("Approval", record.approval),
+    invocationDetailRow("Result", record.output),
+    invocationDetailRow("Boundary", record.boundary)
+  );
+  const exampleHeading = document.createElement("p"); exampleHeading.className = "eyebrow"; exampleHeading.textContent = "Example wording · inert";
+  const example = document.createElement("code"); example.className = "invocation-example"; example.textContent = record.examples?.[0] || "No example supplied.";
+  const note = document.createElement("p"); note.className = "muted"; note.textContent = "Reading or copying this example provides no authority. A later request still enters the owning deterministic gate.";
+  detail.append(eyebrow, heading, summary, facts, exampleHeading, example, note);
+  byId("invocation-list").querySelectorAll("button").forEach((button) => button.classList.toggle("is-active", button.dataset.invocationId === record.id));
+}
+
+function renderInvocationCatalog() {
+  const category = byId("invocation-category").value;
+  const query = byId("invocation-query").value.trim().toLowerCase();
+  const records = state.invocationRecords.filter((record) => (!category || record.category === category) && (!query || [record.label, record.summary, record.core, record.category, ...(record.required_inputs || []), ...(record.optional_inputs || [])].join(" ").toLowerCase().includes(query)));
+  const list = byId("invocation-list"); list.replaceChildren();
+  if (!records.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No curated invocation matches this filter."; list.append(empty);
+    return;
+  }
+  records.forEach((record) => {
+    const button = document.createElement("button"); button.type = "button"; button.dataset.invocationId = record.id; button.className = "invocation-item";
+    const title = document.createElement("strong"); title.textContent = record.label;
+    const meta = document.createElement("small"); meta.textContent = `${record.category} · ${record.core}`;
+    const summary = document.createElement("span"); summary.textContent = record.summary;
+    button.append(title, meta, summary); button.addEventListener("click", () => renderInvocationDetail(record)); list.append(button);
+  });
+  const selected = records.find((record) => record.id === state.selectedInvocation?.id) || records[0];
+  renderInvocationDetail(selected);
+}
+
+async function loadInvocationCatalog() {
+  const status = byId("invocation-catalog-status"); status.textContent = "Loading the curated read-only map…";
+  try {
+    const envelope = await callSoul("invocations.list"); const data = dataOf(envelope);
+    state.invocationRecords = data.records || []; state.invocationCategories = data.categories || [];
+    byId("invocation-count").textContent = String(data.count || 0);
+    const select = byId("invocation-category"); const current = select.value; select.replaceChildren();
+    const all = document.createElement("option"); all.value = ""; all.textContent = "All categories"; select.append(all);
+    state.invocationCategories.forEach((category) => { const option = document.createElement("option"); option.value = category; option.textContent = category; select.append(option); });
+    if (state.invocationCategories.includes(current)) select.value = current;
+    renderInvocationCatalog();
+    status.textContent = `${data.count || 0} invocations loaded. Inspection performed no mutation.`;
+  } catch (error) {
+    status.textContent = error.message || "Invocation Guide failed safely.";
+  }
+}
+
+function openInvocationCatalog() {
+  state.invocationOpener = document.activeElement;
+  byId("invocation-catalog").showModal();
+  loadInvocationCatalog();
+}
+
+function closeInvocationCatalog() {
+  byId("invocation-catalog").close();
+  if (state.invocationOpener?.focus) state.invocationOpener.focus();
 }
 
 function requestId() {
@@ -2854,6 +2932,12 @@ byId("capture-screen").addEventListener("click", openScreenCaptureDialog);
 byId("execute-screen-capture").addEventListener("click", captureScreenPreview);
 byId("record-voice").addEventListener("click", toggleVoiceRecording);
 byId("notification-mode").addEventListener("click", cycleNotificationMode);
+byId("open-invocation-catalog").addEventListener("click", openInvocationCatalog);
+byId("close-invocation-catalog").addEventListener("click", closeInvocationCatalog);
+byId("refresh-invocation-catalog").addEventListener("click", loadInvocationCatalog);
+byId("invocation-category").addEventListener("change", renderInvocationCatalog);
+byId("invocation-query").addEventListener("input", renderInvocationCatalog);
+byId("invocation-catalog").addEventListener("click", (event) => { if (event.target === byId("invocation-catalog")) closeInvocationCatalog(); });
 renderNotificationMode();
 byId("voice-output-profile").value = state.voiceOutputProfile;
 byId("voice-output-profile").addEventListener("change", (event) => {

@@ -1,0 +1,159 @@
+---
+schema_version: soul.invocation_catalog.v1
+entries:
+  - id: system-status
+    label: System status
+    category: Everyday
+    summary: Inspect bounded current host and Soul runtime evidence.
+    skill_ids: [system.status]
+    required_inputs: []
+    optional_inputs: [A narrower system area to explain after collection]
+    core: Any Core
+    approval: No approval for the read; deeper or mutating work remains separate.
+    output: A dated evidence summary with explicit unavailable fields.
+    boundary: Status collection does not authorize host mutation or infer uncollected health.
+    examples:
+      - Check the current system status.
+  - id: weather
+    label: Local weather
+    category: Everyday
+    summary: Retrieve a concise current weather report and optionally continue into a three-day outlook.
+    skill_ids: [weather.report]
+    required_inputs: []
+    optional_inputs: [An explicit request for the three-day outlook]
+    core: Any Core
+    approval: No approval for this bounded read.
+    output: Temperature, conditions, wind, humidity, air quality, and an offered outlook.
+    boundary: A failed fetch does not become a model-memory weather claim.
+    examples:
+      - What does the weather look like?
+  - id: web-research
+    label: Web research
+    category: Knowledge
+    summary: Search configured public sources in one bounded foreground research pass.
+    skill_ids: [web.research]
+    required_inputs: [Research question or objective]
+    optional_inputs: [Desired deliverable, topics, or source constraints]
+    core: Daily Core for model synthesis; retrieval can fail independently.
+    approval: No approval for public read-only research.
+    output: Source-backed findings that can inform a response, proposal, script, or artifact.
+    boundary: Sources remain untrusted evidence and research never authorizes an action.
+    examples:
+      - Research current Bash practices for this script and summarize the useful constraints.
+  - id: knowledge-vault
+    label: Knowledge Vault
+    category: Knowledge
+    summary: Search reviewed Markdown knowledge or prepare an explicit durable-knowledge candidate.
+    skill_ids: [knowledge.vault.search, knowledge.vault.reflect]
+    required_inputs: [A search query or one explicit knowledge candidate]
+    optional_inputs: [Title, tags, source reference, or target note]
+    core: Any Core for search; Daily Core may help draft a reflection.
+    approval: Search is read-only; writing a reviewed note requires the exact write gate.
+    output: Search matches or a visible candidate and exact write preview.
+    boundary: Ordinary conversation is not silently promoted into durable knowledge.
+    examples:
+      - Search the Knowledge Vault for our local model migration notes.
+  - id: picture-and-screen
+    label: Picture and screen understanding
+    category: Perception
+    summary: Inspect one supplied picture, one explicit fresh screen capture, or an existing Studio candidate.
+    handler_id: picture_understanding
+    required_inputs: [A picture plus question, an explicit capture target, or an exact project/candidate reference]
+    optional_inputs: [Current window, left monitor, right monitor, selected region, or archive context]
+    core: Daily Core
+    approval: The explicit attachment or one-shot capture request is the consent boundary.
+    output: A grounded visual description with ephemeral pixels by default.
+    boundary: No background watching, periodic capture, screen control, or authority from pixels.
+    examples:
+      - Describe what is currently visible on my right monitor.
+  - id: music-production
+    label: Music production
+    category: Creative
+    summary: Gather a song brief, draft missing optional choices, generate, review, revise, and export a kept result.
+    skill_ids: [creative.music_production]
+    required_inputs: [Intent, supported duration, vocal or instrumental mode, rights status]
+    optional_inputs: [Title, BPM, key, meter, seed, Sound and Structure, lyrics]
+    core: Music Core for ACE-Step generation
+    approval: Exact action click authorizes each Core transition, generation, revision, disposition, or export gate.
+    output: Authenticated audio candidates, analysis evidence, revisions, and reviewed exports.
+    boundary: Conversation never substitutes for candidate review or disposition.
+    examples:
+      - Help me create a 180-second instrumental liquid drum and bass track.
+  - id: visual-production
+    label: Visual production
+    category: Creative
+    summary: Gather a visual brief, generate and revise a still, or continue reviewed context into native motion.
+    skill_ids: [creative.visual_production]
+    required_inputs: [A clear visual intent]
+    optional_inputs: [Title, aspect, scene direction, exclusions, seed, motion duration]
+    core: AMD-Free Core for local still and native-motion generation
+    approval: Exact action click authorizes Core transition and each bounded render.
+    output: Authenticated still or motion candidates retained in Visual Studio.
+    boundary: Motion review, binding, destructive visual actions, and publication retain their owning gates.
+    examples:
+      - Create a landscape visual of an empty machine cathedral suspended over dark water.
+  - id: companion-production
+    label: Music and visual companion
+    category: Creative
+    summary: Coordinate reviewed music and visual candidates into a bounded companion and local upload package.
+    skill_ids: [creative.companion_production]
+    required_inputs: [Exact music project or candidate and exact visual project or candidate]
+    optional_inputs: [Static presentation or reviewed generated motion]
+    core: Dynamic; Soul must explain and gate any required transition.
+    approval: Binding, rendering, export, and packaging are separate exact actions.
+    output: A full-duration local companion and optional exact upload package.
+    boundary: External publication and YouTube account actions remain outside this invocation.
+    examples:
+      - Pair my kept Afterimage Current song with its kept visual and prepare a local upload package.
+  - id: core-control
+    label: Core control
+    category: Runtime
+    summary: Inspect or transition among configured Cores without rebooting.
+    skill_ids: [cores.activate]
+    required_inputs: [Exact target Core]
+    optional_inputs: []
+    core: The currently active Core performs the preview.
+    approval: Only the exact server-authored action click authorizes the transition.
+    output: Active-work check, transition preview, and resulting runtime state.
+    boundary: Ordinary discussion and downstream intent never silently switch Cores.
+    examples:
+      - Switch to Music Core.
+  - id: project-timeline
+    label: Project Timeline
+    category: Project
+    summary: Inspect the implementation ledger or explicitly revise one item.
+    skill_ids: [project.timeline.inspect, project.timeline.update]
+    required_inputs: [Exact item or unmistakable timeline request]
+    optional_inputs: [Status, notes, implementation, technologies, interfaces, commands, or references]
+    core: Any Core
+    approval: Read and explicit owner-local edits do not require a second gate; revision matching prevents stale writes.
+    output: Current tracker state or one updated item.
+    boundary: Tracker state is planning evidence, not merge, release, or execution authority.
+    examples:
+      - Show the project timeline.
+  - id: conversation-management
+    label: Conversation management
+    category: Administration
+    summary: Archive conversations from the active list or permanently delete selected local transmissions.
+    skill_ids: [chats.clear, chats.forget]
+    required_inputs: [Exact title, selected conversations, or an explicit all-conversations scope]
+    optional_inputs: [Archive-only or permanent-forget intent]
+    core: Any Core
+    approval: Preview plus exact destructive action is required.
+    output: An inventory preview followed by an archive or deletion receipt.
+    boundary: Archive preserves transcripts; permanent forget is destructive and separately labeled.
+    examples:
+      - Preview archiving the selected conversations.
+  - id: downloads-cleanup
+    label: Downloads cleanup
+    category: Administration
+    summary: Inspect Downloads, prepare a cleanup plan, move reviewed candidates to Trash, or restore the latest cleanup.
+    skill_ids: [downloads.inspect, downloads.cleanup_plan, downloads.move_to_trash, downloads.restore_last_cleanup]
+    required_inputs: [An explicit inspection, plan, move, or restore request]
+    optional_inputs: [Candidate constraints]
+    core: Any Core
+    approval: Inspection and planning are read-only; move and restore require exact approval.
+    output: Evidence, plan, Trash receipt, or restore receipt.
+    boundary: Files are never permanently deleted by this workflow.
+    examples:
+      - Inspect my Downloads folder and prepare a cleanup plan.

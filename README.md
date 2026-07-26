@@ -42,6 +42,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Picture Understanding | Attach one local PNG or JPEG to Chat and ask Soul what it can observe | [Picture Understanding](docs/guides/PICTURE_UNDERSTANDING.md) |
 | Knowledge Vault | Share a portable Markdown knowledge surface with Soul and optionally open it in Obsidian | [Knowledge Vault](docs/guides/KNOWLEDGE_VAULT.md) |
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
+| Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |

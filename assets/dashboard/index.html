@@ -160,6 +160,11 @@
             </div>
             <p id="runtime-card-status" class="runtime-card-status" role="status" aria-live="polite">Manual controls require an idle, verified runtime.</p>
           </section>
+          <section class="context-card invocation-card" aria-labelledby="invocation-heading">
+            <div class="card-heading"><div><p class="eyebrow">Operational vocabulary</p><h2 id="invocation-heading">Invocations</h2></div><span id="invocation-count" class="count-badge">—</span></div>
+            <p class="card-note">What Soul can do, what it needs, and where your authority remains.</p>
+            <button id="open-invocation-catalog" class="gate-button" type="button" aria-haspopup="dialog" aria-controls="invocation-catalog">Open invocation guide</button>
+          </section>
           <section class="context-card" aria-labelledby="workspace-heading">
             <div class="card-heading"><div><p class="eyebrow">Collaboration slate</p><h2 id="workspace-heading">Workspace</h2></div><span id="workspace-count" class="count-badge">0</span></div>
             <p class="card-note">Metadata attached to this conversation.</p>
@@ -474,6 +479,23 @@
       <aside class="unavailable-boundary"><div><p class="eyebrow">Augmentation boundary</p><h2>Implementation and integration remain external</h2></div><p>Gate A1 may create one detached worktree and handoff; Gate A2 may approve one exact committed candidate for consideration. Soul never invokes Codex, creates a branch, merges, pushes, deploys, or force-removes a dirty worktree.</p></aside>
     </section>
   </main>
+  <dialog id="invocation-catalog" class="review-center invocation-catalog" aria-labelledby="invocation-catalog-title">
+    <div class="review-shell">
+      <header class="review-header">
+        <div class="review-title-lockup"><span class="review-sigil" aria-hidden="true">⌁</span><div><p class="eyebrow">Operational vocabulary</p><h2 id="invocation-catalog-title">Invocation Guide</h2><p>Inspect what Soul may invoke, the information each path needs, and its exact authority boundary.</p></div></div>
+        <div class="review-header-actions"><button id="refresh-invocation-catalog" class="refresh-button" type="button">Refresh</button><button id="close-invocation-catalog" class="icon-button" type="button" aria-label="Close Invocation Guide">×</button></div>
+      </header>
+      <div class="invocation-toolbar">
+        <label for="invocation-category">Category<select id="invocation-category"><option value="">All categories</option></select></label>
+        <label for="invocation-query">Find<input id="invocation-query" type="search" maxlength="120" placeholder="music, weather, Core, screen…"></label>
+      </div>
+      <div class="invocation-workspace">
+        <div id="invocation-list" class="invocation-list"><p class="muted">Open the guide to load the curated catalog.</p></div>
+        <article id="invocation-detail" class="invocation-detail" aria-live="polite"><div class="review-empty"><span aria-hidden="true">◇</span><h3>Select an invocation.</h3><p>Examples are inert documentation. They do not run or authorize the capability.</p></div></article>
+      </div>
+      <footer class="review-footer"><p id="invocation-catalog-status" role="status" aria-live="polite">The guide loads only when opened and never executes an invocation.</p><span>Read-only · local · bounded</span></footer>
+    </div>
+  </dialog>
   <dialog id="review-center" class="review-center" aria-labelledby="review-center-title">
     <div class="review-shell">
       <header class="review-header">
