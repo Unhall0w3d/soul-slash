@@ -92,6 +92,8 @@ inventory and human review, not model judgment.
 - the repository remains inside the same workstation and is not an offline or
   off-site copy;
 - retention and prune behavior are documented candidates but not implemented;
+- the approved 30-day deletion-aware retention rule requires a bounded hold
+  ledger before any snapshot pruning can safely be enabled;
 - the current public setup documentation does not yet provide a single
   machine-readable dependency lock or recovery manifest.
 
@@ -123,6 +125,8 @@ overwritten, and no unattended process was introduced.
 - [x] Preserve Caddy trust material in the encrypted repository.
 - [ ] Choose portable quiescent capture or authorize investigation of an
   optional Btrfs source-snapshot adapter.
-- [ ] Confirm or revise the candidate retention policy.
+- [x] Retain deleted source files for 30 days after deletion is first detected.
+- [ ] Implement and deterministically verify deletion-aware snapshot holds
+  before enabling `forget` or `prune`.
 - [ ] Select an additional offline or off-site recovery copy.
 - [ ] Schedule a separately gated complete recovery rehearsal.

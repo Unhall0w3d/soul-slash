@@ -206,22 +206,26 @@ Restore must never target the live tree first.
 Single-file or single-project recovery should use the same staging rule.
 In-place restore and deletion flags are prohibited in the first implementation.
 
-## Retention proposal
+## Retention policy
 
-Candidate policy for review, not approval:
+Deleted source files must remain recoverable for 30 full days after their
+deletion is first detected by a successful, verified snapshot.
 
-- retain the latest 7 daily snapshots;
-- retain 5 weekly snapshots;
-- retain 12 monthly snapshots;
-- protect manually tagged pre-migration and release snapshots from ordinary
-  retention;
-- dry-run retention before any destructive prune;
-- run a metadata check after prune;
-- perform a full data-read verification periodically rather than on every
-  foreground backup.
+Because restic retains snapshots rather than individual files, a simple
+`--keep-within 30d` rule is insufficient. If backups are separated by more
+than 30 days, the last snapshot containing a newly deleted file may already be
+older than the desired recovery interval. Retention enforcement must therefore
+record the detection time and protect at least one prior snapshot containing
+each deleted path until the corresponding hold expires.
 
-The first implementation should support manual snapshots and verification
-only. Scheduling, pruning, and off-site replication are separate gates.
+Missing, unreadable, or unexpectedly unmounted source roots must fail preflight
+rather than be interpreted as mass deletion. Every retention operation must
+render a dry-run preview, preserve active deletion holds, require exact human
+approval, and run a repository metadata check afterward.
+
+No `forget` or `prune` operation is approved until the deletion-hold ledger and
+its deterministic verifier are implemented. Scheduling and off-site
+replication remain separate gates.
 
 ## Destination and key custody
 
@@ -284,7 +288,7 @@ See `docs/soul/BACKUP_AND_RECOVERY.md` for the operating procedure.
 - whether finished exports and the Knowledge Vault share the same repository;
 - portable quiescent capture versus an optional Btrfs snapshot adapter;
 - acceptable manual-backup pause;
-- retention values;
+- implementation and verification of the approved 30-day deletion-aware hold;
 - whether any future scheduled execution is desirable.
 - location and custody of an additional offline or off-site copy;
 - timing and scope of a complete host-loss recovery rehearsal.

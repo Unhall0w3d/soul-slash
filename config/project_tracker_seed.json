@@ -201,10 +201,10 @@
       "horizon": "now",
       "status": "needs_review",
       "priority": "high",
-      "summary": "Review the candidate-complete encrypted local backup foundation: inventoried source allow-list, ext4 target, restic snapshot, full pack verification, and staged restore. Retention, a second copy, and full-host recovery remain separate gates.",
-      "acceptance": "Backup, restore, verification, exclusions, and secret handling have a reviewed reproducible procedure.",
+      "summary": "Review the candidate-complete encrypted local backup foundation and implement the approved deletion-aware retention hold before enabling prune. Deleted source files must remain recoverable for 30 days after their deletion is first detected.",
+      "acceptance": "Backup, restore, verification, exclusions, and secret handling have a reviewed reproducible procedure; retention preserves the last recoverable copy of a deleted path for 30 full days from verified deletion detection.",
       "source": "Backup and Disaster Recovery A0 review",
-      "notes": "Local target prepared and verified on 2026-07-26. Recovered former SanDisk data remains in ~/Recovered and is explicitly excluded from Soul backups."
+      "notes": "Local target prepared and verified on 2026-07-26. Recovered former SanDisk data remains in ~/Recovered and is explicitly excluded from Soul backups. Do not run restic forget or prune until the deletion-detection hold ledger and verifier exist."
     },
     {
       "item_id": "track_project_search",

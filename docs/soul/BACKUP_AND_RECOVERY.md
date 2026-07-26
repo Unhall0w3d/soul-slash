@@ -59,6 +59,37 @@ restic --repo /mnt/soul-backup/restic check --read-data
 The first snapshot was fully read on 2026-07-26: 79 of 79 packs passed and
 restic reported no errors.
 
+## Retention policy
+
+Deleted source files remain recoverable for 30 full days after Soul first
+detects their deletion.
+
+Restic retains snapshots rather than individual files. Consequently, this
+policy must not be approximated with `forget --keep-within 30d`: after a long
+gap between backups, the immediately preceding snapshot may already be older
+than 30 days when a deletion is first observed.
+
+The future bounded retention operation must:
+
+1. validate every configured source root before capture so a missing mount or
+   unreadable directory is not mistaken for deletion;
+2. create and verify the new snapshot;
+3. compare it with the last verified snapshot;
+4. timestamp newly observed deletions at completion of that verified snapshot;
+5. protect at least one prior snapshot containing each deleted path until 30
+   full days after that detection timestamp;
+6. preview the exact snapshots and deletion holds before any `forget` action;
+7. require explicit human approval before `forget` or `prune`;
+8. verify repository metadata after retention completes.
+
+Deleting a file from the source does not delete it immediately from the
+repository. If no later verified snapshot exists, the deletion has not yet
+been detected and the 30-day clock has not started.
+
+Automated retention enforcement is not installed yet. Until the deletion-hold
+ledger and deterministic verifier are implemented, do not run `restic forget`
+or `restic prune` against this repository.
+
 ## Staged restore
 
 Never restore directly over live Soul state. Select a snapshot, restore into a
@@ -96,5 +127,5 @@ and other reproducible material.
 This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
 and physical location. It is not an offline or off-site copy. Retention,
-pruning, periodic scheduling, an additional copy, and a full disaster
-rehearsal remain separately reviewed work.
+pruning enforcement, periodic scheduling, an additional copy, and a full
+disaster rehearsal remain separately reviewed work.
