@@ -48,8 +48,15 @@ binding, final rendering, or publication packaging.
 After both candidates are kept and exactly bound, Chat may reuse the existing
 static-presentation, full-duration render, finished-song export, and local
 upload-package services. Each remains its own digest-bound action and stops for
-human review. Native motion generation, visual deletion, and external
-publication remain outside the conversational workflow.
+human review. Image-guided motion, motion review and binding, visual deletion,
+and external publication remain outside the conversational workflow.
+
+The later A1 native-motion extension permits a kept or exact existing visual
+context to start one 4-, 8-, or 12-second text-to-video candidate through the
+existing FastWan preview and execution gate. Chat returns the WebM for review.
+A stored `revise` motion review can unlock one linked Chat-prepared native
+revision. The prior candidate remains immutable and each render retains its
+own Core-aware exact action.
 
 ## Core transitions
 

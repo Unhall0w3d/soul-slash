@@ -76,7 +76,7 @@ skills:
     internal_handler: conversation_creative_workflow
     category: creative_studios
     status: available
-    description: Gather or draft a visual brief through chat, generate and review a local still, and translate a recorded revise review into one exact source-preserving guided edit with an authenticated image result.
+    description: Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, and continue a kept visual context into exact native text-to-video generation or a review-led native revision.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW
@@ -88,8 +88,8 @@ skills:
   creative.companion_production:
     internal_handler: conversation_creative_workflow
     category: creative_studios
-    status: partial
-    description: Coordinate reviewed music and visual candidates through exact lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; native motion generation and external publication remain outside this chat workflow.
+    status: available
+    description: Coordinate supported reviewed music, still, and native-motion work through exact generation, lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW

@@ -139,11 +139,35 @@ publish it.
 Repeating a completed render or package action returns the existing result
 without duplicating files.
 
+## Native motion from Chat
+
+An active visual workflow may continue into native text-to-video after its new
+still has a recorded `keep` review, or when the flow resolved an exact existing
+kept Visual Studio project. The Operator asks explicitly for a native scene and
+supplies:
+
+- 4, 8, or 12 seconds; and
+- a chronological direction describing scene evolution, camera behavior,
+  lighting, and atmosphere.
+
+Soul generates only the optional seed. Before execution, Chat shows the exact
+direction, duration, seed, FastWan profile, generation and delivery frame
+envelope, estimated runtime when available, active and required Core, and the
+fact that publication is excluded. The action click authorizes the disclosed
+transition to AMD-Free Core and one bounded render. The resulting WebM returns
+as an authenticated player and remains a Visual Studio motion candidate.
+
+Motion review remains in Visual Studio for this slice. After the Operator
+records `revise`, an explicit Chat request can prepare one linked native-motion
+revision using replacement direction, a new seed, and either the original
+duration or another explicitly selected supported duration. The prior motion
+candidate remains immutable.
+
 ## Present boundary
 
-Candidate creation, review, reviewed music and visual revision loops, exact companion binding, static-presentation encoding, full-duration companion rendering, kept-song export, rejected-music-candidate deletion, and local upload-package export are chat-native. Binding accepts newly generated candidates only after both have recorded `keep` reviews; exact existing sources already resolve only to kept candidates. Each step reuses the owning Studio service's preview, digest, and execution contract. Recording `keep` does not bind or export, and one completed gate never authorizes the next; each mutation requires an explicit request and separate action click.
+Candidate creation, still review, reviewed music and still revision loops, contextual native-motion generation and review-led native revision, exact still companion binding, static-presentation encoding, full-duration companion rendering, kept-song export, rejected-music-candidate deletion, and local upload-package export are chat-native. Binding accepts newly generated still candidates only after both have recorded `keep` reviews; exact existing sources already resolve only to kept candidates. Each step reuses the owning Studio service's preview, digest, and execution contract. Recording `keep` does not bind or export, and one completed gate never authorizes the next; each mutation requires an explicit request and separate action click.
 
-Native text-to-video and image-to-video generation, visual-project deletion, fine trimming, and external publication remain dedicated Studio or human operations. Soul can describe those boundaries and preserve candidate lineage, but it must not claim they occurred from conversation alone.
+Motion review and motion-to-music binding, image-guided motion generation, visual-project deletion, fine trimming, and external publication remain dedicated Studio or human operations. Skill Studio promotion, Self Augmentation mutation, and Review Center authority also remain on their structured Dashboard surfaces. Soul can describe those boundaries and preserve candidate lineage, but it must not claim those operations occurred from conversation alone.
 
 Creative flow records are private per-conversation task state under ignored runtime storage. They are not durable personality memory, do not run a watcher or resident model, and terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or `blocked_for_human_review`.
 

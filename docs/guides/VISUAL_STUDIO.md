@@ -42,6 +42,33 @@ The result enters the normal motion candidate list. Diffusion remains on AMD Vul
 
 The existing **Create motion study** action remains the image-guided route and requires a kept still.
 
+### Qualification ledger
+
+The right-side **Qualification ledger** reads retained motion receipts and
+human reviews. It groups evidence across the supported four-, eight-, and
+twelve-second durations and shows sample counts, reviewed counts, keep/revise
+counts, average human rating, render elapsed time, and runtime per output
+second. It is a read-only comparison surface: it does not infer visual quality,
+change a review, qualify a profile, or start a render.
+
+Use the ledger to decide whether added duration or interpolation produces
+enough visible benefit to justify its runtime and resource cost. Missing or
+unreviewed evidence remains explicit.
+
+### Native scenes through Chat
+
+After a Chat-created visual receives a `keep` review—or Chat resolves an exact
+existing kept Visual Studio project—you may ask Soul to generate a native
+scene. Supply a chronological direction and a 4-, 8-, or 12-second duration.
+Chat shows the exact seed, profile, frame envelope, estimated runtime, and Core
+transition before one action click. The WebM returns to Chat but remains a
+Visual Studio candidate.
+
+Record motion review here. If disposition is `revise`, Chat can prepare the
+next linked native revision from explicit replacement direction. Motion
+review, image-guided motion, binding motion to music, and deletion retain their
+Visual Studio controls.
+
 ## Review a candidate
 
 Each candidate records its generation kind, elapsed time, immutable input, and image artifact. Review it with a 1–5 rating, a keep/revise disposition, and notes explaining what worked and what should change.

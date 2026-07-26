@@ -57,12 +57,21 @@ module SoulCore
       if prior && prior["stage"] == "reviewed"
         followup = plan_music_post_review(prior, message, provider, progress)
         return followup if followup
+        followup = plan_native_motion(prior, message)
+        return followup if followup
         followup = plan_visual_revision(prior, message, provider, progress)
         return followup if followup
         followup = plan_companion_binding(prior, message)
         return followup if followup
         return nil unless @planner.explicit_request?(message)
 
+        supersede(prior)
+        prior = nil
+      end
+      if prior && prior["stage"] == "motion_generated"
+        followup = plan_native_motion_revision(prior, message)
+        return followup if followup
+        return nil unless @planner.explicit_request?(message)
         supersede(prior)
         prior = nil
       end
@@ -130,6 +139,7 @@ module SoulCore
       return execute_review(flow) if action.fetch("action_id") == "creative_review"
       return execute_music_revision(flow, progress) if action.fetch("action_id") == "creative_music_revision"
       return execute_visual_revision(flow, progress) if action.fetch("action_id") == "creative_visual_revision"
+      return execute_native_motion(flow, progress) if action.fetch("action_id") == "creative_native_motion"
       return execute_companion_binding(flow) if action.fetch("action_id") == "creative_companion_bind"
       return execute_companion_presentation(flow, progress) if action.fetch("action_id") == "creative_companion_presentation"
       return execute_companion_final(flow, progress) if action.fetch("action_id") == "creative_companion_final"
@@ -185,6 +195,252 @@ module SoulCore
     end
 
     private
+
+    def plan_native_motion(flow, message)
+      return nil unless native_motion_source_eligible?(flow)
+      intake = flow.fetch("motion_intake", {})
+      return nil unless explicit_native_motion_request?(message) || intake["kind"] == "generate"
+
+      duration = native_motion_duration(message) || intake["duration_seconds"]
+      instruction = native_motion_instruction(message) || intake["instruction"]
+      unless duration
+        return native_motion_input_result(
+          flow, "Choose a 4-, 8-, or 12-second native scene duration.",
+          kind: "generate", instruction: instruction
+        )
+      end
+      unless instruction
+        return native_motion_input_result(
+          flow, "Describe the chronological scene direction you want rendered.",
+          kind: "generate", duration_seconds: duration
+        )
+      end
+
+      visual = flow.dig("generated", "visual")
+      preview = @visual_studio.native_motion_preview(
+        project_id: visual.dig("project", "project_id"),
+        instruction: instruction,
+        seed: SecureRandom.random_number(2_147_483_648),
+        duration_seconds: duration
+      )
+      return failure_result(preview.fetch("reason", "native motion preview did not complete"), flow) unless preview.fetch("ok")
+      flow.delete("motion_intake")
+      prepare_native_motion_action(flow, preview.fetch("data"), instruction: instruction, duration: duration, kind: "generate")
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("native motion planning failed safely: #{error.class}", flow)
+    end
+
+    def plan_native_motion_revision(flow, message)
+      intake = flow.fetch("motion_intake", {})
+      return nil unless explicit_native_motion_revision_request?(message) || intake["kind"] == "revision"
+      visual = flow.dig("generated", "visual")
+      motion = flow.dig("generated", "motion")
+      return failure_result("the native motion source is unavailable", flow) unless visual && motion
+
+      inspected = @visual_studio.inspect(project_id: visual.dig("project", "project_id"))
+      return failure_result(inspected.fetch("reason", "visual project inspection did not complete"), flow) unless inspected.fetch("ok")
+      source = Array(inspected.dig("data", "project", "motions")).find do |candidate|
+        candidate["motion_candidate_id"] == motion["motion_candidate_id"]
+      end
+      return failure_result("the native motion source no longer exists", flow) unless source
+      unless source.dig("review", "disposition") == "revise"
+        return result(
+          "Record a `revise` review for this exact native scene in Visual Studio before asking Chat to generate its linked revision.",
+          "creative_native_motion_review_required", flow
+        )
+      end
+
+      duration = native_motion_duration(message) || intake["duration_seconds"] || Integer(source.fetch("duration_seconds").round)
+      instruction = native_motion_revision_instruction(message) || intake["instruction"]
+      if intake["kind"] == "revision" && instruction.nil?
+        followup = message.to_s.strip
+        instruction = followup if followup.length.between?(20, 8_000)
+      end
+      unless instruction
+        return native_motion_input_result(
+          flow, "Describe what the native scene revision should change.",
+          kind: "revision", duration_seconds: duration
+        )
+      end
+      preview = @visual_studio.native_motion_revision_preview(
+        project_id: visual.dig("project", "project_id"),
+        source_motion_id: source.fetch("motion_candidate_id"),
+        instruction: instruction,
+        seed: SecureRandom.random_number(2_147_483_648),
+        duration_seconds: duration
+      )
+      return failure_result(preview.fetch("reason", "native motion revision preview did not complete"), flow) unless preview.fetch("ok")
+      flow.delete("motion_intake")
+      prepare_native_motion_action(
+        flow, preview.fetch("data"), instruction: instruction, duration: duration,
+        kind: "revision", source_motion_id: source.fetch("motion_candidate_id")
+      )
+    rescue KeyError, ArgumentError => error
+      failure_result(error.message, flow)
+    rescue StandardError => error
+      failure_result("native motion revision planning failed safely: #{error.class}", flow)
+    end
+
+    def prepare_native_motion_action(flow, preview, instruction:, duration:, kind:, source_motion_id: nil)
+      flow["motion_action"] = {
+        "kind" => kind,
+        "instruction" => instruction,
+        "duration_seconds" => duration,
+        "seed" => preview.fetch("seed"),
+        "motion_candidate_id" => preview.fetch("motion_candidate_id"),
+        "source_motion_candidate_id" => source_motion_id,
+        "confirmation_phrase" => preview.fetch("confirmation_phrase"),
+        "downstream_digest" => preview.fetch("expected_digest"),
+        "preview_scope" => preview.reject { |key, _| %w[confirmation_phrase expected_digest].include?(key) }
+      }
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["core_requirement"] = core_requirement(flow, action_id: "creative_native_motion")
+      flow["pending_action"] = build_native_motion_action(flow, kind)
+      @flow_store.write(flow)
+      result(render_native_motion(flow), "creative_native_motion_ready", flow, actions: [flow.fetch("pending_action")])
+    end
+
+    def build_native_motion_action(flow, kind)
+      {
+        "action_id" => "creative_native_motion",
+        "operation" => "chats.creative.execute",
+        "label" => kind == "revision" ? "Generate exact native scene revision" : "Generate exact native scene",
+        "flow_id" => flow.fetch("flow_id"),
+        "chat_id" => flow.fetch("chat_id"),
+        "confirmation_phrase" => EXECUTE_CONFIRMATION,
+        "expected_digest" => action_digest(flow),
+        "risk" => "bounded_native_video_generation",
+        "core_requirement" => flow.fetch("core_requirement")
+      }
+    end
+
+    def render_native_motion(flow)
+      action = flow.fetch("motion_action")
+      scope = action.fetch("preview_scope")
+      [
+        action.fetch("kind") == "revision" ? "The linked native scene revision is ready for exact review." : "The native scene is ready for exact review.",
+        "Duration: #{action.fetch('duration_seconds')} seconds",
+        "Direction: #{action.fetch('instruction')}",
+        "Seed: #{action.fetch('seed')}",
+        "Profile: #{scope['profile_id']}",
+        "Generation / delivery: #{scope['generation_frames']} frames at #{scope['generation_fps']} fps → #{scope['frames']} frames at #{scope['fps']} fps",
+        "Delivery method: #{scope['delivery_method']}",
+        "Estimated runtime: #{scope['estimated_runtime_seconds'] || 'not yet measured'} seconds",
+        "External publication: not included",
+        "",
+        *render_core_requirement(flow),
+        "",
+        "Clicking the action authorizes only this exact Core-aware bounded render."
+      ].join("\n")
+    end
+
+    def execute_native_motion(flow, progress)
+      action = flow.fetch("motion_action")
+      visual = flow.dig("generated", "visual")
+      core = ensure_creative_core(flow, action_id: "creative_native_motion")
+      return append_terminal(flow, core, "Core transition did not complete; native motion was not started") unless core.fetch("ok")
+
+      attributes = {
+        project_id: visual.dig("project", "project_id"),
+        motion_id: action.fetch("motion_candidate_id"),
+        instruction: action.fetch("instruction"),
+        seed: action.fetch("seed"),
+        duration_seconds: action.fetch("duration_seconds"),
+        confirmation: action.fetch("confirmation_phrase"),
+        expected_digest: action.fetch("downstream_digest"),
+        progress: progress
+      }
+      outcome = if action.fetch("kind") == "revision"
+        @visual_studio.native_motion_revision_execute(
+          **attributes, source_motion_id: action.fetch("source_motion_candidate_id")
+        )
+      else
+        @visual_studio.native_motion_execute(**attributes)
+      end
+      return append_terminal(flow, outcome, "Native motion generation stopped safely") unless outcome.fetch("ok")
+
+      motion = outcome.dig("data", "motion")
+      flow["generated"]["motion"] = motion
+      flow.delete("motion_action")
+      flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["stage"] = "motion_generated"
+      flow["pending_action"] = nil
+      attachments = [native_motion_attachment(visual, motion)]
+      content = "The native scene is ready for review. It remains a Visual Studio candidate and nothing was bound, exported, uploaded, or published. Record keep or revise in Visual Studio; a revise review can return here for another exact linked attempt."
+      message = append_assistant(flow.fetch("chat_id"), content, flow, attachments)
+      flow["result_message_id"] = message.fetch("id")
+      flow["last_action_id"] = "creative_native_motion"
+      @flow_store.write(flow)
+      domain(
+        "blocked_for_human_review", true, "native motion generated; Visual Studio review required",
+        data: { "flow" => public_flow(flow), "assistant_message" => message, "attachments" => attachments, "motion" => motion },
+        mutation: outcome.fetch("mutation", "visual_native_motion_generated")
+      )
+    rescue KeyError, ArgumentError => error
+      domain("awaiting_input", false, error.message)
+    rescue StandardError => error
+      domain("failed", false, "native motion execution failed safely: #{error.class}")
+    end
+
+    def native_motion_source_eligible?(flow)
+      visual = flow.dig("generated", "visual")
+      return false unless visual
+      return true if visual["existing"]
+
+      flow.dig("review_draft", "visual_disposition") == "keep"
+    end
+
+    def explicit_native_motion_request?(message)
+      text = message.to_s.strip
+      ConversationRequestShape.new.action_request?(text) &&
+        text.match?(/\b(?:create|generate|make|render|build|produce)\b/i) &&
+        text.match?(/\b(?:native video|native scene|text[- ]to[- ]video|generated video)\b/i)
+    end
+
+    def explicit_native_motion_revision_request?(message)
+      text = message.to_s.strip
+      text.match?(/\b(?:revise|retry|regenerate|redo)\b/i) &&
+        text.match?(/\b(?:native video|native scene|motion|video|scene|it)\b/i)
+    end
+
+    def native_motion_duration(message)
+      match = message.to_s.match(/\b(4|8|12)\s*(?:seconds?|secs?|s)\b/i)
+      match && Integer(match[1])
+    end
+
+    def native_motion_instruction(message)
+      text = message.to_s.strip
+      instruction = if text.include?(":")
+        text.split(":", 2).last.to_s.strip
+      else
+        text[/\b(?:native video|native scene|text[- ]to[- ]video|generated video)\b(?:\s+(?:of|showing|where|with|that))?\s+(.+)\z/i, 1].to_s.strip
+      end
+      instruction.length.between?(20, 8_000) ? instruction : nil
+    end
+
+    def native_motion_revision_instruction(message)
+      text = message.to_s.strip
+      instruction = if text.include?(":")
+        text.split(":", 2).last.to_s.strip
+      else
+        text[/\b(?:revise|retry|regenerate|redo)\b.*?\b(?:to|so that|with)\b\s+(.+)\z/i, 1].to_s.strip
+      end
+      instruction.length.between?(20, 8_000) ? instruction : nil
+    end
+
+    def native_motion_input_result(flow, prompt, kind: nil, instruction: nil, duration_seconds: nil)
+      flow["motion_intake"] = {
+        "kind" => kind,
+        "instruction" => instruction,
+        "duration_seconds" => duration_seconds
+      }.compact
+      flow["lifecycle_state"] = "awaiting_input"
+      flow["pending_action"] = nil
+      @flow_store.write(flow)
+      result(prompt, "creative_native_motion_awaiting_input", flow)
+    end
 
     def plan_music_post_review(flow, message, provider, progress)
       revision = plan_music_revision(flow, message, provider, progress)
@@ -1155,6 +1411,7 @@ module SoulCore
       case action_id
       when "creative_music_revision" then "music"
       when "creative_visual_revision" then "amd-free"
+      when "creative_native_motion" then "amd-free"
       when "creative_generate"
         return "music" if new_music?(flow)
         return "amd-free" if new_visual?(flow)
@@ -1282,6 +1539,18 @@ module SoulCore
         "image_url" => "/api/v1/visual/image/#{project.fetch('project_id')}/#{candidate.fetch('candidate_id')}" }
     end
 
+    def native_motion_attachment(visual, motion)
+      project = visual.fetch("project")
+      {
+        "kind" => "video",
+        "title" => "#{project.fetch('title')} · native scene",
+        "project_id" => project.fetch("project_id"),
+        "motion_candidate_id" => motion.fetch("motion_candidate_id"),
+        "video_url" => "/api/v1/visual/motion/#{project.fetch('project_id')}/#{motion.fetch('motion_candidate_id')}",
+        "note" => "Local Visual Studio motion candidate; not bound, exported, uploaded, or published."
+      }
+    end
+
     def companion_video_attachment(flow, companion, artifact)
       music = flow.dig("generated", "music")
       project = music.fetch("project")
@@ -1344,7 +1613,7 @@ module SoulCore
         "flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required",
         "plan", "core_requirement", "generated", "outputs", "completion_target",
         "revision_draft", "visual_revision_draft", "disposition_action",
-        "companion_action", "companion_render_action", "publication_action",
+        "companion_action", "companion_render_action", "publication_action", "motion_action", "motion_intake",
         "created_at", "updated_at"
       )
     end

@@ -39,6 +39,7 @@ require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
 require_relative "visual_studio_service"
+require_relative "visual_motion_qualification_service"
 
 module SoulCore
   class ApplicationFacade
@@ -324,6 +325,7 @@ module SoulCore
       when "music.publication.preview" then domain(music_publication_package.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description")))
       when "music.publication.execute" then domain(music_publication_package.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "visual.resources.status" then domain(visual_studio.resources)
+      when "visual.motion.qualification" then domain(visual_motion_qualification.snapshot)
       when "visual.projects.list" then domain(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)))
       when "visual.projects.create" then domain(visual_studio.create(required(parameters, "visual_project")))
       when "visual.projects.get" then domain(visual_studio.inspect(project_id: required(parameters, "visual_project_id")))
@@ -711,6 +713,10 @@ module SoulCore
 
     def visual_studio
       @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion)
+    end
+
+    def visual_motion_qualification
+      @visual_motion_qualification_service ||= VisualMotionQualificationService.new(visual_studio: visual_studio)
     end
 
     def project_tracker

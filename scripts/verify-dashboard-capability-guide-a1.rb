@@ -45,12 +45,13 @@ checks["music_guide_states_required_inputs_and_authority"] =
   music.include?("model response is never approval")
 
 visual = guide.respond(visual_request)
-checks["visual_guide_discloses_partial_companion_boundary"] =
+checks["visual_guide_discloses_available_bounded_motion_boundary"] =
   guide.match?(visual_request) &&
-  visual.include?("Availability: partial") &&
+  visual.include?("Availability: available") &&
   visual.include?("clear visual intent") &&
-  visual.include?("post-binding local companion output are Chat-capable") &&
-  visual.include?("Native motion generation, visual deletion, and external publication remain Studio or human operations")
+  visual.include?("4-, 8-, or 12-second duration") &&
+  visual.include?("native text-to-video") &&
+  visual.include?("destructive visual actions, and external publication retain Studio or human authority")
 
 tracker = guide.respond("What can I ask you to do in Project Timeline?")
 checks["timeline_guide_uses_shared_ledger_contract"] =
