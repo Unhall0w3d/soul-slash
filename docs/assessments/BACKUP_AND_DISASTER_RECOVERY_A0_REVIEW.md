@@ -13,6 +13,10 @@ Status: review in progress; design candidate only
 - separated irreplaceable owner state from reconstructable dependencies;
 - inspected installed filesystem and backup tooling;
 - compared current upstream restic and Borg capabilities;
+- identified and inventoried the separate 120 GB-class SanDisk SSD proposed as
+  the first local repository;
+- copied its personal Documents, Pictures, and Janempa trees to an owner-only
+  home-directory recovery location and checksum-compared every copied file;
 - drafted backup, restore, verification, exclusion, retention, and secret
   boundaries without installing or executing a backup tool.
 
@@ -47,6 +51,12 @@ excluded from routine snapshots.
 Restic is the leading A1 candidate, but no destination, key custody, package
 installation, service, timer, prune policy, or backup execution is approved.
 
+The SanDisk provides 111.8 GiB usable capacity and is a suitable first local
+repository candidate. Its existing personal data copy matches across 2,569
+files and 4,099,426,963 bytes. The NTFS source remains mounted read-only and
+unchanged. SMART health, final filesystem choice, unmount, partitioning, and
+formatting remain pending explicit review.
+
 ## Local LLM evaluation
 
 None. Storage classification and recovery policy require deterministic
@@ -55,7 +65,9 @@ inventory and human review, not model judgment.
 ## Known weaknesses
 
 - current measurements describe one workstation at one point in time;
-- no external backup destination has been selected or measured;
+- the local SanDisk candidate shares the workstation failure boundary and is
+  not an offline/off-site backup;
+- SMART health has not yet been read because privileged access is required;
 - no recovery snapshot exists yet;
 - no restore rehearsal has been run;
 - exact cross-file quiescence needs an A1 implementation decision;

@@ -233,9 +233,41 @@ loss. The intended mature posture is:
 The backup password must not be stored in `.env`, the Soul repository, the
 backup itself, logs, receipts, or model context.
 
+### Local SanDisk candidate
+
+The Operator workstation contains a separate SanDisk SSD Plus 120 GB device
+with 111.8 GiB usable capacity. At review time it held one read-only mounted
+NTFS partition with 5.7 GiB used and 106.1 GiB free.
+
+The three personal data trees on the device were copied into an owner-only
+recovery directory on the primary home filesystem. A checksum-mode rsync
+comparison reported no differences across 2,569 files and 4,099,426,963 bytes.
+The Windows recycle bin, empty recovery directory, and volume metadata were
+intentionally not migrated. The source SSD remains unchanged pending health
+review and a separate destructive confirmation.
+
+If SMART health is acceptable, the recommended local-target layout is:
+
+- GPT partition table;
+- one ext4 partition labeled `SOUL_BACKUP`;
+- a stable UUID-based mount at `/mnt/soul-backup`;
+- an owner-only restic repository below that mount;
+- `nofail` mount behavior so loss of the backup disk cannot block boot;
+- a capacity warning before the repository consumes 80% of the filesystem.
+
+Ext4 is preferred here for a simple portable filesystem boundary; restic
+provides repository encryption, deduplication, and integrity verification.
+Using Btrfs for the backup target would not make the source capture globally
+atomic and is unnecessary for the first implementation.
+
+This internal SSD is only the first local recovery copy. It shares the
+workstation's power, chassis, and administrative boundary and therefore does
+not satisfy the additional offline/off-site copy requirement.
+
 ## Human decisions required before A1 implementation
 
 - first repository destination and available capacity;
+- acceptable SMART health for the local SanDisk candidate;
 - restic versus Borg if the destination strongly favors Borg/SSH;
 - key-custody method;
 - whether finished exports and the Knowledge Vault share the same repository;
