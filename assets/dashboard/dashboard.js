@@ -706,7 +706,7 @@ function messageArticle(record, { pending = false, working = false } = {}) {
   const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body);
   if (role === "assistant" && !working) {
     const spoken = String(record.content || record.text || "").trim();
-    if (spoken && spoken.length <= 2000 && !/^[\[{]/.test(spoken)) article.append(messageSpeakButton(spoken));
+    if (spoken && spoken.length <= 2000 && !/^[\[{]/.test(spoken)) article.append(messageSpeakButton(spoken, speechContextForMessage(record)));
   }
   const runtime = record.metadata?.runtime || {};
   renderMessageAttachments(article, Array.isArray(runtime.attachments) ? runtime.attachments : []);
@@ -720,11 +720,17 @@ function messageArticle(record, { pending = false, working = false } = {}) {
   return article;
 }
 
-function messageSpeakButton(text) {
+function speechContextForMessage(record) {
+  const orchestration = record?.metadata?.runtime?.orchestration || {};
+  const toolIds = Array.isArray(orchestration.tool_ids) ? orchestration.tool_ids : [];
+  return toolIds.includes("weather.report") ? "weather_report" : "general";
+}
+
+function messageSpeakButton(text, speechContext = "general") {
   const button = document.createElement("button"); button.type = "button"; button.className = "message-speak-button"; button.textContent = "Speak"; button.setAttribute("aria-pressed", "false");
   button.addEventListener("click", () => {
     if (state.voiceSynthesisButton === button) { stopVoicePlayback(); return; }
-    synthesizeMessageSpeech(text, button);
+    synthesizeMessageSpeech(text, button, speechContext);
   });
   return button;
 }
@@ -745,7 +751,7 @@ function stopVoicePlayback() {
   if (!state.busy && !state.voiceTranscribing && !state.voiceRecorder) setSoulActivity("idle", "Foreground work remains bounded to this request.");
 }
 
-async function synthesizeMessageSpeech(text, button) {
+async function synthesizeMessageSpeech(text, button, speechContext = "general") {
   stopVoicePlayback();
   const controller = new AbortController(); state.voiceSynthesisController = controller; state.voiceSynthesisButton = button;
   button.disabled = false; button.textContent = "Cancel"; button.setAttribute("aria-pressed", "true");
@@ -755,7 +761,7 @@ async function synthesizeMessageSpeech(text, button) {
     const response = await fetch(expressive ? "/api/v1/voice/synthesize-stream" : "/api/v1/voice/synthesize", {
       method: "POST", credentials: "same-origin", cache: "no-store", signal: controller.signal,
       headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
-      body: JSON.stringify({ text, voice: state.voiceOutputProfile, quality: state.voiceOutputQuality })
+      body: JSON.stringify({ text, voice: state.voiceOutputProfile, quality: state.voiceOutputQuality, speech_context: speechContext })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
@@ -1822,7 +1828,7 @@ async function sendMessage(event) {
       const reply = [...records].reverse().find((record) => record.role === "assistant" && String(record.content || record.text || "").trim());
       const buttons = [...document.querySelectorAll(".message--assistant .message-speak-button")];
       const button = buttons.at(-1);
-      if (reply && button) await synthesizeMessageSpeech(String(reply.content || reply.text).trim(), button);
+      if (reply && button) await synthesizeMessageSpeech(String(reply.content || reply.text).trim(), button, speechContextForMessage(reply));
       else announce("Soul completed the exchange without an eligible spoken reply");
     }
   } catch (error) { try { const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records); if (!records.some((record) => record.role === "user" && record.content === message)) input.value = message; } catch (_reconcileError) { input.value = message; } setSoulActivity("failed", picture ? "Picture understanding stopped safely; the selected picture and draft remain available." : "The exchange failed safely; an unsent draft has been restored."); emitSoulNotification("attention"); showError(error); } finally { setBusy(false); input.focus(); }

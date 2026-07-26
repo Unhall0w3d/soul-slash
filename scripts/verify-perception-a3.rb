@@ -4,6 +4,7 @@
 require "base64"
 require "tmpdir"
 require_relative "../lib/soul_core/chat_store"
+require_relative "../lib/soul_core/screen_observation_claim_guard"
 require_relative "../lib/soul_core/voice_screen_understanding_service"
 
 def check(label, condition)
@@ -108,6 +109,7 @@ check("explicit current-screen question routes", SoulCore::VoiceScreenRequest.pa
 check("explicit active-window question routes", SoulCore::VoiceScreenRequest.parse("Read the active window and summarize the warning.")&.fetch("mode") == "active_window")
 check("transcribed explain-current-window wording routes", SoulCore::VoiceScreenRequest.parse("Can you explain the current window?")&.fetch("mode") == "active_window")
 check("natural dashboard self-identification wording routes", SoulCore::VoiceScreenRequest.parse("What is this dashboard?")&.fetch("mode") == "active_window")
+check("natural current-view wording requires a fresh active-window capture", SoulCore::VoiceScreenRequest.parse("What am I looking at?")&.fetch("mode") == "active_window")
 check("explicit selected-region question routes", SoulCore::VoiceScreenRequest.parse("What do you see in this selected region?")&.fetch("mode") == "region")
 check("refresh-view wording requests a fresh monitor capture", SoulCore::VoiceScreenRequest.parse("Can you refresh your view of my screen?")&.fetch("mode") == "monitor")
 check("visible screen wording no longer falls through to model memory", SoulCore::VoiceScreenRequest.parse("Describe the words that appear on screen.")&.fetch("mode") == "monitor")
@@ -118,6 +120,14 @@ check("visible workspace preserves exact name", SoulCore::VoiceScreenRequest.par
 check("screen-capability discussion remains conversation", SoulCore::VoiceScreenRequest.parse("We should improve screen understanding.") == nil)
 check("ordinary screen mention remains conversation", SoulCore::VoiceScreenRequest.parse("I spend too much time looking at my screen.") == nil)
 check("perception verb without current target remains conversation", SoulCore::VoiceScreenRequest.parse("Describe how screen capture works.") == nil)
+
+guard = SoulCore::ScreenObservationClaimGuard.new
+guarded = guard.apply(
+  content: "The browser shows **The Archive** video.\nThe exact buttons are **First Step**, **Main Quest**, and **Final Quest**.\nThe window contains a video player and a dark interface.",
+  verification_context: "application=Opera GX title=Heaven EXE YouTube\nPause listening\nRestart presence\nClose presence"
+)
+check("fresh-screen guard removes unsupported remembered titles and invented controls", !guarded["content"].include?("The Archive") && !guarded["content"].include?("Main Quest") && guarded["removed_claim_lines"] == 2)
+check("fresh-screen guard preserves non-literal visual observations", guarded["content"].include?("dark interface"))
 
 Dir.mktmpdir("soul-perception-a3-") do |root|
   store = SoulCore::ChatStore.new(root: root)
@@ -138,6 +148,7 @@ Dir.mktmpdir("soul-perception-a3-") do |root|
   check("voice perception checks Core before capture", readiness.calls == 1 && progress.first["summary"].include?("before capturing"))
   check("successful request captures and analyzes exactly once", result["lifecycle_state"] == "complete" && capture.requests == [{ "mode" => "active_window", "selector" => nil }] && picture.calls.length == 1)
   check("exact transcript becomes the picture question", picture.calls.first[:question] == "Read the active window and tell me whether the warning is actionable.")
+  check("voice screen requests require fresh literal-claim policy", picture.calls.first[:response_policy] == "fresh_screen")
   check("fresh OCR and reviewed self identity reach vision ephemerally", picture.calls.first[:analysis_context].include?("Soul / Voice Presence") && picture.calls.first[:analysis_context].include?("Restart presence"))
   check("fresh compositor window identity reaches vision ephemerally", picture.calls.first[:analysis_context].include?("application=Opera GX") && picture.calls.first[:analysis_context].include?("title=Soul / Voice Presence"))
   check("voice-requested pixels are always ephemeral", picture.calls.first[:retain] == false && result["image_retained"] == false)

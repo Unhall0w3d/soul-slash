@@ -469,7 +469,8 @@ module SoulCore
     end
 
     def weather_detail_followup?(text, recent_evidence)
-      return false unless text.match?(AFFIRMATIVE_FOLLOWUP_PATTERN)
+      normalized = text.to_s.sub(/\A\s*[-*•]\s*/, "").strip
+      return false unless normalized.match?(AFFIRMATIVE_FOLLOWUP_PATTERN)
 
       Array(recent_evidence).reverse.any? do |record|
         record["evidence_profile"] == "weather_report" && record["status"] == "ok"

@@ -73,6 +73,7 @@ begin
 
   facade = SoulCore::ApplicationFacade.new(root: ROOT, process_env: environment)
   chat_id = voice_chat_id(facade)
+  speech_context = "general"
   emit("type" => "state", "state" => "thinking", "summary" => "Soul is considering the transmission.")
   perception = SoulCore::VoiceScreenUnderstandingService.new(root: ROOT).handle(
     chat_id: chat_id,
@@ -90,6 +91,8 @@ begin
     )
     lifecycle = exchange.fetch("lifecycle_state", "failed")
     assistant = exchange.dig("data", "assistant_message", "content").to_s
+    tool_ids = Array(exchange.dig("data", "result", "metadata", "orchestration", "tool_ids"))
+    speech_context = "weather_report" if tool_ids.include?("weather.report")
     unless exchange["ok"]
       assistant = exchange.fetch("errors", []).first&.fetch("message", nil) || "Soul could not complete the turn."
     end
@@ -109,7 +112,7 @@ begin
   end
   emit("type" => "state", "state" => "speaking", "summary" => "Preparing Soul's voice.")
   speech = SoulCore::VoiceSynthesisService.new(**synthesis_options).synthesize(
-    text: assistant, voice_name: selected_voice, quality: "responsive"
+    text: assistant, voice_name: selected_voice, quality: "responsive", speech_context: speech_context
   )
   raise speech.fetch("message", "speech synthesis failed") unless speech["ok"]
   File.binwrite(output_path, speech.fetch("audio"), mode: "wx", perm: 0o600)

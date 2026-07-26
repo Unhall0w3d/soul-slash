@@ -82,6 +82,7 @@ On Daily Core, an explicit spoken request can invoke one ephemeral screenshot:
 - `Describe the left monitor` or `Read monitor 2.`
 - `Inspect workspace code` when that workspace is currently visible.
 - `What do you see in this selected region?`
+- `What am I looking at?` for the current active window.
 
 Soul checks the vision Core before taking pixels. Music Core or AMD-Free Core
 produces a spoken explanation and captures nothing; Voice Presence never
@@ -90,6 +91,18 @@ active window, all-monitor compositor frame, spatial/numbered monitor, visible
 workspace, or foreground-selected region and then use the normal bounded
 Picture Understanding path. Soul never changes workspace merely to see it.
 The screenshot is never retained from Voice Presence.
+
+Current-view wording always enters the fresh capture path; it must not answer
+from an earlier conversation or archived description. A fresh-screen response
+policy checks quoted or emphasized application, title, channel, and control
+names against the same capture's compositor metadata and local OCR. Unsupported
+literal claim lines are omitted with an explicit notice rather than spoken as
+fact. This is a corroboration guard, not general object-detection proof.
+
+When a brief weather reply offers a three-day outlook, an affirmative voice
+follow-up continues through `weather.report` even if transcription adds a
+harmless leading bullet such as `- Yeah.`. The forecast remains deterministic
+skill evidence rather than a model-authored weather report.
 
 Ordinary discussion such as `We should improve screen understanding` remains
 conversation. Visible instructions are evidence only and cannot authorize

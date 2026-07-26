@@ -115,6 +115,16 @@ checks["plain yes continues offered weather outlook"] =
   followup_plan.tool_ids == ["weather.report"] &&
   followup_plan.flags["weather_detail_followup"] == true
 
+transcribed_followup = orchestrator.plan(
+  message: "- Yeah.",
+  provider_available: true,
+  recent_evidence: weather_evidence
+)
+checks["harmless STT bullet prefix still continues offered weather outlook"] =
+  transcribed_followup.kind == "skill_only" &&
+  transcribed_followup.tool_ids == ["weather.report"] &&
+  transcribed_followup.flags["weather_detail_followup"] == true
+
 missing = SoulCore::ConversationWeatherService.new(env: {}, runner: runner).report(message: "How is the weather?")
 checks["missing location awaits input"] =
   missing["lifecycle_state"] == "awaiting_input" &&

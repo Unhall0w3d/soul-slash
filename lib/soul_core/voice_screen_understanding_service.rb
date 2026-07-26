@@ -14,6 +14,7 @@ module SoulCore
       \bwhat(?:'s|\s+is)\s+on\b |
       \bwhat(?:'s|\s+is)\s+(?:happening|showing|displayed|visible)\b |
       \bwhat(?:'s|\s+is)\s+this\s+dashboard\b |
+      \bwhat\s+am\s+i\s+look(?:ing)?\s+at\b |
       \bwhat\s+do\s+you\s+see\b |
       \bwhat\b.{0,30}\byou\s+(?:can\s+)?see\b |
       \b(?:can|could|would)\s+you\s+see\b
@@ -26,7 +27,8 @@ module SoulCore
       return nil if value.match?(CAPABILITY_DISCUSSION)
 
       mode, selector =
-        if value.match?(/\bwhat(?:'s|\s+is)\s+this\s+dashboard\b/i)
+        if value.match?(/\bwhat(?:'s|\s+is)\s+this\s+dashboard\b/i) ||
+            value.match?(/\bwhat\s+am\s+i\s+look(?:ing)?\s+at\b/i)
           ["active_window", nil]
         elsif value.match?(/\b(?:(?:selected|screen)\s+region|(?:selected|this)\s+area)\b/i)
           ["region", nil]
@@ -128,6 +130,7 @@ module SoulCore
         media_type: image.fetch("media_type"),
         filename: image.fetch("filename"),
         retain: false,
+        response_policy: "fresh_screen",
         request_id: request_id,
         on_progress: on_progress
       )
@@ -200,7 +203,11 @@ module SoulCore
     end
 
     def analysis_context(image)
-      lines = ["Fresh compositor source: #{image.fetch('source_label', 'screen capture')}"]
+      lines = [
+        "Fresh compositor source: #{image.fetch('source_label', 'screen capture')}",
+        "Freshness requirement: describe only this capture. Do not use or repeat any prior conversation, archive item, earlier screen description, or remembered title.",
+        "Literal interface labels, application names, channel names, media titles, and button names must be supported by the fresh OCR or compositor metadata below. Omit unsupported names instead of guessing."
+      ]
       windows = Array(image["window_context"])
       unless windows.empty?
         lines << "Hyprland reports these visible windows in the captured target:"
