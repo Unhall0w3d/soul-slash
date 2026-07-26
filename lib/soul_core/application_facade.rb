@@ -20,6 +20,7 @@ require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "project_tracker_service"
+require_relative "project_release_service"
 require_relative "model_runtime_control_service"
 require_relative "core_orchestration_service"
 require_relative "skill_registry"
@@ -63,6 +64,7 @@ module SoulCore
       workspace_service: nil,
       status_collector: nil,
       project_tracker_service: nil,
+      project_release_service: nil,
       model_runtime_control_service: nil,
       core_orchestration_service: nil,
       approval_store: nil,
@@ -101,6 +103,7 @@ module SoulCore
       @workspace_service = workspace_service
       @status_collector = status_collector
       @project_tracker_service = project_tracker_service
+      @project_release_service = project_release_service
       @model_runtime_control_service = model_runtime_control_service
       @core_orchestration_service = core_orchestration_service
       @approval_store = approval_store
@@ -282,9 +285,11 @@ module SoulCore
       when "self_augmentation.model_qualification.execute" then domain(self_augmentation_experiments.record_model_qualification(experiment_id: required(parameters,"experiment_id"), suite_id: required(parameters,"suite_id"), model_profile: required(parameters,"model_profile"), result: required(parameters,"result"), evidence_digest: required(parameters,"evidence_digest"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.experiments.cleanup.preview" then domain(self_augmentation_experiments.cleanup_preview(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.experiments.cleanup.execute" then domain(self_augmentation_experiments.cleanup(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "music.projects.list" then domain(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)))
+      when "music.projects.list" then domain(project_release.decorate_outcome(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)), kind: "music"))
       when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
       when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.projects.release" then domain(project_release.release(kind: "music", project_id: required(parameters, "project_id")))
+      when "music.projects.restore" then domain(project_release.restore(kind: "music", project_id: required(parameters, "project_id")))
       when "music.projects.delete.preview" then domain(music_project_deletion.preview(project_id: required(parameters, "project_id")))
       when "music.projects.delete.execute" then domain(music_project_deletion.execute(project_id: required(parameters, "project_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.references.list" then domain(music_reference_library.inventory(limit: bounded_limit(parameters["limit"], 500)))
@@ -330,9 +335,11 @@ module SoulCore
       when "music.publication.execute" then domain(music_publication_package.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "visual.resources.status" then domain(visual_studio.resources)
       when "visual.motion.qualification" then domain(visual_motion_qualification.snapshot)
-      when "visual.projects.list" then domain(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)))
+      when "visual.projects.list" then domain(project_release.decorate_outcome(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)), kind: "visual"))
       when "visual.projects.create" then domain(visual_studio.create(required(parameters, "visual_project")))
-      when "visual.projects.get" then domain(visual_studio.inspect(project_id: required(parameters, "visual_project_id")))
+      when "visual.projects.get" then domain(project_release.decorate_outcome(visual_studio.inspect(project_id: required(parameters, "visual_project_id")), kind: "visual"))
+      when "visual.projects.release" then domain(project_release.release(kind: "visual", project_id: required(parameters, "visual_project_id")))
+      when "visual.projects.restore" then domain(project_release.restore(kind: "visual", project_id: required(parameters, "visual_project_id")))
       when "visual.projects.update" then domain(visual_studio.update(project_id: required(parameters, "visual_project_id"), attributes: required(parameters, "visual_project")))
       when "visual.projects.delete.preview" then domain(visual_studio.project_delete_preview(project_id: required(parameters, "visual_project_id")))
       when "visual.projects.delete.execute" then domain(visual_studio.project_delete_execute(project_id: required(parameters, "visual_project_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -772,6 +779,10 @@ module SoulCore
       @music_project_deletion_service ||= MusicProjectDeletionService.new(root: @root)
     end
 
+    def project_release
+      @project_release_service ||= ProjectReleaseService.new(root: @root)
+    end
+
     def music_reference_library
       @music_reference_library_service ||= MusicReferenceLibraryService.new(root: @root)
     end
@@ -816,7 +827,7 @@ module SoulCore
         candidate["visual_sources"] = music_visual_companion.available_sources(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
         candidate["visuals"] = music_visual_companion.inventory(project_id: project_id, candidate_id: candidate.fetch("candidate_id"))
       end
-      result
+      project_release.decorate_outcome(result, kind: "music")
     end
 
     def draft_music_revision(project_id:, source_candidate_id:)
