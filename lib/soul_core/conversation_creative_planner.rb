@@ -8,7 +8,8 @@ require_relative "conversation_request_shape"
 module SoulCore
   class ConversationCreativePlanner
     Contract = ConversationProviderContract
-    SUPPORTED_DURATIONS = [30, 90, 180, 600].freeze
+    VARIABLE_DURATION_RANGE = (30..300)
+    FIXED_DURATIONS = [600].freeze
     MUSIC_REQUIRED = %w[music_intent duration_seconds vocal_mode rights_status].freeze
     RESPONSE_KEYS = %w[
       related kind music_intent duration_seconds vocal_mode rights_status title
@@ -49,7 +50,7 @@ module SoulCore
 
       Decide whether the newest user message explicitly starts or naturally continues the supplied creative workflow. A topical mention is not an invocation. Statements such as "I am working on your music skills", "we should discuss images later", or "that song was good" are unrelated unless an active workflow question makes them a direct answer. Set related=false for ordinary conversation.
 
-      Music user-required fields are intent, one exact supported duration (30, 90, 180, or 600 seconds), vocal_mode (vocal or instrumental), and rights_status (original, licensed, or public_domain). Never invent or infer a missing user-required field. Preserve prior user-supplied required values unless the user explicitly changes them. Use empty string or 0 for a missing required value and ask one focused next_question.
+      Music user-required fields are intent, one exact whole-second duration from 30 through 300 seconds or exactly 600 seconds, vocal_mode (vocal or instrumental), and rights_status (original, licensed, or public_domain). Convert minute-and-second wording such as 2:24 to exact total seconds. Never invent or infer a missing user-required field. Preserve prior user-supplied required values unless the user explicitly changes them. Use empty string or 0 for a missing required value and ask one focused next_question.
 
       Put only required field names explicitly supplied by the user in user_provided_required: music_intent, duration_seconds, vocal_mode, rights_status, visual_intent. Preserve this provenance from prior_workflow. Never add a name merely because you inferred or drafted its value.
 
@@ -105,7 +106,7 @@ module SoulCore
       if %w[music combined].include?(kind) && plan["existing_music_title"].to_s.empty?
         supplied = Array(plan["user_provided_required"])
         missing << "intent" unless supplied.include?("music_intent") && !plan["music_intent"].to_s.empty?
-        missing << "duration" unless supplied.include?("duration_seconds") && SUPPORTED_DURATIONS.include?(plan["duration_seconds"])
+        missing << "duration" unless supplied.include?("duration_seconds") && supported_duration?(plan["duration_seconds"])
         missing << "mode" unless supplied.include?("vocal_mode") && %w[vocal instrumental].include?(plan["vocal_mode"])
         missing << "rights status" unless supplied.include?("rights_status") && %w[original licensed public_domain].include?(plan["rights_status"])
       end
@@ -116,6 +117,10 @@ module SoulCore
     end
 
     private
+
+    def supported_duration?(duration)
+      duration.is_a?(Integer) && (VARIABLE_DURATION_RANGE.cover?(duration) || FIXED_DURATIONS.include?(duration))
+    end
 
     def complete_optional(plan)
       value = plan.dup

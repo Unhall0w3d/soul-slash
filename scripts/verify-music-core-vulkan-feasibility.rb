@@ -29,7 +29,7 @@ check.call("runtime and GGML source revisions are exact", manifest.dig("runtime"
 check.call("manifest is the production Vulkan contract", manifest["schema_version"] == "soul.music_vulkan.models.v1")
 check.call("model repository revision is immutable", manifest.dig("models", "revision") == "9b3707625776cc4cf775e9b12ab82f9fe48335ff")
 check.call("candidate set is exact 4B LM 2B Turbo Q8 and BF16 VAE", manifest.dig("models", "files").map { |item| item["filename"] } == %w[Qwen3-Embedding-0.6B-Q8_0.gguf acestep-5Hz-lm-4B-Q8_0.gguf acestep-v15-turbo-Q8_0.gguf vae-BF16.gguf] && manifest.dig("models", "files").all? { |item| item["bytes"].is_a?(Integer) && item["bytes"].positive? && item["sha256"].match?(/\A[a-f0-9]{64}\z/) })
-check.call("profile promotes reviewed 600 seconds and isolates the 210-second qualification", manifest.dig("profile", "accelerator") == "AMD Vulkan" && manifest.dig("profile", "offload") == false && manifest.dig("profile", "durations") == [30, 90, 180, 600] && manifest.dig("profile", "qualification_durations") == [210])
+check.call("profile promotes whole-second range while preserving historical exact qualification evidence", manifest.dig("profile", "accelerator") == "AMD Vulkan" && manifest.dig("profile", "offload") == false && manifest.dig("profile", "durations") == [30, 90, 180, 600] && manifest.dig("profile", "qualification_durations") == [210] && manifest.dig("profile", "variable_duration_qualification") == { "marker" => "variable_duration_v1", "minimum_seconds" => 30, "maximum_seconds" => 300, "step_seconds" => 1, "production_enabled" => true })
 check.call("LM collapse recovery is capped at three total attempts", manifest.dig("profile", "max_lm_attempts") == 3 && script.include?("max_lm_attempts.times") && script.include?("three consecutive LM audio-code plans degenerated"))
 check.call("production backend enforces the accepted collapse guard before synthesis", backend.include?("audio_code_health") && backend.index("audio_code_health") < backend.index('binary("ace-synth")') && backend.include?("three consecutive LM audio-code plans degenerated"))
 check.call("production generation publishes FLAC and MP3 then removes the WAV intermediate", generation.include?("run_lossless_transcode") && generation.include?("FileUtils.rm_f(wav_path)") && generation.include?("listening.mp3"))
@@ -40,7 +40,7 @@ check.call("all mutations require exact digest and confirmation", %w[INSTALL_MUS
 check.call("downloads use HTTPS-only redirects and verified partial files", script.include?('"--proto-redir", "=https"') && script.include?(".partial-") && script.include?("size or digest verification"))
 check.call("foreground commands use owned process groups and bounded termination", script.include?("pgroup: true") && script.include?('Process.kill("TERM", -wait.pid)') && script.include?('Process.kill("KILL", -wait.pid)') && script.include?("MAX_LOG_BYTES"))
 check.call("pinned binaries resolve only their local GGML shared libraries", script.include?('"LD_LIBRARY_PATH" => runtime_library_path') && script.include?('File.join(@install_dir, "build")'))
-check.call("pilot allows only one batch and separates production from qualification durations", script.include?("PRODUCTION_DURATIONS = [30, 90, 180, 600]") && script.include?('210 => "duration_210_v1"') && !script.include?('600 => "duration_600_v1"') && script.include?('"batch_size" => 1') && script.include?('"inference_steps" => 8'))
+check.call("pilot allows one batch and separates production, exact qualification, and bounded whole-second qualification", script.include?("PRODUCTION_DURATIONS = [30, 90, 180, 600]") && script.include?('210 => "duration_210_v1"') && script.include?('VARIABLE_DURATION_QUALIFICATION = "variable_duration_v1"') && script.include?("VARIABLE_DURATION_RANGE = (30..300)") && !script.include?("VARIABLE_DURATION_STEP") && !script.include?('600 => "duration_600_v1"') && script.include?('"batch_size" => 1') && script.include?('"inference_steps" => 8'))
 check.call("pilot can pin the accepted LM seed for comparison", script.include?('%w[lm_seed qualification]') && script.include?('Integer(data["lm_seed"])'))
 check.call("pilot requests an upstream-supported lossless WAV format", script.include?('"output_format" => "wav16"'))
 check.call("failed pilots retain bounded UTF-8-safe diagnostic logs", script.include?("pilot.failed.log") && script.include?("MAX_LOG_BYTES") && script.include?(".scrub"))
@@ -111,6 +111,33 @@ Dir.mktmpdir("soul-vulkan-duration-qualification") do |temporary|
   stdout, status = Open3.capture2e("ruby", File.join(ROOT, "scripts/soul-music-vulkan-pilot"), "plan", "--action", "run", "--request", request_path, "--manifest", File.join(ROOT, "config/music_vulkan_models.json"), "--root", File.join(Dir.home, ".local", "share", "soul", "music"))
   marked_ten_minute = JSON.parse(stdout)
   check.call("retired 600-second qualification markers cannot enter production", !status.success? && marked_ten_minute["lifecycle_state"] == "awaiting_input" && marked_ten_minute["reason"].include?("must not carry"))
+
+  variable = base_request.merge(
+    "duration" => 144,
+    "qualification" => "variable_duration_v1",
+    "seed" => 1_055_000_055
+  )
+  File.write(request_path, JSON.generate(variable))
+  stdout, status = Open3.capture2("ruby", File.join(ROOT, "scripts/soul-music-vulkan-pilot"), "plan", "--action", "run", "--request", request_path, "--manifest", File.join(ROOT, "config/music_vulkan_models.json"), "--root", File.join(Dir.home, ".local", "share", "soul", "music"))
+  variable_plan = JSON.parse(stdout)
+  check.call("bounded 2:24 duration requires and digests its explicit qualification marker", status.success? && variable_plan["lifecycle_state"] == "blocked_for_human_review" && variable_plan.dig("preview_scope", "duration") == 144 && variable_plan.dig("preview_scope", "qualification") == "variable_duration_v1")
+
+  File.write(request_path, JSON.generate(variable.merge("duration" => 210)))
+  stdout, status = Open3.capture2("ruby", File.join(ROOT, "scripts/soul-music-vulkan-pilot"), "plan", "--action", "run", "--request", request_path, "--manifest", File.join(ROOT, "config/music_vulkan_models.json"), "--root", File.join(Dir.home, ".local", "share", "soul", "music"))
+  variable_210 = JSON.parse(stdout)
+  check.call("continuous variable lane includes 210 seconds without invalidating its historical marker", status.success? && variable_210.dig("preview_scope", "duration") == 210 && variable_210.dig("preview_scope", "qualification") == "variable_duration_v1")
+
+  File.write(request_path, JSON.generate(variable.except("qualification")))
+  stdout, status = Open3.capture2e("ruby", File.join(ROOT, "scripts/soul-music-vulkan-pilot"), "plan", "--action", "run", "--request", request_path, "--manifest", File.join(ROOT, "config/music_vulkan_models.json"), "--root", File.join(Dir.home, ".local", "share", "soul", "music"))
+  unmarked_variable = JSON.parse(stdout)
+  check.call("unmarked variable durations stop before authorization", !status.success? && unmarked_variable["lifecycle_state"] == "awaiting_input")
+
+  [29, 301, 600].each do |invalid_duration|
+    File.write(request_path, JSON.generate(variable.merge("duration" => invalid_duration)))
+    stdout, status = Open3.capture2e("ruby", File.join(ROOT, "scripts/soul-music-vulkan-pilot"), "plan", "--action", "run", "--request", request_path, "--manifest", File.join(ROOT, "config/music_vulkan_models.json"), "--root", File.join(Dir.home, ".local", "share", "soul", "music"))
+    invalid = JSON.parse(stdout)
+    check.call("variable marker cannot broaden #{invalid_duration}-second request", !status.success? && invalid["lifecycle_state"] == "awaiting_input")
+  end
 end
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?

@@ -7,7 +7,9 @@ Soul can collaborate on Music Studio and Visual Studio work from Chat without tu
 The Operator must supply four decisions. Soul does not silently invent them:
 
 - intent;
-- one supported duration: 30, 90, 180, or 600 seconds;
+- one exact whole-second duration from 30 through 300 seconds, or the fixed
+  600-second option. Soul converts minute-and-second wording such as 2:24 to
+  `144` seconds;
 - mode: vocal or instrumental;
 - rights status: original, licensed, or public domain.
 
