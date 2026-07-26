@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-26T10:39:14-04:00
+Generated: 2026-07-26T19:47:31-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-30
+31
 ```
 
 ## Skills
@@ -412,6 +412,25 @@ Example ways the owner might ask for this:
 
 - use knowledge vault search
 - run knowledge.vault.search
+
+### Local Search
+
+```text
+id: local.search
+category: knowledge
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Search reviewed repository documentation, Knowledge Vault notes, and canonical Music and Visual project briefs in one bounded source-attributed foreground read.
+
+Example ways the owner might ask for this:
+
+- use local search
+- run local.search
 
 ### Project Timeline Inspect
 

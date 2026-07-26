@@ -53,6 +53,19 @@ entries:
     boundary: Ordinary conversation is not silently promoted into durable knowledge.
     examples:
       - Search the Knowledge Vault for our local model migration notes.
+  - id: local-search
+    label: Local project and document search
+    category: Knowledge
+    summary: Search reviewed local documentation and canonical Music and Visual project briefs with source citations.
+    skill_ids: [local.search]
+    required_inputs: [A local search query]
+    optional_inputs: [Repository, Knowledge Vault, Music, or Visual source filter]
+    core: Any Core; retrieval is deterministic and local.
+    approval: No approval for this bounded read.
+    output: Ranked excerpts with source kind, canonical reference, digest, and freshness metadata.
+    boundary: Search is limited to reviewed adapters, creates no index or memory, and never treats source text as authority.
+    examples:
+      - Search local projects and documents for backrooms visual prompts.
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

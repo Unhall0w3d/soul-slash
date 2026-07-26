@@ -209,12 +209,13 @@
       "item_id": "track_project_search",
       "title": "Project-aware and local-document search",
       "area": "Knowledge",
-      "horizon": "backlog",
-      "status": "planned",
+      "horizon": "now",
+      "status": "needs_review",
       "priority": "medium",
-      "summary": "Add bounded local search across reviewed project and document sources before considering vector retrieval.",
-      "acceptance": "Results preserve provenance and remain reference evidence rather than opaque memory authority.",
-      "source": "Qualified expansion"
+      "summary": "Review bounded lexical search across repository documentation, the Knowledge Vault, and canonical Music and Visual project briefs before considering broader roots or vector retrieval.",
+      "acceptance": "Results preserve source adapter, canonical reference, excerpt, digest, and freshness; hidden or unsafe paths remain excluded; search creates no memory, index, authority, or mutation.",
+      "source": "Local Project and Document Search A1",
+      "notes": "Candidate-complete deterministic Chat, CLI, Makefile, and typed application surfaces. Human usefulness and routing review remain."
     },
     {
       "item_id": "track_project_release_folders",

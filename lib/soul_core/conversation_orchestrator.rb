@@ -127,6 +127,9 @@ module SoulCore
       /\A\s*(?:show\s+|check\s+)?knowledge\s+vault\s+status\s*[?.!]*\z/i,
       /\A\s*search\s+(?:the\s+)?knowledge\s+vault\s+(?:for\s+)?.+\z/i
     ].freeze
+    LOCAL_SEARCH_CONTROL_PATTERNS = [
+      /\A\s*(?:please\s+)?(?:search|find)\s+(?:(?:my\s+)?(?:local\s+)?(?:projects?\s+and\s+documents?|documents?\s+and\s+projects?)|(?:my\s+)?local\s+sources?|(?:my\s+)?project\s+archive)\s+(?:for\s+)?.+\z/i
+    ].freeze
     PROJECT_TRACKER_CONTROL_PATTERNS = [
       /\A\s*(?:show|list|open)\s+(?:the\s+)?(?:project\s+timeline|implementation\s+tracker)\s*[?.!]*\z/i,
       /\A\s*what(?:'s|\s+is)\s+(?:next|on\s+the\s+project\s+timeline)\s*[?.!]*\z/i,
@@ -301,6 +304,14 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "explicit Knowledge Vault status and search remain bounded deterministic reads",
           flags: flags.merge("knowledge_vault_control" => true)
+        )
+      end
+
+      if LOCAL_SEARCH_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "explicit local project and document search remains a bounded source-attributed read",
+          flags: flags.merge("local_search_control" => true)
         )
       end
 

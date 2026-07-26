@@ -9,6 +9,7 @@ require_relative "chat_execution_history"
 require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "knowledge_vault_service"
+require_relative "local_search_service"
 require_relative "invocation_catalog_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
@@ -90,6 +91,7 @@ module SoulCore
       music_reference_synthesis_provider: nil,
       visual_studio_service: nil,
       knowledge_vault_service: nil,
+      local_search_service: nil,
       invocation_catalog_service: nil
     )
       @root = File.expand_path(root)
@@ -129,6 +131,7 @@ module SoulCore
       @music_reference_synthesis_provider = music_reference_synthesis_provider
       @visual_studio_service = visual_studio_service
       @knowledge_vault_service = knowledge_vault_service
+      @local_search_service = local_search_service
       @invocation_catalog_service = invocation_catalog_service
     end
 
@@ -243,6 +246,12 @@ module SoulCore
           tags: parameters["tags"] || [],
           confirmation: parameters["confirmation"],
           expected_digest: parameters["expected_digest"]
+        ))
+      when "local_search.search"
+        domain(local_search.search(
+          query: required(parameters, "query"),
+          limit: parameters["limit"],
+          sources: parameters["sources"]
         ))
       when "invocations.list" then [invocation_catalog.list(category: parameters["category"], query: parameters["query"]), "complete", "none", false]
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
@@ -697,6 +706,16 @@ module SoulCore
 
       _report, resolver = resolved_configuration
       @knowledge_vault_service ||= KnowledgeVaultService.new(
+        root: @root,
+        process_env: resolver.effective_environment
+      )
+    end
+
+    def local_search
+      return @local_search_service if @local_search_service
+
+      _report, resolver = resolved_configuration
+      @local_search_service ||= LocalSearchService.new(
         root: @root,
         process_env: resolver.effective_environment
       )

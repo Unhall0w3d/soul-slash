@@ -126,6 +126,8 @@ Current bounded capabilities include:
 - bounded Knowledge Vault search, reviewed memory bridges, deterministic
   knowledge-destination reflection, and explicit local conversation-to-note
   proposal planning
+- bounded source-attributed local search across repository documentation,
+  Knowledge Vault notes, and canonical Music and Visual project briefs
 
 Separate Beta candidates are held outside the production registry. They run only after preview and exact human confirmation, with bounded foreground execution and local diagnostic evidence.
 

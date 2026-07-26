@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/configuration_resolver"
+require_relative "../lib/soul_core/local_search_service"
+
+query = ARGV.shift.to_s
+limit = ARGV.shift || 10
+sources = ARGV.empty? ? nil : ARGV
+resolver = SoulCore::ConfigurationResolver.new(root: Dir.pwd, process_env: ENV)
+configuration = resolver.resolve
+
+unless configuration.fetch("ok")
+  puts JSON.pretty_generate(
+    "ok" => false,
+    "lifecycle_state" => "failed",
+    "message" => "Soul configuration is invalid: #{configuration.fetch('errors', []).join('; ')}",
+    "data" => {}
+  )
+  exit 1
+end
+
+service = SoulCore::LocalSearchService.new(root: Dir.pwd, process_env: resolver.effective_environment)
+result = service.search(query: query, limit: limit, sources: sources)
+puts JSON.pretty_generate(result)
+exit(result["lifecycle_state"] == "failed" ? 1 : 0)
