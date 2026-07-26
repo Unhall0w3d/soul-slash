@@ -13,6 +13,11 @@ require_relative "music_revision_draft_service"
 module SoulCore
   class ConversationCreativeWorkflowService
     EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
+    CORE_LABELS = {
+      "daily" => "Daily Core",
+      "amd-free" => "AMD-Free Core",
+      "music" => "Music Core"
+    }.freeze
 
     def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
       @root = File.expand_path(root)
@@ -91,6 +96,7 @@ module SoulCore
       flow["lifecycle_state"] = "blocked_for_human_review"
       flow["stage"] = "ready"
       flow["missing_required"] = []
+      flow["core_requirement"] = core_requirement(flow, action_id: "creative_generate")
       flow["pending_action"] = build_action(flow)
       @flow_store.write(flow)
       result(render_brief(flow), "creative_ready", flow, actions: [flow.fetch("pending_action")])
@@ -124,7 +130,7 @@ module SoulCore
       return execute_music_disposition(flow) if %w[creative_music_export creative_music_reject].include?(action.fetch("action_id"))
 
       progress&.call({ "stage" => "core", "message" => "Verifying the exact creative Core transition." })
-      core = ensure_creative_core(flow)
+      core = ensure_creative_core(flow, action_id: action.fetch("action_id"))
       return append_terminal(flow, core, "Core transition did not complete; no creative generation was started") unless core.fetch("ok")
 
       attachments = []
@@ -413,6 +419,7 @@ module SoulCore
         "packet_digest" => data["packet_digest"]
       }
       flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["core_requirement"] = core_requirement(flow, action_id: "creative_music_revision")
       flow["pending_action"] = build_music_revision_action(flow)
       @flow_store.write(flow)
       result(render_music_revision(flow), "creative_music_revision_ready", flow, actions: [flow.fetch("pending_action")])
@@ -443,7 +450,8 @@ module SoulCore
     def build_music_revision_action(flow)
       { "action_id" => "creative_music_revision", "operation" => "chats.creative.execute", "label" => "Generate exact revised candidate",
         "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
-        "expected_digest" => action_digest(flow), "risk" => "bounded_music_revision_generation" }
+        "expected_digest" => action_digest(flow), "risk" => "bounded_music_revision_generation",
+        "core_requirement" => flow.fetch("core_requirement") }
     end
 
     def render_music_revision(flow)
@@ -460,6 +468,8 @@ module SoulCore
         "Lyrics and section markers (preserved):", revision['lyrics'].to_s, "",
         "Why this revision: #{draft['rationale']}",
         "Changes: #{Array(draft['changes']).join(' ')}", "",
+        *render_core_requirement(flow),
+        "",
         "Review the complete input. Clicking the action revalidates Music Core and authorizes only this exact linked revision candidate."
       ].join("\n")
     end
@@ -468,7 +478,7 @@ module SoulCore
       draft = flow.fetch("revision_draft")
       music = flow.dig("generated", "music")
       progress&.call({ "stage" => "core", "message" => "Revalidating Music Core for the exact revision." })
-      core = ensure_creative_core(flow)
+      core = ensure_creative_core(flow, action_id: "creative_music_revision")
       return core unless core.fetch("ok")
 
       project_id = music.dig("project", "project_id")
@@ -523,6 +533,7 @@ module SoulCore
         "seed" => data.fetch("seed"), "rationale" => data.fetch("rationale"), "packet_digest" => data["packet_digest"]
       }
       flow["lifecycle_state"] = "blocked_for_human_review"
+      flow["core_requirement"] = core_requirement(flow, action_id: "creative_visual_revision")
       flow["pending_action"] = build_visual_revision_action(flow)
       @flow_store.write(flow)
       result(render_visual_revision(flow), "creative_visual_revision_ready", flow, actions: [flow.fetch("pending_action")])
@@ -547,7 +558,8 @@ module SoulCore
     def build_visual_revision_action(flow)
       { "action_id" => "creative_visual_revision", "operation" => "chats.creative.execute", "label" => "Generate exact guided visual revision",
         "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
-        "expected_digest" => action_digest(flow), "risk" => "bounded_visual_revision_generation" }
+        "expected_digest" => action_digest(flow), "risk" => "bounded_visual_revision_generation",
+        "core_requirement" => flow.fetch("core_requirement") }
     end
 
     def render_visual_revision(flow)
@@ -558,6 +570,8 @@ module SoulCore
         "Visual: #{visual.dig('project', 'title')}", "Source candidate: #{draft['source_candidate_id']}",
         "Edit instruction: #{draft['instruction']}", "Seed: #{draft['seed']}",
         "Why this revision: #{draft['rationale']}", "",
+        *render_core_requirement(flow),
+        "",
         "Review the complete edit. Clicking the action revalidates the creative Core and authorizes only this exact linked image-guided revision."
       ].join("\n")
     end
@@ -566,7 +580,7 @@ module SoulCore
       draft = flow.fetch("visual_revision_draft")
       visual = flow.dig("generated", "visual")
       progress&.call({ "stage" => "core", "message" => "Revalidating the creative Core for the exact visual revision." })
-      core = ensure_creative_core(flow)
+      core = ensure_creative_core(flow, action_id: "creative_visual_revision")
       return core unless core.fetch("ok")
 
       project_id = visual.dig("project", "project_id")
@@ -719,7 +733,8 @@ module SoulCore
     def build_action(flow)
       { "action_id" => "creative_generate", "operation" => "chats.creative.execute", "label" => action_label(flow),
         "flow_id" => flow.fetch("flow_id"), "chat_id" => flow.fetch("chat_id"), "confirmation_phrase" => EXECUTE_CONFIRMATION,
-        "expected_digest" => action_digest(flow), "risk" => "write_local_state_and_bounded_generation" }
+        "expected_digest" => action_digest(flow), "risk" => "write_local_state_and_bounded_generation",
+        "core_requirement" => flow.fetch("core_requirement") }
     end
 
     def action_digest(flow)
@@ -750,6 +765,7 @@ module SoulCore
         lines.concat(["", "Visual", "Title: #{value(plan['visual_title'])}", "Intent: #{value(plan['visual_intent'])}",
           "Frame: #{value(plan['aspect_ratio'])}", "Scene and aesthetic: #{value(plan['visual_prompt'])}"])
       end
+      lines.concat(["", *render_core_requirement(flow)]) unless question
       lines << "\n#{question}" if question
       lines << "\nReview the visible brief. The action below authorizes the exact Core-aware local generation; model text alone cannot start it." unless question
       lines.join("\n")
@@ -770,8 +786,69 @@ module SoulCore
       end
     end
 
-    def ensure_creative_core(flow)
-      target_core_id = needs_music?(flow) ? "music" : "amd-free"
+    def core_requirement(flow, action_id:)
+      status = @core_orchestration.status
+      raise ArgumentError, status.fetch("reason", "Core status is unavailable") unless status.fetch("ok")
+
+      active_core_id = status.dig("data", "active_core_id").to_s
+      raise ArgumentError, "active Core is unavailable" unless CORE_LABELS.key?(active_core_id)
+
+      required_core_id = required_core_id(flow, action_id)
+      {
+        "active_core_id" => active_core_id,
+        "active_core_label" => CORE_LABELS.fetch(active_core_id),
+        "required_core_id" => required_core_id,
+        "required_core_label" => required_core_id ? CORE_LABELS.fetch(required_core_id) : "No Core transfer",
+        "transition_required" => !required_core_id.nil? && active_core_id != required_core_id,
+        "authorization" => "included_in_exact_action_click",
+        "reason" => core_requirement_reason(action_id, required_core_id)
+      }
+    end
+
+    def required_core_id(flow, action_id)
+      case action_id
+      when "creative_music_revision" then "music"
+      when "creative_visual_revision" then "amd-free"
+      when "creative_generate"
+        return "music" if new_music?(flow)
+        return "amd-free" if new_visual?(flow)
+        nil
+      else
+        nil
+      end
+    end
+
+    def core_requirement_reason(action_id, required_core_id)
+      return "This action resolves reviewed local sources and does not start bounded generation." unless required_core_id
+      return "Music generation reserves AMD for ACE-Step while NVIDIA carries chat." if %w[creative_generate creative_music_revision].include?(action_id) && required_core_id == "music"
+
+      "Visual generation releases AMD chat before the bounded Vulkan render."
+    end
+
+    def render_core_requirement(flow)
+      requirement = flow.fetch("core_requirement")
+      transition = if requirement.fetch("transition_required")
+        "#{requirement.fetch('active_core_label')} → #{requirement.fetch('required_core_label')} after your click"
+      elsif requirement["required_core_id"]
+        "Already in #{requirement.fetch('required_core_label')}; no transfer needed"
+      else
+        "No transfer needed"
+      end
+      [
+        "Core preflight",
+        "Active: #{requirement.fetch('active_core_label')}",
+        "Required: #{requirement.fetch('required_core_label')}",
+        "Transition: #{transition}",
+        "Reason: #{requirement.fetch('reason')}"
+      ]
+    end
+
+    def ensure_creative_core(flow, action_id:)
+      target_core_id = required_core_id(flow, action_id)
+      stored = flow.fetch("core_requirement")
+      return domain("blocked_for_human_review", false, "creative Core requirement changed; review the action again") unless stored["required_core_id"] == target_core_id
+      return success({ "core_transition" => "not_required" }) unless target_core_id
+
       status = @core_orchestration.status
       return status unless status.fetch("ok")
       return status if status.dig("data", "active_core_id") == target_core_id
@@ -902,7 +979,7 @@ module SoulCore
     end
 
     def public_flow(flow)
-      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "companion_action", "created_at", "updated_at")
+      flow.slice("flow_id", "chat_id", "kind", "stage", "lifecycle_state", "missing_required", "plan", "core_requirement", "generated", "revision_draft", "visual_revision_draft", "disposition_action", "companion_action", "created_at", "updated_at")
     end
 
     def needs_music?(flow) = %w[music combined].include?(flow.fetch("kind"))

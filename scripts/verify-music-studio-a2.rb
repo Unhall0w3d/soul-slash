@@ -282,11 +282,27 @@ Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
 end
 
 Dir.mktmpdir("soul-music-a2-instrumental-token-") do |root|
-  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { "abababababababab" }, clock: -> { Time.utc(2026, 7, 18, 20, 0, 0) })
+  ids = %w[abababababababab cdcdcdcdcdcdcdcd]
+  store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift }, clock: -> { Time.utc(2026, 7, 18, 20, 0, 0) })
   instrumental = project_input.merge("vocal_mode" => "instrumental", "lyrics" => "", "timesignature" => "7")
   project = store.create(instrumental)
   input = store.input_payload(project)
   check.call("instrumental projects send the pinned runtime's trained no-vocal token", project["lyrics"].empty? && input["lyrics"] == "[Instrumental]" && input["timesignature"] == "7")
+
+  timed = store.create(instrumental.merge(
+    "title" => "Timed instrumental fixture",
+    "caption" => "Industrial breakcore changes its dominant rhythm after 30 seconds, fractures again at 60 seconds, and ends with a transformed final chase."
+  ))
+  timed_input = store.input_payload(timed)
+  check.call("instrumental timing stays in Sound and Structure while runtime lyrics stay exact", timed["caption"].include?("30 seconds") && timed_input["lyrics"] == "[Instrumental]")
+
+  vocal_timing_rejected = begin
+    store.create(project_input.merge("caption" => "A vocal arrangement changes its lead texture after 30 seconds."))
+    false
+  rescue SoulCore::MusicProjectStore::ValidationError => error
+    error.message.include?("Vocal Sound and Structure")
+  end
+  check.call("vocal timing remains in the lyrics and section-marker channel", vocal_timing_rejected)
 
   rejected = begin
     store.create(instrumental.merge("lyrics" => "[Instrumental Section]"))

@@ -228,15 +228,21 @@ module SoulCore
       [
         {
           "capability" => "vision_screen_understanding",
-          "status" => "missing",
-          "detail" => "No vision model or screenshot ingestion workflow is currently registered by this assessment.",
-          "requires" => ["screenshot_capture_skill", "vision_model_runtime", "vision_workflow_handler"]
+          "status" => "partial",
+          "detail" => "Dashboard Chat has bounded PNG/JPEG understanding through the Daily Core. Explicit monitor, window, and region capture remain unimplemented.",
+          "requires" => ["screenshot_capture_skill", "screen_workflow_handler", "voice_perception_routing"]
         },
         {
           "capability" => "speech_to_text",
-          "status" => "missing",
-          "detail" => "No local speech-to-text runtime is currently registered by this assessment.",
-          "requires" => ["audio_capture", "stt_runtime", "transcription_skill"]
+          "status" => "available",
+          "detail" => "Dashboard Chat has explicit push-to-talk capture and a bounded local whisper.cpp transcription adapter; the optional pinned runtime is checked at invocation.",
+          "requires" => []
+        },
+        {
+          "capability" => "text_to_speech",
+          "status" => "available",
+          "detail" => "Dashboard Chat has explicit per-message playback and a bounded CPU-only Supertonic 3 synthesis adapter; the optional pinned runtime is checked at invocation.",
+          "requires" => []
         },
         {
           "capability" => "model_suitability_routing",
@@ -286,12 +292,14 @@ module SoulCore
         )
       end
 
-      recs << rec(
-        "info",
-        "Vision capability not implemented",
-        "Soul cannot yet inspect screenshots or reason over visible screen content.",
-        "Future phase: add screenshot capture, a vision model runtime, and a bounded vision workflow."
-      )
+      if report.fetch("capability_gaps", []).any? { |gap| gap["capability"] == "vision_screen_understanding" && gap["status"] == "partial" }
+        recs << rec(
+          "info",
+          "Screen capture remains unimplemented",
+          "Soul can inspect one explicit PNG or JPEG in Chat, but cannot yet capture a monitor, window, or region.",
+          "Future phase: add explicit one-shot capture and a bounded screen-understanding workflow."
+        )
+      end
 
       recs
     end

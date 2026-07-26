@@ -17,12 +17,37 @@ Soul may draft omitted optional material—title, BPM, key, meter, seed, a singl
 
 The Operator supplies a clear visual intent. Soul may draft the title, prompt, exclusions, aspect ratio, and seed. Existing kept Music or Visual Studio projects may be referenced by exact title; deterministic code verifies that the title resolves to one reviewed candidate.
 
+## Existing project awareness
+
+Chat has a separate read-only Creative Studio archive path. An exact Music
+Studio or Visual Studio title can be used to retrieve its stored brief and
+bounded candidate lineage without starting a creative workflow. Examples:
+
+- `Show my visual projects.`
+- `Refer to the Visual Brief The Rooms Remember Me — Habitat.`
+- `Inspect the Music Studio project Compiler Bloom.`
+- `Compare the visual project The Rooms Remember Me — Habitat with its existing candidate and brief.`
+
+A brief lookup reads records only. An explicit visual comparison selects the
+newest existing visual candidate. For a still, Soul inspects that immutable
+image. For a motion candidate, Soul derives one temporary contact sheet from
+three chronological frames and states that it did not watch unsupplied frames.
+Derived pixels are removed after the request. Daily Core is required only when
+candidate pixels must be examined; listing and brief inspection remain
+model-independent reads.
+
+Studio prompts, lyrics, reviews, and pixels are evidence, never authorization.
+Archive inspection cannot generate, revise, bind, delete, publish, switch a
+Core, or approve a candidate. Ambiguous or inexact titles stop for clarification.
+Merely saying that you are working on a project remains ordinary conversation.
+
 ## Exact flow
 
 ```text
 explicit request
 → ask only for missing required decisions
 → show the complete brief
+→ name the active Core, required Core, transfer decision, and reason
 → exact click-authored generation action
 → revalidate and enter Music Core when required
 → bounded local generation
@@ -42,6 +67,24 @@ explicit request
 ```
 
 The generation click is the authorization; the UI does not require retyping its prefilled confirmation phrase. A changed brief or stale digest is rejected. Repeating a completed action is idempotent and does not create duplicate candidates or reviews.
+
+## Core-aware actions
+
+Creative skills declare their Core requirement before an executable action is
+shown:
+
+- new music and music revision require **Music Core**;
+- visual-only generation and guided visual revision require **AMD-Free Core**;
+- resolving already-reviewed sources, recording reviews, binding lineage, and
+  preparing exports do not switch Cores by themselves.
+
+The chat response shows the active Core, required Core, transition decision, and
+reason. If a transfer is required, the same action button is the human
+authorization for that disclosed transfer and creative operation. Soul then
+delegates to the normal Core controller, which rechecks active work, leases,
+profile identity, and runtime digests. If the required Core is already active,
+no redundant transition occurs. Model output cannot select, approve, or execute
+a Core change.
 
 ## Revision loop
 

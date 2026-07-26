@@ -14,6 +14,8 @@ module SoulCore
       capability_info
       capability_gap
       research_reflection
+      knowledge_reflection
+      knowledge_reflection_control
       web_lookup
       web_research
       creative_workflow

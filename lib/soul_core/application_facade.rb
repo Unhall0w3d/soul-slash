@@ -8,6 +8,7 @@ require_relative "approval_token_store"
 require_relative "chat_execution_history"
 require_relative "chat_store"
 require_relative "configuration_resolver"
+require_relative "knowledge_vault_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
@@ -17,6 +18,7 @@ require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
+require_relative "project_tracker_service"
 require_relative "model_runtime_control_service"
 require_relative "core_orchestration_service"
 require_relative "skill_registry"
@@ -58,6 +60,7 @@ module SoulCore
       conversation_forget_service: nil,
       workspace_service: nil,
       status_collector: nil,
+      project_tracker_service: nil,
       model_runtime_control_service: nil,
       core_orchestration_service: nil,
       approval_store: nil,
@@ -81,7 +84,8 @@ module SoulCore
       music_reference_analysis_service: nil,
       music_reference_synthesis_service: nil,
       music_reference_synthesis_provider: nil,
-      visual_studio_service: nil
+      visual_studio_service: nil,
+      knowledge_vault_service: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h
@@ -93,6 +97,7 @@ module SoulCore
       @conversation_forget_service = conversation_forget_service
       @workspace_service = workspace_service
       @status_collector = status_collector
+      @project_tracker_service = project_tracker_service
       @model_runtime_control_service = model_runtime_control_service
       @core_orchestration_service = core_orchestration_service
       @approval_store = approval_store
@@ -117,6 +122,7 @@ module SoulCore
       @music_reference_synthesis_service = music_reference_synthesis_service
       @music_reference_synthesis_provider = music_reference_synthesis_provider
       @visual_studio_service = visual_studio_service
+      @knowledge_vault_service = knowledge_vault_service
     end
 
     def call(request, progress: nil)
@@ -185,6 +191,9 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
+      when "project_tracker.snapshot" then domain(project_tracker.snapshot)
+      when "project_tracker.items.create" then domain(project_tracker.create(attributes: required(parameters, "item")))
+      when "project_tracker.items.update" then domain(project_tracker.update(item_id: required(parameters, "item_id"), attributes: required(parameters, "item"), expected_revision: required(parameters, "expected_revision")))
       when "core.status" then domain(core_orchestration.status)
       when "core.activate.preview" then domain(core_orchestration.preview(core_id: required(parameters, "core_id")))
       when "core.activate.execute" then domain(core_orchestration.execute(core_id: required(parameters, "core_id"), target_profile_id: required(parameters, "target_profile_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -198,6 +207,36 @@ module SoulCore
       when "configuration.show" then domain(configuration_report)
       when "configuration.explain" then domain(configuration_explain(parameters))
       when "configuration.validate" then domain(configuration_validate)
+      when "knowledge_vault.status" then domain(knowledge_vault.status)
+      when "knowledge_vault.search" then domain(knowledge_vault.search(query: required(parameters, "query"), limit: parameters["limit"]))
+      when "knowledge_vault.initialize.preview" then domain(knowledge_vault.initialize_preview)
+      when "knowledge_vault.initialize.execute" then domain(knowledge_vault.initialize_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "knowledge_vault.memory_export.preview" then domain(knowledge_vault.memory_export_preview)
+      when "knowledge_vault.memory_export.execute" then domain(knowledge_vault.memory_export_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "knowledge_vault.memory_import.preview" then domain(knowledge_vault.memory_import_preview(relative_path: required(parameters, "relative_path"), layer: required(parameters, "layer")))
+      when "knowledge_vault.memory_import.execute" then domain(knowledge_vault.memory_import_execute(relative_path: required(parameters, "relative_path"), layer: required(parameters, "layer"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "knowledge_vault.reflection.preview"
+        domain(knowledge_vault.reflection_preview(
+          title: required(parameters, "title"),
+          body: required(parameters, "body"),
+          knowledge_kind: required(parameters, "knowledge_kind"),
+          evidence_status: required(parameters, "evidence_status"),
+          source_reference: required(parameters, "source_reference"),
+          target_relative_path: parameters["target_relative_path"],
+          tags: parameters["tags"] || []
+        ))
+      when "knowledge_vault.reflection.execute"
+        domain(knowledge_vault.reflection_execute(
+          title: required(parameters, "title"),
+          body: required(parameters, "body"),
+          knowledge_kind: required(parameters, "knowledge_kind"),
+          evidence_status: required(parameters, "evidence_status"),
+          source_reference: required(parameters, "source_reference"),
+          target_relative_path: parameters["target_relative_path"],
+          tags: parameters["tags"] || [],
+          confirmation: parameters["confirmation"],
+          expected_digest: parameters["expected_digest"]
+        ))
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
       when "skill_studio.proposals.list" then domain(skill_studio.proposals(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
       when "skill_studio.proposals.get" then domain(skill_studio.proposal(proposal_id: required(parameters, "proposal_id")))
@@ -324,7 +363,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Self Improvement", "Creative Studios"],
+        "product_tabs" => ["Chat", "Project Timeline", "Self Improvement", "Creative Studios"],
         "creative_surfaces" => ["Music Studio", "Visual Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
@@ -636,6 +675,16 @@ module SoulCore
       @skill_registry ||= SkillRegistry.new(path: File.join(@root, "Soul", "skills", "registry.yaml"))
     end
 
+    def knowledge_vault
+      return @knowledge_vault_service if @knowledge_vault_service
+
+      _report, resolver = resolved_configuration
+      @knowledge_vault_service ||= KnowledgeVaultService.new(
+        root: @root,
+        process_env: resolver.effective_environment
+      )
+    end
+
     def skill_studio
       @skill_studio_service ||= SkillStudioService.new(root: @root, clock: @clock)
     end
@@ -662,6 +711,10 @@ module SoulCore
 
     def visual_studio
       @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion)
+    end
+
+    def project_tracker
+      @project_tracker_service ||= ProjectTrackerService.new(root: @root, clock: @clock)
     end
 
     def conversation_creative_workflow

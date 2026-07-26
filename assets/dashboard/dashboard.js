@@ -1,11 +1,86 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel" });
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel" });
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
+state.voiceRoundTripPending = false;
+state.pictureAttachment = null;
+state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
+Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
+const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
+const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
+const NOTIFICATION_MODES = ["voice", "cues", "muted"];
+const NOTIFICATION_EVENTS = Object.freeze({
+  submit: { cue: "submit" },
+  chat_ready: { cue: "complete", spoken: "chat-ready" },
+  music_ready: { cue: "complete", spoken: "music-ready" },
+  visual_ready: { cue: "complete", spoken: "visual-ready" },
+  lyrics_ready: { cue: "complete", spoken: "lyrics-ready" },
+  attention: { cue: "attention", spoken: "attention" }
+});
+try { const storedVoice = localStorage.getItem("soul.voice.output.profile"); state.voiceOutputProfile = VOICE_OUTPUT_PROFILES.has(storedVoice) ? storedVoice : "F3"; } catch (_error) { state.voiceOutputProfile = "F3"; }
+try { const storedQuality = localStorage.getItem("soul.voice.output.quality"); state.voiceOutputQuality = VOICE_OUTPUT_QUALITIES.has(storedQuality) ? storedQuality : "responsive"; } catch (_error) { state.voiceOutputQuality = "responsive"; }
+try { const storedMode = localStorage.getItem("soul.notifications.mode"); state.notificationMode = NOTIFICATION_MODES.includes(storedMode) ? storedMode : "voice"; } catch (_error) { state.notificationMode = "voice"; }
+state.notificationPlayback = null;
+state.notificationKeys = new Set();
+
+function renderNotificationMode() {
+  const button = byId("notification-mode"); if (!button) return;
+  const labels = { voice: "Alerts Voice", cues: "Alerts Cues", muted: "Alerts Muted" };
+  button.querySelector("span").textContent = labels[state.notificationMode];
+  button.dataset.mode = state.notificationMode;
+  button.title = state.notificationMode === "voice"
+    ? "Cues plus pre-generated speech while Voice Presence is open and idle · click to change"
+    : (state.notificationMode === "cues" ? "Nonverbal notification cues only · click to change" : "Local notifications muted · click to change");
+}
+
+function cycleNotificationMode() {
+  const index = NOTIFICATION_MODES.indexOf(state.notificationMode);
+  state.notificationMode = NOTIFICATION_MODES[(index + 1) % NOTIFICATION_MODES.length];
+  try { localStorage.setItem("soul.notifications.mode", state.notificationMode); } catch (_error) { /* session preference remains */ }
+  renderNotificationMode();
+  announce(`${byId("notification-mode").querySelector("span").textContent} selected`);
+}
+
+function playNotificationFile(path, volume) {
+  return new Promise((resolve) => {
+    if (state.notificationPlayback) {
+      state.notificationPlayback.pause();
+      state.notificationPlayback.src = "";
+    }
+    const audio = new Audio(path); state.notificationPlayback = audio; audio.volume = volume;
+    const finish = () => { if (state.notificationPlayback === audio) state.notificationPlayback = null; resolve(); };
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", finish, { once: true });
+    audio.play().catch(finish);
+  });
+}
+
+async function voicePresenceReceipt() {
+  try {
+    const response = await fetch("/api/v1/voice/presence/status", { credentials: "same-origin", cache: "no-store" });
+    const result = await response.json();
+    return response.ok ? result.data || {} : {};
+  } catch (_error) { return {}; }
+}
+
+async function emitSoulNotification(eventName, uniqueKey = null) {
+  const event = NOTIFICATION_EVENTS[eventName]; if (!event || state.notificationMode === "muted") return;
+  if (uniqueKey && state.notificationKeys.has(uniqueKey)) return;
+  if (uniqueKey) {
+    state.notificationKeys.add(uniqueKey);
+    if (state.notificationKeys.size > 100) state.notificationKeys.delete(state.notificationKeys.values().next().value);
+  }
+  await playNotificationFile(`/notifications/cue-${event.cue}.wav`, 0.48);
+  if (state.notificationMode !== "voice" || !event.spoken) return;
+  const presence = await voicePresenceReceipt();
+  if (presence.running !== true || presence.presence_state !== "listening") return;
+  const voice = presence.notification_voice === "M3" ? "m3" : "f3";
+  await playNotificationFile(`/notifications/${voice}-${event.spoken}.wav`, 0.78);
+}
 
 function formatBytes(value) {
   const bytes = Number(value); if (!Number.isFinite(bytes) || bytes < 0) return "unavailable";
@@ -78,6 +153,43 @@ async function activeMusicJobs(projectId) {
 
 const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress);
 
+async function callPictureStream(payload, onProgress = () => {}) {
+  const response = await fetch("/api/v1/perception/picture-stream", {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+    body: JSON.stringify(payload), cache: "no-store"
+  });
+  if (!response.ok || !response.body) {
+    const failure = await response.json().catch(() => ({}));
+    if (response.status === 401 || failure.error?.code === "password_change_required") window.location.reload();
+    if (response.status === 403 && failure.error?.code === "csrf") window.location.reload();
+    throw new Error(failure.error?.reason || "Picture understanding failed safely");
+  }
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let result = null;
+  while (true) {
+    const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const lines = buffer.split("\n"); buffer = lines.pop() || "";
+    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") result = event.result; });
+    if (done) break;
+  }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") result = event.result; }
+  if (!result) throw new Error("Picture stream ended without a terminal result");
+  return result;
+}
+
+async function callScreenCapture(mode) {
+  const response = await fetch("/api/v1/perception/screen-capture", {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+    body: JSON.stringify({ mode }), cache: "no-store"
+  });
+  const result = await response.json().catch(() => ({}));
+  if (response.status === 401 || result.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
+  if (response.status === 403 && result.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed"); }
+  if (!response.ok || result.lifecycle_state !== "complete") throw new Error(result.reason || result.error?.reason || "Screen capture stopped safely");
+  return result;
+}
+
 async function authRequest(path, body) {
   const options = { credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf } };
   if (body !== undefined) { options.method = "POST"; options.body = JSON.stringify(body); }
@@ -91,7 +203,7 @@ async function authRequest(path, body) {
 function setDashboardLocked(locked) {
   document.body.classList.toggle("auth-locked", locked);
   const gate = byId("auth-gate"); gate.hidden = !locked;
-  [document.querySelector(".app-header"), document.querySelector("main"), byId("review-center"), byId("clear-dialog"), byId("model-runtime-dialog")].forEach((element) => { if (element) element.inert = locked; });
+  [document.querySelector(".app-header"), document.querySelector("main"), byId("review-center"), byId("clear-dialog"), byId("model-runtime-dialog"), byId("screen-capture-dialog")].forEach((element) => { if (element) element.inert = locked; });
   if (!locked) { byId("logout-button").hidden = false; byId("auth-status").textContent = ""; }
 }
 
@@ -134,6 +246,8 @@ async function changePassword(event) {
 }
 
 async function logout() {
+  if (state.voiceRecorder) cancelVoiceRecording("Voice capture canceled at logout.");
+  stopVoicePlayback();
   byId("logout-button").disabled = true;
   try { await authRequest("/auth/v1/logout", {}); } finally { window.location.reload(); }
 }
@@ -189,18 +303,62 @@ function hideGenerationProgress(progress) { if (progress) progress.hidden = true
 function setSoulActivity(activityState, summary) {
   const presence = byId("soul-presence"); if (!presence) return;
   presence.dataset.state = activityState || "idle";
-  const titles = { idle: "Soul is listening.", received: "Transmission received.", context: "Reading the thread.", planning: "Tracing a path.", inspecting: "Inspecting local evidence.", researching: "Following public signals.", synthesizing: "Shaping a response.", drafting: "Preparing an artifact.", reviewing: "Reviewing the result.", finalizing: "Sealing continuity.", complete: "Soul is present.", failed: "The path closed safely." };
+  const titles = { idle: "Soul is listening.", received: "Transmission received.", context: "Reading the thread.", planning: "Tracing a path.", inspecting: "Inspecting local evidence.", researching: "Following public signals.", synthesizing: "Shaping a response.", speaking: "Soul is speaking.", drafting: "Preparing an artifact.", reviewing: "Reviewing the result.", finalizing: "Sealing continuity.", complete: "Soul is present.", failed: "The path closed safely." };
   byId("soul-presence-title").textContent = titles[activityState] || "Soul is working.";
   byId("soul-activity-summary").textContent = summary || "Foreground work remains bounded to this request.";
 }
 
 function setBusy(busy, message = "") {
   state.busy = busy;
-  byId("send-message").disabled = busy || !state.activeChat;
+  byId("send-message").disabled = busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("message-input").disabled = !state.activeChat;
+  byId("attach-picture").disabled = busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  byId("capture-screen").disabled = busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("send-message").querySelector("span").textContent = busy ? "Working" : "Send";
   byId("composer-hint").textContent = busy ? "Soul is working · you may draft, but ordinary Enter will not interrupt" : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected");
+  updateVoiceControl();
   if (message) announce(message);
+}
+
+function updateVoiceControl() {
+  const button = byId("record-voice"); if (!button) return;
+  const recording = Boolean(state.voiceRecorder);
+  button.disabled = !recording && (!state.activeChat || state.busy || state.voiceTranscribing || !state.authenticated);
+  button.setAttribute("aria-pressed", String(recording));
+  button.setAttribute("aria-label", recording ? "Stop push-to-talk recording" : "Start push-to-talk recording");
+  button.querySelector("span:last-child").textContent = recording ? "Stop" : (state.voiceTranscribing ? "Hearing" : "Speak");
+}
+
+async function refreshVoicePresence() {
+  const button = byId("voice-presence-launch"); if (!button || !state.authenticated) return;
+  try {
+    const response = await fetch("/api/v1/voice/presence/status", { credentials: "same-origin", cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error?.reason || "Voice Presence status unavailable");
+    const running = result.data?.running === true;
+    button.dataset.running = String(running);
+    button.querySelector("span").textContent = running ? "Voice Listening" : "Voice Presence";
+    button.title = running ? "Soul Voice Presence is open on the local desktop" : "Open the visible local Hey Soul window";
+  } catch (_error) {
+    button.dataset.running = "false";
+    button.querySelector("span").textContent = "Voice Unavailable";
+  }
+}
+
+async function launchVoicePresence() {
+  const button = byId("voice-presence-launch"); button.disabled = true;
+  try {
+    const response = await fetch("/api/v1/voice/presence/launch", {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+      headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+      body: JSON.stringify({ action: "launch" })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || result.error?.reason || "Voice Presence did not open");
+    announce(result.message || "Voice Presence opened on the local desktop");
+    await refreshVoicePresence();
+  } catch (error) { showError(error); }
+  finally { button.disabled = false; }
 }
 
 function tabFromLocation() { return Object.entries(TAB_LOCATIONS).find(([, hash]) => hash === window.location.hash)?.[0] || null; }
@@ -208,6 +366,9 @@ function tabFromLocation() { return Object.entries(TAB_LOCATIONS).find(([, hash]
 function switchTab(name, { updateLocation = true } = {}) {
   if (!Object.hasOwn(TAB_LOCATIONS, name)) name = "chat";
   const chat = name === "chat";
+  const timeline = name === "timeline";
+  if (!chat && state.voiceRecorder) cancelVoiceRecording("Voice capture stopped because Chat was closed.");
+  if (!chat) stopVoicePlayback();
   const studio = name === "studio";
   const improvement = name === "improvement";
   const augmentation = name === "augmentation";
@@ -216,12 +377,14 @@ function switchTab(name, { updateLocation = true } = {}) {
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual;
   byId("chat-panel").hidden = !chat;
+  byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
   byId("visual-panel").hidden = !visual;
   byId("chat-tab").classList.toggle("is-active", chat);
+  byId("timeline-tab").classList.toggle("is-active", timeline);
   byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
@@ -230,6 +393,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("music-tab").classList.toggle("is-active", music);
   byId("visual-tab").classList.toggle("is-active", visual);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
+  byId("timeline-tab").setAttribute("aria-selected", String(timeline));
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);
@@ -248,6 +412,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (augmentation && state.authenticated && !state.augmentationLoaded) loadSelfAugmentation();
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
+  if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
 }
 
 function setSelfImprovementMenu(open) {
@@ -260,6 +425,134 @@ function setCreativeMenu(open) {
   byId("creative-menu").hidden = !open;
   byId("creative-tab").setAttribute("aria-expanded", String(open));
   byId("creative-navigation").classList.toggle("is-open", open);
+}
+
+const TIMELINE_HORIZONS = ["now", "next", "later", "backlog"];
+const TIMELINE_STATUS_LABELS = Object.freeze({
+  planned: "Planned", in_progress: "In progress", blocked: "Blocked",
+  needs_review: "Needs review", validated: "Validated", done: "Done", deferred: "Deferred"
+});
+
+function timelineItems() { return Array.isArray(state.projectTracker?.items) ? state.projectTracker.items : []; }
+
+function buildTimelineCard(item) {
+  const card = document.createElement("button"); card.type = "button"; card.className = "timeline-item"; card.dataset.status = item.status;
+  const status = document.createElement("span"); status.textContent = `${TIMELINE_STATUS_LABELS[item.status] || item.status} · ${item.priority} · ${item.area}`;
+  const title = document.createElement("strong"); title.textContent = item.title;
+  const summary = document.createElement("small"); summary.textContent = item.summary;
+  card.append(status, title, summary); card.addEventListener("click", () => openTimelineEditor(item));
+  return card;
+}
+
+function renderProjectTimeline() {
+  const items = timelineItems();
+  byId("timeline-total").textContent = String(items.length);
+  byId("timeline-active").textContent = String(items.filter((item) => item.status === "in_progress").length);
+  byId("timeline-review").textContent = String(items.filter((item) => item.status === "needs_review").length);
+  byId("timeline-blocked").textContent = String(items.filter((item) => item.status === "blocked").length);
+  byId("timeline-done").textContent = String(items.filter((item) => ["validated", "done"].includes(item.status)).length);
+  const filter = byId("timeline-status-filter").value;
+  const inventoryMode = ["implemented", "done", "validated"].includes(filter);
+  byId("timeline-board").hidden = inventoryMode;
+  byId("timeline-inventory").hidden = !inventoryMode;
+  const inventoryList = byId("timeline-implemented-items"); inventoryList.replaceChildren();
+  if (inventoryMode) {
+    const implemented = items
+      .filter((item) => ["validated", "done"].includes(item.status) && (filter === "implemented" || item.status === filter))
+      .sort((left, right) => left.area.localeCompare(right.area) || left.title.localeCompare(right.title));
+    if (!implemented.length) {
+      const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No completed or validated feature records."; inventoryList.append(empty);
+    } else {
+      implemented.forEach((item) => inventoryList.append(buildTimelineCard(item)));
+    }
+  }
+  TIMELINE_HORIZONS.forEach((horizon) => {
+    const column = byId(`timeline-${horizon}`); column.replaceChildren();
+    const visible = items
+      .filter((item) => item.horizon === horizon && (
+        filter === "all" ||
+        (filter === "active" && !["validated", "done", "deferred"].includes(item.status)) ||
+        (filter === "implemented" && ["validated", "done"].includes(item.status)) ||
+        item.status === filter
+      ))
+      .sort((left, right) => (({ high: 0, medium: 1, low: 2 })[left.priority] - ({ high: 0, medium: 1, low: 2 })[right.priority]) || left.title.localeCompare(right.title));
+    if (!visible.length) {
+      const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = filter === "all" ? "No entries in this horizon." : "No matching entries."; column.append(empty); return;
+    }
+    visible.forEach((item) => column.append(buildTimelineCard(item)));
+  });
+}
+
+async function loadProjectTimeline({ announceLoad = false } = {}) {
+  byId("timeline-status").textContent = "Reading owner-local project state…";
+  try {
+    const envelope = await callSoul("project_tracker.snapshot");
+    requireLifecycle(envelope, ["complete"], "Project timeline could not be loaded");
+    state.projectTracker = dataOf(envelope); state.timelineLoaded = true; renderProjectTimeline();
+    const message = `Timeline ready · ${timelineItems().length} tracked items · revision ${state.projectTracker.revision}`;
+    byId("timeline-status").textContent = message; if (announceLoad) announce(message);
+  } catch (error) { state.timelineLoaded = false; byId("timeline-status").textContent = error.message; }
+}
+
+function openTimelineEditor(item = null) {
+  state.selectedTimelineItem = item;
+  byId("timeline-editor").hidden = false; byId("timeline-board").parentElement.classList.add("has-editor");
+  byId("timeline-editor-title").textContent = item ? "Feature record" : "New timeline item";
+  byId("timeline-item-id").value = item?.item_id || "";
+  byId("timeline-item-revision").value = item?.revision || "";
+  byId("timeline-item-title").value = item?.title || "";
+  byId("timeline-item-area").value = item?.area || "";
+  byId("timeline-item-horizon").value = item?.horizon || "next";
+  byId("timeline-item-status").value = item?.status || "planned";
+  byId("timeline-item-priority").value = item?.priority || "medium";
+  byId("timeline-item-summary").value = item?.summary || "";
+  byId("timeline-item-implementation").value = item?.implementation || "";
+  byId("timeline-item-technologies").value = item?.technologies || "";
+  byId("timeline-item-interfaces").value = item?.interfaces || "";
+  byId("timeline-item-commands").value = item?.commands || "";
+  byId("timeline-item-references").value = item?.references || "";
+  byId("timeline-item-acceptance").value = item?.acceptance || "";
+  byId("timeline-item-notes").value = item?.notes || "";
+  byId("timeline-item-source").value = item?.source || "Operator";
+  byId("timeline-editor-status").textContent = item ? `Editing ${item.item_id} · revision ${item.revision}` : "Create one explicit ledger entry.";
+  byId("timeline-item-title").focus();
+}
+
+function closeTimelineEditor() {
+  state.selectedTimelineItem = null; byId("timeline-editor").hidden = true;
+  byId("timeline-board").parentElement.classList.remove("has-editor"); byId("timeline-editor-status").textContent = "";
+}
+
+function timelineFormItem() {
+  return {
+    title: byId("timeline-item-title").value, area: byId("timeline-item-area").value,
+    horizon: byId("timeline-item-horizon").value, status: byId("timeline-item-status").value,
+    priority: byId("timeline-item-priority").value, summary: byId("timeline-item-summary").value,
+    implementation: byId("timeline-item-implementation").value,
+    technologies: byId("timeline-item-technologies").value,
+    interfaces: byId("timeline-item-interfaces").value,
+    commands: byId("timeline-item-commands").value,
+    references: byId("timeline-item-references").value,
+    acceptance: byId("timeline-item-acceptance").value, notes: byId("timeline-item-notes").value,
+    source: byId("timeline-item-source").value
+  };
+}
+
+async function saveTimelineItem(event) {
+  event.preventDefault(); const button = byId("save-timeline-item"); button.disabled = true;
+  byId("timeline-editor-status").textContent = "Writing one bounded ledger revision…";
+  try {
+    const itemId = byId("timeline-item-id").value;
+    const parameters = itemId
+      ? { item_id: itemId, item: timelineFormItem(), expected_revision: Number(byId("timeline-item-revision").value) }
+      : { item: timelineFormItem() };
+    const envelope = await callSoul(itemId ? "project_tracker.items.update" : "project_tracker.items.create", parameters);
+    requireLifecycle(envelope, ["complete"], envelope.errors?.[0]?.message || "Timeline item was not saved");
+    state.projectTracker = dataOf(envelope).tracker; renderProjectTimeline(); closeTimelineEditor();
+    const message = itemId ? "Timeline item updated." : "Timeline item created.";
+    byId("timeline-status").textContent = `${message} Revision ${state.projectTracker.revision}.`; announce(message);
+  } catch (error) { byId("timeline-editor-status").textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function renderChatList() {
@@ -293,6 +586,8 @@ async function loadChats(selectFirst = true) {
 }
 
 function resetConversationView() {
+  if (state.voiceRecorder) cancelVoiceRecording("Voice capture stopped because the conversation closed.");
+  clearPictureAttachment();
   state.activeChat = null;
   byId("active-chat-kicker").textContent = "No active thread";
   byId("active-chat-title").textContent = "Open a conversation";
@@ -301,11 +596,14 @@ function resetConversationView() {
   byId("message-input").disabled = true;
   byId("message-input").placeholder = "Create a conversation to begin…";
   byId("send-message").disabled = true;
+  updateVoiceControl();
   byId("composer-hint").textContent = "No conversation selected";
   renderMessages([], true); renderWorkspace([]); renderInbox({ records: [] });
 }
 
 async function selectChat(chat) {
+  stopVoicePlayback();
+  if (state.activeChat?.id && state.activeChat.id !== chat.id) clearPictureAttachment();
   state.activeChat = chat; renderChatList();
   byId("active-chat-kicker").textContent = chat.id;
   byId("active-chat-title").textContent = chat.title || "Untitled conversation";
@@ -328,17 +626,106 @@ function messageArticle(record, { pending = false, working = false } = {}) {
   if (pending) article.classList.add("message--pending"); if (working) article.classList.add("message--working");
   const label = document.createElement("div"); label.className = "message-label"; label.textContent = role === "user" ? (pending ? "You · sending" : "You") : "Soul /";
   const body = document.createElement("div"); body.className = "message-body"; body.textContent = record.content || record.text || ""; article.append(label, body);
+  if (role === "assistant" && !working) {
+    const spoken = String(record.content || record.text || "").trim();
+    if (spoken && spoken.length <= 2000 && !/^[\[{]/.test(spoken)) article.append(messageSpeakButton(spoken));
+  }
   const runtime = record.metadata?.runtime || {};
   renderMessageAttachments(article, Array.isArray(runtime.attachments) ? runtime.attachments : []);
+  if (runtime.perception) {
+    const meta = document.createElement("p"); meta.className = "message-perception-meta";
+    const dimensions = runtime.perception.width && runtime.perception.height ? `${runtime.perception.width}×${runtime.perception.height}` : null;
+    meta.textContent = [runtime.perception.model, dimensions, runtime.perception.retained ? "retained locally" : "source discarded", runtime.perception.latency_ms ? `${(Number(runtime.perception.latency_ms) / 1000).toFixed(1)}s` : null].filter(Boolean).join(" · ");
+    article.append(meta);
+  }
   renderMessageActions(article, Array.isArray(runtime.actions) ? runtime.actions : []);
   return article;
+}
+
+function messageSpeakButton(text) {
+  const button = document.createElement("button"); button.type = "button"; button.className = "message-speak-button"; button.textContent = "Speak"; button.setAttribute("aria-pressed", "false");
+  button.addEventListener("click", () => {
+    if (state.voiceSynthesisButton === button) { stopVoicePlayback(); return; }
+    synthesizeMessageSpeech(text, button);
+  });
+  return button;
+}
+
+function stopVoicePlayback() {
+  state.voiceSynthesisController?.abort();
+  state.voiceSynthesisController = null;
+  if (state.voicePlayback) { state.voicePlayback.pause(); state.voicePlayback.src = ""; }
+  state.voicePlayback = null;
+  if (state.voicePlaybackUrl) URL.revokeObjectURL(state.voicePlaybackUrl);
+  state.voicePlaybackUrl = null;
+  if (state.voiceSynthesisButton) {
+    state.voiceSynthesisButton.disabled = false;
+    state.voiceSynthesisButton.textContent = "Speak";
+    state.voiceSynthesisButton.setAttribute("aria-pressed", "false");
+  }
+  state.voiceSynthesisButton = null;
+  if (!state.busy && !state.voiceTranscribing && !state.voiceRecorder) setSoulActivity("idle", "Foreground work remains bounded to this request.");
+}
+
+async function synthesizeMessageSpeech(text, button) {
+  stopVoicePlayback();
+  const controller = new AbortController(); state.voiceSynthesisController = controller; state.voiceSynthesisButton = button;
+  button.disabled = false; button.textContent = "Cancel"; button.setAttribute("aria-pressed", "true");
+  setSoulActivity("speaking", "Preparing one bounded local voice response.");
+  try {
+    const expressive = state.voiceOutputQuality === "expressive";
+    const response = await fetch(expressive ? "/api/v1/voice/synthesize-stream" : "/api/v1/voice/synthesize", {
+      method: "POST", credentials: "same-origin", cache: "no-store", signal: controller.signal,
+      headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+      body: JSON.stringify({ text, voice: state.voiceOutputProfile, quality: state.voiceOutputQuality })
+    });
+    if (!response.ok) {
+      const failure = await response.json().catch(() => ({}));
+      throw new Error(failure.error?.reason || "Speech synthesis failed safely");
+    }
+    let blob;
+    if (expressive) {
+      if (!response.body) throw new Error("Expressive voice stream was unavailable");
+      const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let terminal = null;
+      while (true) {
+        const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const lines = buffer.split("\n"); buffer = lines.pop() || "";
+        lines.filter(Boolean).forEach((line) => {
+          const event = JSON.parse(line);
+          if (event.type === "progress") {
+            setSoulActivity("speaking", event.event?.message || "Expressive voice rendering is active.");
+            button.textContent = "Cancel";
+          }
+          if (event.type === "result") terminal = event.result;
+        });
+        if (done) break;
+      }
+      if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") terminal = event.result; }
+      if (!terminal?.ok) throw new Error(terminal?.message || "Expressive speech stopped safely");
+      const binary = atob(terminal.audio_base64); const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      blob = new Blob([bytes], { type: terminal.content_type || "audio/wav" });
+    } else {
+      blob = await response.blob();
+    }
+    if (state.voiceSynthesisController !== controller) return;
+    const url = URL.createObjectURL(blob); const audio = new Audio(url);
+    state.voicePlaybackUrl = url; state.voicePlayback = audio; state.voiceSynthesisController = null;
+    button.disabled = false; button.textContent = "Stop"; button.setAttribute("aria-pressed", "true");
+    const finish = () => { if (state.voicePlayback === audio) stopVoicePlayback(); };
+    audio.addEventListener("ended", finish, { once: true }); audio.addEventListener("error", finish, { once: true });
+    await audio.play();
+  } catch (error) {
+    if (error.name !== "AbortError") announce(error.message);
+    if (state.voiceSynthesisController === controller || state.voiceSynthesisButton === button) stopVoicePlayback();
+  }
 }
 
 function safeLocalArtifactUrl(value, kind) {
   const text = String(value || "");
   const patterns = {
     audio: /^\/api\/v1\/music\/audio\/music_[a-f0-9]{16}\/candidate_[a-f0-9]{16}\/(?:mp3|flac)$/,
-    image: /^\/api\/v1\/visual\/image\/visual_project_[a-f0-9]{16}\/visual_candidate_[a-f0-9]{16}$/,
+    image: /^(?:\/api\/v1\/visual\/image\/visual_project_[a-f0-9]{16}\/visual_candidate_[a-f0-9]{16}|\/api\/v1\/perception\/image\/chat_[A-Za-z0-9_.-]+\/[a-f0-9]{64}\.(?:png|jpg))$/,
     video: /^\/api\/v1\/music\/visual\/music_[a-f0-9]{16}\/candidate_[a-f0-9]{16}\/visual_[a-f0-9]{16}\/(?:loop|preview)$/
   };
   return patterns[kind]?.test(text) ? text : null;
@@ -361,6 +748,7 @@ function renderMessageAttachments(article, attachments) {
       const source = safeLocalArtifactUrl(attachment.video_url, "video");
       if (source) { const player = document.createElement("video"); player.controls = true; player.preload = "none"; player.src = source; item.append(player); }
     }
+    if (attachment.note) { const note = document.createElement("p"); note.textContent = attachment.note; item.append(note); }
     if (item.childElementCount > 1) region.append(item);
   });
   if (region.childElementCount) article.append(region);
@@ -433,6 +821,27 @@ async function createChat() {
 function musicProjectInput() {
   const vocalMode = byId("music-vocal-mode").value;
   return { title: byId("music-title").value, intent: byId("music-intent").value, target_duration_seconds: Number(byId("music-duration").value), vocal_mode: vocalMode, rights_status: byId("music-rights").value, caption: byId("music-caption").value, lyrics: vocalMode === "instrumental" ? "" : byId("music-lyrics").value, bpm: Number(byId("music-bpm").value), keyscale: byId("music-key").value, timesignature: byId("music-time").value, language: "en", seed: Number(byId("music-seed").value) };
+}
+
+function syncMusicCompositionMode() {
+  const lyrics = byId("music-lyrics"); const instrumental = byId("music-vocal-mode").value === "instrumental"; const locked = Boolean(state.selectedMusicProject);
+  byId("music-caption-guidance").textContent = instrumental
+    ? "Describe one coherent instrumental identity under 512 characters. Broad or second-based movement timing belongs here; BPM, key, and meter remain in their dedicated fields. Soul sends the runtime’s exact trained no-vocal token."
+    : "Describe one coherent vocal identity under 512 characters. Put exact section timing in Lyrics and section markers; BPM, key, and meter remain in their dedicated fields.";
+  byId("music-lyrics-label").textContent = instrumental ? "Lyrics unavailable in Instrumental mode" : "Lyrics and section markers";
+  lyrics.placeholder = instrumental
+    ? "Instrumental projects use the runtime’s exact no-vocal token. Put arrangement and movement timing in Sound and structure."
+    : "[Intro]\n\n[Verse 1 - rhythmic male vocal]\nOne lyric line at a time\n\n[Instrumental]\n\n[Outro]";
+  lyrics.required = !instrumental;
+  if (locked) return;
+  if (instrumental) {
+    if (!lyrics.disabled && lyrics.value) lyrics.dataset.vocalDraft = lyrics.value;
+    lyrics.value = "";
+    lyrics.disabled = true;
+  } else {
+    lyrics.disabled = false;
+    if (!lyrics.value && lyrics.dataset.vocalDraft) lyrics.value = lyrics.dataset.vocalDraft;
+  }
 }
 
 async function loadMusicStudio() {
@@ -614,7 +1023,7 @@ function renderMusicProjects() {
 }
 
 function resetMusicForm() {
-  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
+  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); syncMusicCompositionMode(); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
 }
 
 async function createMusicProject(event) {
@@ -623,7 +1032,7 @@ async function createMusicProject(event) {
 }
 
 async function selectMusicProject(project) {
-  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); byId("save-music-project").hidden = true; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); syncMusicCompositionMode(); byId("save-music-project").hidden = true; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
 }
 
 async function previewMusicProjectDelete() {
@@ -653,7 +1062,7 @@ async function previewMusicGeneration() {
 async function startMusicGeneration() {
   if (!state.musicPreview || state.musicGenerating) return; state.musicGenerating = true; byId("start-music-generation").disabled = true; byId("cancel-music-generation").disabled = false; showGenerationProgress(byId("music-progress"), { stage: "preparing", message: "Engaging the bounded Music Core." });
   const params = { project_id: state.selectedMusicProject.project_id, candidate_id: state.musicPreview.candidate_id, confirmation: byId("music-generation-confirmation").value, expected_digest: state.musicPreview.expected_digest };
-  try { const envelope = await callNdjson("/api/v1/music-stream", "music.generation.execute", params, {}, (event) => showGenerationProgress(byId("music-progress"), event)); lifecycle(envelope); byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject(state.selectedMusicProject); } catch (error) { byId("music-generation-status").textContent = error.message; } finally { state.musicGenerating = false; byId("cancel-music-generation").disabled = true; hideGenerationProgress(byId("music-progress")); }
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.generation.execute", params, {}, (event) => showGenerationProgress(byId("music-progress"), event)); lifecycle(envelope); byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject(state.selectedMusicProject); if (dataOf(envelope).candidate) emitSoulNotification("music_ready", `music:${dataOf(envelope).candidate.candidate_id}`); } catch (error) { byId("music-generation-status").textContent = error.message; emitSoulNotification("attention"); } finally { state.musicGenerating = false; byId("cancel-music-generation").disabled = true; hideGenerationProgress(byId("music-progress")); }
 }
 
 async function cancelMusicGeneration() {
@@ -670,7 +1079,8 @@ async function restoreMusicGeneration(projectId) {
     showMusicProgress(job.latest_progress || { stage: "working", message: "Reattached to the active bounded generation job." });
     const envelope = await followMusicJob(job.job_id, showMusicProgress); lifecycle(envelope);
     if (state.selectedMusicProject?.project_id === projectId) { byId("music-generation-status").textContent = envelope.lifecycle_state === "blocked_for_human_review" ? "Candidate complete. Listen and record adherence evidence below." : (envelope.errors?.[0]?.message || envelope.lifecycle_state); await selectMusicProject({ project_id: projectId }); }
-  } catch (error) { if (state.selectedMusicProject?.project_id === projectId) byId("music-generation-status").textContent = error.message; }
+    if (dataOf(envelope).candidate) emitSoulNotification("music_ready", `music:${dataOf(envelope).candidate.candidate_id}`);
+  } catch (error) { if (state.selectedMusicProject?.project_id === projectId) byId("music-generation-status").textContent = error.message; emitSoulNotification("attention"); }
   finally { state.musicGenerating = false; state.musicJobId = null; byId("cancel-music-generation").disabled = true; hideGenerationProgress(byId("music-progress")); }
 }
 
@@ -931,7 +1341,7 @@ function musicAnalysisPanel(candidate) {
 
 async function runMusicAnalysis(candidate, preview, confirmation, status, button) {
   button.disabled = true; status.textContent = "Starting bounded CPU transcription…"; const params = { project_id: candidate.project_id, candidate_id: candidate.candidate_id, confirmation, expected_digest: preview.expected_digest };
-  try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.analysis.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).analysis) throw new Error(envelope.errors?.[0]?.message || "Analysis did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; button.disabled = false; }
+  try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.analysis.execute", params, {}, (event) => { const line = String(event.message || "").trim().split("\n").filter(Boolean).pop(); if (line) status.textContent = `${String(event.stage || "working").replaceAll("_", " ")}: ${line.slice(0, 240)}`; }); lifecycle(envelope); if (!dataOf(envelope).analysis) throw new Error(envelope.errors?.[0]?.message || "Analysis did not complete"); await selectMusicProject(state.selectedMusicProject); emitSoulNotification("lyrics_ready", `lyrics:${candidate.candidate_id}`); } catch (error) { status.textContent = error.message; button.disabled = false; emitSoulNotification("attention"); }
 }
 
 function renderMusicAnalysisEvidence(panel, analysis, badge, candidate) {
@@ -961,7 +1371,7 @@ function prepareMusicRevision(candidate, panel, launch, status, draft) {
 }
 
 function musicRevisionGate(sourceCandidate, revision, preview, status) {
-  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; const progress = createGenerationProgress(); input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); prefillApprovalGate(input, start, preview.confirmation_phrase); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded Music Core revision pass…"; showGenerationProgress(progress, { stage: "preparing", message: "Binding review evidence to the revised candidate." }); const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => showGenerationProgress(progress, event)); lifecycle(envelope); if (!dataOf(envelope).candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; } finally { state.musicGenerating = false; cancel.disabled = true; hideGenerationProgress(progress); } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions, progress); return gate;
+  const gate = document.createElement("div"); gate.className = "music-revision-gate"; const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(preview.preview_scope, null, 2); const label = document.createElement("label"); label.textContent = `Approval phrase · ${preview.confirmation_phrase}`; const input = document.createElement("input"); input.autocomplete = "off"; input.spellcheck = false; const actions = document.createElement("div"); actions.className = "music-actions"; const start = document.createElement("button"); start.type = "button"; start.className = "gate-button gate-button--gold"; start.textContent = "Generate revised candidate"; start.disabled = true; const cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "danger-button"; cancel.textContent = "Cancel active revision"; cancel.disabled = true; const progress = createGenerationProgress(); input.addEventListener("input", () => { start.disabled = input.value !== preview.confirmation_phrase; }); prefillApprovalGate(input, start, preview.confirmation_phrase); start.addEventListener("click", async () => { start.disabled = true; cancel.disabled = false; input.disabled = true; state.musicGenerating = true; state.musicCandidateId = preview.candidate_id; status.textContent = "Starting the bounded Music Core revision pass…"; showGenerationProgress(progress, { stage: "preparing", message: "Binding review evidence to the revised candidate." }); const params = { project_id: sourceCandidate.project_id, source_candidate_id: sourceCandidate.candidate_id, candidate_id: preview.candidate_id, revision, confirmation: input.value, expected_digest: preview.expected_digest }; try { const envelope = await callNdjson("/api/v1/music-stream", "music.candidates.revision.execute", params, {}, (event) => showGenerationProgress(progress, event)); lifecycle(envelope); const candidate = dataOf(envelope).candidate; if (!candidate) throw new Error(envelope.errors?.[0]?.message || "Revision did not complete"); await selectMusicProject(state.selectedMusicProject); emitSoulNotification("music_ready", `music:${candidate.candidate_id}`); } catch (error) { status.textContent = error.message; start.disabled = false; input.disabled = false; emitSoulNotification("attention"); } finally { state.musicGenerating = false; cancel.disabled = true; hideGenerationProgress(progress); } }); cancel.addEventListener("click", () => cancelRevisionGeneration(preview.candidate_id, status)); actions.append(start, cancel); gate.append(scope, label, input, actions, progress); return gate;
 }
 
 async function cancelRevisionGeneration(candidateId, status) {
@@ -1113,16 +1523,227 @@ async function executeClear() {
   } catch (error) { status.textContent = error.message || "Archive failed safely."; }
 }
 
+function preferredVoiceMimeType() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return ["audio/webm;codecs=opus", "audio/mp4", "audio/webm", "audio/ogg;codecs=opus"].find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+async function toggleVoiceRecording() {
+  if (state.voiceRecorder) { stopVoiceRecording(); return; }
+  if (!state.activeChat || state.busy || state.voiceTranscribing) return;
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    byId("composer-hint").textContent = "This browser does not expose microphone recording.";
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: false
+    });
+    const mimeType = preferredVoiceMimeType();
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    state.voiceStream = stream; state.voiceRecorder = recorder; state.voiceChunks = []; state.voiceStartedAt = performance.now(); state.voiceDiscard = false;
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) state.voiceChunks.push(event.data);
+      const elapsed = Math.floor((performance.now() - state.voiceStartedAt) / 1000);
+      byId("composer-hint").textContent = `Listening · ${Math.min(elapsed, 60)}s of 60s · press Stop when finished`;
+      if (elapsed >= 60 && recorder.state === "recording") stopVoiceRecording();
+    });
+    recorder.addEventListener("stop", finishVoiceRecording, { once: true });
+    recorder.addEventListener("error", () => cancelVoiceRecording("Microphone capture failed safely."));
+    recorder.start(1000);
+    setSoulActivity("listening", "The microphone is open only for this visible push-to-talk recording.");
+    byId("composer-hint").textContent = "Listening · 0s of 60s · press Stop when finished";
+    updateVoiceControl();
+  } catch (error) {
+    state.voiceStream?.getTracks().forEach((track) => track.stop()); state.voiceStream = null; state.voiceRecorder = null;
+    byId("composer-hint").textContent = error?.name === "NotAllowedError" ? "Microphone permission was not granted." : "Microphone capture could not start.";
+    setSoulActivity("failed", "The microphone remained closed.");
+    updateVoiceControl();
+  }
+}
+
+function stopVoiceRecording() {
+  const recorder = state.voiceRecorder;
+  if (recorder?.state === "recording") recorder.stop();
+}
+
+function cancelVoiceRecording(message) {
+  state.voiceDiscard = true;
+  const recorder = state.voiceRecorder;
+  if (recorder?.state === "recording") recorder.stop();
+  else {
+    state.voiceStream?.getTracks().forEach((track) => track.stop());
+    state.voiceStream = null; state.voiceRecorder = null; state.voiceChunks = [];
+    byId("composer-hint").textContent = message;
+    updateVoiceControl();
+  }
+}
+
+async function finishVoiceRecording() {
+  const chunks = state.voiceChunks.slice();
+  const mimeType = state.voiceRecorder?.mimeType || chunks[0]?.type || "audio/webm";
+  const discard = state.voiceDiscard;
+  state.voiceStream?.getTracks().forEach((track) => track.stop());
+  state.voiceStream = null; state.voiceRecorder = null; state.voiceChunks = []; state.voiceStartedAt = 0; state.voiceDiscard = false;
+  updateVoiceControl();
+  if (discard) {
+    byId("composer-hint").textContent = "Voice recording canceled; no audio was retained.";
+    setSoulActivity("idle", "The local thread is quiet.");
+    return;
+  }
+  if (!chunks.length) {
+    byId("composer-hint").textContent = "No microphone audio was captured.";
+    setSoulActivity("failed", "The recording ended without audio.");
+    return;
+  }
+
+  state.voiceTranscribing = true; updateVoiceControl();
+  byId("composer-hint").textContent = "Transcribing locally · the recording will be discarded afterward";
+  setSoulActivity("transcribing", "CPU Whisper is turning the bounded recording into an editable draft.");
+  try {
+    const blob = new Blob(chunks, { type: mimeType });
+    const response = await fetch("/api/v1/voice/transcribe", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": mimeType, "X-Soul-CSRF": csrf },
+      body: blob, cache: "no-store"
+    });
+    const envelope = await response.json();
+    if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
+    if (response.status === 403 && envelope.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed"); }
+    if (!response.ok) throw new Error(envelope.error?.reason || "Microphone upload failed safely");
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || dataOf(envelope).message || "No transcript was produced");
+    insertVoiceTranscript(dataOf(envelope).transcript || "");
+    byId("composer-hint").textContent = `${Number(dataOf(envelope).duration_seconds || 0).toFixed(1)}s transcribed locally · sending through the ordinary Chat path`;
+    setSoulActivity("received", "The recording was discarded. Its transcript is entering the bounded conversation path.");
+    state.voiceRoundTripPending = true;
+    state.voiceTranscribing = false;
+    updateVoiceControl();
+    byId("composer").requestSubmit();
+  } catch (error) {
+    byId("composer-hint").textContent = error.message || "Local transcription failed safely.";
+    setSoulActivity("failed", "No message was sent and temporary audio was discarded.");
+  } finally {
+    state.voiceTranscribing = false; updateVoiceControl(); byId("message-input").focus();
+  }
+}
+
+function insertVoiceTranscript(transcript) {
+  const input = byId("message-input"); const text = String(transcript).trim(); if (!text) return;
+  const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
+  const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+  const prefix = start > 0 && !/\s$/.test(input.value.slice(0, start)) ? " " : "";
+  const suffix = end < input.value.length && !/^\s/.test(input.value.slice(end)) ? " " : "";
+  input.value = `${input.value.slice(0, start)}${prefix}${text}${suffix}${input.value.slice(end)}`;
+  const cursor = start + prefix.length + text.length + suffix.length; input.setSelectionRange(cursor, cursor);
+}
+
+function clearPictureAttachment() {
+  if (state.pictureAttachment?.previewUrl) URL.revokeObjectURL(state.pictureAttachment.previewUrl);
+  state.pictureAttachment = null;
+  const input = byId("picture-input"); if (input) input.value = "";
+  const panel = byId("picture-attachment"); if (panel) panel.hidden = true;
+  const preview = byId("picture-attachment-preview"); if (preview) preview.removeAttribute("src");
+  const retain = byId("picture-attachment-retain"); if (retain) retain.checked = false;
+  if (!state.busy && byId("composer-hint")) byId("composer-hint").textContent = state.activeChat ? "Ready · local continuity enabled" : "No conversation selected";
+}
+
+async function selectPictureAttachment(event) {
+  const file = event.target.files?.[0]; if (!file) return;
+  if (!["image/png", "image/jpeg"].includes(file.type)) { clearPictureAttachment(); showError(new Error("Picture attachments must be PNG or JPEG.")); return; }
+  if (file.size <= 0 || file.size > 10 * 1024 * 1024) { clearPictureAttachment(); showError(new Error("Picture attachments must be between 1 byte and 10 MiB.")); return; }
+  try {
+    const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => reject(new Error("The browser could not read that picture.")); reader.readAsDataURL(file); });
+    const comma = dataUrl.indexOf(","); if (comma < 0) throw new Error("The browser produced an invalid picture payload.");
+    const previewUrl = URL.createObjectURL(file);
+    if (state.pictureAttachment?.previewUrl) URL.revokeObjectURL(state.pictureAttachment.previewUrl);
+    state.pictureAttachment = { filename: file.name, mediaType: file.type, bytes: file.size, imageBase64: dataUrl.slice(comma + 1), previewUrl };
+    byId("picture-attachment-preview").src = previewUrl;
+    byId("picture-attachment-name").textContent = file.name;
+    byId("picture-attachment-meta").textContent = `${formatBytes(file.size)} · ${file.type === "image/png" ? "PNG" : "JPEG"} · local only`;
+    byId("picture-attachment").hidden = false;
+    byId("composer-hint").textContent = "Picture ready · ask one explicit question · Daily Core required";
+    byId("message-input").focus();
+  } catch (error) { clearPictureAttachment(); showError(error); }
+}
+
+function openScreenCaptureDialog() {
+  if (!state.activeChat || state.busy || state.screenCapturing) return;
+  byId("screen-capture-status").textContent = "No pixels have been captured.";
+  byId("screen-capture-dialog").showModal();
+}
+
+async function captureScreenPreview() {
+  if (!state.activeChat || state.busy || state.screenCapturing) return;
+  const selected = document.querySelector('input[name="screen-capture-mode"]:checked');
+  const mode = selected?.value || "monitor";
+  const button = byId("execute-screen-capture");
+  state.screenCapturing = true; button.disabled = true;
+  byId("screen-capture-status").textContent = mode === "region" ? "Waiting for one desktop region selection…" : "Capturing one local preview…";
+  byId("capture-screen").disabled = true;
+  try {
+    const result = await callScreenCapture(mode);
+    const capture = result.capture;
+    clearPictureAttachment();
+    const dataUrl = `data:${capture.media_type};base64,${capture.image_base64}`;
+    state.pictureAttachment = {
+      filename: capture.filename, mediaType: capture.media_type, bytes: capture.bytes,
+      imageBase64: capture.image_base64, previewUrl: null, source: "screen_capture",
+      scope: capture.scope, sourceLabel: capture.source_label
+    };
+    byId("picture-attachment-preview").src = dataUrl;
+    byId("picture-attachment-name").textContent = capture.filename;
+    byId("picture-attachment-meta").textContent = `${formatBytes(capture.bytes)} · PNG · ${capture.source_label} · local preview`;
+    byId("picture-attachment").hidden = false;
+    byId("composer-hint").textContent = "Screen preview ready · ask one explicit question · Daily Core required";
+    byId("screen-capture-dialog").close();
+    byId("message-input").focus();
+    announce("One screen preview captured locally; no model has inspected it");
+  } catch (error) {
+    byId("screen-capture-status").textContent = error.message;
+    showError(error);
+  } finally {
+    state.screenCapturing = false; button.disabled = false;
+    byId("capture-screen").disabled = state.busy || !state.activeChat;
+  }
+}
+
 async function sendMessage(event) {
-  event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy) return;
-  const chatId = state.activeChat.id; input.value = ""; appendPendingExchange(message); setSoulActivity("received", "The interface has accepted your transmission.");
+  event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy || state.voiceTranscribing || state.voiceRecorder) return;
+  const voiceRoundTrip = state.voiceRoundTripPending; state.voiceRoundTripPending = false;
+  const picture = state.pictureAttachment;
+  const chatId = state.activeChat.id; input.value = ""; appendPendingExchange(message); emitSoulNotification("submit"); setSoulActivity("received", picture ? "The local picture and question have entered a bounded perception path." : "The interface has accepted your transmission.");
   setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending"; document.querySelector(".state-ribbon").dataset.lifecycle = "pending"; document.querySelector(".conversation").dataset.lifecycle = "pending";
   try {
-    const envelope = await callSoulStream("chats.send", { chat_id: chatId, message }, { current_chat_id: chatId }, (progress) => { setSoulActivity(progress.state, progress.summary); updateWorkingMessage(progress.summary); }); lifecycle(envelope);
-    const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); renderMessages(dataOf(messages).records || []);
+    let envelope;
+    if (picture) {
+      envelope = await callPictureStream({
+        request_id: requestId(), chat_id: chatId, question: message,
+        image_base64: picture.imageBase64, media_type: picture.mediaType,
+        filename: picture.filename, retain: byId("picture-attachment-retain").checked
+      }, (progress) => {
+        const summary = progress.message || "Bounded local picture understanding is active.";
+        setSoulActivity(progress.state === "observing" ? "inspecting" : progress.state, summary); updateWorkingMessage(summary);
+      });
+      if (envelope.lifecycle_state !== "complete") throw new Error(envelope.reason || envelope.lifecycle_state || "Picture understanding failed safely");
+      clearPictureAttachment();
+      byId("lifecycle-state").textContent = "complete"; document.querySelector(".state-ribbon").dataset.lifecycle = "complete"; document.querySelector(".conversation").dataset.lifecycle = "complete";
+    } else {
+      envelope = await callSoulStream("chats.send", { chat_id: chatId, message }, { current_chat_id: chatId }, (progress) => { setSoulActivity(progress.state, progress.summary); updateWorkingMessage(progress.summary); }); lifecycle(envelope);
+    }
+    const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records);
     const workspace = await callSoul("workspace.chat", { chat_id: chatId, limit: 50 }, { current_chat_id: chatId }); renderWorkspace(dataOf(workspace).records || []);
     await loadChats(false); announce(`Request ${envelope.lifecycle_state || "finished"}`);
-  } catch (error) { try { const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records); if (!records.some((record) => record.role === "user" && record.content === message)) input.value = message; } catch (_reconcileError) { input.value = message; } setSoulActivity("failed", "The exchange failed safely; an unsent draft has been restored."); showError(error); } finally { setBusy(false); input.focus(); }
+    if (!voiceRoundTrip) emitSoulNotification("chat_ready", `chat:${chatId}:${records.at(-1)?.id || requestId()}`);
+    if (voiceRoundTrip) {
+      const reply = [...records].reverse().find((record) => record.role === "assistant" && String(record.content || record.text || "").trim());
+      const buttons = [...document.querySelectorAll(".message--assistant .message-speak-button")];
+      const button = buttons.at(-1);
+      if (reply && button) await synthesizeMessageSpeech(String(reply.content || reply.text).trim(), button);
+      else announce("Soul completed the exchange without an eligible spoken reply");
+    }
+  } catch (error) { try { const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records); if (!records.some((record) => record.role === "user" && record.content === message)) input.value = message; } catch (_reconcileError) { input.value = message; } setSoulActivity("failed", picture ? "Picture understanding stopped safely; the selected picture and draft remain available." : "The exchange failed safely; an unsent draft has been restored."); emitSoulNotification("attention"); showError(error); } finally { setBusy(false); input.focus(); }
 }
 
 async function togglePin() {
@@ -1902,7 +2523,8 @@ function renderNativeMotionRevisionGate(gate, project, motion, status) {
         try {
           const result = await callNdjson("/api/v1/music-stream", "visual.native_motion.revision.execute", { visual_project_id: project.project_id, source_motion_candidate_id: motion.motion_candidate_id, motion_candidate_id: scope.motion_candidate_id, instruction: instruction.value, seed: seed.value, duration_seconds: duration.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event));
           requireLifecycle(result, ["blocked_for_human_review"], "Native-scene revision failed safely"); await selectVisualProject(project.project_id); status.textContent = "Native-scene revision generated. Review the new candidate below.";
-        } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); }
+          emitSoulNotification("visual_ready", `visual:${scope.motion_candidate_id}`);
+        } catch (error) { status.textContent = error.message; execute.disabled = false; emitSoulNotification("attention"); } finally { hideGenerationProgress(progress); }
       });
       gate.append(summary, execute, progress); status.textContent = "The exact revised direction, seed, duration, and model are ready for approval.";
     } catch (error) { status.textContent = error.message; preview.disabled = false; }
@@ -1916,7 +2538,7 @@ function renderVisualMotionGate(gate, project, candidate, status) {
   const seedLabel = document.createElement("label"); seedLabel.textContent = "Motion seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview motion generation";
   const progress = createGenerationProgress();
-  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.motion.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Motion runtime is not ready"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact motion study"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-to-video study…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging Wan for the exact image-guided study." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.motion.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, motion_candidate_id: scope.motion_candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Motion generation failed safely"); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.motion.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Motion runtime is not ready"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact motion study"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-to-video study…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging Wan for the exact image-guided study." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.motion.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, motion_candidate_id: scope.motion_candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Motion generation failed safely"); await selectVisualProject(project.project_id); emitSoulNotification("visual_ready", `visual:${scope.motion_candidate_id}`); } catch (error) { status.textContent = error.message; execute.disabled = false; emitSoulNotification("attention"); } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
   gate.append(label, seedLabel, preview, progress);
 }
 
@@ -1926,7 +2548,7 @@ function renderVisualEditGate(gate, project, candidate, status) {
   const seedLabel = document.createElement("label"); seedLabel.textContent = "Revision seed"; const seed = document.createElement("input"); seed.type = "number"; seed.min = "0"; seed.max = "2147483647"; seed.value = String(Math.floor(Math.random() * 2147483647)); seedLabel.append(seed);
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview guided edit";
   const progress = createGenerationProgress();
-  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.edit.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Edit preview failed safely"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact guided edit"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-guided revision…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging the visual runtime for the guided revision." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.edit.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, visual_candidate_id: scope.candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Guided visual revision failed safely"); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
+  preview.addEventListener("click", async () => { preview.disabled = true; try { const envelope = await callSoul("visual.edit.preview", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, instruction: instruction.value, seed: seed.value }); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Edit preview failed safely"); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact guided edit"; execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Rendering bounded image-guided revision…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging the visual runtime for the guided revision." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.edit.execute", { visual_project_id: project.project_id, source_visual_candidate_id: candidate.candidate_id, visual_candidate_id: scope.candidate_id, instruction: instruction.value, seed: seed.value, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Guided visual revision failed safely"); await selectVisualProject(project.project_id); emitSoulNotification("visual_ready", `visual:${scope.candidate_id}`); } catch (error) { status.textContent = error.message; execute.disabled = false; emitSoulNotification("attention"); } finally { hideGenerationProgress(progress); } }); gate.append(summary, execute, progress); } catch (error) { status.textContent = error.message; preview.disabled = false; } });
   gate.append(label, seedLabel, preview, progress);
 }
 
@@ -1986,7 +2608,7 @@ async function previewNativeMotion() {
     const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2);
     const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Generate exact native scene";
     const progress = createGenerationProgress();
-    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Generating a bounded scene directly from text…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging FastWan for the exact native scene." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.native_motion.execute", { visual_project_id: project.project_id, motion_candidate_id: scope.motion_candidate_id, instruction, seed, duration_seconds: durationSeconds, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Native scene generation failed safely"); await selectVisualProject(project.project_id); status.textContent = "Native scene generated. Review it below before binding it to music."; } catch (error) { status.textContent = error.message; execute.disabled = false; } finally { hideGenerationProgress(progress); } });
+    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Generating a bounded scene directly from text…"; showGenerationProgress(progress, { stage: "preparing", message: "Engaging FastWan for the exact native scene." }); try { const result = await callNdjson("/api/v1/music-stream", "visual.native_motion.execute", { visual_project_id: project.project_id, motion_candidate_id: scope.motion_candidate_id, instruction, seed, duration_seconds: durationSeconds, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); requireLifecycle(result, ["blocked_for_human_review"], "Native scene generation failed safely"); await selectVisualProject(project.project_id); status.textContent = "Native scene generated. Review it below before binding it to music."; emitSoulNotification("visual_ready", `visual:${scope.motion_candidate_id}`); } catch (error) { status.textContent = error.message; execute.disabled = false; emitSoulNotification("attention"); } finally { hideGenerationProgress(progress); } });
     confirm.append(summary, execute, progress); confirm.hidden = false; status.textContent = "The exact scene direction, seed, model, duration, and output envelope are ready for approval.";
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
@@ -2044,8 +2666,8 @@ async function startVisualGeneration() {
   try {
     const parameters = { visual_project_id: state.visualPreview.project_id, visual_candidate_id: state.visualPreview.candidate_id, confirmation: state.visualPreview.confirmation_phrase, expected_digest: state.visualPreview.expected_digest };
     const envelope = await callNdjson("/api/v1/music-stream", "visual.generation.execute", parameters, {}, (event) => showGenerationProgress(byId("visual-progress"), event));
-    requireLifecycle(envelope, ["blocked_for_human_review"], "Visual draft generation failed safely"); byId("visual-generation-status").textContent = "Visual draft generated; review the candidate below."; await selectVisualProject(state.visualPreview.project_id);
-  } catch (error) { byId("visual-generation-status").textContent = error.message; }
+    requireLifecycle(envelope, ["blocked_for_human_review"], "Visual draft generation failed safely"); byId("visual-generation-status").textContent = "Visual draft generated; review the candidate below."; const candidateId = state.visualPreview.candidate_id; await selectVisualProject(state.visualPreview.project_id); emitSoulNotification("visual_ready", `visual:${candidateId}`);
+  } catch (error) { byId("visual-generation-status").textContent = error.message; emitSoulNotification("attention"); }
   finally { state.visualGenerating = false; hideGenerationProgress(byId("visual-progress")); }
 }
 
@@ -2055,13 +2677,14 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true });
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence();
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
 byId("login-form").addEventListener("submit", login);
 byId("password-change-form").addEventListener("submit", changePassword);
 byId("logout-button").addEventListener("click", logout);
+byId("voice-presence-launch").addEventListener("click", launchVoicePresence);
 byId("core-selector").addEventListener("click", () => setCoreMenu(byId("core-menu").hidden));
 byId("review-center-button").addEventListener("click", openReviewCenter);
 byId("close-review-center").addEventListener("click", closeReviewCenter);
@@ -2072,6 +2695,7 @@ document.querySelectorAll("[data-activity-filter]").forEach((button) => button.a
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
 byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
+byId("timeline-tab").addEventListener("click", () => switchTab("timeline"));
 byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
 byId("creative-tab").addEventListener("click", () => setCreativeMenu(byId("creative-menu").hidden));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
@@ -2079,6 +2703,11 @@ byId("improvement-tab").addEventListener("click", () => switchTab("improvement")
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
+byId("new-timeline-item").addEventListener("click", () => openTimelineEditor());
+byId("refresh-timeline").addEventListener("click", () => loadProjectTimeline({ announceLoad: true }));
+byId("timeline-status-filter").addEventListener("change", renderProjectTimeline);
+byId("timeline-editor").addEventListener("submit", saveTimelineItem);
+byId("close-timeline-editor").addEventListener("click", closeTimelineEditor);
 window.addEventListener("hashchange", () => { const tab = tabFromLocation(); if (tab) switchTab(tab, { updateLocation: false }); });
 document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("creative-navigation").contains(event.target)) setCreativeMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
 byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
@@ -2095,6 +2724,7 @@ byId("preview-visual-project-delete").addEventListener("click", previewVisualPro
 byId("execute-visual-project-delete").addEventListener("click", executeVisualProjectDeletion);
 byId("new-music-project").addEventListener("click", resetMusicForm);
 byId("music-project-form").addEventListener("submit", createMusicProject);
+byId("music-vocal-mode").addEventListener("change", syncMusicCompositionMode);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
 byId("preview-music-reference").addEventListener("click", previewMusicReference);
 byId("music-reference-confirmation").addEventListener("input", () => { byId("analyze-music-reference").disabled = !state.musicReferencePreview || byId("music-reference-confirmation").value !== state.musicReferencePreview.confirmation_phrase; });
@@ -2189,5 +2819,30 @@ byId("close-model-runtime-dialog").addEventListener("click", () => byId("model-r
 byId("model-runtime-confirmation").addEventListener("input", () => { byId("execute-model-runtime").disabled = !state.modelRuntimePreview || byId("model-runtime-confirmation").value !== state.modelRuntimePreview.confirmation; });
 byId("execute-model-runtime").addEventListener("click", executeModelRuntime);
 byId("composer").addEventListener("submit", sendMessage);
+byId("attach-picture").addEventListener("click", () => byId("picture-input").click());
+byId("picture-input").addEventListener("change", selectPictureAttachment);
+byId("picture-attachment-remove").addEventListener("click", () => { clearPictureAttachment(); byId("message-input").focus(); });
+byId("capture-screen").addEventListener("click", openScreenCaptureDialog);
+byId("execute-screen-capture").addEventListener("click", captureScreenPreview);
+byId("record-voice").addEventListener("click", toggleVoiceRecording);
+byId("notification-mode").addEventListener("click", cycleNotificationMode);
+renderNotificationMode();
+byId("voice-output-profile").value = state.voiceOutputProfile;
+byId("voice-output-profile").addEventListener("change", (event) => {
+  const voice = event.target.value;
+  if (!VOICE_OUTPUT_PROFILES.has(voice)) { event.target.value = state.voiceOutputProfile; return; }
+  stopVoicePlayback(); state.voiceOutputProfile = voice;
+  try { localStorage.setItem("soul.voice.output.profile", voice); } catch (_error) { /* browser preference remains session-local */ }
+  announce(`${event.target.selectedOptions[0].textContent} selected for the next spoken response`);
+});
+byId("voice-output-quality").value = state.voiceOutputQuality;
+byId("voice-output-quality").addEventListener("change", (event) => {
+  const quality = event.target.value;
+  if (!VOICE_OUTPUT_QUALITIES.has(quality)) { event.target.value = state.voiceOutputQuality; return; }
+  stopVoicePlayback(); state.voiceOutputQuality = quality;
+  try { localStorage.setItem("soul.voice.output.quality", quality); } catch (_error) { /* browser preference remains session-local */ }
+  announce(`${event.target.selectedOptions[0].textContent} delivery selected`);
+});
 byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (state.busy) { announce("Soul is still working; the draft was not sent or used as an interruption."); return; } byId("composer").requestSubmit(); } });
+syncMusicCompositionMode();
 initializeAuthentication();

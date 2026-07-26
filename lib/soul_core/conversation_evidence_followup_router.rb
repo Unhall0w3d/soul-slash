@@ -32,7 +32,7 @@ module SoulCore
     end
 
     REFERENTIAL_PATTERNS = [
-      /\b(?:that|those|them|it|this result|that result|the result|the check|the assessment|the evidence)\b/i,
+      /\b(?:this result|that result|the result|the check|the assessment|the evidence)\b/i,
       /\b(?:you mentioned|you referred to|you were referring to|you were talking about)\b/i,
       /\bwhich\b.{0,60}\bwere you (?:referring to|talking about)\b/i,
       /\bwhich\b.{0,60}\bdid you mean\b/i,
@@ -50,6 +50,8 @@ module SoulCore
       /\bwhere did (?:that|those|this)\b/i,
       /\bdetails? (?:from|about|on) (?:the|that|those|this)\b/i
     ].freeze
+    GENERIC_PRONOUN_PATTERN = /\b(?:that|those|them|it)\b/i
+    MAX_GENERIC_PRONOUN_FOLLOWUP_TOKENS = 12
 
     STOP_WORDS = %w[
       a about after again all also am an and any are as at be because been before being
@@ -143,8 +145,11 @@ module SoulCore
     end
 
     def followup_language?(text)
-      REFERENTIAL_PATTERNS.any? { |pattern| text.match?(pattern) } ||
+      strong_reference = REFERENTIAL_PATTERNS.any? { |pattern| text.match?(pattern) } ||
         RESULT_ACTION_PATTERNS.any? { |pattern| text.match?(pattern) }
+      return true if strong_reference
+
+      text.match?(GENERIC_PRONOUN_PATTERN) && tokenize(text).length <= MAX_GENERIC_PRONOUN_FOLLOWUP_TOKENS
     end
 
     def selection_reason(text, terms)

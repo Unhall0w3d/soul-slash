@@ -8,6 +8,8 @@ Status: candidate-complete; awaiting Operator chat review
 - Added private per-conversation creative task state with bounded size, atomic owner-only writes, cancellation, explicit terminal states, and no watcher, service, resident model, or polling loop.
 - Added structured local-model planning for Music, Visual, and combined candidate briefs. Music preserves the four user-required decisions: intent, supported duration, vocal/instrumental mode, and rights status. Optional fields remain visible before execution.
 - Added exact click-authored generation actions bound to the flow digest and action identity. Music/combined work selects Music Core; visual-only work selects AMD-Free Core. Runtime state is revalidated before mutation.
+- Added explicit Core-aware skill preflight. Creative generation and revision actions now name the active Core, required Core, transition decision, and reason before the Operator click. The requirement is server-derived, stored in private workflow state, included in action metadata and digest scope, and revalidated before the existing Core controller runs.
+- Avoided redundant or invented transfers: an already-suitable Core proceeds directly, while reviewed-source-only resolution requires no Core change.
 - Added authenticated audio and image attachments to Chat.
 - Added structured review translation and a second exact action that records Music and Visual Studio reviews without silently revising, rejecting, binding, exporting, or publishing.
 - Added strict standalone Core requests such as `Switch to Music Core`, using the existing Core preview/digest/execute service. Discussion about a Core is not an invocation.
@@ -79,6 +81,20 @@ ruby -c changed Ruby runtime files                            PASS
 git diff --check                                              PASS
 ```
 
+Core-aware follow-up verification:
+
+```text
+ruby scripts/verify-conversational-creative-workflow.rb       PASS (60 checks)
+ruby -c lib/soul_core/conversation_creative_workflow_service.rb PASS
+ruby -c lib/soul_core/assistant_skill_catalog.rb              PASS
+ruby bin/soul improve assistant-skill-catalog-refresh         PASS
+```
+
+The added deterministic cases cover Daily → Music disclosure, visual-only
+AMD-Free disclosure, no redundant visual revision transfer, music revision
+requirements, reviewed-source resolution without a transfer, stale-action
+blocking, click-bound transition execution, and idempotent replay.
+
 The older phase-wide verifiers that require a completely clean curation state were initially blocked only by this slice's new untracked verifier and passed after candidate files were intentionally staged. Phase 10, Phase 11A, and Phase 12B compatibility regressions also pass after updating their stale identity/brand assertions to the current canonical direction. The responsive-chat verifier contains a pre-existing disconnect expectation that conflicts with the current explicit `ClientDisconnected` server behavior; that unrelated assertion is not treated as validation for this slice.
 
 ## Local LLM evaluation
@@ -109,6 +125,10 @@ The morning test conversations remain the intended persona and multi-turn behavi
 - [ ] An explicit song request asks only for omitted required choices.
 - [ ] Optional music fields are coherent, visible, editable in conversation, and the Sound and Structure block stays within 512 characters.
 - [ ] An explicit image request uses AMD-Free Core; music and combined requests use Music Core.
+- [ ] The action names active and required Cores before approval.
+- [ ] A required transfer occurs only after the action click.
+- [ ] An already-suitable Core does not restart or switch services.
+- [ ] Reviewed existing-source operations do not claim a generation Core.
 - [ ] Clicking the exact action persists across navigation and returns a playable/viewable candidate.
 - [ ] Candidate feedback becomes a faithful visible review rather than an automatic keep or revision.
 - [ ] Repeated action clicks do not duplicate generation or reviews.

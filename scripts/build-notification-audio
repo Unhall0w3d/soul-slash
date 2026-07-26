@@ -1,0 +1,60 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "open3"
+require "tmpdir"
+
+ROOT = File.expand_path("..", __dir__)
+OUTPUT = File.join(ROOT, "assets", "notifications")
+RUNTIME = File.expand_path(ENV.fetch("SOUL_VOICE_SYNTHESIS_ROOT", File.join(Dir.home, ".local", "share", "soul", "voice", "runtime")))
+PYTHON = File.join(RUNTIME, ".venv", "bin", "python")
+MODEL = File.join(RUNTIME, "supertonic-3")
+RUNNER = File.join(ROOT, "scripts", "soul-voice-synthesis-runner.py")
+PHRASES = {
+  "chat-ready" => "A response is ready in Chat.",
+  "music-ready" => "Your music candidate is ready for review.",
+  "visual-ready" => "Your visual candidate is ready for review.",
+  "lyrics-ready" => "Lyric analysis is ready for review.",
+  "attention" => "A task needs your attention."
+}.freeze
+CUES = {
+  "submit" => [740, 0.11],
+  "wake" => [1040, 0.16],
+  "complete" => [1320, 0.21],
+  "attention" => [360, 0.28]
+}.freeze
+
+abort "ffmpeg is required" unless system("ffmpeg", "-version", out: File::NULL, err: File::NULL)
+abort "reviewed Supertonic runtime is unavailable" unless File.executable?(PYTHON) && File.directory?(MODEL)
+FileUtils.mkdir_p(OUTPUT)
+
+CUES.each do |name, (frequency, duration)|
+  fade_start = [duration - 0.07, 0.02].max.round(2)
+  destination = File.join(OUTPUT, "cue-#{name}.wav")
+  command = [
+    "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi", "-i", "sine=frequency=#{frequency}:duration=#{duration}:sample_rate=24000",
+    "-af", "volume=0.16,afade=t=out:st=#{fade_start}:d=0.07",
+    "-c:a", "pcm_s16le", destination
+  ]
+  abort "could not generate #{name} cue" unless system(*command)
+end
+
+Dir.mktmpdir("soul-notification-audio-") do |temporary|
+  PHRASES.each do |name, phrase|
+    input = File.join(temporary, "#{name}.txt")
+    File.binwrite(input, phrase, mode: "w", perm: 0o600)
+    %w[F3 M3].each do |voice|
+      destination = File.join(OUTPUT, "#{voice.downcase}-#{name}.wav")
+      command = [
+        PYTHON, RUNNER, "--model-dir", MODEL, "--input", input,
+        "--output", destination, "--voice", voice, "--language", "en",
+        "--steps", "10", "--speed", "1.04"
+      ]
+      abort "could not generate #{voice} #{name} notice" unless system(*command)
+    end
+  end
+end
+
+puts "Generated #{CUES.length} cues and #{PHRASES.length * 2} reusable spoken notices in #{OUTPUT}."

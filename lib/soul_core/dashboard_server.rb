@@ -10,6 +10,8 @@ module SoulCore
     HEADER_BYTES_LIMIT = 16 * 1024
     HEADER_COUNT_LIMIT = 64
     BODY_LIMIT = 128 * 1024
+    VOICE_BODY_LIMIT = 8 * 1024 * 1024
+    PICTURE_BODY_LIMIT = 14 * 1024 * 1024
     READ_TIMEOUT = 5
     # Browser audio/video controls issue bounded range requests alongside ordinary
     # API, asset, and foreground render-stream traffic. Keep a hard ceiling while
@@ -193,7 +195,12 @@ module SoulCore
 
       length = headers["content-length"] ? Integer(headers["content-length"], 10) : 0
       raise ArgumentError, "negative content length" if length.negative?
-      raise PayloadTooLarge if length > BODY_LIMIT
+      body_limit = case target
+                   when "/api/v1/voice/transcribe" then VOICE_BODY_LIMIT
+                   when "/api/v1/perception/picture-stream" then PICTURE_BODY_LIMIT
+                   else BODY_LIMIT
+                   end
+      raise PayloadTooLarge if length > body_limit
       body = read_exact(client, length)
       { method: method, target: target, headers: headers, body: body }
     end
@@ -207,7 +214,7 @@ module SoulCore
     end
 
     def read_exact(client, length)
-      bytes = +""
+      bytes = +"".b
       while bytes.bytesize < length
         chunk = client.read(length - bytes.bytesize)
         raise ArgumentError, "incomplete body" unless chunk

@@ -67,10 +67,25 @@ Dir.mktmpdir("soul-phase12d2-") do |root|
         path: Soul/skills/audio/transcribe.rb
         description: Transcribe an audio recording into local text.
         risk: read_only
+      cores.activate:
+        path: Soul/skills/cores/activate.rb
+        description: Preview and activate one configured Core without rebooting while preserving active-work checks.
+        risk: approval_required
+      skill.brief.draft:
+        path: Soul/skills/skill/brief/draft.rb
+        description: Draft a review-only Soul skill proposal using a configured provider.
+        risk: review_only
   YAML
   covered_service = SoulCore::CapabilityGapIntakeService.new(root: root, clock: clock)
   covered = covered_service.intake(chat_id: "chat_fixture_1", request: "Please transcribe this audio recording", classification: "model_reported_missing_capability", reason: "model said unable")
   check.call("matching production skill suppresses duplicate proposal", covered["status"] == "covered" && covered.dig("coverage", "kind") == "production_skill" && covered["proposal_created"] == false)
+  unrelated = covered_service.intake(
+    chat_id: "chat_fixture_1",
+    request: "Create a bounded local desktop session skill that unlocks the screen by voice while locked",
+    classification: "operator_requested_missing_capability",
+    reason: "desktop voice unlock is not registered"
+  )
+  check.call("generic overlap does not mistake core activation for desktop unlock", unrelated["status"] == "created" && unrelated["proposal_created"] != false)
 end
 
 Dir.mktmpdir("soul-phase12d2-runtime-") do |root|

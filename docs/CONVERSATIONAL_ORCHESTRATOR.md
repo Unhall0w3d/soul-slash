@@ -89,6 +89,17 @@ may enter the existing human-reviewed capability-gap lane.
 Request shape does not authorize an operation, select a model capability, or
 replace downstream validation and exact approval gates.
 
+## Dashboard capability discovery
+
+An explicit question such as `What can you do through the dashboard?` uses the
+read-only `dashboard.capabilities.inspect` guide. It reports which surfaces
+currently have bounded Chat mappings, their required inputs, Core implications,
+and retained human gates. It also labels partial and Dashboard-only surfaces
+instead of allowing the local model to imply unsupported coverage.
+
+The guide performs no downstream invocation. Statements such as `I'm working on
+your dashboard capabilities` remain ordinary conversation.
+
 ## Failure behavior
 
 If a deterministic skill succeeds but synthesis fails or violates grounding:

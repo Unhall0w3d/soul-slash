@@ -353,7 +353,7 @@ lon = place["longitude"]
 weather_params = {
   latitude: lat,
   longitude: lon,
-  current: "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
+  current: "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m",
   daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max",
   forecast_days: options[:forecast_days],
   timezone: "auto",
@@ -399,6 +399,7 @@ brief = {
   condition: weather_description(current["weather_code"]),
   humidity_percent: current["relative_humidity_2m"],
   wind_speed: current["wind_speed_10m"],
+  wind_direction_degrees: current["wind_direction_10m"],
   air_quality: {
     us_aqi: aqi,
     category: us_aqi_category(aqi),

@@ -18,17 +18,31 @@ module SoulCore
     ACTIONS = %w[load unload switch].freeze
     COMMAND_TIMEOUT_SECONDS = 12
     HTTP_TIMEOUT_SECONDS = 2
+    TEMPORARY_RESTORE_TIMEOUT_SECONDS = 90
+    TEMPORARY_RESTORE_POLL_SECONDS = 0.5
     MAX_HTTP_BYTES = 128 * 1024
     MAX_SELECTION_BYTES = 1024
     STARTUP_SELECTOR_UNIT = "soul-model-runtime-selected.service"
 
-    def initialize(root: Dir.pwd, env: ENV, lease_store: nil, runner: BoundedCommandRunner.new, http_get: nil, profile_registry: nil)
+    class TemporaryReleaseError < StandardError
+      attr_reader :lifecycle_state, :receipt
+
+      def initialize(message, lifecycle_state: "failed", receipt: {})
+        super(message)
+        @lifecycle_state = lifecycle_state
+        @receipt = receipt
+      end
+    end
+
+    def initialize(root: Dir.pwd, env: ENV, lease_store: nil, runner: BoundedCommandRunner.new, http_get: nil, profile_registry: nil, sleeper: ->(seconds) { sleep(seconds) }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
       @root = File.expand_path(root)
       @env = env.to_h
       @lease_store = lease_store || ModelRuntimeLeaseStore.new(root: @root)
       @runner = runner
       @http_get = http_get || method(:bounded_http_get)
       @profile_registry = profile_registry || ModelRuntimeProfileRegistry.new(root: @root, env: @env)
+      @sleeper = sleeper
+      @monotonic_clock = monotonic_clock
     end
 
     def status
@@ -119,7 +133,83 @@ module SoulCore
       blocked(error.message)
     end
 
+    # Internal, bounded accelerator time-sharing boundary. The existing runtime
+    # control lock remains held for the complete release/work/restore cycle, so
+    # another model mutation or specialist lease cannot enter between steps.
+    def with_temporary_release(profile_id:, on_progress: nil)
+      raise TemporaryReleaseError.new("model runtime control is disabled", lifecycle_state: "blocked_for_human_review") unless enabled?
+
+      configuration
+      @lease_store.with_control_lock do
+        before = status_unlocked
+        target = configuration.fetch("profiles").find { |profile| profile.fetch("id") == profile_id.to_s }
+        raise TemporaryReleaseError.new("known active model runtime profile is required", lifecycle_state: "awaiting_input") unless target
+
+        blocker = mutation_blocker("unload", before, target)
+        raise TemporaryReleaseError.new(blocker, lifecycle_state: "blocked_for_human_review", receipt: before) if blocker
+
+        progress(on_progress, "releasing_chat_engine", "The completed response is secure. Releasing the idle chat engine for expressive voice rendering.")
+        stopped = service_command("stop", target)
+        unless stopped.success? && observe_service_state(target.fetch("service")) == "inactive"
+          raise TemporaryReleaseError.new("chat engine could not be released safely", receipt: before)
+        end
+
+        released_at = @monotonic_clock.call
+        value = nil
+        work_error = nil
+        restore_error = nil
+        begin
+          value = yield
+        rescue Exception => error # ensure restoration for interruption and ordinary synthesis failures
+          work_error = error
+        ensure
+          progress(on_progress, "restoring_chat_engine", "Expressive rendering is terminal. Restoring the prior chat engine.")
+          restore_error = restore_temporary_profile(target)
+        end
+
+        receipt = {
+          "profile_id" => target.fetch("id"),
+          "service" => target.fetch("service"),
+          "released_seconds" => (@monotonic_clock.call - released_at).round(3),
+          "restored" => restore_error.nil?,
+          "health" => restore_error.nil? ? "ready" : "failed"
+        }
+        raise TemporaryReleaseError.new(restore_error, receipt: receipt) if restore_error
+        raise work_error if work_error
+
+        progress(on_progress, "chat_engine_ready", "The prior chat engine is healthy. Expressive audio is ready.")
+        [value, receipt]
+      end
+    rescue ModelRuntimeProfileRegistry::ConfigurationError => error
+      raise TemporaryReleaseError.new(error.message, lifecycle_state: "blocked_for_human_review")
+    rescue ModelRuntimeLeaseStore::LockUnavailable
+      raise TemporaryReleaseError.new("model runtime control is busy", lifecycle_state: "awaiting_input")
+    rescue ModelRuntimeLeaseStore::IntegrityError => error
+      raise TemporaryReleaseError.new(error.message, lifecycle_state: "blocked_for_human_review")
+    end
+
     private
+
+    def restore_temporary_profile(profile)
+      started = service_command("start", profile)
+      return "prior chat engine restart command #{started.status}" unless started.success?
+
+      deadline = @monotonic_clock.call + TEMPORARY_RESTORE_TIMEOUT_SECONDS
+      loop do
+        service_ready = observe_service_state(profile.fetch("service")) == "active"
+        server_ready = service_ready && observe_server(profile).fetch("health") == "ready"
+        return nil if server_ready
+        return "prior chat engine did not become healthy before the restore timeout" if @monotonic_clock.call >= deadline
+
+        @sleeper.call(TEMPORARY_RESTORE_POLL_SECONDS)
+      end
+    end
+
+    def progress(callback, stage, message)
+      callback&.call("stage" => stage, "message" => message)
+    rescue StandardError
+      nil
+    end
 
     def mutate(action, target, before)
       case action

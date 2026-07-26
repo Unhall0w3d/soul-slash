@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+require "securerandom"
+require_relative "../lib/soul_core/application_facade"
+require_relative "../lib/soul_core/configuration_resolver"
+require_relative "../lib/soul_core/voice_transcription_service"
+require_relative "../lib/soul_core/voice_synthesis_service"
+require_relative "../lib/soul_core/voice_screen_understanding_service"
+
+ROOT = File.expand_path("..", __dir__)
+STATE_ROOT = File.expand_path(ENV.fetch("SOUL_VOICE_PRESENCE_STATE_ROOT", "~/.local/state/soul/voice-presence"))
+
+def emit(event)
+  STDOUT.puts(JSON.generate(event))
+  STDOUT.flush
+end
+
+def request(operation, parameters, context = {})
+  {
+    "schema_version" => SoulCore::ApplicationContract::SCHEMA_VERSION,
+    "request_id" => "voice-#{SecureRandom.uuid}",
+    "operation" => operation,
+    "parameters" => parameters,
+    "context" => { "interface" => "voice_presence" }.merge(context)
+  }
+end
+
+def voice_chat_id(facade)
+  FileUtils.mkdir_p(STATE_ROOT, mode: 0o700)
+  state_path = File.join(STATE_ROOT, "continuity.json")
+  if File.file?(state_path) && !File.symlink?(state_path)
+    record = JSON.parse(File.binread(state_path, 16 * 1024))
+    chat_id = record["chat_id"].to_s
+    found = facade.call(request("chats.get", { "chat_id" => chat_id }))
+    return chat_id if found["ok"]
+  end
+  created = facade.call(request("chats.create", { "title" => "Voice presence" }))
+  raise "voice transmission could not be created" unless created["ok"]
+
+  chat_id = created.dig("data", "record", "id")
+  temporary = "#{state_path}.#{Process.pid}.tmp"
+  File.binwrite(temporary, "#{JSON.pretty_generate({ "schema_version" => "soul.voice_presence.continuity.v1", "chat_id" => chat_id })}\n", mode: "wx", perm: 0o600)
+  File.rename(temporary, state_path)
+  chat_id
+end
+
+begin
+  audio_path = File.expand_path(ARGV.fetch(0))
+  output_path = File.expand_path(ARGV.fetch(1))
+  selected_voice = ARGV[2].to_s
+  selected_voice = nil unless %w[F3 M3].include?(selected_voice)
+  raise "capture is unavailable" unless File.file?(audio_path) && !File.symlink?(audio_path)
+  raise "output path already exists" if File.exist?(output_path) || File.symlink?(output_path)
+
+  resolver = SoulCore::ConfigurationResolver.new(root: ROOT, process_env: ENV).tap(&:resolve)
+  environment = resolver.effective_environment
+  transcription_options = { root: ROOT }
+  transcription_options[:music_root] = environment["SOUL_VOICE_TRANSCRIPTION_ROOT"] unless environment["SOUL_VOICE_TRANSCRIPTION_ROOT"].to_s.empty?
+  transcription_options[:manifest_path] = environment["SOUL_VOICE_TRANSCRIPTION_MANIFEST"] unless environment["SOUL_VOICE_TRANSCRIPTION_MANIFEST"].to_s.empty?
+  transcription_options[:model_name] = environment["SOUL_VOICE_TRANSCRIPTION_MODEL"] unless environment["SOUL_VOICE_TRANSCRIPTION_MODEL"].to_s.empty?
+
+  emit("type" => "state", "state" => "hearing", "summary" => "Resolving your voice.")
+  transcription = SoulCore::VoiceTranscriptionService.new(**transcription_options).transcribe(
+    audio_bytes: File.binread(audio_path, SoulCore::VoiceTranscriptionService::MAX_UPLOAD_BYTES),
+    content_type: "audio/wav"
+  )
+  raise transcription.dig("data", "message").to_s.empty? ? "transcription failed" : transcription.dig("data", "message") unless transcription["ok"]
+  transcript = transcription.dig("data", "transcript").to_s.strip
+  emit("type" => "transcript", "text" => transcript)
+
+  facade = SoulCore::ApplicationFacade.new(root: ROOT, process_env: environment)
+  chat_id = voice_chat_id(facade)
+  emit("type" => "state", "state" => "thinking", "summary" => "Soul is considering the transmission.")
+  perception = SoulCore::VoiceScreenUnderstandingService.new(root: ROOT).handle(
+    chat_id: chat_id,
+    transcript: transcript,
+    request_id: "voice-screen-#{SecureRandom.uuid}",
+    on_progress: ->(progress) { emit({ "type" => "progress" }.merge(progress)) }
+  )
+  if perception["matched"]
+    lifecycle = perception.fetch("lifecycle_state", "failed")
+    assistant = perception.fetch("reply", "").to_s
+  else
+    exchange = facade.call(
+      request("chats.send", { "chat_id" => chat_id, "message" => transcript }, { "current_chat_id" => chat_id }),
+      progress: ->(progress) { emit({ "type" => "progress" }.merge(progress)) }
+    )
+    lifecycle = exchange.fetch("lifecycle_state", "failed")
+    assistant = exchange.dig("data", "assistant_message", "content").to_s
+    unless exchange["ok"]
+      assistant = exchange.fetch("errors", []).first&.fetch("message", nil) || "Soul could not complete the turn."
+    end
+  end
+  raise "Soul returned no eligible spoken reply" if assistant.strip.empty?
+
+  synthesis_options = { root: ROOT, process_env: environment }
+  {
+    runtime_root: "SOUL_VOICE_SYNTHESIS_ROOT",
+    manifest_path: "SOUL_VOICE_SYNTHESIS_MANIFEST",
+    voice_name: "SOUL_VOICE_SYNTHESIS_VOICE",
+    speed: "SOUL_VOICE_SYNTHESIS_SPEED",
+    expressive_root: "SOUL_VOICE_EXPRESSIVE_ROOT",
+    expressive_manifest_path: "SOUL_VOICE_EXPRESSIVE_MANIFEST"
+  }.each do |option, key|
+    synthesis_options[option] = environment[key] unless environment[key].to_s.empty?
+  end
+  emit("type" => "state", "state" => "speaking", "summary" => "Preparing Soul's voice.")
+  speech = SoulCore::VoiceSynthesisService.new(**synthesis_options).synthesize(
+    text: assistant, voice_name: selected_voice, quality: "responsive"
+  )
+  raise speech.fetch("message", "speech synthesis failed") unless speech["ok"]
+  File.binwrite(output_path, speech.fetch("audio"), mode: "wx", perm: 0o600)
+  emit("type" => "result", "lifecycle_state" => lifecycle, "transcript" => transcript, "reply" => assistant, "chat_id" => chat_id, "audio_path" => output_path)
+rescue Interrupt
+  emit("type" => "result", "lifecycle_state" => "canceled", "error" => "voice turn canceled")
+  exit 130
+rescue StandardError => error
+  emit("type" => "result", "lifecycle_state" => "failed", "error" => error.message.to_s[0, 300])
+  exit 1
+end

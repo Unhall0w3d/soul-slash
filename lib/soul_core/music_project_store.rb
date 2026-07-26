@@ -42,7 +42,7 @@ module SoulCore
       raise ValidationError, "missing project fields: #{missing.join(', ')}" unless missing.empty?
 
       validate_inputs!(data)
-      validate_caption_contract!(data.fetch("caption"))
+      validate_caption_contract!(data.fetch("caption"), vocal_mode: data.fetch("vocal_mode"))
       prepare_root!
       raise IntegrityError, "music project limit exceeded" if safe_entries(@directory).length >= MAX_PROJECTS
 
@@ -166,7 +166,7 @@ module SoulCore
         "seed" => Integer(data.fetch("seed"))
       )
       validate_generation_input!(revised, error_class: ValidationError)
-      validate_caption_contract!(revised.fetch("caption"))
+      validate_caption_contract!(revised.fetch("caption"), vocal_mode: project.fetch("vocal_mode"))
       material_fields = REVISION_FIELDS - ["seed"]
       raise ValidationError, "revision must materially change sound, structure, lyrics, or musical parameters" if material_fields.all? { |field| revised.fetch(field) == source_input.fetch(field) }
       revised
@@ -304,12 +304,14 @@ module SoulCore
       raise ValidationError, "duration, bpm, and seed must be integers"
     end
 
-    def validate_caption_contract!(caption)
+    def validate_caption_contract!(caption, vocal_mode:)
       raise ValidationError, "Sound and Structure exceeds the runtime's 512-character caption limit" if caption.length > 512
       raise ValidationError, "Sound and Structure must keep BPM in the dedicated field" if caption.match?(/\b\d{2,3}\s*BPM\b/i)
       raise ValidationError, "Sound and Structure must keep time signature in the dedicated field" if caption.match?(/\b(?:2|3|4|5|6|7|9|12)\s*\/\s*(?:4|8|16)\b/)
       raise ValidationError, "Sound and Structure must keep key in the dedicated field" if caption.match?(/\b[A-G](?:[#b]|-flat|-sharp)?\s+(?:major|minor)\b/)
-      raise ValidationError, "Sound and Structure must put temporal section changes in the lyrics script" if caption.match?(/\b\d{1,3}\s*(?:sec|second)s?\b/i)
+      if vocal_mode == "vocal" && caption.match?(/\b\d{1,3}\s*(?:sec|second)s?\b/i)
+        raise ValidationError, "Vocal Sound and Structure must put temporal section changes in the lyrics script"
+      end
       raise ValidationError, "Sound and Structure must not embed revision directives" if caption.match?(/\b(?:revision directives?|key revisions?)\s*:/i)
     end
 

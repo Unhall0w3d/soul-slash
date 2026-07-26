@@ -221,7 +221,7 @@ html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("Music Studio separates evidence targets approval and exact rejection", %w[music-reference-observed music-reference-target music-reference-synthesis-confirmation music-reference-synthesis-reject-confirmation].all? { |id| html.include?(id) } && javascript.include?("music.references.synthesis.draft") && javascript.include?("music.references.synthesis.approval.execute") && javascript.include?("music.references.synthesis.rejection.execute"))
 check.call("fusion UI requires explicit profile selection and exposes no automatic generation", html.include?("draft-music-reference-fusion") && javascript.include?("music.references.fusion.draft") && javascript.include?("count < 2 || count > 5") && !javascript.include?("setInterval(draftMusicReference"))
-check.call("composition form teaches a concise coherent caption and vocal temporal script", html.include?("Describe one coherent sonic identity") && html.include?("512 characters") && html.include?("section markers below apply to vocal projects"))
+check.call("composition form teaches mode-specific timing without weakening the instrumental token", html.include?("music-caption-guidance") && html.include?("music-lyrics-label") && javascript.include?("Broad or second-based movement timing belongs here") && javascript.include?("exact trained no-vocal token") && javascript.include?("lyrics.disabled = true"))
 
 abort "Music reference synthesis A5 verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music reference synthesis A5 verification passed."

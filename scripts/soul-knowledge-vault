@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/configuration_resolver"
+require_relative "../lib/soul_core/knowledge_vault_service"
+
+root = File.expand_path("..", __dir__)
+resolver = SoulCore::ConfigurationResolver.new(root: root, process_env: ENV)
+configuration = resolver.resolve
+unless configuration.fetch("ok")
+  puts JSON.pretty_generate(
+    "ok" => false,
+    "lifecycle_state" => configuration.fetch("lifecycle_state"),
+    "message" => "Soul configuration is invalid",
+    "data" => { "errors" => configuration.fetch("errors") }
+  )
+  exit 1
+end
+service = SoulCore::KnowledgeVaultService.new(root: root, process_env: resolver.effective_environment)
+command = ARGV.shift.to_s
+
+reflection_input = lambda do |path|
+  expanded = File.expand_path(path.to_s)
+  raise ArgumentError, "reflection JSON path is required" if path.to_s.strip.empty?
+  stat = File.lstat(expanded)
+  raise ArgumentError, "reflection input must be a regular non-symlink file" unless stat.file? && !stat.symlink?
+  raise ArgumentError, "reflection input exceeds 64 KiB" if stat.size > 64 * 1024
+
+  value = JSON.parse(File.binread(expanded))
+  raise ArgumentError, "reflection input must be a JSON object" unless value.is_a?(Hash)
+  allowed = %w[title body knowledge_kind evidence_status source_reference target_relative_path tags]
+  unknown = value.keys - allowed
+  raise ArgumentError, "unknown reflection input fields: #{unknown.join(', ')}" unless unknown.empty?
+
+  {
+    title: value["title"],
+    body: value["body"],
+    knowledge_kind: value["knowledge_kind"],
+    evidence_status: value["evidence_status"],
+    source_reference: value["source_reference"],
+    target_relative_path: value["target_relative_path"],
+    tags: value["tags"] || []
+  }
+end
+
+begin
+  result = case command
+         when "status"
+           service.status
+         when "search"
+           service.search(query: ARGV.shift.to_s, limit: ARGV.shift || 10)
+         when "initialize-preview"
+           service.initialize_preview
+         when "initialize-execute"
+           service.initialize_execute(
+             confirmation: ENV["CONFIRMATION"],
+             expected_digest: ENV["EXPECTED_DIGEST"]
+           )
+         when "memory-export-preview"
+           service.memory_export_preview
+         when "memory-export-execute"
+           service.memory_export_execute(
+             confirmation: ENV["CONFIRMATION"],
+             expected_digest: ENV["EXPECTED_DIGEST"]
+           )
+         when "memory-import-preview"
+           service.memory_import_preview(relative_path: ARGV.shift.to_s, layer: ARGV.shift.to_s)
+         when "memory-import-execute"
+           service.memory_import_execute(
+             relative_path: ARGV.shift.to_s,
+             layer: ARGV.shift.to_s,
+             confirmation: ENV["CONFIRMATION"],
+             expected_digest: ENV["EXPECTED_DIGEST"]
+           )
+         when "reflection-preview"
+           service.reflection_preview(**reflection_input.call(ARGV.shift))
+         when "reflection-execute"
+           service.reflection_execute(
+             **reflection_input.call(ARGV.shift),
+             confirmation: ENV["CONFIRMATION"],
+             expected_digest: ENV["EXPECTED_DIGEST"]
+           )
+         else
+           {
+             "ok" => false,
+             "lifecycle_state" => "awaiting_input",
+             "message" => "usage: soul-knowledge-vault status | search QUERY [LIMIT] | initialize-preview | initialize-execute | memory-export-preview | memory-export-execute | memory-import-preview PATH LAYER | memory-import-execute PATH LAYER | reflection-preview INPUT.json | reflection-execute INPUT.json",
+             "data" => {}
+           }
+           end
+
+  puts JSON.pretty_generate(result)
+  exit(result["lifecycle_state"] == "failed" ? 1 : 0)
+rescue Errno::ENOENT, JSON::ParserError, ArgumentError => error
+  puts JSON.pretty_generate(
+    "ok" => false,
+    "lifecycle_state" => "failed",
+    "message" => error.message,
+    "data" => {}
+  )
+  exit 1
+end

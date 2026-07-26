@@ -17,6 +17,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
+- [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
+- [x] shared owner-local Project Timeline with explicit Dashboard and Chat edits
 
 ## Near-term refinement
 
@@ -35,7 +37,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] longer-form music/mix composition through measured duration steps and repetition analysis
 - [ ] authenticated YouTube draft upload with publication remaining human-controlled
 - [ ] voice input and speech output through the same conversation and skill core
-- [ ] image/screen understanding with declared privacy and capability boundaries
+- [x] image/screen understanding with declared privacy and capability boundaries
+  - [x] A0 local runtime, model, capture-tool, and privacy readiness assessment
+  - [x] A1 bounded picture attachment and understanding
+  - [x] A2 explicit one-shot monitor, window, or region capture
+  - [x] A3 voice-mediated perception requests
 - [ ] project-aware and local-document search skills
 - [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
 

@@ -55,6 +55,27 @@ activity-probe, digest, confirmation, allowlist, and timeout checks. No model
 may choose or authorize a Core transition. Soul does not silently restore the
 previous Core after creative work.
 
+Before presenting an executable creative action, Soul must resolve and expose:
+
+- the active Core;
+- the exact Core required by the pending operation;
+- whether the approved action includes a Core transition;
+- why that Core is required.
+
+Music generation and music revision require Music Core. Visual-only generation
+and image-guided visual revision require AMD-Free Core. Resolving reviewed
+existing sources, recording reviews, binding lineage, and preparing exports do
+not imply a Core transition unless their downstream operation performs bounded
+generation.
+
+The Core requirement is deterministic server state included in the reviewed
+workflow digest and action metadata. It is not chosen by the local model. A
+single Operator click may authorize the exact creative action and its disclosed
+Core transition; execution must revalidate the requirement, current Core,
+active work, lease, profile, and runtime digest before changing services. If
+the Core is already suitable, the same action proceeds without a redundant
+transition.
+
 ## Presentation
 
 Chat messages may carry authenticated local attachments:
@@ -81,7 +102,8 @@ Markdown. The dashboard renders only known same-origin artifact routes.
 - deterministic routing tests for invocation versus ordinary mention;
 - required-field and optional-draft validation;
 - exact action digest, stale-action, and idempotent replay tests;
-- Core transition blockers and no-model-authorization evidence;
+- visible active/required Core preflight, already-suitable behavior, Core
+  transition blockers, and no-model-authorization evidence;
 - music, visual, combined, existing-source, binding, render, and export flow
   tests using bounded fakes;
 - dashboard attachment/action rendering checks;

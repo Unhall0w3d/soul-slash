@@ -36,6 +36,20 @@ MUSIC_DURATION ?= 30
 MUSIC_VULKAN_MANIFEST ?= $(PROJECT_ROOT)/config/music_vulkan_models.json
 MUSIC_TRANSCRIPTION_MANIFEST ?= $(PROJECT_ROOT)/config/music_transcription_models.json
 MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
+VOICE_TRANSCRIPTION_ROOT ?= $(MUSIC_ROOT)
+VOICE_TRANSCRIPTION_MANIFEST ?= $(MUSIC_TRANSCRIPTION_MANIFEST)
+VOICE_TRANSCRIPTION_MODEL ?= $(MUSIC_TRANSCRIPTION_MODEL)
+VOICE_SYNTHESIS_ROOT ?= $(HOME)/.local/share/soul/voice/runtime
+VOICE_SYNTHESIS_MANIFEST ?= $(PROJECT_ROOT)/config/voice_synthesis_models.json
+VOICE_SYNTHESIS_REQUIREMENTS ?= $(PROJECT_ROOT)/config/voice_synthesis_requirements.txt
+VOICE_SYNTHESIS_AUDITION_DIR ?= /tmp/soul-voice-audition
+VOICE_EXPRESSIVE_ROOT ?= $(HOME)/.local/share/soul/voice/expressive
+VOICE_EXPRESSIVE_MANIFEST ?= $(PROJECT_ROOT)/config/voice_expressive_models.json
+VOICE_EXPRESSIVE_REQUIREMENTS ?= $(PROJECT_ROOT)/config/voice_expressive_requirements.txt
+VOICE_PRESENCE_ROOT ?= $(HOME)/.local/share/soul/voice/presence
+VOICE_PRESENCE_MANIFEST ?= $(PROJECT_ROOT)/config/voice_presence_models.json
+VOICE_PRESENCE_REQUIREMENTS ?= $(PROJECT_ROOT)/config/voice_presence_requirements.txt
+VOICE_PRESENCE_SOURCE ?= effect_output.soul-rnnoise
 MUSIC_REFERENCE_PYTHON ?= 3.14
 MUSIC_REFERENCE_YTDLP_VERSION ?= 2026.7.4
 MUSIC_REFERENCE_ESSENTIA_VERSION ?= 2.1b6.dev1438
@@ -48,8 +62,9 @@ VISUAL_MOTION_MANIFEST ?= $(PROJECT_ROOT)/config/visual_motion_models.json
 VISUAL_MOTION_INPUT ?=
 VISUAL_NATIVE_ROOT ?= $(HOME)/.local/share/soul/visual-native
 VISUAL_NATIVE_MANIFEST ?= $(PROJECT_ROOT)/config/visual_native_models.json
+KNOWLEDGE_REFLECTION_INPUT ?=
 
-.PHONY: help defaults-show supported-stack-check check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run visual-native-check visual-native-runtime-plan visual-native-runtime-install visual-native-model-download-plan visual-native-model-download verify-visual-motion-qualification verify-visual-native-video music-transcription-plan music-transcription-install music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
+.PHONY: help defaults-show supported-stack-check check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run visual-native-check visual-native-runtime-plan visual-native-runtime-install visual-native-model-download-plan visual-native-model-download verify-visual-motion-qualification verify-visual-native-video music-transcription-plan music-transcription-install voice-transcription-check voice-transcription-plan voice-transcription-install verify-voice-transcription voice-synthesis-check voice-synthesis-plan voice-synthesis-install voice-synthesis-audition verify-voice-synthesis notification-audio-build verify-notification-cues verify-project-timeline music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity knowledge-vault-status knowledge-vault-search knowledge-vault-init-preview knowledge-vault-init knowledge-vault-memory-export-preview knowledge-vault-memory-export knowledge-vault-memory-import-preview knowledge-vault-memory-import knowledge-vault-reflection-preview knowledge-vault-reflection-execute verify-knowledge-vault verify-knowledge-reflection detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -81,6 +96,30 @@ help:
 > @echo "  make visual-native-model-download-plan  Preview exact FastWan model bytes"
 > @echo "  make music-transcription-plan  Preview the optional pinned CPU vocal-analysis install"
 > @echo "  make music-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
+> @echo "  make voice-transcription-check  Verify bounded Chat push-to-talk dependencies"
+> @echo "  make voice-transcription-plan  Preview the shared pinned CPU transcription install"
+> @echo "  make voice-transcription-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION"
+> @echo "  make voice-synthesis-check  Verify bounded local Chat speech dependencies"
+> @echo "  make voice-synthesis-plan  Preview the pinned Supertonic 3 install"
+> @echo "  make voice-synthesis-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_VOICE_SYNTHESIS"
+> @echo "  make voice-synthesis-audition  Render F1/F3/F5 and M1/M3/M5 comparison clips"
+> @echo "  make voice-expressive-check  Verify the bounded Chatterbox expressive runtime"
+> @echo "  make voice-expressive-plan  Preview the pinned expressive runtime install"
+> @echo "  make voice-expressive-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_EXPRESSIVE_VOICE"
+> @echo "  make voice-noise-filter-plan  Preview a system-wide RNNoise virtual microphone"
+> @echo "  make voice-noise-filter-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_RNNOISE_FILTER"
+> @echo "  make voice-presence-plan  Preview the local Hey Soul wake runtime and app entry"
+> @echo "  make voice-presence-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_VOICE_PRESENCE"
+> @echo "  make voice-presence-launch  Open visible persistent voice (close window to stop)"
+> @echo "  make verify-notification-cues  Verify static cues and Presence-aware spoken notices"
+> @echo "  make verify-project-timeline  Verify the shared Dashboard/Chat implementation ledger"
+> @echo "  make knowledge-vault-status  Inspect the optional external Markdown vault"
+> @echo "  make knowledge-vault-init-preview  Preview the portable starter structure"
+> @echo "  make knowledge-vault-init EXPECTED_DIGEST=... CONFIRM=INITIALIZE_KNOWLEDGE_VAULT"
+> @echo "  make knowledge-vault-search KNOWLEDGE_QUERY='local models'"
+> @echo "  make knowledge-vault-reflection-preview KNOWLEDGE_REFLECTION_INPUT=/path/candidate.json"
+> @echo "  make knowledge-vault-reflection-execute KNOWLEDGE_REFLECTION_INPUT=... EXPECTED_DIGEST=... CONFIRM=WRITE_KNOWLEDGE_VAULT_NOTE"
+> @echo "  make verify-knowledge-reflection  Test explicit conversation-to-vault proposals and exact writes"
 > @echo "  make music-reference-enrichment-plan  Preview pinned rich reference-analysis models"
 > @echo "  make music-reference-enrichment-install EXPECTED_DIGEST=... CONFIRM=INSTALL_MUSIC_REFERENCE_ENRICHMENT"
 > @echo "  make verify-music-reference-synthesis  Test reference synthesis retry approval and fusion gates"
@@ -309,6 +348,92 @@ music-transcription-install:
 > @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_TRANSCRIPTION" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_TRANSCRIPTION is required."; exit 2; }
 > @ruby scripts/soul-music-transcription install --manifest "$(MUSIC_TRANSCRIPTION_MANIFEST)" --root "$(MUSIC_ROOT)" --model "$(MUSIC_TRANSCRIPTION_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
+voice-transcription-check:
+> @ruby scripts/soul-voice-transcription check --manifest "$(VOICE_TRANSCRIPTION_MANIFEST)" --root "$(VOICE_TRANSCRIPTION_ROOT)" --model "$(VOICE_TRANSCRIPTION_MODEL)"
+
+voice-transcription-plan:
+> @ruby scripts/soul-music-transcription plan --manifest "$(VOICE_TRANSCRIPTION_MANIFEST)" --root "$(VOICE_TRANSCRIPTION_ROOT)" --model "$(VOICE_TRANSCRIPTION_MODEL)"
+
+voice-transcription-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run voice-transcription-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_MUSIC_TRANSCRIPTION" || { echo "Exact confirmation INSTALL_SOUL_MUSIC_TRANSCRIPTION is required."; exit 2; }
+> @ruby scripts/soul-music-transcription install --manifest "$(VOICE_TRANSCRIPTION_MANIFEST)" --root "$(VOICE_TRANSCRIPTION_ROOT)" --model "$(VOICE_TRANSCRIPTION_MODEL)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-voice-transcription:
+> @ruby scripts/verify-voice-transcription-a0.rb
+
+voice-synthesis-check:
+> @ruby scripts/soul-voice-synthesis check --manifest "$(VOICE_SYNTHESIS_MANIFEST)" --requirements "$(VOICE_SYNTHESIS_REQUIREMENTS)" --root "$(VOICE_SYNTHESIS_ROOT)"
+
+voice-synthesis-plan:
+> @ruby scripts/soul-voice-synthesis plan --manifest "$(VOICE_SYNTHESIS_MANIFEST)" --requirements "$(VOICE_SYNTHESIS_REQUIREMENTS)" --root "$(VOICE_SYNTHESIS_ROOT)"
+
+voice-synthesis-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run voice-synthesis-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_VOICE_SYNTHESIS" || { echo "Exact confirmation INSTALL_SOUL_VOICE_SYNTHESIS is required."; exit 2; }
+> @ruby scripts/soul-voice-synthesis install --manifest "$(VOICE_SYNTHESIS_MANIFEST)" --requirements "$(VOICE_SYNTHESIS_REQUIREMENTS)" --root "$(VOICE_SYNTHESIS_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+voice-synthesis-audition:
+> @ruby scripts/soul-voice-synthesis audition --manifest "$(VOICE_SYNTHESIS_MANIFEST)" --requirements "$(VOICE_SYNTHESIS_REQUIREMENTS)" --root "$(VOICE_SYNTHESIS_ROOT)" --output "$(VOICE_SYNTHESIS_AUDITION_DIR)"
+
+verify-voice-synthesis:
+> @ruby scripts/verify-voice-synthesis-a0.rb
+
+voice-expressive-check:
+> @ruby scripts/soul-voice-expressive check --manifest "$(VOICE_EXPRESSIVE_MANIFEST)" --requirements "$(VOICE_EXPRESSIVE_REQUIREMENTS)" --root "$(VOICE_EXPRESSIVE_ROOT)"
+
+voice-expressive-plan:
+> @ruby scripts/soul-voice-expressive plan --manifest "$(VOICE_EXPRESSIVE_MANIFEST)" --requirements "$(VOICE_EXPRESSIVE_REQUIREMENTS)" --root "$(VOICE_EXPRESSIVE_ROOT)"
+
+voice-expressive-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run voice-expressive-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_EXPRESSIVE_VOICE" || { echo "Exact confirmation INSTALL_SOUL_EXPRESSIVE_VOICE is required."; exit 2; }
+> @ruby scripts/soul-voice-expressive install --manifest "$(VOICE_EXPRESSIVE_MANIFEST)" --requirements "$(VOICE_EXPRESSIVE_REQUIREMENTS)" --root "$(VOICE_EXPRESSIVE_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-voice-expressive:
+> @ruby scripts/verify-voice-synthesis-a1-expressive.rb
+
+voice-noise-filter-check:
+> @ruby scripts/soul-voice-noise-filter check
+
+voice-noise-filter-plan:
+> @ruby scripts/soul-voice-noise-filter plan
+
+voice-noise-filter-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run voice-noise-filter-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_RNNOISE_FILTER" || { echo "Exact confirmation INSTALL_SOUL_RNNOISE_FILTER is required."; exit 2; }
+> @ruby scripts/soul-voice-noise-filter --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)" install
+
+verify-voice-noise-filter:
+> @ruby scripts/verify-voice-noise-filter-a1.rb
+
+voice-presence-check:
+> @ruby scripts/soul-voice-presence-runtime check --manifest "$(VOICE_PRESENCE_MANIFEST)" --requirements "$(VOICE_PRESENCE_REQUIREMENTS)" --root "$(VOICE_PRESENCE_ROOT)"
+
+voice-presence-plan:
+> @ruby scripts/soul-voice-presence-runtime plan --manifest "$(VOICE_PRESENCE_MANIFEST)" --requirements "$(VOICE_PRESENCE_REQUIREMENTS)" --root "$(VOICE_PRESENCE_ROOT)"
+
+voice-presence-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run voice-presence-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_VOICE_PRESENCE" || { echo "Exact confirmation INSTALL_SOUL_VOICE_PRESENCE is required."; exit 2; }
+> @ruby scripts/soul-voice-presence-runtime install --manifest "$(VOICE_PRESENCE_MANIFEST)" --requirements "$(VOICE_PRESENCE_REQUIREMENTS)" --root "$(VOICE_PRESENCE_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+voice-presence-launch:
+> @SOUL_VOICE_PRESENCE_ROOT="$(VOICE_PRESENCE_ROOT)" SOUL_VOICE_PRESENCE_MANIFEST="$(VOICE_PRESENCE_MANIFEST)" SOUL_VOICE_PRESENCE_SOURCE="$(VOICE_PRESENCE_SOURCE)" scripts/soul-voice-presence
+
+verify-voice-presence:
+> @ruby scripts/verify-voice-presence-a2.rb
+> @ruby scripts/verify-voice-presence-a3.rb
+
+notification-audio-build:
+> @ruby scripts/build-notification-audio
+
+verify-notification-cues:
+> @ruby scripts/verify-notification-cues-a1.rb
+
+verify-project-timeline:
+> @ruby scripts/verify-project-timeline-a1.rb
+
 music-reference-tooling-check:
 > @ruby scripts/soul-music-reference-tooling check --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)"
 
@@ -421,6 +546,53 @@ dashboard-service-uninstall:
 
 verify-web-knowledge:
 > @ruby scripts/verify-responsive-chat-and-web-research.rb
+
+knowledge-vault-status:
+> @scripts/soul-knowledge-vault status
+
+knowledge-vault-search:
+> @test -n "$(KNOWLEDGE_QUERY)" || { echo "KNOWLEDGE_QUERY is required."; exit 2; }
+> @scripts/soul-knowledge-vault search "$(KNOWLEDGE_QUERY)" "$(or $(KNOWLEDGE_LIMIT),10)"
+
+knowledge-vault-init-preview:
+> @scripts/soul-knowledge-vault initialize-preview
+
+knowledge-vault-init:
+> @test "$(CONFIRM)" = "INITIALIZE_KNOWLEDGE_VAULT" || { echo "Review the preview, then set CONFIRM=INITIALIZE_KNOWLEDGE_VAULT."; exit 2; }
+> @test -n "$(EXPECTED_DIGEST)" || { echo "EXPECTED_DIGEST is required."; exit 2; }
+> @CONFIRMATION="$(CONFIRM)" EXPECTED_DIGEST="$(EXPECTED_DIGEST)" scripts/soul-knowledge-vault initialize-execute
+
+knowledge-vault-memory-export-preview:
+> @scripts/soul-knowledge-vault memory-export-preview
+
+knowledge-vault-memory-export:
+> @test "$(CONFIRM)" = "EXPORT_APPROVED_MEMORY_TO_VAULT" || { echo "Review the preview, then set CONFIRM=EXPORT_APPROVED_MEMORY_TO_VAULT."; exit 2; }
+> @test -n "$(EXPECTED_DIGEST)" || { echo "EXPECTED_DIGEST is required."; exit 2; }
+> @CONFIRMATION="$(CONFIRM)" EXPECTED_DIGEST="$(EXPECTED_DIGEST)" scripts/soul-knowledge-vault memory-export-execute
+
+knowledge-vault-memory-import-preview:
+> @test -n "$(KNOWLEDGE_NOTE)" -a -n "$(KNOWLEDGE_LAYER)" || { echo "KNOWLEDGE_NOTE and KNOWLEDGE_LAYER are required."; exit 2; }
+> @scripts/soul-knowledge-vault memory-import-preview "$(KNOWLEDGE_NOTE)" "$(KNOWLEDGE_LAYER)"
+
+knowledge-vault-memory-import:
+> @test "$(CONFIRM)" = "IMPORT_VAULT_NOTE_AS_MEMORY_CANDIDATE" || { echo "Review the preview, then set CONFIRM=IMPORT_VAULT_NOTE_AS_MEMORY_CANDIDATE."; exit 2; }
+> @test -n "$(EXPECTED_DIGEST)" -a -n "$(KNOWLEDGE_NOTE)" -a -n "$(KNOWLEDGE_LAYER)" || { echo "EXPECTED_DIGEST, KNOWLEDGE_NOTE, and KNOWLEDGE_LAYER are required."; exit 2; }
+> @CONFIRMATION="$(CONFIRM)" EXPECTED_DIGEST="$(EXPECTED_DIGEST)" scripts/soul-knowledge-vault memory-import-execute "$(KNOWLEDGE_NOTE)" "$(KNOWLEDGE_LAYER)"
+
+knowledge-vault-reflection-preview:
+> @test -n "$(KNOWLEDGE_REFLECTION_INPUT)" || { echo "KNOWLEDGE_REFLECTION_INPUT is required; start from config/knowledge_reflection.example.json."; exit 2; }
+> @scripts/soul-knowledge-vault reflection-preview "$(KNOWLEDGE_REFLECTION_INPUT)"
+
+knowledge-vault-reflection-execute:
+> @test "$(CONFIRM)" = "WRITE_KNOWLEDGE_VAULT_NOTE" || { echo "Review the preview, then set CONFIRM=WRITE_KNOWLEDGE_VAULT_NOTE."; exit 2; }
+> @test -n "$(EXPECTED_DIGEST)" -a -n "$(KNOWLEDGE_REFLECTION_INPUT)" || { echo "EXPECTED_DIGEST and KNOWLEDGE_REFLECTION_INPUT are required."; exit 2; }
+> @CONFIRMATION="$(CONFIRM)" EXPECTED_DIGEST="$(EXPECTED_DIGEST)" scripts/soul-knowledge-vault reflection-execute "$(KNOWLEDGE_REFLECTION_INPUT)"
+
+verify-knowledge-vault:
+> @ruby scripts/verify-knowledge-vault-a0.rb
+
+verify-knowledge-reflection:
+> @ruby scripts/verify-knowledge-reflection-a2.rb
 
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb
