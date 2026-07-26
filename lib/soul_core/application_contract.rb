@@ -76,6 +76,7 @@ module SoulCore
       "knowledge_vault.memory_import.execute" => %w[relative_path layer confirmation expected_digest],
       "knowledge_vault.reflection.preview" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags],
       "knowledge_vault.reflection.execute" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags confirmation expected_digest],
+      "invocations.list" => %w[category query],
       "skills.list" => %w[limit],
       "skill_studio.proposals.list" => %w[limit],
       "skill_studio.proposals.get" => %w[proposal_id],

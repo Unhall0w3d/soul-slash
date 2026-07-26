@@ -21,6 +21,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Core-aware Chat-native text-to-video generation and review-led native revision from an exact reviewed visual context
 - [x] read-only motion qualification ledger over retained runtime receipts and human reviews
 - [x] shared owner-local Project Timeline with explicit Dashboard and Chat edits
+- [x] curated read-only Invocation Guide across Dashboard and Chat
 
 ## Near-term refinement
 

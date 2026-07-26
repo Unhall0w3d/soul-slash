@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-26T01:40:33-04:00
+Generated: 2026-07-26T10:39:14-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-29
+30
 ```
 
 ## Skills
@@ -196,6 +196,25 @@ Example ways the owner might ask for this:
 
 - use dashboard capabilities inspect
 - run dashboard.capabilities.inspect
+
+### Dashboard Invocations Inspect
+
+```text
+id: dashboard.invocations.inspect
+category: project_coordination
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Read the curated invocation guide, including required inputs, Core needs, approval behavior, outputs, and retained authority boundaries, without invoking anything.
+
+Example ways the owner might ask for this:
+
+- use dashboard invocations inspect
+- run dashboard.invocations.inspect
 
 ### Downloads Cleanup Plan
 
