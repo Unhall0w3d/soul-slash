@@ -199,11 +199,12 @@
       "title": "Backup and disaster-recovery design",
       "area": "Operations",
       "horizon": "now",
-      "status": "in_progress",
+      "status": "needs_review",
       "priority": "high",
-      "summary": "Inventory irreplaceable owner state separately from reproducible models, caches, helper environments, and installed deployment files; define a reviewed backup and restore contract before implementation.",
+      "summary": "Review the candidate-complete encrypted local backup foundation: inventoried source allow-list, ext4 target, restic snapshot, full pack verification, and staged restore. Retention, a second copy, and full-host recovery remain separate gates.",
       "acceptance": "Backup, restore, verification, exclusions, and secret handling have a reviewed reproducible procedure.",
-      "source": "Backup and Disaster Recovery A0 review"
+      "source": "Backup and Disaster Recovery A0 review",
+      "notes": "Local target prepared and verified on 2026-07-26. Recovered former SanDisk data remains in ~/Recovered and is explicitly excluded from Soul backups."
     },
     {
       "item_id": "track_project_search",

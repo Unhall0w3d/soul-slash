@@ -1,6 +1,6 @@
 # Backup and Disaster Recovery A0 Brief
 
-Status: review in progress; no backup implementation or destination approved
+Status: local recovery foundation candidate-complete; human review required
 
 ## Objective
 
@@ -10,9 +10,11 @@ cover backup, restore, verification, exclusions, secret handling, retention,
 and recovery rehearsal before any scheduled or unattended behavior is
 considered.
 
-This slice is read-only except for documentation and the explicit Project
-Timeline status update. It installs nothing, creates no backup repository, and
-adds no service, timer, watcher, or scheduled task.
+The initial A0 slice began as a read-only inventory. The Operator subsequently
+approved preparation of the separate SanDisk device, installation of restic,
+creation of an encrypted repository, one manual snapshot, full integrity
+verification, and a staged restore rehearsal. No service, timer, watcher,
+scheduled task, unattended retention, or live-tree restore was added.
 
 ## Current inventory snapshot
 
@@ -110,9 +112,9 @@ may be considered later if avoiding large downloads becomes worth the storage.
 
 ## Tool assessment
 
-The workstation currently has `rsync`, `tar`, `zstd`, GnuPG, and Btrfs tools,
-but no snapshot backup application. Btrfs is the current home filesystem and
-could provide an optional point-in-time source snapshot; it must not become a
+The workstation has `rsync`, `tar`, `zstd`, GnuPG, Btrfs tools, and the signed
+Arch restic 0.19.1 package. Btrfs is the current home filesystem and could
+provide an optional point-in-time source snapshot; it must not become a
 public-repository requirement.
 
 The recommended A1 candidate is **restic**:
@@ -130,7 +132,8 @@ repositories. Restic is preferred while the destination remains undecided
 because its backend range and JSON-oriented scripting surface better fit a
 portable public project.
 
-No package is approved for installation by this brief.
+Restic installation and the local repository were separately approved by the
+Operator during this review.
 
 Upstream references reviewed:
 
@@ -236,7 +239,7 @@ backup itself, logs, receipts, or model context.
 ### Local SanDisk candidate
 
 The Operator workstation contains a separate SanDisk SSD Plus 120 GB device
-with 111.8 GiB usable capacity. At review time it held one read-only mounted
+with 111.8 GiB usable capacity. At initial review it held one read-only mounted
 NTFS partition with 5.7 GiB used and 106.1 GiB free.
 
 The three personal data trees on the device were copied into an owner-only
@@ -245,15 +248,20 @@ comparison reported no differences across 2,569 files and 4,099,426,963 bytes.
 An owner-only relative SHA-256 manifest was then generated and all 2,569
 entries verified successfully.
 The Windows recycle bin, empty recovery directory, and volume metadata were
-intentionally not migrated. The source SSD remains unchanged pending health
-review and a separate destructive confirmation.
+intentionally not migrated. The recovered personal data remains in
+`~/Recovered/SanDisk-SSD-2026-07-26/`; the Operator explicitly directed that
+this recovered copy not be included in Soul's backup set.
 
-If SMART health is acceptable, the recommended local-target layout is:
+SMART reported PASSED, a fresh short self-test completed without error, and
+the observed failure counters were zero. Following explicit approval, the
+device was repartitioned and now uses:
 
 - GPT partition table;
-- one ext4 partition labeled `SOUL_BACKUP`;
+- one ext4 partition labeled `SOUL_BACKUP`, UUID
+  `b9713868-7a24-4369-864d-cd67029981fb`;
 - a stable UUID-based mount at `/mnt/soul-backup`;
-- an owner-only restic repository below that mount;
+- an owner-only encrypted restic repository at
+  `/mnt/soul-backup/restic`;
 - `nofail` mount behavior so loss of the backup disk cannot block boot;
 - a capacity warning before the repository consumes 80% of the filesystem.
 
@@ -266,25 +274,29 @@ This internal SSD is only the first local recovery copy. It shares the
 workstation's power, chassis, and administrative boundary and therefore does
 not satisfy the additional offline/off-site copy requirement.
 
-## Human decisions required before A1 implementation
+The first manual repository snapshot is `20ae7e63`. A full restic data check
+read all 79 packs and reported no errors. A staged restore of the private
+Project Timeline validated as JSON and matched the live file byte-for-byte.
+See `docs/soul/BACKUP_AND_RECOVERY.md` for the operating procedure.
 
-- first repository destination and available capacity;
-- acceptable SMART health for the local SanDisk candidate;
-- restic versus Borg if the destination strongly favors Borg/SSH;
-- key-custody method;
+## Remaining human decisions
+
 - whether finished exports and the Knowledge Vault share the same repository;
-- whether to preserve Caddy trust material;
 - portable quiescent capture versus an optional Btrfs snapshot adapter;
 - acceptable manual-backup pause;
 - retention values;
 - whether any future scheduled execution is desirable.
+- location and custody of an additional offline or off-site copy;
+- timing and scope of a complete host-loss recovery rehearsal.
 
-## A0 acceptance
+## A0 result
 
 - recovery classes reflect actual current storage;
 - secrets and ephemeral authority are treated differently;
 - reproducible models and helper environments are excluded by default;
 - restore stages and verifies before touching live data;
-- tool and destination choices remain human decisions;
-- no persistence, privilege, backup repository, or destructive retention is
-  introduced.
+- the local tool, filesystem, mount, and destination were explicitly selected;
+- one encrypted snapshot, full data verification, and a staged single-file
+  recovery rehearsal succeeded;
+- no scheduler, unattended persistence, destructive retention, or live-tree
+  restore was introduced.
