@@ -303,7 +303,9 @@ module SoulCore
       return session_error if session_error
 
       request = JSON.parse(body)
-      result = voice_synthesis.synthesize(text: request["text"], voice_name: request["voice"], quality: request["quality"] || "responsive")
+      options = { text: request["text"], voice_name: request["voice"], quality: request["quality"] || "responsive" }
+      options[:speech_context] = request["speech_context"] unless request["speech_context"].to_s.empty?
+      result = voice_synthesis.synthesize(**options)
       unless result.fetch("ok")
         status = result.fetch("lifecycle_state") == "awaiting_input" ? 422 : 503
         return json_response(status, error_envelope("voice_synthesis", result.fetch("message")))
@@ -328,10 +330,12 @@ module SoulCore
 
       stream = Enumerator.new do |output|
         progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
-        result = voice_synthesis.synthesize(
+        options = {
           text: request["text"], voice_name: request["voice"],
           quality: request["quality"] || "expressive", on_progress: progress
-        )
+        }
+        options[:speech_context] = request["speech_context"] unless request["speech_context"].to_s.empty?
+        result = voice_synthesis.synthesize(**options)
         payload = if result.fetch("ok")
           result.except("audio").merge("audio_base64" => Base64.strict_encode64(result.fetch("audio")))
         else

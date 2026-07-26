@@ -53,8 +53,8 @@ class SynthesisFixtureService
 
   def initialize = (@calls = [])
   def status = { "lifecycle_state" => "complete", "ok" => true, "available" => true }
-  def synthesize(text:, voice_name: nil, quality: "responsive", on_progress: nil)
-    @calls << [text, voice_name]
+  def synthesize(text:, voice_name: nil, quality: "responsive", speech_context: nil, on_progress: nil)
+    @calls << [text, voice_name, speech_context]
     { "lifecycle_state" => "complete", "ok" => true, "audio" => "RIFF....WAVEfixture".b, "content_type" => "audio/wav", "voice" => voice_name || "F3" }
   end
 end
@@ -109,9 +109,11 @@ Dir.mktmpdir("soul-synthesis-test-") do |root|
     "Cookie" => "soul_session=session", "Content-Type" => "application/json", "X-Soul-CSRF" => "voice-csrf"
   }
   response = app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers, body: JSON.generate("text" => "Speak this.", "voice" => "M3"))
-  check.call("authenticated same-origin synthesis returns private non-cached WAV", response.status == 200 && response.headers["Content-Type"] == "audio/wav" && response.headers["Cache-Control"] == "private, no-store" && synthesis.calls == [["Speak this.", "M3"]])
-  check.call("missing CSRF blocks synthesis before invocation", app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers.reject { |key, _| key == "X-Soul-CSRF" }, body: JSON.generate("text" => "No.")).status == 403 && synthesis.calls.length == 1)
-  check.call("wrong Origin blocks synthesis before invocation", app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers.merge("Origin" => "https://elsewhere.test"), body: JSON.generate("text" => "No.")).status == 403 && synthesis.calls.length == 1)
+  check.call("authenticated same-origin synthesis returns private non-cached WAV", response.status == 200 && response.headers["Content-Type"] == "audio/wav" && response.headers["Cache-Control"] == "private, no-store" && synthesis.calls == [["Speak this.", "M3", nil]])
+  contextual = app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers, body: JSON.generate("text" => "72°F", "voice" => "F3", "speech_context" => "weather_report"))
+  check.call("authenticated synthesis forwards explicit weather context", contextual.status == 200 && synthesis.calls.last == ["72°F", "F3", "weather_report"])
+  check.call("missing CSRF blocks synthesis before invocation", app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers.reject { |key, _| key == "X-Soul-CSRF" }, body: JSON.generate("text" => "No.")).status == 403 && synthesis.calls.length == 2)
+  check.call("wrong Origin blocks synthesis before invocation", app.call(method: "POST", target: "/api/v1/voice/synthesize", headers: headers.merge("Origin" => "https://elsewhere.test"), body: JSON.generate("text" => "No.")).status == 403 && synthesis.calls.length == 2)
   check.call("synthesis status requires dashboard authentication", app.call(method: "GET", target: "/api/v1/voice/synthesis/status", headers: { "Host" => "127.0.0.1:4567" }).status == 401)
 end
 

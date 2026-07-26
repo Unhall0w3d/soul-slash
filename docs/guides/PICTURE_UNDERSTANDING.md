@@ -50,6 +50,13 @@ Voice Presence. The map describes what those surfaces are; only current pixels
 and exact OCR may establish which panel, project, control state, or approval is
 actually visible.
 
+Voice-requested screen captures add a `fresh_screen` response policy. In
+addition to the vision prompt, a deterministic post-inference guard compares
+quoted or emphasized literal UI/title claims with the fresh OCR and compositor
+context. A line containing an unsupported literal name is omitted and the
+answer says that unverified labels were withheld. Ordinary uploaded pictures
+do not use this screen-specific policy.
+
 Picture understanding currently requires **Daily Core** because the production
 Gemma 4 model and its multimodal projector run there. If another Core is active,
 the picture and draft remain selected; switch to Daily Core and send again.

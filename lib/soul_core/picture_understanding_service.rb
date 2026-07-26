@@ -13,6 +13,7 @@ require "yaml"
 require_relative "application_contract"
 require_relative "application_request_receipt_store"
 require_relative "chat_store"
+require_relative "screen_observation_claim_guard"
 
 module SoulCore
   class LocalVisionClient
@@ -161,11 +162,12 @@ module SoulCore
       @state_root = File.expand_path(state_root || (configured_state.empty? ? File.join(@root, "Soul/private/perception") : configured_state))
     end
 
-    def analyze(chat_id:, question:, image_base64:, media_type:, filename:, retain:, request_id:, analysis_context: nil, on_progress: nil)
+    def analyze(chat_id:, question:, image_base64:, media_type:, filename:, retain:, request_id:, analysis_context: nil, response_policy: nil, on_progress: nil)
       validate_identity!(chat_id, request_id)
       raise ArgumentError, "unknown chat ID" unless @chat_store.chat(chat_id)
       prompt = validate_question(question)
       context = validate_analysis_context(analysis_context)
+      policy = validate_response_policy(response_policy)
       image = decode_and_validate(image_base64, media_type)
       readiness = @provider.status
       return outcome(readiness.fetch("lifecycle_state", "awaiting_input"), false, readiness.fetch("reason"), "active_core_id" => readiness["active_core_id"]) unless readiness["ready"]
@@ -173,6 +175,7 @@ module SoulCore
       input_digest = Digest::SHA256.hexdigest(image.fetch("bytes"))
       operation_digest = Digest::SHA256.hexdigest(JSON.generate(
         "chat_id" => chat_id, "question" => prompt, "analysis_context" => context,
+        "response_policy" => policy,
         "image_sha256" => input_digest,
         "media_type" => image.fetch("media_type"), "retain" => retain == true
       ))
@@ -190,6 +193,9 @@ module SoulCore
       result = @provider.analyze(
         question: provider_question(prompt, context), image_base64: encoded, media_type: image.fetch("media_type"),
         timeout_seconds: TIMEOUT_SECONDS
+      )
+      response_content, guard_metadata = apply_response_policy(
+        result.fetch("content"), policy: policy, verification_context: context
       )
       retained_path = retain == true ? retain_image(chat_id, image.fetch("bytes"), input_digest, image.fetch("extension")) : nil
       attachment = {
@@ -219,13 +225,15 @@ module SoulCore
             "latency_ms" => result.fetch("latency_ms"),
             "usage" => result.fetch("usage", {}),
             "authority" => "untrusted_evidence_only",
-            "supplemental_context" => (context.empty? ? nil : "ephemeral_local_ocr")
+            "supplemental_context" => (context.empty? ? nil : "ephemeral_local_ocr"),
+            "response_policy" => policy,
+            "claim_guard" => guard_metadata
           }
         }
       }
       user_message = @chat_store.add_message(chat_id, role: "user", content: prompt, metadata: metadata)
       assistant_message = @chat_store.add_message(
-        chat_id, role: "assistant", content: result.fetch("content"),
+        chat_id, role: "assistant", content: response_content,
         metadata: metadata.except("runtime").merge(
           "provider_id" => result.fetch("provider_id"),
           "mode" => "picture_understanding",
@@ -294,6 +302,24 @@ module SoulCore
       raise ArgumentError, "picture analysis context exceeds #{MAX_ANALYSIS_CONTEXT_BYTES} bytes" if value.bytesize > MAX_ANALYSIS_CONTEXT_BYTES
 
       value
+    end
+
+    def validate_response_policy(policy)
+      value = policy.to_s.strip
+      return nil if value.empty?
+      raise ArgumentError, "unsupported picture response policy" unless value == "fresh_screen"
+
+      value
+    end
+
+    def apply_response_policy(content, policy:, verification_context:)
+      return [content, nil] unless policy == "fresh_screen"
+
+      result = ScreenObservationClaimGuard.new.apply(
+        content: content,
+        verification_context: verification_context
+      )
+      [result.fetch("content"), result.except("content")]
     end
 
     def provider_question(prompt, context)

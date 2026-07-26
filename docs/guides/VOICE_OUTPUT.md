@@ -67,6 +67,14 @@ its resulting reply. JSON payloads, oversized responses, and
 messages without eligible prose do not expose or pass the speech boundary.
 Markdown code blocks and raw URLs are excluded from synthesized prose.
 
+Weather replies use a deterministic presentation context derived from the
+recorded `weather.report` tool metadata. Dashboard Chat and Voice Presence keep
+the compact text unchanged while speech expands units such as `°F`, `mph`,
+percent, compass directions, and AQI into pronounceable phrases. Weather facts
+are separated into measured sentences and responsive synthesis runs at a
+slightly slower bounded rate. No model rewrites or supplements the weather
+evidence for speech.
+
 ## Voice selection
 
 The reviewed runtime includes feminine profiles `F1` through `F5` and

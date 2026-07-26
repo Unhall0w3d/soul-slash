@@ -8,6 +8,7 @@ require "time"
 require_relative "bounded_command_runner"
 require_relative "model_runtime_control_service"
 require_relative "model_runtime_lease_store"
+require_relative "speech_presentation_service"
 
 module SoulCore
   class VoiceSynthesisService
@@ -30,6 +31,7 @@ module SoulCore
       expressive_manifest_path: ENV.fetch("SOUL_VOICE_EXPRESSIVE_MANIFEST", File.expand_path("../../config/voice_expressive_models.json", __dir__)),
       model_runtime_control: nil,
       lease_store: nil,
+      speech_presentation: nil,
       process_env: ENV,
       runner: BoundedCommandRunner.new
     )
@@ -42,6 +44,7 @@ module SoulCore
       @expressive_manifest = load_expressive_manifest
       @lease_store = lease_store || ModelRuntimeLeaseStore.new(root: @root)
       @model_runtime_control = model_runtime_control || ModelRuntimeControlService.new(root: @root, env: process_env, lease_store: @lease_store)
+      @speech_presentation = speech_presentation || SpeechPresentationService.new
       @manifest = load_manifest
       @runtime = @manifest.fetch("runtime")
       defaults = @manifest.fetch("defaults")
@@ -74,12 +77,13 @@ module SoulCore
       )
     end
 
-    def synthesize(text:, voice_name: nil, quality: "responsive", on_progress: nil)
+    def synthesize(text:, voice_name: nil, quality: "responsive", speech_context: nil, on_progress: nil)
       selected_quality = quality.to_s
       return failure("awaiting_input", "requested voice quality is unavailable") unless %w[responsive expressive].include?(selected_quality)
       selected_voice = voice_name.to_s.empty? ? @voice_name : voice_name.to_s
       return failure("awaiting_input", "requested synthesis voice is unavailable") unless @manifest.fetch("voices").key?(selected_voice)
-      normalized = normalize_text(text)
+      presentation = @speech_presentation.prepare(text, context: speech_context)
+      normalized = presentation.fetch("text")
       return failure("awaiting_input", "this message does not contain eligible spoken prose") if normalized.empty?
       maximum = selected_quality == "expressive" ? EXPRESSIVE_MAX_TEXT_CHARACTERS : MAX_TEXT_CHARACTERS
       return failure("awaiting_input", "spoken text exceeds #{maximum} characters") if normalized.length > maximum
@@ -108,7 +112,7 @@ module SoulCore
         )
       else
         progress(on_progress, "rendering_voice", "Rendering the responsive local voice.")
-        run_responsive!(input: input, output: output, voice: selected_voice)
+        run_responsive!(input: input, output: output, voice: selected_voice, speed: responsive_speed(presentation))
       end
       validate_audio!(output)
       audio = File.binread(output, MAX_AUDIO_BYTES)
@@ -120,6 +124,8 @@ module SoulCore
         "content_type" => "audio/wav",
         "voice" => selected_voice,
         "quality" => selected_quality,
+        "speech_context" => presentation.fetch("context"),
+        "speed" => selected_quality == "responsive" ? responsive_speed(presentation) : nil,
         "device" => device,
         "runtime_receipt" => runtime_receipt,
         "retained" => false
@@ -135,11 +141,11 @@ module SoulCore
 
     private
 
-    def run_responsive!(input:, output:, voice:)
+    def run_responsive!(input:, output:, voice:, speed: @speed)
       result = @runner.run(
         python_path, runner_path, "--model-dir", model_dir, "--input", input, "--output", output,
         "--voice", voice, "--language", @manifest.dig("defaults", "language"),
-        "--steps", @manifest.dig("defaults", "steps").to_s, "--speed", @speed.to_s,
+        "--steps", @manifest.dig("defaults", "steps").to_s, "--speed", speed.to_s,
         timeout_seconds: SYNTHESIS_TIMEOUT_SECONDS, max_output_bytes: MAX_COMMAND_OUTPUT_BYTES
       )
       raise ArgumentError, "timed out and was stopped" if result.status == "timeout"
@@ -218,15 +224,8 @@ module SoulCore
       nil
     end
 
-    def normalize_text(value)
-      text = value.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: " ")
-      text = text.gsub(/```.*?```/m, " ")
-      text = text.gsub(/`[^`\n]+`/, " ")
-      text = text.gsub(%r{https?://\S+}, " ")
-      text = text.gsub(/^\s{0,3}\#{1,6}\s+/, "")
-      text = text.gsub(/^\s*[-*+]\s+/, "")
-      text = text.gsub(/[*_~>|]/, "")
-      text.gsub(/\s+/, " ").strip
+    def responsive_speed(presentation)
+      (@speed * presentation.fetch("speed_factor")).clamp(0.7, 2.0).round(3)
     end
 
     def validate_audio!(path)

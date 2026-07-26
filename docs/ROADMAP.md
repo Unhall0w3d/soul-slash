@@ -28,6 +28,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] expose appropriate dashboard capabilities to Chat through bounded skills and contextual routing
 - [ ] refine persona fidelity across supported chat models without corrupting structured tool output
 - [ ] improve conversational progress summaries and multi-message usability
+- [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [ ] remove remaining implementation-phase labels and stale UI/documentation language
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles

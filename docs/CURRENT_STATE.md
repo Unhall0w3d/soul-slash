@@ -51,7 +51,16 @@ and a currently visible workspace. Hidden workspaces are never switched
 silently. Refresh/update-view language forces the perception path instead of
 letting the chat model reuse a prior description, and the vision prompt must
 verify names and visible words from pixels rather than echo hints in the
-question.
+question. Natural `What am I looking at?` wording also forces one fresh active-
+window capture. Voice-requested screen answers apply a deterministic literal-
+claim guard: quoted or emphasized titles, channels, applications, and control
+names absent from that capture's compositor/OCR evidence are withheld.
+
+Weather speech is now presentation-aware without changing retained Chat text.
+Recorded `weather.report` metadata expands compact units into pronounceable
+phrases, inserts measured sentence boundaries, and applies a modestly slower
+responsive rate. Harmless speech-to-text bullet punctuation on an affirmative
+weather follow-up no longer diverts the detailed report into the general model.
 
 The dashboard has one personal administrator boundary. First-run `admin` / `soul123` access is limited to mandatory password replacement. Salted credentials and seven-day session digests remain in ignored owner-only runtime storage. Sign-ups and additional accounts are unavailable.
 
