@@ -110,6 +110,8 @@ check("explicit active-window question routes", SoulCore::VoiceScreenRequest.par
 check("transcribed explain-current-window wording routes", SoulCore::VoiceScreenRequest.parse("Can you explain the current window?")&.fetch("mode") == "active_window")
 check("natural dashboard self-identification wording routes", SoulCore::VoiceScreenRequest.parse("What is this dashboard?")&.fetch("mode") == "active_window")
 check("natural current-view wording requires a fresh active-window capture", SoulCore::VoiceScreenRequest.parse("What am I looking at?")&.fetch("mode") == "active_window")
+targeted_current_view = SoulCore::VoiceScreenRequest.parse("What am I looking at on my right monitor?")
+check("explicit monitor target outranks natural current-view fallback", targeted_current_view&.fetch("mode") == "monitor" && targeted_current_view.dig("selector", "kind") == "position" && targeted_current_view.dig("selector", "value") == "right")
 check("explicit selected-region question routes", SoulCore::VoiceScreenRequest.parse("What do you see in this selected region?")&.fetch("mode") == "region")
 check("refresh-view wording requests a fresh monitor capture", SoulCore::VoiceScreenRequest.parse("Can you refresh your view of my screen?")&.fetch("mode") == "monitor")
 check("visible screen wording no longer falls through to model memory", SoulCore::VoiceScreenRequest.parse("Describe the words that appear on screen.")&.fetch("mode") == "monitor")

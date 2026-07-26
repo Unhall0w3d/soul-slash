@@ -16,7 +16,8 @@ It is ready for human review, not automatically approved for merge.
   weather context from recorded `weather.report` tool metadata.
 - Weather follow-up detection tolerates a harmless leading STT bullet while
   still requiring recent successful weather evidence.
-- `What am I looking at?` routes to one fresh active-window capture.
+- `What am I looking at?` routes to one fresh active-window capture while an
+  explicit monitor, screen, region, or workspace target still takes precedence.
 - Voice screen analysis explicitly rejects prior/archive descriptions.
 - A deterministic fresh-screen claim guard removes lines containing quoted or
   emphasized literal UI/title names not found in fresh OCR/compositor evidence.
