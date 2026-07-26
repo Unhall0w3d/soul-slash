@@ -18,6 +18,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
 - [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
+- [x] Core-aware Chat-native text-to-video generation and review-led native revision from an exact reviewed visual context
+- [x] read-only motion qualification ledger over retained runtime receipts and human reviews
 - [x] shared owner-local Project Timeline with explicit Dashboard and Chat edits
 
 ## Near-term refinement
@@ -33,7 +35,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 ## Qualified expansion candidates
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
-- [ ] qualify longer or higher-fidelity motion only when measured output justifies its runtime and resource cost
+- [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
 - [ ] longer-form music/mix composition through measured duration steps and repetition analysis
 - [ ] authenticated YouTube draft upload with publication remaining human-controlled
 - [ ] voice input and speech output through the same conversation and skill core

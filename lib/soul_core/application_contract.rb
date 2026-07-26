@@ -189,6 +189,7 @@ module SoulCore
       "visual.motion.delete.execute" => %w[visual_project_id motion_candidate_id confirmation expected_digest],
       "visual.motion.promotion.preview" => %w[visual_project_id motion_candidate_id project_id candidate_id],
       "visual.motion.promotion.execute" => %w[visual_project_id motion_candidate_id project_id candidate_id confirmation expected_digest],
+      "visual.motion.qualification" => [],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze

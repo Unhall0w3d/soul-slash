@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-26T01:19:22-04:00
+Generated: 2026-07-26T01:40:33-04:00
 
 Source registry:
 
@@ -123,14 +123,14 @@ Example ways the owner might ask for this:
 ```text
 id: creative.companion_production
 category: creative_studios
-status: partial
+status: available
 risk: approval_required
 confirmation_required: true
 required_core: dynamic_by_generation_operation
 core_transition_authority: exact_action_click
 ```
 
-Coordinate reviewed music and visual candidates through exact lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; native motion generation and external publication remain outside this chat workflow.
+Coordinate supported reviewed music, still, and native-motion work through exact generation, lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
 
 Example ways the owner might ask for this:
 
@@ -170,7 +170,7 @@ required_core: amd-free
 core_transition_authority: exact_action_click
 ```
 
-Gather or draft a visual brief through chat, generate and review a local still, and translate a recorded revise review into one exact source-preserving guided edit with an authenticated image result.
+Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, and continue a kept visual context into exact native text-to-video generation or a review-led native revision.
 
 Example ways the owner might ask for this:
 

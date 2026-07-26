@@ -2621,8 +2621,35 @@ async function refreshVisualResources() {
   finally { button.disabled = false; }
 }
 
+async function refreshMotionQualification() {
+  const button = byId("refresh-motion-qualification"); const summary = byId("motion-qualification-summary"); const status = byId("motion-qualification-status");
+  button.disabled = true; status.textContent = "Reading retained motion receipts and human reviews…";
+  try {
+    const envelope = await callSoul("visual.motion.qualification"); lifecycle(envelope); const data = dataOf(envelope);
+    const overview = document.createElement("dl");
+    [["Samples", data.sample_count], ["Human reviewed", data.reviewed_count], ["Awaiting review", data.unreviewed_count], ["Archive attention", (data.inspection_failures || []).length]].forEach(([label, value]) => {
+      const row = document.createElement("div"); const term = document.createElement("dt"); const detail = document.createElement("dd"); term.textContent = label; detail.textContent = String(value); row.append(term, detail); overview.append(row);
+    });
+    const coverage = document.createElement("div");
+    (data.coverage || []).forEach((item) => {
+      const row = document.createElement("div"); row.className = "qualification-duration";
+      const heading = document.createElement("strong"); heading.textContent = `${item.duration_seconds} seconds`;
+      const evidence = document.createElement("span"); const rating = item.average_rating == null ? "no rating" : `${item.average_rating}/5 average`;
+      evidence.textContent = `${item.reviewed_count}/${item.sample_count} reviewed · ${item.kept_count} kept · ${item.revise_count} revise · ${rating}`;
+      row.append(heading, evidence); coverage.append(row);
+    });
+    const next = document.createElement("p"); next.className = "muted"; next.textContent = data.next_review;
+    summary.replaceChildren(overview, coverage, next);
+    status.textContent = `${String(data.evidence_state || "pending").replaceAll("_", " ")} · human qualification only`;
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function loadVisualStudio() {
-  try { const envelope = await callSoul("visual.projects.list", { limit: 200 }); lifecycle(envelope); state.visualProjects = dataOf(envelope).projects || []; state.visualLoaded = true; renderVisualProjects(); await refreshVisualResources(); }
+  try { const envelope = await callSoul("visual.projects.list", { limit: 200 }); lifecycle(envelope); state.visualProjects = dataOf(envelope).projects || []; state.visualLoaded = true; renderVisualProjects(); await Promise.all([refreshVisualResources(), refreshMotionQualification()]); }
   catch (error) { byId("visual-form-status").textContent = error.message; }
 }
 
@@ -2719,6 +2746,7 @@ byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
 byId("preview-native-motion").addEventListener("click", previewNativeMotion);
+byId("refresh-motion-qualification").addEventListener("click", refreshMotionQualification);
 byId("start-visual-generation").addEventListener("click", startVisualGeneration);
 byId("preview-visual-project-delete").addEventListener("click", previewVisualProjectDeletion);
 byId("execute-visual-project-delete").addEventListener("click", executeVisualProjectDeletion);
