@@ -32,7 +32,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [ ] remove remaining implementation-phase labels and stale UI/documentation language
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
-- [ ] strengthen cleanup, retention, backup, and recovery evidence
+- [~] design backup and disaster recovery from an inventoried owner-state boundary
 
 ## Qualified expansion candidates
 
@@ -51,7 +51,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Separate deployment tracks
 
-- [ ] backup and disaster-recovery design
+- [~] backup and disaster-recovery A0 review; implementation remains separately gated
 - [ ] reviewed Proxmox/container deployment where it provides a concrete operational benefit
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review

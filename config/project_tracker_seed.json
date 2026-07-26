@@ -198,12 +198,12 @@
       "item_id": "track_backup_recovery",
       "title": "Backup and disaster-recovery design",
       "area": "Operations",
-      "horizon": "backlog",
-      "status": "planned",
-      "priority": "medium",
-      "summary": "Define recoverable boundaries for private memory, trackers, projects, models, configuration, and exported work.",
+      "horizon": "now",
+      "status": "in_progress",
+      "priority": "high",
+      "summary": "Inventory irreplaceable owner state separately from reproducible models, caches, helper environments, and installed deployment files; define a reviewed backup and restore contract before implementation.",
       "acceptance": "Backup, restore, verification, exclusions, and secret handling have a reviewed reproducible procedure.",
-      "source": "Deployment roadmap"
+      "source": "Backup and Disaster Recovery A0 review"
     },
     {
       "item_id": "track_project_search",
