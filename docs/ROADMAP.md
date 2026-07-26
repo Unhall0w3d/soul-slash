@@ -36,7 +36,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
-- [ ] longer-form music/mix composition through measured duration steps and repetition analysis
+- [ ] assemble reviewed variable-duration songs and short visual loops into an editable longer-form mix timeline with transition, overlap, trim, loop, and export controls
 - [ ] authenticated YouTube draft upload with publication remaining human-controlled
 - [ ] voice input and speech output through the same conversation and skill core
 - [x] image/screen understanding with declared privacy and capability boundaries

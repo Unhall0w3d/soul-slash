@@ -18,6 +18,8 @@ class MusicVulkanPilot
   QUALIFICATION_DURATIONS = {
     210 => "duration_210_v1"
   }.freeze
+  VARIABLE_DURATION_QUALIFICATION = "variable_duration_v1"
+  VARIABLE_DURATION_RANGE = (30..300)
   MAX_MANIFEST_BYTES = 64 * 1024
   MAX_REQUEST_BYTES = 64 * 1024
   MAX_LOG_BYTES = 2 * 1024 * 1024
@@ -257,6 +259,7 @@ class MusicVulkanPilot
 
     expected = QUALIFICATION_DURATIONS[duration]
     return duration if expected && qualification == expected
+    return duration if variable_duration_qualification?(duration, qualification)
 
     if PRODUCTION_DURATIONS.include?(duration)
       raise ArgumentError, "production pilot durations must not carry a qualification marker"
@@ -264,11 +267,20 @@ class MusicVulkanPilot
     if expected
       raise ArgumentError, "#{duration}-second qualification requires marker #{expected}"
     end
+    if qualification == VARIABLE_DURATION_QUALIFICATION
+      raise ArgumentError, "variable-duration qualification must be an exact whole-second duration from 30 through 300 and must not replace an existing exact duration gate"
+    end
 
     supported = QUALIFICATION_DURATIONS.keys.sort.join(" or ")
-    raise ArgumentError, "pilot duration must be exactly 30, 90, 180, or 600 seconds, or an explicitly marked #{supported}-second qualification"
+    raise ArgumentError, "pilot duration must be production-supported, an explicitly marked #{supported}-second qualification, or a bounded variable-duration qualification"
   rescue KeyError, ArgumentError, TypeError => error
     raise ArgumentError, "invalid pilot duration: #{error.message}"
+  end
+
+  def variable_duration_qualification?(duration, qualification)
+    qualification == VARIABLE_DURATION_QUALIFICATION &&
+      VARIABLE_DURATION_RANGE.cover?(duration) &&
+      !PRODUCTION_DURATIONS.include?(duration)
   end
 
   def effective_request

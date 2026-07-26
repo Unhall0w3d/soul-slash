@@ -14,7 +14,7 @@ check = lambda do |label, condition|
   failures << label unless condition
 end
 
-check.call("published project schema exposes only reviewed duration presets", schema.dig("properties", "target_duration_seconds", "enum") == [30, 90, 180, 600])
+check.call("published project schema exposes exact 30–300-second range plus fixed ten minutes", schema.dig("properties", "target_duration_seconds", "anyOf") == [{ "minimum" => 30, "maximum" => 300 }, { "const" => 600 }])
 
 FakeResult = Struct.new(:stdout, :stderr, :exit_status, :status, :truncated, keyword_init: true) do
   def success? = status == "ok"
@@ -189,10 +189,10 @@ Dir.mktmpdir("soul-music-a2-") do |root|
 
   missing_rights = service.create_project(project_input.except("rights_status"))
   unknown = service.create_project(project_input.merge("surprise" => true))
-  unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 45))
+  unsupported_duration = service.create_project(project_input.merge("target_duration_seconds" => 301))
   embedded_metadata = service.create_project(project_input.merge("caption" => "Energetic melodic rock at 110 BPM in D minor and 4/4 time with clear drums and guitars."))
   oversized_caption = service.create_project(project_input.merge("caption" => "a" * 513))
-  check.call("project schema rejects missing rights, unknown fields, unsupported duration, embedded metadata, and oversized runtime captions without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30, 90, 180, or 600") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && oversized_caption["reason"].include?("512-character") && !File.exist?(File.join(root, "Soul", "music", "projects")))
+  check.call("project schema rejects missing rights, unknown fields, unsupported duration, embedded metadata, and oversized runtime captions without writes", missing_rights["lifecycle_state"] == "awaiting_input" && unknown["lifecycle_state"] == "awaiting_input" && unsupported_duration["lifecycle_state"] == "awaiting_input" && unsupported_duration["reason"].include?("30 through 300") && embedded_metadata["lifecycle_state"] == "awaiting_input" && embedded_metadata["reason"].include?("dedicated field") && oversized_caption["reason"].include?("512-character") && !File.exist?(File.join(root, "Soul", "music", "projects")))
 
   created = service.create_project(project_input)
   project = created.dig("data", "project")
@@ -270,15 +270,15 @@ Dir.mktmpdir("soul-music-a2-") do |root|
 end
 
 Dir.mktmpdir("soul-music-a2-legacy-duration-") do |root|
-  ids = %w[7777777777777777 8888888888888888 9999999999999999 aaaaaaaaaaaaaaaa]
+  ids = %w[1111111111111111 2222222222222222 3333333333333333 4444444444444444 5555555555555555 6666666666666666 7777777777777777]
   store = SoulCore::MusicProjectStore.new(root: root, id_generator: -> { ids.shift }, clock: -> { Time.utc(2026, 7, 17, 20, 0, 0) })
-  projects = [30, 90, 180, 600].map { |duration| store.create(project_input.merge("target_duration_seconds" => duration)) }
-  check.call("all four supported duration presets create projects", projects.map { |item| item.fetch("target_duration_seconds") } == [30, 90, 180, 600])
+  projects = [30, 43, 90, 144, 180, 300, 600].map { |duration| store.create(project_input.merge("target_duration_seconds" => duration)) }
+  check.call("range boundaries, variable examples, presets, and fixed ten minutes create projects", projects.map { |item| item.fetch("target_duration_seconds") } == [30, 43, 90, 144, 180, 300, 600])
   project = projects.first
   record_path = File.join(store.project_path(project.fetch("project_id")), "project.json")
-  legacy = JSON.parse(File.read(record_path)).merge("target_duration_seconds" => 45)
+  legacy = JSON.parse(File.read(record_path)).merge("target_duration_seconds" => 17)
   File.write(record_path, JSON.generate(legacy))
-  check.call("bounded legacy non-preset projects remain readable", store.read(project.fetch("project_id")).fetch("target_duration_seconds") == 45)
+  check.call("bounded pre-range legacy projects remain readable", store.read(project.fetch("project_id")).fetch("target_duration_seconds") == 17)
 end
 
 Dir.mktmpdir("soul-music-a2-instrumental-token-") do |root|

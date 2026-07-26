@@ -17,7 +17,8 @@ module SoulCore
     DEFAULT_DIRECTORY = File.join("Soul", "music", "projects")
     MAX_PROJECTS = 1_000
     MAX_PROJECT_BYTES = 64 * 1024
-    SUPPORTED_DURATIONS = [30, 90, 180, 600].freeze
+    VARIABLE_DURATION_RANGE = (30..300)
+    FIXED_DURATIONS = [600].freeze
     STRING_LIMITS = { "title" => 120, "intent" => 2_000, "caption" => 8_000, "lyrics" => 20_000, "keyscale" => 40 }.freeze
     REQUIRED_INPUTS = %w[title intent target_duration_seconds vocal_mode rights_status caption lyrics bpm keyscale timesignature language seed].freeze
 
@@ -292,7 +293,7 @@ module SoulCore
       bpm = Integer(data["bpm"])
       seed = Integer(data["seed"])
       if supported_duration_only
-        raise ValidationError, "target duration must be 30, 90, 180, or 600 seconds" unless SUPPORTED_DURATIONS.include?(duration)
+        raise ValidationError, "target duration must be an exact whole second from 30 through 300, or exactly 600 seconds" unless supported_duration?(duration)
       else
         raise ValidationError, "legacy target duration must be 10..600 seconds" unless (10..600).cover?(duration)
       end
@@ -302,6 +303,10 @@ module SoulCore
       raise ValidationError, "language must be a two- or three-letter lowercase code" unless data["language"].to_s.match?(/\A[a-z]{2,3}\z/)
     rescue ArgumentError, TypeError
       raise ValidationError, "duration, bpm, and seed must be integers"
+    end
+
+    def supported_duration?(duration)
+      VARIABLE_DURATION_RANGE.cover?(duration) || FIXED_DURATIONS.include?(duration)
     end
 
     def validate_caption_contract!(caption, vocal_mode:)

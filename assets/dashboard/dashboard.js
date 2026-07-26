@@ -823,6 +823,10 @@ function musicProjectInput() {
   return { title: byId("music-title").value, intent: byId("music-intent").value, target_duration_seconds: Number(byId("music-duration").value), vocal_mode: vocalMode, rights_status: byId("music-rights").value, caption: byId("music-caption").value, lyrics: vocalMode === "instrumental" ? "" : byId("music-lyrics").value, bpm: Number(byId("music-bpm").value), keyscale: byId("music-key").value, timesignature: byId("music-time").value, language: "en", seed: Number(byId("music-seed").value) };
 }
 
+function supportedMusicDuration(duration) {
+  return Number.isInteger(duration) && ((duration >= 30 && duration <= 300) || duration === 600);
+}
+
 function syncMusicCompositionMode() {
   const lyrics = byId("music-lyrics"); const instrumental = byId("music-vocal-mode").value === "instrumental"; const locked = Boolean(state.selectedMusicProject);
   byId("music-caption-guidance").textContent = instrumental
@@ -1028,7 +1032,7 @@ function resetMusicForm() {
 
 async function createMusicProject(event) {
   event.preventDefault(); byId("save-music-project").disabled = true;
-  try { const envelope = await callSoul("music.projects.create", { project: musicProjectInput() }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Project needs attention"); state.musicLoaded = false; await loadMusicStudio(); byId("music-form-status").textContent = "Project created. Preview before generation."; } catch (error) { byId("music-form-status").textContent = error.message; } finally { byId("save-music-project").disabled = false; }
+  try { const project = musicProjectInput(); if (!supportedMusicDuration(project.target_duration_seconds)) throw new Error("Duration must be an exact whole second from 30 through 300, or exactly 600 seconds."); const envelope = await callSoul("music.projects.create", { project }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Project needs attention"); state.musicLoaded = false; await loadMusicStudio(); byId("music-form-status").textContent = "Project created. Preview before generation."; } catch (error) { byId("music-form-status").textContent = error.message; } finally { byId("save-music-project").disabled = false; }
 }
 
 async function selectMusicProject(project) {
@@ -2591,8 +2595,9 @@ async function selectVisualProject(projectId) {
   try {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
     state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
+    byId("visual-native-motion-instruction").value = project.prompt; byId("visual-native-motion-seed").value = String(project.seed);
     byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
-    byId("preview-native-motion").disabled = false; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "Text-to-video creates a new scene without reading a still candidate.";
+    byId("preview-native-motion").disabled = false; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "The stored scene prompt is prefilled as an editable text-to-video direction; no still candidate is read.";
     renderVisualProjects(); renderVisualCandidates(project);
   } catch (error) { byId("visual-form-status").textContent = error.message; }
 }

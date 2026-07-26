@@ -15,7 +15,9 @@ Use **Inspect resources** before generation. A project may be drafted in another
 Required creative decisions are:
 
 - **Intent** — what the piece should communicate or accomplish;
-- **Duration** — currently 30 seconds, 90 seconds, 3 minutes, or 10 minutes. These are exact presets rather than an arbitrary-duration field;
+- **Duration** — any exact whole-second target from 30 seconds through 5 minutes,
+  or the separately qualified fixed 10-minute option. Enter minute-and-second
+  targets as total seconds; for example, 2:24 is `144`;
 - **Mode** — vocal or instrumental;
 - **Rights status** — original, licensed, or public-domain material.
 

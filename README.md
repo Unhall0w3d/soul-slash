@@ -25,7 +25,7 @@ The supported local runtime topology currently includes:
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-Music Studio currently supports 30-, 90-, 180-, and 600-second projects, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study; upload and publication remain human actions.
+Music Studio supports exact whole-second projects from 30 seconds through 5 minutes plus a fixed 10-minute option, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study; upload and publication remain human actions.
 
 For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
