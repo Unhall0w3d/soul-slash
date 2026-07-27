@@ -3,8 +3,10 @@
 
 require "fileutils"
 require "json"
+require "pty"
 require "stringio"
 require "tmpdir"
+require "timeout"
 
 require_relative "../lib/soul_core/application_facade"
 require_relative "../lib/soul_core/maintenance_foreground_execution_service"
@@ -360,6 +362,66 @@ Dir.mktmpdir("soul-maintenance-runner") do |root|
   before = calls.length
   bad_result = SoulCore::MaintenanceTransactionRunner.new(root: root, clock: clock, command_executor: executor, output: StringIO.new).run(transaction_path: bad_path, mode: "live")
   check.call("runner rejects shell or unallowlisted vectors before authentication", bad_result["lifecycle_state"] == "failed" && calls.length == before + 1 && calls.last == ["/usr/bin/sudo", "-k"])
+
+  group_path = File.join(root, "interactive-child-process-group")
+  native_runner = SoulCore::MaintenanceTransactionRunner.new(root: root, clock: clock, output: StringIO.new)
+  native_status = native_runner.send(
+    :spawn_interactive,
+    ["/usr/bin/ruby", "-e", "File.write(ARGV.fetch(0), Process.getpgrp.to_s)", group_path],
+    5,
+    ->(_pid) {}
+  )
+  check.call(
+    "interactive children remain in the visible terminal foreground process group",
+    native_status.zero? && File.read(group_path).to_i == Process.getpgrp
+  )
+
+  prompt_fixture = File.join(root, "tty-prompt-fixture.rb")
+  File.write(prompt_fixture, <<~RUBY)
+    require "io/console"
+    print "Fixture password: "
+    STDOUT.flush
+    value = STDIN.noecho(&:gets).to_s.strip
+    puts
+    exit(value == "fixture-input-token" ? 0 : 1)
+  RUBY
+  harness = File.join(root, "tty-runner-harness.rb")
+  runner_library = File.expand_path("../lib", __dir__)
+  File.write(harness, <<~RUBY)
+    $LOAD_PATH.unshift(#{runner_library.inspect})
+    require "soul_core/maintenance_transaction_runner"
+    runner = SoulCore::MaintenanceTransactionRunner.new(root: #{root.inspect})
+    status = runner.send(
+      :spawn_interactive,
+      ["/usr/bin/ruby", #{prompt_fixture.inspect}],
+      5,
+      ->(_pid) {}
+    )
+    exit(status)
+  RUBY
+  transcript = +""
+  prompt_sent = false
+  PTY.spawn("/usr/bin/ruby", harness) do |reader, writer, pid|
+    begin
+      Timeout.timeout(8) do
+        loop do
+          transcript << reader.readpartial(1024)
+          next if prompt_sent || !transcript.include?("Fixture password:")
+          writer.write("fixture-input-token\n")
+          writer.flush
+          prompt_sent = true
+        end
+      end
+    rescue EOFError, Errno::EIO
+      nil
+    ensure
+      Process.wait(pid) rescue nil
+    end
+  end
+  check.call(
+    "interactive password input is hidden by the child TTY discipline",
+    prompt_sent && !transcript.include?("fixture-input-token")
+  )
 end
 
 Dir.mktmpdir("soul-maintenance-facade") do |root|
