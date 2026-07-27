@@ -107,13 +107,20 @@ The remote reboot coordinator:
 3. waits an initial bounded holdoff;
 4. performs bounded fixed-target reconnect checks;
 5. requires the device to return with a changed boot identity;
-6. performs one full fleet recollection;
-7. atomically updates the persisted snapshot and receipt; and
-8. terminates.
+6. requires fixed device-specific management, service, version, dependency,
+   and health evidence to pass within the same bounded reconnect window;
+7. performs one full fleet recollection only after readiness passes;
+8. atomically updates the persisted snapshot and receipt; and
+9. terminates.
 
-There is no reboot retry. Failure to reconnect terminates
-`blocked_for_human_review` with the prior snapshot retained and the target card
-marked from the operation receipt.
+There is no reboot retry. Failure to reconnect or to pass the reviewed
+readiness checks terminates `blocked_for_human_review` with the prior snapshot
+retained and the target card marked from the operation receipt.
+
+Forge readiness includes Proxmox management, LXC `100` running state, and the
+Pi-hole guest's FTL, Unbound, version, DNS-listener, and blocking evidence
+through the fixed `pihole-maintenance` alias. A running container alone is not
+sufficient.
 
 ## Dashboard behavior
 
@@ -191,6 +198,8 @@ Tests must prove:
   target data;
 - maintenance never reboots;
 - reboot sends at most one reboot request and uses bounded reconnect checks;
+- a changed boot identity without fixed device readiness never replaces the
+  prior fleet snapshot;
 - successful operations recollect and persist status;
 - failed operations retain the previous snapshot and a redacted receipt;
 - the cache is private, atomic, bounded, and symlink-safe;

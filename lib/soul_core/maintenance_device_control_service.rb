@@ -32,6 +32,36 @@ module SoulCore
         "maintenance" => [
           ["/usr/bin/apt-get", "update"],
           ["/usr/bin/apt-get", "-y", "-o", "Dpkg::Options::=--force-confold", "dist-upgrade"]
+        ],
+        "reboot_readiness" => [
+          {
+            "label" => "Proxmox VE management",
+            "argv" => ["/usr/bin/pveversion"],
+            "stdout_includes" => ["pve-manager/"]
+          },
+          {
+            "label" => "Pi-hole LXC 100",
+            "argv" => ["/usr/sbin/pct", "status", "100"],
+            "stdout_includes" => ["status: running"]
+          },
+          {
+            "label" => "Pi-hole dependency services",
+            "ssh_alias" => "pihole-maintenance",
+            "argv" => ["/usr/bin/systemctl", "is-active", "pihole-FTL", "unbound"],
+            "stdout_includes" => ["active\nactive"]
+          },
+          {
+            "label" => "Pi-hole dependency versions",
+            "ssh_alias" => "pihole-maintenance",
+            "argv" => ["/usr/local/bin/pihole", "-v"],
+            "stdout_includes" => ["Core version is", "Web version is", "FTL version is"]
+          },
+          {
+            "label" => "Pi-hole dependency DNS and blocking",
+            "ssh_alias" => "pihole-maintenance",
+            "argv" => ["/usr/local/bin/pihole", "status"],
+            "stdout_includes" => ["FTL is listening", "blocking is enabled"]
+          }
         ]
       },
       "pihole" => {
@@ -43,6 +73,23 @@ module SoulCore
           ["/usr/bin/apt-get", "update"],
           ["/usr/bin/apt-get", "-y", "-o", "Dpkg::Options::=--force-confold", "dist-upgrade"],
           ["/usr/local/bin/pihole", "-up"]
+        ],
+        "reboot_readiness" => [
+          {
+            "label" => "Pi-hole services",
+            "argv" => ["/usr/bin/systemctl", "is-active", "pihole-FTL", "unbound"],
+            "stdout_includes" => ["active\nactive"]
+          },
+          {
+            "label" => "Pi-hole versions",
+            "argv" => ["/usr/local/bin/pihole", "-v"],
+            "stdout_includes" => ["Core version is", "Web version is", "FTL version is"]
+          },
+          {
+            "label" => "Pi-hole DNS and blocking",
+            "argv" => ["/usr/local/bin/pihole", "status"],
+            "stdout_includes" => ["FTL is listening", "blocking is enabled"]
+          }
         ]
       }
     }.freeze
@@ -84,6 +131,7 @@ module SoulCore
         "action" => action,
         "ssh_alias" => target.fetch("ssh_alias"),
         "commands" => commands.map { |argv| {"argv" => argv} },
+        "readiness" => action == "reboot" ? target.fetch("reboot_readiness") : [],
         "impact" => action == "reboot" ? target.fetch("impact") : [],
         "automatic_retry" => false,
         "fleet_wide" => false
@@ -187,16 +235,44 @@ module SoulCore
 
       progress&.call({"stage" => "holdoff", "message" => "Reboot requested once; waiting #{REBOOT_HOLDOFF_SECONDS} seconds before reconnect checks."})
       @sleeper.call(REBOOT_HOLDOFF_SECONDS)
+      new_boot_seen = false
       RECONNECT_ATTEMPTS.times do |attempt|
         progress&.call({"stage" => "reconnecting", "message" => "Reconnect check #{attempt + 1} of #{RECONNECT_ATTEMPTS} for #{plan.fetch('device_label')}."})
         current = remote_run(plan.fetch("ssh_alias"), "/usr/bin/cat", "/proc/sys/kernel/random/boot_id", timeout: 7)
         evidence << command_evidence("reboot.reconnect.#{attempt + 1}", current)
         if current.status == "ok" && !output(current).empty? && output(current) != output(before)
-          return receipt(plan, started, "complete", "#{plan.fetch('device_label')} rebooted and returned with a new boot identity.", evidence)
+          new_boot_seen = true
+          ready, readiness_evidence = reboot_ready?(plan, attempt + 1, progress)
+          evidence.concat(readiness_evidence)
+          if ready
+            return receipt(plan, started, "complete", "#{plan.fetch('device_label')} rebooted, returned with a new boot identity, and passed reviewed readiness checks.", evidence)
+          end
         end
         @sleeper.call(RECONNECT_INTERVAL_SECONDS) unless attempt == RECONNECT_ATTEMPTS - 1
       end
-      receipt(plan, started, "blocked_for_human_review", "#{plan.fetch('device_label')} did not return within the bounded reconnect window.", evidence)
+      summary = if new_boot_seen
+                  "#{plan.fetch('device_label')} returned with a new boot identity but did not pass reviewed readiness checks within the bounded window."
+                else
+                  "#{plan.fetch('device_label')} did not return within the bounded reconnect window."
+                end
+      receipt(plan, started, "blocked_for_human_review", summary, evidence)
+    end
+
+    def reboot_ready?(plan, attempt, progress)
+      checks = plan.fetch("readiness")
+      progress&.call({
+        "stage" => "verifying",
+        "message" => "Running #{checks.length} fixed readiness checks for #{plan.fetch('device_label')} after reconnect #{attempt}."
+      })
+      evidence = checks.each_with_index.map do |check, index|
+        result = remote_run(check.fetch("ssh_alias", plan.fetch("ssh_alias")), *check.fetch("argv"), timeout: 10)
+        verified = result.status == "ok" && check.fetch("stdout_includes").all? { |needle| output(result).include?(needle) }
+        command_evidence("reboot.readiness.#{attempt}.#{index + 1}", result).merge(
+          "status" => verified ? "ok" : "not_ready",
+          "check" => check.fetch("label")
+        )
+      end
+      [evidence.all? { |entry| entry["status"] == "ok" }, evidence]
     end
 
     def remote_run(target, *argv, timeout: 20, accepted_exit_statuses: [0])

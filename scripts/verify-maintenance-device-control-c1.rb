@@ -36,10 +36,12 @@ end
 class C1Runner
   attr_reader :calls
 
-  def initialize(reconnect: true)
+  def initialize(reconnect: true, readiness_after: 0)
     @calls = []
     @boot_reads = 0
     @reconnect = reconnect
+    @readiness_after = readiness_after
+    @readiness_round = 0
   end
 
   def run(*command, **options)
@@ -51,6 +53,14 @@ class C1Runner
       return ok(@boot_reads == 1 || !@reconnect ? "boot-old\n" : "boot-new\n")
     end
     return failed(255) if remote == ["/usr/bin/systemctl", "reboot"]
+    if remote == ["/usr/bin/pveversion"]
+      @readiness_round += 1
+      return ok(@readiness_round <= @readiness_after ? "" : "pve-manager/9.2.5\n")
+    end
+    return ok("status: running\n") if remote == ["/usr/sbin/pct", "status", "100"]
+    return ok("active\nactive\n") if remote == ["/usr/bin/systemctl", "is-active", "pihole-FTL", "unbound"]
+    return ok("Core version is v6.4.3\nWeb version is v6.6\nFTL version is v6.7\n") if remote == ["/usr/local/bin/pihole", "-v"]
+    return ok("FTL is listening on port 53\nPi-hole blocking is enabled\n") if remote == ["/usr/local/bin/pihole", "status"]
     ok("")
   end
 
@@ -238,7 +248,7 @@ Dir.mktmpdir("soul-device-control-") do |root|
                progress_events.last["stage"] == "collecting" &&
                maintenance_fleet.collect_count == 1)
 
-  reboot_runner = C1Runner.new(reconnect: true)
+  reboot_runner = C1Runner.new(reconnect: true, readiness_after: 1)
   reboot_fleet = C1FleetStub.new
   reboot = SoulCore::MaintenanceDeviceControlService.new(
     root: root, fleet_status_service: reboot_fleet, runner: reboot_runner,
@@ -252,11 +262,35 @@ Dir.mktmpdir("soul-device-control-") do |root|
     expected_digest: reboot_preview.dig("data", "expected_digest")
   )
   reboot_requests = reboot_runner.calls.count { |call| call["argv"].last(2) == ["/usr/bin/systemctl", "reboot"] }
-  check.call("Forge reboot discloses Pi-hole impact, sends one request, verifies changed boot, and recollects",
+  reboot_evidence = reboot_result.dig("data", "receipt", "evidence") || []
+  check.call("Forge reboot discloses Pi-hole impact, sends one request, waits for fixed readiness, and recollects",
              reboot_preview.dig("data", "plan", "impact").join.include?("Pi-hole") &&
+               reboot_preview.dig("data", "plan", "readiness").length == 5 &&
+               reboot_preview.dig("data", "plan", "readiness").count { |check| check["ssh_alias"] == "pihole-maintenance" } == 3 &&
                reboot_requests == 1 &&
+               reboot_evidence.any? { |entry| entry["status"] == "not_ready" } &&
+               reboot_evidence.any? { |entry| entry["adapter"].start_with?("reboot.readiness.") && entry["status"] == "ok" } &&
                reboot_result["lifecycle_state"] == "complete" &&
                reboot_fleet.collect_count == 1)
+
+  unready_runner = C1Runner.new(reconnect: true, readiness_after: SoulCore::MaintenanceDeviceControlService::RECONNECT_ATTEMPTS + 1)
+  unready_fleet = C1FleetStub.new
+  unready_reboot = SoulCore::MaintenanceDeviceControlService.new(
+    root: root, fleet_status_service: unready_fleet, runner: unready_runner,
+    clock: -> { Time.utc(2026, 7, 27, 22, 12, 0) }, sleeper: ->(_seconds) {}, live_execution_enabled: true
+  )
+  unready_preview = unready_reboot.preview(device_id: "forge", action: "reboot")
+  unready_result = unready_reboot.execute(
+    device_id: "forge", action: "reboot",
+    confirmation: unready_preview.dig("data", "confirmation"),
+    expected_digest: unready_preview.dig("data", "expected_digest")
+  )
+  unready_requests = unready_runner.calls.count { |call| call["argv"].last(2) == ["/usr/bin/systemctl", "reboot"] }
+  check.call("changed boot without reviewed readiness stops without recollection or reboot retry",
+             unready_result["lifecycle_state"] == "blocked_for_human_review" &&
+               unready_result.dig("data", "receipt", "summary").to_s.include?("did not pass reviewed readiness") &&
+               unready_requests == 1 &&
+               unready_fleet.collect_count == 0)
 
   failed_runner = C1Runner.new(reconnect: false)
   failed_fleet = C1FleetStub.new
@@ -324,6 +358,7 @@ check.call("Dashboard loads persisted status and contains no fleet-wide mutation
              !html.match?(/Maintain fleet|Reboot fleet/i))
 check.call("remote execution uses the bounded administration stream with progress",
            javascript.include?('callNdjson("/api/v1/administration-stream", "maintenance.device.execute"') &&
+             javascript.include?("Fixed verification") &&
              http.include?("maintenance.device.execute"))
 
 if errors.empty?

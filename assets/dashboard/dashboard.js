@@ -2535,6 +2535,10 @@ function maintenanceDeviceDialogDetails(plan) {
     ["Automatic retry", "none"]
   ].forEach(([label, value]) => details.append(labeledRecord(label, value)));
   (plan.commands || []).forEach((command, index) => details.append(labeledRecord(`Fixed step ${index + 1}`, (command.argv || []).join(" "))));
+  (plan.readiness || []).forEach((check, index) => {
+    const target = check.ssh_alias ? `${check.ssh_alias} → ` : "";
+    details.append(labeledRecord(`Fixed verification ${index + 1}`, `${check.label || "Readiness"} · ${target}${(check.argv || []).join(" ")}`));
+  });
   (plan.impact || []).forEach((impact) => details.append(labeledRecord("Dependency impact", impact)));
   const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
   blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
