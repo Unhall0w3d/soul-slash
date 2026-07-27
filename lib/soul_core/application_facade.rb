@@ -31,6 +31,7 @@ require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
 require_relative "maintenance_rehearsal_service"
 require_relative "maintenance_foreground_execution_service"
+require_relative "maintenance_reboot_restore_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
 require_relative "music_generation_service"
@@ -80,6 +81,7 @@ module SoulCore
       host_improvement_plan_service: nil,
       maintenance_rehearsal_service: nil,
       maintenance_foreground_execution_service: nil,
+      maintenance_reboot_restore_service: nil,
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
       music_generation_service: nil,
@@ -123,6 +125,7 @@ module SoulCore
       @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
       @maintenance_foreground_execution_service = maintenance_foreground_execution_service
+      @maintenance_reboot_restore_service = maintenance_reboot_restore_service
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
       @music_generation_service = music_generation_service
@@ -303,6 +306,9 @@ module SoulCore
       when "maintenance.execution.rehearsal" then domain(maintenance_foreground_execution.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.execution.execute" then domain(maintenance_foreground_execution.execute(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.execution.receipts" then domain(maintenance_foreground_execution.receipts(limit: bounded_limit(parameters["limit"], MaintenanceForegroundExecutionService::MAX_RECEIPTS)))
+      when "maintenance.reboot_restore.preview" then domain(maintenance_reboot_restore.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
+      when "maintenance.reboot_restore.execute" then domain(maintenance_reboot_restore.execute(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "maintenance.reboot_restore.status" then domain(maintenance_reboot_restore.status)
       when "self_augmentation.census" then domain(self_augmentation.census)
       when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
       when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
@@ -770,6 +776,18 @@ module SoulCore
         clock: @clock,
         rehearsal_service: maintenance_rehearsal,
         live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "1"
+      )
+    end
+
+    def maintenance_reboot_restore
+      return @maintenance_reboot_restore_service if @maintenance_reboot_restore_service
+
+      _report, resolver = resolved_configuration
+      @maintenance_reboot_restore_service ||= MaintenanceRebootRestoreService.new(
+        root: @root,
+        clock: @clock,
+        foreground_service: maintenance_foreground_execution,
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A3_LIVE"] == "1"
       )
     end
 

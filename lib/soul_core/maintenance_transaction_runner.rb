@@ -7,6 +7,8 @@ require "thread"
 require "time"
 require "timeout"
 
+require_relative "maintenance_reboot_coordinator"
+
 module SoulCore
   class MaintenanceTransactionRunner
     TRANSACTION_SCHEMA = "soul.maintenance.transaction.v1"
@@ -20,12 +22,14 @@ module SoulCore
       root: Dir.pwd,
       clock: -> { Time.now.utc },
       command_executor: nil,
+      reboot_coordinator: nil,
       sleeper: ->(seconds) { sleep(seconds) },
       output: $stdout
     )
       @root = File.expand_path(root)
       @clock = clock
       @command_executor = command_executor || method(:spawn_interactive)
+      @reboot_coordinator = reboot_coordinator || MaintenanceRebootCoordinator.new(root: @root, clock: @clock)
       @sleeper = sleeper
       @output = output
       @canceled = false
@@ -98,7 +102,26 @@ module SoulCore
       end
 
       stop_keeper
+      return run_reboot(transaction, records, deadline) if transaction.fetch("mode") == "live_reboot"
+
       result_for(transaction, "complete", records, password_prompts: 1)
+    end
+
+    def run_reboot(transaction, records, deadline)
+      @output.puts("\n[A3] Revalidating reboot and one-shot restoration postconditions.")
+      @reboot_coordinator.prepare(transaction)
+      @reboot_coordinator.mark_reboot_requested
+      @output.puts("[A3] Durable restore journal written. Requesting one reboot.")
+      status = execute(transaction.fetch("reboot_argv"), deadline: deadline)
+      records << {"adapter" => "system.reboot", "exit_status" => status, "status" => status_for(status)}
+      unless status.zero?
+        @reboot_coordinator.mark_reboot_failed("reviewed reboot command did not complete")
+        return result_for(transaction, "failed", records, password_prompts: 1, reason: "reviewed reboot command did not complete")
+      end
+      result_for(transaction, "awaiting_login", records, password_prompts: 1, reboot_requested: true)
+    rescue StandardError => error
+      @reboot_coordinator.mark_reboot_failed(error.message)
+      result_for(transaction, "blocked_for_human_review", records, password_prompts: 1, reason: error.message)
     end
 
     def execute(argv, deadline:)
@@ -159,7 +182,7 @@ module SoulCore
     end
 
     def invalidate_ticket(transaction)
-      return true unless transaction && transaction["mode"] == "live"
+      return true unless transaction && %w[live live_reboot].include?(transaction["mode"])
       argv = transaction.fetch("sudo_invalidate_argv", [])
       return false if argv.empty?
       Integer(@command_executor.call(argv, 30, ->(_pid) {})).zero?
@@ -168,7 +191,13 @@ module SoulCore
     end
 
     def validate_live_vectors!(transaction)
-      raise "reboot authority is prohibited in A2" unless transaction["reboot_allowed"] == false
+      if transaction.fetch("mode") == "live"
+        raise "reboot authority is prohibited in A2" unless transaction["reboot_allowed"] == false
+        raise "A2 contains a reboot vector" if transaction.key?("reboot_argv")
+      else
+        raise "reboot authority is required only for A3" unless transaction["mode"] == "live_reboot" && transaction["reboot_allowed"] == true
+        raise "A3 reboot vector is invalid" unless transaction["reboot_argv"] == ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+      end
       raise "sudo validation vector is invalid" unless transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"]
       raise "sudo refresh vector is invalid" unless transaction["sudo_refresh_argv"] == ["/usr/bin/sudo", "-n", "-v"]
       raise "sudo invalidation vector is invalid" unless transaction["sudo_invalidate_argv"] == ["/usr/bin/sudo", "-k"]
@@ -213,18 +242,18 @@ module SoulCore
 
     def validate_mode!(transaction, requested)
       raise "transaction mode mismatch" unless transaction.fetch("mode") == requested
-      raise "transaction mode is invalid" unless %w[rehearsal live].include?(requested)
+      raise "transaction mode is invalid" unless %w[rehearsal live live_reboot].include?(requested)
     end
 
     def print_header(transaction)
       @output.puts("Soul / Guided Maintenance")
       @output.puts("Transaction: #{transaction.fetch('transaction_id')}")
       @output.puts("Mode: #{transaction.fetch('mode')}")
-      @output.puts("A2 never requests a reboot.")
+      @output.puts(transaction.fetch("mode") == "live_reboot" ? "A3 may request one reboot only after every reviewed postcondition passes." : "A2 never requests a reboot.")
       @output.flush
     end
 
-    def result_for(transaction, state, commands, password_prompts:, ticket_invalidated: false, reason: "")
+    def result_for(transaction, state, commands, password_prompts:, ticket_invalidated: false, reboot_requested: false, reason: "")
       {
         "schema_version" => RESULT_SCHEMA,
         "transaction_id" => transaction.fetch("transaction_id"),
@@ -232,7 +261,7 @@ module SoulCore
         "password_prompts" => password_prompts,
         "commands" => commands,
         "sudo_ticket_invalidated" => ticket_invalidated || transaction.fetch("mode") == "rehearsal",
-        "reboot_requested" => false,
+        "reboot_requested" => reboot_requested == true,
         "reason" => reason
       }
     end

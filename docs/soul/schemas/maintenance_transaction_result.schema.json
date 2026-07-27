@@ -7,10 +7,10 @@
   "properties": {
     "schema_version": {"const": "soul.maintenance.transaction_result.v1"},
     "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
-    "lifecycle_state": {"enum": ["complete", "failed", "canceled", "blocked_for_human_review"]},
+    "lifecycle_state": {"enum": ["complete", "awaiting_login", "failed", "canceled", "blocked_for_human_review"]},
     "password_prompts": {"type": "integer", "minimum": 0, "maximum": 1},
     "commands": {"type": "array", "maxItems": 8},
-    "reboot_requested": {"const": false}
+    "reboot_requested": {"type": "boolean"}
   },
   "additionalProperties": true
 }

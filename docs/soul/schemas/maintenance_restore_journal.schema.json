@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.restore_journal.v1",
+  "title": "Soul Maintenance One-Shot Restore Journal",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "journal_id",
+    "transaction_id",
+    "plan_digest",
+    "owner_uid",
+    "created_at",
+    "resume_deadline_at",
+    "source_boot_id",
+    "current_state",
+    "restore_registry_digest",
+    "window_snapshot",
+    "update_commands",
+    "reboot_requested",
+    "restore_attempts",
+    "journal_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.restore_journal.v1"},
+    "journal_id": {"type": "string", "pattern": "^restore_[a-f0-9]{16}$"},
+    "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
+    "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "owner_uid": {"type": "integer", "minimum": 0},
+    "current_state": {
+      "enum": [
+        "awaiting_login",
+        "reboot_requested",
+        "restoring",
+        "complete",
+        "failed",
+        "blocked_for_human_review"
+      ]
+    },
+    "restore_registry_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "update_commands": {"type": "array", "minItems": 1, "maxItems": 3},
+    "reboot_requested": {"type": "boolean"},
+    "restore_attempts": {"type": "array", "maxItems": 33},
+    "journal_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": true
+}

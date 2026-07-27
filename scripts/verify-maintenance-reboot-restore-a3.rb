@@ -1,0 +1,453 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "stringio"
+require "tmpdir"
+require "time"
+
+require_relative "../lib/soul_core/application_contract"
+require_relative "../lib/soul_core/maintenance_reboot_coordinator"
+require_relative "../lib/soul_core/maintenance_reboot_restore_service"
+require_relative "../lib/soul_core/maintenance_resume_deployment"
+require_relative "../lib/soul_core/maintenance_session_restorer"
+require_relative "../lib/soul_core/maintenance_transaction_runner"
+
+errors = []
+check = lambda do |label, condition|
+  puts "- #{label}: #{condition ? 'ok' : 'FAILED'}"
+  errors << label unless condition
+end
+clock = -> { Time.utc(2026, 7, 27, 20, 0, 0) }
+old_boot = "11111111-1111-1111-1111-111111111111"
+new_boot = "22222222-2222-2222-2222-222222222222"
+
+class A3RehearsalFixture
+  attr_reader :registry, :snapshot
+
+  def initialize
+    @registry = {
+      "schema_version" => "soul.maintenance.restore_registry.v1",
+      "entries" => [
+        {
+          "entry_id" => "fixture.window", "identities" => ["fixture-app"],
+          "process_identities" => [], "argv" => ["/usr/bin/true"],
+          "maximum_instances" => 1, "title_policy" => "omit",
+          "startup_policy" => "launch_window", "executable_available" => true
+        },
+        {
+          "entry_id" => "fixture.background", "identities" => ["fixture-background"],
+          "process_identities" => ["fixture-background"], "argv" => ["/usr/bin/true"],
+          "maximum_instances" => 1, "title_policy" => "omit",
+          "startup_policy" => "launch_if_absent", "executable_available" => true
+        }
+      ]
+    }
+    @snapshot = {
+      "schema_version" => "soul.maintenance.window_snapshot.v1",
+      "privacy" => {"titles_stored" => false, "raw_command_lines_stored" => false, "urls_stored" => false, "environment_stored" => false},
+      "process_inventory" => {"raw_arguments_stored" => false, "unmatched_processes_stored" => false},
+      "active_workspace" => {"id" => 2, "name" => "2"},
+      "monitors" => [{"id" => 0, "name" => "fixture"}],
+      "workspaces" => [{"id" => 2, "name" => "2"}],
+      "windows" => [{
+        "initial_class" => "fixture-app", "class" => "fixture-app",
+        "workspace" => {"id" => 2, "name" => "2"}, "monitor_id" => 0,
+        "floating" => false, "fullscreen" => 0, "pinned" => false,
+        "restore_status" => "restorable", "restore_entry_id" => "fixture.window",
+        "launch_argv" => ["/usr/bin/true"], "title_stored" => false
+      }, {
+        "initial_class" => "unknown-game", "class" => "unknown-game",
+        "workspace" => {"id" => 4, "name" => "4"}, "monitor_id" => 0,
+        "floating" => false, "fullscreen" => 0, "pinned" => false,
+        "restore_status" => "unsupported", "restore_entry_id" => nil,
+        "launch_argv" => nil, "reason" => "application identity is not allowlisted",
+        "title_stored" => false
+      }],
+      "background_applications" => [{
+        "process_identity" => "fixture-background", "restore_status" => "restorable",
+        "restore_entry_id" => "fixture.background", "launch_argv" => ["/usr/bin/true"],
+        "startup_policy" => "launch_if_absent", "placement" => "background_no_window",
+        "raw_arguments_stored" => false
+      }],
+      "restorable_count" => 2, "unsupported_count" => 1
+    }
+  end
+
+  def restore_registry = @registry
+  def capture_window_snapshot = Marshal.load(Marshal.dump(@snapshot))
+end
+
+class A3AdapterFixture
+  attr_reader :launches, :placements, :activations
+
+  def initialize(background_running: true)
+    @background_running = background_running
+    @launches = []
+    @placements = []
+    @activations = []
+  end
+
+  def wait_ready(_seconds) = true
+  def windows = []
+  def process_running?(_identity) = @background_running
+  def launch(entry_id, argv, attempt)
+    @launches << [entry_id, argv, attempt]
+    true
+  end
+  def wait_for_window(_identities, _excluded, _seconds) = {"address" => "0xabc", "initialClass" => "fixture-app", "class" => "fixture-app"}
+  def place_window(window, record)
+    @placements << [window, record]
+    true
+  end
+  def activate_workspace(workspace)
+    @activations << workspace
+    true
+  end
+end
+
+class A3PartialAdapter < A3AdapterFixture
+  def launch(entry_id, argv, attempt)
+    @launches << [entry_id, argv, attempt]
+    false
+  end
+
+  def process_running?(_identity) = true
+end
+
+def transaction(root, clock, registry_digest, mode: "live_reboot")
+  id = "maintenance_tx_1111111111111111"
+  {
+    "schema_version" => "soul.maintenance.transaction.v1",
+    "transaction_id" => id,
+    "mode" => mode,
+    "owner_uid" => Process.uid,
+    "created_at" => clock.call.iso8601,
+    "deadline_at" => (clock.call + 600).iso8601,
+    "plan_digest" => "a" * 64,
+    "commands" => [
+      {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}
+    ],
+    "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
+    "sudo_refresh_argv" => ["/usr/bin/sudo", "-n", "-v"],
+    "sudo_invalidate_argv" => ["/usr/bin/sudo", "-k"],
+    "reboot_allowed" => mode == "live_reboot",
+    "reboot_argv" => (["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"] if mode == "live_reboot"),
+    "source_boot_id" => "11111111-1111-1111-1111-111111111111",
+    "restore_registry_digest" => registry_digest,
+    "result_path" => File.join(root, "Soul", "private", "host_maintenance", "transactions", "#{id}.result.json")
+  }.compact
+end
+
+puts "Maintenance conditional reboot and restore A3 verification:"
+
+Dir.mktmpdir("soul-a3-runner") do |root|
+  fixture = A3RehearsalFixture.new
+  registry_digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  calls = []
+  executor = lambda do |argv, _timeout, callback|
+    calls << argv
+    callback.call(12_345)
+    0
+  end
+  tx = transaction(root, clock, registry_digest)
+  path = File.join(root, "Soul", "private", "host_maintenance", "transactions", "#{tx.fetch('transaction_id')}.claimed.json")
+  FileUtils.mkdir_p(File.dirname(path), mode: 0o700)
+  File.write(path, JSON.pretty_generate(tx) + "\n", mode: "w", perm: 0o600)
+  runner = SoulCore::MaintenanceTransactionRunner.new(
+    root: root, clock: clock, command_executor: executor,
+    reboot_coordinator: coordinator, sleeper: ->(_seconds) { Thread.pass },
+    output: StringIO.new
+  )
+  result = runner.run(transaction_path: path, mode: "live_reboot")
+  journal = JSON.parse(File.read(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+  check.call("A3 writes a durable journal before one fixed reboot request",
+             result["lifecycle_state"] == "awaiting_login" &&
+             result["reboot_requested"] == true &&
+             calls.include?(SoulCore::MaintenanceRebootRestoreService::FIXED_REBOOT_ARGV) &&
+             journal["current_state"] == "reboot_requested" &&
+             journal["reboot_requested"] == true)
+  check.call("A3 uses one password prompt and invalidates its sudo ticket",
+             result["password_prompts"] == 1 && result["sudo_ticket_invalidated"] == true &&
+             calls.count { |argv| argv == ["/usr/bin/sudo", "-v"] } == 1 &&
+             calls.include?(["/usr/bin/sudo", "-k"]))
+
+  adapter = A3AdapterFixture.new
+  restorer = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  )
+  restored = restorer.run
+  second = restorer.run
+  check.call("post-login restoration is allowlisted, duplicate-aware, and one-shot",
+             restored["lifecycle_state"] == "complete" &&
+             adapter.launches.map(&:first) == ["fixture.window"] &&
+             restored.dig("data", "skipped") == 1 &&
+             second.dig("data", "restored") == 0 &&
+             !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+end
+
+[
+  ["package lock", {package_lock_probe: -> { true }, active_work_probe: -> { [] }, resume_unit_probe: -> { true }, reboot_permission_probe: -> { true }}],
+  ["active Soul work", {package_lock_probe: -> { false }, active_work_probe: -> { ["music_generation"] }, resume_unit_probe: -> { true }, reboot_permission_probe: -> { true }}],
+  ["missing resume unit", {package_lock_probe: -> { false }, active_work_probe: -> { [] }, resume_unit_probe: -> { false }, reboot_permission_probe: -> { true }}],
+  ["unavailable reboot permission", {package_lock_probe: -> { false }, active_work_probe: -> { [] }, resume_unit_probe: -> { true }, reboot_permission_probe: -> { false }}]
+].each do |label, probes|
+  Dir.mktmpdir("soul-a3-blocker") do |root|
+    fixture = A3RehearsalFixture.new
+    digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+    coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+      root: root, clock: clock, rehearsal_service: fixture,
+      boot_id_reader: -> { old_boot }, **probes
+    )
+    blocked = begin
+      coordinator.prepare(transaction(root, clock, digest))
+      false
+    rescue StandardError
+      true
+    end
+    check.call("#{label} blocks journal creation and reboot preparation",
+               blocked && !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+  end
+end
+
+Dir.mktmpdir("soul-a3-same-boot") do |root|
+  fixture = A3RehearsalFixture.new
+  digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, digest))
+  coordinator.mark_reboot_requested
+  adapter = A3AdapterFixture.new
+  result = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { old_boot }
+  ).run
+  check.call("same-boot journal fails closed without launching an application",
+             result["lifecycle_state"] == "blocked_for_human_review" && adapter.launches.empty?)
+end
+
+Dir.mktmpdir("soul-a3-registry-drift") do |root|
+  fixture = A3RehearsalFixture.new
+  original_digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, original_digest))
+  coordinator.mark_reboot_requested
+  fixture.registry.fetch("entries").first["argv"] = ["/usr/bin/false"]
+  adapter = A3AdapterFixture.new
+  result = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  check.call("changed restore registry fails closed without launching an application",
+             result["lifecycle_state"] == "blocked_for_human_review" && adapter.launches.empty?)
+end
+
+Dir.mktmpdir("soul-a3-partial") do |root|
+  fixture = A3RehearsalFixture.new
+  digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, digest))
+  coordinator.mark_reboot_requested
+  adapter = A3PartialAdapter.new
+  result = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  check.call("partial restoration terminates for human review after one retry",
+             result["lifecycle_state"] == "blocked_for_human_review" &&
+             adapter.launches.length == 2 &&
+             !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+end
+
+Dir.mktmpdir("soul-a3-stale") do |root|
+  fixture = A3RehearsalFixture.new
+  digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, digest))
+  coordinator.mark_reboot_requested
+  adapter = A3AdapterFixture.new
+  late_clock = -> { clock.call + 1_801 }
+  result = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: late_clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  check.call("stale post-login journal is consumed and never launches later",
+             result["lifecycle_state"] == "blocked_for_human_review" &&
+             adapter.launches.empty? &&
+             !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+end
+
+Dir.mktmpdir("soul-a3-tamper") do |root|
+  fixture = A3RehearsalFixture.new
+  digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, digest))
+  coordinator.mark_reboot_requested
+  path = File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")
+  journal = JSON.parse(File.read(path))
+  journal["source_boot_id"] = "33333333-3333-3333-3333-333333333333"
+  File.write(path, JSON.pretty_generate(journal) + "\n", mode: "w", perm: 0o600)
+  adapter = A3AdapterFixture.new
+  result = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  check.call("tampered journal is quarantined without restoration",
+             result["lifecycle_state"] == "blocked_for_human_review" && adapter.launches.empty?)
+end
+
+Dir.mktmpdir("soul-a3-a2-boundary") do |root|
+  fixture = A3RehearsalFixture.new
+  digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  tx = transaction(root, clock, digest, mode: "live")
+  path = File.join(root, "Soul", "private", "host_maintenance", "transactions", "#{tx.fetch('transaction_id')}.claimed.json")
+  FileUtils.mkdir_p(File.dirname(path), mode: 0o700)
+  File.write(path, JSON.pretty_generate(tx) + "\n", mode: "w", perm: 0o600)
+  calls = []
+  executor = ->(argv, _timeout, callback) { calls << argv; callback.call(1); 0 }
+  result = SoulCore::MaintenanceTransactionRunner.new(root: root, clock: clock, command_executor: executor, sleeper: ->(_seconds) { Thread.pass }, output: StringIO.new).run(transaction_path: path, mode: "live")
+  check.call("existing A2 path remains incapable of reboot",
+             result["lifecycle_state"] == "complete" && result["reboot_requested"] == false &&
+             !calls.include?(SoulCore::MaintenanceRebootRestoreService::FIXED_REBOOT_ARGV))
+end
+
+class A3ForegroundFixture
+  def preview(force_database_refresh:)
+    plan = {
+      "force_database_refresh" => force_database_refresh == true || force_database_refresh == "true",
+      "commands" => [{"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}],
+      "flatpak_installations" => [],
+      "restore_registry_digest" => "b" * 64,
+      "window_restore_summary" => {"restorable_count" => 1, "unsupported_count" => 0},
+      "preflight" => {"live_blockers" => [], "rehearsal_blockers" => []},
+      "expected_digest" => "c" * 64
+    }
+    {"ok" => true, "lifecycle_state" => "complete", "data" => {"plan" => plan}}
+  end
+end
+
+class A3HandoffFixture
+  attr_reader :transaction
+  def pending_live_digest?(_digest) = false
+  def reserve_transaction(value)
+    @transaction = value
+    {"launch_uri" => "soul-maintenance://transaction/#{value.fetch('transaction_id')}/#{"d" * 64}"}
+  end
+  def status = {"available" => true}
+end
+
+class A3ResumeFixture
+  def status
+    {"data" => {"unit_name" => "soul-maintenance-resume.service", "installed_exact" => true, "enabled" => true, "ready" => true, "persistent_process" => false, "restart_policy" => "none", "timer" => false}}
+  end
+end
+
+Dir.mktmpdir("soul-a3-service") do |root|
+  handoff = A3HandoffFixture.new
+  disabled = SoulCore::MaintenanceRebootRestoreService.new(
+    root: root, clock: clock, foreground_service: A3ForegroundFixture.new,
+    desktop_handoff: handoff, resume_deployment: A3ResumeFixture.new,
+    live_execution_enabled: false, boot_id_reader: -> { old_boot },
+    reboot_permission_probe: -> { true }, id_generator: -> { "1234567890abcdef" }
+  )
+  preview = disabled.preview(force_database_refresh: false)
+  blocked = disabled.execute(force_database_refresh: false, expected_digest: preview.dig("data", "expected_digest"), confirmation: SoulCore::MaintenanceRebootRestoreService::CONFIRMATION)
+  check.call("tracked A3 behavior remains disabled without a supervised local gate",
+             preview.dig("data", "plan", "execution_available") == false && blocked["lifecycle_state"] == "blocked_for_human_review")
+
+  enabled = SoulCore::MaintenanceRebootRestoreService.new(
+    root: root, clock: clock, foreground_service: A3ForegroundFixture.new,
+    desktop_handoff: handoff, resume_deployment: A3ResumeFixture.new,
+    live_execution_enabled: true, boot_id_reader: -> { old_boot },
+    reboot_permission_probe: -> { true }, id_generator: -> { "1234567890abcdef" }
+  )
+  ready = enabled.preview(force_database_refresh: false)
+  reserved = enabled.execute(force_database_refresh: false, expected_digest: ready.dig("data", "expected_digest"), confirmation: SoulCore::MaintenanceRebootRestoreService::CONFIRMATION)
+  check.call("enabled A3 reserves only one exact desktop handoff and does not reboot in the Dashboard",
+             ready.dig("data", "plan", "execution_available") == true &&
+             reserved["lifecycle_state"] == "complete" &&
+             handoff.transaction["mode"] == "live_reboot" &&
+             handoff.transaction["reboot_argv"] == SoulCore::MaintenanceRebootRestoreService::FIXED_REBOOT_ARGV &&
+             reserved.dig("data", "reboot_requested") == false)
+end
+
+Dir.mktmpdir("soul-a3-deployment") do |home|
+  commands = []
+  runner = lambda do |argv|
+    commands << argv
+    if argv.include?("is-enabled")
+      {"success" => true, "stdout" => "enabled\n", "stderr" => ""}
+    else
+      {"success" => true, "stdout" => "", "stderr" => ""}
+    end
+  end
+  deployment = SoulCore::MaintenanceResumeDeployment.new(root: File.expand_path("..", __dir__), home: home, command_runner: runner)
+  unit = deployment.unit_content
+  waiting = deployment.install(confirmation: nil)
+  installed = deployment.install(confirmation: SoulCore::MaintenanceResumeDeployment::CONFIRM_INSTALL)
+  status = deployment.status
+  check.call("resume deployment is one-shot without restart, timer, watcher, or network listener",
+             unit.include?("Type=oneshot") && unit.include?("ConditionPathExists=") &&
+             !unit.include?("Restart=") && !unit.include?("[Timer]") &&
+             deployment.plan.dig("data", "persistent_process") == false)
+  check.call("resume deployment requires exact confirmation and never starts the unit during install",
+             waiting["lifecycle_state"] == "awaiting_input" &&
+             installed["lifecycle_state"] == "complete" &&
+             status.dig("data", "ready") == true &&
+             deployment.plan["mutation"] == "none" &&
+             status["mutation"] == "none" &&
+             installed["mutation"] == "local_service_configuration" &&
+             commands.none? { |argv| argv.include?("start") || argv.include?("restart") })
+end
+
+contract = SoulCore::ApplicationContract::OPERATIONS
+html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
+javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+check.call("typed Dashboard exposes A3 preview, execute, and status without password fields or polling",
+           %w[maintenance.reboot_restore.preview maintenance.reboot_restore.execute maintenance.reboot_restore.status].all? { |operation| contract.key?(operation) } &&
+           html.include?('id="preview-maintenance-reboot"') &&
+           html.include?('id="execute-maintenance-reboot"') &&
+           javascript.include?('"maintenance.reboot_restore.preview"') &&
+           javascript.include?('"maintenance.reboot_restore.execute"') &&
+           !html.match?(/maintenance-reboot[^<]{0,100}password[^<]{0,100}<input/i) &&
+           !javascript.match?(/maintenanceReboot.{0,200}(?:setInterval|WebSocket|EventSource)/m))
+
+Dir.glob(File.expand_path("../docs/soul/schemas/maintenance_*.schema.json", __dir__)).each { |path| JSON.parse(File.read(path)) }
+check.call("all maintenance schemas are valid JSON", true)
+check.call("public A3 default remains disabled", File.read(File.expand_path("../.env.example", __dir__)).include?("SOUL_MAINTENANCE_A3_LIVE=false"))
+
+abort "Maintenance A3 verification failed: #{errors.join(', ')}" unless errors.empty?
+puts "Maintenance conditional reboot and restore A3 verification complete."
