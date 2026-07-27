@@ -25,7 +25,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Near-term refinement
 
-- [ ] expose appropriate dashboard capabilities to Chat through bounded skills and contextual routing
+- [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
 - [ ] refine persona fidelity across supported chat models without corrupting structured tool output
 - [ ] improve conversational progress summaries and multi-message usability
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
@@ -35,9 +35,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; pruning remains disabled
-- [~] qualify the guided maintenance A1 read-only plan and Hyprland
-  workspace-restore rehearsal; update execution and reboot remain separate A2
-  and A3 gates
+- [~] qualify guided maintenance: A1 rehearsal and A2/A2B foreground execution
+  are accepted; the merged A3 conditional-reboot and one-shot restoration
+  candidate still requires resume-unit, no-journal, Dashboard-preview, and
+  supervised live-reboot review
 
 ## Qualified expansion candidates
 
@@ -45,7 +46,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
 - [ ] assemble reviewed variable-duration songs and short visual loops into an editable longer-form mix timeline with transition, overlap, trim, loop, and export controls
 - [ ] authenticated YouTube draft upload with publication remaining human-controlled
-- [ ] voice input and speech output through the same conversation and skill core
+- [x] bounded voice input and speech output through the same conversation and skill core, including visible wake-word presence and natural follow-up
 - [x] image/screen understanding with declared privacy and capability boundaries
   - [x] A0 local runtime, model, capture-tool, and privacy readiness assessment
   - [x] A1 bounded picture attachment and understanding

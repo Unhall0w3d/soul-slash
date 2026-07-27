@@ -83,7 +83,7 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
-- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The A2 candidate adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and a future approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. Live execution remains disabled by default and every A2 path stops before reboot. A3 conditional reboot and one-shot restoration remain unimplemented.
+- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The merged A3 candidate adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. Its resume unit has not been installed and its Dashboard, no-journal, and supervised live-reboot acceptance gates remain open.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -126,7 +126,11 @@ Core changes are click-authorized and lease-revalidated. Before a conversational
 
 `make dashboard` runs a foreground loopback development instance. The reviewed optional deployment installs explicit user services for the loopback dashboard and Caddy HTTPS on one exact LAN address. Installation is preview-first, requires a changed administrator password and exact confirmation, and leaves firewall, DHCP, router, and client certificate trust to the Operator.
 
-Proxmox, Internet exposure, multi-user accounts, backup, and disaster recovery remain separate future tracks.
+Proxmox, Internet exposure, and multi-user accounts remain separate future
+tracks. Backup & Recovery now has a candidate-complete encrypted local
+foundation and one verified live capture; retention execution, a second copy,
+live-tree promotion, and full disaster-recovery qualification remain separate
+review gates.
 
 ## Memory, artifacts, and deletion
 
@@ -187,9 +191,11 @@ Near-term work is expected to concentrate on:
 - production hardening and documentation of creative workflows;
 - additional Music Studio refinement based on real generations;
 - motion-quality refinement based on reviewed image-guided and native scenes;
-- explicit one-shot monitor, window, or region capture building on the bounded
-  Gemma 4 picture-understanding path now available in Chat;
-- restoration rehearsal and broader deployment only under separate review.
+- broader visual-perception refinement beyond the implemented explicit,
+  one-shot monitor, active-window, visible-workspace, and region paths;
+- A3 resume-unit, no-journal, Dashboard-preview, and supervised live-reboot
+  qualification only under separate review; and
+- broader deployment only under its own review.
 
 No release or stable tag has been created.
 
