@@ -381,6 +381,24 @@ Dir.mktmpdir("soul-maintenance-facade") do |root|
   check.call("typed facade exposes A2 preview without mutation", envelope["lifecycle_state"] == "complete" && envelope.dig("meta", "mutation") == "none" && envelope.dig("data", "plan", "automatic_reboot") == false)
 end
 
+Dir.mktmpdir("soul-maintenance-live-configuration") do |root|
+  File.write(File.join(root, ".env"), "SOUL_MAINTENANCE_A2_LIVE=true\n", mode: "w", perm: 0o600)
+  facade = SoulCore::ApplicationFacade.new(root: root, clock: clock)
+  envelope = facade.call({
+    "schema_version" => "soul.application.v1",
+    "request_id" => "maintenance-a2-live-config",
+    "operation" => "maintenance.execution.receipts",
+    "parameters" => {"limit" => 1},
+    "context" => {"interface" => "dashboard_test"}
+  })
+  check.call(
+    "typed true configuration arms the A2 service while its public default remains disabled",
+    envelope["lifecycle_state"] == "complete" &&
+      envelope.dig("data", "live_execution_enabled") == true &&
+      File.read(File.expand_path("../.env.example", __dir__)).include?("SOUL_MAINTENANCE_A2_LIVE=false")
+  )
+end
+
 Dir.glob(File.expand_path("../docs/soul/schemas/maintenance_*.schema.json", __dir__)).each { |path| JSON.parse(File.read(path)) }
 check.call("all maintenance schemas are valid JSON", true)
 

@@ -115,8 +115,14 @@ behavior and must not be delegated to a model.
 
 ## Known weaknesses
 
-- The real sudo/yay interaction has not been exercised because a live package
-  update is not authorized.
+- The real sudo/yay interaction was not exercised during candidate completion.
+  One supervised live run was separately authorized on 2026-07-27 and remains
+  pending.
+- The first supervised arming attempt found a typed-boolean boundary mismatch:
+  the resolver emits enabled booleans as `"1"` while the maintenance facade
+  compared only with `"true"`. The repair uses the resolver's canonical
+  representation and adds a facade-level regression proving the local true
+  setting arms A2 while the public default remains false.
 - The installed dashboard unit sets `NoNewPrivileges=true`, which correctly
   appears as a live-only blocker because a child terminal cannot perform native
   `sudo -v`. Enabling live A2 requires a separately reviewed design decision;
