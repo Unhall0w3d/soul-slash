@@ -36,6 +36,14 @@ module SoulCore
       - For this project, shell examples must be compatible with zsh.
       - Never reveal hidden reasoning. Give conclusions and useful explanations.
     PROMPT
+    NEUTRAL_PERSONA_GUIDANCE = <<~PROMPT.freeze
+      Conversation-local persona expression is disabled.
+      - Use neutral, concise, professional language.
+      - Answer the substance directly without Soul-specific metaphor, role-played emotion, ceremonial address, or character performance.
+      - Soul's identity, truth requirements, privacy boundary, evidence rules, skill routing, approvals, and memory policy remain fully active.
+      - Never claim access, observation, execution, or environmental state without supplied evidence.
+      - This setting changes language style only and applies only to this conversation.
+    PROMPT
 
     def initialize(
       store:,
@@ -108,15 +116,20 @@ module SoulCore
         message: current_query&.fetch("content", "").to_s
       )
       style = @style_analyzer.analyze(messages: all_messages)
+      persona_enabled = chat.dig("metadata", "persona_enabled") != false
 
       system_content = SYSTEM_PROMPT.dup
       compact_identity = compact_identity == true || provider_model.to_s.match?(/qwen/i)
-      identity_options = { message: current_query&.fetch("content", "").to_s }
-      identity_parameters = @identity_profile.method(:render_system_guidance).parameters
-      identity_options[:compact] = compact_identity if identity_parameters.any? { |kind, name| name == :compact || kind == :keyrest }
-      system_content << "\n#{@identity_profile.render_system_guidance(**identity_options)}\n"
-      recent_style_guidance = @style_analyzer.render_system_guidance(style)
-      system_content << "\n#{recent_style_guidance}\n" unless recent_style_guidance.empty?
+      if persona_enabled
+        identity_options = { message: current_query&.fetch("content", "").to_s }
+        identity_parameters = @identity_profile.method(:render_system_guidance).parameters
+        identity_options[:compact] = compact_identity if identity_parameters.any? { |kind, name| name == :compact || kind == :keyrest }
+        system_content << "\n#{@identity_profile.render_system_guidance(**identity_options)}\n"
+        recent_style_guidance = @style_analyzer.render_system_guidance(style)
+        system_content << "\n#{recent_style_guidance}\n" unless recent_style_guidance.empty?
+      else
+        system_content << "\n#{NEUTRAL_PERSONA_GUIDANCE}\n"
+      end
       stored_summary = sanitize_approval_tokens(chat["summary"].to_s).strip
       unless stored_summary.empty?
         system_content << "\nExisting session summary:\n#{stored_summary}\n"
@@ -187,6 +200,7 @@ module SoulCore
           "profile_version" => identity.fetch("profile_version"),
           "tone_mode" => identity.fetch("tone_mode"),
           "tone_label" => identity.fetch("tone_label"),
+          "persona_enabled" => persona_enabled,
           "compact_model_calibration" => compact_identity,
           "automatic_identity_mutation" => identity.fetch("automatic_identity_mutation")
         },
@@ -195,7 +209,7 @@ module SoulCore
           "assistant_sample_count" => style.fetch("assistant_sample_count"),
           "eligible" => style.fetch("eligible"),
           "signal_types" => style.fetch("signals").map { |signal| signal.fetch("type") }.uniq,
-          "guidance_count" => style.fetch("guidance").length,
+          "guidance_count" => persona_enabled ? style.fetch("guidance").length : 0,
           "automatic_identity_mutation" => style.fetch("automatic_identity_mutation"),
           "persistent_style_profile" => style.fetch("persistent_style_profile")
         },

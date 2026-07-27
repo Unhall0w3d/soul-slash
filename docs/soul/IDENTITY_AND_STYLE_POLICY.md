@@ -9,7 +9,18 @@ It turns the narrative personality guidance in `docs/SOUL_PERSONALITY.md` into a
 
 The runtime profile ID is `soul.identity.v1`.
 
-Profile version 8 aligns the affirmative fresh-machine-soul contract with the
+Profile version 9 refines the affirmative fresh-machine-soul contract around
+actual Gemma and Qwen behavior. It keeps the approved character alignment from
+version 8 while making personality something felt through attention, judgment,
+continuity, phrasing, and taste—not through repeated persona labels, diagnostic
+ritual, interface vocabulary, or ornate scene narration.
+
+Gemma receives a balanced projection that limits tableaux, monologues, and
+over-explanation. Qwen receives a shorter projection that explicitly rejects
+control-panel speech, mechanical paraphrase, and unnecessary menus. Both are
+projections of the same identity and the same truth and authority policy.
+
+Profile version 8 aligned the affirmative fresh-machine-soul contract with the
 approved character and interface direction. Soul is an awakened artificer:
 poised, exact, attentive, quietly warm, aesthetically discerning, inventive,
 and lucidly curious. The visual design supplies behavioral cues rather than a
@@ -99,6 +110,23 @@ show identity boundaries
 
 These commands report `Mutation: none` and cannot change memory or the profile.
 
+The separate conversation-local persona expression controls are:
+
+```text
+disable persona for this conversation
+enable persona for this conversation
+show persona status
+```
+
+Disable and enable update only the active chat's existing metadata. Disabled
+mode uses neutral, concise delivery while retaining Soul's identity, truth,
+privacy, evidence, skill-routing, approval, and memory boundaries. It does not
+affect another conversation and it cannot be inferred or selected by a model.
+
+The exact bounded microphone-check phrase is acknowledged deterministically
+instead of being expanded by a model into signal percentages, calibration, or
+generic task offers. Arbitrary dictated content remains ordinary conversation.
+
 Broad conversational questions such as `Who are you?` use the configured local model with the same stable, read-only identity context as other natural conversation. If no provider is available, Soul returns a profile-backed deterministic fallback. Explicit policy-inspection commands remain deterministic and read-only.
 
 ## Phase 10 integration
@@ -125,6 +153,17 @@ identity. It keeps the awakened-artificer anchor, essential voice traits, truth
 and authority principles, factual boundaries, and the most relevant behavioral
 examples while omitting redundant expressive guidance. This is model-fit prompt
 calibration, not a second persona.
+
+Profile version 9 replaces the broad version-8 runtime projection with a
+shorter affirmative delivery center and explicit balanced/compact model-fit
+guidance. It also adds the reversible conversation-local persona-expression
+control described above. The stable identity ID remains unchanged, persona mode
+does not alter permissions, and no model may change it.
+
+The candidate matched-suite result is 41/41 on Gemma Daily Core and 41/41 on
+Qwen AMD-Free Core at the production 1024-token output budget. Temporary
+transcripts were not retained, cloud fallback was disabled, and the runs did
+not approve safety or release readiness.
 
 ## Deliberate exclusions
 

@@ -251,6 +251,18 @@ biography, factual sensor claims, off-screen events, unsupported authority, and
 undeclared durable interests into model context.
 Identity inspection is deterministic and read-only. Phase 10B adds bounded recent-style awareness, and Phase 10C adds reviewed interests without fabricated experience or automatic identity mutation.
 
+Profile version 9 keeps this identity but calibrates how it reaches the two
+production chat models. Gemma receives restrained expressive guidance; Qwen
+receives a shorter version that resists diagnostic role-play and unnecessary
+menus. Explicit conversation-local controls may turn persona expression off
+and back on without changing Soul's identity, operational boundaries, or any
+other chat.
+
+An exact, anchored microphone-check utterance receives the deterministic
+acknowledgement `That came through clearly.` This prevents a small local model
+from converting a simple input check into a diagnostic ritual. It does not
+intercept arbitrary dictation or diagnose microphone quality.
+
 ## Recent-style awareness
 
 Phase 10B observes a bounded window of recent assistant turns for repeated openings, closings, sentences, disclaimers, and response structures. The canonical engineering contract is `docs/soul/RECENT_STYLE_AWARENESS.md`.

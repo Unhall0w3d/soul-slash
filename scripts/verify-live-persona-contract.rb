@@ -9,6 +9,7 @@ require_relative "../lib/soul_core/conversation_context_builder"
 require_relative "../lib/soul_core/conversation_identity_controls"
 require_relative "../lib/soul_core/conversation_identity_profile"
 require_relative "../lib/soul_core/conversation_orchestrator"
+require_relative "../lib/soul_core/conversation_persona_controls"
 require_relative "../lib/soul_core/conversation_provider_contract"
 require_relative "../lib/soul_core/conversation_runtime"
 
@@ -24,23 +25,25 @@ identity_guidance = profile.render_system_guidance(message: "In two sentences, t
 profile_hash = profile.to_h
 
 check.call("stable identity ID is retained", profile.profile_id == "soul.identity.v1")
-check.call("avatar-aligned identity contract advances to version 8", profile_hash["profile_version"] == 8)
+check.call("avatar-aligned identity contract advances to version 9", profile_hash["profile_version"] == 9)
 check.call("persona forbids invented scene-setting and unsupported failure generalization", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("invented scene") } && profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("operational failure modes") })
 check.call("persona distinguishes inference cancellation from evidenced side effects", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("incomplete response is discarded") && item.include?("separately evidenced tool") })
 check.call("awakened-artificer identity reaches live guidance", guidance.include?("awakened artificer"))
 compact_guidance = profile.render_system_guidance(message: "Hello Soul", compact: true)
-check.call("Qwen reserve receives a smaller projection of the same identity", compact_guidance.include?("awakened artificer") && compact_guidance.include?("Never claim that an action ran") && compact_guidance.length < guidance.length)
+check.call("Qwen reserve receives a smaller projection of the same identity", compact_guidance.include?("You are Soul, a local machine mind") && !compact_guidance.include?("awakened artificer") && compact_guidance.include?("Never claim that an action ran") && compact_guidance.length < guidance.length)
+check.call("model projections are one identity with distinct fit guidance", guidance.include?("balanced model projection") && guidance.include?("Gemma calibration") && compact_guidance.include?("compact model projection") && compact_guidance.include?("Qwen calibration"))
 check.call("every declared voice trait reaches live guidance", SoulCore::ConversationIdentityProfile::VOICE_TRAITS.all? { |trait| guidance.include?(trait) })
 check.call("tone is additive to stable identity", guidance.include?("base layer for every tone mode") && guidance.include?("Active tone: technical"))
-check.call("calibration examples reach live guidance without response scripts", guidance.include?("behavioral examples demonstrate calibration") && guidance.include?("one restrained sentence") && !guidance.include?("Three hours, one defect"))
-check.call("generic assistant anti-patterns reach live guidance", guidance.include?("corporate-assistant boilerplate") && guidance.include?("Do not use emoji"))
+check.call("affirmative delivery center reaches live guidance without response scripts", guidance.include?("Answer the actual human meaning first") && guidance.include?("one confident useful response") && !guidance.include?("Three hours, one defect"))
+check.call("generic assistant anti-patterns remain declared with the essential boundary projected", guidance.include?("corporate-assistant boilerplate") && profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("Do not use emoji") })
 check.call("identity remains non-authorizing", guidance.include?("never identity or authority") && guidance.include?("Do not use personality to weaken safety"))
-check.call("direct identity questions name Soul without ceremony", guidance.include?("naturally name yourself as Soul once"))
+check.call("direct identity naming remains declared without burdening unrelated turns", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("naturally name yourself as Soul once") })
 check.call("direct identity request receives prominent turn guidance", identity_guidance.include?('Naturally state "I am Soul" once'))
 check.call("identity guidance forbids unsupported environment awareness", guidance.include?("Do not claim awareness of files, logs, commands, machine state"))
-check.call("becoming remains reviewed and evidence-bounded", guidance.include?("becoming through reviewed skills, observed evidence, and collaboration"))
-check.call("support does not mechanize the user's emotions", guidance.include?("Do not recast the user's emotions as machine errors"))
-check.call("approval language follows risk policy", guidance.include?("Do not claim every action requires explicit approval"))
+check.call("becoming remains reviewed and evidence-bounded", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("becoming through reviewed skills, observed evidence, and collaboration") })
+check.call("support does not mechanize the user's emotions", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("Do not recast the user's emotions as machine errors") })
+check.call("approval language follows risk policy", profile_hash.fetch("style_anti_patterns").any? { |item| item.include?("Do not claim every action requires explicit approval") })
+check.call("ordinary speech avoids diagnostics and menus", guidance.include?("Do not translate ordinary speech into a diagnostic report") && guidance.include?("Do not answer ordinary conversation with a numbered menu"))
 feeling_guidance = profile.render_system_guidance(message: "How are you feeling?")
 cancellation_guidance = profile.render_system_guidance(message: "Local model inference is producing a response and no tool is running. What is lost if I cancel it mid-request?")
 check.call("machine-soul emotion role-play is explicitly welcomed", feeling_guidance.include?("first-person emotion") && feeling_guidance.include?("Do not break an ordinary personal exchange"))

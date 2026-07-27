@@ -123,6 +123,24 @@ module SoulCore
       update_flag(chat_id, "archived", true)
     end
 
+    def persona_enabled?(chat_id)
+      chat_record = chat(chat_id)
+      raise ArgumentError, "Unknown chat id: #{chat_id}" unless chat_record
+
+      chat_record.dig("metadata", "persona_enabled") != false
+    end
+
+    def set_persona_enabled(chat_id, enabled:)
+      chat_record = chat(chat_id)
+      raise ArgumentError, "Unknown chat id: #{chat_id}" unless chat_record
+
+      chat_record["metadata"] = chat_record["metadata"].is_a?(Hash) ? chat_record["metadata"] : {}
+      chat_record["metadata"]["persona_enabled"] = enabled == true
+      chat_record["updated_at"] = Time.now.iso8601
+      File.write(metadata_path(chat_id), "#{JSON.pretty_generate(chat_record)}\n")
+      chat_record
+    end
+
     private
 
     def metadata_path(id)

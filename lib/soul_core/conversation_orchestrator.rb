@@ -5,6 +5,8 @@ require_relative "conversation_capability_registry"
 require_relative "conversation_evidence_followup_router"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_orchestration_contract"
+require_relative "conversation_persona_controls"
+require_relative "conversation_acknowledgment_controls"
 require_relative "conversation_request_shape"
 require_relative "conversation_tool_catalog"
 require_relative "dashboard_capability_guide"
@@ -108,6 +110,8 @@ module SoulCore
       /\A\s*(?:show\s+tone\s+policy|inspect\s+tone\s+modes?)\s*[?.!]*\z/i,
       /\A\s*(?:show|inspect)\s+identity\s+boundaries\s*[?.!]*\z/i
     ].freeze
+    PERSONA_MODE_CONTROL_PATTERNS = ConversationPersonaControls::PATTERNS
+    ACKNOWLEDGMENT_CONTROL_PATTERNS = ConversationAcknowledgmentControls::PATTERNS
     MEMORY_MAINTENANCE_PATTERNS = [
       /\A\s*(?:memory maintenance help|help memory maintenance)\s*[?.!]*\z/i,
       /\A\s*list\s+approved\s+reflections?\s*[?.!]*\z/i,
@@ -280,6 +284,20 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "identity policy inspection remains deterministic and read-only",
           flags: flags.merge("identity_control" => true)
+        )
+      end
+      if PERSONA_MODE_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "conversation-local persona expression changes only through an explicit deterministic control",
+          flags: flags.merge("persona_mode_control" => true)
+        )
+      end
+      if ACKNOWLEDGMENT_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "a narrow microphone check can be acknowledged without model interpretation",
+          flags: flags.merge("acknowledgment_control" => true)
         )
       end
       if MEMORY_MAINTENANCE_PATTERNS.any? { |pattern| text.match?(pattern) }
