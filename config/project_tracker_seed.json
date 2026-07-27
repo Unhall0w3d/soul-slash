@@ -386,7 +386,7 @@
       "technologies": "Ruby bounded services; JSON schemas and restore registry; yay, Flatpak, Hyprland hyprctl structured JSON; Dashboard JavaScript. Later reviewed slices may add one visible kitty transaction and one bounded systemd user oneshot.",
       "interfaces": "Administration → Guided Maintenance; typed maintenance.preview and maintenance.rehearsal application operations; Self Assessment evidence; Invocation Guide explanation.",
       "commands": "make verify-maintenance-rehearsal",
-      "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md",
+      "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md",
       "acceptance": "A1 must prove fresh read-only evidence, exact command planning, snapshot privacy, allowlisted restore decisions, bounded lifecycle simulation, and zero authentication, mutation, launch, persistence, or reboot effects before A2 is considered.",
       "source": "Human-approved Class-5 brief, 2026-07-27"
     }

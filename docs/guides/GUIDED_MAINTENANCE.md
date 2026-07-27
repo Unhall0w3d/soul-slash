@@ -53,6 +53,10 @@ A1 cannot:
 A2 foreground execution and A3 reboot/restoration remain distinct
 human-review gates.
 
+The candidate A2 contract is documented in
+[`MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md`](../soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md).
+It remains unimplemented until explicitly approved.
+
 ## Verification
 
 ```text
