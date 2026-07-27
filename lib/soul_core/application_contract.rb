@@ -111,6 +111,8 @@ module SoulCore
       "host_improvement.arch_upgrade.preview" => [],
       "host_improvement.arch_upgrade.handoff" => %w[confirmation expected_digest],
       "host_improvement.plans.verify" => %w[plan_id],
+      "maintenance.preview" => %w[force_database_refresh],
+      "maintenance.rehearsal" => %w[force_database_refresh],
       "self_augmentation.census" => [],
       "self_augmentation.proposals.list" => %w[limit],
       "self_augmentation.proposals.preview" => %w[objective why_not_skill],

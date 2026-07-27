@@ -37,6 +37,39 @@ Those packets do not implement a skill, alter the host, download a model, or pro
 
 On the supported Arch/CachyOS host path, Self Assessment can prepare a fresh, digest-bound full-upgrade handoff. Soul never runs `pacman`, invokes `sudo`, or collects a password. The Operator executes the terminal command and may return afterward to verify postconditions.
 
+## Guided maintenance rehearsal
+
+The approved A1 maintenance slice adds a separate read-only preview and
+rehearsal for a future end-to-end transaction:
+
+```text
+yay full upgrade
+→ Flatpak update
+→ privacy-filtered Hyprland window snapshot
+→ conditional reboot
+→ one-shot workspace restoration after SDDM auto-login
+```
+
+Choose normal `yay -Syu` behavior or explicitly request the forced
+package-database refresh used on the primary host (`yay -Syyu`). The preview
+shows exact inert argument arrays, detected Flatpak installation scopes, and
+which open application identities are safely mapped by the restore registry.
+It also checks allowlisted process names for tray-only applications that have
+no compositor window. Those use `launch_if_absent`, so a later restorer must
+first honor normal desktop autostart and avoid duplicates.
+Unknown applications, games, transient dialogs, excess duplicate windows, and
+missing executables remain visible as unsupported.
+
+The snapshot deliberately excludes window titles, browser URLs, raw process
+commands, terminal contents, environment values, and credentials. The
+process view stores only matched allowlisted names—not raw arguments or an
+inventory of unrelated background services. The
+rehearsal simulates the declared lifecycle and reports blockers. It requests no
+password, writes no operational state, launches nothing, and cannot reboot.
+
+Actual authentication and updates require a separately reviewed A2 gate.
+Conditional reboot and the one-shot post-login restorer require A3.
+
 ## Storage and retention
 
 The Storage view classifies data before any cleanup system is considered. Production models, private memory, projects, accepted pilots, and finished exports are protected categories. Current cleanup manifests are preview-only; this surface has no general deletion executor.
@@ -62,4 +95,5 @@ It cannot:
 
 - [`docs/BOUNDED_HOST_SYSTEM_STATUS.md`](../BOUNDED_HOST_SYSTEM_STATUS.md)
 - [`docs/soul/SELF_AUGMENTATION_AND_HOST_IMPROVEMENT_ARCHITECTURE.md`](../soul/SELF_AUGMENTATION_AND_HOST_IMPROVEMENT_ARCHITECTURE.md)
+- [`docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md`](../soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md)
 - [`docs/assessments/STORAGE_AND_RETENTION_A1_REVIEW.md`](../assessments/STORAGE_AND_RETENTION_A1_REVIEW.md)

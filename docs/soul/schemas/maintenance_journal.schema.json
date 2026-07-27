@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.journal.v1",
+  "title": "Soul Maintenance Rehearsal Journal",
+  "type": "object",
+  "required": ["schema_version", "journal_id", "plan_id", "current_state", "rehearsal", "commands_executed", "state_written"],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.journal.v1"},
+    "journal_id": {"type": "string", "pattern": "^rehearsal_[a-f0-9]{16}$"},
+    "current_state": {"enum": ["complete", "blocked_for_human_review"]},
+    "rehearsal": {"const": true},
+    "commands_executed": {"type": "array", "maxItems": 0},
+    "state_written": {"const": false},
+    "password_requested": {"const": false},
+    "reboot_requested": {"const": false}
+  },
+  "additionalProperties": true
+}

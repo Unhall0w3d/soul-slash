@@ -466,9 +466,19 @@
         <p id="host-plan-status" class="dialog-status" role="status"></p>
       </section>
 
+      <section class="improvement-card host-plan-card" aria-labelledby="maintenance-rehearsal-heading">
+        <div class="card-heading"><div><p class="eyebrow">Guided maintenance · A1</p><h2 id="maintenance-rehearsal-heading">Reboot and workspace rehearsal</h2></div><span class="count-badge">read only</span></div>
+        <p class="card-note">Preview the approved one-password update sequence and a privacy-filtered Hyprland restore map. A1 cannot authenticate, update, launch applications, write a journal, or reboot.</p>
+        <label class="check-row" for="maintenance-force-refresh"><input id="maintenance-force-refresh" type="checkbox"> Force package-database refresh with <code>yay -Syyu</code> on this run</label>
+        <div class="host-plan-actions"><button id="preview-maintenance" class="gate-button" type="button">Preview maintenance run</button><button id="rehearse-maintenance" class="gate-button" type="button" disabled>Run non-destructive rehearsal</button></div>
+        <div id="maintenance-preview-details" class="recommendation-list"><p class="muted">No maintenance preview collected.</p></div>
+        <pre id="maintenance-rehearsal-output" class="diagnostic-output" hidden></pre>
+        <p id="maintenance-rehearsal-status" class="dialog-status" role="status">No privilege or host mutation is available in A1.</p>
+      </section>
+
       <aside class="unavailable-boundary" aria-labelledby="unavailable-actions-heading">
         <div><p class="eyebrow">Assessment boundary</p><h2 id="unavailable-actions-heading">Host changes require separate approval</h2></div>
-        <p>Update installation, package removal, orphan cleanup, service changes, model downloads, implementation, and promotion require separately reviewed executors. Self Assessment only inspects and prepares candidate proposals.</p>
+        <p>The approved A1 slice adds planning and rehearsal only. Authentication, update execution, reboot, and post-login restoration require separately reviewed executors at the A2 and A3 gates. Self Assessment only inspects, plans, and rehearses in this slice.</p>
       </aside>
     </section>
 

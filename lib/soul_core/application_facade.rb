@@ -29,6 +29,7 @@ require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
+require_relative "maintenance_rehearsal_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
 require_relative "music_generation_service"
@@ -76,6 +77,7 @@ module SoulCore
       skill_studio_service: nil,
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
+      maintenance_rehearsal_service: nil,
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
       music_generation_service: nil,
@@ -117,6 +119,7 @@ module SoulCore
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
       @host_improvement_plan_service = host_improvement_plan_service
+      @maintenance_rehearsal_service = maintenance_rehearsal_service
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
       @music_generation_service = music_generation_service
@@ -290,6 +293,8 @@ module SoulCore
       when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
       when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
+      when "maintenance.preview" then domain(maintenance_rehearsal.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
+      when "maintenance.rehearsal" then domain(maintenance_rehearsal.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "self_augmentation.census" then domain(self_augmentation.census)
       when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
       when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
@@ -742,6 +747,10 @@ module SoulCore
 
     def host_improvement
       @host_improvement_plan_service ||= HostImprovementPlanService.new(root: @root, clock: @clock)
+    end
+
+    def maintenance_rehearsal
+      @maintenance_rehearsal_service ||= MaintenanceRehearsalService.new(root: @root, clock: @clock)
     end
 
     def self_augmentation

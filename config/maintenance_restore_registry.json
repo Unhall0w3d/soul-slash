@@ -1,0 +1,77 @@
+{
+  "schema_version": "soul.maintenance.restore_registry.v1",
+  "entries": [
+    {
+      "entry_id": "terminal.kitty",
+      "identities": ["kitty"],
+      "process_identities": [],
+      "argv": ["/usr/bin/kitty"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "files.dolphin",
+      "identities": ["dolphin", "org.kde.dolphin"],
+      "process_identities": [],
+      "argv": ["/usr/bin/dolphin"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "browser.firefox",
+      "identities": ["firefox", "org.mozilla.firefox"],
+      "process_identities": [],
+      "argv": ["/usr/bin/firefox"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "browser.opera",
+      "identities": ["opera", "opera gx", "opera-gx"],
+      "process_identities": [],
+      "argv": ["/usr/bin/opera-gx"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "notes.obsidian",
+      "identities": ["obsidian"],
+      "process_identities": [],
+      "argv": ["/usr/bin/obsidian"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "development.codex_desktop",
+      "identities": ["codex-desktop"],
+      "process_identities": [],
+      "argv": ["/usr/bin/codex-desktop"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "communication.vesktop",
+      "identities": ["vesktop", "dev.vencord.vesktop"],
+      "process_identities": [],
+      "argv": ["/usr/bin/flatpak", "run", "dev.vencord.Vesktop"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_window"
+    },
+    {
+      "entry_id": "transfer.qbittorrent",
+      "identities": ["qbittorrent", "org.qbittorrent.qbittorrent"],
+      "process_identities": ["qbittorrent"],
+      "argv": ["/usr/bin/qbittorrent"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_if_absent"
+    }
+  ]
+}

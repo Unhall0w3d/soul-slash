@@ -12,6 +12,7 @@ Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectVie
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupBusy: false });
+state.maintenancePreview = null;
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
 const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
 const NOTIFICATION_MODES = ["voice", "cues", "muted"];
@@ -2319,6 +2320,84 @@ async function verifyHostPlan() {
   finally { byId("verify-host-plan").disabled = !state.selectedHostPlan; }
 }
 
+function renderMaintenancePreview(plan) {
+  const list = byId("maintenance-preview-details"); list.replaceChildren();
+  const snapshot = plan.window_snapshot || {};
+  list.append(
+    labeledRecord("Authentication contract", "One password request · transaction-scoped · A1 does not authenticate"),
+    labeledRecord("Package mode", plan.force_database_refresh ? "yay -Syyu · forced database refresh" : "yay -Syu · normal full upgrade"),
+    labeledRecord("Restore map", `${snapshot.restorable_count || 0} restorable · ${snapshot.unsupported_count || 0} unsupported`),
+    labeledRecord("Privacy boundary", "No titles, URLs, raw process commands, terminal contents, or environment values")
+  );
+  (plan.commands || []).forEach((command) => {
+    list.append(labeledRecord(command.adapter || "planned operation", (command.argv || []).join(" ")));
+  });
+  (snapshot.windows || []).filter((window) => window.restore_status !== "restorable").slice(0, 12).forEach((window) => {
+    const identity = window.initial_class || window.class || "unknown application";
+    list.append(labeledRecord(`${identity} · skipped`, window.reason || "not safely restorable"));
+  });
+  (snapshot.background_applications || []).forEach((application) => {
+    list.append(labeledRecord(
+      `${application.process_identity} · background`,
+      application.restore_status === "restorable" ? "launch only if absent after login" : (application.reason || "not safely restorable")
+    ));
+  });
+}
+
+async function previewMaintenance() {
+  const status = byId("maintenance-rehearsal-status");
+  const force = byId("maintenance-force-refresh").checked;
+  status.textContent = "Collecting fresh package and Hyprland evidence…";
+  byId("preview-maintenance").disabled = true;
+  byId("rehearse-maintenance").disabled = true;
+  try {
+    const envelope = await callSoul("maintenance.preview", { force_database_refresh: String(force) });
+    const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete" || !data.plan) throw new Error(envelope.errors?.[0]?.message || "Maintenance preview failed safely.");
+    state.maintenancePreview = data;
+    renderMaintenancePreview(data.plan);
+    byId("rehearse-maintenance").disabled = false;
+    status.textContent = "Preview ready. No command was executed and no state was written.";
+  } catch (error) {
+    state.maintenancePreview = null;
+    status.textContent = error.message;
+  } finally {
+    byId("preview-maintenance").disabled = false;
+  }
+}
+
+async function rehearseMaintenance() {
+  if (!state.maintenancePreview) return;
+  const status = byId("maintenance-rehearsal-status");
+  const output = byId("maintenance-rehearsal-output");
+  status.textContent = "Rehearsing bounded lifecycle and restore decisions…";
+  byId("rehearse-maintenance").disabled = true;
+  try {
+    const envelope = await callSoul("maintenance.rehearsal", { force_database_refresh: String(byId("maintenance-force-refresh").checked) });
+    const data = dataOf(envelope); const journal = data.journal;
+    if (!journal) throw new Error(envelope.errors?.[0]?.message || "Maintenance rehearsal failed safely.");
+    output.hidden = false;
+    output.textContent = [
+      `State: ${journal.current_state}`,
+      `Simulated: ${(journal.simulated_lifecycle || []).map((entry) => entry.state).join(" → ")}`,
+      `Restorable: ${journal.restorable_count}`,
+      `Unsupported: ${journal.unsupported_count}`,
+      `Password requested: ${journal.password_requested}`,
+      `Commands executed: ${(journal.commands_executed || []).length}`,
+      `State written: ${journal.state_written}`,
+      `Reboot requested: ${journal.reboot_requested}`,
+      ...(journal.blockers || []).map((blocker) => `Blocker: ${blocker}`)
+    ].join("\n");
+    status.textContent = envelope.lifecycle_state === "complete"
+      ? "Rehearsal complete. Every stage was simulated; the host was unchanged."
+      : (envelope.errors?.[0]?.message || "Rehearsal stopped for human review; the host was unchanged.");
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    byId("rehearse-maintenance").disabled = !state.maintenancePreview;
+  }
+}
+
 function renderAugmentationProposals(records) {
   state.augmentationProposals = records; const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
   records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for Gate A1`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
@@ -3151,6 +3230,14 @@ byId("preview-host-plan").addEventListener("click", previewHostPlan);
 byId("host-plan-confirmation").addEventListener("input", () => { byId("create-host-plan").disabled = !state.hostPlanPreview || byId("host-plan-confirmation").value !== state.hostPlanPreview.confirmation_phrase; });
 byId("create-host-plan").addEventListener("click", createHostPlan);
 byId("verify-host-plan").addEventListener("click", verifyHostPlan);
+byId("preview-maintenance").addEventListener("click", previewMaintenance);
+byId("rehearse-maintenance").addEventListener("click", rehearseMaintenance);
+byId("maintenance-force-refresh").addEventListener("change", () => {
+  state.maintenancePreview = null;
+  byId("rehearse-maintenance").disabled = true;
+  byId("maintenance-rehearsal-output").hidden = true;
+  byId("maintenance-rehearsal-status").textContent = "Refresh the preview after changing the package mode.";
+});
 byId("run-augmentation-census").addEventListener("click", runAugmentationCensus);
 byId("preview-augmentation-proposal").addEventListener("click", previewAugmentationProposal);
 byId("augmentation-confirmation").addEventListener("input", () => { byId("create-augmentation-proposal").disabled = !state.augmentationPreview || byId("augmentation-confirmation").value !== state.augmentationPreview.confirmation_phrase; });

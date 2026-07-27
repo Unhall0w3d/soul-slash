@@ -721,3 +721,6 @@ verify-music-reference-synthesis:
 
 verify-music-lite-edit:
 > @ruby scripts/verify-music-lite-edit.rb
+
+verify-maintenance-rehearsal:
+> @ruby scripts/verify-maintenance-rehearsal-a1.rb
