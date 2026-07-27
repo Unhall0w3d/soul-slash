@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/youtube_api_client"
+require_relative "../lib/soul_core/youtube_oauth_service"
+require_relative "../lib/soul_core/youtube_authenticated_upload_service"
+
+ROOT = File.expand_path("..", __dir__)
+
+options = {
+  visibility: "private"
+}
+
+parser = OptionParser.new do |value|
+  value.banner = "Usage: scripts/soul-youtube-publisher COMMAND [options]"
+  value.on("--client-json PATH", "Downloaded Desktop OAuth client JSON") { |path| options[:client_path] = path }
+  value.on("--project-id ID", "Soul Music project ID") { |id| options[:project_id] = id }
+  value.on("--candidate-id ID", "Finished Music candidate ID") { |id| options[:candidate_id] = id }
+  value.on("--visual-id ID", "Reviewed full-length visual ID") { |id| options[:visual_id] = id }
+  value.on("--visibility VALUE", "private, unlisted, or public (default: private)") { |visibility| options[:visibility] = visibility }
+  value.on("--confirmation PHRASE", "Exact confirmation phrase") { |confirmation| options[:confirmation] = confirmation }
+  value.on("--expected-digest SHA256", "Exact preview digest") { |digest| options[:expected_digest] = digest }
+end
+
+def required(options, key, flag)
+  value = options[key].to_s
+  raise OptionParser::MissingArgument, flag if value.empty?
+  value
+end
+
+begin
+  parser.parse!
+  command = ARGV.shift.to_s
+  raise OptionParser::InvalidArgument, "unexpected arguments: #{ARGV.join(' ')}" unless ARGV.empty?
+  api = SoulCore::YouTubeApiClient.new
+  oauth = SoulCore::YouTubeOAuthService.new(root: ROOT, api: api)
+  upload = SoulCore::YouTubeAuthenticatedUploadService.new(root: ROOT, oauth: oauth, api: api)
+
+  result = case command
+           when "status"
+             oauth.status
+           when "authorize-preview"
+             oauth.preview(client_path: required(options, :client_path, "--client-json"))
+           when "authorize-execute"
+             oauth.execute(
+               client_path: required(options, :client_path, "--client-json"),
+               confirmation: required(options, :confirmation, "--confirmation"),
+               expected_digest: required(options, :expected_digest, "--expected-digest")
+             )
+           when "upload-preview"
+             upload.preview(
+               project_id: required(options, :project_id, "--project-id"),
+               candidate_id: required(options, :candidate_id, "--candidate-id"),
+               visual_id: required(options, :visual_id, "--visual-id"),
+               visibility: options.fetch(:visibility)
+             )
+           when "upload-execute"
+             upload.execute(
+               project_id: required(options, :project_id, "--project-id"),
+               candidate_id: required(options, :candidate_id, "--candidate-id"),
+               visual_id: required(options, :visual_id, "--visual-id"),
+               visibility: options.fetch(:visibility),
+               confirmation: required(options, :confirmation, "--confirmation"),
+               expected_digest: required(options, :expected_digest, "--expected-digest"),
+               progress: ->(event, data) { warn(JSON.generate({ "event" => event, "data" => data })) }
+             )
+           else
+             raise OptionParser::InvalidArgument, "command must be status, authorize-preview, authorize-execute, upload-preview, or upload-execute"
+           end
+
+  puts JSON.pretty_generate(result)
+  exit(result["ok"] ? 0 : 1)
+rescue OptionParser::ParseError => error
+  puts JSON.pretty_generate(
+    "ok" => false,
+    "lifecycle_state" => "awaiting_input",
+    "reason" => error.message,
+    "data" => {},
+    "mutation" => "none"
+  )
+  exit 2
+end
