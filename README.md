@@ -25,7 +25,7 @@ The supported local runtime topology currently includes:
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-Music Studio supports exact whole-second projects from 30 seconds through 5 minutes plus a fixed 10-minute option, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study; upload and publication remain human actions.
+Music Studio supports exact whole-second projects from 30 seconds through 5 minutes plus a fixed 10-minute option, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. An owner-authorized A0 candidate can upload one exact package through a foreground OAuth and confirmation gate; private is the default and publication remains a human decision. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study.
 
 For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
@@ -50,6 +50,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
 | Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
+| YouTube Publication | Authorize and upload one exact reviewed package through a foreground human gate | [YouTube Publication](docs/guides/YOUTUBE_PUBLICATION.md) |
 | Visual Studio | Generate, review, revise, and bind private local imagery or short motion scenes | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
 
 ## Design principles

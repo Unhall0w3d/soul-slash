@@ -46,7 +46,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
 - [ ] assemble reviewed variable-duration songs and short visual loops into an editable longer-form mix timeline with transition, overlap, trim, loop, and export controls
-- [ ] authenticated YouTube draft upload with publication remaining human-controlled
+- [~] review the A0 foreground authenticated YouTube upload candidate; private
+  remains the default and publication remains human-controlled
 - [x] bounded voice input and speech output through the same conversation and skill core, including visible wake-word presence and natural follow-up
 - [x] image/screen understanding with declared privacy and capability boundaries
   - [x] A0 local runtime, model, capture-tool, and privacy readiness assessment
