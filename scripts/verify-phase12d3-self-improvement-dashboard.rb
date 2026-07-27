@@ -126,7 +126,12 @@ check.call("dashboard exposes the third ARIA tab and assessment scopes", html.in
 check.call("dashboard requires preview and exact proposal confirmation", javascript.index('callSoul("self_improvement.proposals.preview"') < javascript.index('callSoul("self_improvement.proposals.execute"') && javascript.include?("confirmation_phrase") && html.include?("GENERATE_SELF_IMPROVEMENT_PROPOSALS"))
 check.call("dashboard adds no polling or unsafe HTML rendering", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML/))
 check.call("dashboard bounds manual assessment requests and clears running state on failure", javascript.include?("AbortSignal.timeout(35_000)") && javascript.include?('`${scope} · failed`'))
-check.call("host mutation remains visibly separated and approval-gated", html.include?("Host changes require separate approval") && html.include?("separately reviewed executors") && html.include?("Self Assessment only inspects"))
+check.call("host mutation remains visibly separated and approval-gated",
+           html.include?("Host changes require separate approval") &&
+             html.include?("Self Assessment only inspects and prepares evidence") &&
+             html.include?('id="maintenance-panel"') &&
+             html.include?("A2 must separately qualify") &&
+             html.include?("A3 must separately qualify"))
 
 abort "Phase 12D.3 verification failed: #{errors.join(', ')}" unless errors.empty?
 puts "Phase 12D.3 Self Improvement dashboard verification complete."

@@ -19,7 +19,7 @@ Status: candidate-complete; human review required
 - detects allowlisted tray-only applications from process names alone and marks
   them `launch_if_absent` so normal autostart cannot be duplicated;
 - exposes unsupported windows and missing executables instead of guessing;
-- added a Dashboard preview and lifecycle rehearsal under Self Assessment; and
+- added a Dashboard preview and lifecycle rehearsal under Administration; and
 - added Invocation Guide and Project Timeline metadata without adding Chat
   execution authority.
 
@@ -35,10 +35,14 @@ Status: candidate-complete; human review required
 - `assets/dashboard/index.html`
 - `assets/dashboard/dashboard.js`
 - `assets/dashboard/dashboard.css`
+- `lib/soul_core/dashboard_capability_guide.rb`
+- `lib/soul_core/voice_screen_understanding_service.rb`
+- `scripts/verify-dashboard-self-improvement-navigation.rb`
 - `scripts/verify-maintenance-rehearsal-a1.rb`
 - `Makefile`
 - `README.md`
 - `docs/guides/SELF_ASSESSMENT.md`
+- `docs/guides/GUIDED_MAINTENANCE.md`
 - `docs/ROADMAP.md`
 - `docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md`
 - `docs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md`
@@ -157,5 +161,6 @@ Confirmation gate weakened: no
 - [ ] Review every default restore-registry application and executable path.
 - [ ] Confirm unknown applications and games remain unsupported by default.
 - [ ] Run the live Dashboard preview and rehearsal.
+- [ ] Confirm Guided Maintenance appears under Administration rather than Self Improvement.
 - [ ] Approve A1, request repair, or reject it.
 - [ ] Do not authorize A2 or A3 solely because A1 tests pass.

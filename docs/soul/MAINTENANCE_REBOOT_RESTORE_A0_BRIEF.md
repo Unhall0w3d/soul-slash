@@ -21,7 +21,8 @@ authorization until the human architect explicitly approves it.
 
 ## Operator experience
 
-Self Assessment exposes **Guided maintenance** with:
+Administration exposes **Guided Maintenance**, using fresh Self Assessment
+evidence, with:
 
 - a fresh package and reboot assessment;
 - the exact update mode and commands;

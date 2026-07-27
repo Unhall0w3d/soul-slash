@@ -64,6 +64,8 @@ module SoulCore
       "Self Augmentation",
       "Music Studio",
       "Visual Studio",
+      "Administration",
+      "Guided Maintenance",
       "Review Center"
     ].freeze
     DASHBOARD_SURFACE_GUIDE = <<~TEXT.strip.freeze
@@ -78,6 +80,8 @@ module SoulCore
       - Creative Studios opens Music Studio and Visual Studio.
       - Music Studio manages composition briefs, generated candidates, listening evidence, revisions, and exports.
       - Visual Studio manages still and motion briefs, candidates, reviews, and music companions.
+      - Administration opens Backup & Recovery and Guided Maintenance.
+      - Guided Maintenance previews and rehearses update, reboot, and Hyprland restoration work; A1 cannot execute it.
       - Review Center is a read-only view of pending approvals and recent bounded activity.
       - Core selects the reviewed runtime profile; Voice Presence opens the local hands-free voice surface.
       Use this map to explain the dashboard, but identify the currently visible panel and

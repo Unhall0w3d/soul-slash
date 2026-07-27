@@ -44,9 +44,10 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Local Search | Search reviewed documentation, Knowledge Vault notes, and canonical Music/Visual briefs with source citations | [Local Project and Document Search](docs/guides/LOCAL_SEARCH.md) |
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
+| Guided Maintenance | Preview and rehearse the reviewed Arch/AUR, Flatpak, reboot, and Hyprland restoration flow from Administration | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
-| Self Assessment | Inspect host, runtime, capability, update, and storage evidence; rehearse the future guided update/reboot/Hyprland restore flow without mutation | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
+| Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
 | Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
 | Visual Studio | Generate, review, revise, and bind private local imagery or short motion scenes | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
