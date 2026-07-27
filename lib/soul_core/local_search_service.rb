@@ -60,9 +60,11 @@ module SoulCore
         }
       end
 
-      ranked = results.sort_by do |record|
-        [-record.fetch("score"), record.fetch("source"), record.fetch("reference")]
-      end.first(wanted)
+      ranked = ranked_results(
+        results,
+        selected_sources: selected_sources,
+        limit: wanted
+      )
       complete(
         {
           "query" => text,
@@ -362,6 +364,24 @@ module SoulCore
       raise ArgumentError, "unknown local search sources: #{unknown.join(', ')}" unless unknown.empty?
 
       SOURCES.select { |source| selected.include?(source) }
+    end
+
+    def ranked_results(records, selected_sources:, limit:)
+      ordered = records.sort_by do |record|
+        [-record.fetch("score"), record.fetch("source"), record.fetch("reference")]
+      end
+      contributing_sources = selected_sources.select do |source|
+        ordered.any? { |record| record.fetch("source") == source }
+      end
+      return ordered.first(limit) if contributing_sources.length <= 1 || limit < contributing_sources.length
+
+      reserved = contributing_sources.filter_map do |source|
+        ordered.find { |record| record.fetch("source") == source }
+      end
+      selected = (reserved + ordered).uniq.first(limit)
+      selected.sort_by do |record|
+        [-record.fetch("score"), record.fetch("source"), record.fetch("reference")]
+      end
     end
 
     def relative_path(path)

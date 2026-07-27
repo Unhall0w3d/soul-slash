@@ -10,6 +10,7 @@ require_relative "conversation_tool_catalog"
 require_relative "dashboard_capability_guide"
 require_relative "intent_router"
 require_relative "invocation_catalog_service"
+require_relative "local_search_chat_controls"
 
 module SoulCore
   class ConversationOrchestrator
@@ -127,9 +128,7 @@ module SoulCore
       /\A\s*(?:show\s+|check\s+)?knowledge\s+vault\s+status\s*[?.!]*\z/i,
       /\A\s*search\s+(?:the\s+)?knowledge\s+vault\s+(?:for\s+)?.+\z/i
     ].freeze
-    LOCAL_SEARCH_CONTROL_PATTERNS = [
-      /\A\s*(?:please\s+)?(?:search|find)\s+(?:(?:my\s+)?(?:local\s+)?(?:projects?\s+and\s+documents?|documents?\s+and\s+projects?)|(?:my\s+)?local\s+sources?|(?:my\s+)?project\s+archive)\s+(?:for\s+)?.+\z/i
-    ].freeze
+    LOCAL_SEARCH_CONTROL_PATTERNS = LocalSearchChatControls::REQUEST_PATTERNS
     PROJECT_TRACKER_CONTROL_PATTERNS = [
       /\A\s*(?:show|list|open)\s+(?:the\s+)?(?:project\s+timeline|implementation\s+tracker)\s*[?.!]*\z/i,
       /\A\s*what(?:'s|\s+is)\s+(?:next|on\s+the\s+project\s+timeline)\s*[?.!]*\z/i,

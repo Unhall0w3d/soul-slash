@@ -29,6 +29,15 @@ search local sources for machine cathedral
 search my project archive for Signal
 ```
 
+Select one adapter when the source matters:
+
+```text
+search local repository documents for confirmation gates
+search local knowledge vault for Gemma daily
+search my music projects for liquid drum and bass
+search my visual projects for backrooms
+```
+
 Nearby conversation does not invoke search. “I am working on my local
 projects” remains conversation, and “find sources for…” remains available to
 the public-web research path.
@@ -36,6 +45,18 @@ the public-web research path.
 Chat returns deterministic results rather than asking a model to invent a
 summary. Each match names its source and canonical reference, includes a short
 excerpt, retrieval time, and digest prefix, and ends with `Mutation: none`.
+Results are numbered in deterministic rank order. A general multi-source query
+reserves one qualifying result from every contributing adapter when the result
+limit can hold them all, preventing repository documentation from hiding a
+matching Music or Visual project.
+
+A later conversational follow-up may ask the active local model to summarize
+or compare the displayed results. That model call receives an explicit
+untrusted/reference-only boundary. A response that changes evidence into
+authorization, stops at its token limit, or leaves a requested list visibly
+incomplete receives at most one foreground retry. Repeat failure returns the
+deterministic search evidence with a disclosure instead of pretending the
+synthesis succeeded.
 
 ## Command line
 
@@ -60,6 +81,23 @@ scripts/soul-local-search "signal" 10 repository music
 ```
 
 Supported filters are `repository`, `knowledge_vault`, `music`, and `visual`.
+
+## Cross-Core behavioral evaluation
+
+The manually invoked harness evaluates the currently active Core; it never
+switches Cores itself:
+
+```sh
+make local-search-core-eval LOCAL_SEARCH_CORE=daily
+make local-search-core-eval LOCAL_SEARCH_CORE=amd-free
+```
+
+Activate each Core through the existing human gate before its run. The harness
+requires an idle, conflict-free model runtime and uses temporary Chat and
+request-receipt state. It tests Knowledge Vault Core topology, ranked Music
+projects, a Visual project, and the reference-only confirmation-gate boundary.
+It exits after four bounded search/follow-up conversations and persists no
+evaluation transcript.
 
 ## Trust and freshness
 
