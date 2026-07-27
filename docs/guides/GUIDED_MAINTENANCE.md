@@ -112,12 +112,43 @@ evidence while preserving the service sandbox.
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
 restorer.
 
+## A3 conditional reboot candidate
+
+A3 is a separate disabled-by-default gate. It reuses the fixed A2 update
+vectors, then captures a fresh privacy-filtered restore map and writes one
+boot-bound journal before requesting a reboot. The tracked and local default is:
+
+```text
+SOUL_MAINTENANCE_A3_LIVE=false
+```
+
+The one-shot resume unit is also installed through a separate exact plan:
+
+```text
+make maintenance-resume-plan
+make maintenance-resume-install CONFIRM=INSTALL_SOUL_MAINTENANCE_RESUME
+make maintenance-resume-status
+```
+
+Installing the unit does not run it. It exits immediately when no pending
+journal exists, has no restart policy or timer, and cannot authenticate, update
+packages, or reboot. A valid post-reboot run waits at most 90 seconds for
+Hyprland, revalidates the restore registry, launches only fixed allowlisted
+applications, skips already-running background entries, places supported
+windows, restores the previously active workspace last, writes a terminal
+receipt, and consumes the journal.
+
+Chat and Voice may explain the plan but cannot arm or authorize A3. The first
+live A3 reboot remains a separate supervised human gate even after the
+deterministic candidate and resume-unit installation are reviewed.
+
 ## Verification
 
 ```text
 make verify-maintenance-rehearsal
 make verify-maintenance-foreground-execution
 make verify-maintenance-desktop-handoff
+make verify-maintenance-reboot-restore
 ```
 
 Engineering evidence:
@@ -127,3 +158,5 @@ Engineering evidence:
 - [`MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md`](../assessments/MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md)
 - [`MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md`](../soul/MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md)
 - [`MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md`](../assessments/MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md)
+- [`MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md`](../soul/MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md)
+- [`MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md`](../assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md)

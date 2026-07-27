@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/maintenance_resume_deployment"
+
+command = ARGV.shift.to_s
+confirmation = nil
+until ARGV.empty?
+  argument = ARGV.shift
+  case argument
+  when "--confirmation" then confirmation = ARGV.shift
+  else
+    warn "Unknown argument: #{argument}"
+    exit 1
+  end
+end
+
+deployment = SoulCore::MaintenanceResumeDeployment.new(root: File.expand_path("..", __dir__))
+result = case command
+         when "plan" then deployment.plan
+         when "install" then deployment.install(confirmation: confirmation)
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: confirmation)
+         else
+           warn "Usage: scripts/soul-maintenance-resume-service plan|install|status|uninstall [--confirmation PHRASE]"
+           exit 1
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : (%w[awaiting_input blocked_for_human_review].include?(result["lifecycle_state"]) ? 2 : 1))

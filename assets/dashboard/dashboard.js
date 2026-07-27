@@ -505,7 +505,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
-  if (maintenance && state.authenticated) loadMaintenanceReceipts();
+  if (maintenance && state.authenticated) { loadMaintenanceReceipts(); loadMaintenanceRebootStatus(); }
   if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
 }
 
@@ -2512,6 +2512,68 @@ async function loadMaintenanceReceipts() {
   } catch (error) { byId("maintenance-execution-status").textContent = error.message; }
 }
 
+function renderMaintenanceRebootPlan(plan) {
+  const details = byId("maintenance-reboot-details"); details.replaceChildren();
+  [
+    ["Authentication", "one native sudo -v prompt · never enters the Dashboard"],
+    ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
+    ["Restore map", `${plan.window_restore_summary?.restorable_count ?? 0} restorable · ${plan.window_restore_summary?.unsupported_count ?? 0} unsupported`],
+    ["Resume unit", plan.resume_unit?.ready ? "exact unit installed · enabled · one-shot" : "not ready"],
+    ["Source boot", plan.source_boot_id || "unavailable"],
+    ["Reboot", "one conditional request · no automatic retry"]
+  ].forEach(([label, value]) => details.append(labeledRecord(label, value)));
+  (plan.preflight?.a3_blockers || []).forEach((blocker) => details.append(labeledRecord("A3 blocker", blocker)));
+}
+
+async function previewMaintenanceReboot() {
+  const force = byId("maintenance-force-refresh").checked; const status = byId("maintenance-reboot-status");
+  state.maintenanceRebootPreview = null; byId("execute-maintenance-reboot").disabled = true;
+  status.textContent = "Revalidating update, reboot, resume-unit, and restore evidence…";
+  try {
+    const envelope = await callSoul("maintenance.reboot_restore.preview", { force_database_refresh: String(force) }); lifecycle(envelope);
+    const data = dataOf(envelope); const plan = data.plan;
+    if (!plan) throw new Error(envelope.errors?.[0]?.message || "A3 transaction preview failed safely.");
+    state.maintenanceRebootPreview = data; renderMaintenanceRebootPlan(plan);
+    byId("execute-maintenance-reboot").disabled = !plan.execution_available;
+    byId("execute-maintenance-reboot").textContent = plan.execution_available ? "Open update and reboot terminal" : "Live reboot unavailable";
+    byId("maintenance-reboot-state").textContent = (plan.preflight?.a3_blockers || []).length ? "blocked" : (plan.execution_available ? "review ready" : "candidate ready");
+    status.textContent = (plan.preflight?.a3_blockers || []).length
+      ? "A3 blockers remain visible; no reboot transaction can open."
+      : (plan.execution_available ? "Exact A3 digest ready for separately authorized supervision." : "A3 candidate is ready; live reboot remains locally disabled.");
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function executeMaintenanceReboot() {
+  const preview = state.maintenanceRebootPreview; if (!preview) return;
+  const progress = byId("maintenance-reboot-progress"); const status = byId("maintenance-reboot-status");
+  showGenerationProgress(progress, "Conditional reboot", "Opening the visible one-password update and reboot terminal…");
+  byId("preview-maintenance-reboot").disabled = true; byId("execute-maintenance-reboot").disabled = true;
+  try {
+    const envelope = await callSoul("maintenance.reboot_restore.execute", {
+      force_database_refresh: String(byId("maintenance-force-refresh").checked),
+      confirmation: preview.confirmation,
+      expected_digest: preview.expected_digest
+    });
+    const data = dataOf(envelope); lifecycle(envelope);
+    if (!data.handoff?.launch_uri) throw new Error(envelope.errors?.[0]?.message || "A3 transaction stopped safely.");
+    launchMaintenanceUri(data.handoff.launch_uri);
+    status.textContent = "Visible A3 terminal requested. If every postcondition passes, the host will reboot once and the one-shot resume unit will close the journal after login.";
+    state.maintenanceRebootPreview = null;
+  } catch (error) { status.textContent = error.message; }
+  finally { hideGenerationProgress(progress); byId("preview-maintenance-reboot").disabled = false; }
+}
+
+async function loadMaintenanceRebootStatus() {
+  try {
+    const envelope = await callSoul("maintenance.reboot_restore.status"); const data = dataOf(envelope); lifecycle(envelope);
+    const resume = data.resume_unit || {};
+    byId("maintenance-reboot-state").textContent = data.pending_restore ? "pending restore" : (resume.ready ? "unit ready" : "unit unavailable");
+    byId("maintenance-reboot-status").textContent = data.pending_restore
+      ? "A boot-bound restoration journal is pending; do not start another maintenance transaction."
+      : (resume.ready ? "The exact one-shot resume unit is installed and no restoration is pending." : "Install the reviewed one-shot resume unit before A3 can become available.");
+  } catch (error) { byId("maintenance-reboot-status").textContent = error.message; }
+}
+
 function renderAugmentationProposals(records) {
   state.augmentationProposals = records; const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
   records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for Gate A1`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
@@ -3275,6 +3337,9 @@ byId("refresh-maintenance-evidence").addEventListener("click", refreshNativeMain
 byId("rehearse-maintenance-execution").addEventListener("click", () => runMaintenanceExecution("rehearsal"));
 byId("execute-maintenance").addEventListener("click", () => runMaintenanceExecution("live"));
 byId("refresh-maintenance-receipt").addEventListener("click", loadMaintenanceReceipts);
+byId("preview-maintenance-reboot").addEventListener("click", previewMaintenanceReboot);
+byId("execute-maintenance-reboot").addEventListener("click", executeMaintenanceReboot);
+byId("refresh-maintenance-reboot-status").addEventListener("click", loadMaintenanceRebootStatus);
 byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
 byId("forget-backup-password").addEventListener("click", () => {
   byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);

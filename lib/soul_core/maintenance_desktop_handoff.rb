@@ -195,7 +195,7 @@ module SoulCore
     def pending_live_digest?(digest_value)
       Dir.glob(File.join(@transactions_root, "maintenance_tx_*.{reserved,claimed}.json")).any? do |path|
         transaction = read_json(path, TRANSACTION_SCHEMA)
-        transaction["mode"] == "live" && secure_equal?(transaction["plan_digest"], digest_value)
+        %w[live live_reboot].include?(transaction["mode"]) && secure_equal?(transaction["plan_digest"], digest_value)
       rescue StandardError
         true
       end
@@ -238,14 +238,16 @@ module SoulCore
       claim(source, claimed)
       transaction = read_json(claimed, TRANSACTION_SCHEMA)
       validate_claimed_transaction!(transaction, id, digest_value)
-      result_record = @transaction_runner_factory.call.run(transaction_path: claimed, mode: "live")
+      result_record = @transaction_runner_factory.call.run(transaction_path: claimed, mode: transaction.fetch("mode"))
       receipt = build_receipt(transaction, result_record)
       write_receipt(receipt)
       FileUtils.rm_f(claimed)
       FileUtils.rm_f(transaction.fetch("result_path"))
       prune_receipts
       lifecycle = receipt.fetch("lifecycle_state")
-      result(lifecycle, lifecycle == "complete", "live maintenance transaction #{lifecycle}", {"receipt" => receipt}, "host_packages_updated")
+      accepted = %w[complete awaiting_login].include?(lifecycle)
+      mutation = transaction.fetch("mode") == "live_reboot" ? "host_reboot_requested" : "host_packages_updated"
+      result(lifecycle, accepted, "live maintenance transaction #{lifecycle}", {"receipt" => receipt}, mutation)
     rescue StandardError => error
       result("failed", false, "live maintenance handoff failed safely: #{safe_error(error)}")
     end
@@ -280,11 +282,16 @@ module SoulCore
 
     def validate_transaction_reservation!(transaction)
       raise "maintenance transaction schema is invalid" unless transaction["schema_version"] == TRANSACTION_SCHEMA
-      raise "maintenance transaction mode is invalid" unless transaction["mode"] == "live"
+      raise "maintenance transaction mode is invalid" unless %w[live live_reboot].include?(transaction["mode"])
       raise "maintenance transaction owner is invalid" unless transaction["owner_uid"] == Process.uid
       raise "maintenance transaction ID is invalid" unless transaction["transaction_id"].to_s.match?(/\Amaintenance_tx_[a-f0-9]{16}\z/)
       raise "maintenance transaction digest is invalid" unless transaction["plan_digest"].to_s.match?(/\A[a-f0-9]{64}\z/)
-      raise "maintenance transaction reboot authority is invalid" unless transaction["reboot_allowed"] == false
+      expected_reboot = transaction["mode"] == "live_reboot"
+      raise "maintenance transaction reboot authority is invalid" unless transaction["reboot_allowed"] == expected_reboot
+      if expected_reboot
+        raise "maintenance transaction reboot vector is invalid" unless transaction["reboot_argv"] == ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+        raise "maintenance transaction restore registry digest is invalid" unless transaction["restore_registry_digest"].to_s.match?(/\A[a-f0-9]{64}\z/)
+      end
       deadline = Time.iso8601(transaction.fetch("deadline_at"))
       raise "maintenance transaction deadline is invalid" unless deadline > @clock.call && deadline <= @clock.call + RESERVATION_TTL_SECONDS
       expected_result = File.join(@transactions_root, "#{transaction.fetch('transaction_id')}.result.json")
@@ -308,21 +315,21 @@ module SoulCore
 
     def build_receipt(transaction, result_record)
       lifecycle = result_record.fetch("lifecycle_state", "failed")
-      lifecycle = "failed" unless %w[complete failed canceled blocked_for_human_review].include?(lifecycle)
+      lifecycle = "failed" unless %w[complete awaiting_login failed canceled blocked_for_human_review].include?(lifecycle)
       {
         "schema_version" => RECEIPT_SCHEMA,
         "receipt_id" => "maintenance_receipt_#{transaction.fetch('transaction_id').delete_prefix('maintenance_tx_')}",
         "transaction_id" => transaction.fetch("transaction_id"),
-        "mode" => "live",
+        "mode" => transaction.fetch("mode"),
         "plan_digest" => transaction.fetch("plan_digest"),
         "started_at" => transaction.fetch("created_at"),
         "finished_at" => @clock.call.iso8601,
         "lifecycle_state" => lifecycle,
-        "terminal_exit_status" => lifecycle == "complete" ? 0 : 1,
+        "terminal_exit_status" => %w[complete awaiting_login].include?(lifecycle) ? 0 : 1,
         "password_prompts" => Integer(result_record.fetch("password_prompts", 0)),
         "commands" => Array(result_record["commands"]).first(8).map { |item| item.to_h.slice("adapter", "exit_status", "status") },
         "sudo_ticket_invalidated" => result_record["sudo_ticket_invalidated"] == true,
-        "reboot_requested" => false,
+        "reboot_requested" => result_record["reboot_requested"] == true,
         "reason" => result_record["reason"].to_s.byteslice(0, 500),
         "redacted" => true
       }

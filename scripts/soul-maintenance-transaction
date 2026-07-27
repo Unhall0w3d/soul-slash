@@ -12,7 +12,7 @@ end.parse!
 
 abort "root is required" if options[:root].to_s.empty?
 abort "transaction is required" if options[:transaction].to_s.empty?
-abort "mode is invalid" unless %w[rehearsal live].include?(options[:mode])
+abort "mode is invalid" unless %w[rehearsal live live_reboot].include?(options[:mode])
 
 root = File.expand_path(options.fetch(:root))
 $LOAD_PATH.unshift(File.join(root, "lib"))
@@ -22,4 +22,4 @@ result = SoulCore::MaintenanceTransactionRunner.new(root: root).run(
   transaction_path: options.fetch(:transaction),
   mode: options.fetch(:mode)
 )
-exit(result && result["lifecycle_state"] == "complete" ? 0 : 1)
+exit(result && %w[complete awaiting_login].include?(result["lifecycle_state"]) ? 0 : 1)

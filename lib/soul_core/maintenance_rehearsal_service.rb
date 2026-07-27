@@ -124,6 +124,16 @@ module SoulCore
       )
     end
 
+    # A3 captures this again only after every update leg succeeds. Keeping the
+    # collector here preserves the A1 privacy and allowlist boundary.
+    def capture_window_snapshot
+      window_snapshot(load_registry)
+    end
+
+    def restore_registry
+      load_registry
+    end
+
     private
 
     def package_assessor
