@@ -228,9 +228,9 @@ module SoulCore
       session_error = authenticated_session_error(headers)
       return session_error if session_error
       request = JSON.parse(body)
-      allowed = %w[backup.create.execute backup.retention.execute backup.restore.execute]
+      allowed = %w[backup.create.execute backup.retention.execute backup.restore.execute maintenance.device.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
-        return json_response(422, error_envelope("invalid_stream_operation", "administration stream accepts bounded backup and recovery execution only"))
+        return json_response(422, error_envelope("invalid_stream_operation", "administration stream accepts bounded backup, recovery, and device-maintenance execution only"))
       end
       stream = Enumerator.new do |output|
         progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }

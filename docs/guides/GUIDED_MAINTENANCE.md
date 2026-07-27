@@ -6,52 +6,60 @@ and one-shot restoration of safely allowlisted Hyprland applications.
 
 Open it from **Administration → Guided Maintenance**.
 
-## Current reviewed flow
+## Infrastructure control plane
+
+The page begins with the newest persisted fleet snapshot for the Maven
+workstation, the dynamically discovered Proxmox node, and the Pi-hole LXC.
+Click **Collect fleet status** to replace it with a fresh bounded collection
+and inspect:
+
+- device reachability, platform, and versions;
+- native, AUR, and applicable Flatpak update counts;
+- running and available kernel evidence;
+- reboot indicators;
+- Proxmox LXC `100` state;
+- a unified maintenance-channel indicator on every card;
+- Pi-hole FTL, Unbound, blocking, and DNS-query health; and
+- an evidence-driven architecture map.
+
+The snapshot is private, atomic, and survives Dashboard reloads. The proposed
+owner-level oneshot timer collects it at local noon and midnight. The timer
+cannot maintain or reboot anything and has no persistent worker or polling
+loop. Workstation pacman and remote APT counts use currently cached system
+metadata and are labeled as such. An offline device remains visible without
+hiding evidence from the other devices.
+
+## Device-scoped flow
 
 ```text
-collect fresh Self Assessment evidence
-→ choose normal or forced database refresh
-→ preview exact inert update commands
-→ inspect visible and tray-only application restore decisions
-→ simulate the complete lifecycle
-→ stop without changing the host
+choose exactly one Maven, Forge, or Pi-hole card
+→ choose Maintenance or Reboot
+→ inspect the exact device, commands, confirmation, and dependency impact
+→ authorize only that digest
+→ wait for bounded completion or reconnect verification
+→ replace the persisted fleet snapshot
 ```
 
-Normal mode plans `yay -Syu`. The explicit forced-refresh option plans
-`yay -Syyu`. System Flatpak updates are shown as reusing the future
-transaction's existing authorization; user installations are planned
-separately.
+There is no fleet-wide maintenance or reboot action.
 
-The window map uses structured Hyprland data. A second privacy-filtered process
-view accounts for approved tray-only applications such as qBittorrent.
-Windowless entries use `launch_if_absent`, meaning a future restorer must first
-honor ordinary desktop autostart and never create a duplicate.
+Maven delegates to the reviewed A2 visible-terminal maintenance path and A3
+conditional reboot/restoration path. Forge and Pi-hole use fixed passwordless
+maintenance aliases, fixed command vectors, a global maintenance lock,
+device-specific confirmation, one attempt, and redacted receipts. A Forge
+reboot explicitly discloses that Pi-hole LXC `100` is interrupted.
 
-## Privacy boundary
+Remote maintenance never reboots automatically. A remote reboot records the
+old boot identity, sends one reboot request, holds off, performs bounded
+reconnect checks, requires a changed boot identity, and then recollects fleet
+status. It never retries the reboot request.
 
-The rehearsal stores or displays only the application identity and placement
-information needed to explain restoration. It excludes:
+## Safety engines retained behind the cards
 
-- window titles and document names;
-- browser URLs and tabs;
-- terminal contents;
-- raw process arguments and environments;
-- unmatched background processes; and
-- passwords, tokens, or other credentials.
-
-## What A1 cannot do
-
-A1 cannot:
-
-- request or retain a sudo password;
-- run `yay`, `pacman`, or a Flatpak update;
-- launch, close, or move an application;
-- write an operational maintenance journal;
-- request a reboot; or
-- install a post-login restoration unit.
-
-A2 foreground execution and A3 reboot/restoration remain distinct
-human-review gates.
+The former A1, A2, and A3 presentation cards are no longer shown. Their
+reviewed backend contracts remain authoritative for Maven: privacy-filtered
+workspace capture, the native desktop handoff, one native sudo prompt, exact
+package vectors, receipt bounds, reboot preconditions, and one-shot
+restoration are unchanged.
 
 ## A2 foreground candidate
 

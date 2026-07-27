@@ -13,6 +13,9 @@ Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTime
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupBusy: false });
 state.maintenancePreview = null;
+state.maintenanceFleet = null;
+state.maintenanceFleetLoaded = false;
+state.maintenanceDevicePreview = null;
 state.chatProgress = new Map();
 state.localChatRequests = new Set();
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
@@ -509,7 +512,11 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
-  if (maintenance && state.authenticated) { loadMaintenanceReceipts(); loadMaintenanceRebootStatus(); }
+  if (maintenance && state.authenticated) {
+    if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
+    loadMaintenanceReceipts();
+    loadMaintenanceRebootStatus();
+  }
   if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
 }
 
@@ -2387,6 +2394,247 @@ async function executeImprovementProposals() {
   state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
 }
 
+function maintenanceStateLabel(status) {
+  return {
+    healthy: "Healthy",
+    updates_available: "Updates available",
+    attention: "Attention",
+    offline: "Offline",
+    external: "External"
+  }[status] || "Unknown";
+}
+
+function renderMaintenanceDevice(device) {
+  const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = device.status || "unknown";
+  const heading = document.createElement("header");
+  const identity = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = device.address || "address unavailable";
+  const title = document.createElement("h3"); title.textContent = device.label || device.id || "Device";
+  const role = document.createElement("p"); role.className = "maintenance-device-role"; role.textContent = device.role || "Managed device";
+  identity.append(eyebrow, title, role);
+  const stateBadge = document.createElement("span"); stateBadge.className = "maintenance-state-badge"; stateBadge.textContent = maintenanceStateLabel(device.status);
+  heading.append(identity, stateBadge);
+
+  const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
+  const facts = [
+    ["Platform", device.os || "unavailable"],
+    ["Version", device.version || "unavailable"],
+    ["Updates", `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Reboot", device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated"]
+  ];
+  facts.forEach(([label, value]) => {
+    const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
+    dt.textContent = label; dd.textContent = String(value); row.append(dt, dd); metrics.append(row);
+  });
+
+  const services = document.createElement("div"); services.className = "maintenance-service-list";
+  const channel = document.createElement("span"); channel.dataset.state = device.reachable ? "active" : "failed";
+  channel.textContent = `Maintenance channel · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
+  (device.services || []).forEach((service) => {
+    const chip = document.createElement("span"); chip.dataset.state = service.state || "unknown"; chip.textContent = `${service.label} · ${service.state || "unknown"}`; services.append(chip);
+  });
+  const piholeContainer = device.facts?.pihole_container;
+  if (piholeContainer) {
+    const chip = document.createElement("span"); chip.dataset.state = piholeContainer.status === "running" ? "active" : "failed";
+    chip.textContent = `LXC ${piholeContainer.id} · ${piholeContainer.status || "unknown"}`; services.append(chip);
+  }
+  const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
+  ["maintenance", "reboot"].forEach((action) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = action === "reboot" ? "gate-button maintenance-reboot-button" : "gate-button gate-button--gold";
+    button.textContent = action === "reboot" ? "Reboot" : "Maintenance";
+    button.disabled = !device.reachable;
+    button.addEventListener("click", () => openMaintenanceDeviceAction(device.id, action));
+    actions.append(button);
+  });
+  card.append(heading, metrics, services, actions);
+  return card;
+}
+
+function renderMaintenanceTopology(topology) {
+  const canvas = byId("maintenance-topology"); canvas.replaceChildren();
+  const nodes = new Map((topology?.nodes || []).map((node) => [node.id, node]));
+  const hypervisor = (topology?.nodes || []).find((node) => String(node.role || "").includes("Proxmox"));
+  const primaryIds = ["maven", hypervisor?.id, "pihole", "internet"].filter(Boolean);
+  const chain = document.createElement("div"); chain.className = "maintenance-topology-chain";
+  primaryIds.forEach((id, index) => {
+    const node = nodes.get(id); if (!node) return;
+    if (index > 0) {
+      const connector = document.createElement("div"); connector.className = "maintenance-topology-connector"; connector.setAttribute("aria-hidden", "true"); connector.append(document.createElement("i"));
+      chain.append(connector);
+    }
+    const block = document.createElement("div"); block.className = "maintenance-topology-node"; block.dataset.state = node.status || "unknown";
+    const marker = document.createElement("span"); marker.textContent = node.id === "maven" ? "01" : node.id === hypervisor?.id ? "02" : node.id === "pihole" ? "03" : "04";
+    const copy = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = node.label; const role = document.createElement("small"); role.textContent = node.role;
+    const address = document.createElement("code"); address.textContent = node.address;
+    copy.append(strong, role, address); block.append(marker, copy); chain.append(block);
+  });
+  const links = document.createElement("div"); links.className = "maintenance-topology-links";
+  (topology?.edges || []).forEach((edge) => {
+    const link = document.createElement("div"); link.dataset.kind = edge.kind || "link";
+    const route = document.createElement("span"); route.textContent = `${nodes.get(edge.from)?.label || edge.from} → ${nodes.get(edge.to)?.label || edge.to}`;
+    const label = document.createElement("strong"); label.textContent = edge.label || "connected";
+    link.append(route, label); links.append(link);
+  });
+  canvas.append(chain, links);
+}
+
+function renderMaintenanceFleet(data) {
+  state.maintenanceFleet = data;
+  const summary = data.summary || {};
+  byId("maintenance-fleet-reachable").textContent = `${summary.reachable_count ?? 0} / ${summary.device_count ?? 0}`;
+  byId("maintenance-fleet-updates").textContent = String(summary.updates_available ?? 0);
+  byId("maintenance-fleet-kernels").textContent = String(summary.kernel_attention_count ?? 0);
+  byId("maintenance-fleet-reboots").textContent = String(summary.reboot_required_count ?? 0);
+  const grid = byId("maintenance-device-grid"); grid.replaceChildren();
+  (data.devices || []).forEach((device) => grid.append(renderMaintenanceDevice(device)));
+  if (!data.devices?.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No device evidence returned."; grid.append(empty); }
+  renderMaintenanceTopology(data.topology);
+  state.maintenanceFleetLoaded = true;
+}
+
+async function loadMaintenanceFleetSnapshot() {
+  const status = byId("maintenance-fleet-status");
+  try {
+    const envelope = await callSoul("maintenance.fleet.snapshot"); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (data.available === false || !Array.isArray(data.devices)) {
+      status.textContent = data.reason || "No persisted fleet status exists yet. Collect one now.";
+      return;
+    }
+    renderMaintenanceFleet(data);
+    status.textContent = `Persisted snapshot from ${new Date(data.collected_at).toLocaleString()} · collect now to replace it.`;
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function loadMaintenanceFleet() {
+  const button = byId("refresh-maintenance-fleet"); const status = byId("maintenance-fleet-status");
+  button.disabled = true; status.textContent = "Collecting bounded workstation, Proxmox, Pi-hole, package, kernel, and service evidence…";
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(120_000) : undefined;
+    const envelope = await callSoul("maintenance.fleet.status", {}, {}, { signal }); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete" || !Array.isArray(data.devices)) throw new Error(envelope.errors?.[0]?.message || data.reason || "Fleet status failed safely.");
+    renderMaintenanceFleet(data);
+    status.textContent = `Collected and persisted ${new Date(data.collected_at).toLocaleString()} · workstation pacman and remote APT counts use current cached metadata.`;
+    announce("Maintenance fleet status ready");
+  } catch (error) {
+    status.textContent = error.name === "TimeoutError" ? "Fleet collection exceeded its foreground time limit; no background process remains." : error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function maintenanceDeviceDialogDetails(plan) {
+  const details = byId("maintenance-device-dialog-details"); details.replaceChildren();
+  [
+    ["Device", `${plan.device_label || "Maven"}${plan.address ? ` · ${plan.address}` : ""}`],
+    ["Action", plan.action || "maintenance"],
+    ["Scope", plan.fleet_wide === false ? "one device only" : "Maven reviewed local transaction"],
+    ["Automatic retry", "none"]
+  ].forEach(([label, value]) => details.append(labeledRecord(label, value)));
+  (plan.commands || []).forEach((command, index) => details.append(labeledRecord(`Fixed step ${index + 1}`, (command.argv || []).join(" "))));
+  (plan.impact || []).forEach((impact) => details.append(labeledRecord("Dependency impact", impact)));
+  const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
+  blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
+}
+
+async function openMaintenanceDeviceAction(deviceId, action) {
+  const dialog = byId("maintenance-device-dialog"); const status = byId("maintenance-device-dialog-status");
+  state.maintenanceDevicePreview = null;
+  byId("maintenance-device-confirmation").value = "";
+  byId("maintenance-device-confirmation-row").hidden = true;
+  byId("execute-maintenance-device-action").disabled = true;
+  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceId === "maven" ? "Maven" : deviceId === "forge" ? "Forge" : "Pi-hole"}`;
+  if (!dialog.open) dialog.showModal();
+  status.textContent = "Collecting a fresh device-scoped preview…";
+  try {
+    let envelope;
+    if (deviceId === "maven") {
+      envelope = await callSoul(action === "maintenance" ? "maintenance.execution.preview" : "maintenance.reboot_restore.preview", { force_database_refresh: "false" });
+    } else {
+      envelope = await callSoul("maintenance.device.preview", { device_id: deviceId, action });
+    }
+    lifecycle(envelope);
+    const data = dataOf(envelope); const plan = data.plan;
+    if (!plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
+    const normalizedPlan = deviceId === "maven"
+      ? Object.assign({}, plan, { device_id: "maven", device_label: "Maven", action, fleet_wide: false, impact: [] })
+      : plan;
+    maintenanceDeviceDialogDetails(normalizedPlan);
+    if (deviceId === "maven") {
+      const prepare = document.createElement("button"); prepare.type = "button"; prepare.className = "gate-button";
+      prepare.textContent = "Refresh Maven package evidence";
+      prepare.addEventListener("click", async () => {
+        status.textContent = "Reserving one visible read-only Maven evidence terminal…";
+        try {
+          const evidenceEnvelope = await callSoul("maintenance.evidence.reserve"); lifecycle(evidenceEnvelope);
+          const evidence = dataOf(evidenceEnvelope);
+          if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || "Maven evidence handoff is unavailable.");
+          launchMaintenanceUri(evidence.launch_uri);
+          status.textContent = "When the evidence terminal closes, reopen this device action for a fresh exact preview.";
+        } catch (error) { status.textContent = error.message; }
+      });
+      byId("maintenance-device-dialog-details").append(prepare);
+    }
+    state.maintenanceDevicePreview = { deviceId, action, data, plan: normalizedPlan };
+    const available = deviceId === "maven" ? plan.execution_available === true : plan.live_execution_enabled === true;
+    const confirmation = data.confirmation || plan.confirmation;
+    byId("maintenance-device-confirmation-phrase").textContent = confirmation || "—";
+    byId("maintenance-device-confirmation-row").hidden = false;
+    status.textContent = available
+      ? `Review the exact ${action} plan, then type its device-specific confirmation.`
+      : (deviceId === "maven"
+        ? "This Maven action remains blocked by its existing A2/A3 gate or preflight. No bypass was introduced."
+        : "Remote live execution remains locally disabled pending candidate review.");
+    byId("execute-maintenance-device-action").disabled = !available;
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+async function executeMaintenanceDeviceAction() {
+  const preview = state.maintenanceDevicePreview; if (!preview) return;
+  const confirmation = byId("maintenance-device-confirmation").value;
+  const expected = preview.data.confirmation || preview.plan.confirmation;
+  if (confirmation !== expected) return;
+  const progress = byId("maintenance-device-progress"); const status = byId("maintenance-device-dialog-status");
+  showGenerationProgress(progress, `${preview.action === "reboot" ? "Rebooting" : "Maintaining"} ${preview.plan.device_label}`, "The exact device-scoped operation is running in the foreground…");
+  byId("execute-maintenance-device-action").disabled = true;
+  try {
+    let envelope;
+    if (preview.deviceId === "maven") {
+      const operation = preview.action === "maintenance" ? "maintenance.execution.execute" : "maintenance.reboot_restore.execute";
+      envelope = await callSoul(operation, {
+        force_database_refresh: "false",
+        confirmation,
+        expected_digest: preview.data.expected_digest
+      });
+      const data = dataOf(envelope); lifecycle(envelope);
+      if (!data.handoff?.launch_uri) throw new Error(envelope.errors?.[0]?.message || "Maven transaction stopped safely.");
+      launchMaintenanceUri(data.handoff.launch_uri);
+      status.textContent = "The visible Maven terminal owns this one device transaction. Its successful completion refreshes the persisted fleet snapshot.";
+    } else {
+      envelope = await callNdjson("/api/v1/administration-stream", "maintenance.device.execute", {
+        device_id: preview.deviceId,
+        action: preview.action,
+        confirmation,
+        expected_digest: preview.data.expected_digest
+      }, {}, (event) => showGenerationProgress(progress, event));
+      const data = dataOf(envelope); lifecycle(envelope);
+      if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || data.receipt?.summary || "Device operation stopped safely.");
+      if (data.fleet?.devices) renderMaintenanceFleet(data.fleet);
+      status.textContent = data.receipt?.summary || "Device operation completed and fleet status was refreshed.";
+    }
+    state.maintenanceDevicePreview = null;
+  } catch (error) {
+    status.textContent = error.name === "TimeoutError" ? "The device operation exceeded its foreground bound and requires review." : error.message;
+  } finally {
+    hideGenerationProgress(progress);
+  }
+}
+
 function renderHostPlans(records) {
   const list = byId("host-plan-list"); list.replaceChildren(); byId("host-plan-count").textContent = String(records.length);
   records.forEach((plan) => { const button = labeledRecord(plan.plan_id, `${plan.pending_update_count} pending · ${plan.risk_class} · terminal handoff`); button.tabIndex = 0; button.addEventListener("click", () => { state.selectedHostPlan = plan.plan_id; byId("verify-host-plan").disabled = false; byId("host-plan-status").textContent = `${plan.plan_id} selected for a foreground postcondition check.`; }); list.append(button); });
@@ -3432,6 +3680,18 @@ byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
+byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet);
+byId("maintenance-device-confirmation").addEventListener("input", () => {
+  const preview = state.maintenanceDevicePreview;
+  const expected = preview && (preview.data.confirmation || preview.plan.confirmation);
+  const available = preview && (preview.deviceId === "maven" ? preview.plan.execution_available === true : preview.plan.live_execution_enabled === true);
+  byId("execute-maintenance-device-action").disabled = !available || byId("maintenance-device-confirmation").value !== expected;
+});
+byId("execute-maintenance-device-action").addEventListener("click", executeMaintenanceDeviceAction);
+byId("maintenance-device-dialog").addEventListener("close", () => {
+  state.maintenanceDevicePreview = null;
+  byId("maintenance-device-confirmation").value = "";
+});
 byId("preview-maintenance-execution").addEventListener("click", previewMaintenanceExecution);
 byId("refresh-maintenance-evidence").addEventListener("click", refreshNativeMaintenanceEvidence);
 byId("rehearse-maintenance-execution").addEventListener("click", () => runMaintenanceExecution("rehearsal"));

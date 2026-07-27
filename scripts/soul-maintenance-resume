@@ -12,7 +12,13 @@ abort "root is required" if options[:root].to_s.empty? || !ARGV.empty?
 root = File.expand_path(options.fetch(:root))
 $LOAD_PATH.unshift(File.join(root, "lib"))
 require "soul_core/maintenance_session_restorer"
+require "soul_core/maintenance_fleet_status_service"
 
 result = SoulCore::MaintenanceSessionRestorer.new(root: root).run
+begin
+  SoulCore::MaintenanceFleetStatusService.new(root: root).collect
+rescue StandardError => error
+  warn "Fleet status refresh requires review: #{error.class}"
+end
 puts result.fetch("reason")
 exit(result["lifecycle_state"] == "failed" ? 1 : 0)

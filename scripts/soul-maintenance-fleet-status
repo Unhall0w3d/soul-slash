@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+root = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(root, "lib"))
+
+require "json"
+require "soul_core/maintenance_fleet_status_service"
+
+result = SoulCore::MaintenanceFleetStatusService.new(root: root).collect
+puts JSON.generate({
+  "ok" => result["ok"],
+  "lifecycle_state" => result["lifecycle_state"],
+  "collected_at" => result.dig("data", "collected_at"),
+  "reachable_count" => result.dig("data", "summary", "reachable_count")
+})
+exit(result["ok"] ? 0 : 1)
