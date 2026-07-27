@@ -3,6 +3,7 @@
 
 require "fileutils"
 require "json"
+require "open3"
 require "tmpdir"
 
 require_relative "../lib/soul_core/bounded_command_runner"
@@ -18,7 +19,13 @@ class A2BRunner
   Result = SoulCore::BoundedCommandRunner::Result
 
   def run(*argv, **_options)
-    stdout = argv.take(4) == ["/usr/bin/xdg-mime", "query", "default", "x-scheme-handler/soul-maintenance"] ? "soul-maintenance.desktop\n" : ""
+    stdout = if argv.take(4) == ["/usr/bin/xdg-mime", "query", "default", "x-scheme-handler/soul-maintenance"]
+      "soul-maintenance.desktop\n"
+    elsif argv == ["/usr/bin/gio", "mime", "x-scheme-handler/soul-maintenance"]
+      "Default application for “x-scheme-handler/soul-maintenance”: soul-maintenance.desktop\n"
+    else
+      ""
+    end
     Result.new(stdout: stdout, stderr: "", exit_status: 0, status: "ok", truncated: false)
   end
 end
@@ -124,15 +131,21 @@ Dir.mktmpdir("soul-maintenance-a2b") do |root|
     transaction_runner_factory: -> { transaction_runner },
     id_generator: -> { "0123456789abcdef" }
   )
-  File.write(handoff.desktop_path, handoff.desktop_entry, mode: "w", perm: 0o600)
+  File.write(handoff.desktop_path, handoff.desktop_entry, mode: "w", perm: 0o644)
+  validation_output, validation_status = Open3.capture2e("/usr/bin/desktop-file-validate", handoff.desktop_path)
 
   status = handoff.status
   check.call("exact user-local desktop entry is recognized without a service or listener",
-             status["available"] && status["system_service"] == false && status["persistent_process"] == false)
+             status["available"] && status["system_service"] == false && status["persistent_process"] == false &&
+               (File.stat(handoff.desktop_path).mode & 0o777) == 0o644)
   check.call("desktop entry uses one URL field code and the fixed repository handler",
-             handoff.desktop_entry.include?("Exec=\"#{handler}\" %u") &&
+             handoff.desktop_entry.include?("TryExec=#{handler}") &&
+             handoff.desktop_entry.include?("Exec=#{handler} %u") &&
+               handoff.desktop_entry.include?("Icon=#{File.join(root, 'assets', 'brand', 'soul-account-avatar-150.png')}") &&
                handoff.desktop_entry.include?("MimeType=x-scheme-handler/soul-maintenance;") &&
                !handoff.desktop_entry.match?(/(?:sh -c|bash -c|systemctl|Listen)/))
+  check.call("desktop entry passes the same freedesktop validator used by the host",
+             validation_status.success? && !validation_output.include?("error:"))
 
   evidence_reservation = handoff.reserve_evidence
   evidence_uri = evidence_reservation.fetch("launch_uri")

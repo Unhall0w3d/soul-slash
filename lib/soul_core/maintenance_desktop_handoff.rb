@@ -26,6 +26,7 @@ module SoulCore
     MAX_RESERVATIONS = 16
     MAX_RECEIPTS = 30
     XDG_MIME = "/usr/bin/xdg-mime"
+    GIO = "/usr/bin/gio"
 
     attr_reader :desktop_path
 
@@ -57,18 +58,21 @@ module SoulCore
     def desktop_entry
       executable = File.join(@root, "scripts", "soul-maintenance-uri")
       icon = File.join(@root, "assets", "brand", "soul-account-avatar-150.png")
+      [executable, icon].each do |path|
+        raise "maintenance desktop handler requires a metacharacter-free project path" unless path.match?(%r{\A/[A-Za-z0-9_./+-]+\z})
+      end
       <<~DESKTOP
         [Desktop Entry]
         Type=Application
         Version=1.0
         Name=Soul Guided Maintenance
         Comment=Open one reviewed Soul maintenance transaction
-        TryExec=#{desktop_quote(executable)}
-        Exec=#{desktop_quote(executable)} %u
-        Icon=#{desktop_quote(icon)}
+        TryExec=#{executable}
+        Exec=#{executable} %u
+        Icon=#{icon}
         Terminal=false
         NoDisplay=true
-        Categories=System;Utility;
+        Categories=Utility;
         MimeType=x-scheme-handler/soul-maintenance;
       DESKTOP
     end
@@ -81,13 +85,18 @@ module SoulCore
         problems << "maintenance desktop handler is not installed"
       elsif File.size(@desktop_path) > 64 * 1024 || File.binread(@desktop_path, 64 * 1024) != desktop_entry
         problems << "maintenance desktop handler differs from the reviewed entry"
+      elsif (File.stat(@desktop_path).mode & 0o777) != 0o644
+        problems << "maintenance desktop handler mode is invalid"
       end
       registration = registered_desktop_id
       problems << "maintenance URI scheme is not registered to the reviewed handler" unless registration == DESKTOP_ID
+      gio_registration = gio_registered_desktop_id
+      problems << "desktop application registry cannot resolve the reviewed handler" unless gio_registration == DESKTOP_ID
       {
         "available" => problems.empty?,
         "desktop_path" => @desktop_path,
         "registered_desktop_id" => registration,
+        "gio_registered_desktop_id" => gio_registration,
         "problems" => problems,
         "persistent_process" => false,
         "system_service" => false
@@ -97,6 +106,7 @@ module SoulCore
         "available" => false,
         "desktop_path" => @desktop_path,
         "registered_desktop_id" => nil,
+        "gio_registered_desktop_id" => nil,
         "problems" => ["maintenance desktop handler check failed safely: #{safe_error(error)}"],
         "persistent_process" => false,
         "system_service" => false
@@ -343,13 +353,21 @@ module SoulCore
       execution.stdout.to_s.strip.byteslice(0, 200)
     end
 
-    def launch_uri(kind, id, digest_value)
-      "#{URI_SCHEME}://#{kind}/#{id}/#{digest_value}"
+    def gio_registered_desktop_id
+      return nil unless File.executable?(GIO)
+      execution = @runner.run(
+        GIO, "mime", "x-scheme-handler/#{URI_SCHEME}",
+        timeout_seconds: 5,
+        max_output_bytes: 16 * 1024,
+        env: {"LC_ALL" => "C"}
+      )
+      return nil unless execution.success? && !execution.truncated
+      line = execution.stdout.to_s.lines.find { |value| value.start_with?("Default application for ") }
+      line.to_s.split(": ", 2).last.to_s.strip.byteslice(0, 200)
     end
 
-    def desktop_quote(value)
-      escaped = value.to_s.gsub("\\", "\\\\").gsub('"', '\\"').gsub("`", "\\`").gsub("$", "\\$")
-      %Q{"#{escaped}"}
+    def launch_uri(kind, id, digest_value)
+      "#{URI_SCHEME}://#{kind}/#{id}/#{digest_value}"
     end
 
     def claimed_transaction_path(id)

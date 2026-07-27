@@ -74,6 +74,16 @@ protection, and reboot prohibition are deterministic safety behavior.
   and a supervised click test in the operator's ordinary browser.
 - Whether that browser displays an external-protocol confirmation is controlled
   by the browser and desktop portal.
+- The first supervised test found two desktop-registry defects hidden by
+  `xdg-mime`'s textual association: the absolute `Icon=` path was quoted, and
+  the non-secret application entry inherited the `0600` mode used for private
+  transaction state. Hyprland's generic `xdg-open` additionally treats a
+  quoted `Exec=` first token literally and skips the handler. The repair uses
+  the fixed metacharacter-free repository executable path as one unquoted
+  token, emits a valid unquoted absolute icon path, uses the standard `0644`
+  application-metadata mode, and requires both XDG and GIO to resolve the
+  reviewed handler before reporting it available. Reservations, evidence, and
+  receipts remain `0600`.
 - Native package evidence depends on the host's installed `checkupdates`, AUR
   helper, and Flatpak tooling. Failure remains visible and fail-closed.
 - Live package execution is still disabled and untested.

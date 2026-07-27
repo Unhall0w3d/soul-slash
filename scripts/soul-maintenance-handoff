@@ -35,7 +35,7 @@ def atomic_write(path, content)
     file.fsync
   end
   File.rename(temporary, path)
-  File.chmod(0o600, path)
+  File.chmod(0o644, path)
 ensure
   FileUtils.rm_f(temporary) if defined?(temporary) && temporary
 end
@@ -51,6 +51,7 @@ begin
     "uri_scheme" => SoulCore::MaintenanceDesktopHandoff::URI_SCHEME,
     "handler_path" => File.join(ROOT, "scripts", "soul-maintenance-uri"),
     "desktop_entry_sha256" => Digest::SHA256.hexdigest(handoff.desktop_entry),
+    "desktop_entry_mode" => "0644",
     "writes_system_files" => false,
     "installs_service" => false,
     "opens_listener" => false,
