@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.window_snapshot.v1",
+  "title": "Soul Maintenance Window Snapshot",
+  "type": "object",
+  "required": ["schema_version", "privacy", "process_inventory", "active_workspace", "monitors", "workspaces", "windows", "background_applications", "restorable_count", "unsupported_count"],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.window_snapshot.v1"},
+    "windows": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "required": ["initial_class", "class", "workspace", "restore_status", "title_stored"],
+        "properties": {
+          "restore_status": {"enum": ["restorable", "unsupported"]},
+          "title_stored": {"const": false}
+        },
+        "additionalProperties": true
+      }
+    },
+    "background_applications": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "required": ["process_identity", "restore_status", "startup_policy", "placement", "raw_arguments_stored"],
+        "properties": {
+          "restore_status": {"enum": ["restorable", "unsupported"]},
+          "startup_policy": {"const": "launch_if_absent"},
+          "placement": {"const": "background_no_window"},
+          "raw_arguments_stored": {"const": false}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

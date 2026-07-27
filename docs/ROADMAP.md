@@ -35,6 +35,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; pruning remains disabled
+- [~] qualify the guided maintenance A1 read-only plan and Hyprland
+  workspace-restore rehearsal; update execution and reboot remain separate A2
+  and A3 gates
 
 ## Qualified expansion candidates
 

@@ -172,3 +172,16 @@ entries:
     boundary: Files are never permanently deleted by this workflow.
     examples:
       - Inspect my Downloads folder and prepare a cleanup plan.
+  - id: guided-maintenance
+    label: Guided maintenance rehearsal
+    category: Administration
+    summary: Preview the approved Arch, AUR, Flatpak, reboot, and Hyprland workspace-restore transaction without executing it.
+    handler_id: maintenance_rehearsal
+    required_inputs: [An explicit maintenance preview or rehearsal request]
+    optional_inputs: [Normal yay -Syu mode or forced-refresh yay -Syyu mode]
+    core: Any Core for the read-only rehearsal
+    approval: A1 needs no privilege because it cannot execute; future update and reboot slices retain their own reviewed gates.
+    output: Fresh package evidence, exact inert argv, privacy-filtered window restore decisions, and a simulated terminal lifecycle.
+    boundary: A rehearsal never authenticates, updates, launches applications, writes a transaction journal, or reboots.
+    examples:
+      - Explain the guided maintenance rehearsal.
