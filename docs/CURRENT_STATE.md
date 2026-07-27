@@ -6,6 +6,7 @@ Soul/ is an experimental local-first assistant runtime and creative workspace. O
 
 ```text
 Chat
+Project Timeline
 Self Improvement
   ├─ Skill Studio
   ├─ Self Assessment
@@ -13,6 +14,8 @@ Self Improvement
 Creative Studios
   ├─ Music Studio
   └─ Visual Studio
+Administration
+  └─ Backup & Recovery
 Review Center
 ```
 
@@ -44,10 +47,11 @@ phrase. Speech retains the ordinary utterance bounds; silence returns to
 “Hey Soul” listening without counting as a failure. The microphone remains
 closed while Soul thinks or speaks.
 
-The installed wake-sensitivity update, natural follow-up behavior, and
-dashboard self-recognition map have deterministic coverage but remain
-**untested in their current live configuration**. Operator validation is
-deferred until the next at-computer voice session.
+The installed wake-sensitivity update, natural follow-up behavior, dashboard
+self-recognition map, notification cues, spoken notices, screen targeting, and
+Core-aware invocation handoff completed Operator live acceptance on
+2026-07-27. Minor refinements remain ordinary follow-up work rather than open
+release gates.
 
 Dashboard notification delivery now has voice, cues-only, and muted modes.
 Submission, wake, completion, and attention cues are static local assets.
@@ -97,6 +101,15 @@ seconds at a delivered 24 fps. Longer companions repeat one accepted scene and
 are labeled accordingly.
 
 The operator-facing flows are documented in [`docs/guides/`](guides/).
+
+### Administration
+
+- **Backup & Recovery** inspects the configured encrypted restic repository,
+  captures the exact owner allow-list through a reviewed gate, verifies and
+  inventories snapshots, preserves deleted paths through a 30-day
+  deletion-detection hold, and restores only into isolated owner-private
+  staging. The first live encrypted capture passed verification on 2026-07-27.
+  Retention remains exact and manual; live-tree promotion is not automated.
 
 ## Runtime topology
 
@@ -175,7 +188,7 @@ Near-term work is expected to concentrate on:
 - motion-quality refinement based on reviewed image-guided and native scenes;
 - explicit one-shot monitor, window, or region capture building on the bounded
   Gemma 4 picture-understanding path now available in Chat;
-- backup/recovery and broader deployment only under separate review.
+- restoration rehearsal and broader deployment only under separate review.
 
 No release or stable tag has been created.
 
