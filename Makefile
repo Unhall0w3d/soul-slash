@@ -66,7 +66,7 @@ KNOWLEDGE_REFLECTION_INPUT ?=
 BACKUP_HOME ?= $(HOME)
 
 .PHONY: help defaults-show supported-stack-check check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run visual-native-check visual-native-runtime-plan visual-native-runtime-install visual-native-model-download-plan visual-native-model-download verify-visual-motion-qualification verify-visual-native-video music-transcription-plan music-transcription-install voice-transcription-check voice-transcription-plan voice-transcription-install verify-voice-transcription voice-synthesis-check voice-synthesis-plan voice-synthesis-install voice-synthesis-audition verify-voice-synthesis notification-audio-build verify-notification-cues verify-project-timeline verify-chat-progress-summaries backup-config-plan backup-configure verify-backup-administration music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-character-identity knowledge-vault-status knowledge-vault-search knowledge-vault-init-preview knowledge-vault-init knowledge-vault-memory-export-preview knowledge-vault-memory-export knowledge-vault-memory-import-preview knowledge-vault-memory-import knowledge-vault-reflection-preview knowledge-vault-reflection-execute verify-knowledge-vault verify-knowledge-reflection local-search local-search-core-eval verify-local-search detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes verify-maintenance-foreground-execution verify-maintenance-desktop-handoff maintenance-handoff-check maintenance-handoff-plan maintenance-handoff-install
-.PHONY: verify-maintenance-reboot-restore maintenance-resume-plan maintenance-resume-install maintenance-resume-status maintenance-resume-uninstall
+.PHONY: verify-maintenance-reboot-restore verify-maintenance-fleet-status verify-maintenance-device-control maintenance-resume-plan maintenance-resume-install maintenance-resume-status maintenance-resume-uninstall fleet-status-schedule-plan fleet-status-schedule-install fleet-status-schedule-status fleet-status-schedule-uninstall
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -159,6 +159,11 @@ help:
 > @echo "  make maintenance-resume-install CONFIRM=INSTALL_SOUL_MAINTENANCE_RESUME"
 > @echo "  make maintenance-resume-status"
 > @echo "  make verify-maintenance-desktop-handoff"
+> @echo "  make verify-maintenance-fleet-status"
+> @echo "  make verify-maintenance-device-control"
+> @echo "  make fleet-status-schedule-plan"
+> @echo "  make fleet-status-schedule-install CONFIRM=INSTALL_SOUL_FLEET_STATUS_TIMER"
+> @echo "  make fleet-status-schedule-status"
 > @echo "  make verify-web-knowledge  Test bounded lookup, SearXNG research, reflection, and chat streaming"
 > @echo "  make verify-model-runtime-controls  Test leases and preview-gated model controls"
 > @echo "  make verify-character-identity  Test character assets, palette, contrast, and unchanged mark geometry"
@@ -756,6 +761,24 @@ maintenance-handoff-install:
 
 verify-maintenance-reboot-restore:
 > @ruby scripts/verify-maintenance-reboot-restore-a3.rb
+
+verify-maintenance-fleet-status:
+> @ruby scripts/verify-maintenance-fleet-status-b1.rb
+
+verify-maintenance-device-control:
+> @ruby scripts/verify-maintenance-device-control-c1.rb
+
+fleet-status-schedule-plan:
+> @ruby scripts/soul-maintenance-fleet-status-schedule plan
+
+fleet-status-schedule-install:
+> @ruby scripts/soul-maintenance-fleet-status-schedule install --confirmation "$(CONFIRM)"
+
+fleet-status-schedule-status:
+> @ruby scripts/soul-maintenance-fleet-status-schedule status
+
+fleet-status-schedule-uninstall:
+> @ruby scripts/soul-maintenance-fleet-status-schedule uninstall --confirmation "$(CONFIRM)"
 
 maintenance-resume-plan:
 > @ruby scripts/soul-maintenance-resume-service plan

@@ -17,9 +17,17 @@ abort "mode is invalid" unless %w[rehearsal live live_reboot].include?(options[:
 root = File.expand_path(options.fetch(:root))
 $LOAD_PATH.unshift(File.join(root, "lib"))
 require "soul_core/maintenance_transaction_runner"
+require "soul_core/maintenance_fleet_status_service"
 
 result = SoulCore::MaintenanceTransactionRunner.new(root: root).run(
   transaction_path: options.fetch(:transaction),
   mode: options.fetch(:mode)
 )
+if result && result["lifecycle_state"] == "complete" && options[:mode] == "live"
+  begin
+    SoulCore::MaintenanceFleetStatusService.new(root: root).collect
+  rescue StandardError => error
+    warn "Fleet status refresh requires review: #{error.class}"
+  end
+end
 exit(result && %w[complete awaiting_login].include?(result["lifecycle_state"]) ? 0 : 1)

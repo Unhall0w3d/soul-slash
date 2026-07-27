@@ -1,0 +1,34 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+root = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(root, "lib"))
+
+require "json"
+require "soul_core/maintenance_fleet_status_deployment"
+
+command = ARGV.shift.to_s
+confirmation = nil
+while ARGV.any?
+  flag = ARGV.shift
+  if flag == "--confirmation"
+    confirmation = ARGV.shift
+  else
+    warn "Unknown argument: #{flag}"
+    exit 2
+  end
+end
+
+deployment = SoulCore::MaintenanceFleetStatusDeployment.new(root: root)
+result = case command
+when "plan" then deployment.plan
+when "install" then deployment.install(confirmation: confirmation)
+when "status" then deployment.status
+when "uninstall" then deployment.uninstall(confirmation: confirmation)
+else
+  warn "Usage: scripts/soul-maintenance-fleet-status-schedule plan|install|status|uninstall [--confirmation PHRASE]"
+  exit 2
+end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

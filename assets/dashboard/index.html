@@ -488,9 +488,45 @@
 
     <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
       <header class="improvement-header">
-        <div><p class="eyebrow">Host administration</p><h1>Guided Maintenance</h1><p>Coordinate reviewed update, reboot, and session-restoration work without turning general conversation into host authority.</p></div>
-        <div class="improvement-boundary"><strong>A3 · conditional reboot candidate</strong><span>Inspect → update → snapshot → reboot → restore once</span><small>A2 is accepted and remains separately available; live A3 is disabled.</small></div>
+        <div><p class="eyebrow">Infrastructure operations</p><h1>Guided Maintenance</h1><p>One bounded control room for this workstation, the Proxmox hypervisor, and the Pi-hole resolver—observe first, authorize exact changes second.</p></div>
+        <div class="improvement-boundary"><strong>Device-scoped maintenance fabric</strong><span>Select one node → review → authorize → verify</span><small>No fleet-wide action exists. Status persists and is recollected at noon, midnight, and after successful device work.</small></div>
       </header>
+      <section class="maintenance-fleet-overview" aria-labelledby="maintenance-fleet-heading">
+        <div class="maintenance-fleet-toolbar">
+          <div><p class="eyebrow">Persisted infrastructure evidence</p><h2 id="maintenance-fleet-heading">Maintenance control plane</h2><p>Each card owns its maintenance and reboot scope. Collect now, or use the most recent persisted noon/midnight snapshot.</p></div>
+          <button id="refresh-maintenance-fleet" class="gate-button gate-button--gold" type="button">Collect fleet status</button>
+        </div>
+        <div class="maintenance-fleet-summary" aria-label="Fleet summary">
+          <div><span>Reachable</span><strong id="maintenance-fleet-reachable">—</strong></div>
+          <div><span>Updates</span><strong id="maintenance-fleet-updates">—</strong></div>
+          <div><span>Kernel attention</span><strong id="maintenance-fleet-kernels">—</strong></div>
+          <div><span>Reboots</span><strong id="maintenance-fleet-reboots">—</strong></div>
+        </div>
+        <div id="maintenance-device-grid" class="maintenance-device-grid">
+          <p class="muted">Collect fleet status to inspect Maven, Proxmox, and Pi-hole.</p>
+        </div>
+        <section class="maintenance-topology-card" aria-labelledby="maintenance-topology-heading">
+          <div class="card-heading"><div><p class="eyebrow">Connected architecture</p><h2 id="maintenance-topology-heading">Operations topology</h2></div><span class="count-badge">evidence driven</span></div>
+          <div id="maintenance-topology" class="maintenance-topology" role="img" aria-label="Infrastructure topology">
+            <p class="muted">Topology will appear with the first status collection.</p>
+          </div>
+        </section>
+        <p id="maintenance-fleet-status" class="dialog-status" role="status">Loading the most recent fleet snapshot…</p>
+      </section>
+      <dialog id="maintenance-device-dialog" class="clear-dialog maintenance-device-dialog" aria-labelledby="maintenance-device-dialog-title">
+        <form method="dialog" class="clear-dialog-shell">
+          <div class="dialog-heading"><div><p class="eyebrow">Device-scoped authority</p><h2 id="maintenance-device-dialog-title">Review device action</h2></div><button id="close-maintenance-device-dialog" class="quiet-button" value="cancel" type="submit">Close</button></div>
+          <div id="maintenance-device-dialog-details" class="recommendation-list"><p class="muted">Choose a device action from its card.</p></div>
+          <div id="maintenance-device-confirmation-row" hidden>
+            <label for="maintenance-device-confirmation">Type <code id="maintenance-device-confirmation-phrase">—</code></label>
+            <input id="maintenance-device-confirmation" type="text" autocomplete="off" spellcheck="false">
+            <button id="execute-maintenance-device-action" class="gate-button gate-button--gold" type="button" disabled>Execute device action</button>
+          </div>
+          <div id="maintenance-device-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Device operation</strong><span data-generation-message>One bounded device operation is active.</span></div>
+          <p id="maintenance-device-dialog-status" class="dialog-status" role="status">No device action selected.</p>
+        </form>
+      </dialog>
+      <div id="maintenance-legacy-controls" hidden>
       <section class="improvement-card host-plan-card" aria-labelledby="maintenance-rehearsal-heading">
         <div class="card-heading"><div><p class="eyebrow">Guided maintenance · A1</p><h2 id="maintenance-rehearsal-heading">Reboot and workspace rehearsal</h2></div><span class="count-badge">read only</span></div>
         <p class="card-note">Preview the approved one-password update sequence and a privacy-filtered Hyprland restore map. A1 cannot authenticate, update, launch applications, write a journal, or reboot.</p>
@@ -518,6 +554,7 @@
         <p id="maintenance-reboot-status" class="dialog-status" role="status">The one-shot resume unit and live A3 gate remain separately reviewed. No password is collected here.</p>
       </section>
       <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>A3 remains disabled by default</h2></div><p>The authenticated Dashboard click can authorize only one exact digest after local arming. Chat and Voice cannot authorize reboot. The visible terminal owns the single native password prompt; the resume unit cannot update, authenticate, or reboot.</p></aside>
+      </div>
     </section>
 
     <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>

@@ -30,6 +30,8 @@ require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
+require_relative "maintenance_fleet_status_service"
+require_relative "maintenance_device_control_service"
 require_relative "maintenance_rehearsal_service"
 require_relative "maintenance_foreground_execution_service"
 require_relative "maintenance_reboot_restore_service"
@@ -80,6 +82,8 @@ module SoulCore
       skill_studio_service: nil,
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
+      maintenance_fleet_status_service: nil,
+      maintenance_device_control_service: nil,
       maintenance_rehearsal_service: nil,
       maintenance_foreground_execution_service: nil,
       maintenance_reboot_restore_service: nil,
@@ -124,6 +128,8 @@ module SoulCore
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
       @host_improvement_plan_service = host_improvement_plan_service
+      @maintenance_fleet_status_service = maintenance_fleet_status_service
+      @maintenance_device_control_service = maintenance_device_control_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
       @maintenance_foreground_execution_service = maintenance_foreground_execution_service
       @maintenance_reboot_restore_service = maintenance_reboot_restore_service
@@ -301,6 +307,11 @@ module SoulCore
       when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
       when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
+      when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
+      when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
+      when "maintenance.device.preview" then domain(maintenance_device_control.preview(device_id: required(parameters, "device_id"), action: required(parameters, "action")))
+      when "maintenance.device.execute" then domain(maintenance_device_control.execute(device_id: required(parameters, "device_id"), action: required(parameters, "action"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "maintenance.device.receipts" then domain(maintenance_device_control.receipts(limit: bounded_limit(parameters["limit"], MaintenanceDeviceControlService::MAX_RECEIPTS)))
       when "maintenance.preview" then domain(maintenance_rehearsal.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "maintenance.rehearsal" then domain(maintenance_rehearsal.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "maintenance.execution.preview" then domain(maintenance_foreground_execution.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
@@ -767,6 +778,22 @@ module SoulCore
 
     def maintenance_rehearsal
       @maintenance_rehearsal_service ||= MaintenanceRehearsalService.new(root: @root, clock: @clock)
+    end
+
+    def maintenance_fleet_status
+      @maintenance_fleet_status_service ||= MaintenanceFleetStatusService.new(root: @root, clock: @clock)
+    end
+
+    def maintenance_device_control
+      return @maintenance_device_control_service if @maintenance_device_control_service
+
+      _report, resolver = resolved_configuration
+      @maintenance_device_control_service ||= MaintenanceDeviceControlService.new(
+        root: @root,
+        clock: @clock,
+        fleet_status_service: maintenance_fleet_status,
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_REMOTE_LIVE"] == "1"
+      )
     end
 
     def maintenance_foreground_execution
