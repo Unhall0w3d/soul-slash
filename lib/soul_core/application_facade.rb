@@ -769,7 +769,7 @@ module SoulCore
         root: @root,
         clock: @clock,
         rehearsal_service: maintenance_rehearsal,
-        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "true"
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "1"
       )
     end
 
