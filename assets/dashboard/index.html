@@ -489,7 +489,7 @@
     <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
       <header class="improvement-header">
         <div><p class="eyebrow">Host administration</p><h1>Guided Maintenance</h1><p>Coordinate reviewed update, reboot, and session-restoration work without turning general conversation into host authority.</p></div>
-        <div class="improvement-boundary"><strong>A1 · rehearsal only</strong><span>Inspect → map → simulate</span><small>No authentication, mutation, launch, persistence, or reboot.</small></div>
+        <div class="improvement-boundary"><strong>A2 · foreground candidate</strong><span>Inspect → rehearse → separately authorize</span><small>Live update remains disabled; A2 cannot reboot.</small></div>
       </header>
       <section class="improvement-card host-plan-card" aria-labelledby="maintenance-rehearsal-heading">
         <div class="card-heading"><div><p class="eyebrow">Guided maintenance · A1</p><h2 id="maintenance-rehearsal-heading">Reboot and workspace rehearsal</h2></div><span class="count-badge">read only</span></div>
@@ -500,7 +500,16 @@
         <pre id="maintenance-rehearsal-output" class="diagnostic-output" hidden></pre>
         <p id="maintenance-rehearsal-status" class="dialog-status" role="status">No privilege or host mutation is available in A1.</p>
       </section>
-      <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>Rehearsal is not host authority</h2></div><p>A2 must separately qualify the visible one-password foreground updater. A3 must separately qualify conditional reboot and one-shot post-login restoration.</p></aside>
+      <section class="improvement-card host-plan-card" aria-labelledby="maintenance-execution-heading">
+        <div class="card-heading"><div><p class="eyebrow">Foreground execution · A2</p><h2 id="maintenance-execution-heading">One-password terminal transaction</h2></div><span id="maintenance-execution-state" class="count-badge">review gated</span></div>
+        <p class="card-note">Revalidate the exact plan, then open a visible no-mutation terminal rehearsal. The installed live executor remains disabled until its completed candidate and one supervised run receive separate approval.</p>
+        <div class="host-plan-actions"><button id="preview-maintenance-execution" class="gate-button" type="button">Review A2 transaction</button><button id="rehearse-maintenance-execution" class="gate-button" type="button" disabled>Open terminal rehearsal</button><button id="execute-maintenance" class="gate-button gate-button--gold" type="button" disabled>Live update unavailable</button></div>
+        <div id="maintenance-execution-details" class="recommendation-list"><p class="muted">No A2 transaction reviewed.</p></div>
+        <div id="maintenance-execution-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Foreground transaction</strong><span data-generation-message>The visible maintenance terminal owns this bounded operation.</span></div>
+        <p id="maintenance-execution-status" class="dialog-status" role="status">No password is collected by the Dashboard.</p>
+        <div id="maintenance-receipts" class="recommendation-list"><p class="muted">No A2 receipt loaded.</p></div>
+      </section>
+      <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>A2 stops before reboot</h2></div><p>The Dashboard button is the authority for one exact digest. The password may appear only in native <code>sudo -v</code> inside the visible terminal. Conditional reboot and one-shot post-login restoration remain A3.</p></aside>
     </section>
 
     <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>

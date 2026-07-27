@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+
+options = {}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--transaction PATH") { |value| options[:transaction] = value }
+  parser.on("--mode MODE") { |value| options[:mode] = value }
+end.parse!
+
+abort "root is required" if options[:root].to_s.empty?
+abort "transaction is required" if options[:transaction].to_s.empty?
+abort "mode is invalid" unless %w[rehearsal live].include?(options[:mode])
+
+root = File.expand_path(options.fetch(:root))
+$LOAD_PATH.unshift(File.join(root, "lib"))
+require "soul_core/maintenance_transaction_runner"
+
+result = SoulCore::MaintenanceTransactionRunner.new(root: root).run(
+  transaction_path: options.fetch(:transaction),
+  mode: options.fetch(:mode)
+)
+exit(result && result["lifecycle_state"] == "complete" ? 0 : 1)

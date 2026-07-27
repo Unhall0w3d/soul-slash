@@ -505,6 +505,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
+  if (maintenance && state.authenticated) loadMaintenanceReceipts();
   if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
 }
 
@@ -2402,6 +2403,85 @@ async function rehearseMaintenance() {
   }
 }
 
+function renderMaintenanceExecutionPlan(plan) {
+  const details = byId("maintenance-execution-details"); details.replaceChildren();
+  const rows = [
+    ["Authentication", "one native sudo -v prompt · never enters the Dashboard"],
+    ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
+    ["Flatpak scopes", (plan.flatpak_installations || []).map((item) => item.scope).join(", ") || "none"],
+    ["Active work", plan.preflight?.active_work?.join(", ") || "none"],
+    ["Disk evidence", (plan.preflight?.disk_free || []).map((item) => `${item.path} · ${Math.floor(Number(item.available_kib || 0) / 1024)} MiB free`).join(" · ") || "unavailable"],
+    ["Restore map", `${plan.window_restore_summary?.restorable_count ?? 0} restorable · ${plan.window_restore_summary?.unsupported_count ?? 0} unsupported`],
+    ["Reboot", "prohibited in A2"]
+  ];
+  rows.forEach(([label, value]) => details.append(labeledRecord(label, value)));
+  (plan.preflight?.rehearsal_blockers || []).forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
+  (plan.preflight?.live_blockers || []).filter((blocker) => !(plan.preflight?.rehearsal_blockers || []).includes(blocker))
+    .forEach((blocker) => details.append(labeledRecord("Live blocker", blocker)));
+}
+
+function renderMaintenanceReceipt(receipt) {
+  const container = byId("maintenance-receipts"); container.replaceChildren();
+  if (!receipt) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No A2 receipt loaded."; container.append(empty); return; }
+  [
+    ["Transaction", receipt.transaction_id],
+    ["Mode", receipt.mode],
+    ["Lifecycle", receipt.lifecycle_state],
+    ["Password prompts", receipt.password_prompts],
+    ["Sudo ticket", receipt.sudo_ticket_invalidated ? "invalidated" : "attention required"],
+    ["Commands", (receipt.commands || []).map((item) => `${item.adapter} · ${item.status}`).join(" · ") || "none"],
+    ["Reboot", receipt.reboot_requested ? "unexpected request blocked" : "not requested"]
+  ].forEach(([label, value]) => container.append(labeledRecord(label, String(value ?? "—"))));
+}
+
+async function previewMaintenanceExecution() {
+  const force = byId("maintenance-force-refresh").checked; const status = byId("maintenance-execution-status");
+  state.maintenanceExecutionPreview = null; byId("rehearse-maintenance-execution").disabled = true; byId("execute-maintenance").disabled = true;
+  status.textContent = "Revalidating package, disk, active-work, and restore evidence…";
+  try {
+    const envelope = await callSoul("maintenance.execution.preview", { force_database_refresh: String(force) }); lifecycle(envelope);
+    const data = dataOf(envelope); const plan = data.plan; if (!plan) throw new Error(envelope.errors?.[0]?.message || "A2 transaction preview failed safely");
+    state.maintenanceExecutionPreview = data; renderMaintenanceExecutionPlan(plan);
+    const rehearsalBlocked = (plan.preflight?.rehearsal_blockers || plan.preflight?.blockers || []).length > 0;
+    const liveBlocked = (plan.preflight?.live_blockers || plan.preflight?.blockers || []).length > 0;
+    byId("rehearse-maintenance-execution").disabled = rehearsalBlocked;
+    byId("execute-maintenance").disabled = liveBlocked || !plan.execution_available;
+    byId("execute-maintenance").textContent = plan.execution_available ? "Open maintenance terminal" : "Live update unavailable";
+    byId("maintenance-execution-state").textContent = rehearsalBlocked ? "blocked" : (plan.execution_available ? "review ready" : "rehearsal ready");
+    status.textContent = rehearsalBlocked
+      ? "A2 rehearsal preflight found blockers; no terminal can open."
+      : (liveBlocked
+        ? "Fixture rehearsal is ready; live-update blockers remain visible and no host update is available."
+        : "Exact A2 digest ready. Terminal rehearsal performs no authentication or host update.");
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function runMaintenanceExecution(mode) {
+  const preview = state.maintenanceExecutionPreview; if (!preview) return;
+  const progress = byId("maintenance-execution-progress"); const status = byId("maintenance-execution-status");
+  showGenerationProgress(progress, "Foreground transaction", mode === "rehearsal" ? "Opening the visible no-mutation terminal rehearsal…" : "The visible terminal now owns the reviewed update transaction…");
+  byId("preview-maintenance-execution").disabled = true; byId("rehearse-maintenance-execution").disabled = true; byId("execute-maintenance").disabled = true;
+  try {
+    const operation = mode === "rehearsal" ? "maintenance.execution.rehearsal" : "maintenance.execution.execute";
+    const envelope = await callSoul(operation, {
+      force_database_refresh: String(byId("maintenance-force-refresh").checked),
+      confirmation: preview.confirmation,
+      expected_digest: preview.expected_digest
+    });
+    const data = dataOf(envelope); lifecycle(envelope); renderMaintenanceReceipt(data.receipt);
+    status.textContent = data.receipt ? `${data.receipt.mode} · ${data.receipt.lifecycle_state} · sudo ticket ${data.receipt.sudo_ticket_invalidated ? "invalidated" : "requires review"}` : (envelope.errors?.[0]?.message || "Transaction stopped safely.");
+    state.maintenanceExecutionPreview = null;
+  } catch (error) { status.textContent = error.message; }
+  finally { hideGenerationProgress(progress); byId("preview-maintenance-execution").disabled = false; }
+}
+
+async function loadMaintenanceReceipts() {
+  try {
+    const envelope = await callSoul("maintenance.execution.receipts", { limit: 1 }); const data = dataOf(envelope); lifecycle(envelope);
+    renderMaintenanceReceipt((data.receipts || [])[0]);
+  } catch (error) { byId("maintenance-execution-status").textContent = error.message; }
+}
+
 function renderAugmentationProposals(records) {
   state.augmentationProposals = records; const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
   records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for Gate A1`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
@@ -3160,6 +3240,9 @@ byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
+byId("preview-maintenance-execution").addEventListener("click", previewMaintenanceExecution);
+byId("rehearse-maintenance-execution").addEventListener("click", () => runMaintenanceExecution("rehearsal"));
+byId("execute-maintenance").addEventListener("click", () => runMaintenanceExecution("live"));
 byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
 byId("forget-backup-password").addEventListener("click", () => {
   byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);

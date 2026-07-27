@@ -1,6 +1,7 @@
 # Maintenance Foreground Execution A2 Brief
 
-Status: candidate human-authorization brief; implementation not authorized
+Status: human-approved for implementation and deterministic rehearsal on
+2026-07-27; live package update not authorized
 
 ## Outcome
 
@@ -19,9 +20,9 @@ transaction that:
 A2 does not install the post-login restorer, request a reboot, close
 applications, or restore a workspace. Those remain A3 work.
 
-This is a Class 5 host-mutation feature. This brief does not authorize
-implementation or a live update until the human architect explicitly approves
-it.
+This is a Class 5 host-mutation feature. The human architect approved its
+implementation and deterministic rehearsal after reviewing the exact brief.
+That approval does not authorize a live package update.
 
 ## Operator experience
 
@@ -262,9 +263,9 @@ and lifecycle without authenticating or changing the host.
    ticket.
 7. Only then consider an A3 brief.
 
-## Human decision required
+## Recorded human decision
 
-Approval of this brief authorizes implementation and deterministic rehearsal of
-A2 only. It does not authorize a real package update, reboot, persistent
-post-login unit, or workspace restoration. The first real A2 update and all A3
+The human architect approved implementation and deterministic rehearsal of A2
+on 2026-07-27. A real package update, reboot, persistent post-login unit, and
+workspace restoration remain unauthorized. The first real A2 update and all A3
 work require later explicit approvals.

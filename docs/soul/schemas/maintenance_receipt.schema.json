@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.receipt.v1",
+  "title": "Soul Maintenance Foreground Receipt",
+  "type": "object",
+  "required": ["schema_version", "receipt_id", "transaction_id", "mode", "plan_digest", "lifecycle_state", "password_prompts", "commands", "sudo_ticket_invalidated", "reboot_requested", "redacted"],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.receipt.v1"},
+    "receipt_id": {"type": "string", "pattern": "^maintenance_receipt_[a-f0-9]{16}$"},
+    "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
+    "mode": {"enum": ["rehearsal", "live"]},
+    "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "lifecycle_state": {"enum": ["complete", "failed", "canceled", "blocked_for_human_review"]},
+    "password_prompts": {"type": "integer", "minimum": 0, "maximum": 1},
+    "commands": {"type": "array", "maxItems": 8},
+    "reboot_requested": {"const": false},
+    "redacted": {"const": true}
+  },
+  "additionalProperties": true
+}

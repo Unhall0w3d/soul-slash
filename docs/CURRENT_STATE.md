@@ -83,7 +83,7 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
-- **Guided Maintenance**, under Administration, consumes fresh assessment evidence, previews the exact future Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map, and rehearses its lifecycle without authenticating, mutating, persisting operational state, launching applications, or rebooting.
+- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The A2 candidate adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal; live execution is disabled by default and every A2 path stops before reboot. A3 conditional reboot and one-shot restoration remain unimplemented.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
