@@ -32,7 +32,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [ ] remove remaining implementation-phase labels and stale UI/documentation language
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
-- [~] review the candidate-complete local encrypted backup and staged-restore foundation; implement the approved 30-day deletion-aware retention hold before pruning
+- [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; pruning remains disabled
 
 ## Qualified expansion candidates
 
@@ -51,7 +51,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation is candidate-complete; 30-day deletion-aware hold enforcement, second-copy, and full-recovery gates remain
+- [~] backup and disaster-recovery local foundation and deletion-aware hold ledger are candidate-complete; retention execution, second-copy, and full-recovery gates remain
 - [ ] reviewed Proxmox/container deployment where it provides a concrete operational benefit
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review

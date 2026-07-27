@@ -86,9 +86,64 @@ Deleting a file from the source does not delete it immediately from the
 repository. If no later verified snapshot exists, the deletion has not yet
 been detected and the 30-day clock has not started.
 
-Automated retention enforcement is not installed yet. Until the deletion-hold
-ledger and deterministic verifier are implemented, do not run `restic forget`
-or `restic prune` against this repository.
+The deletion-aware hold ledger is now candidate-complete for human review. It
+does not enable retention execution. Until the candidate is approved and a
+separate bounded retention executor is reviewed, do not run `restic forget` or
+`restic prune` against this repository.
+
+### Candidate hold-ledger flow
+
+The owner-private ledger belongs at:
+
+```text
+Soul/private/backup/retention-ledger.json
+```
+
+It is included by the existing private-state backup surface and must not enter
+Git. After a successful snapshot and `restic check`, prepare a versioned
+snapshot manifest from the exact restic snapshot inventory. The manifest
+contains full snapshot and repository IDs, the unchanged verified source
+roots, the sorted unique path inventory, the UTC verification timestamp, and
+the successful check mode. See
+`docs/soul/BACKUP_RETENTION_A1_BRIEF.md` for its exact schema.
+
+Preview an observation without writing:
+
+```sh
+ruby scripts/soul-backup-retention.rb observe-preview \
+  --ledger Soul/private/backup/retention-ledger.json \
+  --manifest /OWNER_PRIVATE_PATH/verified-snapshot.json
+```
+
+Record only the exact reviewed preview:
+
+```sh
+ruby scripts/soul-backup-retention.rb observe-execute \
+  --ledger Soul/private/backup/retention-ledger.json \
+  --manifest /OWNER_PRIVATE_PATH/verified-snapshot.json \
+  --confirmation RECORD_VERIFIED_BACKUP_SNAPSHOT \
+  --expected-digest DIGEST_FROM_PREVIEW
+```
+
+To classify a proposed set of full snapshot IDs, place the IDs in a private
+JSON array and run:
+
+```sh
+ruby scripts/soul-backup-retention.rb retention-preview \
+  --ledger Soul/private/backup/retention-ledger.json \
+  --candidates /OWNER_PRIVATE_PATH/candidate-snapshots.json
+```
+
+The result separates actively protected candidates from hold-clear candidates.
+`hold-clear` means only that the 30-day deletion policy does not protect that
+snapshot; it does not mean the snapshot should be deleted. The command cannot
+execute retention.
+
+The ledger will fail closed if it is missing or corrupt, source roots change,
+snapshot verification did not pass, paths escape the verified roots, snapshot
+time moves backward, or approval is stale. The first observed snapshot creates
+the baseline. Deletion detection begins with the next successfully observed
+snapshot.
 
 ## Staged restore
 

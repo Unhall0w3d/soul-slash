@@ -91,9 +91,9 @@ inventory and human review, not model judgment.
   host-loss recovery;
 - the repository remains inside the same workstation and is not an offline or
   off-site copy;
-- retention and prune behavior are documented candidates but not implemented;
-- the approved 30-day deletion-aware retention rule requires a bounded hold
-  ledger before any snapshot pruning can safely be enabled;
+- deletion-aware retention is now implemented as a separate A1 review
+  candidate, but it is not yet approved;
+- the A1 candidate intentionally exposes no `forget` or `prune` execution;
 - the current public setup documentation does not yet provide a single
   machine-readable dependency lock or recovery manifest.
 
@@ -126,7 +126,8 @@ overwritten, and no unattended process was introduced.
 - [ ] Choose portable quiescent capture or authorize investigation of an
   optional Btrfs source-snapshot adapter.
 - [x] Retain deleted source files for 30 days after deletion is first detected.
-- [ ] Implement and deterministically verify deletion-aware snapshot holds
-  before enabling `forget` or `prune`.
+- [x] Implement and deterministically verify deletion-aware snapshot holds.
+- [ ] Review the A1 ledger candidate before designing any `forget` or `prune`
+  execution.
 - [ ] Select an additional offline or off-site recovery copy.
 - [ ] Schedule a separately gated complete recovery rehearsal.

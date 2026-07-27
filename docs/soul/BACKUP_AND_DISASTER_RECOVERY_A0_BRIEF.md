@@ -223,9 +223,10 @@ rather than be interpreted as mass deletion. Every retention operation must
 render a dry-run preview, preserve active deletion holds, require exact human
 approval, and run a repository metadata check afterward.
 
-No `forget` or `prune` operation is approved until the deletion-hold ledger and
-its deterministic verifier are implemented. Scheduling and off-site
-replication remain separate gates.
+The deletion-hold ledger and its deterministic verifier are now implemented as
+an A1 review candidate. No `forget` or `prune` operation is approved or exposed
+by that candidate. Retention execution, scheduling, and off-site replication
+remain separate gates.
 
 ## Destination and key custody
 
@@ -288,7 +289,8 @@ See `docs/soul/BACKUP_AND_RECOVERY.md` for the operating procedure.
 - whether finished exports and the Knowledge Vault share the same repository;
 - portable quiescent capture versus an optional Btrfs snapshot adapter;
 - acceptable manual-backup pause;
-- implementation and verification of the approved 30-day deletion-aware hold;
+- human review of the implemented 30-day deletion-aware hold candidate;
+- separately gated retention execution after hold-ledger approval;
 - whether any future scheduled execution is desirable.
 - location and custody of an additional offline or off-site copy;
 - timing and scope of a complete host-loss recovery rehearsal.
