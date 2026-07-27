@@ -39,17 +39,18 @@ module SoulCore
         return blocked("application request ID conflicts with an existing or incomplete chat send") unless reservation.fetch("status") == "reserved"
       end
 
+      progress_sink = request_progress(request_id, progress)
       user_message = @store.add_message(
         chat_id,
         role: "user",
         content: text,
         metadata: application_metadata(request_id, interface)
       )
-      emit(progress, "received", "Transmission received and written to local continuity.")
+      emit(progress_sink, "received", "Transmission received and written to local continuity.")
       runtime_options = { chat_id: chat_id, message: text }
-      runtime_options[:progress] = progress if progress
+      runtime_options[:progress] = progress_sink if runtime_accepts_progress?
       result = @runtime.respond(**runtime_options)
-      emit(progress, "finalizing", "Sealing the response into this transmission.")
+      emit(progress_sink, "finalizing", "Sealing the response into this transmission.")
       assistant_message = @store.add_message(
         chat_id,
         role: "assistant",
@@ -67,7 +68,7 @@ module SoulCore
         user_message_id: user_message.fetch("id"),
         assistant_message_id: assistant_message.fetch("id")
       )
-      emit(progress, "complete", "Response complete.")
+      emit(progress_sink, "complete", "Response complete.")
       success(user_message, assistant_message, result, replay: false)
     rescue ArgumentError => error
       safe_fail(request_id, "invalid_input")
@@ -80,7 +81,51 @@ module SoulCore
       failure("chat exchange failed safely: #{error.class}")
     end
 
+    def progress(chat_id: nil, limit: ApplicationRequestReceiptStore::MAX_ACTIVE)
+      if chat_id
+        raise ArgumentError, "invalid canonical chat ID" unless chat_id.to_s.match?(ApplicationContract::CHAT_ID)
+        return awaiting("unknown chat ID: #{chat_id}") unless @store.chat(chat_id)
+      end
+
+      records = @receipt_store.active(operation: "chats.send", identity: chat_id, limit: limit)
+      {
+        "ok" => true,
+        "lifecycle_state" => "complete",
+        "data" => {"records" => records, "count" => records.length},
+        "mutation" => "none"
+      }
+    rescue ArgumentError => error
+      failure(error.message)
+    rescue StandardError => error
+      failure("chat progress failed safely: #{error.class}")
+    end
+
     private
+
+    def runtime_accepts_progress?
+      @runtime.method(:respond).parameters.any? do |kind, name|
+        kind == :keyrest || %i[key keyreq].include?(kind) && name == :progress
+      end
+    rescue NameError
+      false
+    end
+
+    def request_progress(request_id, external)
+      lambda do |event|
+        state = event.to_h.fetch("state")
+        summary = event.to_h.fetch("summary")
+        begin
+          @receipt_store.progress(request_id: request_id, state: state, summary: summary)
+        rescue StandardError
+          nil
+        end
+        begin
+          external&.call({"state" => state, "summary" => summary})
+        rescue StandardError
+          nil
+        end
+      end
+    end
 
     def emit(progress, state, summary)
       progress&.call({ "state" => state, "summary" => summary })

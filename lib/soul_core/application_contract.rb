@@ -31,6 +31,7 @@ module SoulCore
       "chats.list" => %w[limit],
       "chats.get" => %w[chat_id],
       "chats.messages" => %w[chat_id limit],
+      "chats.progress" => %w[chat_id limit],
       "chats.create" => %w[title],
       "chats.send" => %w[chat_id message],
       "chats.creative.execute" => %w[chat_id flow_id action_id confirmation expected_digest],

@@ -171,7 +171,17 @@ Soul/runtime/application/request_receipts.jsonl
 mode: 0600
 ```
 
-Receipts contain request identity, input digest, chat identity, message IDs, and terminal category. They do not duplicate chat content, credentials, hidden reasoning, or configuration.
+Receipts contain request identity, input digest, chat identity, message IDs,
+terminal category, and—while a Chat send is active—a bounded event-derived
+progress state and summary. They do not duplicate chat content, credentials,
+hidden reasoning, configuration, research payloads, paths, or tool output.
+
+The read-only `chats.progress` projection returns at most 20 active
+`chats.send` receipts, optionally scoped to one canonical chat. Summary text is
+limited to 240 UTF-8 characters and active records expire from this projection
+after four hours. Completed and failed receipts cannot be reopened by a later
+progress event. The operation only observes the owning foreground request; it
+does not start, resume, retry, cancel, poll, or authorize work.
 
 Replaying the same request ID, chat, and message returns the existing exchange without another provider call or appended message. Reusing a request ID with changed scope blocks for human review.
 

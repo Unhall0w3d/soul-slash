@@ -13,6 +13,8 @@ Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTime
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupBusy: false });
 state.maintenancePreview = null;
+state.chatProgress = new Map();
+state.localChatRequests = new Set();
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
 const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
 const NOTIFICATION_MODES = ["voice", "cues", "muted"];
@@ -190,12 +192,12 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
   return envelope;
 }
 
-async function callNdjson(endpoint, operation, parameters = {}, context = {}, onProgress = () => {}) {
+async function callNdjson(endpoint, operation, parameters = {}, context = {}, onProgress = () => {}, requestOptions = {}) {
   if (endpoint === "/api/v1/music-stream" && ["music.generation.execute", "music.candidates.revision.execute"].includes(operation)) endpoint = "/api/v1/music-job-stream";
   const response = await fetch(endpoint, {
     method: "POST", credentials: "same-origin",
     headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
-    body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
+    body: JSON.stringify({ schema_version: "soul.application.v1", request_id: requestOptions.requestId || requestId(), operation, parameters, context: { interface: "dashboard", ...context } }),
     cache: "no-store"
   });
   if (!response.ok || !response.body) {
@@ -231,7 +233,7 @@ async function activeMusicJobs(projectId) {
   const result = await response.json(); if (!response.ok) throw new Error(result.error?.reason || "Music job status failed safely"); return result.jobs || [];
 }
 
-const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress);
+const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}, requestOptions = {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress, requestOptions);
 
 async function callPictureStream(payload, onProgress = () => {}) {
   const response = await fetch("/api/v1/perception/picture-stream", {
@@ -388,14 +390,16 @@ function setSoulActivity(activityState, summary) {
   byId("soul-activity-summary").textContent = summary || "Foreground work remains bounded to this request.";
 }
 
+function chatWorkActive() { return state.localChatRequests.size > 0 || state.chatProgress.size > 0; }
+
 function setBusy(busy, message = "") {
-  state.busy = busy;
-  byId("send-message").disabled = busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  state.busy = Boolean(busy || chatWorkActive());
+  byId("send-message").disabled = state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("message-input").disabled = !state.activeChat;
-  byId("attach-picture").disabled = busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
-  byId("capture-screen").disabled = busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
-  byId("send-message").querySelector("span").textContent = busy ? "Working" : "Send";
-  byId("composer-hint").textContent = busy ? "Soul is working · you may draft, but ordinary Enter will not interrupt" : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected");
+  byId("attach-picture").disabled = state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  byId("capture-screen").disabled = state.busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  byId("send-message").querySelector("span").textContent = state.busy ? "Working" : "Send";
+  byId("composer-hint").textContent = state.busy ? "Soul is working · you may draft, but ordinary Enter will not interrupt" : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected");
   updateVoiceControl();
   if (message) announce(message);
 }
@@ -655,6 +659,32 @@ async function saveTimelineItem(event) {
   finally { button.disabled = false; }
 }
 
+function replaceChatProgress(records, chatId = null) {
+  if (chatId) state.chatProgress.delete(chatId);
+  else state.chatProgress.clear();
+  (records || []).forEach((record) => {
+    if (record.operation === "chats.send" && /^chat_[A-Za-z0-9_.-]+$/.test(record.identity || "") && record.status === "reserved") {
+      state.chatProgress.set(record.identity, record);
+    }
+  });
+}
+
+function recordChatProgress(chatId, requestIdValue, progress = {}) {
+  const summary = String(progress.summary || "Bounded foreground work remains active.").trim().slice(0, 240);
+  const record = {
+    request_id: requestIdValue, operation: "chats.send", identity: chatId, status: "reserved",
+    progress_state: String(progress.state || "planning"), progress_summary: summary
+  };
+  state.chatProgress.set(chatId, record);
+  if (state.activeChat?.id === chatId) {
+    if (record.progress_state === "received") markPendingMessageAccepted(requestIdValue);
+    renderChatProgress(record);
+    setSoulActivity(record.progress_state, summary);
+  }
+  renderChatList();
+  setBusy(false);
+}
+
 function renderChatList() {
   const list = byId("chat-list");
   list.replaceChildren();
@@ -667,7 +697,9 @@ function renderChatList() {
     const sigil = document.createElement("span"); sigil.className = "sigil"; sigil.textContent = "◆";
     const copy = document.createElement("span");
     const title = document.createElement("strong"); title.textContent = chat.title || "Untitled conversation";
-    const meta = document.createElement("small"); meta.textContent = chat.updated_at ? `updated ${formatTime(chat.updated_at)}` : chat.id;
+    const progress = state.chatProgress.get(chat.id);
+    if (progress) button.classList.add("is-working");
+    const meta = document.createElement("small"); meta.textContent = progress ? `${String(progress.progress_state || "working").replaceAll("_", " ")} · active` : (chat.updated_at ? `updated ${formatTime(chat.updated_at)}` : chat.id);
     copy.append(title, meta); button.append(sigil, copy);
     if (chat.pinned) { const pin = document.createElement("span"); pin.className = "pin"; pin.textContent = "PIN"; button.append(pin); }
     button.addEventListener("click", () => selectChat(chat)); list.append(button);
@@ -679,7 +711,11 @@ function formatTime(value) {
 }
 
 async function loadChats(selectFirst = true) {
-  const envelope = await callSoul("chats.list", { limit: 50 }); lifecycle(envelope);
+  const [envelope, progress] = await Promise.all([
+    callSoul("chats.list", { limit: 50 }),
+    callSoul("chats.progress", { limit: 20 })
+  ]);
+  lifecycle(envelope); replaceChatProgress(dataOf(progress).records || []);
   state.chats = dataOf(envelope).records || []; renderChatList();
   if (selectFirst && !state.activeChat && state.chats.length) await selectChat(state.chats[0]);
   if (!state.chats.length) resetConversationView();
@@ -711,12 +747,14 @@ async function selectChat(chat) {
   byId("composer-hint").textContent = "Local provider request · foreground only";
   byId("message-input").placeholder = "Write a message to Soul…"; setBusy(true, "Loading conversation");
   try {
-    const [messages, workspace, inbox] = await Promise.all([
+    const [messages, workspace, inbox, progress] = await Promise.all([
       callSoul("chats.messages", { chat_id: chat.id, limit: 200 }, { current_chat_id: chat.id }),
       callSoul("workspace.chat", { chat_id: chat.id, limit: 50 }, { current_chat_id: chat.id }),
-      callSoul("inbox.list", { chat_id: chat.id, limit: 50 }, { current_chat_id: chat.id })
+      callSoul("inbox.list", { chat_id: chat.id, limit: 50 }, { current_chat_id: chat.id }),
+      callSoul("chats.progress", { chat_id: chat.id, limit: 1 }, { current_chat_id: chat.id })
     ]);
-    lifecycle(messages); renderMessages(dataOf(messages).records || []); renderWorkspace(dataOf(workspace).records || []); renderInbox(dataOf(inbox));
+    lifecycle(messages); replaceChatProgress(dataOf(progress).records || [], chat.id); renderMessages(dataOf(messages).records || []);
+    renderChatProgress(state.chatProgress.get(chat.id)); renderWorkspace(dataOf(workspace).records || []); renderInbox(dataOf(inbox)); renderChatList();
     announce(`Opened ${chat.title || "conversation"}`);
   } catch (error) { showError(error); } finally { setBusy(false); }
 }
@@ -901,9 +939,30 @@ function renderMessages(records, noChat = false) {
   area.scrollTop = area.scrollHeight;
 }
 
-function appendPendingExchange(message) {
+function appendPendingExchange(message, requestIdValue) {
   const area = byId("messages"); area.querySelector(".empty-state")?.remove(); area.append(messageArticle({ role: "user", content: message }, { pending: true }));
+  const pending = area.lastElementChild; if (pending) pending.dataset.requestId = requestIdValue;
   const working = messageArticle({ role: "assistant", content: "Reading the transmission…" }, { working: true }); working.id = "soul-working-message"; area.append(working); area.scrollTop = area.scrollHeight;
+}
+
+function markPendingMessageAccepted(requestIdValue) {
+  const pending = [...document.querySelectorAll(".message--pending")].find((item) => item.dataset.requestId === requestIdValue);
+  if (!pending) return;
+  pending.classList.remove("message--pending");
+  const label = pending.querySelector(".message-label"); if (label) label.textContent = "You";
+}
+
+function renderChatProgress(record) {
+  const existing = byId("soul-working-message");
+  if (!record || record.status !== "reserved") { existing?.remove(); return; }
+  const summary = String(record.progress_summary || "Bounded foreground work remains active.").trim().slice(0, 240);
+  if (existing) {
+    const body = existing.querySelector(".message-body"); if (body) body.textContent = summary;
+    existing.dataset.requestId = record.request_id || ""; return;
+  }
+  const working = messageArticle({ role: "assistant", content: summary }, { working: true });
+  working.id = "soul-working-message"; working.dataset.requestId = record.request_id || "";
+  const area = byId("messages"); area.querySelector(".empty-state")?.remove(); area.append(working); area.scrollTop = area.scrollHeight;
 }
 
 function updateWorkingMessage(summary) { const body = byId("soul-working-message")?.querySelector(".message-body"); if (body) body.textContent = summary; }
@@ -1834,13 +1893,15 @@ async function sendMessage(event) {
   event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy || state.voiceTranscribing || state.voiceRecorder) return;
   const voiceRoundTrip = state.voiceRoundTripPending; state.voiceRoundTripPending = false;
   const picture = state.pictureAttachment;
-  const chatId = state.activeChat.id; input.value = ""; appendPendingExchange(message); emitSoulNotification("submit"); setSoulActivity("received", picture ? "The local picture and question have entered a bounded perception path." : "The interface has accepted your transmission.");
+  const chatId = state.activeChat.id; const chatRequestId = requestId(); input.value = ""; appendPendingExchange(message, chatRequestId);
+  if (!picture) state.localChatRequests.add(chatRequestId);
+  emitSoulNotification("submit"); setSoulActivity("received", picture ? "The local picture and question have entered a bounded perception path." : "Submitting this transmission to local continuity.");
   setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending"; document.querySelector(".state-ribbon").dataset.lifecycle = "pending"; document.querySelector(".conversation").dataset.lifecycle = "pending";
   try {
     let envelope;
     if (picture) {
       envelope = await callPictureStream({
-        request_id: requestId(), chat_id: chatId, question: message,
+        request_id: chatRequestId, chat_id: chatId, question: message,
         image_base64: picture.imageBase64, media_type: picture.mediaType,
         filename: picture.filename, retain: byId("picture-attachment-retain").checked
       }, (progress) => {
@@ -1851,20 +1912,59 @@ async function sendMessage(event) {
       clearPictureAttachment();
       byId("lifecycle-state").textContent = "complete"; document.querySelector(".state-ribbon").dataset.lifecycle = "complete"; document.querySelector(".conversation").dataset.lifecycle = "complete";
     } else {
-      envelope = await callSoulStream("chats.send", { chat_id: chatId, message }, { current_chat_id: chatId }, (progress) => { setSoulActivity(progress.state, progress.summary); updateWorkingMessage(progress.summary); }); lifecycle(envelope);
+      envelope = await callSoulStream(
+        "chats.send",
+        { chat_id: chatId, message },
+        { current_chat_id: chatId },
+        (progress) => recordChatProgress(chatId, chatRequestId, progress),
+        { requestId: chatRequestId }
+      );
+      lifecycle(envelope);
     }
-    const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records);
-    const workspace = await callSoul("workspace.chat", { chat_id: chatId, limit: 50 }, { current_chat_id: chatId }); renderWorkspace(dataOf(workspace).records || []);
+    state.localChatRequests.delete(chatRequestId); state.chatProgress.delete(chatId);
+    const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || [];
+    if (state.activeChat?.id === chatId) {
+      renderMessages(records);
+      const workspace = await callSoul("workspace.chat", { chat_id: chatId, limit: 50 }, { current_chat_id: chatId }); renderWorkspace(dataOf(workspace).records || []);
+    }
     await loadChats(false); announce(`Request ${envelope.lifecycle_state || "finished"}`);
     if (!voiceRoundTrip) emitSoulNotification("chat_ready", `chat:${chatId}:${records.at(-1)?.id || requestId()}`);
-    if (voiceRoundTrip) {
+    if (voiceRoundTrip && state.activeChat?.id === chatId) {
       const reply = [...records].reverse().find((record) => record.role === "assistant" && String(record.content || record.text || "").trim());
       const buttons = [...document.querySelectorAll(".message--assistant .message-speak-button")];
       const button = buttons.at(-1);
       if (reply && button) await synthesizeMessageSpeech(String(reply.content || reply.text).trim(), button, speechContextForMessage(reply));
       else announce("Soul completed the exchange without an eligible spoken reply");
     }
-  } catch (error) { try { const messages = await callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }); const records = dataOf(messages).records || []; renderMessages(records); if (!records.some((record) => record.role === "user" && record.content === message)) input.value = message; } catch (_reconcileError) { input.value = message; } setSoulActivity("failed", picture ? "Picture understanding stopped safely; the selected picture and draft remain available." : "The exchange failed safely; an unsent draft has been restored."); emitSoulNotification("attention"); showError(error); } finally { setBusy(false); input.focus(); }
+  } catch (error) {
+    let active = null; let accepted = false;
+    try {
+      const [messages, progress] = await Promise.all([
+        callSoul("chats.messages", { chat_id: chatId, limit: 200 }, { current_chat_id: chatId }),
+        picture ? Promise.resolve(null) : callSoul("chats.progress", { chat_id: chatId, limit: 1 }, { current_chat_id: chatId })
+      ]);
+      const records = dataOf(messages).records || [];
+      accepted = records.some((record) => record.metadata?.application_request_id === chatRequestId) ||
+        records.some((record) => record.role === "user" && record.content === message);
+      if (progress) {
+        replaceChatProgress(dataOf(progress).records || [], chatId);
+        active = state.chatProgress.get(chatId) || null;
+      }
+      if (state.activeChat?.id === chatId) { renderMessages(records); renderChatProgress(active); }
+      if (!accepted) input.value = message;
+    } catch (_reconcileError) { input.value = message; }
+    if (active) {
+      setSoulActivity(active.progress_state, active.progress_summary);
+      announce("The browser detached after acceptance; bounded work remains active. Reopen this conversation to refresh its state.");
+    } else {
+      setSoulActivity("failed", picture ? "Picture understanding stopped safely; the selected picture and draft remain available." : (accepted ? "The accepted exchange reached no active progress state; refresh this conversation for its terminal result." : "The exchange failed safely; an unsent draft has been restored."));
+      emitSoulNotification("attention"); showError(error);
+    }
+  } finally {
+    state.localChatRequests.delete(chatRequestId);
+    setBusy(false);
+    if (state.activeChat?.id === chatId) input.focus();
+  }
 }
 
 async function togglePin() {

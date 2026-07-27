@@ -4,6 +4,7 @@ require "digest"
 require "time"
 require_relative "application_chat_service"
 require_relative "application_contract"
+require_relative "application_request_receipt_store"
 require_relative "approval_token_store"
 require_relative "chat_execution_history"
 require_relative "chat_store"
@@ -194,6 +195,7 @@ module SoulCore
       when "chats.list" then [chats_list(parameters), "complete", "none", false]
       when "chats.get" then domain(chats_get(parameters))
       when "chats.messages" then domain(chats_messages(parameters))
+      when "chats.progress" then domain(chat_service.progress(chat_id: parameters["chat_id"], limit: bounded_limit(parameters["limit"], ApplicationRequestReceiptStore::MAX_ACTIVE)))
       when "chats.create" then domain(chats_create(parameters))
       when "chats.send" then domain(chats_send(parameters, context, request_id, progress: progress))
       when "chats.creative.execute" then domain(conversation_creative_workflow.execute(chat_id: required(parameters, "chat_id"), flow_id: required(parameters, "flow_id"), action_id: parameters["action_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))

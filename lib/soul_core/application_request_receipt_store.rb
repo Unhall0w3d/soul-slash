@@ -9,6 +9,10 @@ module SoulCore
     DEFAULT_PATH = File.join("Soul", "runtime", "application", "request_receipts.jsonl")
     MAX_EVENTS = 5_000
     MAX_BYTES = 2 * 1024 * 1024
+    MAX_PROGRESS_SUMMARY_CHARACTERS = 240
+    MAX_ACTIVE = 20
+    ACTIVE_TTL_SECONDS = 4 * 60 * 60
+    PROGRESS_STATE = /\A[a-z][a-z0-9_]{0,39}\z/
 
     def initialize(root:, path: DEFAULT_PATH, clock: -> { Time.now })
       @root = File.expand_path(root)
@@ -57,6 +61,56 @@ module SoulCore
 
     def fail(request_id:, category:)
       transition(request_id, "failed", "failed", "failure_category" => category.to_s[0, 120])
+    end
+
+    def progress(request_id:, state:, summary:)
+      progress_state = state.to_s.dup.force_encoding(Encoding::UTF_8)
+      progress_summary = summary.to_s.dup.force_encoding(Encoding::UTF_8)
+      raise ArgumentError, "progress state must be valid UTF-8" unless progress_state.valid_encoding?
+      raise ArgumentError, "progress state is invalid" unless progress_state.match?(PROGRESS_STATE)
+      raise ArgumentError, "progress summary must be valid UTF-8" unless progress_summary.valid_encoding?
+      raise ArgumentError, "progress summary is empty" if progress_summary.strip.empty?
+      raise ArgumentError, "progress summary exceeds #{MAX_PROGRESS_SUMMARY_CHARACTERS} characters" if progress_summary.length > MAX_PROGRESS_SUMMARY_CHARACTERS
+
+      with_locked_file do |file|
+        current = replay(file)[request_id.to_s]
+        raise ArgumentError, "unknown application request ID" unless current
+        return public_receipt(current) if %w[complete failed].include?(current["status"])
+
+        event = {
+          "event_type" => "progress",
+          "request_id" => request_id.to_s,
+          "status" => "reserved",
+          "progress_state" => progress_state,
+          "progress_summary" => progress_summary.strip,
+          "progress_at" => @clock.call.iso8601
+        }
+        append!(file, event)
+        public_receipt(current.merge(event))
+      end
+    end
+
+    def active(operation:, identity: nil, limit: MAX_ACTIVE)
+      maximum = Integer(limit)
+      raise ArgumentError, "active receipt limit must be positive" unless maximum.positive?
+      return [] unless File.exist?(@path)
+
+      File.open(@path, File::RDONLY) do |file|
+        file.flock(File::LOCK_SH)
+        cutoff = @clock.call - ACTIVE_TTL_SECONDS
+        replay(file).values
+          .select { |record| record["status"] == "reserved" && record["operation"] == operation.to_s }
+          .select { |record| identity.nil? || record["identity"] == identity.to_s }
+          .select { |record| active_timestamp(record) >= cutoff }
+          .sort_by { |record| active_timestamp(record) }
+          .reverse
+          .first([maximum, MAX_ACTIVE].min)
+          .map { |record| progress_receipt(record) }
+      ensure
+        file&.flock(File::LOCK_UN)
+      end
+    rescue Errno::ENOENT
+      []
     end
 
     def find(request_id)
@@ -144,7 +198,29 @@ module SoulCore
         "user_message_id",
         "assistant_message_id",
         "failure_category",
-        "created_at"
+        "created_at",
+        "progress_state",
+        "progress_summary",
+        "progress_at"
+      )
+    end
+
+    def active_timestamp(record)
+      Time.iso8601(record["progress_at"] || record.fetch("created_at"))
+    rescue ArgumentError, KeyError
+      Time.at(0)
+    end
+
+    def progress_receipt(record)
+      public_receipt(record).slice(
+        "request_id",
+        "operation",
+        "identity",
+        "status",
+        "created_at",
+        "progress_state",
+        "progress_summary",
+        "progress_at"
       )
     end
   end
