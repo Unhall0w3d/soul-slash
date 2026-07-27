@@ -8,6 +8,7 @@ require "time"
 require "timeout"
 
 require_relative "bounded_command_runner"
+require_relative "maintenance_desktop_handoff"
 require_relative "maintenance_rehearsal_service"
 
 module SoulCore
@@ -19,6 +20,7 @@ module SoulCore
     MAX_RECEIPTS = 30
     MAX_FILE_BYTES = 512 * 1024
     MAX_DURATION_SECONDS = 4 * 60 * 60
+    HANDOFF_START_TTL_SECONDS = 10 * 60
     MINIMUM_FREE_KIB = 2 * 1024 * 1024
     FIXED_PATHS = {
       "kitty" => "/usr/bin/kitty",
@@ -79,6 +81,7 @@ module SoulCore
       active_work_probe: nil,
       package_lock_probe: -> { File.exist?("/var/lib/pacman/db.lck") },
       privilege_transition_probe: nil,
+      desktop_handoff: nil,
       live_execution_enabled: false,
       id_generator: -> { SecureRandom.hex(8) }
     )
@@ -90,6 +93,7 @@ module SoulCore
       @active_work_probe = active_work_probe || method(:default_active_work)
       @package_lock_probe = package_lock_probe
       @privilege_transition_probe = privilege_transition_probe || method(:privilege_transition_available?)
+      @desktop_handoff = desktop_handoff || MaintenanceDesktopHandoff.new(root: @root, clock: @clock, runner: runner)
       @live_execution_enabled = live_execution_enabled == true
       @id_generator = id_generator
       @state_root = File.join(@root, "Soul", "private", "host_maintenance")
@@ -103,8 +107,11 @@ module SoulCore
       return a1 unless a1["ok"]
 
       base = a1.dig("data", "plan")
+      native_evidence = @desktop_handoff.native_evidence
+      base["package_evidence"] = native_evidence.fetch("package_evidence") if native_evidence["available"]
+      handoff_status = @desktop_handoff.status
       commands = a2_commands(base.fetch("commands"))
-      preflight = preflight(base, commands)
+      preflight = preflight(base, commands, handoff_status: handoff_status, native_evidence: native_evidence)
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "risk_class" => "class_5",
@@ -112,6 +119,8 @@ module SoulCore
         "force_database_refresh" => base.fetch("force_database_refresh"),
         "commands" => commands,
         "package_evidence" => stable_package_evidence(base.fetch("package_evidence")),
+        "native_package_evidence" => native_evidence.slice("available", "generated_at", "expires_at", "evidence_digest", "reason"),
+        "desktop_handoff" => handoff_status.slice("available", "registered_desktop_id", "problems"),
         "flatpak_installations" => base.fetch("flatpak_installations"),
         "restore_registry_digest" => base.fetch("restore_registry_digest"),
         "window_restore_summary" => stable_restore_summary(base.fetch("window_snapshot")),
@@ -156,12 +165,20 @@ module SoulCore
     def execute(force_database_refresh:, expected_digest:, confirmation:)
       return outcome("blocked_for_human_review", false, "live A2 execution is not enabled; complete code review and supervised authorization first") unless @live_execution_enabled
 
-      run_transaction(
-        mode: "live",
+      reserve_live_transaction(
         force_database_refresh: force_database_refresh,
         expected_digest: expected_digest,
         confirmation: confirmation
       )
+    end
+
+    def reserve_native_evidence
+      handoff = @desktop_handoff.status
+      return outcome("blocked_for_human_review", false, "maintenance desktop handoff is unavailable", {"handoff" => handoff}) unless handoff["available"]
+      reservation = @desktop_handoff.reserve_evidence
+      outcome("complete", true, "native package evidence terminal reserved", reservation, "maintenance_evidence_reserved")
+    rescue StandardError => error
+      outcome("failed", false, "native package evidence reservation failed safely: #{safe_error(error)}")
     end
 
     def receipts(limit: MAX_RECEIPTS)
@@ -169,7 +186,12 @@ module SoulCore
       count = [[Integer(limit), 1].max, MAX_RECEIPTS].min
       rows = receipt_paths.filter_map { |path| read_json(path, RECEIPT_SCHEMA) }
         .sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count)
-      outcome("complete", true, "maintenance receipts loaded", {"receipts" => rows, "live_execution_enabled" => @live_execution_enabled})
+      outcome("complete", true, "maintenance receipts loaded", {
+        "receipts" => rows,
+        "live_execution_enabled" => @live_execution_enabled,
+        "desktop_handoff" => @desktop_handoff.status,
+        "native_package_evidence" => @desktop_handoff.native_evidence.except("package_evidence")
+      })
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
     rescue StandardError => error
@@ -178,8 +200,34 @@ module SoulCore
 
     private
 
+    def reserve_live_transaction(force_database_refresh:, expected_digest:, confirmation:)
+      return outcome("blocked_for_human_review", false, "exact maintenance confirmation is required") unless confirmation.to_s == CONFIRMATION
+      operation_lock = acquire_operation_lock
+      return outcome("blocked_for_human_review", false, "another maintenance transaction is active") unless operation_lock
+      fresh = preview(force_database_refresh: force_database_refresh)
+      return fresh unless fresh["ok"]
+      plan = fresh.dig("data", "plan")
+      return outcome("blocked_for_human_review", false, "maintenance preview changed; review the fresh plan") unless secure_equal?(expected_digest, fresh.dig("data", "expected_digest"))
+      blockers = plan.dig("preflight", "live_blockers") || plan.dig("preflight", "blockers")
+      return outcome("blocked_for_human_review", false, "maintenance preflight is blocked", {"blockers" => blockers, "plan" => plan}) unless blockers.empty?
+      return outcome("blocked_for_human_review", false, "this exact live maintenance plan is already reserved or completed") if used_live_digest?(expected_digest)
+      transaction = build_transaction(plan, "live")
+      handoff = @desktop_handoff.reserve_transaction(transaction)
+      outcome("complete", true, "live maintenance terminal reserved", {
+        "handoff" => handoff,
+        "plan" => plan,
+        "reboot_requested" => false
+      }, "maintenance_live_transaction_reserved")
+    rescue ArgumentError => error
+      outcome("awaiting_input", false, error.message)
+    rescue StandardError => error
+      outcome("failed", false, "maintenance transaction reservation failed safely: #{safe_error(error)}")
+    ensure
+      release_operation_lock(operation_lock)
+    end
+
     def run_transaction(mode:, force_database_refresh:, expected_digest:, confirmation:)
-      raise ArgumentError, "maintenance mode is invalid" unless %w[rehearsal live].include?(mode)
+      raise ArgumentError, "maintenance mode is invalid" unless mode == "rehearsal"
       return outcome("blocked_for_human_review", false, "exact maintenance confirmation is required") unless confirmation.to_s == CONFIRMATION
 
       operation_lock = acquire_operation_lock
@@ -247,7 +295,7 @@ module SoulCore
       end
     end
 
-    def preflight(base, commands)
+    def preflight(base, commands, handoff_status:, native_evidence:)
       missing = FIXED_PATHS.filter_map do |name, path|
         name unless File.file?(path) && File.executable?(path)
       end
@@ -270,14 +318,17 @@ module SoulCore
       common_blockers << "no restorable application inventory is available" if base.dig("window_snapshot", "restorable_count").to_i.zero?
       common_blockers << "maintenance command count is invalid" unless commands.length.between?(1, 3)
       live_blockers = common_blockers.dup
+      live_blockers << native_evidence.fetch("reason", "native package evidence is incomplete") unless native_evidence["available"]
       live_blockers << "package update evidence is incomplete" unless package_evidence_usable?(base.fetch("package_evidence"))
-      live_blockers << "dashboard confinement prevents native sudo authentication" unless @privilege_transition_probe.call == true
+      live_blockers << "reviewed desktop handoff is unavailable" unless handoff_status["available"]
       {
         "package_lock_present" => package_lock,
         "active_package_processes" => package_processes,
         "active_work" => active_work,
         "disk_free" => disks,
         "required_executables" => FIXED_PATHS.merge("transaction_runner" => script),
+        "desktop_handoff_available" => handoff_status["available"],
+        "native_package_evidence_available" => native_evidence["available"],
         "rehearsal_blockers" => common_blockers,
         "live_blockers" => live_blockers,
         "blockers" => live_blockers
@@ -333,6 +384,8 @@ module SoulCore
           }
         end,
         "required_executables" => preflight.fetch("required_executables"),
+        "desktop_handoff_available" => preflight.fetch("desktop_handoff_available"),
+        "native_package_evidence_available" => preflight.fetch("native_package_evidence_available"),
         "rehearsal_blockers" => preflight.fetch("rehearsal_blockers"),
         "live_blockers" => preflight.fetch("live_blockers")
       }
@@ -368,7 +421,7 @@ module SoulCore
         "mode" => mode,
         "owner_uid" => Process.uid,
         "created_at" => @clock.call.iso8601,
-        "deadline_at" => (@clock.call + MAX_DURATION_SECONDS).iso8601,
+        "deadline_at" => (@clock.call + (mode == "live" ? HANDOFF_START_TTL_SECONDS : MAX_DURATION_SECONDS)).iso8601,
         "plan_digest" => plan.fetch("expected_digest"),
         "commands" => mode == "live" ? plan.fetch("commands") : rehearsal_commands,
         "sudo_validation_argv" => mode == "live" ? [FIXED_PATHS.fetch("sudo"), "-v"] : [],
@@ -459,7 +512,7 @@ module SoulCore
     end
 
     def used_live_digest?(expected_digest)
-      receipt_paths.any? do |path|
+      @desktop_handoff.pending_live_digest?(expected_digest) || receipt_paths.any? do |path|
         receipt = read_json(path, RECEIPT_SCHEMA)
         receipt["mode"] == "live" && receipt["plan_digest"] == expected_digest
       rescue StandardError

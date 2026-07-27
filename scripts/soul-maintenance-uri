@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/maintenance_desktop_handoff"
+
+ROOT = File.expand_path("..", __dir__)
+KITTY = "/usr/bin/kitty"
+RUBY = "/usr/bin/ruby"
+URI_PATTERN = %r{\Asoul-maintenance://(?:evidence/maintenance_evidence_[a-f0-9]{16}|transaction/maintenance_tx_[a-f0-9]{16})/[a-f0-9]{64}\z}
+
+inside_terminal = ARGV.delete("--inside-terminal")
+uri = ARGV.shift.to_s
+
+unless URI_PATTERN.match?(uri) && ARGV.empty?
+  warn "Soul maintenance handoff rejected an invalid URI."
+  exit 2
+end
+
+unless inside_terminal
+  unless File.executable?(KITTY) && File.executable?(RUBY)
+    warn "Soul maintenance requires the reviewed kitty and Ruby executables."
+    exit 1
+  end
+  Process.exec(
+    KITTY,
+    "--class", "soul-maintenance",
+    "--title", "Soul / Guided Maintenance",
+    RUBY, File.expand_path(__FILE__),
+    "--inside-terminal", uri
+  )
+end
+
+result = SoulCore::MaintenanceDesktopHandoff.new(root: ROOT).handle_uri(uri)
+puts
+puts result.fetch("reason")
+receipt = result.dig("data", "receipt")
+if receipt
+  puts "Lifecycle: #{receipt.fetch('lifecycle_state')}"
+  puts "Password prompts: #{receipt.fetch('password_prompts')}"
+  puts "Sudo ticket invalidated: #{receipt.fetch('sudo_ticket_invalidated')}"
+  puts "Reboot requested: #{receipt.fetch('reboot_requested')}"
+end
+exit(result["ok"] ? 0 : (result["lifecycle_state"] == "blocked_for_human_review" ? 2 : 1))

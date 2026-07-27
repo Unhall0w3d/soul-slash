@@ -1,0 +1,89 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "optparse"
+require "securerandom"
+
+require_relative "../lib/soul_core/maintenance_desktop_handoff"
+
+ROOT = File.expand_path("..", __dir__)
+INSTALL_CONFIRMATION = "INSTALL_SOUL_MAINTENANCE_HANDOFF"
+XDG_MIME = "/usr/bin/xdg-mime"
+UPDATE_DESKTOP_DATABASE = "/usr/bin/update-desktop-database"
+
+options = {}
+OptionParser.new do |parser|
+  parser.on("--expected-digest SHA256") { |value| options[:expected_digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift.to_s
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit status
+end
+
+def atomic_write(path, content)
+  raise "desktop handler destination is a symbolic link" if File.symlink?(path)
+  temporary = "#{path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+  File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+    file.write(content)
+    file.flush
+    file.fsync
+  end
+  File.rename(temporary, path)
+  File.chmod(0o600, path)
+ensure
+  FileUtils.rm_f(temporary) if defined?(temporary) && temporary
+end
+
+begin
+  handoff = SoulCore::MaintenanceDesktopHandoff.new(root: ROOT)
+  desktop_path = handoff.desktop_path
+  applications = File.dirname(desktop_path)
+  plan_basis = {
+    "operation" => "maintenance_desktop_handoff_install",
+    "desktop_path" => desktop_path,
+    "desktop_id" => SoulCore::MaintenanceDesktopHandoff::DESKTOP_ID,
+    "uri_scheme" => SoulCore::MaintenanceDesktopHandoff::URI_SCHEME,
+    "handler_path" => File.join(ROOT, "scripts", "soul-maintenance-uri"),
+    "desktop_entry_sha256" => Digest::SHA256.hexdigest(handoff.desktop_entry),
+    "writes_system_files" => false,
+    "installs_service" => false,
+    "opens_listener" => false,
+    "enables_live_updates" => false
+  }
+  expected_digest = Digest::SHA256.hexdigest(JSON.generate(plan_basis))
+  plan = plan_basis.merge(
+    "expected_digest" => expected_digest,
+    "confirmation_phrase" => INSTALL_CONFIRMATION
+  )
+
+  case action
+  when "check"
+    status = handoff.status
+    emit(status.merge("lifecycle_state" => status.fetch("available") ? "complete" : "blocked_for_human_review"))
+  when "plan"
+    emit(plan.merge("lifecycle_state" => "blocked_for_human_review"))
+  when "install"
+    raise "review the exact current plan digest before installation" unless options[:expected_digest] == expected_digest
+    raise "exact confirmation #{INSTALL_CONFIRMATION} is required" unless options[:confirmation] == INSTALL_CONFIRMATION
+    raise "required xdg-mime executable is unavailable" unless File.executable?(XDG_MIME)
+    raise "required desktop database executable is unavailable" unless File.executable?(UPDATE_DESKTOP_DATABASE)
+    FileUtils.mkdir_p(applications, mode: 0o700)
+    raise "desktop applications directory is unsafe" if File.symlink?(applications)
+    atomic_write(desktop_path, handoff.desktop_entry)
+    system(UPDATE_DESKTOP_DATABASE, applications) or raise "desktop database update failed"
+    system(XDG_MIME, "default", SoulCore::MaintenanceDesktopHandoff::DESKTOP_ID, "x-scheme-handler/#{SoulCore::MaintenanceDesktopHandoff::URI_SCHEME}") or raise "URI handler registration failed"
+    status = handoff.status
+    raise status.fetch("problems").join("; ") unless status.fetch("available")
+    emit(status.merge("lifecycle_state" => "complete", "installed" => true))
+  else
+    raise "action must be check, plan, or install"
+  end
+rescue StandardError => error
+  emit({"lifecycle_state" => "failed", "error" => error.message.to_s.byteslice(0, 500)}, 1)
+end

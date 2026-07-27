@@ -175,12 +175,12 @@ entries:
   - id: guided-maintenance
     label: Guided Maintenance
     category: Administration
-    summary: Preview the reviewed maintenance transaction and open its visible no-mutation A2 terminal rehearsal.
+    summary: Preview the reviewed maintenance transaction, refresh native package evidence through a single-use desktop handoff, and open its visible no-mutation A2 terminal rehearsal.
     handler_id: maintenance_rehearsal
     required_inputs: [An explicit maintenance preview or terminal-rehearsal request]
     optional_inputs: [Normal yay -Syu mode or forced-refresh yay -Syyu mode]
     core: Any Core; routing is deterministic and model-independent.
-    approval: A1 preview is read-only. A2 rehearsal uses one exact digest and Dashboard click. Live A2 remains disabled pending supervised authorization; A3 remains separate.
+    approval: A1 preview is read-only. Native evidence and A2 rehearsal use one exact digest and Dashboard click. Live A2 remains disabled pending supervised authorization; A3 remains separate.
     output: Fresh package, disk, active-work, and restore evidence; exact argv; a bounded terminal rehearsal; and a redacted local receipt.
     boundary: Chat may explain the plan but cannot authorize execution. Rehearsal never authenticates or updates, and no A2 path can reboot.
     examples:

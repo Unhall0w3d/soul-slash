@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.handoff_reservation.v1",
+  "title": "Soul Maintenance Desktop Handoff Reservation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "reservation_id",
+    "kind",
+    "owner_uid",
+    "created_at",
+    "expires_at",
+    "expected_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.handoff_reservation.v1"},
+    "reservation_id": {"type": "string", "pattern": "^maintenance_evidence_[a-f0-9]{16}$"},
+    "kind": {"const": "evidence"},
+    "owner_uid": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "expected_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": false
+}

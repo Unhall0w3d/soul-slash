@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.native_package_evidence.v1",
+  "title": "Soul Native Package Evidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "owner_uid",
+    "reservation_id",
+    "generated_at",
+    "expires_at",
+    "package_evidence",
+    "evidence_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.native_package_evidence.v1"},
+    "owner_uid": {"type": "integer", "minimum": 1},
+    "reservation_id": {"type": "string", "pattern": "^maintenance_evidence_[a-f0-9]{16}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "package_evidence": {
+      "type": "object",
+      "required": ["status", "managers"],
+      "properties": {
+        "status": {"const": "ok"},
+        "managers": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "evidence_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": false
+}

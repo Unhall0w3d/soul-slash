@@ -2434,6 +2434,27 @@ function renderMaintenanceReceipt(receipt) {
   ].forEach(([label, value]) => container.append(labeledRecord(label, String(value ?? "—"))));
 }
 
+function launchMaintenanceUri(uri) {
+  const exact = String(uri || "");
+  const allowed = /^soul-maintenance:\/\/(?:evidence\/maintenance_evidence_[a-f0-9]{16}|transaction\/maintenance_tx_[a-f0-9]{16})\/[a-f0-9]{64}$/;
+  if (!allowed.test(exact)) throw new Error("Maintenance handoff URI failed local validation.");
+  window.location.href = exact;
+}
+
+async function refreshNativeMaintenanceEvidence() {
+  const status = byId("maintenance-execution-status");
+  byId("refresh-maintenance-evidence").disabled = true;
+  status.textContent = "Reserving one visible read-only native evidence terminal…";
+  try {
+    const envelope = await callSoul("maintenance.evidence.reserve"); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (!data.launch_uri) throw new Error(envelope.errors?.[0]?.message || data.reason || "Native evidence handoff is unavailable.");
+    launchMaintenanceUri(data.launch_uri);
+    status.textContent = "Native evidence terminal requested. When it closes, click Review A2 transaction again.";
+  } catch (error) { status.textContent = error.message; }
+  finally { byId("refresh-maintenance-evidence").disabled = false; }
+}
+
 async function previewMaintenanceExecution() {
   const force = byId("maintenance-force-refresh").checked; const status = byId("maintenance-execution-status");
   state.maintenanceExecutionPreview = null; byId("rehearse-maintenance-execution").disabled = true; byId("execute-maintenance").disabled = true;
@@ -2468,8 +2489,14 @@ async function runMaintenanceExecution(mode) {
       confirmation: preview.confirmation,
       expected_digest: preview.expected_digest
     });
-    const data = dataOf(envelope); lifecycle(envelope); renderMaintenanceReceipt(data.receipt);
-    status.textContent = data.receipt ? `${data.receipt.mode} · ${data.receipt.lifecycle_state} · sudo ticket ${data.receipt.sudo_ticket_invalidated ? "invalidated" : "requires review"}` : (envelope.errors?.[0]?.message || "Transaction stopped safely.");
+    const data = dataOf(envelope); lifecycle(envelope);
+    if (mode === "live" && data.handoff?.launch_uri) {
+      launchMaintenanceUri(data.handoff.launch_uri);
+      status.textContent = "Visible maintenance terminal requested. The Dashboard will not poll; click Refresh receipt after the terminal closes.";
+    } else {
+      renderMaintenanceReceipt(data.receipt);
+      status.textContent = data.receipt ? `${data.receipt.mode} · ${data.receipt.lifecycle_state} · sudo ticket ${data.receipt.sudo_ticket_invalidated ? "invalidated" : "requires review"}` : (envelope.errors?.[0]?.message || "Transaction stopped safely.");
+    }
     state.maintenanceExecutionPreview = null;
   } catch (error) { status.textContent = error.message; }
   finally { hideGenerationProgress(progress); byId("preview-maintenance-execution").disabled = false; }
@@ -2479,6 +2506,9 @@ async function loadMaintenanceReceipts() {
   try {
     const envelope = await callSoul("maintenance.execution.receipts", { limit: 1 }); const data = dataOf(envelope); lifecycle(envelope);
     renderMaintenanceReceipt((data.receipts || [])[0]);
+    const evidence = data.native_package_evidence || {}; const handoff = data.desktop_handoff || {};
+    if (!handoff.available) byId("maintenance-execution-status").textContent = (handoff.problems || []).join(" · ") || "Maintenance desktop handoff is unavailable.";
+    else if (evidence.available) byId("maintenance-execution-status").textContent = `Native package evidence ready until ${new Date(evidence.expires_at).toLocaleTimeString()}.`;
   } catch (error) { byId("maintenance-execution-status").textContent = error.message; }
 }
 
@@ -3241,8 +3271,10 @@ byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("preview-maintenance-execution").addEventListener("click", previewMaintenanceExecution);
+byId("refresh-maintenance-evidence").addEventListener("click", refreshNativeMaintenanceEvidence);
 byId("rehearse-maintenance-execution").addEventListener("click", () => runMaintenanceExecution("rehearsal"));
 byId("execute-maintenance").addEventListener("click", () => runMaintenanceExecution("live"));
+byId("refresh-maintenance-receipt").addEventListener("click", loadMaintenanceReceipts);
 byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
 byId("forget-backup-password").addEventListener("click", () => {
   byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);
