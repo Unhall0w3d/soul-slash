@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "soul.maintenance.execution_plan.v1",
+  "title": "Soul Maintenance Foreground Execution Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "risk_class", "owner_uid", "commands", "preflight", "expected_digest", "one_authentication_required", "automatic_reboot"],
+  "properties": {
+    "schema_version": {"const": "soul.maintenance.execution_plan.v1"},
+    "plan_id": {"type": "string", "pattern": "^maintenance_a2_[a-f0-9]{16}$"},
+    "risk_class": {"const": "class_5"},
+    "owner_uid": {"type": "integer", "minimum": 1},
+    "expected_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "one_authentication_required": {"const": true},
+    "interactive_terminal_required": {"const": true},
+    "automatic_reboot": {"const": false},
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["adapter", "argv", "interactive", "requires_existing_sudo_ticket", "shell"],
+        "properties": {
+          "argv": {"type": "array", "minItems": 3, "maxItems": 5, "items": {"type": "string"}},
+          "interactive": {"const": true},
+          "shell": {"const": false}
+        },
+        "additionalProperties": true
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "required": ["package_lock_present", "active_package_processes", "active_work", "disk_free", "required_executables", "blockers"]
+    }
+  },
+  "additionalProperties": true
+}

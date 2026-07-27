@@ -30,6 +30,7 @@ require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
 require_relative "maintenance_rehearsal_service"
+require_relative "maintenance_foreground_execution_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
 require_relative "music_generation_service"
@@ -78,6 +79,7 @@ module SoulCore
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
       maintenance_rehearsal_service: nil,
+      maintenance_foreground_execution_service: nil,
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
       music_generation_service: nil,
@@ -120,6 +122,7 @@ module SoulCore
       @self_improvement_service = self_improvement_service
       @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
+      @maintenance_foreground_execution_service = maintenance_foreground_execution_service
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
       @music_generation_service = music_generation_service
@@ -295,6 +298,10 @@ module SoulCore
       when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
       when "maintenance.preview" then domain(maintenance_rehearsal.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "maintenance.rehearsal" then domain(maintenance_rehearsal.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false)))
+      when "maintenance.execution.preview" then domain(maintenance_foreground_execution.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
+      when "maintenance.execution.rehearsal" then domain(maintenance_foreground_execution.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "maintenance.execution.execute" then domain(maintenance_foreground_execution.execute(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "maintenance.execution.receipts" then domain(maintenance_foreground_execution.receipts(limit: bounded_limit(parameters["limit"], MaintenanceForegroundExecutionService::MAX_RECEIPTS)))
       when "self_augmentation.census" then domain(self_augmentation.census)
       when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
       when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
@@ -751,6 +758,18 @@ module SoulCore
 
     def maintenance_rehearsal
       @maintenance_rehearsal_service ||= MaintenanceRehearsalService.new(root: @root, clock: @clock)
+    end
+
+    def maintenance_foreground_execution
+      return @maintenance_foreground_execution_service if @maintenance_foreground_execution_service
+
+      _report, resolver = resolved_configuration
+      @maintenance_foreground_execution_service ||= MaintenanceForegroundExecutionService.new(
+        root: @root,
+        clock: @clock,
+        rehearsal_service: maintenance_rehearsal,
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "true"
+      )
     end
 
     def self_augmentation

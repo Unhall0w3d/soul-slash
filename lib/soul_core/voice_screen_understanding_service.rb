@@ -81,7 +81,7 @@ module SoulCore
       - Music Studio manages composition briefs, generated candidates, listening evidence, revisions, and exports.
       - Visual Studio manages still and motion briefs, candidates, reviews, and music companions.
       - Administration opens Backup & Recovery and Guided Maintenance.
-      - Guided Maintenance previews and rehearses update, reboot, and Hyprland restoration work; A1 cannot execute it.
+      - Guided Maintenance previews maintenance and opens a no-mutation A2 terminal rehearsal; live update remains review-gated and A2 cannot reboot.
       - Review Center is a read-only view of pending approvals and recent bounded activity.
       - Core selects the reviewed runtime profile; Voice Presence opens the local hands-free voice surface.
       Use this map to explain the dashboard, but identify the currently visible panel and

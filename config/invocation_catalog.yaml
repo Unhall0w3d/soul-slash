@@ -173,15 +173,15 @@ entries:
     examples:
       - Inspect my Downloads folder and prepare a cleanup plan.
   - id: guided-maintenance
-    label: Guided maintenance rehearsal
+    label: Guided Maintenance
     category: Administration
-    summary: Preview the approved Arch, AUR, Flatpak, reboot, and Hyprland workspace-restore transaction without executing it.
+    summary: Preview the reviewed maintenance transaction and open its visible no-mutation A2 terminal rehearsal.
     handler_id: maintenance_rehearsal
-    required_inputs: [An explicit maintenance preview or rehearsal request]
+    required_inputs: [An explicit maintenance preview or terminal-rehearsal request]
     optional_inputs: [Normal yay -Syu mode or forced-refresh yay -Syyu mode]
-    core: Any Core for the read-only rehearsal
-    approval: A1 needs no privilege because it cannot execute; future update and reboot slices retain their own reviewed gates.
-    output: Fresh package evidence, exact inert argv, privacy-filtered window restore decisions, and a simulated terminal lifecycle.
-    boundary: A rehearsal never authenticates, updates, launches applications, writes a transaction journal, or reboots.
+    core: Any Core; routing is deterministic and model-independent.
+    approval: A1 preview is read-only. A2 rehearsal uses one exact digest and Dashboard click. Live A2 remains disabled pending supervised authorization; A3 remains separate.
+    output: Fresh package, disk, active-work, and restore evidence; exact argv; a bounded terminal rehearsal; and a redacted local receipt.
+    boundary: Chat may explain the plan but cannot authorize execution. Rehearsal never authenticates or updates, and no A2 path can reboot.
     examples:
       - Explain the guided maintenance rehearsal.

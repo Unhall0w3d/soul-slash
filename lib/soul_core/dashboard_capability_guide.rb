@@ -83,9 +83,9 @@ module SoulCore
         "label" => "Guided Maintenance",
         "aliases" => ["guided maintenance", "maintenance rehearsal", "update rehearsal"],
         "skills" => [],
-        "summary" => "Preview and rehearse the reviewed Arch/AUR, Flatpak, reboot, and Hyprland restoration transaction.",
-        "inputs" => "Use Administration for normal yay -Syu or explicit forced-refresh yay -Syyu planning.",
-        "boundary" => "A1 is read-only; update execution and reboot/restoration remain separately reviewed A2 and A3 gates."
+        "summary" => "Preview the reviewed Arch/AUR and Flatpak transaction and run its visible no-mutation terminal rehearsal.",
+        "inputs" => "Use Administration for normal yay -Syu or explicit forced-refresh yay -Syyu planning and exact click authorization.",
+        "boundary" => "Chat can explain but cannot authorize it. Live A2 remains disabled pending supervised approval, and no A2 path can reboot or restore a session."
       },
       {
         "id" => "review_center",

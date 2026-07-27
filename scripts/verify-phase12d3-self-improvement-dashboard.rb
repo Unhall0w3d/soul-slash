@@ -130,8 +130,8 @@ check.call("host mutation remains visibly separated and approval-gated",
            html.include?("Host changes require separate approval") &&
              html.include?("Self Assessment only inspects and prepares evidence") &&
              html.include?('id="maintenance-panel"') &&
-             html.include?("A2 must separately qualify") &&
-             html.include?("A3 must separately qualify"))
+             html.include?("Live update remains disabled") &&
+             html.include?("Conditional reboot and one-shot post-login restoration remain A3"))
 
 abort "Phase 12D.3 verification failed: #{errors.join(', ')}" unless errors.empty?
 puts "Phase 12D.3 Self Improvement dashboard verification complete."

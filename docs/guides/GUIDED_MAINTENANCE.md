@@ -53,17 +53,46 @@ A1 cannot:
 A2 foreground execution and A3 reboot/restoration remain distinct
 human-review gates.
 
-The candidate A2 contract is documented in
+## A2 foreground candidate
+
+The human-approved A2 contract is documented in
 [`MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md`](../soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md).
-It remains unimplemented until explicitly approved.
+The candidate implementation adds:
+
+- a fresh digest-bound package, disk, active-work, and restore preflight;
+- `yay --sudoflags=-n -Syu` or the explicitly selected `-Syyu` variant;
+- user Flatpak update as the desktop owner and system Flatpak update through the
+  existing non-interactive sudo ticket;
+- a visible foreground kitty transaction with a four-hour hard bound;
+- one native `sudo -v` prompt, a parent-bound ticket keeper, and guaranteed
+  `sudo -k` invalidation;
+- redacted owner-private receipts capped at 30; and
+- a visible no-mutation terminal rehearsal.
+
+The public and local default is `SOUL_MAINTENANCE_A2_LIVE=false`. The live
+button stays unavailable until the completed candidate and one supervised run
+receive separate authorization. Passwords never enter the Dashboard, `.env`,
+receipts, arguments, or model context.
+
+The Dashboard distinguishes fixture-rehearsal blockers from live-only
+blockers. A failed package-metadata fetch or a service sandbox that sets
+`NoNewPrivileges` cannot weaken or enable the live path, but they do not prevent
+the zero-command fixture rehearsal from exercising the visible terminal and
+receipt lifecycle. On the current reference host, both conditions remain
+visible live blockers pending a separately reviewed deployment decision.
+
+A2 always stops before reboot. It cannot install or invoke the A3 post-login
+restorer.
 
 ## Verification
 
 ```text
 make verify-maintenance-rehearsal
+make verify-maintenance-foreground-execution
 ```
 
 Engineering evidence:
 
 - [`MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md`](../soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md)
 - [`MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md`](../assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md)
+- [`MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md`](../assessments/MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md)
