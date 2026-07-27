@@ -75,6 +75,60 @@ class A2IncompletePackageRehearsal < A2FixtureRehearsal
   end
 end
 
+class A2FixtureHandoff
+  attr_reader :transactions
+
+  def initialize(clock, available: true, evidence_available: true)
+    @clock = clock
+    @available = available
+    @evidence_available = evidence_available
+    @transactions = []
+  end
+
+  def status
+    {
+      "available" => @available,
+      "registered_desktop_id" => @available ? "soul-maintenance.desktop" : nil,
+      "problems" => @available ? [] : ["fixture handoff unavailable"]
+    }
+  end
+
+  def native_evidence
+    return {"available" => false, "reason" => "native package evidence has not been collected"} unless @evidence_available
+    evidence = A2FixtureRehearsal.new(@clock).preview.dig("data", "plan", "package_evidence")
+    {
+      "available" => true,
+      "generated_at" => @clock.call.iso8601,
+      "expires_at" => (@clock.call + 900).iso8601,
+      "evidence_digest" => "e" * 64,
+      "package_evidence" => evidence
+    }
+  end
+
+  def reserve_evidence
+    {
+      "reservation_id" => "maintenance_evidence_0123456789abcdef",
+      "expected_digest" => "e" * 64,
+      "launch_uri" => "soul-maintenance://evidence/maintenance_evidence_0123456789abcdef/#{"e" * 64}",
+      "expires_at" => (@clock.call + 600).iso8601
+    }
+  end
+
+  def reserve_transaction(transaction)
+    @transactions << transaction
+    {
+      "transaction_id" => transaction.fetch("transaction_id"),
+      "expected_digest" => transaction.fetch("plan_digest"),
+      "launch_uri" => "soul-maintenance://transaction/#{transaction.fetch('transaction_id')}/#{transaction.fetch('plan_digest')}",
+      "deadline_at" => transaction.fetch("deadline_at")
+    }
+  end
+
+  def pending_live_digest?(digest)
+    @transactions.any? { |transaction| transaction["plan_digest"] == digest }
+  end
+end
+
 class A2FixtureRunner
   Result = SoulCore::BoundedCommandRunner::Result
   attr_reader :calls
@@ -138,10 +192,12 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   File.write(File.join(root, "scripts", "soul-maintenance-transaction"), "# fixture\n")
   runner = A2FixtureRunner.new
   terminal = A2FixtureTerminal.new
+  handoff = A2FixtureHandoff.new(clock)
   service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: runner, terminal_launcher: terminal, active_work_probe: -> { [] },
     package_lock_probe: -> { false }, privilege_transition_probe: -> { true },
+    desktop_handoff: handoff,
     id_generator: -> { "0123456789abcdef" }
   )
 
@@ -155,7 +211,8 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   confined_service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2IncompletePackageRehearsal.new(clock),
     runner: runner, terminal_launcher: terminal, active_work_probe: -> { [] },
-    package_lock_probe: -> { false }, privilege_transition_probe: -> { false }
+    package_lock_probe: -> { false }, privilege_transition_probe: -> { false },
+    desktop_handoff: A2FixtureHandoff.new(clock, available: false, evidence_available: false)
   )
   confined = confined_service.preview
   check.call(
@@ -163,8 +220,8 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
     confined.dig("data", "plan", "rehearsal_available") == true &&
       confined.dig("data", "plan", "execution_available") == false &&
       confined.dig("data", "plan", "preflight", "rehearsal_blockers").empty? &&
-      confined.dig("data", "plan", "preflight", "live_blockers").include?("package update evidence is incomplete") &&
-      confined.dig("data", "plan", "preflight", "live_blockers").include?("dashboard confinement prevents native sudo authentication")
+      confined.dig("data", "plan", "preflight", "live_blockers").include?("native package evidence has not been collected") &&
+      confined.dig("data", "plan", "preflight", "live_blockers").include?("reviewed desktop handoff is unavailable")
   )
 
   wrong = service.rehearse(force_database_refresh: false, expected_digest: preview.dig("data", "expected_digest"), confirmation: "wrong")
@@ -186,7 +243,8 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   busy_service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: runner, terminal_launcher: terminal, active_work_probe: -> { ["music_generation"] },
-    package_lock_probe: -> { false }, privilege_transition_probe: -> { true }
+    package_lock_probe: -> { false }, privilege_transition_probe: -> { true },
+    desktop_handoff: A2FixtureHandoff.new(clock)
   )
   busy = busy_service.preview
   check.call("active Soul work blocks rehearsal and execution", busy.dig("data", "plan", "preflight", "blockers").include?("active Soul work must finish: music_generation") && busy.dig("data", "plan", "rehearsal_available") == false)
@@ -194,7 +252,8 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   lock_service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: runner, terminal_launcher: terminal, active_work_probe: -> { [] },
-    package_lock_probe: -> { true }, privilege_transition_probe: -> { true }
+    package_lock_probe: -> { true }, privilege_transition_probe: -> { true },
+    desktop_handoff: A2FixtureHandoff.new(clock)
   )
   lock_preview = lock_service.preview
   check.call("pacman database lock blocks the exact plan", lock_preview.dig("data", "plan", "preflight", "blockers").include?("pacman database lock is present"))
@@ -203,7 +262,7 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: A2FixtureRunner.new(free_kib: 100), terminal_launcher: terminal,
     active_work_probe: -> { [] }, package_lock_probe: -> { false },
-    privilege_transition_probe: -> { true }
+    privilege_transition_probe: -> { true }, desktop_handoff: A2FixtureHandoff.new(clock)
   )
   low_preview = low_service.preview
   check.call("insufficient disk space blocks the exact plan", low_preview.dig("data", "plan", "preflight", "blockers").any? { |item| item.include?("free-space threshold") })
@@ -217,7 +276,9 @@ Dir.mktmpdir("soul-maintenance-a2-volatile-disk") do |root|
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: A2FixtureRunner.new(free_kib_delta: 128), terminal_launcher: terminal,
     active_work_probe: -> { [] }, package_lock_probe: -> { false },
-    privilege_transition_probe: -> { true }, id_generator: -> { "1234567890abcdef" }
+    privilege_transition_probe: -> { true },
+    desktop_handoff: A2FixtureHandoff.new(clock),
+    id_generator: -> { "1234567890abcdef" }
   )
   preview = service.preview
   rehearsed = service.rehearse(
@@ -235,10 +296,12 @@ Dir.mktmpdir("soul-maintenance-a2-live") do |root|
   FileUtils.mkdir_p(File.join(root, "scripts"))
   File.write(File.join(root, "scripts", "soul-maintenance-transaction"), "# fixture\n")
   terminal = A2FixtureTerminal.new(command_status: "complete")
+  handoff = A2FixtureHandoff.new(clock)
   service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: A2FixtureRunner.new, terminal_launcher: terminal, active_work_probe: -> { [] },
     package_lock_probe: -> { false }, privilege_transition_probe: -> { true },
+    desktop_handoff: handoff,
     live_execution_enabled: true,
     id_generator: -> { "fedcba9876543210" }
   )
@@ -247,14 +310,14 @@ Dir.mktmpdir("soul-maintenance-a2-live") do |root|
     force_database_refresh: true, expected_digest: preview.dig("data", "expected_digest"),
     confirmation: SoulCore::MaintenanceForegroundExecutionService::CONFIRMATION
   )
-  transaction = terminal.transactions.first
-  check.call("enabled live candidate carries one-password vectors and forced-refresh choice", live["lifecycle_state"] == "complete" && transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"] && transaction.fetch("commands").first.fetch("argv") == ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"])
-  check.call("live receipt records one prompt, invalidation, and no reboot", live.dig("data", "receipt", "password_prompts") == 1 && live.dig("data", "receipt", "sudo_ticket_invalidated") == true && live.dig("data", "receipt", "reboot_requested") == false)
+  transaction = handoff.transactions.first
+  check.call("enabled live candidate reserves one exact desktop handoff with reviewed vectors", live["lifecycle_state"] == "complete" && live.dig("data", "handoff", "launch_uri").start_with?("soul-maintenance://transaction/") && transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"] && transaction.fetch("commands").first.fetch("argv") == ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"])
+  check.call("live reservation performs no prompt, package command, or reboot inside the Dashboard", terminal.transactions.empty? && live.dig("data", "reboot_requested") == false && service.receipts.dig("data", "receipts").empty?)
   replay = service.execute(
     force_database_refresh: true, expected_digest: preview.dig("data", "expected_digest"),
     confirmation: SoulCore::MaintenanceForegroundExecutionService::CONFIRMATION
   )
-  check.call("an exact live digest cannot be replayed", replay["lifecycle_state"] == "blocked_for_human_review" && terminal.transactions.one?)
+  check.call("an exact live digest cannot be replayed", replay["lifecycle_state"] == "blocked_for_human_review" && handoff.transactions.one?)
 end
 
 Dir.mktmpdir("soul-maintenance-runner") do |root|
@@ -305,7 +368,8 @@ Dir.mktmpdir("soul-maintenance-facade") do |root|
   service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2FixtureRehearsal.new(clock),
     runner: A2FixtureRunner.new, terminal_launcher: A2FixtureTerminal.new,
-    active_work_probe: -> { [] }, package_lock_probe: -> { false }
+    active_work_probe: -> { [] }, package_lock_probe: -> { false },
+    desktop_handoff: A2FixtureHandoff.new(clock)
   )
   facade = SoulCore::ApplicationFacade.new(root: root, clock: clock, maintenance_foreground_execution_service: service)
   request = {
@@ -322,9 +386,10 @@ check.call("all maintenance schemas are valid JSON", true)
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("Administration exposes preview, terminal rehearsal, disabled live gate, and receipts",
-           %w[preview-maintenance-execution rehearse-maintenance-execution execute-maintenance maintenance-receipts].all? { |id_value| html.include?("id=\"#{id_value}\"") } &&
+check.call("Administration exposes preview, evidence handoff, terminal rehearsal, disabled live gate, and receipts",
+           %w[preview-maintenance-execution refresh-maintenance-evidence rehearse-maintenance-execution execute-maintenance refresh-maintenance-receipt maintenance-receipts].all? { |id_value| html.include?("id=\"#{id_value}\"") } &&
              javascript.include?('callSoul("maintenance.execution.preview"') &&
+             javascript.include?('"maintenance.evidence.reserve"') &&
              javascript.include?('"maintenance.execution.rehearsal"') &&
              javascript.include?('"maintenance.execution.execute"'))
 check.call("Dashboard uses click authority and never collects a sudo password",

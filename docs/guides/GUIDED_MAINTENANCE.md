@@ -6,7 +6,7 @@ safely allowlisted Hyprland applications.
 
 Open it from **Administration → Guided Maintenance**.
 
-## Current A1 flow
+## Current reviewed flow
 
 ```text
 collect fresh Self Assessment evidence
@@ -69,17 +69,44 @@ The candidate implementation adds:
 - redacted owner-private receipts capped at 30; and
 - a visible no-mutation terminal rehearsal.
 
-The public and local default is `SOUL_MAINTENANCE_A2_LIVE=false`. The live
+### Native desktop handoff
+
+The installed Dashboard is deliberately confined with `NoNewPrivileges=true`.
+It therefore cannot create a child process that authenticates with `sudo`, and
+its sandbox cannot refresh pacman metadata reliably. A2B resolves those two
+testability blockers without weakening the Dashboard service:
+
+1. **Refresh native evidence** reserves a single-use, ten-minute
+   `soul-maintenance://` URL.
+2. The desktop opens a visible kitty owned by the logged-in operator.
+3. That bounded process performs read-only package checks and records
+   owner-private evidence that expires after 15 minutes.
+4. Refresh the A2 preview to bind the exact update plan to that evidence.
+5. A future enabled live click similarly reserves one single-use URL; package
+   commands still begin only after the visible terminal obtains one native
+   `sudo -v` authorization.
+
+The URI contains only a typed operation, opaque ID, and SHA-256 digest. It
+contains no command, path, password, or shell text. The handler is an XDG
+desktop association, not a service, daemon, socket, timer, watcher, or
+listener. It is installed through an exact plan:
+
+```text
+make maintenance-handoff-plan
+make maintenance-handoff-install EXPECTED_DIGEST=<reviewed digest> CONFIRM=INSTALL_SOUL_MAINTENANCE_HANDOFF
+make maintenance-handoff-check
+```
+
+The public and local default remains `SOUL_MAINTENANCE_A2_LIVE=false`. The live
 button stays unavailable until the completed candidate and one supervised run
 receive separate authorization. Passwords never enter the Dashboard, `.env`,
 receipts, arguments, or model context.
 
 The Dashboard distinguishes fixture-rehearsal blockers from live-only
-blockers. A failed package-metadata fetch or a service sandbox that sets
-`NoNewPrivileges` cannot weaken or enable the live path, but they do not prevent
-the zero-command fixture rehearsal from exercising the visible terminal and
-receipt lifecycle. On the current reference host, both conditions remain
-visible live blockers pending a separately reviewed deployment decision.
+blockers. A failed package-metadata fetch cannot weaken or enable the live path,
+but it does not prevent the zero-command fixture rehearsal from exercising the
+visible terminal and receipt lifecycle. The desktop handoff supplies native
+evidence while preserving the service sandbox.
 
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
 restorer.
@@ -89,6 +116,7 @@ restorer.
 ```text
 make verify-maintenance-rehearsal
 make verify-maintenance-foreground-execution
+make verify-maintenance-desktop-handoff
 ```
 
 Engineering evidence:
@@ -96,3 +124,5 @@ Engineering evidence:
 - [`MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md`](../soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md)
 - [`MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md`](../assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md)
 - [`MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md`](../assessments/MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md)
+- [`MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md`](../soul/MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md)
+- [`MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md`](../assessments/MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md)

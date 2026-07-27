@@ -85,7 +85,7 @@ module SoulCore
         "skills" => [],
         "summary" => "Preview the reviewed Arch/AUR and Flatpak transaction and run its visible no-mutation terminal rehearsal.",
         "inputs" => "Use Administration for normal yay -Syu or explicit forced-refresh yay -Syyu planning and exact click authorization.",
-        "boundary" => "Chat can explain but cannot authorize it. Live A2 remains disabled pending supervised approval, and no A2 path can reboot or restore a session."
+        "boundary" => "Chat can explain but cannot authorize it. Native evidence uses a single-use visible desktop handoff. Live A2 remains disabled pending supervised approval, and no A2 path can reboot or restore a session."
       },
       {
         "id" => "review_center",
