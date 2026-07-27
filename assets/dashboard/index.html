@@ -64,6 +64,12 @@
           <button id="visual-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="visual-panel"><strong>Visual Studio</strong><span>Local still drafts now; motion after measured qualification</span></button>
         </div>
       </div>
+      <div id="administration-navigation" class="tab-menu">
+        <button id="administration-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="administration-menu">Administration <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
+        <div id="administration-menu" class="self-improvement-menu" role="menu" aria-label="Administration surfaces" hidden>
+          <button id="backup-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="backup-panel"><strong>Backup &amp; Recovery</strong><span>Verified snapshots, deletion holds, retention, and staged restore</span></button>
+        </div>
+      </div>
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
@@ -477,6 +483,56 @@
       </div>
       <section class="improvement-card augmentation-draft" aria-labelledby="augmentation-draft-heading"><div><p class="eyebrow">Proposal gate</p><h2 id="augmentation-draft-heading">Describe a core-system change</h2><p class="card-note">A skill performs a bounded capability. Use this surface only when the architecture itself must change.</p></div><label for="augmentation-objective">Objective</label><textarea id="augmentation-objective" rows="4" maxlength="1000" placeholder="Describe the architectural capability or limitation to change…"></textarea><label for="augmentation-why-not-skill">Why this cannot be a bounded skill</label><textarea id="augmentation-why-not-skill" rows="4" maxlength="1000" placeholder="Explain why shared orchestration, contracts, or core infrastructure must change…"></textarea><button id="preview-augmentation-proposal" class="gate-button" type="button">Preview proposal packet</button><div id="augmentation-proposal-preview" class="gate-card" hidden><div id="augmentation-proposal-preview-details" class="recommendation-list"></div><label for="augmentation-confirmation">Type <code>CREATE_SELF_AUGMENTATION_PROPOSAL</code></label><input id="augmentation-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-augmentation-proposal" class="gate-button gate-button--gold" type="button" disabled>Create review packet</button></div><p id="augmentation-status" class="dialog-status" role="status"></p></section>
       <aside class="unavailable-boundary"><div><p class="eyebrow">Augmentation boundary</p><h2>Implementation and integration remain external</h2></div><p>Gate A1 may create one detached worktree and handoff; Gate A2 may approve one exact committed candidate for consideration. Soul never invokes Codex, creates a branch, merges, pushes, deploys, or force-removes a dirty worktree.</p></aside>
+    </section>
+
+    <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>
+      <header class="studio-header">
+        <div><p class="eyebrow">Continuity administration</p><h1>Backup &amp; Recovery</h1><p>Create verified encrypted snapshots, preserve deletion recovery holds, and stage exact restores without overwriting the live system.</p></div>
+        <div class="studio-boundary"><strong>Manual authority only</strong><span>Inspect → preview → authorize → verify</span><small>No schedule, password retention, automatic pruning, or live-tree replacement.</small></div>
+      </header>
+      <div class="backup-unlock">
+        <label for="backup-password">Repository password <input id="backup-password" type="password" maxlength="1024" autocomplete="off" placeholder="Held only for this page session"></label>
+        <button id="refresh-backup" class="refresh-button" type="button">Unlock &amp; refresh</button>
+        <button id="forget-backup-password" class="quiet-button" type="button">Forget password</button>
+        <p id="backup-status" role="status" aria-live="polite">Open this page to inspect the local recovery target.</p>
+      </div>
+      <div class="backup-summary">
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery target</p><h2>Repository</h2></div><span id="backup-repository-state" class="count-badge">—</span></div><dl id="backup-repository-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Deletion safety</p><h2>Retention ledger</h2></div><span id="backup-ledger-state" class="count-badge">—</span></div><dl id="backup-ledger-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery evidence</p><h2>Receipts &amp; staging</h2></div><span id="backup-receipt-count" class="count-badge">0</span></div><dl id="backup-evidence-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
+      </div>
+      <div class="backup-workspace">
+        <section class="improvement-card backup-snapshot-card">
+          <div class="card-heading"><div><p class="eyebrow">Encrypted history</p><h2>Snapshots</h2></div><span id="backup-snapshot-count" class="count-badge">0</span></div>
+          <p class="card-note">Select exact older snapshots for retention, or one snapshot for staged restore. The newest snapshot cannot be forgotten.</p>
+          <div id="backup-snapshot-list" class="backup-snapshot-list"><p class="muted">Enter the repository password to inspect encrypted history.</p></div>
+        </section>
+        <div class="backup-actions">
+          <section class="gate-card">
+            <div><p class="eyebrow">Verified capture</p><h3>Create a backup</h3><p>Captures the owner allow-list, verifies repository metadata, derives the exact snapshot inventory, and records deletion holds.</p></div>
+            <button id="preview-backup-create" class="gate-button" type="button">Preview backup</button>
+            <div id="backup-create-confirm" hidden><pre id="backup-create-scope" class="clear-preview-list"></pre><button id="execute-backup-create" class="gate-button gate-button--gold" type="button">Create verified backup</button></div>
+            <div id="backup-create-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing backup…</span></div>
+            <p id="backup-create-status" class="dialog-status" role="status"></p>
+          </section>
+          <section class="gate-card backup-danger-gate">
+            <div><p class="eyebrow">Deletion-aware retention</p><h3>Forget selected snapshots</h3><p>Only explicitly selected, non-newest, hold-clear snapshots may be forgotten. Bounded prune and metadata verification follow.</p></div>
+            <button id="preview-backup-retention" class="danger-button" type="button">Preview retention</button>
+            <div id="backup-retention-confirm" hidden><pre id="backup-retention-scope" class="clear-preview-list"></pre><button id="execute-backup-retention" class="danger-button" type="button">Forget selected &amp; prune</button></div>
+            <div id="backup-retention-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing retention…</span></div>
+            <p id="backup-retention-status" class="dialog-status" role="status"></p>
+          </section>
+          <section class="gate-card">
+            <div><p class="eyebrow">Isolated recovery</p><h3>Stage a restore</h3><p>Choose one snapshot. Optional absolute paths below narrow the restore; blank restores the full snapshot into private staging.</p></div>
+            <label for="backup-restore-paths">Optional paths · one per line</label><textarea id="backup-restore-paths" rows="4" placeholder="/home/USER/Projects/soul/Soul/private/project_tracker/state.json"></textarea>
+            <button id="preview-backup-restore" class="gate-button" type="button">Preview staged restore</button>
+            <div id="backup-restore-confirm" hidden><pre id="backup-restore-scope" class="clear-preview-list"></pre><button id="execute-backup-restore" class="gate-button gate-button--gold" type="button">Restore into staging</button></div>
+            <div id="backup-restore-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing restore…</span></div>
+            <p id="backup-restore-status" class="dialog-status" role="status"></p>
+          </section>
+        </div>
+      </div>
+      <aside class="unavailable-boundary"><div><p class="eyebrow">Recovery boundary</p><h2>Staging is not live promotion</h2></div><p>Soul verifies restored files in an isolated owner-private directory and stops for review. Replacing live state, revoking current sessions, and reopening services remain an external recovery procedure.</p></aside>
     </section>
   </main>
   <dialog id="invocation-catalog" class="review-center invocation-catalog" aria-labelledby="invocation-catalog-title">

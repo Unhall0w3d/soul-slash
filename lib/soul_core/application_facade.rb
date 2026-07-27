@@ -20,6 +20,7 @@ require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
+require_relative "backup_administration_service"
 require_relative "project_tracker_service"
 require_relative "project_release_service"
 require_relative "model_runtime_control_service"
@@ -64,6 +65,7 @@ module SoulCore
       conversation_forget_service: nil,
       workspace_service: nil,
       status_collector: nil,
+      backup_administration_service: nil,
       project_tracker_service: nil,
       project_release_service: nil,
       model_runtime_control_service: nil,
@@ -104,6 +106,7 @@ module SoulCore
       @conversation_forget_service = conversation_forget_service
       @workspace_service = workspace_service
       @status_collector = status_collector
+      @backup_administration_service = backup_administration_service
       @project_tracker_service = project_tracker_service
       @project_release_service = project_release_service
       @model_runtime_control_service = model_runtime_control_service
@@ -201,6 +204,13 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
+      when "backup.status" then domain(backup_administration.status(password: parameters["password"]))
+      when "backup.create.preview" then domain(backup_administration.backup_preview(password: required(parameters, "password")))
+      when "backup.create.execute" then domain(backup_administration.backup_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "backup.retention.preview" then domain(backup_administration.retention_preview(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids")))
+      when "backup.retention.execute" then domain(backup_administration.retention_execute(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "backup.restore.preview" then domain(backup_administration.restore_preview(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", [])))
+      when "backup.restore.execute" then domain(backup_administration.restore_execute(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "project_tracker.snapshot" then domain(project_tracker.snapshot)
       when "project_tracker.items.create" then domain(project_tracker.create(attributes: required(parameters, "item")))
       when "project_tracker.items.update" then domain(project_tracker.update(item_id: required(parameters, "item_id"), attributes: required(parameters, "item"), expected_revision: required(parameters, "expected_revision")))
@@ -385,7 +395,8 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Project Timeline", "Self Improvement", "Creative Studios"],
+        "product_tabs" => ["Chat", "Project Timeline", "Self Improvement", "Creative Studios", "Administration"],
+        "administration_surfaces" => ["Backup & Recovery"],
         "creative_surfaces" => ["Music Studio", "Visual Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
@@ -755,6 +766,12 @@ module SoulCore
 
     def project_tracker
       @project_tracker_service ||= ProjectTrackerService.new(root: @root, clock: @clock)
+    end
+
+    def backup_administration
+      @backup_administration_service ||= BackupAdministrationService.new(
+        root: @root, process_env: @process_env, clock: @clock
+      )
     end
 
     def conversation_creative_workflow

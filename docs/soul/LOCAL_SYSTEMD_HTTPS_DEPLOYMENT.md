@@ -46,6 +46,11 @@ soul-dashboard.service
 soul-dashboard-proxy.service
 ```
 
+`soul-dashboard.service` retains `ProtectSystem=strict`. It receives write
+access only to the Soul project and the exact optional
+`SOUL_BACKUP_MOUNT` recovery path. A missing recovery path is ignored; the
+exception does not widen Soul's network listener or grant access elsewhere.
+
 If service activation fails, both services are disabled and stopped. Private data and rendered reviewable configuration are preserved for diagnosis.
 
 ## Local files

@@ -101,6 +101,8 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/chat-stream"
       return music_stream(normalized_headers, body) if target == "/api/v1/music-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-stream"
+      return administration_stream(normalized_headers, body) if target == "/api/v1/administration-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/administration-stream"
       return music_job_start(normalized_headers, body) if target == "/api/v1/music-job-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-stream"
       return music_job_follow(normalized_headers, body) if target == "/api/v1/music-job-follow" && method == "POST"
@@ -216,6 +218,26 @@ module SoulCore
         output << JSON.generate({ "type" => "result", "envelope" => envelope }) + "\n"
       rescue StandardError => error
         output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "music stream failed safely: #{error.class}") }) + "\n"
+      end
+      response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
+    end
+
+    def administration_stream(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+      allowed = %w[backup.create.execute backup.retention.execute backup.restore.execute]
+      unless request.is_a?(Hash) && allowed.include?(request["operation"])
+        return json_response(422, error_envelope("invalid_stream_operation", "administration stream accepts bounded backup and recovery execution only"))
+      end
+      stream = Enumerator.new do |output|
+        progress = ->(event) { output << JSON.generate({ "type" => "progress", "event" => event }) + "\n" }
+        envelope = @facade.call(request, progress: progress)
+        output << JSON.generate({ "type" => "result", "envelope" => envelope }) + "\n"
+      rescue StandardError => error
+        output << JSON.generate({ "type" => "result", "envelope" => error_envelope("stream_failure", "administration stream failed safely: #{error.class}") }) + "\n"
       end
       response(200, stream, "Content-Type" => "application/x-ndjson; charset=utf-8", "Cache-Control" => "no-store")
     end
