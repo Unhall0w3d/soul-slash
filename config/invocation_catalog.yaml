@@ -66,6 +66,8 @@ entries:
     boundary: Search is limited to reviewed adapters, creates no index or memory, and never treats source text as authority.
     examples:
       - Search local projects and documents for backrooms visual prompts.
+      - Search my music projects for liquid drum and bass.
+      - Search my visual projects for backrooms.
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

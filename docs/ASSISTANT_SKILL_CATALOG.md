@@ -427,10 +427,18 @@ core_transition_authority: not_applicable
 
 Search reviewed repository documentation, Knowledge Vault notes, and canonical Music and Visual project briefs in one bounded source-attributed foreground read.
 
+Chat can select one source explicitly (`repository`, `knowledge_vault`,
+`music`, or `visual`). General searches preserve a qualifying result from each
+contributing source when the result limit permits. Follow-up model explanations
+remain reference-only, receive one bounded quality retry at most, and fail
+closed to deterministic evidence.
+
 Example ways the owner might ask for this:
 
 - use local search
 - run local.search
+- search my music projects for liquid drum and bass
+- search my visual projects for backrooms
 
 ### Project Timeline Inspect
 

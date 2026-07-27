@@ -31,7 +31,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [ ] remove remaining implementation-phase labels and stale UI/documentation language
-- [~] review bounded source-attributed local project and document search
+- [~] review A2 bounded source-attributed local project and document search
+  with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [ ] strengthen cleanup, retention, backup, and recovery evidence
 
@@ -47,8 +48,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   - [x] A1 bounded picture attachment and understanding
   - [x] A2 explicit one-shot monitor, window, or region capture
   - [x] A3 voice-mediated perception requests
-- [~] project-aware and local-document lexical search candidate; broader roots
-  and vector retrieval remain separately qualified
+- [~] project-aware and local-document lexical search A2 candidate passes the
+  matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
+  remain separately qualified
 - [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
 
 ## Separate deployment tracks

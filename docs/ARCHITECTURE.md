@@ -127,7 +127,9 @@ Current bounded capabilities include:
   knowledge-destination reflection, and explicit local conversation-to-note
   proposal planning
 - bounded source-attributed local search across repository documentation,
-  Knowledge Vault notes, and canonical Music and Visual project briefs
+  Knowledge Vault notes, and canonical Music and Visual project briefs, with
+  balanced multi-source ranking, exact source-scoped Chat phrases, and a
+  deterministic non-authority/quality guard around later model follow-ups
 
 Separate Beta candidates are held outside the production registry. They run only after preview and exact human confirmation, with bounded foreground execution and local diagnostic evidence.
 
