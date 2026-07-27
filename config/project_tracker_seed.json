@@ -397,6 +397,23 @@
       "source": "Human-approved Chat Progress Summaries A1 brief, 2026-07-27"
     },
     {
+      "item_id": "track_fleet_maintenance_control",
+      "title": "Device-scoped fleet status, maintenance, and reboot control",
+      "area": "Administration + Infrastructure",
+      "horizon": "archive",
+      "status": "validated",
+      "priority": "high",
+      "summary": "Operate the Maven workstation, Forge Proxmox host, and Pi-hole LXC through persistent status cards and separately authorized device-scoped maintenance and reboot actions.",
+      "implementation": "The Guided Maintenance dashboard loads a private atomic fleet snapshot, renders one architecture view and one card per device, and exposes Maintenance and Reboot only on the selected card. Forge and Pi-hole operations use fixed SSH aliases, fixed shell-free command vectors, fresh digest-bound previews, exact device confirmations, one global identity-checked lock, redacted receipts, and no automatic mutation retry. Reboot sends one request, requires a changed boot identity and fixed device-specific readiness, then replaces the snapshot. A status-only systemd timer collects at noon and midnight.",
+      "technologies": "Ruby bounded services and typed application operations; OpenSSH fixed aliases; APT and Pi-hole fixed vectors; Proxmox VE and LXC; JSON snapshots and receipts; SHA-256 digest binding; systemd user oneshot/timer; vanilla JavaScript, HTML, and CSS Dashboard.",
+      "interfaces": "Administration → Guided Maintenance; Collect fleet status; per-device Maintenance and Reboot dialogs; evidence-driven architecture map; persisted status cards.",
+      "commands": "make verify-maintenance-fleet-status\nmake verify-maintenance-device-control\nmake fleet-status-schedule-plan\nmake fleet-status-schedule-status",
+      "references": "docs/soul/MAINTENANCE_FLEET_STATUS_B1_BRIEF.md\ndocs/soul/MAINTENANCE_DEVICE_CONTROL_C1_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/assessments/MAINTENANCE_FLEET_STATUS_B1_REVIEW.md\ndocs/assessments/MAINTENANCE_DEVICE_CONTROL_C1_REVIEW.md",
+      "acceptance": "Deterministic safety and regression suites pass. The timer is installed and active. On 2026-07-27 the operator accepted the interface and completed supervised Forge and Pi-hole maintenance plus one reboot of each device. Every mutation completed with a terminal receipt; the hardened Forge reboot withheld snapshot replacement until Proxmox, LXC, Pi-hole service, version, DNS, and blocking readiness all passed.",
+      "source": "Human-approved Maintenance Device Control C1, 2026-07-27",
+      "notes": "Implemented in commits 2ea121c and 0c63647. Supervised receipts: Forge maintenance device_receipt_9192a74a3625e208; Pi-hole maintenance device_receipt_713c515392cb4f19; Pi-hole reboot device_receipt_f6b016c37f4ba527; Forge reboot device_receipt_1eb39ab94fb81dde. The private dashboard environment keeps remote live execution enabled, but every action still requires a fresh digest and exact device-specific confirmation. Maven conditional reboot and Hyprland restoration remain tracked separately."
+    },
+    {
       "item_id": "track_guided_maintenance_reboot_restore",
       "title": "Guided update, reboot, and Hyprland workspace restoration",
       "area": "Administration",
