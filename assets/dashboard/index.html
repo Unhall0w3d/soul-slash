@@ -68,6 +68,7 @@
         <button id="administration-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="administration-menu">Administration <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="administration-menu" class="self-improvement-menu" role="menu" aria-label="Administration surfaces" hidden>
           <button id="backup-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="backup-panel"><strong>Backup &amp; Recovery</strong><span>Verified snapshots, deletion holds, retention, and staged restore</span></button>
+          <button id="maintenance-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="maintenance-panel"><strong>Guided Maintenance</strong><span>Update, reboot, and workspace-restore planning</span></button>
         </div>
       </div>
     </nav>
@@ -466,19 +467,9 @@
         <p id="host-plan-status" class="dialog-status" role="status"></p>
       </section>
 
-      <section class="improvement-card host-plan-card" aria-labelledby="maintenance-rehearsal-heading">
-        <div class="card-heading"><div><p class="eyebrow">Guided maintenance · A1</p><h2 id="maintenance-rehearsal-heading">Reboot and workspace rehearsal</h2></div><span class="count-badge">read only</span></div>
-        <p class="card-note">Preview the approved one-password update sequence and a privacy-filtered Hyprland restore map. A1 cannot authenticate, update, launch applications, write a journal, or reboot.</p>
-        <label class="check-row" for="maintenance-force-refresh"><input id="maintenance-force-refresh" type="checkbox"> Force package-database refresh with <code>yay -Syyu</code> on this run</label>
-        <div class="host-plan-actions"><button id="preview-maintenance" class="gate-button" type="button">Preview maintenance run</button><button id="rehearse-maintenance" class="gate-button" type="button" disabled>Run non-destructive rehearsal</button></div>
-        <div id="maintenance-preview-details" class="recommendation-list"><p class="muted">No maintenance preview collected.</p></div>
-        <pre id="maintenance-rehearsal-output" class="diagnostic-output" hidden></pre>
-        <p id="maintenance-rehearsal-status" class="dialog-status" role="status">No privilege or host mutation is available in A1.</p>
-      </section>
-
       <aside class="unavailable-boundary" aria-labelledby="unavailable-actions-heading">
         <div><p class="eyebrow">Assessment boundary</p><h2 id="unavailable-actions-heading">Host changes require separate approval</h2></div>
-        <p>The approved A1 slice adds planning and rehearsal only. Authentication, update execution, reboot, and post-login restoration require separately reviewed executors at the A2 and A3 gates. Self Assessment only inspects, plans, and rehearses in this slice.</p>
+        <p>Self Assessment only inspects and prepares evidence. Guided Maintenance is exposed separately under Administration; authentication, update execution, reboot, and post-login restoration still require their reviewed A2 and A3 gates.</p>
       </aside>
     </section>
 
@@ -493,6 +484,23 @@
       </div>
       <section class="improvement-card augmentation-draft" aria-labelledby="augmentation-draft-heading"><div><p class="eyebrow">Proposal gate</p><h2 id="augmentation-draft-heading">Describe a core-system change</h2><p class="card-note">A skill performs a bounded capability. Use this surface only when the architecture itself must change.</p></div><label for="augmentation-objective">Objective</label><textarea id="augmentation-objective" rows="4" maxlength="1000" placeholder="Describe the architectural capability or limitation to change…"></textarea><label for="augmentation-why-not-skill">Why this cannot be a bounded skill</label><textarea id="augmentation-why-not-skill" rows="4" maxlength="1000" placeholder="Explain why shared orchestration, contracts, or core infrastructure must change…"></textarea><button id="preview-augmentation-proposal" class="gate-button" type="button">Preview proposal packet</button><div id="augmentation-proposal-preview" class="gate-card" hidden><div id="augmentation-proposal-preview-details" class="recommendation-list"></div><label for="augmentation-confirmation">Type <code>CREATE_SELF_AUGMENTATION_PROPOSAL</code></label><input id="augmentation-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-augmentation-proposal" class="gate-button gate-button--gold" type="button" disabled>Create review packet</button></div><p id="augmentation-status" class="dialog-status" role="status"></p></section>
       <aside class="unavailable-boundary"><div><p class="eyebrow">Augmentation boundary</p><h2>Implementation and integration remain external</h2></div><p>Gate A1 may create one detached worktree and handoff; Gate A2 may approve one exact committed candidate for consideration. Soul never invokes Codex, creates a branch, merges, pushes, deploys, or force-removes a dirty worktree.</p></aside>
+    </section>
+
+    <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
+      <header class="improvement-header">
+        <div><p class="eyebrow">Host administration</p><h1>Guided Maintenance</h1><p>Coordinate reviewed update, reboot, and session-restoration work without turning general conversation into host authority.</p></div>
+        <div class="improvement-boundary"><strong>A1 · rehearsal only</strong><span>Inspect → map → simulate</span><small>No authentication, mutation, launch, persistence, or reboot.</small></div>
+      </header>
+      <section class="improvement-card host-plan-card" aria-labelledby="maintenance-rehearsal-heading">
+        <div class="card-heading"><div><p class="eyebrow">Guided maintenance · A1</p><h2 id="maintenance-rehearsal-heading">Reboot and workspace rehearsal</h2></div><span class="count-badge">read only</span></div>
+        <p class="card-note">Preview the approved one-password update sequence and a privacy-filtered Hyprland restore map. A1 cannot authenticate, update, launch applications, write a journal, or reboot.</p>
+        <label class="check-row" for="maintenance-force-refresh"><input id="maintenance-force-refresh" type="checkbox"> Force package-database refresh with <code>yay -Syyu</code> on this run</label>
+        <div class="host-plan-actions"><button id="preview-maintenance" class="gate-button" type="button">Preview maintenance run</button><button id="rehearse-maintenance" class="gate-button" type="button" disabled>Run non-destructive rehearsal</button></div>
+        <div id="maintenance-preview-details" class="recommendation-list"><p class="muted">No maintenance preview collected.</p></div>
+        <pre id="maintenance-rehearsal-output" class="diagnostic-output" hidden></pre>
+        <p id="maintenance-rehearsal-status" class="dialog-status" role="status">No privilege or host mutation is available in A1.</p>
+      </section>
+      <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>Rehearsal is not host authority</h2></div><p>A2 must separately qualify the visible one-password foreground updater. A3 must separately qualify conditional reboot and one-shot post-login restoration.</p></aside>
     </section>
 
     <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>

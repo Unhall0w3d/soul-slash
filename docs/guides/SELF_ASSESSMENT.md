@@ -37,10 +37,11 @@ Those packets do not implement a skill, alter the host, download a model, or pro
 
 On the supported Arch/CachyOS host path, Self Assessment can prepare a fresh, digest-bound full-upgrade handoff. Soul never runs `pacman`, invokes `sudo`, or collects a password. The Operator executes the terminal command and may return afterward to verify postconditions.
 
-## Guided maintenance rehearsal
+## Guided maintenance evidence
 
-The approved A1 maintenance slice adds a separate read-only preview and
-rehearsal for a future end-to-end transaction:
+Self Assessment supplies the read-only package and host evidence consumed by
+the separate **Administration → Guided Maintenance** surface. That A1 surface
+previews and rehearses a future end-to-end transaction:
 
 ```text
 yay full upgrade
@@ -67,6 +68,7 @@ inventory of unrelated background services. The
 rehearsal simulates the declared lifecycle and reports blockers. It requests no
 password, writes no operational state, launches nothing, and cannot reboot.
 
+See [Guided Maintenance](GUIDED_MAINTENANCE.md) for its controls and boundaries.
 Actual authentication and updates require a separately reviewed A2 gate.
 Conditional reboot and the one-shot post-login restorer require A3.
 

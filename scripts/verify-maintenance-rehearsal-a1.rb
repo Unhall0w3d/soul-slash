@@ -237,9 +237,11 @@ check.call("typed operations expose preview and rehearsal only",
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("Self Assessment exposes a clearly read-only preview and rehearsal",
+check.call("Administration exposes a clearly read-only preview and rehearsal",
            html.include?('id="preview-maintenance"') &&
              html.include?('id="rehearse-maintenance"') &&
+             html.include?('id="maintenance-panel"') &&
+             html.include?('id="maintenance-tab"') &&
              html.include?("A1 cannot authenticate") &&
              javascript.include?('callSoul("maintenance.preview"') &&
              javascript.include?('callSoul("maintenance.rehearsal"'))

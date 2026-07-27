@@ -79,6 +79,15 @@ module SoulCore
         "boundary" => "Code inspection and proposal review do not authorize implementation or host mutation."
       },
       {
+        "id" => "guided_maintenance",
+        "label" => "Guided Maintenance",
+        "aliases" => ["guided maintenance", "maintenance rehearsal", "update rehearsal"],
+        "skills" => [],
+        "summary" => "Preview and rehearse the reviewed Arch/AUR, Flatpak, reboot, and Hyprland restoration transaction.",
+        "inputs" => "Use Administration for normal yay -Syu or explicit forced-refresh yay -Syyu planning.",
+        "boundary" => "A1 is read-only; update execution and reboot/restoration remain separately reviewed A2 and A3 gates."
+      },
+      {
         "id" => "review_center",
         "label" => "Review Center",
         "aliases" => ["review center", "reviews"],
@@ -92,8 +101,8 @@ module SoulCore
     REQUEST_PATTERNS = [
       /\A\s*(?:please\s+)?(?:show|list|explain|describe)\s+(?:the\s+)?(?:dashboard|studio)\s+(?:capabilities|actions|invocations|workflows)\b/i,
       /\A\s*(?:what|which)\s+(?:dashboard|studio)\s+(?:capabilities|actions|workflows)\s+(?:can|do)\b/i,
-      /\A\s*what\s+can\s+(?:i\s+ask\s+)?you\s+(?:to\s+)?do\s+(?:through|in|with|from)\s+(?:the\s+)?(?:dashboard|chat|music studio|visual studio|skill studio|self assessment|self augmentation|project timeline|review center|core control)\b/i,
-      /\A\s*how\s+(?:can|do)\s+i\s+use\s+(?:the\s+)?(?:dashboard|chat|music studio|visual studio|skill studio|self assessment|self augmentation|project timeline|review center|core control)\s+(?:through|from|in|with)\s+(?:chat|soul)\b/i
+      /\A\s*what\s+can\s+(?:i\s+ask\s+)?you\s+(?:to\s+)?do\s+(?:through|in|with|from)\s+(?:the\s+)?(?:dashboard|chat|music studio|visual studio|skill studio|self assessment|self augmentation|guided maintenance|project timeline|review center|core control)\b/i,
+      /\A\s*how\s+(?:can|do)\s+i\s+use\s+(?:the\s+)?(?:dashboard|chat|music studio|visual studio|skill studio|self assessment|self augmentation|guided maintenance|project timeline|review center|core control)\s+(?:through|from|in|with)\s+(?:chat|soul)\b/i
     ].freeze
 
     def initialize(root: Dir.pwd, registry: nil)

@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel", backup: "#backup-panel" });
+const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel", maintenance: "#maintenance-panel", backup: "#backup-panel" });
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
@@ -454,10 +454,11 @@ function switchTab(name, { updateLocation = true } = {}) {
   const augmentation = name === "augmentation";
   const music = name === "music";
   const visual = name === "visual";
+  const maintenance = name === "maintenance";
   const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual;
-  const administration = backup;
+  const administration = maintenance || backup;
   byId("chat-panel").hidden = !chat;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
@@ -465,6 +466,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
   byId("visual-panel").hidden = !visual;
+  byId("maintenance-panel").hidden = !maintenance;
   byId("backup-panel").hidden = !backup;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("timeline-tab").classList.toggle("is-active", timeline);
@@ -476,6 +478,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("music-tab").classList.toggle("is-active", music);
   byId("visual-tab").classList.toggle("is-active", visual);
   byId("administration-tab").classList.toggle("is-active", administration);
+  byId("maintenance-tab").classList.toggle("is-active", maintenance);
   byId("backup-tab").classList.toggle("is-active", backup);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("timeline-tab").setAttribute("aria-selected", String(timeline));
@@ -490,6 +493,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("music-tab").setAttribute("aria-current", music ? "page" : "false");
   byId("visual-tab").setAttribute("aria-current", visual ? "page" : "false");
   byId("administration-tab").setAttribute("aria-selected", String(administration));
+  byId("maintenance-tab").setAttribute("aria-current", maintenance ? "page" : "false");
   byId("backup-tab").setAttribute("aria-current", backup ? "page" : "false");
   setSelfImprovementMenu(false);
   setCreativeMenu(false);
@@ -3154,6 +3158,7 @@ byId("improvement-tab").addEventListener("click", () => switchTab("improvement")
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
+byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
 byId("forget-backup-password").addEventListener("click", () => {

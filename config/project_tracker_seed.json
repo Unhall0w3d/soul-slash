@@ -377,16 +377,16 @@
     {
       "item_id": "track_guided_maintenance_reboot_restore",
       "title": "Guided update, reboot, and Hyprland workspace restoration",
-      "area": "Self Assessment",
+      "area": "Administration",
       "horizon": "next",
       "status": "in_progress",
       "priority": "high",
       "summary": "Build a one-password, operator-started Arch/AUR and Flatpak maintenance transaction with conditional reboot and one-shot restoration of safely allowlisted Hyprland applications.",
       "implementation": "A1 provides typed plans, journals, privacy-filtered window snapshots, a fixed restore registry, exact inert update argv, and a non-destructive Dashboard rehearsal. It cannot authenticate, update, launch applications, write an operational journal, or reboot. A2 foreground execution and A3 conditional reboot/restoration remain separate review gates.",
       "technologies": "Ruby bounded services; JSON schemas and restore registry; yay, Flatpak, Hyprland hyprctl structured JSON; Dashboard JavaScript. Later reviewed slices may add one visible kitty transaction and one bounded systemd user oneshot.",
-      "interfaces": "Self Improvement → Self Assessment → Reboot and workspace rehearsal; typed maintenance.preview and maintenance.rehearsal application operations; Invocation Guide explanation.",
+      "interfaces": "Administration → Guided Maintenance; typed maintenance.preview and maintenance.rehearsal application operations; Self Assessment evidence; Invocation Guide explanation.",
       "commands": "make verify-maintenance-rehearsal",
-      "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md",
+      "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md",
       "acceptance": "A1 must prove fresh read-only evidence, exact command planning, snapshot privacy, allowlisted restore decisions, bounded lifecycle simulation, and zero authentication, mutation, launch, persistence, or reboot effects before A2 is considered.",
       "source": "Human-approved Class-5 brief, 2026-07-27"
     }
