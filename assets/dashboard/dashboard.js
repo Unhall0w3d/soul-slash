@@ -1,7 +1,7 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel" });
+const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel", backup: "#backup-panel" });
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
@@ -11,6 +11,7 @@ state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
+Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupBusy: false });
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
 const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
 const NOTIFICATION_MODES = ["voice", "cues", "muted"];
@@ -452,8 +453,10 @@ function switchTab(name, { updateLocation = true } = {}) {
   const augmentation = name === "augmentation";
   const music = name === "music";
   const visual = name === "visual";
+  const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual;
+  const administration = backup;
   byId("chat-panel").hidden = !chat;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
@@ -461,6 +464,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
   byId("visual-panel").hidden = !visual;
+  byId("backup-panel").hidden = !backup;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("timeline-tab").classList.toggle("is-active", timeline);
   byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
@@ -470,6 +474,8 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("creative-tab").classList.toggle("is-active", creative);
   byId("music-tab").classList.toggle("is-active", music);
   byId("visual-tab").classList.toggle("is-active", visual);
+  byId("administration-tab").classList.toggle("is-active", administration);
+  byId("backup-tab").classList.toggle("is-active", backup);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("timeline-tab").setAttribute("aria-selected", String(timeline));
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
@@ -482,8 +488,11 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("creative-tab").setAttribute("aria-selected", String(creative));
   byId("music-tab").setAttribute("aria-current", music ? "page" : "false");
   byId("visual-tab").setAttribute("aria-current", visual ? "page" : "false");
+  byId("administration-tab").setAttribute("aria-selected", String(administration));
+  byId("backup-tab").setAttribute("aria-current", backup ? "page" : "false");
   setSelfImprovementMenu(false);
   setCreativeMenu(false);
+  setAdministrationMenu(false);
   if (updateLocation && window.location.hash !== TAB_LOCATIONS[name]) window.history.replaceState(null, "", TAB_LOCATIONS[name]);
   if (studio && state.authenticated && !state.studioLoaded) loadSkillStudio();
   if (improvement && state.authenticated && !state.improvementLoaded) loadSelfImprovement();
@@ -491,6 +500,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
+  if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
 }
 
 function setSelfImprovementMenu(open) {
@@ -503,6 +513,12 @@ function setCreativeMenu(open) {
   byId("creative-menu").hidden = !open;
   byId("creative-tab").setAttribute("aria-expanded", String(open));
   byId("creative-navigation").classList.toggle("is-open", open);
+}
+
+function setAdministrationMenu(open) {
+  byId("administration-menu").hidden = !open;
+  byId("administration-tab").setAttribute("aria-expanded", String(open));
+  byId("administration-navigation").classList.toggle("is-open", open);
 }
 
 const TIMELINE_HORIZONS = ["now", "next", "later", "backlog"];
@@ -2808,6 +2824,224 @@ async function startVisualGeneration() {
   finally { state.visualGenerating = false; hideGenerationProgress(byId("visual-progress")); }
 }
 
+function backupPassword() {
+  const password = byId("backup-password").value;
+  if (!password) throw new Error("Enter the repository password for this operation.");
+  return password;
+}
+
+function backupResult(envelope, accepted = ["complete"]) {
+  const lifecycleState = envelope.lifecycle_state || "failed";
+  if (!accepted.includes(lifecycleState)) throw new Error(envelope.errors?.[0]?.message || "Backup administration stopped safely.");
+  return dataOf(envelope);
+}
+
+function renderBackupFacts(target, facts) {
+  target.replaceChildren();
+  Object.entries(facts).forEach(([term, value]) => {
+    const row = document.createElement("div");
+    const dt = document.createElement("dt"); dt.textContent = term;
+    const dd = document.createElement("dd"); dd.textContent = String(value);
+    row.append(dt, dd); target.append(row);
+  });
+}
+
+function renderBackupSnapshots(snapshots) {
+  const list = byId("backup-snapshot-list"); list.replaceChildren();
+  state.backupSnapshots = Array.isArray(snapshots) ? snapshots : [];
+  byId("backup-snapshot-count").textContent = String(state.backupSnapshots.length);
+  if (!state.backupSnapshots.length) {
+    const empty = document.createElement("p"); empty.className = "muted";
+    empty.textContent = byId("backup-password").value ? "No Soul state snapshots were found." : "Enter the repository password to inspect encrypted history.";
+    list.append(empty); return;
+  }
+  state.backupSnapshots.forEach((snapshot, index) => {
+    const row = document.createElement("div"); row.className = `backup-snapshot${index === 0 ? " is-newest" : ""}`;
+    const controls = document.createElement("div"); controls.className = "backup-snapshot-controls";
+    const retain = document.createElement("input"); retain.type = "checkbox"; retain.className = "backup-retention-select"; retain.value = snapshot.id;
+    retain.disabled = index === 0; retain.title = index === 0 ? "The newest snapshot cannot be forgotten" : "Select for retention";
+    const restore = document.createElement("input"); restore.type = "radio"; restore.name = "backup-restore-snapshot"; restore.value = snapshot.id;
+    restore.title = "Select for staged restore";
+    controls.append(retain, restore);
+    const copy = document.createElement("div");
+    const heading = document.createElement("strong"); heading.textContent = `${snapshot.short_id || snapshot.id.slice(0, 8)}${index === 0 ? " · newest" : ""}`;
+    const time = document.createElement("span"); time.textContent = snapshot.time || "time unavailable";
+    const detail = document.createElement("small"); detail.textContent = `${snapshot.hostname || "unknown host"} · ${Array.isArray(snapshot.paths) ? snapshot.paths.length : 0} recorded roots`;
+    copy.append(heading, time, detail); row.append(controls, copy); list.append(row);
+  });
+}
+
+function renderBackupStatus(payload) {
+  const mount = payload.mount || {};
+  const ready = payload.available && payload.configured && mount.mounted && mount.writable && mount.expected_target;
+  byId("backup-repository-state").textContent = ready ? "READY" : "ATTENTION";
+  renderBackupFacts(byId("backup-repository-details"), {
+    "Repository": payload.repository || "Unavailable",
+    "Mount": mount.target || "Unavailable",
+    "Filesystem": mount.filesystem || "Unavailable",
+    "Write state": mount.mounted ? (mount.writable ? "writable" : "read only") : "not mounted",
+    "Configuration": payload.configured ? `${payload.source_count} sources` : "not configured"
+  });
+  byId("backup-ledger-state").textContent = payload.ledger_present ? "PRESENT" : "BASELINE";
+  renderBackupFacts(byId("backup-ledger-details"), {
+    "Ledger": payload.ledger_present ? "Deletion evidence available" : "Created by first verified capture",
+    "Retention": "30 days after source deletion",
+    "Automation": "Disabled",
+    "Password": "Never retained"
+  });
+  byId("backup-receipt-count").textContent = String(payload.receipt_count || 0);
+  renderBackupFacts(byId("backup-evidence-details"), {
+    "Receipts": payload.receipt_count || 0,
+    "Staged restores": payload.restore_count || 0,
+    "Snapshot access": payload.snapshot_access || "locked",
+    "Live promotion": "External human procedure"
+  });
+  renderBackupSnapshots(payload.snapshots);
+  const status = !payload.available ? "Restic is unavailable."
+    : !payload.configured ? "Backup source and exclusion manifests need configuration."
+      : !mount.mounted ? "The configured recovery target is not mounted."
+        : !mount.expected_target ? "The repository is not on the configured recovery mount."
+          : !mount.writable ? "The recovery target is mounted read-only; capture and retention are blocked."
+            : payload.snapshot_access === "unlocked" ? "Encrypted history unlocked for this page session." : "Recovery target inspected; enter the repository password to unlock history.";
+  byId("backup-status").textContent = status;
+}
+
+async function loadBackupAdministration({ unlock = false } = {}) {
+  byId("refresh-backup").disabled = true;
+  try {
+    const parameters = {};
+    if (unlock) parameters.password = backupPassword();
+    const envelope = await callSoul("backup.status", parameters);
+    renderBackupStatus(backupResult(envelope));
+    state.backupLoaded = true;
+  } catch (error) { byId("backup-status").textContent = error.message; }
+  finally { byId("refresh-backup").disabled = false; }
+}
+
+function resetBackupPreviews() {
+  state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null;
+  ["backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm"].forEach((id) => { byId(id).hidden = true; });
+}
+
+function selectedBackupSnapshotIds() {
+  return Array.from(document.querySelectorAll(".backup-retention-select:checked")).map((input) => input.value);
+}
+
+function selectedBackupRestoreId() {
+  return document.querySelector('input[name="backup-restore-snapshot"]:checked')?.value || "";
+}
+
+function backupRestorePaths() {
+  return byId("backup-restore-paths").value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+async function previewBackupCreate() {
+  byId("preview-backup-create").disabled = true;
+  try {
+    const envelope = await callSoul("backup.create.preview", { password: backupPassword() });
+    state.backupCreatePreview = backupResult(envelope);
+    byId("backup-create-scope").textContent = JSON.stringify({
+      sources: state.backupCreatePreview.sources,
+      estimated_bytes: state.backupCreatePreview.estimated_bytes,
+      prior_snapshot_id: state.backupCreatePreview.prior_snapshot_id,
+      verification: state.backupCreatePreview.verification
+    }, null, 2);
+    byId("backup-create-confirm").hidden = false;
+    byId("backup-create-status").textContent = "Exact capture scope prepared. Clicking the gold gate supplies the displayed authority.";
+  } catch (error) { byId("backup-create-status").textContent = error.message; }
+  finally { byId("preview-backup-create").disabled = false; }
+}
+
+async function executeBackupCreate() {
+  if (!state.backupCreatePreview || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-create").disabled = true;
+  const progress = byId("backup-create-progress");
+  try {
+    showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact capture scope." });
+    const envelope = await callNdjson("/api/v1/administration-stream", "backup.create.execute", {
+      password: backupPassword(), confirmation: state.backupCreatePreview.confirmation_phrase,
+      expected_digest: state.backupCreatePreview.expected_digest
+    }, {}, (event) => showGenerationProgress(progress, event));
+    const result = backupResult(envelope);
+    byId("backup-create-status").textContent = `Verified snapshot ${result.snapshot_id?.slice(0, 12) || "created"}; receipt recorded.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
+  } catch (error) { byId("backup-create-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-create").disabled = false; hideGenerationProgress(progress); }
+}
+
+async function previewBackupRetention() {
+  byId("preview-backup-retention").disabled = true;
+  try {
+    const snapshotIds = selectedBackupSnapshotIds();
+    const envelope = await callSoul("backup.retention.preview", { password: backupPassword(), snapshot_ids: snapshotIds });
+    state.backupRetentionPreview = backupResult(envelope);
+    byId("backup-retention-scope").textContent = JSON.stringify({
+      selected_snapshot_ids: state.backupRetentionPreview.selected_snapshot_ids,
+      remaining_snapshot_count: state.backupRetentionPreview.remaining_snapshot_count,
+      max_repack_size: state.backupRetentionPreview.max_repack_size,
+      post_operation_check: state.backupRetentionPreview.post_operation_check
+    }, null, 2);
+    byId("backup-retention-confirm").hidden = false;
+    byId("backup-retention-status").textContent = "Exact hold-clear snapshot set prepared. No other snapshot may be forgotten by this gate.";
+  } catch (error) { byId("backup-retention-status").textContent = error.message; }
+  finally { byId("preview-backup-retention").disabled = false; }
+}
+
+async function executeBackupRetention() {
+  if (!state.backupRetentionPreview || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-retention").disabled = true;
+  const progress = byId("backup-retention-progress");
+  try {
+    showGenerationProgress(progress, { stage: "preparing", message: "Revalidating snapshot holds and inventory." });
+    const envelope = await callNdjson("/api/v1/administration-stream", "backup.retention.execute", {
+      password: backupPassword(), snapshot_ids: state.backupRetentionPreview.selected_snapshot_ids,
+      confirmation: state.backupRetentionPreview.confirmation_phrase, expected_digest: state.backupRetentionPreview.expected_digest
+    }, {}, (event) => showGenerationProgress(progress, event));
+    const result = backupResult(envelope);
+    byId("backup-retention-status").textContent = `${result.forgotten_snapshot_ids?.length || 0} exact snapshots forgotten; repository verification passed.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
+  } catch (error) { byId("backup-retention-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-retention").disabled = false; hideGenerationProgress(progress); }
+}
+
+async function previewBackupRestore() {
+  byId("preview-backup-restore").disabled = true;
+  try {
+    const envelope = await callSoul("backup.restore.preview", {
+      password: backupPassword(), snapshot_id: selectedBackupRestoreId(), paths: backupRestorePaths()
+    });
+    state.backupRestorePreview = backupResult(envelope);
+    byId("backup-restore-scope").textContent = JSON.stringify({
+      snapshot_id: state.backupRestorePreview.snapshot_id,
+      scope: state.backupRestorePreview.scope,
+      includes: state.backupRestorePreview.includes,
+      target_root: state.backupRestorePreview.target_root,
+      live_tree_mutation: false
+    }, null, 2);
+    byId("backup-restore-confirm").hidden = false;
+    byId("backup-restore-status").textContent = "Exact isolated restore prepared. The operation stops after staging and verification.";
+  } catch (error) { byId("backup-restore-status").textContent = error.message; }
+  finally { byId("preview-backup-restore").disabled = false; }
+}
+
+async function executeBackupRestore() {
+  if (!state.backupRestorePreview || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-restore").disabled = true;
+  const progress = byId("backup-restore-progress");
+  try {
+    showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact isolated restore." });
+    const envelope = await callNdjson("/api/v1/administration-stream", "backup.restore.execute", {
+      password: backupPassword(), snapshot_id: state.backupRestorePreview.snapshot_id,
+      paths: state.backupRestorePreview.includes, confirmation: state.backupRestorePreview.confirmation_phrase,
+      expected_digest: state.backupRestorePreview.expected_digest
+    }, {}, (event) => showGenerationProgress(progress, event));
+    const result = backupResult(envelope, ["blocked_for_human_review"]);
+    byId("backup-restore-status").textContent = `Restore verified in ${result.staged_path}; live state remains unchanged.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
+  } catch (error) { byId("backup-restore-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-restore").disabled = false; hideGenerationProgress(progress); }
+}
+
 async function bootstrap() {
   if (state.bootstrapped) return;
   state.bootstrapped = true;
@@ -2835,21 +3069,35 @@ byId("chat-tab").addEventListener("click", () => switchTab("chat"));
 byId("timeline-tab").addEventListener("click", () => switchTab("timeline"));
 byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
 byId("creative-tab").addEventListener("click", () => setCreativeMenu(byId("creative-menu").hidden));
+byId("administration-tab").addEventListener("click", () => setAdministrationMenu(byId("administration-menu").hidden));
 byId("studio-tab").addEventListener("click", () => switchTab("studio"));
 byId("improvement-tab").addEventListener("click", () => switchTab("improvement"));
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
+byId("backup-tab").addEventListener("click", () => switchTab("backup"));
+byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
+byId("forget-backup-password").addEventListener("click", () => {
+  byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);
+  byId("backup-status").textContent = "Repository password forgotten; encrypted history is locked.";
+});
+byId("preview-backup-create").addEventListener("click", previewBackupCreate);
+byId("execute-backup-create").addEventListener("click", executeBackupCreate);
+byId("preview-backup-retention").addEventListener("click", previewBackupRetention);
+byId("execute-backup-retention").addEventListener("click", executeBackupRetention);
+byId("preview-backup-restore").addEventListener("click", previewBackupRestore);
+byId("execute-backup-restore").addEventListener("click", executeBackupRestore);
 byId("new-timeline-item").addEventListener("click", () => openTimelineEditor());
 byId("refresh-timeline").addEventListener("click", () => loadProjectTimeline({ announceLoad: true }));
 byId("timeline-status-filter").addEventListener("change", renderProjectTimeline);
 byId("timeline-editor").addEventListener("submit", saveTimelineItem);
 byId("close-timeline-editor").addEventListener("click", closeTimelineEditor);
 window.addEventListener("hashchange", () => { const tab = tabFromLocation(); if (tab) switchTab(tab, { updateLocation: false }); });
-document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("creative-navigation").contains(event.target)) setCreativeMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
+document.addEventListener("click", (event) => { if (!byId("self-improvement-navigation").contains(event.target)) setSelfImprovementMenu(false); if (!byId("creative-navigation").contains(event.target)) setCreativeMenu(false); if (!byId("administration-navigation").contains(event.target)) setAdministrationMenu(false); if (!byId("core-navigation").contains(event.target)) setCoreMenu(false); });
 byId("self-improvement-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setSelfImprovementMenu(false); byId("self-improvement-tab").focus(); } });
 byId("core-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCoreMenu(false); byId("core-selector").focus(); } });
 byId("creative-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setCreativeMenu(false); byId("creative-tab").focus(); } });
+byId("administration-navigation").addEventListener("keydown", (event) => { if (event.key === "Escape") { setAdministrationMenu(false); byId("administration-tab").focus(); } });
 byId("new-visual-project").addEventListener("click", resetVisualForm);
 byId("visual-folder-active").addEventListener("click", () => setVisualProjectView("active"));
 byId("visual-folder-released").addEventListener("click", () => setVisualProjectView("released"));

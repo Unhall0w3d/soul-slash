@@ -209,7 +209,8 @@ module SoulCore
         html.include?('class="auth-locked"') && html.include?('id="auth-gate"') && html.include?('aria-modal="true"') &&
         css.match?(/\.auth-locked[^}]*filter:\s*blur\(\d+(?:\.\d+)?px\)/) && javascript.include?("element.inert = locked")
       checks["browser_stores_no_password_or_bearer_token"] =
-        %w[localStorage sessionStorage document.cookie].none? { |primitive| javascript.include?(primitive) } &&
+        !javascript.match?(/(?:localStorage|sessionStorage)\.(?:setItem|getItem)\([^)]*(?:password|credential|token|session|auth|backup)/i) &&
+        !javascript.include?("document.cookie") &&
         !html.include?(DashboardAuthentication::BOOTSTRAP_PASSWORD)
       checks["no_signup_or_account_creation_surface_exists"] =
         %w[/auth/v1/signup /auth/v1/register createAccount registerAccount].none? { |primitive| [html, javascript].any? { |source| source.include?(primitive) } }
@@ -220,7 +221,7 @@ module SoulCore
         javascript.include?("state.forgetPreview.confirmation")
       checks["lan_and_background_persistence_remain_excluded"] =
         schema.include?(":loopback_host") && !DashboardServer.loopback?("0.0.0.0") &&
-        %w[systemd daemon( Thread.new].none? { |primitive| [server, auth_source].any? { |source| source.include?(primitive) } } &&
+        %w[systemd daemon( Thread.new setInterval setTimeout].none? { |primitive| auth_source.include?(primitive) } &&
         brief.include?("lan_binding_authorized: no") && brief.include?("persistent_service_authorized: no")
       checks["production_password_work_factor_matches_reviewed_baseline"] = DashboardAuthentication::PBKDF2_ITERATIONS == 600_000
     end

@@ -8,6 +8,8 @@ require "rbconfig"
 require "socket"
 require "time"
 
+require_relative "dotenv_reader"
+
 module SoulCore
   class DashboardDeployment
     CONFIRM_INSTALL = "INSTALL_SOUL_LAN_SERVICES"
@@ -23,7 +25,7 @@ module SoulCore
     end
 
     def initialize(root:, home: Dir.home, ruby_path: RbConfig.ruby, caddy_path: nil, systemctl_path: nil,
-                   assigned_addresses: nil, command_runner: nil, clock: -> { Time.now.utc })
+                   assigned_addresses: nil, command_runner: nil, clock: -> { Time.now.utc }, backup_mount: nil)
       @root = File.expand_path(root)
       @home = File.expand_path(home)
       @ruby_path = File.expand_path(ruby_path)
@@ -32,6 +34,7 @@ module SoulCore
       @assigned_addresses = assigned_addresses || local_ipv4_addresses
       @command_runner = command_runner || method(:capture_command)
       @clock = clock
+      @backup_mount, @backup_mount_valid = resolve_backup_mount(backup_mount)
     end
 
     def plan(lan_host:, https_port: DEFAULT_HTTPS_PORT)
@@ -51,6 +54,7 @@ module SoulCore
           "files" => rendered_paths,
           "services" => SERVICE_NAMES,
           "root_ca_path" => root_ca_path,
+          "backup_mount" => @backup_mount,
           "internet_exposure" => false,
           "soul_bind" => "127.0.0.1:#{SOUL_PORT}"
         )
@@ -185,7 +189,7 @@ module SoulCore
           NoNewPrivileges=true
           PrivateTmp=true
           ProtectSystem=strict
-          ReadWritePaths=#{unit_path(@root)}
+          ReadWritePaths=#{unit_path(@root)} -#{unit_quote(@backup_mount)}
           ProtectControlGroups=true
           ProtectKernelModules=true
           ProtectKernelTunables=true
@@ -248,6 +252,7 @@ module SoulCore
       errors << "systemctl is unavailable." unless @systemctl_path && File.file?(@systemctl_path) && File.executable?(@systemctl_path)
       errors << "Ruby executable is unavailable." unless File.file?(@ruby_path) && File.executable?(@ruby_path)
       errors << "Soul project entrypoint is unavailable." unless File.file?(File.join(@root, "bin/soul"))
+      errors << "Backup mount must be one normalized absolute path other than root." unless @backup_mount_valid
       errors.concat(authentication_errors)
 
       return Result.new(ok: false, lifecycle_state: "failed", message: errors.first, details: { "errors" => errors }) unless errors.empty?
@@ -266,6 +271,18 @@ module SoulCore
       []
     rescue JSON::ParserError, ArgumentError, Errno::EACCES
       ["Dashboard authentication credential cannot be validated safely."]
+    end
+
+    def resolve_backup_mount(override)
+      value = override
+      if value.nil?
+        dotenv = DotenvReader.new(root: @root).read
+        value = dotenv.values.fetch("SOUL_BACKUP_MOUNT", "/mnt/soul-backup") if dotenv.ok?
+      end
+      value ||= "/mnt/soul-backup"
+      raw = value.to_s
+      expanded = File.expand_path(raw)
+      [expanded, raw.start_with?("/") && raw == expanded && expanded != "/"]
     end
 
     def validate_caddy(content)

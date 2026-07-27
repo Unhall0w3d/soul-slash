@@ -70,6 +70,7 @@ module SoulCore
           checks["rendered_services_are_bounded_and_have_no_polling_or_extra_units"] =
             contents["soul_unit"].include?("Restart=on-failure") && contents["proxy_unit"].include?("Restart=on-failure") &&
             contents["soul_unit"].include?("WorkingDirectory=#{temporary_root}") && !contents["soul_unit"].include?("WorkingDirectory=\"") &&
+            contents["soul_unit"].include?('ReadWritePaths=') && contents["soul_unit"].include?('-"/mnt/soul-backup"') &&
             combined.scan("StartLimitBurst=3").length == 2 &&
             %w[.timer .socket health_uri setInterval setTimeout cron].none? { |primitive| combined.include?(primitive) }
           checks["rendered_files_contain_no_authentication_secret"] =

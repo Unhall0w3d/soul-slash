@@ -201,10 +201,15 @@
       "horizon": "now",
       "status": "needs_review",
       "priority": "high",
-      "summary": "Review the encrypted local backup foundation and candidate-complete deletion-aware retention ledger. Deleted source files remain protected for 30 days after verified deletion detection; forget and prune execution remain disabled.",
+      "summary": "Review A2 Administration-backed encrypted capture, deletion-aware exact retention, and isolated staged restore. Deleted source files remain protected for 30 days after verified deletion detection.",
       "acceptance": "Backup, restore, verification, exclusions, and secret handling have a reviewed reproducible procedure; retention preserves the last recoverable copy of a deleted path for 30 full days from verified deletion detection.",
-      "source": "Backup and Disaster Recovery A0 review",
-      "notes": "Local target prepared and verified on 2026-07-26. The A1 ledger candidate uses exact digest-bound observation, preserves the prior snapshot for each detected deletion, and has deterministic boundary/failure tests. Recovered former SanDisk data remains in ~/Recovered and is explicitly excluded. No restic forget or prune operation is exposed; retention execution remains a later human gate."
+      "source": "Backup Administration A2",
+      "notes": "A2 adds an Administration dropdown and Backup & Recovery page. It validates exact mount identity and source availability; keeps passwords page/operation-local; creates, checks, inventories, and receipts captures; integrates the A1 30-day deletion ledger; executes only exact hold-clear retention with dry-run, minimum/newest protection, bounded prune, and post-check; and restores only into verified owner-private staging. Deterministic verification passes. The hardened systemd deployment grants write access only to the configured recovery mount; live status reports the target ready and writable. Password-authenticated live capture/retention/restore remain human review actions.",
+      "implementation": "BackupAdministrationService composes BoundedCommandRunner, restic, BackupRetentionLedger, SHA-256-bound previews, one nonblocking mutation lock, atomic owner-private manifests/receipts, and request-bound NDJSON progress. Restore terminates blocked_for_human_review and cannot promote staged data into live state.",
+      "technologies": "Ruby, JavaScript, HTML/CSS, restic 0.19.1, ext4, JSON, SHA-256 digest binding, flock, owner-only atomic files, deterministic fixture verification.",
+      "interfaces": "Dashboard: Administration → Backup & Recovery. Setup: Makefile preview/execute manifest configuration. Verification: Makefile target. No Chat invocation, scheduler, watcher, daemon, automatic retention, or live restore.",
+      "commands": "make backup-config-plan; make backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_SOUL_BACKUP_MANIFESTS; make verify-backup-administration.",
+      "references": "docs/soul/BACKUP_ADMINISTRATION_A2_BRIEF.md; docs/soul/BACKUP_ADMINISTRATION_A2_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md"
     },
     {
       "item_id": "track_project_search",

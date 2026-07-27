@@ -1,0 +1,121 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "optparse"
+require "pathname"
+require "securerandom"
+
+CONFIRMATION = "CONFIGURE_SOUL_BACKUP_MANIFESTS"
+
+options = { root: Dir.pwd, home: Dir.home }
+command = ARGV.shift
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--home PATH") { |value| options[:home] = value }
+  parser.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!(ARGV)
+
+abort("Usage: soul-backup-config plan|execute [--root PATH] [--home PATH]") unless %w[plan execute].include?(command)
+
+root = File.expand_path(options.fetch(:root))
+home = File.expand_path(options.fetch(:home))
+state_root = File.join(root, "Soul", "private", "backup")
+sources_path = File.join(state_root, "sources.txt")
+excludes_path = File.join(state_root, "excludes.txt")
+
+source_candidates = [
+  File.join(root, ".env"),
+  File.join(root, "Soul", "private"),
+  File.join(root, "Soul", "config", "cloud_providers.yaml"),
+  File.join(root, "Soul", "config", "model_runtime_profiles.local.yaml"),
+  *%w[memory artifacts identity improvement host_improvement proposals reflection workflows logs].map { |name| File.join(root, "Soul", name) },
+  File.join(root, "Soul", "augmentation", "proposals"),
+  File.join(root, "Soul", "augmentation", "experiments"),
+  *%w[application artifact_inbox chats conversation_evidence conversation_state executions exports].map { |name| File.join(root, "Soul", "runtime", name) },
+  File.join(root, "Soul", "runtime", "dashboard_auth", "credentials.json"),
+  File.join(root, "Soul", "runtime", "model_runtime", "core_selection.json"),
+  File.join(root, "Soul", "runtime", "model_runtime", "selected_profile.json"),
+  File.join(root, "Soul", "music", "jobs"),
+  File.join(root, "Soul", "music", "projects"),
+  File.join(root, "Soul", "music", "references"),
+  File.join(root, "Soul", "visual", "projects"),
+  File.join(home, "Music", "soul-music"),
+  File.join(home, "Knowledge", "soul-vault"),
+  File.join(home, ".config", "soul"),
+  *Dir.glob(File.join(home, ".config", "systemd", "user", "soul-*.service")).sort,
+  File.join(home, ".local", "share", "caddy")
+]
+sources = source_candidates.map { |path| File.expand_path(path) }.uniq.select do |path|
+  File.exist?(path) && !File.symlink?(path) && File.readable?(path)
+end.sort
+abort("No default backup sources exist; initialize Soul before configuring backup manifests.") if sources.empty?
+
+excludes = [
+  "*.lock", "*.part", "*.tmp", ".DS_Store", "__pycache__", ".pytest_cache",
+  "#{File.join(root, "Soul", "private", "backup", "restores")}/**",
+  "#{File.join(root, "Soul", "runtime", "dashboard_auth", "sessions")}/**",
+  "#{File.join(root, "Soul", "runtime")}/**/approval_tokens/**"
+].sort
+
+canonical = lambda do |value|
+  case value
+  when Hash then value.keys.sort.to_h { |key| [key, canonical.call(value.fetch(key))] }
+  when Array then value.map { |item| canonical.call(item) }
+  else value
+  end
+end
+scope = {
+  "operation" => "backup_manifest_configuration",
+  "root" => root,
+  "home" => home,
+  "sources_path" => sources_path,
+  "excludes_path" => excludes_path,
+  "sources" => sources,
+  "excludes" => excludes,
+  "existing_sources" => File.exist?(sources_path),
+  "existing_excludes" => File.exist?(excludes_path),
+  "replace_existing" => false
+}
+digest = Digest::SHA256.hexdigest(JSON.generate(canonical.call(scope)))
+
+if command == "plan"
+  puts JSON.pretty_generate(
+    "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
+    "data" => scope.merge("confirmation_phrase" => CONFIRMATION, "expected_digest" => digest),
+    "next" => "Review every source and exclusion. Execute only on a new clone with no differing owner manifests."
+  )
+  exit 0
+end
+
+abort("Exact confirmation #{CONFIRMATION} is required.") unless options[:confirmation] == CONFIRMATION
+abort("Expected digest is stale or invalid; run plan again.") unless options[:expected_digest] == digest
+
+source_body = sources.join("\n") + "\n"
+exclude_body = excludes.join("\n") + "\n"
+existing_sources = File.file?(sources_path) ? File.read(sources_path) : nil
+existing_excludes = File.file?(excludes_path) ? File.read(excludes_path) : nil
+if (existing_sources && existing_sources != source_body) || (existing_excludes && existing_excludes != exclude_body)
+  abort("Existing owner manifests differ; review them manually. This setup command never replaces backup scope.")
+end
+
+FileUtils.mkdir_p(state_root, mode: 0o700)
+{ sources_path => source_body, excludes_path => exclude_body }.each do |path, body|
+  next if File.file?(path) && File.read(path) == body
+  temporary = "#{path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+  begin
+    File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(body); file.flush; file.fsync }
+    File.rename(temporary, path)
+  ensure
+    FileUtils.rm_f(temporary)
+  end
+end
+
+puts JSON.pretty_generate(
+  "ok" => true, "lifecycle_state" => "complete",
+  "mutation" => "backup_manifests_configured",
+  "data" => { "source_count" => sources.length, "exclusion_count" => excludes.length, "sources_path" => sources_path, "excludes_path" => excludes_path }
+)

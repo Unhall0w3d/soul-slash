@@ -1,186 +1,174 @@
 # Backup and Recovery
 
-Soul's local recovery repository is an encrypted restic repository on separate
-storage. Backups are manual, bounded foreground operations. No timer, daemon,
-watcher, automatic retention, or unattended restore is installed.
+Soul exposes encrypted local recovery under **Administration → Backup &
+Recovery**. Every operation is bounded, foreground, manually initiated, and
+ends in a visible lifecycle state. Soul installs no backup timer, scheduler,
+watcher, daemon, automatic retry, or unattended restore.
 
-## Local deployment
+## What the dashboard does
 
-The Operator workstation currently uses:
+The page has three exact-gated operations:
 
-- `/dev/sda1`, ext4, label `SOUL_BACKUP`;
-- filesystem UUID `b9713868-7a24-4369-864d-cd67029981fb`;
-- mount point `/mnt/soul-backup`;
-- repository `/mnt/soul-backup/restic`;
-- owner-local source and exclusion manifests under
-  `Soul/private/backup/`.
+1. **Create a backup** validates the recovery mount and allow-listed sources,
+   refuses active creative/model work, captures one tagged restic snapshot,
+   runs metadata verification, derives its exact path inventory, updates the
+   deletion-hold ledger, and records an owner-private receipt.
+2. **Forget selected snapshots** accepts only exact full snapshot IDs. It
+   rejects the newest snapshot, unknown snapshots, active deletion holds, and
+   any selection that would leave fewer than two snapshots. Preview runs
+   restic's dry-run; execution performs one bounded forget/prune and verifies
+   repository metadata again.
+3. **Stage a restore** restores one full snapshot or up to 20 exact absolute
+   paths into a new owner-private staging directory with restic verification.
+   It inventories and hashes the result, then stops as
+   `blocked_for_human_review`. It never overwrites live state.
 
-The mount is declared by UUID with `defaults,noatime,nofail` and a bounded
-device timeout. Loss of the backup disk therefore does not intentionally block
-boot. The restic password is held by the human Operator and is not stored in
-the repository, Soul, `.env`, Git, logs, or model context.
+The repository password is entered per dashboard page session. It is sent only
+in the environment of the bounded restic child process. Soul does not place it
+in `.env`, browser storage, command arguments, receipts, logs, Git, model
+context, or the repository itself. **Forget password** clears it from the page.
 
-The recovered contents of the SanDisk's former NTFS filesystem remain in
-`~/Recovered/SanDisk-SSD-2026-07-26/`. They are intentionally absent from the
-backup source manifest and must not be added implicitly.
+## Portable configuration
 
-## Manual snapshot
+Install `restic`, prepare and mount separate storage, and initialize an
+encrypted repository yourself. Configure only non-secret locations in `.env`:
 
-Before starting, confirm that Music and Visual generation jobs are terminal
-and that `/mnt/soul-backup` is mounted read-write. Review both manifest files;
-the source list is an allow-list, not a whole-home backup.
-
-```sh
-findmnt /mnt/soul-backup
-restic --repo /mnt/soul-backup/restic backup \
-  --files-from Soul/private/backup/sources.txt \
-  --exclude-file Soul/private/backup/excludes.txt \
-  --tag soul-state \
-  --host "$(hostname)"
+```dotenv
+SOUL_BACKUP_MOUNT=/mnt/soul-backup
+SOUL_BACKUP_REPOSITORY=/mnt/soul-backup/restic
+SOUL_BACKUP_MAX_REPACK_SIZE=4G
 ```
 
-Restic prompts for the repository password. A completed command is not enough
-to prove recoverability: run verification and a staged restore.
+`SOUL_BACKUP_MAX_REPACK_SIZE` accepts a bounded value such as `512M`, `1G`, or
+`4G`. The configured mount must be the exact filesystem containing the
+repository and must be writable. This prevents an absent recovery disk from
+silently redirecting a backup onto the primary filesystem.
 
-## Integrity verification
+When the persistent dashboard is installed or refreshed through
+`dashboard-service-install`, its `ProtectSystem=strict` sandbox grants write
+access only to the project and this configured recovery mount. Re-run that
+exact-gated installer after changing `SOUL_BACKUP_MOUNT`.
 
-Metadata verification:
+Generate portable owner manifests only after Soul has been initialized:
 
 ```sh
-restic --repo /mnt/soul-backup/restic check
+make backup-config-plan
+make backup-configure \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=CONFIGURE_SOUL_BACKUP_MANIFESTS
 ```
 
-Full data verification:
+The plan includes only existing readable default continuity paths. Review every
+line. The execute command will create missing owner-only manifests, but will
+not replace manifests whose scope differs. Machine-specific additions belong
+in:
 
-```sh
-restic --repo /mnt/soul-backup/restic check --read-data
+```text
+Soul/private/backup/sources.txt
+Soul/private/backup/excludes.txt
 ```
 
-The first snapshot was fully read on 2026-07-26: 79 of 79 packs passed and
-restic reported no errors.
+The source file is an allow-list, not a whole-home backup. The default
+exclusions omit session state, approval tokens, temporary files, and staged
+restores. Models, caches, helper environments, and other reproducible large
+material are not included by default.
 
-## Retention policy
+## Dashboard flow
 
-Deleted source files remain recoverable for 30 full days after Soul first
-detects their deletion.
+1. Confirm no Music/Visual generation or model transition is active.
+2. Open **Administration → Backup & Recovery**.
+3. Inspect the mount, repository, manifest, ledger, and evidence state.
+4. Enter the restic password and select **Unlock & refresh**.
+5. Use one preview button and inspect its exact scope.
+6. Click the corresponding gold/destructive gate. The click supplies the
+   displayed confirmation; there is no redundant phrase field.
+7. Keep the page open while its request-bound progress stream runs. The
+   operation does not detach into a background process.
 
-Restic retains snapshots rather than individual files. Consequently, this
-policy must not be approximated with `forget --keep-within 30d`: after a long
-gap between backups, the immediately preceding snapshot may already be older
-than 30 days when a deletion is first observed.
+If the target is read-only, on the wrong filesystem, missing, or if configured
+sources are unavailable, backup creation fails before restic capture.
 
-The future bounded retention operation must:
+## Deletion-aware retention
 
-1. validate every configured source root before capture so a missing mount or
-   unreadable directory is not mistaken for deletion;
-2. create and verify the new snapshot;
-3. compare it with the last verified snapshot;
-4. timestamp newly observed deletions at completion of that verified snapshot;
-5. protect at least one prior snapshot containing each deleted path until 30
-   full days after that detection timestamp;
-6. preview the exact snapshots and deletion holds before any `forget` action;
-7. require explicit human approval before `forget` or `prune`;
-8. verify repository metadata after retention completes.
+Deleted source files remain recoverable for **30 full days after Soul first
+detects their deletion in a newly captured and verified snapshot**. This is
+intentionally different from `restic forget --keep-within 30d`: a long gap
+between captures could otherwise remove the immediately preceding snapshot
+that still contains a recently deleted file.
 
-Deleting a file from the source does not delete it immediately from the
-repository. If no later verified snapshot exists, the deletion has not yet
-been detected and the 30-day clock has not started.
+For every verified snapshot, Soul records:
 
-The deletion-aware hold ledger is now candidate-complete for human review. It
-does not enable retention execution. Until the candidate is approved and a
-separate bounded retention executor is reviewed, do not run `restic forget` or
-`restic prune` against this repository.
+- repository identity;
+- unchanged source roots;
+- the sorted path inventory;
+- snapshot ID and verification time;
+- holds created for paths present in the preceding snapshot but absent now.
 
-### Candidate hold-ledger flow
+Each hold protects the preceding snapshot until 30 full days after detection.
+Later captures do not reset the clock. A verified reappearance resolves the
+hold. Retention fails closed when the ledger is absent/corrupt, repository or
+source identity changes, verification fails, or a selected snapshot is
+protected. A hold expiring permits review; it does not itself delete anything.
 
-The owner-private ledger belongs at:
+The ledger, manifests, and receipts are owner-private:
 
 ```text
 Soul/private/backup/retention-ledger.json
+Soul/private/backup/manifests/
+Soul/private/backup/receipts/
 ```
 
-It is included by the existing private-state backup surface and must not enter
-Git. After a successful snapshot and `restic check`, prepare a versioned
-snapshot manifest from the exact restic snapshot inventory. The manifest
-contains full snapshot and repository IDs, the unchanged verified source
-roots, the sorted unique path inventory, the UTC verification timestamp, and
-the successful check mode. See
-`docs/soul/BACKUP_RETENTION_A1_BRIEF.md` for its exact schema.
+The lower-level A1 ledger tool remains available for audit and compatibility;
+routine use should go through the integrated dashboard so capture, verification,
+observation, and receipts remain one transaction.
 
-Preview an observation without writing:
+## Restore and disaster recovery
 
-```sh
-ruby scripts/soul-backup-retention.rb observe-preview \
-  --ledger Soul/private/backup/retention-ledger.json \
-  --manifest /OWNER_PRIVATE_PATH/verified-snapshot.json
+Dashboard restores land under:
+
+```text
+Soul/private/backup/restores/restore_<id>/
 ```
 
-Record only the exact reviewed preview:
+This directory is excluded from future snapshots. Inspect file type, size,
+hashes, content, ownership, permissions, and destination mapping before any
+live recovery. Promotion is deliberately external because replacing current
+credentials, conversations, creative projects, or runtime state may require
+stopping services and invalidating active sessions.
 
-```sh
-ruby scripts/soul-backup-retention.rb observe-execute \
-  --ledger Soul/private/backup/retention-ledger.json \
-  --manifest /OWNER_PRIVATE_PATH/verified-snapshot.json \
-  --confirmation RECORD_VERIFIED_BACKUP_SNAPSHOT \
-  --expected-digest DIGEST_FROM_PREVIEW
-```
+A full disaster rehearsal should separately document:
 
-To classify a proposed set of full snapshot IDs, place the IDs in a private
-JSON array and run:
+1. restoring into an empty staging location;
+2. validating critical JSON/YAML and creative artifacts;
+3. comparing hashes and permissions;
+4. stopping affected local services;
+5. copying only reviewed paths;
+6. revoking stale dashboard sessions and restarting services;
+7. confirming Chat, projects, memory, and model/runtime configuration.
 
-```sh
-ruby scripts/soul-backup-retention.rb retention-preview \
-  --ledger Soul/private/backup/retention-ledger.json \
-  --candidates /OWNER_PRIVATE_PATH/candidate-snapshots.json
-```
+## Current Operator deployment
 
-The result separates actively protected candidates from hold-clear candidates.
-`hold-clear` means only that the 30-day deletion policy does not protect that
-snapshot; it does not mean the snapshot should be deleted. The command cannot
-execute retention.
-
-The ledger will fail closed if it is missing or corrupt, source roots change,
-snapshot verification did not pass, paths escape the verified roots, snapshot
-time moves backward, or approval is stale. The first observed snapshot creates
-the baseline. Deletion detection begins with the next successfully observed
-snapshot.
-
-## Staged restore
-
-Never restore directly over live Soul state. Select a snapshot, restore into a
-new staging directory, validate it, compare the proposed destinations, and
-require a separate human gate before any live replacement.
-
-Example for one file:
-
-```sh
-restic --repo /mnt/soul-backup/restic restore latest \
-  --target /tmp/soul-backup-restore-test \
-  --include /home/USER/Projects/soul/Soul/private/project_tracker/state.json
-```
-
-Validate the staged file before considering promotion:
-
-```sh
-jq -e . /tmp/soul-backup-restore-test/home/USER/Projects/soul/Soul/private/project_tracker/state.json
-sha256sum \
-  /home/USER/Projects/soul/Soul/private/project_tracker/state.json \
-  /tmp/soul-backup-restore-test/home/USER/Projects/soul/Soul/private/project_tracker/state.json
-```
-
-The 2026-07-26 rehearsal restored the Project Timeline into `/tmp`; the JSON
-validated and its SHA-256 matched the live source byte-for-byte.
-
-## Scope and limitations
-
-Routine snapshots include private continuity state, conversations, proposals,
-creative project lineage, finished exports, the Knowledge Vault, selected
-deployment configuration, and Caddy trust state. They exclude model stores,
-download caches, helper environments, transient sessions, approval tokens,
-and other reproducible material.
+The present workstation uses an ext4 filesystem labeled `SOUL_BACKUP`, mounted
+at `/mnt/soul-backup`, with the repository at `/mnt/soul-backup/restic`. Its
+`nofail` mount avoids intentionally blocking boot when the disk is absent.
+Former SanDisk data already copied to `~/Recovered/` is not part of Soul's
+backup scope.
 
 This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
-and physical location. It is not an offline or off-site copy. Retention,
-pruning enforcement, periodic scheduling, an additional copy, and a full
-disaster rehearsal remain separately reviewed work.
+and location, so it is not an offline or off-site copy. A second independent
+copy and a complete disaster rehearsal remain later work.
+
+## Verification
+
+Run the deterministic fixture:
+
+```sh
+make verify-backup-administration
+```
+
+It exercises locked status, exact capture authority, repository verification,
+manifest/ledger evidence, newest/minimum retention protection, dry-run and
+exact prune, staged restore, operation concurrency, application/dashboard
+contracts, and password non-persistence. See
+`docs/soul/BACKUP_ADMINISTRATION_A2_REVIEW.md` for the human review checklist.
