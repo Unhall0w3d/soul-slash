@@ -1,8 +1,8 @@
 # Guided Maintenance
 
-Guided Maintenance is Soul's reviewed host-administration workflow for a future
-Arch/AUR and Flatpak update, conditional reboot, and one-shot restoration of
-safely allowlisted Hyprland applications.
+Guided Maintenance is Soul's reviewed host-administration workflow for
+Arch/AUR and Flatpak updates and the later, separately gated conditional reboot
+and one-shot restoration of safely allowlisted Hyprland applications.
 
 Open it from **Administration → Guided Maintenance**.
 
@@ -82,8 +82,8 @@ testability blockers without weakening the Dashboard service:
 3. That bounded process performs read-only package checks and records
    owner-private evidence that expires after 15 minutes.
 4. Refresh the A2 preview to bind the exact update plan to that evidence.
-5. A future enabled live click similarly reserves one single-use URL; package
-   commands still begin only after the visible terminal obtains one native
+5. An explicitly enabled live click similarly reserves one single-use URL;
+   package commands begin only after the visible terminal obtains one native
    `sudo -v` authorization.
 
 The URI contains only a typed operation, opaque ID, and SHA-256 digest. It
@@ -97,10 +97,11 @@ make maintenance-handoff-install EXPECTED_DIGEST=<reviewed digest> CONFIRM=INSTA
 make maintenance-handoff-check
 ```
 
-The public and local default remains `SOUL_MAINTENANCE_A2_LIVE=false`. The live
-button stays unavailable until the completed candidate and one supervised run
-receive separate authorization. Passwords never enter the Dashboard, `.env`,
-receipts, arguments, or model context.
+The public and local default remains `SOUL_MAINTENANCE_A2_LIVE=false`. The first
+separately authorized supervised live transaction completed on 2026-07-27 and
+the local gate was immediately returned to disabled. Future live runs still
+require deliberate local arming and an exact Dashboard review. Passwords never
+enter the Dashboard, `.env`, receipts, arguments, or model context.
 
 The Dashboard distinguishes fixture-rehearsal blockers from live-only
 blockers. A failed package-metadata fetch cannot weaken or enable the live path,

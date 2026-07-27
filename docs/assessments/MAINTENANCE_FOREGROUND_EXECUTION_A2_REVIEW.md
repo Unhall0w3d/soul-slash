@@ -115,9 +115,11 @@ behavior and must not be delegated to a model.
 
 ## Known weaknesses
 
-- The real sudo/yay interaction was not exercised during candidate completion.
-  One supervised live run was separately authorized on 2026-07-27 and remains
-  pending.
+- The first supervised live transaction completed on 2026-07-27. It used one
+  native hidden `sudo` prompt, completed the fixed Arch/AUR and system Flatpak
+  update stages, invalidated the sudo ticket, left no package lock or updater
+  process, and requested no reboot. The local live gate was disabled again
+  immediately after receipt review.
 - The first supervised arming attempt found a typed-boolean boundary mismatch:
   the resolver emits enabled booleans as `"1"` while the maintenance facade
   compared only with `"true"`. The repair uses the resolver's canonical
@@ -131,14 +133,12 @@ behavior and must not be delegated to a model.
   package process or pacman lock survived. The repair keeps interactive
   children in the visible terminal's foreground process group and terminates
   the direct active child on timeout or keeper failure.
-- The installed dashboard unit sets `NoNewPrivileges=true`, which correctly
-  appears as a live-only blocker because a child terminal cannot perform native
-  `sudo -v`. Enabling live A2 requires a separately reviewed design decision;
-  this candidate does not weaken the service sandbox.
-- `checkupdates` succeeds from an ordinary host terminal but cannot refresh
-  package metadata inside the installed dashboard service sandbox. This remains
-  a second visible live-only blocker. A cached or failed check is never
-  misrepresented as fresh evidence.
+- The installed dashboard unit retains `NoNewPrivileges=true`. Native package
+  evidence and the visible authenticated transaction use the reviewed,
+  digest-bound A2B desktop handoff rather than weakening the service sandbox.
+- `checkupdates` may still be unable to refresh package metadata inside the
+  installed dashboard service sandbox. A cached or failed check is never
+  misrepresented as fresh evidence; A2B supplies short-lived native evidence.
 - A terminal connection disappearing while the visible runner remains active is
   bounded by the terminal owner and four-hour deadline, but needs live
   observation.
@@ -197,7 +197,7 @@ yay sudoloop: disabled
 Detached updater or reusable root helper: no
 Automatic prompt answers or --noconfirm: no
 Automatic retry: no
-Live update performed during candidate verification: no
+Live update performed after separate exact authorization: yes, one supervised transaction
 Reboot path present in A2: no
 Persistent service, timer, daemon, watcher, or scheduler added: no
 Receipt contains password, terminal input, or raw environment: no
@@ -205,14 +205,15 @@ Receipt contains password, terminal input, or raw environment: no
 
 ## Human review checklist
 
-- [ ] Confirm A2 remains disabled in the effective configuration.
-- [ ] Review every fixed command vector.
-- [ ] Confirm yay 13 uses `--sudoflags=-n` and `sudoloop` remains false.
-- [ ] Confirm the Dashboard contains no password field.
-- [ ] Confirm Chat and Voice cannot authorize A2.
-- [ ] Review active-work and free-space blocker coverage.
+- [x] Confirm A2 remains disabled in the effective configuration.
+- [x] Review every fixed command vector.
+- [x] Confirm yay 13 uses `--sudoflags=-n` and `sudoloop` remains false.
+- [x] Confirm the Dashboard contains no password field.
+- [x] Confirm Chat and Voice cannot authorize A2.
+- [x] Review active-work and free-space blocker coverage.
 - [x] Run the visible fixture-only terminal rehearsal.
 - [x] Inspect the resulting redacted receipt and surviving processes.
-- [ ] Approve the candidate, request repair, or reject it.
-- [ ] Do not enable the first real update without a later exact authorization.
+- [x] Complete one separately authorized supervised live update.
+- [x] Inspect its redacted receipt, sudo invalidation, package lock, and surviving processes.
+- [x] Accept A2 for the current release and return its local gate to disabled.
 - [ ] Do not begin A3 solely because A2 deterministic tests pass.
