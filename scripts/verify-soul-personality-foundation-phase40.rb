@@ -26,7 +26,7 @@ required = {
 
 runtime_profile = File.read("lib/soul_core/conversation_identity_profile.rb")
 {
-  "profile_version_8" => runtime_profile.include?('PROFILE_VERSION = 8'),
+  "profile_version_9" => runtime_profile.include?('PROFILE_VERSION = 9'),
   "no_sleepy_freshness" => runtime_profile.include?("not childishness, helplessness, sleepiness"),
   "mention_not_invocation" => runtime_profile.include?("listing capabilities, invoking the skill catalog"),
   "avatar_voice_alignment" => runtime_profile.include?("poise, precision, restrained warmth, aesthetic judgment, and lucid curiosity")

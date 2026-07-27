@@ -27,6 +27,17 @@ be queried deterministically in Chat. Catalog inspection and its example
 wording are inert: neither can execute a skill, change a Core, or authorize a
 gate.
 
+Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
+balanced expression projection and Qwen receives a smaller projection of the
+same identity; neither changes authority or routing. Explicit Chat commands can
+disable, inspect, and re-enable persona expression for only the active
+conversation. Disabled mode is neutral delivery, not disabled truth, evidence,
+privacy, skills, approvals, or memory policy.
+Matched temporary-state evaluations completed at the production output budget
+with 41/41 checks on Gemma Daily Core and 41/41 on Qwen AMD-Free Core. This is
+behavioral evidence, not release approval; ordinary Operator conversation
+review remains open.
+
 After Voice Presence finishes playing an eligible response, it opens one
 visible five-second window for a natural follow-up without another wake
 phrase. Speech retains the ordinary utterance bounds; silence returns to
@@ -156,7 +167,7 @@ The foundational Conversational Soul milestone is complete. Deployment/Core orch
 
 Near-term work is expected to concentrate on:
 
-- chat usability, persona fidelity, and dashboard-capability invocation through skills;
+- final human review of version-9 persona fidelity on Gemma and Qwen;
 - interruption-aware duplex voice beyond the reviewed push-to-talk,
   per-message speech, and visible local wake-word presence paths;
 - production hardening and documentation of creative workflows;

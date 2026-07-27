@@ -6,6 +6,8 @@ require_relative "conversation_workspace_controls"
 require_relative "conversation_interest_controls"
 require_relative "conversation_style_controls"
 require_relative "conversation_identity_controls"
+require_relative "conversation_persona_controls"
+require_relative "conversation_acknowledgment_controls"
 require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
 require_relative "knowledge_vault_chat_controls"
@@ -31,6 +33,8 @@ module SoulCore
       @workspace_controls = ConversationWorkspaceControls.new(root: @root)
       @interest_controls = ConversationInterestControls.new(root: @root)
       @identity_controls = ConversationIdentityControls.new
+      @persona_controls = ConversationPersonaControls.new(root: @root)
+      @acknowledgment_controls = ConversationAcknowledgmentControls.new
       @style_controls = ConversationStyleControls.new(root: @root)
       @memory_controls = ConversationMemoryControls.new(root: @root)
       @memory_maintenance_controls = ConversationMemoryMaintenanceControls.new(root: @root)
@@ -59,6 +63,8 @@ module SoulCore
       return @artifact_controls.respond(text, chat_id: chat_id) if @artifact_controls.match?(text)
       return @interest_controls.respond(text, chat_id: chat_id) if @interest_controls.match?(text)
       return @identity_controls.respond(text, chat_id: chat_id) if @identity_controls.match?(text)
+      return @persona_controls.respond(text, chat_id: chat_id) if @persona_controls.match?(text)
+      return @acknowledgment_controls.respond(text, chat_id: chat_id) if @acknowledgment_controls.match?(text)
       return @style_controls.respond(text, chat_id: chat_id) if @style_controls.match?(text)
       return @memory_maintenance_controls.respond(text, chat_id: chat_id) if @memory_maintenance_controls.match?(text)
       return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
