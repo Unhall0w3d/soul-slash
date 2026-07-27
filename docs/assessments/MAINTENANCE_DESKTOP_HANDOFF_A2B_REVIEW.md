@@ -1,6 +1,6 @@
 # Maintenance Desktop Handoff A2B Review
 
-Status: candidate-complete; human desktop test required
+Status: accepted on the reference host; live A2 remains separately gated
 
 ## What was implemented
 
@@ -70,8 +70,6 @@ protection, and reboot prohibition are deterministic safety behavior.
 
 ## Known weaknesses
 
-- The user-local desktop association still needs an exact-plan installation
-  and a supervised click test in the operator's ordinary browser.
 - Whether that browser displays an external-protocol confirmation is controlled
   by the browser and desktop portal.
 - The first supervised test found two desktop-registry defects hidden by
@@ -89,6 +87,23 @@ protection, and reboot prohibition are deterministic safety behavior.
 - Live package execution is still disabled and untested.
 - A2B does not reboot, restore applications, answer package prompts, or
   continue after its visible foreground process terminates.
+
+## Supervised acceptance result
+
+On 2026-07-27, the operator completed the intended ordinary-browser flow:
+
+```text
+Refresh native evidence
+→ Review A2 transaction
+→ Open terminal rehearsal
+→ Refresh receipt
+```
+
+The reviewed plan reported a nonempty restore inventory, no active Soul work,
+sufficient disk evidence, and zero rehearsal blockers. The resulting receipt
+terminated `complete` with four simulated fixture stages, zero password
+prompts, an invalidated unused sudo ticket, and no reboot request. No package
+update or host mutation occurred.
 
 ## Memory keys added or used
 
@@ -131,12 +146,12 @@ Reboot path added: no
 
 ## Human review checklist
 
-- [ ] Install the exact user-local desktop handler plan.
-- [ ] Confirm `make maintenance-handoff-check` reports available.
-- [ ] Click **Refresh native evidence** in the ordinary Dashboard browser.
-- [ ] Confirm one visible kitty opens, completes read-only checks, and closes.
-- [ ] Refresh the A2 preview and confirm native evidence is fresh.
-- [ ] Run the no-mutation terminal rehearsal.
-- [ ] Confirm the Dashboard service still has `NoNewPrivileges=true`.
-- [ ] Confirm live update remains unavailable.
-- [ ] Approve, request repair, or reject A2B.
+- [x] Install the exact user-local desktop handler plan.
+- [x] Confirm `make maintenance-handoff-check` reports available.
+- [x] Click **Refresh native evidence** in the ordinary Dashboard browser.
+- [x] Confirm one visible kitty opens, completes read-only checks, and closes.
+- [x] Refresh the A2 preview and confirm native evidence is fresh.
+- [x] Run the no-mutation terminal rehearsal.
+- [x] Confirm the Dashboard service still has `NoNewPrivileges=true`.
+- [x] Confirm live update remains unavailable.
+- [x] Accept A2B on the reference host.
