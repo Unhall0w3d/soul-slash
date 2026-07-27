@@ -123,6 +123,14 @@ behavior and must not be delegated to a model.
   compared only with `"true"`. The repair uses the resolver's canonical
   representation and adds a facade-level regression proving the local true
   setting arms A2 while the public default remains false.
+- The first native authentication attempt exposed a terminal job-control defect
+  before authentication completed: interactive children were placed in a new
+  background process group, preventing `sudo` from safely controlling TTY echo
+  and reading input. The operator canceled the transaction; its receipt
+  contained zero completed commands, the sudo ticket was invalidated, and no
+  package process or pacman lock survived. The repair keeps interactive
+  children in the visible terminal's foreground process group and terminates
+  the direct active child on timeout or keeper failure.
 - The installed dashboard unit sets `NoNewPrivileges=true`, which correctly
   appears as a live-only blocker because a child terminal cannot perform native
   `sudo -v`. Enabling live A2 requires a separately reviewed design decision;

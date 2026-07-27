@@ -110,13 +110,16 @@ module SoulCore
     end
 
     def spawn_interactive(argv, timeout_seconds, pid_callback)
-      pid = Process.spawn(*argv, in: $stdin, out: $stdout, err: $stderr, pgroup: true)
+      # The child must remain in the visible terminal's foreground process
+      # group. Moving sudo/yay into a new background group prevents them from
+      # safely controlling TTY echo and reading interactive input.
+      pid = Process.spawn(*argv, in: $stdin, out: $stdout, err: $stderr)
       pid_callback.call(pid)
       status = nil
       Timeout.timeout(timeout_seconds) { _pid, status = Process.wait2(pid) }
       status.exitstatus || 1
     rescue Timeout::Error
-      terminate_group(pid)
+      terminate_process(pid)
       124
     rescue Errno::ENOENT
       127
@@ -136,13 +139,13 @@ module SoulCore
           status = @command_executor.call(argv, [deadline - @clock.call, 30].min, ->(_pid) {})
           unless Integer(status).zero?
             @keeper_failed = true
-            terminate_group(@active_pid)
+            terminate_process(@active_pid)
             break
           end
         end
       rescue StandardError
         @keeper_failed = true
-        terminate_group(@active_pid)
+        terminate_process(@active_pid)
       end
       @keeper_thread.report_on_exception = false
     end
@@ -249,7 +252,7 @@ module SoulCore
       %w[INT TERM].each do |signal|
         @previous_handlers[signal] = Signal.trap(signal) do
           @canceled = true
-          terminate_group(@active_pid)
+          terminate_process(@active_pid)
           raise Interrupt
         end
       end
@@ -262,11 +265,11 @@ module SoulCore
       nil
     end
 
-    def terminate_group(pid)
+    def terminate_process(pid)
       return unless pid
-      Process.kill("TERM", -pid)
+      Process.kill("TERM", pid)
       @sleeper.call(1)
-      Process.kill("KILL", -pid) rescue nil
+      Process.kill("KILL", pid) rescue nil
     rescue Errno::ESRCH
       nil
     end
