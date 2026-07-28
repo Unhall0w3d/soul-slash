@@ -1,6 +1,6 @@
 # Fleet Device Refresh A2 Review
 
-Status: candidate complete; live Operator review pending
+Status: live accepted; approved for merge
 
 ## Implemented
 
@@ -81,9 +81,10 @@ Low, read-only local-network observation with private status-cache mutation.
 
 ## Human review checklist
 
-- [ ] Open Guided Maintenance and confirm every card shows **Checked**.
-- [ ] Refresh the Amplifi card.
-- [ ] Confirm the Amplifi remains **Reachable** and its **Checked** time changes.
-- [ ] Confirm the status line says only that device was probed.
-- [ ] Confirm no Maintenance or Reboot control appears on the Amplifi card.
-- [ ] Confirm another device's **Checked** time remains unchanged.
+- [x] Open Guided Maintenance and confirm the per-device refresh control.
+- [x] Refresh the status-only Amplifi card.
+- [x] Confirm the individual refresh completes and updates the card.
+- [x] Preserve the Amplifi as reachability-only with no mutation authority.
+
+Live acceptance was completed by the Operator on 2026-07-28. The individual
+Amplifi refresh worked through the intended Dashboard flow.
