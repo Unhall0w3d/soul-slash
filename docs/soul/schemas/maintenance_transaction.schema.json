@@ -8,8 +8,11 @@
     "schema_version": {"const": "soul.maintenance.transaction.v1"},
     "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
     "mode": {"enum": ["rehearsal", "live", "live_reboot"]},
+    "authority_mode": {"enum": ["rehearsal", "native_prompt", "root_owned_passwordless"]},
     "owner_uid": {"type": "integer", "minimum": 1},
     "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_boot_id": {"type": "string", "pattern": "^[a-f0-9-]{36}$"},
+    "force_database_refresh": {"type": "boolean"},
     "handoff_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "reboot_allowed": {"type": "boolean"},
     "commands": {"type": "array", "minItems": 1, "maxItems": 4}

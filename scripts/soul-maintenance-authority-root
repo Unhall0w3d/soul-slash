@@ -1,0 +1,309 @@
+#!/usr/bin/ruby
+# frozen_string_literal: true
+
+# This file is a source template. It is inert in the repository. The A4
+# deployment plan replaces every marked token, then installs the result root-owned.
+
+require "digest"
+require "fileutils"
+require "json"
+require "time"
+require "timeout"
+
+VERSION = @@VERSION@@
+PROJECT_ROOT = @@PROJECT_ROOT@@
+OWNER_UID = Integer(@@OWNER_UID@@)
+OWNER_NAME = @@OWNER_NAME@@
+OWNER_HOME = @@OWNER_HOME@@
+QUALIFIED_HOSTNAME = @@HOSTNAME@@
+QUALIFIED_YAY_VERSION = @@YAY_VERSION@@
+
+HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
+STATE_ROOT = "/run/soul-maintenance-authority"
+TRANSACTIONS_ROOT = File.join(PROJECT_ROOT, "Soul", "private", "host_maintenance", "transactions")
+PENDING_RESTORE = File.join(PROJECT_ROOT, "Soul", "private", "host_maintenance", "pending_restore.json")
+TRANSACTION_SCHEMA = "soul.maintenance.transaction.v1"
+TRANSACTION_PATTERN = /\Amaintenance_tx_[a-f0-9]{16}\z/
+MAX_TRANSACTION_BYTES = 512 * 1024
+MAX_RUNTIME_SECONDS = 4 * 60 * 60
+PATHS = {
+  "yay" => "/usr/bin/yay",
+  "pacman" => "/usr/bin/pacman",
+  "flatpak" => "/usr/bin/flatpak",
+  "systemctl" => "/usr/bin/systemctl",
+  "makepkg" => "/usr/bin/makepkg",
+  "git" => "/usr/bin/git",
+  "gpg" => "/usr/bin/gpg",
+  "false" => "/usr/bin/false"
+}.freeze
+
+def fail_closed(message, code = 2)
+  warn("Soul maintenance authority refused: #{message.to_s.byteslice(0, 400)}")
+  exit(code)
+end
+
+def current_hostname
+  File.read("/proc/sys/kernel/hostname", 256).strip
+end
+
+def current_boot_id
+  File.read("/proc/sys/kernel/random/boot_id", 128).strip
+end
+
+def helper_digest
+  Digest::SHA256.file(HELPER_PATH).hexdigest
+end
+
+def verify_caller!
+  fail_closed("authority must run as root") unless Process.euid.zero?
+  fail_closed("qualified host does not match") unless current_hostname == QUALIFIED_HOSTNAME
+  fail_closed("sudo owner UID does not match") unless ENV["SUDO_UID"].to_s == OWNER_UID.to_s
+  fail_closed("sudo owner name does not match") unless ENV["SUDO_USER"].to_s == OWNER_NAME
+  fail_closed("sudo command identity is missing") if ENV["SUDO_COMMAND"].to_s.empty?
+  PATHS.each { |name, path| fail_closed("#{name} path is unavailable") unless File.file?(path) && File.executable?(path) }
+end
+
+def read_bounded_json(path, expected_owner:)
+  flags = File::RDONLY
+  flags |= File::NOFOLLOW if defined?(File::NOFOLLOW)
+  file = File.open(path, flags)
+  stat = file.stat
+  fail_closed("state is not a regular file") unless stat.file?
+  fail_closed("state owner is invalid") unless stat.uid == expected_owner
+  fail_closed("state mode is too broad") unless (stat.mode & 0o077).zero?
+  fail_closed("state exceeds its size bound") unless stat.size.between?(2, MAX_TRANSACTION_BYTES)
+  JSON.parse(file.read(MAX_TRANSACTION_BYTES))
+rescue Errno::ELOOP, Errno::ENOENT, JSON::ParserError
+  fail_closed("state is unavailable or invalid")
+ensure
+  file&.close
+end
+
+def transaction_for(id)
+  fail_closed("transaction ID is invalid") unless id.match?(TRANSACTION_PATTERN)
+  transaction = read_bounded_json(File.join(TRANSACTIONS_ROOT, "#{id}.json"), expected_owner: OWNER_UID)
+  fail_closed("transaction schema is invalid") unless transaction["schema_version"] == TRANSACTION_SCHEMA
+  fail_closed("transaction ID does not match") unless transaction["transaction_id"] == id
+  fail_closed("transaction owner is invalid") unless transaction["owner_uid"] == OWNER_UID
+  fail_closed("authority mode is invalid") unless transaction["authority_mode"] == "root_owned_passwordless"
+  fail_closed("transaction mode is invalid") unless %w[live live_reboot].include?(transaction["mode"])
+  fail_closed("plan digest is invalid") unless transaction["plan_digest"].to_s.match?(/\A[a-f0-9]{64}\z/)
+  deadline = Time.iso8601(transaction.fetch("deadline_at"))
+  now = Time.now.utc
+  fail_closed("transaction deadline is invalid") unless deadline > now && deadline <= now + MAX_RUNTIME_SECONDS + 60
+  fail_closed("transaction boot identity changed") unless transaction["source_boot_id"] == current_boot_id
+  transaction
+rescue KeyError, ArgumentError
+  fail_closed("transaction fields are invalid")
+end
+
+def expected_operations(transaction)
+  operations = transaction.fetch("commands").filter_map do |command|
+    case command["adapter"]
+    when "arch_and_aur.full_upgrade" then "arch-update"
+    when "flatpak.system_update" then "flatpak-system-update"
+    when "flatpak.user_update" then nil
+    else fail_closed("transaction contains an unsupported adapter")
+    end
+  end
+  operations << "reboot" if transaction["mode"] == "live_reboot"
+  fail_closed("transaction privileged operation count is invalid") unless operations.length.between?(1, 3)
+  operations
+rescue KeyError, NoMethodError
+  fail_closed("transaction command list is invalid")
+end
+
+def expected_vector(operation, id)
+  ["/usr/bin/sudo", "-n", HELPER_PATH, operation, id]
+end
+
+def validate_vectors!(transaction, operations, id)
+  commands = transaction.fetch("commands")
+  commands.each do |command|
+    adapter = command.fetch("adapter")
+    argv = command.fetch("argv")
+    expected = case adapter
+    when "arch_and_aur.full_upgrade"
+      expected_vector("arch-update", id)
+    when "flatpak.system_update"
+      expected_vector("flatpak-system-update", id)
+    when "flatpak.user_update"
+      ["/usr/bin/flatpak", "update", "--user", "--noninteractive"]
+    end
+    fail_closed("transaction command vector is invalid") unless expected && argv == expected
+    fail_closed("transaction shell boundary is invalid") unless command["shell"] == false
+  end
+  if transaction["mode"] == "live_reboot"
+    fail_closed("reboot vector is invalid") unless transaction["reboot_argv"] == expected_vector("reboot", id)
+  else
+    fail_closed("A2 transaction contains reboot authority") if transaction.key?("reboot_argv")
+  end
+  fail_closed("operation list changed") unless operations == expected_operations(transaction)
+rescue KeyError, NoMethodError
+  fail_closed("transaction vector fields are invalid")
+end
+
+def state_path(id)
+  File.join(STATE_ROOT, "#{id}.json")
+end
+
+def load_or_create_state(transaction, operations)
+  FileUtils.mkdir_p(STATE_ROOT, mode: 0o700)
+  File.chown(0, 0, STATE_ROOT)
+  File.chmod(0o700, STATE_ROOT)
+  path = state_path(transaction.fetch("transaction_id"))
+  return read_bounded_json(path, expected_owner: 0) if File.exist?(path)
+  state = {
+    "version" => VERSION,
+    "transaction_id" => transaction.fetch("transaction_id"),
+    "plan_digest" => transaction.fetch("plan_digest"),
+    "source_boot_id" => transaction.fetch("source_boot_id"),
+    "operations" => operations,
+    "next_index" => 0,
+    "terminal" => false
+  }
+  atomic_root_json(path, state)
+  state
+end
+
+def atomic_root_json(path, value)
+  body = JSON.generate(value) + "\n"
+  temporary = "#{path}.tmp-#{Process.pid}"
+  File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+    file.write(body)
+    file.flush
+    file.fsync
+  end
+  File.chown(0, 0, temporary)
+  File.chmod(0o600, temporary)
+  File.rename(temporary, path)
+ensure
+  FileUtils.rm_f(temporary) if defined?(temporary)
+end
+
+def validate_phase!(state, transaction, operations, requested)
+  fail_closed("authority state version changed") unless state["version"] == VERSION
+  fail_closed("authority state transaction changed") unless state["transaction_id"] == transaction["transaction_id"]
+  fail_closed("authority state plan changed") unless state["plan_digest"] == transaction["plan_digest"]
+  fail_closed("authority state boot changed") unless state["source_boot_id"] == current_boot_id
+  fail_closed("authority state operation list changed") unless state["operations"] == operations
+  fail_closed("transaction is already terminal") if state["terminal"] == true
+  index = Integer(state.fetch("next_index"))
+  fail_closed("privileged operation is out of sequence") unless operations[index] == requested
+  index
+rescue KeyError, ArgumentError
+  fail_closed("authority state is invalid")
+end
+
+def sanitized_environment
+  {
+    "PATH" => "/usr/local/sbin:/usr/local/bin:/usr/bin",
+    "HOME" => OWNER_HOME,
+    "USER" => OWNER_NAME,
+    "LOGNAME" => OWNER_NAME,
+    "SUDO_USER" => OWNER_NAME,
+    "SUDO_UID" => OWNER_UID.to_s,
+    "SUDO_GID" => ENV.fetch("SUDO_GID"),
+    "LANG" => "C.UTF-8",
+    "LC_ALL" => "C.UTF-8",
+    "XDG_CACHE_HOME" => File.join(OWNER_HOME, ".cache"),
+    "XDG_CONFIG_HOME" => File.join(STATE_ROOT, "empty-config")
+  }
+rescue KeyError
+  fail_closed("sudo group identity is missing")
+end
+
+def yay_version
+  output = IO.popen([sanitized_environment, PATHS.fetch("yay"), "--version", {unsetenv_others: true}], &:read)
+  output.to_s[/yay v?([0-9]+\.[0-9]+\.[0-9]+)/, 1].to_s
+rescue SystemCallError
+  ""
+end
+
+def command_for(operation, transaction)
+  case operation
+  when "arch-update"
+    fail_closed("qualified yay version changed") unless yay_version == QUALIFIED_YAY_VERSION
+    refresh = transaction["force_database_refresh"] == true ? "-Syyu" : "-Syu"
+    [
+      PATHS.fetch("yay"),
+      "--pacman", PATHS.fetch("pacman"),
+      "--makepkg", PATHS.fetch("makepkg"),
+      "--git", PATHS.fetch("git"),
+      "--gpg", PATHS.fetch("gpg"),
+      "--sudo", PATHS.fetch("false"),
+      "--config", "/etc/pacman.conf",
+      "--builddir", File.join(OWNER_HOME, ".cache", "yay"),
+      "--editor", PATHS.fetch("false"),
+      "--noconfirm",
+      "--answerclean", "None",
+      "--answerdiff", "None",
+      "--answeredit", "None",
+      "--answerupgrade", "All",
+      "--noremovemake",
+      "--pgpfetch=false",
+      "--provides=false",
+      "--useask=false",
+      "--sudoloop=false",
+      refresh
+    ]
+  when "flatpak-system-update"
+    [PATHS.fetch("flatpak"), "update", "--system", "--noninteractive"]
+  when "reboot"
+    fail_closed("reboot is not authorized by this transaction") unless transaction["mode"] == "live_reboot"
+    journal = read_bounded_json(PENDING_RESTORE, expected_owner: OWNER_UID)
+    fail_closed("pending reboot journal does not match") unless
+      journal["transaction_id"] == transaction["transaction_id"] &&
+      journal["source_boot_id"] == transaction["source_boot_id"] &&
+      journal["current_state"] == "reboot_requested"
+    [PATHS.fetch("systemctl"), "reboot"]
+  else
+    fail_closed("operation is not allowlisted")
+  end
+end
+
+def execute_fixed(argv, deadline)
+  remaining = deadline - Time.now.utc
+  fail_closed("transaction deadline expired") unless remaining.positive?
+  pid = Process.spawn(sanitized_environment, *argv, unsetenv_others: true, in: $stdin, out: $stdout, err: $stderr)
+  status = nil
+  Timeout.timeout([remaining, MAX_RUNTIME_SECONDS].min) { _pid, status = Process.wait2(pid) }
+  status.exitstatus || 1
+rescue Timeout::Error
+  Process.kill("TERM", pid) rescue nil
+  Process.wait(pid) rescue nil
+  124
+rescue SystemCallError
+  127
+end
+
+verify_caller!
+operation = ARGV.shift.to_s
+fail_closed("argument count is invalid") unless ARGV.empty? || (operation != "self-check" && ARGV.length == 1)
+
+if operation == "self-check"
+  fail_closed("self-check accepts no arguments") unless ARGV.empty?
+  puts JSON.generate({
+    "version" => VERSION,
+    "helper_sha256" => helper_digest,
+    "owner_uid" => OWNER_UID,
+    "hostname" => QUALIFIED_HOSTNAME,
+    "password_storage" => false,
+    "arbitrary_command_forwarding" => false
+  })
+  exit(0)
+end
+
+id = ARGV.shift.to_s
+transaction = transaction_for(id)
+operations = expected_operations(transaction)
+validate_vectors!(transaction, operations, id)
+state = load_or_create_state(transaction, operations)
+index = validate_phase!(state, transaction, operations, operation)
+deadline = Time.iso8601(transaction.fetch("deadline_at"))
+status = execute_fixed(command_for(operation, transaction), deadline)
+fail_closed("#{operation} failed with status #{status}", status.zero? ? 1 : status) unless status.zero?
+state["next_index"] = index + 1
+state["terminal"] = state["next_index"] >= operations.length
+atomic_root_json(state_path(id), state)
+exit(0)

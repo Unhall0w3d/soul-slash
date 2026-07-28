@@ -445,6 +445,22 @@
       "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md\ndocs/soul/MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md\ndocs/soul/MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md\ndocs/assessments/MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md\ndocs/assessments/MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md",
       "acceptance": "A1/A2/A2B deterministic and live acceptance passed. The initial 2026-07-27 A3 restoration failed closed and exposed missing compositor identity. After repair, supervised transaction maintenance_tx_c81e6cfe1b15e3cc completed on 2026-07-28 with one password prompt, successful yay and system Flatpak updates, sudo invalidation, reboot, Limine and SDDM autologin, both monitors awake at 120 Hz, Codex on workspace 1/monitor 0, Opera on workspace 2/monitor 1, four complete restore actions, and zero failures. Absent qBittorrent and unsupported Webex/Teams remained unlaunched.",
       "source": "Human-approved Class-5 brief, 2026-07-27"
+    },
+    {
+      "item_id": "track_maintenance_passwordless_authority",
+      "title": "Unattended fixed-operation Maven maintenance authority",
+      "area": "Administration",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Replace Maven's routine sudo and package questions with one digest-bound root-owned helper that exposes only fixed full-update and A3 reboot operations.",
+      "implementation": "A4 is candidate-complete. Native one-password maintenance remains the public default. The opt-in path installs one SHA-256-bound root helper and sudoers rule, uses fixed yay 13.0.1 and Flatpak noninteractive policies, records zero password prompts, and rejects caller commands, packages, flags, paths, and answers.",
+      "technologies": "Ruby; sudoers command digests; root-owned /run phase state; yay 13.0.1; pacman; Flatpak; existing A2/A3 terminal, journal, and restore pipeline.",
+      "interfaces": "Administration → Guided Maintenance; Makefile plan, status, install, uninstall, and verifier targets; ignored SOUL_MAINTENANCE_PASSWORDLESS configuration.",
+      "commands": "make verify-maintenance-passwordless-authority\nmake maintenance-authority-plan\nmake maintenance-authority-status",
+      "references": "docs/soul/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md\ndocs/assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
+      "acceptance": "Review exact helper and sudoers bytes, install once with native authentication, prove arbitrary-operation rejection, then complete supervised zero-prompt A2 and later A3 transactions.",
+      "source": "Operator-authorized A4 implementation, 2026-07-28"
     }
   ]
 }
