@@ -93,13 +93,19 @@ editing public source:
    OS projection, and independently tests fixed executable paths for pacman,
    yay, paru, apt, apt-get, dnf, zypper, apk, Flatpak, Snap, and Nix.
 6. Click **Enroll reviewed device**. The click authorizes one digest-bound
-   write to the owner-private registry. Enrollment and removal clear
-   the now-stale candidate list; scan again to obtain a fresh list.
+   write to the owner-private registry. The enrolled address leaves the
+   current candidate list while every unacted-on result remains available for
+   sequential review. Removing an enrolled record also preserves that current
+   list; scan again only when you want fresh discovery evidence or need the
+   removed device to reappear as a candidate.
 
 Use **Ignore** when an address should not remain in the candidate queue. The
 exact reviewed identity is stored privately, matched by MAC when available and
-IP otherwise, and remains visible in **Ignored devices**. **Restore** removes
-only that exclusion so it can appear in a later explicit scan.
+IP otherwise. Only that candidate leaves the current list; the remaining scan
+results stay actionable. The identity remains visible and reversible in
+**Ignored devices**. **Restore** removes only that exclusion, preserves the
+current candidate list, and lets the restored identity appear in a later
+explicit scan.
 
 After a successful scan, Soul remembers only the canonical subnet in an
 owner-private `0600` preference file and refills the field on the next page

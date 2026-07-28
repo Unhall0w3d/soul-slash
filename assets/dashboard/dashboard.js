@@ -2736,6 +2736,13 @@ function renderMaintenanceDiscoveryCandidates(candidates) {
   });
 }
 
+function removeMaintenanceDiscoveryCandidate(candidate) {
+  const address = String(candidate?.address || "");
+  const remaining = (state.maintenanceDiscoveryCandidates || []).filter((entry) => String(entry.address || "") !== address);
+  renderMaintenanceDiscoveryCandidates(remaining);
+  return remaining.length;
+}
+
 function maintenanceIgnoreParameters() {
   const candidate = state.maintenanceIgnoreCandidate || {};
   return {
@@ -2788,16 +2795,23 @@ async function executeMaintenanceIgnoreMutation() {
   if (!preview || !state.maintenanceIgnoreMode) return;
   const button = byId("execute-maintenance-ignore"); const status = byId("maintenance-ignore-status"); button.disabled = true;
   try {
-    const operation = state.maintenanceIgnoreMode === "ignore"
+    const mode = state.maintenanceIgnoreMode;
+    const actedCandidate = state.maintenanceIgnoreCandidate;
+    const operation = mode === "ignore"
       ? "maintenance.discovery.ignore.execute"
       : "maintenance.discovery.restore.execute";
-    const parameters = state.maintenanceIgnoreMode === "ignore"
+    const parameters = mode === "ignore"
       ? Object.assign(maintenanceIgnoreParameters(), { confirmation: preview.confirmation_phrase, expected_digest: preview.expected_digest })
       : { identity_key: preview.device.identity_key, confirmation: preview.confirmation_phrase, expected_digest: preview.expected_digest };
     const envelope = await callSoul(operation, parameters);
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Ignored-device mutation failed safely."));
-    renderMaintenanceDiscoveryCandidates([]); resetMaintenanceIgnorePanel(); await loadMaintenanceDiscovery();
-    byId("maintenance-discovery-status").textContent = "Ignored-device state changed. Scan again for a fresh actionable candidate list.";
+    const remainingCount = mode === "ignore"
+      ? removeMaintenanceDiscoveryCandidate(actedCandidate)
+      : (state.maintenanceDiscoveryCandidates || []).length;
+    resetMaintenanceIgnorePanel(); await loadMaintenanceDiscovery();
+    byId("maintenance-discovery-status").textContent = mode === "ignore"
+      ? `Candidate ignored. ${remainingCount} candidate${remainingCount === 1 ? "" : "s"} remain from the current scan.`
+      : `Ignored identity restored. ${remainingCount} current candidate${remainingCount === 1 ? "" : "s"} preserved; scan only if you want fresh discovery evidence.`;
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 
@@ -2932,10 +2946,12 @@ async function executeMaintenanceEnrollment() {
       expected_digest: state.maintenanceEnrollmentPreview.expected_digest
     }));
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Enrollment was blocked safely."));
+    const actedCandidate = state.maintenanceEnrollmentCandidate;
+    const remainingCount = removeMaintenanceDiscoveryCandidate(actedCandidate);
     status.textContent = `${dataOf(envelope).device.label} enrolled for inventory only. No maintenance authority was granted.`;
-    resetMaintenanceEnrollmentPreview(); renderMaintenanceDiscoveryCandidates([]);
+    resetMaintenanceEnrollmentPreview(); state.maintenanceEnrollmentCandidate = null; byId("maintenance-enrollment-panel").hidden = true;
     await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
-    byId("maintenance-discovery-status").textContent = "Enrollment changed the private registry. Scan again when you want a fresh candidate list.";
+    byId("maintenance-discovery-status").textContent = `Enrollment complete. ${remainingCount} candidate${remainingCount === 1 ? "" : "s"} remain from the current scan.`;
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -2954,8 +2970,9 @@ async function executeMaintenanceRemoval() {
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Removal was blocked safely."));
     state.maintenanceRemovalPreview = null; byId("maintenance-removal-panel").hidden = true;
     resetMaintenanceEnrollmentPreview(); byId("maintenance-enrollment-panel").hidden = true;
-    renderMaintenanceDiscoveryCandidates([]); await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
-    byId("maintenance-discovery-status").textContent = `${dataOf(envelope).removed_device.label} removed from the private inventory registry. Scan again for a fresh candidate list; the device was not contacted.`;
+    await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+    const remainingCount = (state.maintenanceDiscoveryCandidates || []).length;
+    byId("maintenance-discovery-status").textContent = `${dataOf(envelope).removed_device.label} removed from the private inventory registry; the device was not contacted. ${remainingCount} current candidate${remainingCount === 1 ? "" : "s"} preserved; scan only to rediscover the removed device.`;
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }

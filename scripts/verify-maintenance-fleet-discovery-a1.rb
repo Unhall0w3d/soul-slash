@@ -311,7 +311,7 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
                html.include?("Candidate results are not persisted") &&
                dashboard.include?('const inventoryOnly = device.control !== "maintenance"') &&
                dashboard.include?("already represented and excluded") &&
-               dashboard.include?("Enrollment changed the private registry") &&
+               dashboard.include?("Enrollment complete.") &&
                dashboard.include?("no local identity hints available") &&
                dashboard.include?("dependency.last_subnet") &&
                dashboard.include?('address_policy: byId("maintenance-enrollment-policy").value') &&
@@ -319,6 +319,14 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
                dashboard.include?('"Network reachability"') &&
                dashboard.include?("discovered capabilities grant no mutation authority") &&
                !dashboard.include?("setInterval(scanMaintenanceSubnet"))
+  check.call("Dashboard preserves unacted-on scan candidates after enrollment, ignore, restore, and removal",
+             dashboard.include?("function removeMaintenanceDiscoveryCandidate(candidate)") &&
+               dashboard.include?('.filter((entry) => String(entry.address || "") !== address)') &&
+               dashboard.include?("const remainingCount = mode === \"ignore\"") &&
+               dashboard.include?("const remainingCount = removeMaintenanceDiscoveryCandidate(actedCandidate)") &&
+               dashboard.include?("current candidate${remainingCount === 1 ? \"\" : \"s\"} preserved") &&
+               dashboard.include?("renderMaintenanceDiscoveryCandidates(data.candidates || [])") &&
+               !dashboard.include?("renderMaintenanceDiscoveryCandidates([])"))
 end
 
 if errors.empty?
