@@ -54,6 +54,7 @@ module SoulCore
       blockers << "logind does not currently permit reboot" unless @reboot_permission_probe.call
       blockers << "a pending restore journal already exists" if pending_journal?
       source_boot_id = validated_boot_id
+      preflight = a2.fetch("preflight").merge("a3_blockers" => blockers)
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "risk_class" => "class_5",
@@ -65,14 +66,15 @@ module SoulCore
         "window_restore_summary" => a2.fetch("window_restore_summary"),
         "source_boot_id" => source_boot_id,
         "resume_unit" => resume.slice("unit_name", "installed_exact", "enabled", "ready", "persistent_process", "restart_policy", "timer"),
-        "preflight" => a2.fetch("preflight").merge("a3_blockers" => blockers),
         "one_authentication_required" => true,
         "automatic_reboot" => true,
         "live_execution_enabled" => @live_execution_enabled,
-        "a2_plan_digest" => a2.fetch("expected_digest")
+        "a2_plan_digest" => a2.fetch("expected_digest"),
+        "a3_blockers" => blockers
       }
       expected_digest = digest(basis)
       plan = basis.merge(
+        "preflight" => preflight,
         "plan_id" => "maintenance_a3_#{expected_digest[0, 16]}",
         "created_at" => @clock.call.iso8601,
         "expected_digest" => expected_digest,

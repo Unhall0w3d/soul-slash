@@ -1,7 +1,7 @@
 # Maintenance Conditional Reboot and Restore A3 Review
 
-Status: repaired candidate; first live reboot completed, final restoration
-acceptance pending one supervised rerun
+Status: accepted on Maven after two supervised live reboots; local and public
+live gates disabled
 
 ## Implementation summary
 
@@ -32,6 +32,9 @@ acceptance pending one supervised rerun
   workspace focus to Hyprland's current typed Lua dispatchers.
 - Added an optional bounded, owner-only local display-recovery hook. The public
   default is empty; Maven uses its existing DP-3 retrain script.
+- Stabilized the A3 review digest by binding the already normalized A2 plan
+  digest and exact A3 blockers instead of volatile raw free-space byte counts.
+  Raw disk evidence remains visible in every preview.
 
 ## Files changed
 
@@ -95,6 +98,8 @@ The focused verifier proves:
 - the tracked A3 default remains disabled;
 - the Dashboard reserves a handoff but does not reboot inside its confined
   process;
+- safe raw disk-space fluctuations do not invalidate an otherwise exact
+  reviewed A3 plan;
 - package lock, active Soul work, missing resume unit, unavailable reboot
   permission, changed registry, changed boot identity, stale journal, same-boot
   journal, and journal tampering fail closed;
@@ -109,7 +114,7 @@ The focused verifier proves:
 
 The A1, A2, and A2B maintenance regressions continue to pass.
 
-Live evidence on Maven, 2026-07-27:
+Live evidence on Maven, 2026-07-27 and 2026-07-28:
 
 - one native password prompt completed both fixed update vectors;
 - the reviewed reboot command completed;
@@ -120,9 +125,14 @@ Live evidence on Maven, 2026-07-27:
   systemd unit lacked Hyprland's instance variables;
 - no unsupported application and no absent qBittorrent process was launched;
 - after repair, live probes passed Hyprland discovery, the Maven DP-3 recovery
-  hook, and one transient user-systemd `/usr/bin/true` launch; and
-- the remaining acceptance gate is one supervised reboot proving automatic
-  Opera/Codex placement and DP-3 recovery end to end.
+  hook, and one transient user-systemd `/usr/bin/true` launch;
+- transaction `maintenance_tx_c81e6cfe1b15e3cc` completed both fixed update
+  vectors with one password prompt, invalidated the sudo ticket, rebooted, and
+  completed all four restore actions with zero failures;
+- DP-1 and DP-3 returned awake at 3440x1440 and 120 Hz;
+- Codex returned to workspace 1 on monitor 0 and Opera returned to workspace 2
+  on monitor 1; and
+- absent qBittorrent and unsupported Webex/Teams were not launched.
 
 ## Local LLM eval results
 
@@ -134,7 +144,7 @@ delegated to a model.
 
 - The first live post-login attempt exposed and safely recorded compositor
   environment and dispatcher-version incompatibilities. Both are repaired and
-  live-probed, but the complete path still requires one supervised reboot.
+  the complete path passed its supervised rerun.
 - Exact window placement continues to depend on application class stability
   and compositor timing.
 - Browser tabs, documents, unsaved work, application-internal state, and
@@ -191,17 +201,17 @@ Per-record restore retry: at most one
 Session readiness wait: at most 90 seconds
 Persistent process, daemon, timer, watcher, socket, or listener: no
 Oneshot unit installed on Maven: yes, exact reviewed definition
-Live reboot performed on Maven: yes, one supervised request
+Live reboot performed on Maven: yes, two supervised requests
 ```
 
 ## Human review checklist
 
-- [ ] Review the exact A3 transaction and reboot vectors.
-- [ ] Confirm A2 remains a separate non-rebooting operation.
-- [ ] Confirm `SOUL_MAINTENANCE_A3_LIVE=false` remains effective.
-- [ ] Review the one-shot unit and exact installation plan.
-- [ ] Review every restore-registry entry and executable path.
-- [ ] Confirm unsupported applications and raw process arguments remain
+- [x] Review the exact A3 transaction and reboot vectors.
+- [x] Confirm A2 remains a separate non-rebooting operation.
+- [x] Confirm `SOUL_MAINTENANCE_A3_LIVE=false` remains effective.
+- [x] Review the one-shot unit and exact installation plan.
+- [x] Review every restore-registry entry and executable path.
+- [x] Confirm unsupported applications and raw process arguments remain
   excluded.
 - [x] Install the reviewed one-shot unit through its exact Make target.
 - [x] Run a no-journal unit check and inspect status.
@@ -209,10 +219,9 @@ Live reboot performed on Maven: yes, one supervised request
 - [x] Confirm fixed updates, one authentication, reboot, Limine, and autologin.
 - [x] Confirm the failed restore was bounded, receipt-backed, and launched
   nothing unsupported.
-- [ ] Repeat one supervised reboot with repaired Hyprland discovery, typed
+- [x] Repeat one supervised reboot with repaired Hyprland discovery, typed
   dispatchers, and Maven's bounded DP-3 recovery hook.
-- [ ] Confirm Opera and Codex restore to workspace 1 while absent qBittorrent,
+- [x] Confirm Codex restores to workspace 1 and Opera to workspace 2 while
+  absent qBittorrent,
   unsupported Webex, and unsupported Teams remain unlaunched.
-- [ ] Approve, request repair, or reject this candidate.
-- [ ] Do not enable or run the first live A3 reboot without a later exact,
-  supervised authorization.
+- [x] Accept the repaired candidate after supervised evidence.

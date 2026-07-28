@@ -37,10 +37,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; pruning remains disabled
-- [~] qualify guided maintenance: A1 rehearsal and A2/A2B foreground execution
-  are accepted; the merged A3 conditional-reboot and one-shot restoration
-  candidate still requires resume-unit, no-journal, Dashboard-preview, and
-  supervised live-reboot review
+- [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
+  and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
+  Maven; live gates remain disabled by default
 
 ## Qualified expansion candidates
 
