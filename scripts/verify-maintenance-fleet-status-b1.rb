@@ -122,13 +122,20 @@ puts "Maintenance fleet status B1 verification:"
 Dir.mktmpdir("soul-fleet-status-") do |root|
   os_release = File.join(root, "os-release")
   File.write(os_release, "PRETTY_NAME=\"CachyOS fixture\"\n")
+  route_path = File.join(root, "route")
+  File.write(route_path, <<~ROUTES)
+    Iface	Destination	Gateway	Flags	RefCnt	Use	Metric	Mask	MTU	Window	IRTT
+    eth0	00000000	0132A8C0	0003	0	0	100	00000000	0	0	0
+    eth0	0032A8C0	00000000	0001	0	0	100	00FFFFFF	0	0	0
+  ROUTES
   runner = FleetFakeRunner.new
   service = SoulCore::MaintenanceFleetStatusService.new(
     runner: runner,
     clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" }
+    hostname_reader: -> { "maven" },
+    route_path: route_path
   )
   result = service.collect
   data = result.dig("data")
@@ -158,10 +165,17 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("pihole", "updates", "native") == 2 &&
                devices.dig("pihole", "facts", "blocking_enabled") == true &&
                devices.dig("pihole", "services").all? { |service_record| service_record["state"] == "active" })
-  check.call("summary and Visio-style topology derive from the same device evidence",
+  check.call("summary and network-map topology derive from the same device and route evidence",
              data.dig("summary", "reachable_count") == 3 &&
                data.dig("summary", "updates_available") == 7 &&
                data.dig("summary", "kernel_attention_count") == 2 &&
+               data.dig("topology", "layout") == "network_map" &&
+               data.dig("topology", "network", "interface") == "eth0" &&
+               data.dig("topology", "network", "gateway_address") == "192.168.50.1" &&
+               data.dig("topology", "network", "subnet") == "192.168.50.0/24" &&
+               data.dig("topology", "network", "gateway_node_id") == "default-gateway" &&
+               data.dig("topology", "edges").any? { |edge| edge["kind"] == "wan" && edge["from"] == "default-gateway" } &&
+               data.dig("topology", "edges").any? { |edge| edge["kind"] == "route" && edge["from"] == "maven" && edge["to"] == "default-gateway" } &&
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "backup_planned" } &&
                data.dig("topology", "nodes").map { |node| node["id"] }.include?("pihole"))
   check.call("only fixed aliases and bounded no-password SSH options are used",
@@ -243,6 +257,25 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              dashboard.include?('callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }') &&
                dashboard.include?('["Checked", observedLabel]') &&
                dashboard.include?("only this device was probed"))
+  check.call("dashboard presents route flow as WAN to gateway to LAN and keeps secondary relationships below",
+             dashboard.include?("maintenance-network-map") &&
+               dashboard.include?("WAN & provider cloud") &&
+               dashboard.include?("Default gateway") &&
+               dashboard.include?("Local switching & routing") &&
+               dashboard.include?('!["route", "wan"].includes(edge.kind)'))
+
+  missing_route_data = SoulCore::MaintenanceFleetStatusService.new(
+    runner: FleetFakeRunner.new,
+    clock: -> { Time.utc(2026, 7, 27, 21, 2, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "maven" },
+    route_path: File.join(root, "missing-route")
+  ).collect.fetch("data")
+  check.call("missing route evidence degrades safely without hiding known devices",
+             missing_route_data.dig("topology", "network", "evidence") == "unavailable" &&
+               missing_route_data.dig("topology", "network", "gateway_address").nil? &&
+               missing_route_data.dig("topology", "nodes").any? { |node| node["id"] == "maven" })
 
   private_root = File.join(root, "private-root")
   registry_directory = File.join(private_root, "Soul", "private", "host_maintenance")

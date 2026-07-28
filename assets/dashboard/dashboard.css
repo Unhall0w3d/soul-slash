@@ -289,15 +289,36 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 #maintenance-device-confirmation-row[hidden] { display:none; }
 .maintenance-topology-card { padding:21px; border:1px solid var(--line); border-radius:3px 20px 3px 16px; background:rgba(5,12,18,.7); }
 .maintenance-topology { margin-top:16px; }
-.maintenance-topology-chain { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); align-items:stretch; gap:9px; }
-.maintenance-topology-node { display:grid; grid-template-columns:32px minmax(0,1fr); gap:10px; min-height:116px; padding:16px; border:1px solid rgba(58,174,223,.23); border-radius:3px 18px 3px 13px; background:linear-gradient(140deg,rgba(17,34,44,.94),rgba(8,15,22,.98)); }
+.maintenance-network-map { display:grid; justify-items:stretch; }
+.maintenance-network-tier { display:grid; grid-template-columns:minmax(150px,210px) minmax(0,1fr); align-items:center; gap:18px; }
+.maintenance-network-tier-heading p { margin:0 0 5px; }
+.maintenance-network-tier-heading strong { display:block; color:#B5D1D9; font:400 20px var(--serif); }
+.maintenance-network-cloud { padding:15px; border:1px solid rgba(58,174,223,.18); border-radius:3px 18px 3px 13px; background:linear-gradient(100deg,rgba(9,20,29,.56),rgba(15,30,42,.82)); }
+.maintenance-network-cloud-nodes { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:9px; }
+.maintenance-network-gateway { width:min(760px,100%); justify-self:center; padding:15px; border:1px solid rgba(196,161,98,.36); border-radius:18px 3px 15px 3px; background:linear-gradient(110deg,rgba(196,161,98,.08),rgba(9,22,31,.94)); }
+.maintenance-network-uplink { position:relative; display:grid; place-items:center; min-height:62px; }
+.maintenance-network-uplink i { position:absolute; inset:0 auto; width:1px; background:linear-gradient(var(--cyan),var(--gold)); box-shadow:0 0 12px rgba(58,174,223,.38); }
+.maintenance-network-uplink i::after { content:""; position:absolute; left:-4px; bottom:0; width:7px; height:7px; border-right:1px solid var(--gold); border-bottom:1px solid var(--gold); transform:rotate(45deg); }
+.maintenance-network-uplink span { position:relative; padding:5px 10px; border:1px solid rgba(58,174,223,.2); background:#09141D; color:#7899A2; font:9px var(--mono); letter-spacing:.06em; text-transform:uppercase; }
+.maintenance-network-uplink--lan { min-height:48px; }
+.maintenance-network-lan { width:100%; padding:17px; border:1px solid rgba(58,174,223,.3); border-radius:3px 22px 3px 17px; background:linear-gradient(145deg,rgba(15,31,41,.88),rgba(6,14,21,.96)); }
+.maintenance-network-lan>header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:13px; padding-bottom:11px; border-bottom:1px solid var(--line); }
+.maintenance-network-lan>header p { margin:0 0 5px; }
+.maintenance-network-lan>header strong { color:#BCD8E0; font:400 23px var(--serif); }
+.maintenance-network-lan>header code { color:var(--gold-light); font:10px var(--mono); }
+.maintenance-network-lan-nodes { display:grid; grid-template-columns:repeat(auto-fit,minmax(205px,1fr)); gap:9px; }
+.maintenance-topology-node { display:grid; grid-template-columns:36px minmax(0,1fr); gap:10px; min-height:104px; padding:14px; border:1px solid rgba(58,174,223,.23); border-radius:3px 18px 3px 13px; background:linear-gradient(140deg,rgba(17,34,44,.94),rgba(8,15,22,.98)); }
 .maintenance-topology-node>span { display:grid; place-items:center; align-self:start; width:29px; height:29px; border:1px solid rgba(58,174,223,.34); border-radius:50%; color:var(--cyan); font:10px var(--mono); }
 .maintenance-topology-node strong,.maintenance-topology-node small,.maintenance-topology-node code { display:block; }
-.maintenance-topology-node strong { color:#BBD8E0; font:400 20px var(--serif); }
-.maintenance-topology-node small { min-height:3em; margin-top:5px; color:#718D96; font-size:10px; line-height:1.4; }
+.maintenance-topology-node strong { color:#BBD8E0; font:400 19px var(--serif); }
+.maintenance-topology-node small { min-height:2.8em; margin-top:5px; color:#718D96; font-size:10px; line-height:1.4; }
 .maintenance-topology-node code { margin-top:9px; color:var(--gold-light); font:10px var(--mono); }
-.maintenance-topology-node[data-state="attention"],.maintenance-topology-node[data-state="offline"] { border-color:rgba(255,23,68,.32); }
-.maintenance-topology-links { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:10px; }
+.maintenance-topology-node[data-state="healthy"],.maintenance-topology-node[data-state="reachable"] { border-color:rgba(85,214,165,.3); }
+.maintenance-topology-node[data-state="updates_available"] { border-color:rgba(229,196,92,.4); }
+.maintenance-topology-node[data-state="attention"],.maintenance-topology-node[data-state="offline"] { border-color:rgba(255,23,68,.4); }
+.maintenance-topology-node[data-state="external"] { border-color:rgba(196,161,98,.28); background:linear-gradient(140deg,rgba(32,31,34,.9),rgba(10,17,23,.98)); }
+.maintenance-topology-relationships { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.maintenance-topology-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:7px; margin-top:10px; }
 .maintenance-topology-links>div { padding:9px 10px; border-left:2px solid rgba(58,174,223,.45); background:rgba(58,174,223,.035); }
 .maintenance-topology-links>div[data-kind="backup_planned"] { border-left-color:var(--gold); background:rgba(196,161,98,.035); }
 .maintenance-topology-links span,.maintenance-topology-links strong { display:block; }
@@ -317,6 +338,6 @@ button:disabled { cursor:not-allowed; opacity:.4; }
   .backup-panel { padding:29px 17px 45px; }.backup-unlock,.backup-summary,.backup-workspace { grid-template-columns:1fr; }.backup-unlock button { width:100%; }.backup-snapshot-card { position:static; }.backup-snapshot-list { max-height:380px; }
   .review-center { width:100vw; height:100vh; max-width:none; max-height:none; border:0; border-radius:0; }.review-metrics { grid-template-columns:repeat(2,1fr); }.review-workspace,.review-view { display:block; overflow:auto; }.review-navigation { display:block; border-right:0; border-bottom:1px solid var(--line); }.review-navigation [role="tablist"] { grid-template-columns:repeat(2,1fr); }.review-authority-note { display:none; }.review-list-pane { max-height:350px; border-right:0; border-bottom:1px solid var(--line); }.review-list { max-height:230px; }.review-detail { min-height:450px; }.review-detail-meta { grid-template-columns:1fr; }
   .invocation-toolbar,.invocation-workspace { grid-template-columns:1fr; }.invocation-list { max-height:300px; border-right:0; border-bottom:1px solid var(--line); }.invocation-facts>div { grid-template-columns:1fr; gap:5px; }
-  .maintenance-fleet-toolbar { display:block; }.maintenance-fleet-toolbar button { width:100%; margin-top:17px; }.maintenance-fleet-summary { grid-template-columns:repeat(2,1fr); }.maintenance-fleet-summary>div:nth-child(2) { border-right:0; }.maintenance-fleet-summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }.maintenance-discovery-card>summary,.maintenance-discovery-intro { display:block; }.maintenance-discovery-card>summary small { display:block; margin-top:7px; text-align:left; }.maintenance-discovery-controls,.maintenance-discovery-columns,.maintenance-enrollment-fields { grid-template-columns:1fr; }.maintenance-discovery-controls button { width:100%; }.maintenance-device-grid,.maintenance-topology-chain { grid-template-columns:1fr; }.maintenance-topology-links { grid-template-columns:1fr; }
+  .maintenance-fleet-toolbar { display:block; }.maintenance-fleet-toolbar button { width:100%; margin-top:17px; }.maintenance-fleet-summary { grid-template-columns:repeat(2,1fr); }.maintenance-fleet-summary>div:nth-child(2) { border-right:0; }.maintenance-fleet-summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }.maintenance-discovery-card>summary,.maintenance-discovery-intro { display:block; }.maintenance-discovery-card>summary small { display:block; margin-top:7px; text-align:left; }.maintenance-discovery-controls,.maintenance-discovery-columns,.maintenance-enrollment-fields { grid-template-columns:1fr; }.maintenance-discovery-controls button { width:100%; }.maintenance-device-grid,.maintenance-network-tier { grid-template-columns:1fr; }.maintenance-network-lan>header { align-items:flex-start; flex-direction:column; }.maintenance-topology-links { grid-template-columns:1fr; }
 }
 @media (max-width:520px) { .assessment-actions { grid-template-columns:1fr; }.review-metrics { grid-template-columns:1fr; }.review-metrics>div { border-bottom:1px solid var(--line); }.composer-row { grid-template-columns:repeat(3,1fr); }.composer textarea { grid-column:1/-1; }.send-button,.voice-button { min-height:44px; }.picture-attachment { grid-template-columns:64px minmax(0,1fr); }.picture-attachment img { width:64px; height:54px; }.picture-attachment>button { grid-column:1/-1; } }
