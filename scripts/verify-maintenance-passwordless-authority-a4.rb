@@ -102,6 +102,23 @@ gated = SoulCore::MaintenancePasswordlessAuthority.new(
 blocked_install = gated.install(expected_digest: gated.plan.dig("data", "expected_digest"), confirmation: "wrong")
 check.call("installation performs no privileged call without exact confirmation", blocked_install["lifecycle_state"] == "awaiting_input" && install_calls.all? { |argv| argv == ["/usr/bin/yay", "--version"] })
 
+confined_runner = lambda do |argv|
+  if argv == ["/usr/bin/yay", "--version"]
+    {"success" => true, "stdout" => "yay v13.0.1 - libalpm v16.0.1\n", "stderr" => ""}
+  else
+    {"success" => false, "stdout" => "", "stderr" => "sudo: The \"no new privileges\" flag is set\n"}
+  end
+end
+confined_authority = SoulCore::MaintenancePasswordlessAuthority.new(root: root, command_runner: confined_runner)
+confined_authority.define_singleton_method(:regular_file_exact?) { |_path, _digest, _mode| true }
+confined_status = confined_authority.status
+check.call(
+  "confined Dashboard defers sudoers proof to the native handoff without disabling A4",
+  confined_status.dig("data", "ready") == true &&
+    confined_status.dig("data", "sudoers_authorization_exact") == false &&
+    confined_status.dig("data", "authorization_verification") == "deferred_to_native_handoff"
+)
+
 fake_authority = Object.new
 def fake_authority.status
   {"ok" => true, "data" => {"ready" => true, "authority_mode" => "root_owned_passwordless", "helper_sha256" => "a" * 64}}
