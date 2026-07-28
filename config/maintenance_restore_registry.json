@@ -65,6 +65,24 @@
       "startup_policy": "launch_window"
     },
     {
+      "entry_id": "communication.webex",
+      "identities": ["webex"],
+      "process_identities": ["ciscocollabhost"],
+      "argv": ["/opt/Webex/bin/CiscoCollabHost"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_if_absent"
+    },
+    {
+      "entry_id": "communication.teams_for_linux",
+      "identities": ["teams-for-linux"],
+      "process_identities": ["teams-for-linux"],
+      "argv": ["/usr/bin/teams-for-linux", "--gtk-version=3"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_if_absent"
+    },
+    {
       "entry_id": "transfer.qbittorrent",
       "identities": ["qbittorrent", "org.qbittorrent.qbittorrent"],
       "process_identities": ["qbittorrent"],

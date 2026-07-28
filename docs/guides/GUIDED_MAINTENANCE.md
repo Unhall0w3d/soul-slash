@@ -118,8 +118,18 @@ but it does not prevent the zero-command fixture rehearsal from exercising the
 visible terminal and receipt lifecycle. The desktop handoff supplies native
 evidence while preserving the service sandbox.
 
+**Collect fleet status** and Maven's native evidence serve different purposes.
+Fleet collection inventories cached workstation and remote device state.
+Before Maven maintenance or reboot, use the prominent **Refresh Maven
+evidence** action, let its visible read-only terminal close, then select
+**Recheck Maven preflight**. This preserves the fresh Class-5 authorization
+gate without hiding its recovery control in the plan scroller.
+
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
-restorer.
+restorer. Its package-only approval digest therefore does not bind the current
+window/workspace restoration inventory; closing the evidence terminal does not
+invalidate the reviewed update plan. A3 captures and binds its own fresh
+restore state separately before reboot.
 
 ## A4 unattended fixed-operation authority candidate
 
@@ -132,12 +142,17 @@ SOUL_MAINTENANCE_PASSWORDLESS=false
 ```
 
 The root-owned helper accepts only `arch-update`, `flatpak-system-update`, or
-`reboot` plus one opaque maintenance transaction ID. It accepts no executable,
-package target, path, option, or free-form answer. Its sudoers entry binds the
-exact helper content by SHA-256 digest. Yay 13.0.1 receives a fixed,
-target-free policy: no clean rebuild, no diff review, no PKGBUILD edit, upgrade
-the reviewed set, retain make dependencies, and proceed noninteractively.
-Flatpak uses its native `--noninteractive` system update.
+`reboot` plus one opaque maintenance transaction ID. Its sudoers entry binds
+the exact helper content by SHA-256 digest. Yay 13.0.1 runs as the qualified
+desktop user because AUR packages must not be built as root, and receives a
+fixed, target-free policy: no clean rebuild, no diff review, no PKGBUILD edit,
+upgrade the reviewed set, retain make dependencies, and proceed
+noninteractively. During that exact active operation, yay's pacman calls return
+through a helper bridge bound to its recorded PID/start identity. The bridge
+rejects removal, database operations, alternate roots/configuration paths, and
+non-pacman execution. The public surface still accepts no executable, package
+target, path, option, or free-form answer. Flatpak uses its native
+`--noninteractive` system update.
 
 The visible terminal remains an audit and cancellation surface. Package-manager
 errors stop the transaction; there is no model-driven prompt answering or
@@ -186,6 +201,10 @@ fixed allowlisted applications, skips already-running background entries,
 places supported windows through Hyprland's typed Lua dispatchers, restores the
 previously active workspace last, writes a terminal receipt, and consumes the
 journal. The unit and native handoff use the stable `/usr/bin/ruby` runtime.
+Maven's reviewed registry includes Webex and Teams for Linux as
+`launch_if_absent` entries: they are recorded only when their window or process
+exists before reboot, never launched merely because they are installed, and
+never duplicated if autologin already restored them.
 
 Hosts that require a physical display-link retrain after autologin may provide
 one owner-controlled executable:

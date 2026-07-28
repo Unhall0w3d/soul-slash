@@ -32,6 +32,10 @@ live gates disabled
   workspace focus to Hyprland's current typed Lua dispatchers.
 - Added an optional bounded, owner-only local display-recovery hook. The public
   default is empty; Maven uses its existing DP-3 retrain script.
+- Added Maven-reviewed Webex and Teams for Linux restore entries. Their exact
+  window classes and process names are allowlisted with fixed launch vectors;
+  each is restored only when represented in the pre-reboot window/process
+  snapshot and skipped if already running after autologin.
 - Stabilized the A3 review digest by binding the already normalized A2 plan
   digest and exact A3 blockers instead of volatile raw free-space byte counts.
   Raw disk evidence remains visible in every preview.
@@ -105,6 +109,9 @@ The focused verifier proves:
   journal, and journal tampering fail closed;
 - unsupported applications are never launched;
 - already-running background applications are not duplicated;
+- Maven's current native snapshot maps running Webex and Teams for Linux to
+  their exact fixed launch vectors on workspace 4/monitor 1 without retaining
+  titles or raw process arguments;
 - partial restoration uses at most one retry and terminates for human review;
 - completed restoration consumes the journal and a later unit invocation is a
   no-op;
@@ -132,7 +139,7 @@ Live evidence on Maven, 2026-07-27 and 2026-07-28:
 - DP-1 and DP-3 returned awake at 3440x1440 and 120 Hz;
 - Codex returned to workspace 1 on monitor 0 and Opera returned to workspace 2
   on monitor 1; and
-- absent qBittorrent and unsupported Webex/Teams were not launched.
+- absent qBittorrent and then-unallowlisted Webex/Teams were not launched.
 
 ## Local LLM eval results
 
@@ -222,6 +229,9 @@ Live reboot performed on Maven: yes, two supervised requests
 - [x] Repeat one supervised reboot with repaired Hyprland discovery, typed
   dispatchers, and Maven's bounded DP-3 recovery hook.
 - [x] Confirm Codex restores to workspace 1 and Opera to workspace 2 while
-  absent qBittorrent,
-  unsupported Webex, and unsupported Teams remain unlaunched.
+  absent qBittorrent remains unlaunched.
+- [x] Review Maven's exact Webex and Teams for Linux class/process identities
+  and launch vectors.
+- [ ] Confirm a later supervised reboot restores Webex and Teams only when
+  present in the pre-reboot snapshot.
 - [x] Accept the repaired candidate after supervised evidence.

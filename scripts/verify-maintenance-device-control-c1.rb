@@ -349,6 +349,12 @@ check.call("Dashboard removes visible A1/A2/A3 cards and generates exactly two d
            html.include?('id="maintenance-legacy-controls" hidden') &&
              javascript.include?('["maintenance", "reboot"].forEach') &&
              html.include?('id="maintenance-device-dialog"'))
+check.call("Maven dialog keeps evidence recovery outside the scrolling plan and explains the exact blocker",
+           html.include?('id="maintenance-maven-evidence-actions"') &&
+             html.include?('id="refresh-maintenance-device-evidence"') &&
+             html.include?('id="recheck-maintenance-device-preflight"') &&
+             javascript.include?("Refresh Maven evidence, then recheck this preflight.") &&
+             javascript.include?("A4 fixed-operation authority · no password prompt"))
 check.call("all cards use one maintenance-channel status while Pi-hole OpenSSH duplication is absent",
            javascript.include?("Maintenance channel ·") &&
              !javascript.include?("SSH evidence ·") &&
