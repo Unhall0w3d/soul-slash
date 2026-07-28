@@ -64,9 +64,10 @@ VISUAL_NATIVE_ROOT ?= $(HOME)/.local/share/soul/visual-native
 VISUAL_NATIVE_MANIFEST ?= $(PROJECT_ROOT)/config/visual_native_models.json
 KNOWLEDGE_REFLECTION_INPUT ?=
 BACKUP_HOME ?= $(HOME)
+FLEET_SUBNET ?=
 
 .PHONY: help defaults-show supported-stack-check check setup setup-llamacpp setup-ollama setup-music music-check music-pilot-plan music-model-download music-pilot-run music-vulkan-check music-vulkan-setup-plan music-vulkan-setup music-vulkan-download-plan music-vulkan-download music-vulkan-run-plan music-vulkan-run verify-music-core-vulkan visual-check visual-runtime-plan visual-runtime-install visual-model-download-plan visual-model-download visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run visual-native-check visual-native-runtime-plan visual-native-runtime-install visual-native-model-download-plan visual-native-model-download verify-visual-motion-qualification verify-visual-native-video music-transcription-plan music-transcription-install voice-transcription-check voice-transcription-plan voice-transcription-install verify-voice-transcription voice-synthesis-check voice-synthesis-plan voice-synthesis-install voice-synthesis-audition verify-voice-synthesis notification-audio-build verify-notification-cues verify-project-timeline verify-chat-progress-summaries backup-config-plan backup-configure verify-backup-administration music-reference-tooling-check music-reference-tooling-plan music-reference-tooling-install music-reference-enrichment-check music-reference-enrichment-plan music-reference-enrichment-install music-projects music-resources music-project-create music-project-inspect music-generate-preview music-generate-execute music-cancel-preview music-cancel-execute verify-music-a2 verify-music-vocal-analysis verify-music-references verify-music-reference-analysis verify-music-reference-synthesis verify-music-lite-edit verify-music-publication-package verify-youtube-authenticated-upload verify-youtube-description-sync verify-character-identity knowledge-vault-status knowledge-vault-search knowledge-vault-init-preview knowledge-vault-init knowledge-vault-memory-export-preview knowledge-vault-memory-export knowledge-vault-memory-import-preview knowledge-vault-memory-import knowledge-vault-reflection-preview knowledge-vault-reflection-execute verify-knowledge-vault verify-knowledge-reflection local-search local-search-core-eval verify-local-search detect test-runtime test-fast test-think test-soul doctor env-show download-model start-llamacpp foreground-llamacpp dashboard dashboard-reset-admin dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall verify-web-knowledge verify-model-runtime-controls model-runtime-amd-plan model-runtime-amd-install model-runtime-amd-status model-runtime-amd-uninstall model-runtime-gemma-plan model-runtime-gemma-install model-runtime-gemma-status model-runtime-gemma-uninstall model-runtime-startup-plan model-runtime-startup-install model-runtime-startup-status model-runtime-startup-uninstall model-runtime-startup-reconcile model-runtime-identity-plan model-runtime-identity-execute private-memory-plan private-memory-execute verify-private-memory clean-runtime chmod-scripts fix-mtimes verify-maintenance-foreground-execution verify-maintenance-desktop-handoff maintenance-handoff-check maintenance-handoff-plan maintenance-handoff-install
-.PHONY: verify-maintenance-reboot-restore verify-maintenance-passwordless-authority maintenance-authority-plan maintenance-authority-status maintenance-authority-install maintenance-authority-uninstall verify-maintenance-fleet-status verify-maintenance-device-control maintenance-resume-plan maintenance-resume-install maintenance-resume-status maintenance-resume-uninstall fleet-status-schedule-plan fleet-status-schedule-install fleet-status-schedule-status fleet-status-schedule-uninstall
+.PHONY: verify-maintenance-reboot-restore verify-maintenance-passwordless-authority maintenance-authority-plan maintenance-authority-status maintenance-authority-install maintenance-authority-uninstall verify-maintenance-fleet-status verify-maintenance-device-control verify-maintenance-fleet-discovery fleet-discovery-check fleet-discovery-scan maintenance-resume-plan maintenance-resume-install maintenance-resume-status maintenance-resume-uninstall fleet-status-schedule-plan fleet-status-schedule-install fleet-status-schedule-status fleet-status-schedule-uninstall
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -165,6 +166,8 @@ help:
 > @echo "  make verify-maintenance-desktop-handoff"
 > @echo "  make verify-maintenance-fleet-status"
 > @echo "  make verify-maintenance-device-control"
+> @echo "  make fleet-discovery-check  Verify optional bounded subnet discovery prerequisites"
+> @echo "  make fleet-discovery-scan FLEET_SUBNET=192.168.1.0/24  Run one non-persisted private-LAN scan"
 > @echo "  make fleet-status-schedule-plan"
 > @echo "  make fleet-status-schedule-install CONFIRM=INSTALL_SOUL_FLEET_STATUS_TIMER"
 > @echo "  make fleet-status-schedule-status"
@@ -795,6 +798,16 @@ verify-maintenance-fleet-status:
 
 verify-maintenance-device-control:
 > @ruby scripts/verify-maintenance-device-control-c1.rb
+
+verify-maintenance-fleet-discovery:
+> @ruby scripts/verify-maintenance-fleet-discovery-a1.rb
+
+fleet-discovery-check:
+> @ruby scripts/soul-maintenance-fleet-discovery status
+
+fleet-discovery-scan:
+> @test -n "$(FLEET_SUBNET)" || { echo "FLEET_SUBNET is required (private IPv4 /24 through /32)"; exit 2; }
+> @ruby scripts/soul-maintenance-fleet-discovery scan --subnet "$(FLEET_SUBNET)"
 
 fleet-status-schedule-plan:
 > @ruby scripts/soul-maintenance-fleet-status-schedule plan

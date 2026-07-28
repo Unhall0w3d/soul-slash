@@ -31,6 +31,7 @@ require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "host_improvement_plan_service"
 require_relative "maintenance_fleet_status_service"
+require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
 require_relative "maintenance_rehearsal_service"
 require_relative "maintenance_foreground_execution_service"
@@ -83,6 +84,7 @@ module SoulCore
       self_improvement_service: nil,
       host_improvement_plan_service: nil,
       maintenance_fleet_status_service: nil,
+      maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
       maintenance_rehearsal_service: nil,
       maintenance_foreground_execution_service: nil,
@@ -129,6 +131,7 @@ module SoulCore
       @self_improvement_service = self_improvement_service
       @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
+      @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
       @maintenance_foreground_execution_service = maintenance_foreground_execution_service
@@ -309,6 +312,13 @@ module SoulCore
       when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
+      when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
+      when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
+      when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
+      when "maintenance.discovery.enroll.preview" then domain(maintenance_fleet_discovery.enrollment_preview(address: required(parameters, "address"), label: required(parameters, "label"), mode: required(parameters, "mode"), ssh_alias: parameters["ssh_alias"]))
+      when "maintenance.discovery.enroll.execute" then domain(maintenance_fleet_discovery.enroll(address: required(parameters, "address"), label: required(parameters, "label"), mode: required(parameters, "mode"), ssh_alias: parameters["ssh_alias"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "maintenance.discovery.remove.preview" then domain(maintenance_fleet_discovery.removal_preview(device_id: required(parameters, "device_id")))
+      when "maintenance.discovery.remove.execute" then domain(maintenance_fleet_discovery.remove(device_id: required(parameters, "device_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.device.preview" then domain(maintenance_device_control.preview(device_id: required(parameters, "device_id"), action: required(parameters, "action")))
       when "maintenance.device.execute" then domain(maintenance_device_control.execute(device_id: required(parameters, "device_id"), action: required(parameters, "action"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "maintenance.device.receipts" then domain(maintenance_device_control.receipts(limit: bounded_limit(parameters["limit"], MaintenanceDeviceControlService::MAX_RECEIPTS)))
@@ -782,6 +792,14 @@ module SoulCore
 
     def maintenance_fleet_status
       @maintenance_fleet_status_service ||= MaintenanceFleetStatusService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env
+      )
+    end
+
+    def maintenance_fleet_discovery
+      @maintenance_fleet_discovery_service ||= MaintenanceFleetDiscoveryService.new(
         root: @root,
         clock: @clock,
         process_env: @process_env
