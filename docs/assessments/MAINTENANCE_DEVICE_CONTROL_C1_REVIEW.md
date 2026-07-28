@@ -193,7 +193,7 @@ The final persisted evidence showed Forge and Pi-hole healthy, Proxmox
 `9.2.5`, kernel `7.0.14-6-pve`, LXC `100` running, complete Pi-hole
 `Core v6.4.3 · Web v6.6 · FTL v6.7` version evidence, active FTL/Unbound/DNS,
 zero updates, and no reboot indication. An independent direct DNS query against
-`192.168.124.206` also succeeded. This live result demonstrates that the
+The Operator-configured Pi-hole address also succeeded. This live result demonstrates that the
 readiness gate prevents the partial post-boot snapshot observed by the earlier
 Pi-hole reboot.
 

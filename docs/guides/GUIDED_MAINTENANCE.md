@@ -9,7 +9,8 @@ Open it from **Administration → Guided Maintenance**.
 ## Infrastructure control plane
 
 The page begins with the newest persisted fleet snapshot for the Maven
-workstation, the dynamically discovered Proxmox node, and the Pi-hole LXC.
+workstation, the dynamically discovered Proxmox node, the Pi-hole LXC, and any
+optional status-only appliances configured by the Operator.
 Click **Collect fleet status** to replace it with a fresh bounded collection
 and inspect:
 
@@ -22,6 +23,25 @@ and inspect:
 - Pi-hole FTL, Unbound, blocking, and DNS-query health; and
 - an evidence-driven architecture map.
 
+An optional Cisco 8851/Webex Calling card is deliberately narrower. It proves
+only bounded network reachability and displays the configured device identity,
+provider-owned lifecycle, and topology relationship. Reachability does not
+assert Webex registration, call readiness, firmware currency, or line state.
+The phone never receives Maintenance or Reboot buttons.
+
+Configure it in ignored `.env`:
+
+```text
+SOUL_FLEET_CISCO_PHONE_ENABLED=true
+SOUL_FLEET_CISCO_PHONE_ADDRESS=<reserved IPv4 address or hostname>
+SOUL_FLEET_CISCO_PHONE_LABEL=Cisco 8851
+```
+
+Use a DHCP reservation if the phone should retain a stable address. Cisco
+documents richer read-only Product Information and Status pages when phone web
+access is enabled; Soul does not enable, authenticate to, or retain those pages
+in this slice.
+
 The snapshot is private, atomic, and survives Dashboard reloads. The proposed
 owner-level oneshot timer collects it at local noon and midnight. The timer
 cannot maintain or reboot anything and has no persistent worker or polling
@@ -32,7 +52,7 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one Maven, Forge, or Pi-hole card
+choose exactly one mutable Maven, Forge, or Pi-hole card
 → choose Maintenance or Reboot
 → inspect the exact device, commands, confirmation, and dependency impact
 → authorize only that digest
@@ -41,6 +61,8 @@ choose exactly one Maven, Forge, or Pi-hole card
 ```
 
 There is no fleet-wide maintenance or reboot action.
+Status-only appliance cards are inventory and observation surfaces, not action
+targets.
 
 Maven delegates to the reviewed A2 visible-terminal maintenance path and A3
 conditional reboot/restoration path. Forge and Pi-hole use fixed passwordless

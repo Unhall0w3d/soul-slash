@@ -112,8 +112,9 @@ hardening was not weakened.
 - The topology is an operational overview, not automated network discovery.
 - Remote access depends on the fixed owner-managed SSH aliases and their
   dedicated keys remaining valid.
-- The fixed workstation, Proxmox, and Pi-hole addresses are deployment-specific
-  constants in this B1 adapter.
+- D1 moved workstation, Proxmox, and Pi-hole display addresses to portable
+  environment configuration and added the optional status-only Cisco phone
+  adapter. See `CISCO_PHONE_FLEET_STATUS_D1_REVIEW.md`.
 - B1 does not execute updates, restart services, operate guests, reboot,
   configure backups, enforce retention, or test recovery.
 - No narrow/mobile visual acceptance has yet been recorded; approval accepts

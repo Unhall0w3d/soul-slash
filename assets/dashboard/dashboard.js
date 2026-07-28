@@ -2397,6 +2397,7 @@ async function executeImprovementProposals() {
 function maintenanceStateLabel(status) {
   return {
     healthy: "Healthy",
+    reachable: "Reachable",
     updates_available: "Updates available",
     attention: "Attention",
     offline: "Offline",
@@ -2415,12 +2416,13 @@ function renderMaintenanceDevice(device) {
   heading.append(identity, stateBadge);
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
+  const statusOnly = device.control === "status_only";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
-    ["Updates", `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
-    ["Kernel", `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
-    ["Reboot", device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated"]
+    ["Updates", statusOnly ? "provider-managed · not queried" : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", statusOnly ? `${device.kernel?.running || "appliance-managed"} · ${device.kernel?.available || "provider-managed"}` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Reboot", statusOnly ? (device.reboot?.reason || "not assessed") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")]
   ];
   facts.forEach(([label, value]) => {
     const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
@@ -2429,7 +2431,7 @@ function renderMaintenanceDevice(device) {
 
   const services = document.createElement("div"); services.className = "maintenance-service-list";
   const channel = document.createElement("span"); channel.dataset.state = device.reachable ? "active" : "failed";
-  channel.textContent = `Maintenance channel · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
+  channel.textContent = `${statusOnly ? "Status probe" : "Maintenance channel"} · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
   (device.services || []).forEach((service) => {
     const chip = document.createElement("span"); chip.dataset.state = service.state || "unknown"; chip.textContent = `${service.label} · ${service.state || "unknown"}`; services.append(chip);
   });
@@ -2439,13 +2441,19 @@ function renderMaintenanceDevice(device) {
     chip.textContent = `LXC ${piholeContainer.id} · ${piholeContainer.status || "unknown"}`; services.append(chip);
   }
   const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
-  ["maintenance", "reboot"].forEach((action) => {
-    const button = document.createElement("button"); button.type = "button"; button.className = action === "reboot" ? "gate-button maintenance-reboot-button" : "gate-button gate-button--gold";
-    button.textContent = action === "reboot" ? "Reboot" : "Maintenance";
-    button.disabled = !device.reachable;
-    button.addEventListener("click", () => openMaintenanceDeviceAction(device.id, action));
-    actions.append(button);
-  });
+  if (statusOnly) {
+    const notice = document.createElement("p"); notice.className = "maintenance-status-only";
+    notice.textContent = "Status only · lifecycle and mutation remain provider-managed";
+    actions.append(notice);
+  } else {
+    ["maintenance", "reboot"].forEach((action) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = action === "reboot" ? "gate-button maintenance-reboot-button" : "gate-button gate-button--gold";
+      button.textContent = action === "reboot" ? "Reboot" : "Maintenance";
+      button.disabled = !device.reachable;
+      button.addEventListener("click", () => openMaintenanceDeviceAction(device.id, action));
+      actions.append(button);
+    });
+  }
   card.append(heading, metrics, services, actions);
   return card;
 }
@@ -2454,16 +2462,16 @@ function renderMaintenanceTopology(topology) {
   const canvas = byId("maintenance-topology"); canvas.replaceChildren();
   const nodes = new Map((topology?.nodes || []).map((node) => [node.id, node]));
   const hypervisor = (topology?.nodes || []).find((node) => String(node.role || "").includes("Proxmox"));
-  const primaryIds = ["maven", hypervisor?.id, "pihole", "internet"].filter(Boolean);
+  const preferredIds = ["maven", hypervisor?.id, "pihole", "cisco-8851", "webex-calling", "internet"].filter(Boolean);
+  const primaryIds = [...new Set([
+    ...preferredIds.filter((id) => nodes.has(id)),
+    ...(topology?.nodes || []).map((node) => node.id)
+  ])];
   const chain = document.createElement("div"); chain.className = "maintenance-topology-chain";
   primaryIds.forEach((id, index) => {
     const node = nodes.get(id); if (!node) return;
-    if (index > 0) {
-      const connector = document.createElement("div"); connector.className = "maintenance-topology-connector"; connector.setAttribute("aria-hidden", "true"); connector.append(document.createElement("i"));
-      chain.append(connector);
-    }
     const block = document.createElement("div"); block.className = "maintenance-topology-node"; block.dataset.state = node.status || "unknown";
-    const marker = document.createElement("span"); marker.textContent = node.id === "maven" ? "01" : node.id === hypervisor?.id ? "02" : node.id === "pihole" ? "03" : "04";
+    const marker = document.createElement("span"); marker.textContent = String(index + 1).padStart(2, "0");
     const copy = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = node.label; const role = document.createElement("small"); role.textContent = node.role;
     const address = document.createElement("code"); address.textContent = node.address;
     copy.append(strong, role, address); block.append(marker, copy); chain.append(block);
@@ -2510,7 +2518,7 @@ async function loadMaintenanceFleetSnapshot() {
 
 async function loadMaintenanceFleet() {
   const button = byId("refresh-maintenance-fleet"); const status = byId("maintenance-fleet-status");
-  button.disabled = true; status.textContent = "Collecting bounded workstation, Proxmox, Pi-hole, package, kernel, and service evidence…";
+  button.disabled = true; status.textContent = "Collecting bounded workstation, infrastructure, appliance, package, kernel, and service evidence…";
   try {
     const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(120_000) : undefined;
     const envelope = await callSoul("maintenance.fleet.status", {}, {}, { signal }); lifecycle(envelope);

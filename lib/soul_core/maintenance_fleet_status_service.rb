@@ -13,10 +13,13 @@ module SoulCore
     COMMAND_TIMEOUT_SECONDS = 20
     MAX_OUTPUT_BYTES = 256 * 1024
     SSH_PATH = "/usr/bin/ssh"
-    LOCAL_ADDRESS = "192.168.124.238"
-    PROXMOX_ADDRESS = "192.168.124.225"
-    PIHOLE_ADDRESS = "192.168.124.206"
+    PING_PATH = "/usr/bin/ping"
     MAX_SNAPSHOT_BYTES = 512 * 1024
+    DEFAULT_ADDRESSES = {
+      "maven" => "local",
+      "proxmox" => "proxmox-maintenance",
+      "pihole" => "pihole-maintenance"
+    }.freeze
 
     def initialize(
       runner: BoundedCommandRunner.new,
@@ -24,6 +27,7 @@ module SoulCore
       ssh_config: File.expand_path("~/.ssh/config"),
       os_release_path: "/etc/os-release",
       hostname_reader: -> { Socket.gethostname },
+      process_env: ENV,
       root: nil
     )
       @runner = runner
@@ -31,6 +35,12 @@ module SoulCore
       @ssh_config = File.expand_path(ssh_config)
       @os_release_path = File.expand_path(os_release_path)
       @hostname_reader = hostname_reader
+      @process_env = process_env.to_h.transform_keys(&:to_s)
+      @addresses = {
+        "maven" => configured_display_address("SOUL_FLEET_MAVEN_ADDRESS", DEFAULT_ADDRESSES.fetch("maven")),
+        "proxmox" => configured_display_address("SOUL_FLEET_FORGE_ADDRESS", DEFAULT_ADDRESSES.fetch("proxmox")),
+        "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_ADDRESS", DEFAULT_ADDRESSES.fetch("pihole"))
+      }.freeze
       @snapshot_path = root && File.join(File.expand_path(root), "Soul", "private", "host_maintenance", "fleet_status.json")
       @evidence = []
     end
@@ -42,6 +52,7 @@ module SoulCore
         collect_proxmox,
         collect_pihole
       ]
+      devices << collect_cisco_phone if cisco_phone_enabled?
       topology = build_topology(devices)
       states = devices.each_with_object(Hash.new(0)) { |device, counts| counts[device.fetch("status")] += 1 }
 
@@ -128,7 +139,7 @@ module SoulCore
         id: "maven",
         label: "Maven",
         role: "Hyprland workstation · maintenance controller",
-        address: LOCAL_ADDRESS,
+        address: @addresses.fetch("maven"),
         reachable: true,
         os: os_release_summary,
         version: output(local_run("workstation.hyprland_version", "/usr/bin/hyprland", "-v")).lines.first.to_s.strip,
@@ -146,7 +157,7 @@ module SoulCore
 
     def collect_proxmox
       reachable = remote_run("proxmox.reachability", "proxmox-maintenance", "/usr/bin/hostname")
-      return offline_device("proxmox", "Proxmox", "Proxmox VE hypervisor", PROXMOX_ADDRESS, reachable) unless successful?(reachable)
+      return offline_device("proxmox", "Proxmox", "Proxmox VE hypervisor", @addresses.fetch("proxmox"), reachable) unless successful?(reachable)
 
       node_name = bounded_node_name(output(reachable))
       version = remote_run("proxmox.version", "proxmox-maintenance", "/usr/bin/pveversion")
@@ -190,7 +201,7 @@ module SoulCore
         id: node_name,
         label: node_name.split("-").map(&:capitalize).join(" "),
         role: "Proxmox VE hypervisor",
-        address: PROXMOX_ADDRESS,
+        address: @addresses.fetch("proxmox"),
         reachable: true,
         os: "Proxmox VE on Debian",
         version: output(version),
@@ -213,7 +224,7 @@ module SoulCore
 
     def collect_pihole
       reachable = remote_run("pihole.reachability", "pihole-maintenance", "/usr/bin/hostname")
-      return offline_device("pihole", "Pi-hole", "DNS filtering · Unbound resolver · LXC 100", PIHOLE_ADDRESS, reachable) unless successful?(reachable)
+      return offline_device("pihole", "Pi-hole", "DNS filtering · Unbound resolver · LXC 100", @addresses.fetch("pihole"), reachable) unless successful?(reachable)
 
       version = remote_run("pihole.version", "pihole-maintenance", "/usr/local/bin/pihole", "-v")
       status = remote_run("pihole.status", "pihole-maintenance", "/usr/local/bin/pihole", "status")
@@ -250,7 +261,7 @@ module SoulCore
         id: "pihole",
         label: "Pi-hole",
         role: "DNS filtering · Unbound resolver · LXC 100",
-        address: PIHOLE_ADDRESS,
+        address: @addresses.fetch("pihole"),
         reachable: true,
         os: "Debian 13 (LXC)",
         version: pihole_version_summary(output(version)),
@@ -272,9 +283,70 @@ module SoulCore
       )
     end
 
+    def collect_cisco_phone
+      address = cisco_phone_address
+      label = configured_display_address("SOUL_FLEET_CISCO_PHONE_LABEL", "Cisco 8851")
+      reachable = local_run(
+        "cisco_phone.reachability",
+        PING_PATH, "-c", "1", "-W", "2", address,
+        timeout: 5
+      )
+      role = "Webex Calling desk phone · status only"
+      return offline_device(
+        "cisco-8851",
+        label,
+        role,
+        address,
+        reachable,
+        control: "status_only",
+        facts: cisco_phone_facts("unreachable")
+      ) unless successful?(reachable)
+
+      device(
+        id: "cisco-8851",
+        label: label,
+        role: role,
+        address: address,
+        reachable: true,
+        os: "Cisco IP Phone",
+        version: "provider-managed · not queried",
+        kernel: {"running" => "appliance-managed", "available" => "Webex-managed", "update_required" => false},
+        updates: update_summary(freshness: "provider_managed"),
+        reboot: {"required" => false, "reason" => "not assessed · provider-managed"},
+        services: [
+          {"id" => "network_reachability", "label" => "Network reachability", "state" => "active"}
+        ],
+        facts: cisco_phone_facts("reachable"),
+        control: "status_only",
+        status: "reachable"
+      )
+    end
+
     def build_topology(devices)
       proxmox = devices.find { |device| device.dig("facts", "platform") == "proxmox" }
       proxmox_id = proxmox ? proxmox.fetch("id") : "proxmox"
+      external_nodes = [
+        {"id" => "internet", "label" => "Internet", "role" => "Package sources · recursive DNS roots", "address" => "WAN", "status" => "external"}
+      ]
+      if devices.any? { |device| device.fetch("id") == "cisco-8851" }
+        external_nodes << {
+          "id" => "webex-calling",
+          "label" => "Webex Calling",
+          "role" => "Provider-managed calling service",
+          "address" => "cloud",
+          "status" => "external"
+        }
+      end
+      edges = [
+        {"from" => "maven", "to" => proxmox_id, "label" => "SSH maintenance", "kind" => "management"},
+        {"from" => proxmox_id, "to" => "pihole", "label" => "hosts LXC 100", "kind" => "containment"},
+        {"from" => "maven", "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
+        {"from" => "pihole", "to" => "internet", "label" => "Unbound recursion · Quad9 fallback", "kind" => "upstream"},
+        {"from" => "maven", "to" => proxmox_id, "label" => "second-copy target · planned", "kind" => "backup_planned"}
+      ]
+      if devices.any? { |device| device.fetch("id") == "cisco-8851" }
+        edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}
+      end
       {
         "nodes" => devices.map do |device|
           {
@@ -284,35 +356,28 @@ module SoulCore
             "address" => device.fetch("address"),
             "status" => device.fetch("status")
           }
-        end + [
-          {"id" => "internet", "label" => "Internet", "role" => "Package sources · recursive DNS roots", "address" => "WAN", "status" => "external"}
-        ],
-        "edges" => [
-          {"from" => "maven", "to" => proxmox_id, "label" => "SSH maintenance", "kind" => "management"},
-          {"from" => proxmox_id, "to" => "pihole", "label" => "hosts LXC 100", "kind" => "containment"},
-          {"from" => "maven", "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
-          {"from" => "pihole", "to" => "internet", "label" => "Unbound recursion · Quad9 fallback", "kind" => "upstream"},
-          {"from" => "maven", "to" => proxmox_id, "label" => "second-copy target · planned", "kind" => "backup_planned"}
-        ]
+        end + external_nodes,
+        "edges" => edges
       }
     end
 
-    def device(id:, label:, role:, address:, reachable:, os:, version:, kernel:, updates:, reboot:, services:, facts:)
+    def device(id:, label:, role:, address:, reachable:, os:, version:, kernel:, updates:, reboot:, services:, facts:, control: "maintenance", status: nil)
       service_attention = services.any? { |service| service["state"] != "active" }
-      status = if !reachable
-                 "offline"
-               elsif service_attention || reboot["required"] || kernel["update_required"]
-                 "attention"
-               elsif updates["total"].positive?
-                 "updates_available"
-               else
-                 "healthy"
-               end
+      status ||= if !reachable
+                   "offline"
+                 elsif service_attention || reboot["required"] || kernel["update_required"]
+                   "attention"
+                 elsif updates["total"].positive?
+                   "updates_available"
+                 else
+                   "healthy"
+                 end
       {
         "id" => id,
         "label" => label,
         "role" => role,
         "address" => address,
+        "control" => control,
         "status" => status,
         "reachable" => reachable,
         "os" => safe_text(os),
@@ -325,12 +390,13 @@ module SoulCore
       }
     end
 
-    def offline_device(id, label, role, address, result)
+    def offline_device(id, label, role, address, result, control: "maintenance", facts: {})
       {
         "id" => id,
         "label" => label,
         "role" => role,
         "address" => address,
+        "control" => control,
         "status" => "offline",
         "reachable" => false,
         "os" => "unavailable",
@@ -339,8 +405,48 @@ module SoulCore
         "updates" => update_summary(freshness: "unavailable"),
         "reboot" => {"required" => false, "reason" => "unavailable while device is offline"},
         "services" => [],
-        "facts" => {"connection_status" => result.status}
+        "facts" => facts.merge("connection_status" => result.status)
       }
+    end
+
+    def cisco_phone_enabled?
+      %w[1 true yes on].include?(@process_env["SOUL_FLEET_CISCO_PHONE_ENABLED"].to_s.strip.downcase)
+    end
+
+    def cisco_phone_address
+      value = @process_env["SOUL_FLEET_CISCO_PHONE_ADDRESS"].to_s.strip
+      raise "Cisco phone address is required when fleet phone status is enabled" if value.empty?
+      raise "Cisco phone address must be one IPv4 address or hostname" unless valid_network_address?(value)
+
+      value
+    end
+
+    def cisco_phone_facts(reachability)
+      {
+        "platform" => "cisco_ip_phone",
+        "configured_model" => "Cisco 8851",
+        "calling_platform" => "Webex Calling",
+        "management_channel" => "icmp_status",
+        "control_capability" => "status_only",
+        "mutation_supported" => false,
+        "reachability" => reachability,
+        "registration_status" => "not assessed",
+        "firmware_status" => "provider-managed · not assessed",
+        "web_status" => "not configured",
+        "address_assignment" => "operator-configured · reserve DHCP address for stable tracking"
+      }
+    end
+
+    def configured_display_address(key, fallback)
+      value = @process_env[key].to_s.strip
+      safe_text(value.empty? ? fallback : value)
+    end
+
+    def valid_network_address?(value)
+      return true if value.match?(/\A(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\.(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\z/)
+
+      value.match?(/\A[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-Z0-9])?\z/) &&
+        value.split(".").all? { |label| label.length.between?(1, 63) && !label.start_with?("-") && !label.end_with?("-") }
     end
 
     def local_run(adapter, *argv, timeout: COMMAND_TIMEOUT_SECONDS, accepted_exit_statuses: [0])

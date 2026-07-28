@@ -138,9 +138,9 @@ sufficient.
 ## Fixed targets and dependency disclosure
 
 ```text
-Maven   192.168.124.238  local reviewed A2/A3 services
-Forge   192.168.124.225  SSH alias proxmox-maintenance
-Pi-hole 192.168.124.206  SSH alias pihole-maintenance
+Maven   <local address>   local reviewed A2/A3 services
+Forge   <local address>   SSH alias proxmox-maintenance
+Pi-hole <local address>   SSH alias pihole-maintenance
 ```
 
 Forge reboot impact includes Pi-hole LXC `100`. The UI must disclose this

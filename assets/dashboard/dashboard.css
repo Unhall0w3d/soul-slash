@@ -239,6 +239,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-service-list span[data-state="failed"] { border-color:rgba(255,23,68,.3); color:#E77B8B; }
 .maintenance-device-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:auto; padding-top:15px; border-top:1px solid var(--line); }
 .maintenance-device-actions .gate-button { width:100%; min-width:0; }
+.maintenance-status-only { grid-column:1/-1; margin:0; color:#86A5AE; font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; }
 .maintenance-reboot-button { border-color:rgba(196,161,98,.46); color:var(--gold-light); }
 .maintenance-device-dialog { width:min(760px,calc(100vw - 32px)); }
 .maintenance-device-dialog .clear-dialog-shell { max-height:min(820px,calc(100vh - 48px)); overflow:auto; }
@@ -249,7 +250,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 #maintenance-device-confirmation-row[hidden] { display:none; }
 .maintenance-topology-card { padding:21px; border:1px solid var(--line); border-radius:3px 20px 3px 16px; background:rgba(5,12,18,.7); }
 .maintenance-topology { margin-top:16px; }
-.maintenance-topology-chain { display:grid; grid-template-columns:minmax(150px,1fr) 54px minmax(150px,1fr) 54px minmax(150px,1fr) 54px minmax(150px,1fr); align-items:stretch; }
+.maintenance-topology-chain { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); align-items:stretch; gap:9px; }
 .maintenance-topology-node { display:grid; grid-template-columns:32px minmax(0,1fr); gap:10px; min-height:116px; padding:16px; border:1px solid rgba(58,174,223,.23); border-radius:3px 18px 3px 13px; background:linear-gradient(140deg,rgba(17,34,44,.94),rgba(8,15,22,.98)); }
 .maintenance-topology-node>span { display:grid; place-items:center; align-self:start; width:29px; height:29px; border:1px solid rgba(58,174,223,.34); border-radius:50%; color:var(--cyan); font:10px var(--mono); }
 .maintenance-topology-node strong,.maintenance-topology-node small,.maintenance-topology-node code { display:block; }
@@ -257,9 +258,6 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-topology-node small { min-height:3em; margin-top:5px; color:#718D96; font-size:10px; line-height:1.4; }
 .maintenance-topology-node code { margin-top:9px; color:var(--gold-light); font:10px var(--mono); }
 .maintenance-topology-node[data-state="attention"],.maintenance-topology-node[data-state="offline"] { border-color:rgba(255,23,68,.32); }
-.maintenance-topology-connector { display:grid; place-items:center; }
-.maintenance-topology-connector i { position:relative; display:block; width:100%; height:1px; background:linear-gradient(90deg,var(--cyan),rgba(58,174,223,.28)); }
-.maintenance-topology-connector i::after { content:""; position:absolute; top:-4px; right:0; width:7px; height:7px; border-top:1px solid var(--cyan); border-right:1px solid var(--cyan); transform:rotate(45deg); }
 .maintenance-topology-links { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; margin-top:10px; }
 .maintenance-topology-links>div { padding:9px 10px; border-left:2px solid rgba(58,174,223,.45); background:rgba(58,174,223,.035); }
 .maintenance-topology-links>div[data-kind="backup_planned"] { border-left-color:var(--gold); background:rgba(196,161,98,.035); }
@@ -271,7 +269,6 @@ button:disabled { cursor:not-allowed; opacity:.4; }
   .app-header { grid-template-columns:1fr auto; }.primary-tabs { grid-row:2; grid-column:1/-1; min-height:44px; justify-content:center; }.tab::after { bottom:-1px; }
   .chat-layout { height:calc(100vh - 136px); grid-template-columns:250px minmax(430px,1fr); }.context-rail { display:grid; grid-column:1/-1; grid-template-columns:repeat(3,1fr); gap:13px; overflow:visible; }.studio-panel,.improvement-panel,.augmentation-panel,.music-panel { min-height:calc(100vh - 136px); }.timeline-board { grid-template-columns:repeat(2,minmax(230px,1fr)); }.timeline-inventory-list { grid-template-columns:repeat(2,minmax(230px,1fr)); }.timeline-layout.has-editor { grid-template-columns:minmax(0,1fr) minmax(330px,400px); }.music-layout { grid-template-columns:240px minmax(0,1fr); }.music-reference-library { grid-column:1/-1; border-top:1px solid var(--line); border-left:0; }.music-reference-list { max-height:320px; }.music-form-grid { grid-template-columns:repeat(2,1fr); }.music-review { grid-template-columns:repeat(3,1fr); }.music-visual-presentation-settings { grid-template-columns:repeat(2,minmax(130px,1fr)); }.improvement-grid { grid-template-columns:repeat(2,1fr); }.assessment-toolbar { grid-template-columns:1fr 120px 1fr; }.review-workspace { grid-template-columns:195px 1fr; }.review-view { grid-template-columns:320px 1fr; }
   .backup-panel { min-height:calc(100vh - 136px); }.backup-unlock { grid-template-columns:minmax(260px,1fr) auto auto; }.backup-unlock p { grid-column:1/-1; }.backup-workspace { grid-template-columns:300px minmax(0,1fr); }
-  .maintenance-topology-chain { grid-template-columns:1fr 38px 1fr 38px 1fr 38px 1fr; }
 }
 @media (max-width:820px) {
   .app-header { grid-template-columns:1fr; gap:9px; padding:12px 15px; }.header-state { justify-self:start; }.primary-tabs { grid-row:auto; grid-column:auto; justify-content:flex-start; flex-wrap:wrap; overflow:visible; }.tab { min-height:44px; }.self-improvement-menu { position:fixed; top:145px; left:14px; transform:none; }.self-improvement-menu::before { display:none; }.core-menu { position:fixed; top:145px; left:14px; right:auto; }
@@ -281,6 +278,6 @@ button:disabled { cursor:not-allowed; opacity:.4; }
   .backup-panel { padding:29px 17px 45px; }.backup-unlock,.backup-summary,.backup-workspace { grid-template-columns:1fr; }.backup-unlock button { width:100%; }.backup-snapshot-card { position:static; }.backup-snapshot-list { max-height:380px; }
   .review-center { width:100vw; height:100vh; max-width:none; max-height:none; border:0; border-radius:0; }.review-metrics { grid-template-columns:repeat(2,1fr); }.review-workspace,.review-view { display:block; overflow:auto; }.review-navigation { display:block; border-right:0; border-bottom:1px solid var(--line); }.review-navigation [role="tablist"] { grid-template-columns:repeat(2,1fr); }.review-authority-note { display:none; }.review-list-pane { max-height:350px; border-right:0; border-bottom:1px solid var(--line); }.review-list { max-height:230px; }.review-detail { min-height:450px; }.review-detail-meta { grid-template-columns:1fr; }
   .invocation-toolbar,.invocation-workspace { grid-template-columns:1fr; }.invocation-list { max-height:300px; border-right:0; border-bottom:1px solid var(--line); }.invocation-facts>div { grid-template-columns:1fr; gap:5px; }
-  .maintenance-fleet-toolbar { display:block; }.maintenance-fleet-toolbar button { width:100%; margin-top:17px; }.maintenance-fleet-summary { grid-template-columns:repeat(2,1fr); }.maintenance-fleet-summary>div:nth-child(2) { border-right:0; }.maintenance-fleet-summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }.maintenance-device-grid { grid-template-columns:1fr; }.maintenance-topology-chain { display:grid; grid-template-columns:1fr; gap:7px; }.maintenance-topology-connector { min-height:27px; }.maintenance-topology-connector i { width:1px; height:27px; background:linear-gradient(var(--cyan),rgba(58,174,223,.28)); }.maintenance-topology-connector i::after { top:auto; right:-3px; bottom:0; transform:rotate(135deg); }.maintenance-topology-links { grid-template-columns:1fr; }
+  .maintenance-fleet-toolbar { display:block; }.maintenance-fleet-toolbar button { width:100%; margin-top:17px; }.maintenance-fleet-summary { grid-template-columns:repeat(2,1fr); }.maintenance-fleet-summary>div:nth-child(2) { border-right:0; }.maintenance-fleet-summary>div:nth-child(-n+2) { border-bottom:1px solid var(--line); }.maintenance-device-grid,.maintenance-topology-chain { grid-template-columns:1fr; }.maintenance-topology-links { grid-template-columns:1fr; }
 }
 @media (max-width:520px) { .assessment-actions { grid-template-columns:1fr; }.review-metrics { grid-template-columns:1fr; }.review-metrics>div { border-bottom:1px solid var(--line); }.composer-row { grid-template-columns:repeat(3,1fr); }.composer textarea { grid-column:1/-1; }.send-button,.voice-button { min-height:44px; }.picture-attachment { grid-template-columns:64px minmax(0,1fr); }.picture-attachment img { width:64px; height:54px; }.picture-attachment>button { grid-column:1/-1; } }

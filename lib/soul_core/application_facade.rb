@@ -781,7 +781,11 @@ module SoulCore
     end
 
     def maintenance_fleet_status
-      @maintenance_fleet_status_service ||= MaintenanceFleetStatusService.new(root: @root, clock: @clock)
+      @maintenance_fleet_status_service ||= MaintenanceFleetStatusService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env
+      )
     end
 
     def maintenance_device_control
@@ -792,7 +796,8 @@ module SoulCore
         root: @root,
         clock: @clock,
         fleet_status_service: maintenance_fleet_status,
-        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_REMOTE_LIVE"] == "1"
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_REMOTE_LIVE"] == "1",
+        process_env: resolver.effective_environment
       )
     end
 
