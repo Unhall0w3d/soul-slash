@@ -40,6 +40,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   Maven; live gates remain disabled by default
+- [~] review and install A4's digest-bound root-owned fixed-operation authority
+  for zero-password, deterministic Maven maintenance; live acceptance remains
+  pending
 
 ## Qualified expansion candidates
 

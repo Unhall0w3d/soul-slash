@@ -9,6 +9,7 @@
     "receipt_id": {"type": "string", "pattern": "^maintenance_receipt_[a-f0-9]{16}$"},
     "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
     "mode": {"enum": ["rehearsal", "live", "live_reboot"]},
+    "authority_mode": {"enum": ["rehearsal", "native_prompt", "root_owned_passwordless"]},
     "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "lifecycle_state": {"enum": ["complete", "awaiting_login", "failed", "canceled", "blocked_for_human_review"]},
     "password_prompts": {"type": "integer", "minimum": 0, "maximum": 1},

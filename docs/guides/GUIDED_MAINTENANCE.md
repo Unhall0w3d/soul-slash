@@ -57,9 +57,10 @@ status. It never retries the reboot request.
 
 The former A1, A2, and A3 presentation cards are no longer shown. Their
 reviewed backend contracts remain authoritative for Maven: privacy-filtered
-workspace capture, the native desktop handoff, one native sudo prompt, exact
-package vectors, receipt bounds, reboot preconditions, and one-shot
-restoration are unchanged.
+workspace capture, the native desktop handoff, exact package vectors, receipt
+bounds, reboot preconditions, and one-shot restoration are unchanged. Native
+mode retains one sudo prompt. The separately installed A4 authority may replace
+that prompt only with a digest-bound root-owned fixed-operation helper.
 
 ## A2 foreground candidate
 
@@ -120,6 +121,44 @@ evidence while preserving the service sandbox.
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
 restorer.
 
+## A4 unattended fixed-operation authority candidate
+
+A4 removes the routine password and package questions without storing a
+password and without granting passwordless access to yay, pacman, Flatpak,
+systemctl, a shell, or an interpreter. The public default remains:
+
+```text
+SOUL_MAINTENANCE_PASSWORDLESS=false
+```
+
+The root-owned helper accepts only `arch-update`, `flatpak-system-update`, or
+`reboot` plus one opaque maintenance transaction ID. It accepts no executable,
+package target, path, option, or free-form answer. Its sudoers entry binds the
+exact helper content by SHA-256 digest. Yay 13.0.1 receives a fixed,
+target-free policy: no clean rebuild, no diff review, no PKGBUILD edit, upgrade
+the reviewed set, retain make dependencies, and proceed noninteractively.
+Flatpak uses its native `--noninteractive` system update.
+
+The visible terminal remains an audit and cancellation surface. Package-manager
+errors stop the transaction; there is no model-driven prompt answering or
+automatic retry. A3 reboot still requires its exact pending restore journal.
+
+Review and deployment commands:
+
+```text
+make verify-maintenance-passwordless-authority
+make maintenance-authority-plan
+make maintenance-authority-install EXPECTED_DIGEST=<reviewed digest> CONFIRM=INSTALL_SOUL_MAINTENANCE_AUTHORITY
+make maintenance-authority-status
+```
+
+Installation itself requests privilege once. After exact installation, the
+ignored local `.env` may opt in with
+`SOUL_MAINTENANCE_PASSWORDLESS=true`. Any process already running as the
+desktop owner can then request the same fixed full-maintenance operation; it
+still cannot turn that authority into an arbitrary root command. Remove the
+authority with the exact `REMOVE_SOUL_MAINTENANCE_AUTHORITY` Make target gate.
+
 ## A3 conditional reboot candidate
 
 A3 is a separate disabled-by-default gate. It reuses the fixed A2 update
@@ -172,6 +211,7 @@ make verify-maintenance-rehearsal
 make verify-maintenance-foreground-execution
 make verify-maintenance-desktop-handoff
 make verify-maintenance-reboot-restore
+make verify-maintenance-passwordless-authority
 ```
 
 Engineering evidence:
@@ -183,3 +223,5 @@ Engineering evidence:
 - [`MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md`](../assessments/MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md)
 - [`MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md`](../soul/MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md)
 - [`MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md`](../assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md)
+- [`MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md`](../soul/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md)
+- [`MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md`](../assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md)

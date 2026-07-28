@@ -804,7 +804,8 @@ module SoulCore
         root: @root,
         clock: @clock,
         rehearsal_service: maintenance_rehearsal,
-        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "1"
+        live_execution_enabled: resolver.effective_environment["SOUL_MAINTENANCE_A2_LIVE"] == "1",
+        passwordless_authority_enabled: resolver.effective_environment["SOUL_MAINTENANCE_PASSWORDLESS"] == "1"
       )
     end
 

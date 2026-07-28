@@ -9,6 +9,7 @@ require "timeout"
 
 require_relative "bounded_command_runner"
 require_relative "maintenance_desktop_handoff"
+require_relative "maintenance_passwordless_authority"
 require_relative "maintenance_rehearsal_service"
 
 module SoulCore
@@ -83,6 +84,8 @@ module SoulCore
       privilege_transition_probe: nil,
       desktop_handoff: nil,
       live_execution_enabled: false,
+      passwordless_authority_enabled: false,
+      passwordless_authority: nil,
       id_generator: -> { SecureRandom.hex(8) }
     )
       @root = File.expand_path(root)
@@ -95,6 +98,8 @@ module SoulCore
       @privilege_transition_probe = privilege_transition_probe || method(:privilege_transition_available?)
       @desktop_handoff = desktop_handoff || MaintenanceDesktopHandoff.new(root: @root, clock: @clock, runner: runner)
       @live_execution_enabled = live_execution_enabled == true
+      @passwordless_authority_enabled = passwordless_authority_enabled == true
+      @passwordless_authority = passwordless_authority
       @id_generator = id_generator
       @state_root = File.join(@root, "Soul", "private", "host_maintenance")
       @transactions_root = File.join(@state_root, "transactions")
@@ -111,7 +116,8 @@ module SoulCore
       base["package_evidence"] = native_evidence.fetch("package_evidence") if native_evidence["available"]
       handoff_status = @desktop_handoff.status
       commands = a2_commands(base.fetch("commands"))
-      preflight = preflight(base, commands, handoff_status: handoff_status, native_evidence: native_evidence)
+      authority = authority_status
+      preflight = preflight(base, commands, handoff_status: handoff_status, native_evidence: native_evidence, authority: authority)
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "risk_class" => "class_5",
@@ -125,7 +131,9 @@ module SoulCore
         "restore_registry_digest" => base.fetch("restore_registry_digest"),
         "window_restore_summary" => stable_restore_summary(base.fetch("window_snapshot")),
         "preflight" => preflight,
-        "one_authentication_required" => true,
+        "authority" => authority,
+        "authority_mode" => authority_mode(authority),
+        "one_authentication_required" => authority_mode(authority) == "native_prompt",
         "interactive_terminal_required" => true,
         "automatic_reboot" => false,
         "live_execution_enabled" => @live_execution_enabled
@@ -199,6 +207,69 @@ module SoulCore
     end
 
     private
+
+    public
+
+    def passwordless_authority_enabled? = @passwordless_authority_enabled
+
+    def authority_status
+      return {"ready" => false, "authority_mode" => "native_prompt", "enabled" => false} unless @passwordless_authority_enabled
+      status = passwordless_authority.status
+      data = status.fetch("data", {})
+      data.merge("enabled" => true)
+    rescue StandardError => error
+      {"ready" => false, "authority_mode" => "native_prompt", "enabled" => true, "probe_error" => safe_error(error)}
+    end
+
+    def materialize_live_commands(commands, transaction_id)
+      return commands unless @passwordless_authority_enabled
+      commands.map do |command|
+        adapter = command.fetch("adapter")
+        next command.merge("argv" => [FIXED_PATHS.fetch("flatpak"), "update", "--user", "--noninteractive"]) if adapter == "flatpak.user_update"
+        operation = case adapter
+        when "arch_and_aur.full_upgrade" then "arch-update"
+        when "flatpak.system_update" then "flatpak-system-update"
+        else raise "unsupported passwordless maintenance adapter"
+        end
+        command.merge(
+          "argv" => passwordless_authority.command_for(operation, transaction_id),
+          "interactive" => false,
+          "requires_existing_sudo_ticket" => false
+        )
+      end
+    end
+
+    def privilege_fields(transaction_id, reboot: false)
+      if @passwordless_authority_enabled
+        fields = {
+          "authority_mode" => "root_owned_passwordless",
+          "sudo_validation_argv" => [],
+          "sudo_refresh_argv" => [],
+          "sudo_invalidate_argv" => []
+        }
+        fields["reboot_argv"] = passwordless_authority.command_for("reboot", transaction_id) if reboot
+        fields
+      else
+        fields = {
+          "authority_mode" => "native_prompt",
+          "sudo_validation_argv" => [FIXED_PATHS.fetch("sudo"), "-v"],
+          "sudo_refresh_argv" => [FIXED_PATHS.fetch("sudo"), "-n", "-v"],
+          "sudo_invalidate_argv" => [FIXED_PATHS.fetch("sudo"), "-k"]
+        }
+        fields["reboot_argv"] = [FIXED_PATHS.fetch("sudo"), "-n", "/usr/bin/systemctl", "reboot"] if reboot
+        fields
+      end
+    end
+
+    private
+
+    def authority_mode(authority = authority_status)
+      @passwordless_authority_enabled && authority["ready"] == true ? "root_owned_passwordless" : "native_prompt"
+    end
+
+    def passwordless_authority
+      @passwordless_authority ||= MaintenancePasswordlessAuthority.new(root: @root)
+    end
 
     def reserve_live_transaction(force_database_refresh:, expected_digest:, confirmation:)
       return outcome("blocked_for_human_review", false, "exact maintenance confirmation is required") unless confirmation.to_s == CONFIRMATION
@@ -274,28 +345,32 @@ module SoulCore
         transformed = case adapter
         when "arch_and_aur.full_upgrade"
           raise "unexpected yay path" unless argv.first == FIXED_PATHS.fetch("yay")
-          [argv.first, "--sudoflags=-n", argv.fetch(1)]
+          @passwordless_authority_enabled ?
+            [MaintenancePasswordlessAuthority::HELPER_PATH, "arch-update", "<transaction_id>"] :
+            [argv.first, "--sudoflags=-n", argv.fetch(1)]
         when "flatpak.user_update"
           raise "unexpected user Flatpak command" unless argv == [FIXED_PATHS.fetch("flatpak"), "update", "--user"]
-          argv
+          @passwordless_authority_enabled ? [*argv, "--noninteractive"] : argv
         when "flatpak.system_update"
           expected = [FIXED_PATHS.fetch("sudo"), "-n", FIXED_PATHS.fetch("flatpak"), "update", "--system"]
           raise "unexpected system Flatpak command" unless argv == expected
-          argv
+          @passwordless_authority_enabled ?
+            [MaintenancePasswordlessAuthority::HELPER_PATH, "flatpak-system-update", "<transaction_id>"] :
+            argv
         else
           raise "unsupported maintenance adapter"
         end
         {
           "adapter" => adapter,
           "argv" => transformed,
-          "interactive" => true,
-          "requires_existing_sudo_ticket" => adapter != "flatpak.user_update",
+          "interactive" => !@passwordless_authority_enabled,
+          "requires_existing_sudo_ticket" => !@passwordless_authority_enabled && adapter != "flatpak.user_update",
           "shell" => false
         }
       end
     end
 
-    def preflight(base, commands, handoff_status:, native_evidence:)
+    def preflight(base, commands, handoff_status:, native_evidence:, authority:)
       missing = FIXED_PATHS.filter_map do |name, path|
         name unless File.file?(path) && File.executable?(path)
       end
@@ -321,6 +396,9 @@ module SoulCore
       live_blockers << native_evidence.fetch("reason", "native package evidence is incomplete") unless native_evidence["available"]
       live_blockers << "package update evidence is incomplete" unless package_evidence_usable?(base.fetch("package_evidence"))
       live_blockers << "reviewed desktop handoff is unavailable" unless handoff_status["available"]
+      if @passwordless_authority_enabled && authority["ready"] != true
+        live_blockers << "root-owned maintenance authority is not installed exactly"
+      end
       {
         "package_lock_present" => package_lock,
         "active_package_processes" => package_processes,
@@ -415,6 +493,12 @@ module SoulCore
       prepare_directories
       id = "maintenance_tx_#{@id_generator.call}"
       raise "transaction ID is invalid" unless id.match?(/\Amaintenance_tx_[a-f0-9]{16}\z/)
+      privilege = mode == "live" ? privilege_fields(id) : {
+        "authority_mode" => "rehearsal",
+        "sudo_validation_argv" => [],
+        "sudo_refresh_argv" => [],
+        "sudo_invalidate_argv" => []
+      }
       {
         "schema_version" => TRANSACTION_SCHEMA,
         "transaction_id" => id,
@@ -423,13 +507,12 @@ module SoulCore
         "created_at" => @clock.call.iso8601,
         "deadline_at" => (@clock.call + (mode == "live" ? HANDOFF_START_TTL_SECONDS : MAX_DURATION_SECONDS)).iso8601,
         "plan_digest" => plan.fetch("expected_digest"),
-        "commands" => mode == "live" ? plan.fetch("commands") : rehearsal_commands,
-        "sudo_validation_argv" => mode == "live" ? [FIXED_PATHS.fetch("sudo"), "-v"] : [],
-        "sudo_refresh_argv" => mode == "live" ? [FIXED_PATHS.fetch("sudo"), "-n", "-v"] : [],
-        "sudo_invalidate_argv" => mode == "live" ? [FIXED_PATHS.fetch("sudo"), "-k"] : [],
+        "force_database_refresh" => plan.fetch("force_database_refresh"),
+        "source_boot_id" => File.read("/proc/sys/kernel/random/boot_id", 128).strip,
+        "commands" => mode == "live" ? materialize_live_commands(plan.fetch("commands"), id) : rehearsal_commands,
         "reboot_allowed" => false,
         "result_path" => File.join(@transactions_root, "#{id}.result.json")
-      }
+      }.merge(privilege)
     end
 
     def rehearsal_commands
@@ -470,6 +553,7 @@ module SoulCore
         "receipt_id" => "maintenance_receipt_#{transaction.fetch('transaction_id').delete_prefix('maintenance_tx_')}",
         "transaction_id" => transaction.fetch("transaction_id"),
         "mode" => transaction.fetch("mode"),
+        "authority_mode" => transaction.fetch("authority_mode", "native_prompt"),
         "plan_digest" => transaction.fetch("plan_digest"),
         "started_at" => transaction.fetch("created_at"),
         "finished_at" => @clock.call.iso8601,

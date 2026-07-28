@@ -85,6 +85,8 @@ module SoulCore
       raise "maintenance transaction deadline is invalid" if deadline <= @clock.call || deadline > @clock.call + MAX_DURATION_SECONDS + 60
       validate_live_vectors!(transaction)
 
+      return run_passwordless(transaction, deadline) if transaction.fetch("authority_mode", "native_prompt") == "root_owned_passwordless"
+
       @output.puts("Administrator authentication is required once.")
       auth = execute(transaction.fetch("sudo_validation_argv"), deadline: deadline)
       return result_for(transaction, @canceled ? "canceled" : "failed", [{"adapter" => "sudo.validate", "exit_status" => auth, "status" => status_for(auth)}], password_prompts: 1, reason: "administrator authentication did not complete") unless auth.zero?
@@ -107,6 +109,20 @@ module SoulCore
       result_for(transaction, "complete", records, password_prompts: 1)
     end
 
+    def run_passwordless(transaction, deadline)
+      @output.puts("Root-owned fixed-operation authority verified. No password or routine package input is required.")
+      records = []
+      transaction.fetch("commands").each do |command|
+        raise Interrupt if @canceled
+        @output.puts("\n[#{command.fetch('adapter')}] #{display_command(command.fetch('argv'))}")
+        status = execute(command.fetch("argv"), deadline: deadline)
+        records << {"adapter" => command.fetch("adapter"), "exit_status" => status, "status" => status_for(status)}
+        return result_for(transaction, @canceled ? "canceled" : "failed", records, password_prompts: 0, ticket_invalidated: true, reason: "maintenance command did not complete") unless status.zero?
+      end
+      return run_reboot(transaction, records, deadline) if transaction.fetch("mode") == "live_reboot"
+      result_for(transaction, "complete", records, password_prompts: 0, ticket_invalidated: true)
+    end
+
     def run_reboot(transaction, records, deadline)
       @output.puts("\n[A3] Revalidating reboot and one-shot restoration postconditions.")
       @reboot_coordinator.prepare(transaction)
@@ -116,12 +132,12 @@ module SoulCore
       records << {"adapter" => "system.reboot", "exit_status" => status, "status" => status_for(status)}
       unless status.zero?
         @reboot_coordinator.mark_reboot_failed("reviewed reboot command did not complete")
-        return result_for(transaction, "failed", records, password_prompts: 1, reason: "reviewed reboot command did not complete")
+        return result_for(transaction, "failed", records, password_prompts: password_prompts_for(transaction), ticket_invalidated: passwordless?(transaction), reason: "reviewed reboot command did not complete")
       end
-      result_for(transaction, "awaiting_login", records, password_prompts: 1, reboot_requested: true)
+      result_for(transaction, "awaiting_login", records, password_prompts: password_prompts_for(transaction), ticket_invalidated: passwordless?(transaction), reboot_requested: true)
     rescue StandardError => error
       @reboot_coordinator.mark_reboot_failed(error.message)
-      result_for(transaction, "blocked_for_human_review", records, password_prompts: 1, reason: error.message)
+      result_for(transaction, "blocked_for_human_review", records, password_prompts: password_prompts_for(transaction), ticket_invalidated: passwordless?(transaction), reason: error.message)
     end
 
     def execute(argv, deadline:)
@@ -183,6 +199,7 @@ module SoulCore
 
     def invalidate_ticket(transaction)
       return true unless transaction && %w[live live_reboot].include?(transaction["mode"])
+      return true if passwordless?(transaction)
       argv = transaction.fetch("sudo_invalidate_argv", [])
       return false if argv.empty?
       Integer(@command_executor.call(argv, 30, ->(_pid) {})).zero?
@@ -191,30 +208,56 @@ module SoulCore
     end
 
     def validate_live_vectors!(transaction)
+      authority_mode = transaction.fetch("authority_mode", "native_prompt")
+      raise "maintenance authority mode is invalid" unless %w[native_prompt root_owned_passwordless].include?(authority_mode)
       if transaction.fetch("mode") == "live"
         raise "reboot authority is prohibited in A2" unless transaction["reboot_allowed"] == false
         raise "A2 contains a reboot vector" if transaction.key?("reboot_argv")
       else
         raise "reboot authority is required only for A3" unless transaction["mode"] == "live_reboot" && transaction["reboot_allowed"] == true
-        raise "A3 reboot vector is invalid" unless transaction["reboot_argv"] == ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+        expected_reboot = if authority_mode == "root_owned_passwordless"
+          ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "reboot", transaction.fetch("transaction_id")]
+        else
+          ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+        end
+        raise "A3 reboot vector is invalid" unless transaction["reboot_argv"] == expected_reboot
       end
-      raise "sudo validation vector is invalid" unless transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"]
-      raise "sudo refresh vector is invalid" unless transaction["sudo_refresh_argv"] == ["/usr/bin/sudo", "-n", "-v"]
-      raise "sudo invalidation vector is invalid" unless transaction["sudo_invalidate_argv"] == ["/usr/bin/sudo", "-k"]
+      expected_privilege = authority_mode == "root_owned_passwordless" ? [[], [], []] : [
+        ["/usr/bin/sudo", "-v"],
+        ["/usr/bin/sudo", "-n", "-v"],
+        ["/usr/bin/sudo", "-k"]
+      ]
+      actual_privilege = [
+        transaction["sudo_validation_argv"],
+        transaction["sudo_refresh_argv"],
+        transaction["sudo_invalidate_argv"]
+      ]
+      raise "sudo lifecycle vectors are invalid" unless actual_privilege == expected_privilege
       commands = transaction.fetch("commands")
       raise "maintenance command count is invalid" unless commands.is_a?(Array) && commands.length.between?(1, 3)
       commands.each do |command|
         argv = command.fetch("argv")
         allowed = case command.fetch("adapter")
         when "arch_and_aur.full_upgrade"
-          [
-            ["/usr/bin/yay", "--sudoflags=-n", "-Syu"],
-            ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"]
-          ].include?(argv)
+          if authority_mode == "root_owned_passwordless"
+            argv == ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "arch-update", transaction.fetch("transaction_id")]
+          else
+            [
+              ["/usr/bin/yay", "--sudoflags=-n", "-Syu"],
+              ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"]
+            ].include?(argv)
+          end
         when "flatpak.user_update"
-          argv == ["/usr/bin/flatpak", "update", "--user"]
+          expected = ["/usr/bin/flatpak", "update", "--user"]
+          expected << "--noninteractive" if authority_mode == "root_owned_passwordless"
+          argv == expected
         when "flatpak.system_update"
-          argv == ["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"]
+          expected = if authority_mode == "root_owned_passwordless"
+            ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "flatpak-system-update", transaction.fetch("transaction_id")]
+          else
+            ["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"]
+          end
+          argv == expected
         else
           false
         end
@@ -272,6 +315,8 @@ module SoulCore
     end
 
     def status_for(code) = code.zero? ? "complete" : "failed"
+    def passwordless?(transaction) = transaction.fetch("authority_mode", "native_prompt") == "root_owned_passwordless"
+    def password_prompts_for(transaction) = passwordless?(transaction) ? 0 : 1
 
     def display_command(argv)
       argv.map { |value| value.match?(/\A[A-Za-z0-9_.,:\/=+-]+\z/) ? value : "[argument]" }.join(" ")

@@ -66,7 +66,9 @@ module SoulCore
         "window_restore_summary" => a2.fetch("window_restore_summary"),
         "source_boot_id" => source_boot_id,
         "resume_unit" => resume.slice("unit_name", "installed_exact", "enabled", "ready", "persistent_process", "restart_policy", "timer"),
-        "one_authentication_required" => true,
+        "authority" => a2.fetch("authority", {}),
+        "authority_mode" => a2.fetch("authority_mode", "native_prompt"),
+        "one_authentication_required" => a2.fetch("authority_mode", "native_prompt") == "native_prompt",
         "automatic_reboot" => true,
         "live_execution_enabled" => @live_execution_enabled,
         "a2_plan_digest" => a2.fetch("expected_digest"),
@@ -140,6 +142,7 @@ module SoulCore
       id = "maintenance_tx_#{@id_generator.call}"
       raise "transaction ID is invalid" unless id.match?(/\Amaintenance_tx_[a-f0-9]{16}\z/)
       FileUtils.mkdir_p(@transactions_root, mode: 0o700)
+      privilege = foreground_privilege_fields(id)
       {
         "schema_version" => "soul.maintenance.transaction.v1",
         "transaction_id" => id,
@@ -148,15 +151,28 @@ module SoulCore
         "created_at" => @clock.call.iso8601,
         "deadline_at" => (@clock.call + HANDOFF_START_TTL_SECONDS).iso8601,
         "plan_digest" => plan.fetch("expected_digest"),
-        "commands" => plan.fetch("commands"),
-        "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
-        "sudo_refresh_argv" => ["/usr/bin/sudo", "-n", "-v"],
-        "sudo_invalidate_argv" => ["/usr/bin/sudo", "-k"],
+        "force_database_refresh" => plan.fetch("force_database_refresh"),
+        "commands" => foreground_materialize_commands(plan.fetch("commands"), id),
         "reboot_allowed" => true,
-        "reboot_argv" => FIXED_REBOOT_ARGV,
         "source_boot_id" => plan.fetch("source_boot_id"),
         "restore_registry_digest" => plan.fetch("restore_registry_digest"),
         "result_path" => File.join(@transactions_root, "#{id}.result.json")
+      }.merge(privilege)
+    end
+
+    def foreground_materialize_commands(commands, id)
+      return @foreground_service.materialize_live_commands(commands, id) if @foreground_service.respond_to?(:materialize_live_commands)
+      commands
+    end
+
+    def foreground_privilege_fields(id)
+      return @foreground_service.privilege_fields(id, reboot: true) if @foreground_service.respond_to?(:privilege_fields)
+      {
+        "authority_mode" => "native_prompt",
+        "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
+        "sudo_refresh_argv" => ["/usr/bin/sudo", "-n", "-v"],
+        "sudo_invalidate_argv" => ["/usr/bin/sudo", "-k"],
+        "reboot_argv" => FIXED_REBOOT_ARGV
       }
     end
 

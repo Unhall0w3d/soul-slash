@@ -1,0 +1,39 @@
+#!/usr/bin/ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+
+require_relative "../lib/soul_core/maintenance_passwordless_authority"
+
+ROOT = File.expand_path("..", __dir__)
+options = {}
+OptionParser.new do |parser|
+  parser.on("--expected-digest SHA256") { |value| options[:expected_digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+action = ARGV.shift.to_s
+
+def emit(value, status = 0)
+  puts JSON.pretty_generate(value)
+  exit(status)
+end
+
+begin
+  authority = SoulCore::MaintenancePasswordlessAuthority.new(root: ROOT)
+  result = case action
+  when "plan"
+    authority.plan
+  when "status"
+    authority.status
+  when "install"
+    authority.install(expected_digest: options[:expected_digest], confirmation: options[:confirmation])
+  when "uninstall"
+    authority.uninstall(confirmation: options[:confirmation])
+  else
+    raise "action must be plan, status, install, or uninstall"
+  end
+  emit(result, result["ok"] ? 0 : 1)
+rescue StandardError => error
+  emit({"ok" => false, "lifecycle_state" => "failed", "reason" => error.message.to_s.byteslice(0, 500)}, 1)
+end
