@@ -13,7 +13,7 @@ module SoulCore
     CONFIRM_REMOVE = "REMOVE_SOUL_MAINTENANCE_AUTHORITY"
     HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
     SUDOERS_PATH = "/etc/sudoers.d/90-soul-maintenance-authority"
-    HELPER_VERSION = "soul-maintenance-authority-a4-v1"
+    HELPER_VERSION = "soul-maintenance-authority-a4-v2"
     TRANSACTION_PATTERN = "maintenance_tx_[a-f0-9]{16}"
     SUPPORTED_YAY_VERSION = "13.0.1"
     FIXED_PATHS = {
@@ -33,7 +33,7 @@ module SoulCore
       "rm" => "/usr/bin/rm"
     }.freeze
 
-    attr_reader :root, :owner_uid, :owner_name, :hostname, :home
+    attr_reader :root, :owner_uid, :owner_gid, :owner_name, :hostname, :home
 
     def initialize(
       root: Dir.pwd,
@@ -46,6 +46,7 @@ module SoulCore
       @root = File.expand_path(root)
       @owner_uid = Integer(owner_uid)
       passwd = Etc.getpwuid(@owner_uid)
+      @owner_gid = Integer(passwd.gid)
       @owner_name = (owner_name || passwd.name).to_s
       @home = File.expand_path(home || passwd.dir)
       @hostname = (hostname || File.read("/proc/sys/kernel/hostname", 256).strip).to_s
@@ -63,6 +64,7 @@ module SoulCore
         "operation" => "maintenance_passwordless_authority_install",
         "version" => HELPER_VERSION,
         "owner_uid" => @owner_uid,
+        "owner_gid" => @owner_gid,
         "owner_name" => @owner_name,
         "hostname" => @hostname,
         "project_root" => @root,
@@ -188,6 +190,7 @@ module SoulCore
         "@@VERSION@@" => HELPER_VERSION,
         "@@PROJECT_ROOT@@" => @root,
         "@@OWNER_UID@@" => @owner_uid.to_s,
+        "@@OWNER_GID@@" => @owner_gid.to_s,
         "@@OWNER_NAME@@" => @owner_name,
         "@@OWNER_HOME@@" => @home,
         "@@HOSTNAME@@" => @hostname,
@@ -202,6 +205,7 @@ module SoulCore
       commands = [
         "#{HELPER_PATH} self-check",
         "#{HELPER_PATH} arch-update maintenance_tx_*",
+        "#{HELPER_PATH} pacman-bridge maintenance_tx_* *",
         "#{HELPER_PATH} flatpak-system-update maintenance_tx_*",
         "#{HELPER_PATH} reboot maintenance_tx_*"
       ]

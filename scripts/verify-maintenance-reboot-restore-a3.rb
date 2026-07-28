@@ -163,6 +163,32 @@ end
 
 puts "Maintenance conditional reboot and restore A3 verification:"
 
+tracked_registry = JSON.parse(File.binread(File.expand_path("../config/maintenance_restore_registry.json", __dir__)))
+tracked_entries = tracked_registry.fetch("entries").to_h { |entry| [entry.fetch("entry_id"), entry] }
+webex = tracked_entries["communication.webex"]
+teams = tracked_entries["communication.teams_for_linux"]
+check.call(
+  "Webex and Teams restore only when represented in the pre-reboot window or process snapshot",
+  webex == {
+    "entry_id" => "communication.webex",
+    "identities" => ["webex"],
+    "process_identities" => ["ciscocollabhost"],
+    "argv" => ["/opt/Webex/bin/CiscoCollabHost"],
+    "maximum_instances" => 1,
+    "title_policy" => "omit",
+    "startup_policy" => "launch_if_absent"
+  } &&
+    teams == {
+      "entry_id" => "communication.teams_for_linux",
+      "identities" => ["teams-for-linux"],
+      "process_identities" => ["teams-for-linux"],
+      "argv" => ["/usr/bin/teams-for-linux", "--gtk-version=3"],
+      "maximum_instances" => 1,
+      "title_policy" => "omit",
+      "startup_policy" => "launch_if_absent"
+    }
+)
+
 Dir.mktmpdir("soul-a3-hyprland") do |runtime_parent|
   runtime_root = File.join(runtime_parent, "hypr")
   signature = "fixture_signature_1234567890"

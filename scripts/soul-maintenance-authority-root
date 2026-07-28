@@ -13,6 +13,7 @@ require "timeout"
 VERSION = @@VERSION@@
 PROJECT_ROOT = @@PROJECT_ROOT@@
 OWNER_UID = Integer(@@OWNER_UID@@)
+OWNER_GID = Integer(@@OWNER_GID@@)
 OWNER_NAME = @@OWNER_NAME@@
 OWNER_HOME = @@OWNER_HOME@@
 QUALIFIED_HOSTNAME = @@HOSTNAME@@
@@ -28,6 +29,7 @@ MAX_TRANSACTION_BYTES = 512 * 1024
 MAX_RUNTIME_SECONDS = 4 * 60 * 60
 PATHS = {
   "yay" => "/usr/bin/yay",
+  "sudo" => "/usr/bin/sudo",
   "pacman" => "/usr/bin/pacman",
   "flatpak" => "/usr/bin/flatpak",
   "systemctl" => "/usr/bin/systemctl",
@@ -48,6 +50,22 @@ end
 
 def current_boot_id
   File.read("/proc/sys/kernel/random/boot_id", 128).strip
+end
+
+def process_identity(pid)
+  numeric = Integer(pid)
+  raw = File.binread("/proc/#{numeric}/stat", 16 * 1024)
+  close = raw.rindex(")")
+  fail_closed("process identity is invalid") unless close
+  fields = raw[(close + 2)..].split
+  {
+    "pid" => numeric,
+    "ppid" => Integer(fields.fetch(1)),
+    "start_ticks" => fields.fetch(19),
+    "exe" => File.realpath("/proc/#{numeric}/exe")
+  }
+rescue ArgumentError, Errno::ENOENT, IndexError
+  fail_closed("process identity is unavailable")
 end
 
 def helper_digest
@@ -231,7 +249,8 @@ def command_for(operation, transaction)
       "--makepkg", PATHS.fetch("makepkg"),
       "--git", PATHS.fetch("git"),
       "--gpg", PATHS.fetch("gpg"),
-      "--sudo", PATHS.fetch("false"),
+      "--sudo", PATHS.fetch("sudo"),
+      "--sudoflags", "-n #{HELPER_PATH} pacman-bridge #{transaction.fetch('transaction_id')}",
       "--config", "/etc/pacman.conf",
       "--builddir", File.join(OWNER_HOME, ".cache", "yay"),
       "--editor", PATHS.fetch("false"),
@@ -262,6 +281,79 @@ def command_for(operation, transaction)
   end
 end
 
+def validate_pacman_bridge!(state, transaction, operations, argv)
+  index = validate_phase!(state, transaction, operations, "arch-update")
+  fail_closed("pacman bridge is outside the active Arch/AUR operation") unless index == state["next_index"]
+  active = state["active_arch_update"]
+  fail_closed("pacman bridge has no active yay owner") unless active.is_a?(Hash)
+
+  yay = process_identity(active.fetch("yay_pid"))
+  fail_closed("active yay process identity changed") unless
+    yay["start_ticks"] == active["yay_start_ticks"] &&
+    yay["exe"] == File.realpath(PATHS.fetch("yay"))
+
+  caller_parent = process_identity(Process.ppid)
+  ancestry_matches = caller_parent["pid"] == yay["pid"]
+  unless ancestry_matches
+    fail_closed("pacman bridge caller is not sudo") unless caller_parent["exe"] == File.realpath(PATHS.fetch("sudo"))
+    ancestry_matches = caller_parent["ppid"] == yay["pid"]
+  end
+  fail_closed("pacman bridge is not descended from active yay") unless ancestry_matches
+
+  fail_closed("pacman bridge command is empty") unless argv.is_a?(Array) && argv.length.between?(2, 256)
+  fail_closed("pacman bridge executable changed") unless argv.first == PATHS.fetch("pacman")
+  fail_closed("pacman bridge argument is too large") unless argv.all? { |part| part.is_a?(String) && part.bytesize.between?(1, 4096) && !part.include?("\0") }
+  fail_closed("pacman bridge operation is not mutation-bounded") unless argv.any? { |part| part == "-S" || part.start_with?("-S") || part == "-U" || part.start_with?("-U") }
+  forbidden = %w[-R --remove -D --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir]
+  fail_closed("pacman bridge contains a forbidden operation") if argv.drop(1).any? { |part| forbidden.include?(part) || forbidden.any? { |token| part.start_with?("#{token}=") } }
+  argv.each_with_index do |part, offset|
+    next unless part == "--config"
+    fail_closed("pacman bridge configuration changed") unless argv[offset + 1] == "/etc/pacman.conf"
+  end
+  argv
+rescue KeyError, ArgumentError
+  fail_closed("pacman bridge state is invalid")
+end
+
+def execute_yay_as_owner(argv, deadline, state, id)
+  gate_read, gate_write = IO.pipe
+  pid = fork do
+    gate_write.close
+    Process.initgroups(OWNER_NAME, OWNER_GID)
+    Process::GID.change_privilege(OWNER_GID)
+    Process::UID.change_privilege(OWNER_UID)
+    gate_read.read(1)
+    gate_read.close
+    exec(sanitized_environment, *argv, unsetenv_others: true, in: $stdin, out: $stdout, err: $stderr)
+  end
+  gate_read.close
+  identity = process_identity(pid)
+  state["active_arch_update"] = {
+    "yay_pid" => pid,
+    "yay_start_ticks" => identity.fetch("start_ticks")
+  }
+  atomic_root_json(state_path(id), state)
+  gate_write.write(".")
+  gate_write.close
+
+  remaining = deadline - Time.now.utc
+  fail_closed("transaction deadline expired") unless remaining.positive?
+  status = nil
+  Timeout.timeout([remaining, MAX_RUNTIME_SECONDS].min) { _pid, status = Process.wait2(pid) }
+  status.exitstatus || 1
+rescue Timeout::Error
+  Process.kill("TERM", pid) rescue nil
+  Process.wait(pid) rescue nil
+  124
+rescue SystemCallError
+  127
+ensure
+  gate_read&.close rescue nil
+  gate_write&.close rescue nil
+  state.delete("active_arch_update") if state
+  atomic_root_json(state_path(id), state) if state && id
+end
+
 def execute_fixed(argv, deadline)
   remaining = deadline - Time.now.utc
   fail_closed("transaction deadline expired") unless remaining.positive?
@@ -279,7 +371,6 @@ end
 
 verify_caller!
 operation = ARGV.shift.to_s
-fail_closed("argument count is invalid") unless ARGV.empty? || (operation != "self-check" && ARGV.length == 1)
 
 if operation == "self-check"
   fail_closed("self-check accepts no arguments") unless ARGV.empty?
@@ -295,13 +386,31 @@ if operation == "self-check"
 end
 
 id = ARGV.shift.to_s
+if operation == "pacman-bridge"
+  fail_closed("pacman bridge argument count is invalid") if ARGV.empty?
+  transaction = transaction_for(id)
+  operations = expected_operations(transaction)
+  validate_vectors!(transaction, operations, id)
+  state = load_or_create_state(transaction, operations)
+  deadline = Time.iso8601(transaction.fetch("deadline_at"))
+  status = execute_fixed(validate_pacman_bridge!(state, transaction, operations, ARGV), deadline)
+  fail_closed("pacman bridge failed with status #{status}", status.zero? ? 1 : status) unless status.zero?
+  exit(0)
+end
+
+fail_closed("argument count is invalid") unless ARGV.empty?
 transaction = transaction_for(id)
 operations = expected_operations(transaction)
 validate_vectors!(transaction, operations, id)
 state = load_or_create_state(transaction, operations)
 index = validate_phase!(state, transaction, operations, operation)
 deadline = Time.iso8601(transaction.fetch("deadline_at"))
-status = execute_fixed(command_for(operation, transaction), deadline)
+command = command_for(operation, transaction)
+status = if operation == "arch-update"
+  execute_yay_as_owner(command, deadline, state, id)
+else
+  execute_fixed(command, deadline)
+end
 fail_closed("#{operation} failed with status #{status}", status.zero? ? 1 : status) unless status.zero?
 state["next_index"] = index + 1
 state["terminal"] = state["next_index"] >= operations.length

@@ -128,8 +128,6 @@ module SoulCore
         "native_package_evidence" => native_evidence.slice("available", "generated_at", "expires_at", "evidence_digest", "reason"),
         "desktop_handoff" => handoff_status.slice("available", "registered_desktop_id", "problems"),
         "flatpak_installations" => base.fetch("flatpak_installations"),
-        "restore_registry_digest" => base.fetch("restore_registry_digest"),
-        "window_restore_summary" => stable_restore_summary(base.fetch("window_snapshot")),
         "preflight" => preflight,
         "authority" => authority,
         "authority_mode" => authority_mode(authority),
@@ -390,7 +388,6 @@ module SoulCore
       low = disks.select { |entry| entry.fetch("available_kib", 0) < MINIMUM_FREE_KIB }
       common_blockers << "maintenance free-space threshold is not met: #{low.map { |entry| entry['path'] }.join(', ')}" unless low.empty?
       common_blockers << "package assessment is unavailable" unless base.dig("package_evidence", "status") == "ok"
-      common_blockers << "no restorable application inventory is available" if base.dig("window_snapshot", "restorable_count").to_i.zero?
       common_blockers << "maintenance command count is invalid" unless commands.length.between?(1, 3)
       live_blockers = common_blockers.dup
       live_blockers << native_evidence.fetch("reason", "native package evidence is incomplete") unless native_evidence["available"]
@@ -477,16 +474,6 @@ module SoulCore
         [name, {"detected" => manager["detected"], "path" => manager["path"], "checks" => checks}]
       end
       {"status" => evidence["status"], "managers" => managers, "reboot_recommended" => evidence.dig("reboot", "recommended")}
-    end
-
-    def stable_restore_summary(snapshot)
-      {
-        "active_workspace" => snapshot["active_workspace"],
-        "restorable_count" => snapshot["restorable_count"],
-        "unsupported_count" => snapshot["unsupported_count"],
-        "windows" => Array(snapshot["windows"]).map { |item| item.slice("initial_class", "class", "workspace", "monitor_id", "floating", "fullscreen", "pinned", "restore_status", "restore_entry_id", "launch_argv") },
-        "background_applications" => Array(snapshot["background_applications"]).map { |item| item.slice("process_identity", "restore_status", "restore_entry_id", "launch_argv", "startup_policy") }
-      }
     end
 
     def build_transaction(plan, mode)

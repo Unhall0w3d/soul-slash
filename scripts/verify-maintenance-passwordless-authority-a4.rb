@@ -31,31 +31,47 @@ check.call(
   "root-owned deployment plan is deterministic and exact-confirmation gated",
   plan_one["ok"] && plan_one["lifecycle_state"] == "blocked_for_human_review" &&
     data["expected_digest"] == plan_two.dig("data", "expected_digest") &&
-    data["confirmation_phrase"] == SoulCore::MaintenancePasswordlessAuthority::CONFIRM_INSTALL
+    data["confirmation_phrase"] == SoulCore::MaintenancePasswordlessAuthority::CONFIRM_INSTALL &&
+    data["owner_gid"].is_a?(Integer)
 )
 check.call(
   "sudoers grants only the digest-bound fixed helper operations",
   sudoers.include?("sha256:#{Digest::SHA256.hexdigest(helper)}") &&
     sudoers.include?("/usr/local/libexec/soul-maintenance-authority arch-update maintenance_tx_*") &&
+    sudoers.include?("/usr/local/libexec/soul-maintenance-authority pacman-bridge maintenance_tx_* *") &&
     sudoers.include?("/usr/local/libexec/soul-maintenance-authority flatpak-system-update maintenance_tx_*") &&
     sudoers.include?("/usr/local/libexec/soul-maintenance-authority reboot maintenance_tx_*") &&
     !sudoers.match?(/NOPASSWD:\s*(?:ALL|\/usr\/bin\/(?:yay|pacman|flatpak|systemctl|ruby|sh|bash))/)
 )
 check.call(
-  "helper accepts no caller command, target, path, flag, or answer",
+  "helper accepts no caller-selected executable, target, or shell command",
   helper.include?("operation = ARGV.shift.to_s") &&
     helper.include?("fail_closed(\"argument count is invalid\")") &&
     helper.include?("transaction command vector is invalid") &&
+    helper.include?("pacman bridge executable changed") &&
+    helper.include?("pacman bridge is not descended from active yay") &&
     !helper.include?("system(*ARGV)") &&
     !helper.include?("eval(") &&
     !helper.include?("`")
 )
 check.call(
-  "yay policy is fixed, target-free, and declines routine review prompts",
+  "yay runs unprivileged with a transaction-scoped pacman bridge and fixed unattended policy",
   %w[--noconfirm --answerclean --answerdiff --answeredit --answerupgrade --noremovemake --pgpfetch=false --provides=false --useask=false --sudoloop=false].all? { |flag| helper.include?(flag) } &&
     helper.include?("\"None\"") && helper.include?("\"All\"") &&
+    helper.include?("Process::GID.change_privilege(OWNER_GID)") &&
+    helper.include?("Process::UID.change_privilege(OWNER_UID)") &&
+    helper.include?("\"--sudo\", PATHS.fetch(\"sudo\")") &&
+    helper.include?("pacman-bridge \#{transaction.fetch('transaction_id')}") &&
     helper.include?("refresh\n    ]") &&
     !helper.include?("--nodeps") && !helper.include?("--overwrite")
+)
+check.call(
+  "pacman bridge is limited to active yay ancestry and rejects dangerous database or path controls",
+  helper.include?("active_arch_update") &&
+    helper.include?("yay_start_ticks") &&
+    helper.include?("caller_parent[\"ppid\"] == yay[\"pid\"]") &&
+    %w[--remove --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir].all? { |flag| helper.include?(flag) } &&
+    helper.include?("pacman bridge configuration changed")
 )
 check.call(
   "Flatpak and reboot remain separate fixed operations",

@@ -77,6 +77,24 @@ class A2IncompletePackageRehearsal < A2FixtureRehearsal
   end
 end
 
+class A2ChangingWindowRehearsal < A2FixtureRehearsal
+  def initialize(clock)
+    super
+    @calls = 0
+  end
+
+  def preview(force_database_refresh: false)
+    @calls += 1
+    result = super
+    snapshot = result.dig("data", "plan", "window_snapshot")
+    snapshot["active_workspace"] = {"id" => @calls, "name" => @calls.to_s}
+    snapshot["windows"].first["class"] = @calls.odd? ? "kitty" : "opera"
+    snapshot["windows"].first["workspace"] = snapshot["active_workspace"]
+    snapshot["restorable_count"] = @calls
+    result
+  end
+end
+
 class A2FixtureHandoff
   attr_reader :transactions
 
@@ -209,6 +227,21 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   check.call("yay uses the existing ticket non-interactively without yay sudoloop", plan.fetch("commands").first.fetch("argv") == ["/usr/bin/yay", "--sudoflags=-n", "-Syu"] && plan.fetch("commands").none? { |command| command.fetch("argv").include?("--sudoloop") })
   check.call("Flatpak user and system scopes retain fixed vectors", plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/flatpak", "update", "--user"]) && plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"]))
   check.call("preflight observes disk, active work, package lock, and fixed tools", plan.dig("preflight", "blockers").empty? && plan.dig("preflight", "disk_free").length == 3 && plan.dig("preflight", "required_executables", "kitty") == "/usr/bin/kitty")
+
+  changing_windows = SoulCore::MaintenanceForegroundExecutionService.new(
+    root: root, clock: clock, rehearsal_service: A2ChangingWindowRehearsal.new(clock),
+    runner: runner, terminal_launcher: terminal, active_work_probe: -> { [] },
+    package_lock_probe: -> { false }, privilege_transition_probe: -> { true },
+    desktop_handoff: handoff
+  )
+  first_window_plan = changing_windows.preview
+  second_window_plan = changing_windows.preview
+  check.call(
+    "package-only maintenance digest ignores changing window and workspace inventory",
+    first_window_plan.dig("data", "expected_digest") == second_window_plan.dig("data", "expected_digest") &&
+      !first_window_plan.dig("data", "plan").key?("window_restore_summary") &&
+      !first_window_plan.dig("data", "plan").key?("restore_registry_digest")
+  )
 
   confined_service = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2IncompletePackageRehearsal.new(clock),

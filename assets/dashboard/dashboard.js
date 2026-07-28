@@ -2528,12 +2528,18 @@ async function loadMaintenanceFleet() {
 
 function maintenanceDeviceDialogDetails(plan) {
   const details = byId("maintenance-device-dialog-details"); details.replaceChildren();
-  [
+  const rows = [
     ["Device", `${plan.device_label || "Maven"}${plan.address ? ` · ${plan.address}` : ""}`],
     ["Action", plan.action || "maintenance"],
     ["Scope", plan.fleet_wide === false ? "one device only" : "Maven reviewed local transaction"],
     ["Automatic retry", "none"]
-  ].forEach(([label, value]) => details.append(labeledRecord(label, value)));
+  ];
+  if (plan.device_id === "maven") {
+    rows.push(["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false
+      ? "A4 fixed-operation authority · no password prompt"
+      : "one native sudo prompt"]);
+  }
+  rows.forEach(([label, value]) => details.append(labeledRecord(label, value)));
   (plan.commands || []).forEach((command, index) => details.append(labeledRecord(`Fixed step ${index + 1}`, (command.argv || []).join(" "))));
   (plan.readiness || []).forEach((check, index) => {
     const target = check.ssh_alias ? `${check.ssh_alias} → ` : "";
@@ -2549,6 +2555,7 @@ async function openMaintenanceDeviceAction(deviceId, action) {
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";
   byId("maintenance-device-confirmation-row").hidden = true;
+  byId("maintenance-maven-evidence-actions").hidden = true;
   byId("execute-maintenance-device-action").disabled = true;
   byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceId === "maven" ? "Maven" : deviceId === "forge" ? "Forge" : "Pi-hole"}`;
   if (!dialog.open) dialog.showModal();
@@ -2567,35 +2574,43 @@ async function openMaintenanceDeviceAction(deviceId, action) {
       ? Object.assign({}, plan, { device_id: "maven", device_label: "Maven", action, fleet_wide: false, impact: [] })
       : plan;
     maintenanceDeviceDialogDetails(normalizedPlan);
-    if (deviceId === "maven") {
-      const prepare = document.createElement("button"); prepare.type = "button"; prepare.className = "gate-button";
-      prepare.textContent = "Refresh Maven package evidence";
-      prepare.addEventListener("click", async () => {
-        status.textContent = "Reserving one visible read-only Maven evidence terminal…";
-        try {
-          const evidenceEnvelope = await callSoul("maintenance.evidence.reserve"); lifecycle(evidenceEnvelope);
-          const evidence = dataOf(evidenceEnvelope);
-          if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || "Maven evidence handoff is unavailable.");
-          launchMaintenanceUri(evidence.launch_uri);
-          status.textContent = "When the evidence terminal closes, reopen this device action for a fresh exact preview.";
-        } catch (error) { status.textContent = error.message; }
-      });
-      byId("maintenance-device-dialog-details").append(prepare);
-    }
+    byId("maintenance-maven-evidence-actions").hidden = deviceId !== "maven";
     state.maintenanceDevicePreview = { deviceId, action, data, plan: normalizedPlan };
     const available = deviceId === "maven" ? plan.execution_available === true : plan.live_execution_enabled === true;
     const confirmation = data.confirmation || plan.confirmation;
     byId("maintenance-device-confirmation-phrase").textContent = confirmation || "—";
     byId("maintenance-device-confirmation-row").hidden = false;
+    const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
     status.textContent = available
       ? `Review the exact ${action} plan, then type its device-specific confirmation.`
       : (deviceId === "maven"
-        ? "This Maven action remains blocked by its existing A2/A3 gate or preflight. No bypass was introduced."
+        ? `Maven is blocked: ${blockers.join(" · ") || "A2/A3 preflight is incomplete"}. Refresh Maven evidence, then recheck this preflight.`
         : "Remote live execution remains locally disabled pending candidate review.");
     byId("execute-maintenance-device-action").disabled = !available;
   } catch (error) {
     status.textContent = error.message;
   }
+}
+
+async function refreshMavenDeviceEvidence() {
+  const preview = state.maintenanceDevicePreview; const status = byId("maintenance-device-dialog-status");
+  if (!preview || preview.deviceId !== "maven") return;
+  byId("refresh-maintenance-device-evidence").disabled = true;
+  status.textContent = "Reserving one visible read-only Maven evidence terminal…";
+  try {
+    const evidenceEnvelope = await callSoul("maintenance.evidence.reserve"); lifecycle(evidenceEnvelope);
+    const evidence = dataOf(evidenceEnvelope);
+    if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || "Maven evidence handoff is unavailable.");
+    launchMaintenanceUri(evidence.launch_uri);
+    status.textContent = "Native evidence terminal requested. When it closes, select Recheck Maven preflight.";
+  } catch (error) { status.textContent = error.message; }
+  finally { byId("refresh-maintenance-device-evidence").disabled = false; }
+}
+
+async function recheckMavenDevicePreflight() {
+  const preview = state.maintenanceDevicePreview;
+  if (!preview || preview.deviceId !== "maven") return;
+  await openMaintenanceDeviceAction("maven", preview.action);
 }
 
 async function executeMaintenanceDeviceAction() {
@@ -2758,7 +2773,7 @@ async function rehearseMaintenance() {
 function renderMaintenanceExecutionPlan(plan) {
   const details = byId("maintenance-execution-details"); details.replaceChildren();
   const rows = [
-    ["Authentication", "one native sudo -v prompt · never enters the Dashboard"],
+    ["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false ? "A4 fixed-operation authority · no password prompt" : "one native sudo -v prompt · never enters the Dashboard"],
     ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
     ["Flatpak scopes", (plan.flatpak_installations || []).map((item) => item.scope).join(", ") || "none"],
     ["Active work", plan.preflight?.active_work?.join(", ") || "none"],
@@ -2867,7 +2882,7 @@ async function loadMaintenanceReceipts() {
 function renderMaintenanceRebootPlan(plan) {
   const details = byId("maintenance-reboot-details"); details.replaceChildren();
   [
-    ["Authentication", "one native sudo -v prompt · never enters the Dashboard"],
+    ["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false ? "A4 fixed-operation authority · no password prompt" : "one native sudo -v prompt · never enters the Dashboard"],
     ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
     ["Restore map", `${plan.window_restore_summary?.restorable_count ?? 0} restorable · ${plan.window_restore_summary?.unsupported_count ?? 0} unsupported`],
     ["Resume unit", plan.resume_unit?.ready ? "exact unit installed · enabled · one-shot" : "not ready"],
@@ -2898,7 +2913,7 @@ async function previewMaintenanceReboot() {
 async function executeMaintenanceReboot() {
   const preview = state.maintenanceRebootPreview; if (!preview) return;
   const progress = byId("maintenance-reboot-progress"); const status = byId("maintenance-reboot-status");
-  showGenerationProgress(progress, "Conditional reboot", "Opening the visible one-password update and reboot terminal…");
+  showGenerationProgress(progress, "Conditional reboot", preview.plan?.authority_mode === "root_owned_passwordless" ? "Opening the visible zero-password update and reboot terminal…" : "Opening the visible one-password update and reboot terminal…");
   byId("preview-maintenance-reboot").disabled = true; byId("execute-maintenance-reboot").disabled = true;
   try {
     const envelope = await callSoul("maintenance.reboot_restore.execute", {
@@ -3692,6 +3707,8 @@ byId("maintenance-device-confirmation").addEventListener("input", () => {
   byId("execute-maintenance-device-action").disabled = !available || byId("maintenance-device-confirmation").value !== expected;
 });
 byId("execute-maintenance-device-action").addEventListener("click", executeMaintenanceDeviceAction);
+byId("refresh-maintenance-device-evidence").addEventListener("click", refreshMavenDeviceEvidence);
+byId("recheck-maintenance-device-preflight").addEventListener("click", recheckMavenDevicePreflight);
 byId("maintenance-device-dialog").addEventListener("close", () => {
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";
