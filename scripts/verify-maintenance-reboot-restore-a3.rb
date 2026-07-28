@@ -395,14 +395,22 @@ Dir.mktmpdir("soul-a3-a2-boundary") do |root|
 end
 
 class A3ForegroundFixture
+  def initialize
+    @preview_count = 0
+  end
+
   def preview(force_database_refresh:)
+    @preview_count += 1
     plan = {
       "force_database_refresh" => force_database_refresh == true || force_database_refresh == "true",
       "commands" => [{"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}],
       "flatpak_installations" => [],
       "restore_registry_digest" => "b" * 64,
       "window_restore_summary" => {"restorable_count" => 1, "unsupported_count" => 0},
-      "preflight" => {"live_blockers" => [], "rehearsal_blockers" => []},
+      "preflight" => {
+        "live_blockers" => [], "rehearsal_blockers" => [],
+        "disk_free" => [{"path" => "/", "mount" => "/", "available_kib" => 1_000_000 - @preview_count}]
+      },
       "expected_digest" => "c" * 64
     }
     {"ok" => true, "lifecycle_state" => "complete", "data" => {"plan" => plan}}
@@ -452,6 +460,9 @@ Dir.mktmpdir("soul-a3-service") do |root|
              handoff.transaction["mode"] == "live_reboot" &&
              handoff.transaction["reboot_argv"] == SoulCore::MaintenanceRebootRestoreService::FIXED_REBOOT_ARGV &&
              reserved.dig("data", "reboot_requested") == false)
+  check.call("safe raw disk-space fluctuations do not invalidate an exact A3 review",
+             reserved.dig("data", "plan", "preflight", "disk_free", 0, "available_kib") <
+               ready.dig("data", "plan", "preflight", "disk_free", 0, "available_kib"))
 end
 
 Dir.mktmpdir("soul-a3-deployment") do |home|

@@ -93,7 +93,7 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
-- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The merged A3 candidate adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. Its resume unit has not been installed and its Dashboard, no-journal, and supervised live-reboot acceptance gates remain open.
+- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The accepted A3 path adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. On Maven, the reviewed resume unit and display-recovery hook completed a supervised end-to-end update, reboot, DP-3 recovery, and exact Codex/Opera workspace restoration on 2026-07-28. Both live gates remain disabled outside an exact supervised transaction.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -203,8 +203,8 @@ Near-term work is expected to concentrate on:
 - motion-quality refinement based on reviewed image-guided and native scenes;
 - broader visual-perception refinement beyond the implemented explicit,
   one-shot monitor, active-window, visible-workspace, and region paths;
-- A3 resume-unit, no-journal, Dashboard-preview, and supervised live-reboot
-  qualification only under separate review; and
+- additional restore-registry applications only through separate identity,
+  duplicate-detection, placement, and live review; and
 - broader deployment only under its own review.
 
 No release or stable tag has been created.
