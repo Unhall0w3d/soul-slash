@@ -26,7 +26,6 @@ module SoulCore
     TARGETS = {
       "forge" => {
         "label" => "Forge",
-        "address" => "192.168.124.225",
         "ssh_alias" => "proxmox-maintenance",
         "impact" => ["Pi-hole LXC 100 is interrupted while Forge reboots"],
         "maintenance" => [
@@ -66,7 +65,6 @@ module SoulCore
       },
       "pihole" => {
         "label" => "Pi-hole",
-        "address" => "192.168.124.206",
         "ssh_alias" => "pihole-maintenance",
         "impact" => [],
         "maintenance" => [
@@ -103,7 +101,8 @@ module SoulCore
       live_execution_enabled: false,
       ssh_config: File.expand_path("~/.ssh/config"),
       id_generator: -> { SecureRandom.hex(8) },
-      process_alive: nil
+      process_alive: nil,
+      process_env: ENV
     )
       @root = File.expand_path(root)
       @fleet_status_service = fleet_status_service
@@ -114,6 +113,7 @@ module SoulCore
       @ssh_config = File.expand_path(ssh_config)
       @id_generator = id_generator
       @process_alive = process_alive || method(:process_alive?)
+      @process_env = process_env.to_h.transform_keys(&:to_s)
       @state_root = File.join(@root, "Soul", "private", "host_maintenance")
       @receipts_root = File.join(@state_root, "device_receipts")
       @lock_path = File.join(@state_root, "operation.lock")
@@ -127,7 +127,7 @@ module SoulCore
         "schema_version" => PLAN_SCHEMA,
         "device_id" => device_id,
         "device_label" => target.fetch("label"),
-        "address" => target.fetch("address"),
+        "address" => target_display_address(device_id),
         "action" => action,
         "ssh_alias" => target.fetch("ssh_alias"),
         "commands" => commands.map { |argv| {"argv" => argv} },
@@ -497,6 +497,16 @@ module SoulCore
 
     def target!(device_id)
       TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
+    end
+
+    def target_display_address(device_id)
+      key, fallback = case device_id.to_s
+                      when "forge" then ["SOUL_FLEET_FORGE_ADDRESS", "proxmox-maintenance"]
+                      when "pihole" then ["SOUL_FLEET_PIHOLE_ADDRESS", "pihole-maintenance"]
+                      else raise ArgumentError, "device is not available for remote maintenance"
+                      end
+      value = @process_env[key].to_s.strip
+      value.empty? ? fallback : value.byteslice(0, 255).to_s
     end
 
     def action!(action)

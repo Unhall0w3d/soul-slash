@@ -18,8 +18,9 @@ end
 class FleetFakeRunner
   attr_reader :calls
 
-  def initialize(pihole_offline: false)
+  def initialize(pihole_offline: false, phone_offline: false)
     @pihole_offline = pihole_offline
+    @phone_offline = phone_offline
     @calls = []
   end
 
@@ -33,6 +34,11 @@ class FleetFakeRunner
     return ok("") if argv.include?("--system") && argv.include?("remote-ls")
     return ok("linux-cachyos 7.1.5-1\n") if argv == ["/usr/bin/pacman", "-Q", "linux-cachyos"]
     return ok("Hyprland 0.55.4 built from branch v0.55.4\n") if argv == ["/usr/bin/hyprland", "-v"]
+    if argv[0, 5] == ["/usr/bin/ping", "-c", "1", "-W", "2"]
+      return failed("unreachable", 1) if @phone_offline
+
+      return ok("64 bytes from #{argv.fetch(5)}: time=0.4 ms\n")
+    end
 
     target_index = argv.index { |value| %w[proxmox-maintenance pihole-maintenance].include?(value) }
     return failed("unexpected command", 127) unless target_index
@@ -166,6 +172,67 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              data.fetch("evidence").all? { |record| (record.keys - %w[adapter status exit_status truncated]).empty? } &&
                data.fetch("evidence").select { |record| record["adapter"].end_with?("reboot_required") }.all? { |record| record["status"] == "ok" } &&
                !JSON.generate(data.fetch("evidence")).include?("IdentityFile"))
+
+  phone_env = {
+    "SOUL_FLEET_MAVEN_ADDRESS" => "maven.example.test",
+    "SOUL_FLEET_FORGE_ADDRESS" => "forge.example.test",
+    "SOUL_FLEET_PIHOLE_ADDRESS" => "pihole.example.test",
+    "SOUL_FLEET_CISCO_PHONE_ENABLED" => "true",
+    "SOUL_FLEET_CISCO_PHONE_ADDRESS" => "phone.example.test",
+    "SOUL_FLEET_CISCO_PHONE_LABEL" => "Desk Phone"
+  }
+  phone_runner = FleetFakeRunner.new
+  with_phone = SoulCore::MaintenanceFleetStatusService.new(
+    runner: phone_runner,
+    clock: -> { Time.utc(2026, 7, 27, 21, 3, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "maven" },
+    process_env: phone_env
+  ).collect
+  phone_data = with_phone.fetch("data")
+  phone = phone_data.fetch("devices").find { |device| device["id"] == "cisco-8851" }
+  check.call("optional Cisco phone is one bounded status-only reachability probe",
+             phone["label"] == "Desk Phone" &&
+               phone["address"] == "phone.example.test" &&
+               phone["reachable"] == true &&
+               phone["control"] == "status_only" &&
+               phone.dig("facts", "mutation_supported") == false &&
+               phone.dig("facts", "registration_status") == "not assessed" &&
+               phone_runner.calls.count { |call| call.dig("argv", 0) == "/usr/bin/ping" } == 1 &&
+               phone_runner.calls.find { |call| call.dig("argv", 0) == "/usr/bin/ping" }.dig("options", :timeout_seconds) == 5)
+  check.call("phone topology distinguishes local reachability from unasserted Webex state",
+             phone_data.dig("summary", "device_count") == 4 &&
+               phone_data.dig("topology", "nodes").any? { |node| node["id"] == "webex-calling" && node["status"] == "external" } &&
+               phone_data.dig("topology", "edges").any? do |edge|
+                 edge["from"] == "cisco-8851" &&
+                   edge["to"] == "webex-calling" &&
+                   edge["label"].include?("status not asserted")
+               end)
+  check.call("phone evidence excludes device identity, credentials, and raw probe output",
+             !JSON.generate(phone).match?(/serial|mac.address|directory.number|call.history|credential/i) &&
+               phone_data.fetch("evidence").all? { |record| (record.keys - %w[adapter status exit_status truncated]).empty? })
+
+  unavailable_phone = SoulCore::MaintenanceFleetStatusService.new(
+    runner: FleetFakeRunner.new(phone_offline: true),
+    clock: -> { Time.utc(2026, 7, 27, 21, 4, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "maven" },
+    process_env: phone_env
+  ).collect.dig("data", "devices").find { |device| device["id"] == "cisco-8851" }
+  check.call("unreachable Cisco phone remains visible and status-only",
+             unavailable_phone["status"] == "offline" &&
+               unavailable_phone["control"] == "status_only" &&
+               unavailable_phone.dig("facts", "reachability") == "unreachable")
+
+  source = File.read(File.join(__dir__, "../lib/soul_core/maintenance_fleet_status_service.rb"))
+  dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
+  check.call("public service defaults contain no operator-specific RFC1918 addresses",
+             !source.match?(/\b192\.168\.\d{1,3}\.\d{1,3}\b/))
+  check.call("dashboard suppresses mutation controls for status-only devices",
+             dashboard.include?('device.control === "status_only"') &&
+               dashboard.include?("Status only · lifecycle and mutation remain provider-managed"))
 
   offline_runner = FleetFakeRunner.new(pihole_offline: true)
   offline = SoulCore::MaintenanceFleetStatusService.new(
