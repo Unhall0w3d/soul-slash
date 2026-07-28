@@ -13,6 +13,7 @@ module SoulCore
   class MaintenanceFleetStatusService
     SCHEMA_VERSION = "soul.maintenance.fleet_status.v1"
     COMMAND_TIMEOUT_SECONDS = 20
+    DNF5_STATUS_TIMEOUT_SECONDS = 120
     MAX_OUTPUT_BYTES = 256 * 1024
     SSH_PATH = "/usr/bin/ssh"
     PING_PATH = "/usr/bin/ping"
@@ -490,6 +491,11 @@ module SoulCore
         .map { |value| safe_text(value) }
         .select { |value| SUPPORTED_PACKAGE_MANAGERS.include?(value) }
         .uniq
+      if record.fetch("connection_mode") == "ssh" &&
+          facts["os_id"] == "fedora" &&
+          package_managers.include?("dnf")
+        return collect_fedora_inventory_device(record, facts, package_managers)
+      end
       services = [
         {
           "id" => record.fetch("connection_mode") == "ssh" ? "ssh_inventory" : "network_reachability",
@@ -517,6 +523,108 @@ module SoulCore
         control: "inventory_only",
         status: "reachable"
       )
+    end
+
+    def collect_fedora_inventory_device(record, facts, package_managers)
+      target = record.fetch("ssh_alias")
+      updates_result = remote_run(
+        "enrolled_device.dnf5_updates",
+        target,
+        "/usr/bin/dnf5", "--quiet", "check-upgrade",
+        timeout: DNF5_STATUS_TIMEOUT_SECONDS,
+        accepted_exit_statuses: [0, 100]
+      )
+      reboot_result = remote_run(
+        "enrolled_device.dnf5_reboot",
+        target,
+        "/usr/bin/dnf5", "needs-restarting", "--json",
+        timeout: 45
+      )
+      installed_kernels = remote_run(
+        "enrolled_device.installed_kernels",
+        target,
+        "/usr/bin/rpm", "-q", "kernel-core"
+      )
+      ssh = remote_run(
+        "enrolled_device.ssh_service",
+        target,
+        "/usr/bin/systemctl", "is-active", "sshd"
+      )
+      guest_agent = remote_run(
+        "enrolled_device.guest_agent",
+        target,
+        "/usr/bin/systemctl", "is-active", "qemu-guest-agent"
+      )
+
+      update_rows = dnf5_update_rows(updates_result)
+      available_kernel = update_rows
+        .find { |row| row.fetch("name").start_with?("kernel-core.") }
+        &.fetch("version", nil)
+      running_kernel = facts["kernel"].to_s
+      installed = output(installed_kernels).lines
+        .map(&:strip)
+        .filter_map { |line| line.delete_prefix("kernel-core-") unless line.empty? }
+      reboot_required = dnf5_reboot_required?(reboot_result)
+      services = [
+        {
+          "id" => "dnf5_evidence",
+          "label" => "DNF5 evidence",
+          "state" => successful?(updates_result) ? "active" : "failed"
+        },
+        service_record("SSH", ssh),
+        service_record("QEMU guest agent", guest_agent)
+      ]
+
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: record.fetch("role"),
+        address: record.fetch("address"),
+        reachable: true,
+        os: facts["os_pretty_name"].to_s.empty? ? "Fedora Linux" : facts["os_pretty_name"],
+        version: "DNF5 · read-only evidence",
+        kernel: {
+          "running" => running_kernel,
+          "available" => available_kernel || installed.last || running_kernel,
+          "update_required" => !available_kernel.to_s.empty?
+        },
+        updates: update_summary(native: update_rows.length, freshness: "live_dnf5_metadata"),
+        reboot: {
+          "required" => reboot_required,
+          "reason" => reboot_required ? "DNF5 reports a reboot is required" : "DNF5 reports no reboot requirement"
+        },
+        services: services,
+        facts: facts.merge(
+          "reachability" => "reachable",
+          "package_managers" => package_managers,
+          "status_adapter" => "dnf5_read_only",
+          "dnf5_update_evidence" => successful?(updates_result) ? "available" : "unavailable",
+          "installed_kernel_count" => installed.length,
+          "mutation_supported" => false
+        ),
+        control: "inventory_only"
+      )
+    end
+
+    def dnf5_update_rows(result)
+      return [] unless successful?(result)
+
+      result.stdout.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�").lines.filter_map do |line|
+        match = line.strip.match(/\A(\S+\.\S+)\s+(\S+)\s+(\S+)\z/)
+        next unless match
+        next if match[1] == "Name.Arch"
+
+        {"name" => match[1], "version" => match[2], "repository" => match[3]}
+      end
+    end
+
+    def dnf5_reboot_required?(result)
+      return false unless successful?(result)
+
+      parsed = JSON.parse(result.stdout.to_s)
+      Array(parsed).any? { |entry| entry.is_a?(Hash) && entry["type"] == "reboot" && entry["reboot_required"] == true }
+    rescue JSON::ParserError
+      false
     end
 
     def resolve_dhcp_record(record, schedule_recovery:)

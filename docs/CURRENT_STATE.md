@@ -94,6 +94,10 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
 - **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The accepted A3 path adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. On Maven, the reviewed resume unit and display-recovery hook completed a supervised end-to-end update, reboot, DP-3 recovery, and exact Codex/Opera workspace restoration on 2026-07-28. Both live gates remain disabled outside an exact supervised transaction.
+- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its first
+  integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
+  evidence while retaining inventory-only control. DNF5 maintenance and reboot
+  gates remain deliberately unavailable.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -121,6 +125,10 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   deletion-detection hold, and restores only into isolated owner-private
   staging. The first live encrypted capture passed verification on 2026-07-27.
   Retention remains exact and manual; live-tree promotion is not automated.
+- Crucible provides a reboot-qualified, independently mounted 100 GiB XFS
+  target at `/srv/soul-backup`, reachable through key-only SSH/SFTP. The target
+  directory is prepared but contains no restic repository yet; initialization
+  and second-copy execution remain a separate password-bearing review gate.
 
 ## Runtime topology
 

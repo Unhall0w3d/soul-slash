@@ -2452,11 +2452,12 @@ function renderMaintenanceDevice(device) {
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
+  const readOnlyStatus = inventoryOnly && device.facts?.status_adapter === "dnf5_read_only";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
-    ["Updates", inventoryOnly ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
-    ["Kernel", inventoryOnly ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Updates", inventoryOnly && !readOnlyStatus ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
     ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
     ["Checked", observedLabel]
   ];
@@ -2488,7 +2489,9 @@ function renderMaintenanceDevice(device) {
     const notice = document.createElement("p"); notice.className = "maintenance-status-only";
     notice.textContent = statusOnly
       ? "Status only · lifecycle and mutation remain provider-managed"
-      : "Inventory only · discovered capabilities grant no mutation authority";
+      : (readOnlyStatus
+        ? "DNF5 evidence only · maintenance and reboot authority remain disabled"
+        : "Inventory only · discovered capabilities grant no mutation authority");
     actions.append(notice);
   } else {
     ["maintenance", "reboot"].forEach((action) => {
