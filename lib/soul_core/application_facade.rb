@@ -427,8 +427,8 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Project Timeline", "Self Improvement", "Creative Studios", "Administration"],
-        "administration_surfaces" => ["Backup & Recovery", "Guided Maintenance"],
+        "product_tabs" => ["Chat", "Self Improvement", "Creative Studios", "Administration"],
+        "administration_surfaces" => ["Project Timeline", "Backup & Recovery", "Guided Maintenance"],
         "creative_surfaces" => ["Music Studio", "Visual Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {

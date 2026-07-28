@@ -110,7 +110,8 @@ module SoulCore
         checks["bootstrap_is_bounded_read_only_and_does_not_collect_status"] =
           terminal_envelope?(bootstrap, "complete") &&
           bootstrap.dig("data", "system_status", "collected") == false &&
-          bootstrap.dig("data", "product_tabs") == ["Chat", "Project Timeline", "Self Improvement", "Creative Studios", "Administration"] &&
+          bootstrap.dig("data", "product_tabs") == ["Chat", "Self Improvement", "Creative Studios", "Administration"] &&
+          bootstrap.dig("data", "administration_surfaces") == ["Project Timeline", "Backup & Recovery", "Guided Maintenance"] &&
           bootstrap.dig("data", "creative_surfaces") == ["Music Studio", "Visual Studio"] &&
           bootstrap.dig("data", "self_improvement_surfaces") == ["Skill Studio", "Self Assessment", "Self Augmentation"] &&
           status.calls.zero? && runtime.calls.empty? &&

@@ -353,10 +353,11 @@ ruby bin/soul skill system.status
 make dashboard
 ```
 
-Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, the shared
-Project Timeline, grouped Self Improvement surfaces (Skill Studio, Self
-Assessment, and Self Augmentation), grouped Creative Studios (Music and
-Visual), and Review Center. Project Timeline initializes its ignored
+Open `http://127.0.0.1:4567/` locally. The dashboard includes Chat, grouped
+Self Improvement surfaces (Skill Studio, Self Assessment, and Self
+Augmentation), grouped Creative Studios (Music and Visual), Administration
+(Project Timeline, Backup & Recovery, and Guided Maintenance), and Review
+Center. Project Timeline initializes its ignored
 owner-local working ledger from the neutral public seed on first use; see
 `docs/guides/PROJECT_TIMELINE.md`.
 This command binds to loopback, runs in the foreground, and stops with Ctrl+C.

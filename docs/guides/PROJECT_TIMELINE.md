@@ -17,7 +17,7 @@ providing a useful initial timeline to another person who checks out Soul.
 
 ## Dashboard flow
 
-Open **Project Timeline** in the top navigation.
+Open **Administration → Project Timeline** in the top navigation.
 
 The four columns are:
 
