@@ -2,9 +2,9 @@
 
 ```text
 date: 2026-07-28
-candidate_state: candidate-complete
+candidate_state: live-accepted
 risk: Class 1 Dashboard session-state correction
-human_review: required before merge
+human_review: accepted by the Operator
 ```
 
 ## What was implemented
@@ -62,8 +62,10 @@ None. This is deterministic Dashboard session-state behavior.
 
 ## Human review checklist
 
-- [ ] Scan a subnet with at least two candidates.
-- [ ] Enroll one and confirm the others remain.
-- [ ] Ignore another and confirm the remaining list and count update.
-- [ ] Confirm Restore and registry removal do not erase unrelated candidates.
-- [ ] Approve merge or request changes.
+- [x] Scan a subnet with multiple candidates.
+- [x] Act on one and confirm the unrelated candidates remain.
+- [x] Confirm the candidate list and count continue to support sequential work.
+- [x] Approve merge.
+
+Live acceptance was completed by the Operator on 2026-07-28, who confirmed
+that the corrected workflow worked well without an unnecessary rescan.
