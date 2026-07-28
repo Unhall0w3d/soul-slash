@@ -42,6 +42,46 @@ documents richer read-only Product Information and Status pages when phone web
 access is enabled; Soul does not enable, authenticate to, or retain those pages
 in this slice.
 
+## Portable discovery and enrollment
+
+Open **Discover & enroll a device** to extend the local inventory without
+editing public source:
+
+1. Enter one explicit RFC1918 IPv4 subnet from `/24` through `/32`.
+2. Click **Scan subnet**. Soul runs one 30-second-bounded `nmap` host-discovery
+   pass; the candidate list remains in the current page session and is not
+   persisted.
+3. Select one candidate. A reachable address is untrusted until this explicit
+   review.
+4. Choose **Status only**, or **Fixed SSH inventory** with an existing literal
+   OpenSSH `Host` alias whose `HostName` is that exact address.
+5. Preview the exact record. SSH inventory reads a bounded hostname, kernel,
+   OS projection, and independently tests fixed executable paths for pacman,
+   yay, paru, apt, apt-get, dnf, zypper, apk, Flatpak, Snap, and Nix.
+6. Click **Enroll reviewed device**. The click authorizes one digest-bound
+   write to the ignored owner-private registry.
+
+Enrolled cards are `inventory_only`. They can display discovered capabilities,
+but do not expose Maintenance or Reboot. Detecting a package manager never
+creates update authority. A separate future adapter must define, test, and
+receive approval for each mutation family. Removing a device removes only its
+local registry record and sends nothing to the target.
+
+Public bootstrap and troubleshooting:
+
+```text
+make fleet-discovery-check
+make fleet-discovery-scan FLEET_SUBNET=192.168.1.0/24
+make verify-maintenance-fleet-discovery
+```
+
+`nmap` is the only optional discovery dependency. Install it with the host's
+normal package manager if the check reports it missing, then use the
+authenticated Dashboard for enrollment. The CLI scan is deliberately
+non-persisting and is useful for setup validation. Subnets, addresses, SSH
+aliases, discovered candidates, and enrollment records never belong in the
+public repository.
+
 The snapshot is private, atomic, and survives Dashboard reloads. The proposed
 owner-level oneshot timer collects it at local noon and midnight. The timer
 cannot maintain or reboot anything and has no persistent worker or polling
@@ -184,6 +224,7 @@ Review and deployment commands:
 
 ```text
 make verify-maintenance-passwordless-authority
+make verify-maintenance-fleet-discovery
 make maintenance-authority-plan
 make maintenance-authority-install EXPECTED_DIGEST=<reviewed digest> CONFIRM=INSTALL_SOUL_MAINTENANCE_AUTHORITY
 make maintenance-authority-status
@@ -266,3 +307,5 @@ Engineering evidence:
 - [`MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md`](../assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md)
 - [`MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md`](../soul/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md)
 - [`MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md`](../assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md)
+- [`PORTABLE_FLEET_DISCOVERY_A1_BRIEF.md`](../soul/PORTABLE_FLEET_DISCOVERY_A1_BRIEF.md)
+- [`PORTABLE_FLEET_DISCOVERY_A1_REVIEW.md`](../assessments/PORTABLE_FLEET_DISCOVERY_A1_REVIEW.md)

@@ -356,8 +356,8 @@ check.call("Maven dialog keeps evidence recovery outside the scrolling plan and 
              javascript.include?("Refresh Maven evidence, then recheck this preflight.") &&
              javascript.include?("A4 fixed-operation authority · no password prompt"))
 check.call("cards distinguish maintenance channels from status-only probes while Pi-hole OpenSSH duplication is absent",
-           javascript.include?('"Status probe" : "Maintenance channel"') &&
-             javascript.include?('device.control === "status_only"') &&
+           javascript.include?('"Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")') &&
+             javascript.include?('const inventoryOnly = device.control !== "maintenance"') &&
              !javascript.include?("SSH evidence ·") &&
              !javascript.include?("OpenSSH ·"))
 check.call("Dashboard loads persisted status and contains no fleet-wide mutation control",

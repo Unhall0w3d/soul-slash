@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+root = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(root, "lib"))
+
+require "json"
+require "soul_core/env_loader"
+require "soul_core/maintenance_fleet_discovery_service"
+
+command = ARGV.shift.to_s
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+service = SoulCore::MaintenanceFleetDiscoveryService.new(root: root)
+result = case command
+         when "status"
+           service.status
+         when "scan"
+           subnet_index = ARGV.index("--subnet")
+           subnet = subnet_index && ARGV[subnet_index + 1]
+           if subnet.to_s.empty?
+             {"ok" => false, "lifecycle_state" => "awaiting_input", "reason" => "--subnet is required", "data" => {}, "mutation" => "none"}
+           else
+             service.discover(subnet: subnet)
+           end
+         else
+           {"ok" => false, "lifecycle_state" => "awaiting_input", "reason" => "usage: soul-maintenance-fleet-discovery status | scan --subnet PRIVATE_CIDR", "data" => {}, "mutation" => "none"}
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

@@ -16,6 +16,10 @@ state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
 state.maintenanceDevicePreview = null;
+state.maintenanceDiscoveryCandidates = [];
+state.maintenanceDiscoveryRegistry = [];
+state.maintenanceEnrollmentPreview = null;
+state.maintenanceRemovalPreview = null;
 state.chatProgress = new Map();
 state.localChatRequests = new Set();
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
@@ -514,6 +518,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
   if (maintenance && state.authenticated) {
     if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
+    loadMaintenanceDiscovery();
     loadMaintenanceReceipts();
     loadMaintenanceRebootStatus();
   }
@@ -2416,13 +2421,15 @@ function renderMaintenanceDevice(device) {
   heading.append(identity, stateBadge);
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
+  const inventoryOnly = device.control !== "maintenance";
   const statusOnly = device.control === "status_only";
+  const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
-    ["Updates", statusOnly ? "provider-managed · not queried" : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
-    ["Kernel", statusOnly ? `${device.kernel?.running || "appliance-managed"} · ${device.kernel?.available || "provider-managed"}` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
-    ["Reboot", statusOnly ? (device.reboot?.reason || "not assessed") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")]
+    ["Updates", inventoryOnly ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", inventoryOnly ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")]
   ];
   facts.forEach(([label, value]) => {
     const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
@@ -2431,7 +2438,10 @@ function renderMaintenanceDevice(device) {
 
   const services = document.createElement("div"); services.className = "maintenance-service-list";
   const channel = document.createElement("span"); channel.dataset.state = device.reachable ? "active" : "failed";
-  channel.textContent = `${statusOnly ? "Status probe" : "Maintenance channel"} · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
+  channel.textContent = `${statusOnly ? "Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")} · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
+  packageManagers.forEach((manager) => {
+    const chip = document.createElement("span"); chip.dataset.state = "active"; chip.textContent = `${manager} detected`; services.append(chip);
+  });
   (device.services || []).forEach((service) => {
     const chip = document.createElement("span"); chip.dataset.state = service.state || "unknown"; chip.textContent = `${service.label} · ${service.state || "unknown"}`; services.append(chip);
   });
@@ -2441,9 +2451,11 @@ function renderMaintenanceDevice(device) {
     chip.textContent = `LXC ${piholeContainer.id} · ${piholeContainer.status || "unknown"}`; services.append(chip);
   }
   const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
-  if (statusOnly) {
+  if (inventoryOnly) {
     const notice = document.createElement("p"); notice.className = "maintenance-status-only";
-    notice.textContent = "Status only · lifecycle and mutation remain provider-managed";
+    notice.textContent = statusOnly
+      ? "Status only · lifecycle and mutation remain provider-managed"
+      : "Inventory only · discovered capabilities grant no mutation authority";
     actions.append(notice);
   } else {
     ["maintenance", "reboot"].forEach((action) => {
@@ -2532,6 +2544,177 @@ async function loadMaintenanceFleet() {
   } finally {
     button.disabled = false;
   }
+}
+
+function maintenanceDiscoveryError(envelope, fallback) {
+  return envelope.errors?.[0]?.message || envelope.reason || dataOf(envelope).reason || fallback;
+}
+
+function resetMaintenanceEnrollmentPreview() {
+  state.maintenanceEnrollmentPreview = null;
+  byId("maintenance-enrollment-confirm").hidden = true;
+  byId("maintenance-enrollment-scope").textContent = "";
+}
+
+function selectMaintenanceCandidate(candidate) {
+  resetMaintenanceEnrollmentPreview();
+  state.maintenanceRemovalPreview = null;
+  byId("maintenance-removal-panel").hidden = true;
+  byId("maintenance-enrollment-address").value = candidate.address;
+  byId("maintenance-enrollment-label").value = candidate.known_device || "";
+  byId("maintenance-enrollment-mode").value = "status_only";
+  byId("maintenance-enrollment-ssh-alias").value = "";
+  byId("maintenance-enrollment-ssh-row").hidden = true;
+  byId("maintenance-enrollment-heading").textContent = `Review ${candidate.address}`;
+  byId("maintenance-enrollment-panel").hidden = false;
+  byId("maintenance-enrollment-status").textContent = candidate.state === "already_configured"
+    ? "This address is already represented. Enrollment will be blocked unless the existing record is removed or configuration changes."
+    : "Choose a label and inventory boundary, then preview the exact private record.";
+  byId("maintenance-enrollment-label").focus();
+}
+
+function renderMaintenanceDiscoveryCandidates(candidates) {
+  state.maintenanceDiscoveryCandidates = candidates;
+  byId("maintenance-candidate-count").textContent = String(candidates.length);
+  const list = byId("maintenance-discovery-candidates"); list.replaceChildren();
+  if (!candidates.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No reachable candidates were reported inside this scan."; list.append(empty); return;
+  }
+  candidates.forEach((candidate) => {
+    const row = document.createElement("article"); row.className = "maintenance-discovery-item";
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = candidate.address;
+    const detail = document.createElement("small"); detail.textContent = candidate.state === "already_configured" ? `Already represented · ${candidate.known_device}` : "Untrusted candidate · not enrolled";
+    copy.append(title, detail);
+    const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Review";
+    button.addEventListener("click", () => selectMaintenanceCandidate(candidate));
+    row.append(copy, button); list.append(row);
+  });
+}
+
+async function previewMaintenanceRemoval(record) {
+  const status = byId("maintenance-removal-status");
+  state.maintenanceRemovalPreview = null; byId("maintenance-removal-panel").hidden = false;
+  byId("maintenance-removal-heading").textContent = `Remove ${record.label}`;
+  status.textContent = "Binding the current private registry record…";
+  try {
+    const envelope = await callSoul("maintenance.discovery.remove.preview", { device_id: record.id });
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Removal preview failed safely."));
+    const data = dataOf(envelope); state.maintenanceRemovalPreview = data;
+    byId("maintenance-removal-scope").textContent = JSON.stringify(data.device, null, 2);
+    status.textContent = "The gold-free destructive gate removes only this local registry record; the device is untouched.";
+  } catch (error) { status.textContent = error.message; }
+}
+
+function renderMaintenanceDiscoveryRegistry(records) {
+  state.maintenanceDiscoveryRegistry = records;
+  byId("maintenance-registry-count").textContent = String(records.length);
+  byId("maintenance-discovery-summary").textContent = `${records.length} portable device${records.length === 1 ? "" : "s"} enrolled · discovery remains manual`;
+  const list = byId("maintenance-discovery-registry"); list.replaceChildren();
+  if (!records.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No portable devices enrolled on this installation."; list.append(empty); return;
+  }
+  records.forEach((record) => {
+    const row = document.createElement("article"); row.className = "maintenance-discovery-item";
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = record.label;
+    const managers = Array(record.facts?.package_managers).join(" · ");
+    const detail = document.createElement("small"); detail.textContent = `${record.address} · ${record.connection_mode === "ssh" ? "SSH inventory" : "status only"}${managers ? ` · ${managers}` : ""}`;
+    copy.append(title, detail);
+    const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Remove";
+    button.addEventListener("click", () => previewMaintenanceRemoval(record));
+    row.append(copy, button); list.append(row);
+  });
+}
+
+async function loadMaintenanceDiscovery() {
+  const status = byId("maintenance-discovery-status");
+  try {
+    const [dependencyEnvelope, registryEnvelope] = await Promise.all([
+      callSoul("maintenance.discovery.status"),
+      callSoul("maintenance.discovery.registry")
+    ]);
+    const dependency = dataOf(dependencyEnvelope);
+    byId("maintenance-discovery-dependency").textContent = dependency.available ? "Discovery ready" : "nmap required";
+    byId("maintenance-discovery-dependency").dataset.state = dependency.available ? "healthy" : "attention";
+    if (registryEnvelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(registryEnvelope, "Private registry could not be read."));
+    renderMaintenanceDiscoveryRegistry(dataOf(registryEnvelope).devices || []);
+    status.textContent = dependency.available
+      ? "Ready for one explicit private-subnet scan. No scan runs automatically."
+      : "Install nmap, then refresh this inventory surface. Enrollment remains unavailable.";
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function scanMaintenanceSubnet() {
+  const button = byId("scan-maintenance-subnet"); const status = byId("maintenance-discovery-status");
+  button.disabled = true; resetMaintenanceEnrollmentPreview(); byId("maintenance-enrollment-panel").hidden = true;
+  status.textContent = "Running one bounded foreground host-discovery scan…";
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(35_000) : undefined;
+    const envelope = await callSoul("maintenance.discovery.scan", { subnet: byId("maintenance-discovery-subnet").value.trim() }, {}, { signal });
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Subnet scan failed safely."));
+    const data = dataOf(envelope); renderMaintenanceDiscoveryCandidates(data.candidates || []);
+    status.textContent = `${data.candidate_count || 0} reachable candidate${data.candidate_count === 1 ? "" : "s"} returned from ${data.subnet}. Results remain in this page session only.`;
+  } catch (error) {
+    status.textContent = error.name === "TimeoutError" ? "Discovery exceeded its foreground time limit; no background scan remains." : error.message;
+  } finally { button.disabled = false; }
+}
+
+function maintenanceEnrollmentParameters() {
+  return {
+    address: byId("maintenance-enrollment-address").value,
+    label: byId("maintenance-enrollment-label").value.trim(),
+    mode: byId("maintenance-enrollment-mode").value,
+    ssh_alias: byId("maintenance-enrollment-ssh-alias").value.trim()
+  };
+}
+
+async function previewMaintenanceEnrollment() {
+  const button = byId("preview-maintenance-enrollment"); const status = byId("maintenance-enrollment-status");
+  button.disabled = true; resetMaintenanceEnrollmentPreview(); status.textContent = "Collecting bounded reachability and capability evidence…";
+  try {
+    const envelope = await callSoul("maintenance.discovery.enroll.preview", maintenanceEnrollmentParameters());
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Enrollment preview failed safely."));
+    const data = dataOf(envelope); state.maintenanceEnrollmentPreview = data;
+    byId("maintenance-enrollment-scope").textContent = JSON.stringify(data.device, null, 2);
+    byId("maintenance-enrollment-confirm").hidden = false;
+    status.textContent = "Review the exact inventory-only record. Clicking Enroll supplies authority for this private registry write only.";
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function executeMaintenanceEnrollment() {
+  if (!state.maintenanceEnrollmentPreview) return;
+  const button = byId("execute-maintenance-enrollment"); const status = byId("maintenance-enrollment-status");
+  button.disabled = true; status.textContent = "Revalidating the candidate and exact private record…";
+  try {
+    const envelope = await callSoul("maintenance.discovery.enroll.execute", Object.assign(maintenanceEnrollmentParameters(), {
+      confirmation: state.maintenanceEnrollmentPreview.confirmation_phrase,
+      expected_digest: state.maintenanceEnrollmentPreview.expected_digest
+    }));
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Enrollment was blocked safely."));
+    status.textContent = `${dataOf(envelope).device.label} enrolled for inventory only. No maintenance authority was granted.`;
+    resetMaintenanceEnrollmentPreview(); await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function executeMaintenanceRemoval() {
+  if (!state.maintenanceRemovalPreview) return;
+  const button = byId("execute-maintenance-removal"); const status = byId("maintenance-removal-status");
+  button.disabled = true; status.textContent = "Revalidating the exact private registry record…";
+  try {
+    const preview = state.maintenanceRemovalPreview;
+    const envelope = await callSoul("maintenance.discovery.remove.execute", {
+      device_id: preview.device.device_id,
+      confirmation: preview.confirmation_phrase,
+      expected_digest: preview.expected_digest
+    });
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Removal was blocked safely."));
+    state.maintenanceRemovalPreview = null; byId("maintenance-removal-panel").hidden = true;
+    resetMaintenanceEnrollmentPreview(); byId("maintenance-enrollment-panel").hidden = true;
+    await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+    byId("maintenance-discovery-status").textContent = `${dataOf(envelope).removed_device.label} removed from the private inventory registry. The device was not contacted.`;
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
 }
 
 function maintenanceDeviceDialogDetails(plan) {
@@ -3708,6 +3891,16 @@ byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet);
+byId("scan-maintenance-subnet").addEventListener("click", scanMaintenanceSubnet);
+byId("refresh-maintenance-registry").addEventListener("click", loadMaintenanceDiscovery);
+byId("maintenance-enrollment-mode").addEventListener("change", () => {
+  byId("maintenance-enrollment-ssh-row").hidden = byId("maintenance-enrollment-mode").value !== "ssh";
+  resetMaintenanceEnrollmentPreview();
+});
+["maintenance-enrollment-label", "maintenance-enrollment-ssh-alias"].forEach((id) => byId(id).addEventListener("input", resetMaintenanceEnrollmentPreview));
+byId("preview-maintenance-enrollment").addEventListener("click", previewMaintenanceEnrollment);
+byId("execute-maintenance-enrollment").addEventListener("click", executeMaintenanceEnrollment);
+byId("execute-maintenance-removal").addEventListener("click", executeMaintenanceRemoval);
 byId("maintenance-device-confirmation").addEventListener("input", () => {
   const preview = state.maintenanceDevicePreview;
   const expected = preview && (preview.data.confirmation || preview.plan.confirmation);

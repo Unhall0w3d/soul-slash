@@ -502,6 +502,52 @@
           <div><span>Kernel attention</span><strong id="maintenance-fleet-kernels">—</strong></div>
           <div><span>Reboots</span><strong id="maintenance-fleet-reboots">—</strong></div>
         </div>
+        <details class="maintenance-discovery-card">
+          <summary><span><span class="eyebrow">Portable inventory</span><strong>Discover &amp; enroll a device</strong></span><small id="maintenance-discovery-summary">Open to inspect the bounded local discovery surface.</small></summary>
+          <div class="maintenance-discovery-body">
+            <div class="maintenance-discovery-intro">
+              <p>Scan one explicit private IPv4 subnet, then review a candidate before enrolling it into this installation's ignored, owner-private registry. Discovery never grants maintenance authority.</p>
+              <span id="maintenance-discovery-dependency" class="maintenance-state-badge">Not inspected</span>
+            </div>
+            <div class="maintenance-discovery-controls">
+              <label for="maintenance-discovery-subnet">Private subnet · /24 through /32<input id="maintenance-discovery-subnet" type="text" inputmode="decimal" maxlength="22" placeholder="192.168.1.0/24" autocomplete="off" spellcheck="false"></label>
+              <button id="scan-maintenance-subnet" class="gate-button" type="button">Scan subnet</button>
+              <button id="refresh-maintenance-registry" class="quiet-button" type="button">Refresh enrolled</button>
+            </div>
+            <p id="maintenance-discovery-status" class="dialog-status" role="status" aria-live="polite">No scan has run. Candidate results are not persisted.</p>
+            <div class="maintenance-discovery-columns">
+              <section>
+                <div class="card-heading"><div><p class="eyebrow">Current scan only</p><h3>Candidates</h3></div><span id="maintenance-candidate-count" class="count-badge">0</span></div>
+                <div id="maintenance-discovery-candidates" class="maintenance-discovery-list"><p class="muted">Enter a private subnet and scan deliberately.</p></div>
+              </section>
+              <section>
+                <div class="card-heading"><div><p class="eyebrow">Private local registry</p><h3>Enrolled devices</h3></div><span id="maintenance-registry-count" class="count-badge">0</span></div>
+                <div id="maintenance-discovery-registry" class="maintenance-discovery-list"><p class="muted">No registry loaded.</p></div>
+              </section>
+            </div>
+            <section id="maintenance-enrollment-panel" class="gate-card maintenance-enrollment-panel" hidden>
+              <div><p class="eyebrow">Candidate enrollment</p><h3 id="maintenance-enrollment-heading">Review one device</h3><p>Use status-only for reachability. SSH inventory requires an existing literal alias whose HostName is the selected address. Neither mode enables updates or reboot.</p></div>
+              <div class="maintenance-enrollment-fields">
+                <label for="maintenance-enrollment-address">Address<input id="maintenance-enrollment-address" type="text" readonly></label>
+                <label for="maintenance-enrollment-label">Display label<input id="maintenance-enrollment-label" type="text" maxlength="80" autocomplete="off"></label>
+                <label for="maintenance-enrollment-mode">Enrollment mode<select id="maintenance-enrollment-mode"><option value="status_only">Status only</option><option value="ssh">Fixed SSH inventory</option></select></label>
+                <label id="maintenance-enrollment-ssh-row" for="maintenance-enrollment-ssh-alias" hidden>SSH alias<input id="maintenance-enrollment-ssh-alias" type="text" maxlength="128" placeholder="literal-host-alias" autocomplete="off" spellcheck="false"></label>
+              </div>
+              <button id="preview-maintenance-enrollment" class="gate-button" type="button">Preview enrollment</button>
+              <div id="maintenance-enrollment-confirm" hidden>
+                <pre id="maintenance-enrollment-scope" class="clear-preview-list"></pre>
+                <button id="execute-maintenance-enrollment" class="gate-button gate-button--gold" type="button">Enroll reviewed device</button>
+              </div>
+              <p id="maintenance-enrollment-status" class="dialog-status" role="status" aria-live="polite"></p>
+            </section>
+            <section id="maintenance-removal-panel" class="gate-card maintenance-enrollment-panel maintenance-removal-panel" hidden>
+              <div><p class="eyebrow">Registry removal</p><h3 id="maintenance-removal-heading">Remove one enrolled device</h3><p>Removes only Soul's private inventory record. It sends no command to the device.</p></div>
+              <pre id="maintenance-removal-scope" class="clear-preview-list"></pre>
+              <button id="execute-maintenance-removal" class="danger-button" type="button">Remove reviewed device</button>
+              <p id="maintenance-removal-status" class="dialog-status" role="status" aria-live="polite"></p>
+            </section>
+          </div>
+        </details>
         <div id="maintenance-device-grid" class="maintenance-device-grid">
           <p class="muted">Collect fleet status to inspect Maven, Proxmox, and Pi-hole.</p>
         </div>

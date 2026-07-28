@@ -15,6 +15,9 @@ module SoulCore
     SSH_PATH = "/usr/bin/ssh"
     PING_PATH = "/usr/bin/ping"
     MAX_SNAPSHOT_BYTES = 512 * 1024
+    REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
+    MAX_ENROLLED_DEVICES = 64
+    SUPPORTED_PACKAGE_MANAGERS = %w[pacman yay paru apt apt-get dnf zypper apk flatpak snap nix].freeze
     DEFAULT_ADDRESSES = {
       "maven" => "local",
       "proxmox" => "proxmox-maintenance",
@@ -42,6 +45,7 @@ module SoulCore
         "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_ADDRESS", DEFAULT_ADDRESSES.fetch("pihole"))
       }.freeze
       @snapshot_path = root && File.join(File.expand_path(root), "Soul", "private", "host_maintenance", "fleet_status.json")
+      @registry_path = root && File.join(File.expand_path(root), "Soul", "private", "host_maintenance", "discovered_devices.json")
       @evidence = []
     end
 
@@ -53,6 +57,10 @@ module SoulCore
         collect_pihole
       ]
       devices << collect_cisco_phone if cisco_phone_enabled?
+      existing_addresses = devices.map { |device| device.fetch("address") }
+      registry_records.each do |record|
+        devices << collect_enrolled_device(record) unless existing_addresses.include?(record.fetch("address"))
+      end
       topology = build_topology(devices)
       states = devices.each_with_object(Hash.new(0)) { |device, counts| counts[device.fetch("status")] += 1 }
 
@@ -322,6 +330,62 @@ module SoulCore
       )
     end
 
+    def collect_enrolled_device(record)
+      stored_facts = record["facts"].is_a?(Hash) ? record["facts"] : {}
+      facts = stored_facts.merge(
+        "management_channel" => record.fetch("connection_mode") == "ssh" ? "ssh_inventory" : "icmp_status",
+        "control_capability" => "inventory_only",
+        "mutation_supported" => false,
+        "enrollment_id" => record.fetch("id")
+      )
+      result = if record.fetch("connection_mode") == "ssh"
+                 enrolled_ssh_reachability(record.fetch("ssh_alias"))
+               else
+                 local_run("enrolled_device.reachability", PING_PATH, "-c", "1", "-W", "2", record.fetch("address"), timeout: 5)
+               end
+      return offline_device(
+        record.fetch("id"),
+        record.fetch("label"),
+        record.fetch("role"),
+        record.fetch("address"),
+        result,
+        control: "inventory_only",
+        facts: facts.merge("reachability" => "unreachable")
+      ) unless successful?(result)
+
+      package_managers = Array(facts["package_managers"])
+        .map { |value| safe_text(value) }
+        .select { |value| SUPPORTED_PACKAGE_MANAGERS.include?(value) }
+        .uniq
+      services = [
+        {
+          "id" => record.fetch("connection_mode") == "ssh" ? "ssh_inventory" : "network_reachability",
+          "label" => record.fetch("connection_mode") == "ssh" ? "SSH inventory" : "Network reachability",
+          "state" => "active"
+        }
+      ]
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: record.fetch("role"),
+        address: record.fetch("address"),
+        reachable: true,
+        os: facts["os_pretty_name"].to_s.empty? ? "Local network appliance" : facts["os_pretty_name"],
+        version: package_managers.empty? ? "capabilities not queried" : "Packages · #{package_managers.join(" · ")}",
+        kernel: {
+          "running" => facts["kernel"].to_s.empty? ? "not queried" : facts["kernel"],
+          "available" => "not queried",
+          "update_required" => false
+        },
+        updates: update_summary(freshness: "not_queried"),
+        reboot: {"required" => false, "reason" => "not assessed · inventory only"},
+        services: services,
+        facts: facts.merge("reachability" => "reachable", "package_managers" => package_managers),
+        control: "inventory_only",
+        status: "reachable"
+      )
+    end
+
     def build_topology(devices)
       proxmox = devices.find { |device| device.dig("facts", "platform") == "proxmox" }
       proxmox_id = proxmox ? proxmox.fetch("id") : "proxmox"
@@ -346,6 +410,10 @@ module SoulCore
       ]
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}
+      end
+      devices.select { |device| device.fetch("control") == "inventory_only" }.each do |device|
+        channel = device.dig("facts", "management_channel") == "ssh_inventory" ? "fixed SSH inventory" : "bounded status probe"
+        edges << {"from" => "maven", "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
       end
       {
         "nodes" => devices.map do |device|
@@ -411,6 +479,40 @@ module SoulCore
 
     def cisco_phone_enabled?
       %w[1 true yes on].include?(@process_env["SOUL_FLEET_CISCO_PHONE_ENABLED"].to_s.strip.downcase)
+    end
+
+    def registry_records
+      return [] unless @registry_path && File.exist?(@registry_path)
+      return [] if File.symlink?(@registry_path)
+
+      stat = File.stat(@registry_path)
+      return [] unless stat.file? && (stat.mode & 0o077).zero? && stat.size <= MAX_SNAPSHOT_BYTES
+
+      parsed = JSON.parse(File.binread(@registry_path, MAX_SNAPSHOT_BYTES + 1))
+      return [] unless parsed["schema_version"] == REGISTRY_SCHEMA && parsed["devices"].is_a?(Array)
+
+      parsed["devices"].first(MAX_ENROLLED_DEVICES).filter_map do |record|
+        next unless record.is_a?(Hash)
+        next unless record["id"].to_s.match?(/\Amanaged_[a-f0-9]{16}\z/)
+        next unless %w[status_only ssh].include?(record["connection_mode"])
+        next unless record["address"].to_s.match?(/\A\d{1,3}(?:\.\d{1,3}){3}\z/)
+        next unless record["control"] == "inventory_only"
+        next unless record["label"].to_s.length.between?(1, 80) && !record["label"].to_s.match?(/[[:cntrl:]]/)
+        next unless record["role"].to_s.length.between?(1, 160)
+        next unless record["facts"].is_a?(Hash)
+        next if record["connection_mode"] == "ssh" && !record["ssh_alias"].to_s.match?(/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/)
+
+        record
+      end
+    rescue JSON::ParserError, SystemCallError
+      []
+    end
+
+    def enrolled_ssh_reachability(target)
+      primary = remote_run("enrolled_device.reachability", target, "/usr/bin/hostname", timeout: 5)
+      return primary if successful?(primary)
+
+      remote_run("enrolled_device.reachability_fallback", target, "/bin/hostname", timeout: 5)
     end
 
     def cisco_phone_address

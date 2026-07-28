@@ -230,9 +230,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
   dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
   check.call("public service defaults contain no operator-specific RFC1918 addresses",
              !source.match?(/\b192\.168\.\d{1,3}\.\d{1,3}\b/))
-  check.call("dashboard suppresses mutation controls for status-only devices",
-             dashboard.include?('device.control === "status_only"') &&
-               dashboard.include?("Status only · lifecycle and mutation remain provider-managed"))
+  check.call("dashboard suppresses mutation controls for status-only and inventory-only devices",
+             dashboard.include?('const inventoryOnly = device.control !== "maintenance"') &&
+               dashboard.include?("Status only · lifecycle and mutation remain provider-managed") &&
+               dashboard.include?("discovered capabilities grant no mutation authority"))
 
   offline_runner = FleetFakeRunner.new(pihole_offline: true)
   offline = SoulCore::MaintenanceFleetStatusService.new(
