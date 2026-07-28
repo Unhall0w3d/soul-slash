@@ -465,7 +465,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual;
-  const administration = maintenance || backup;
+  const administration = timeline || maintenance || backup;
   byId("chat-panel").hidden = !chat;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
@@ -488,7 +488,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("maintenance-tab").classList.toggle("is-active", maintenance);
   byId("backup-tab").classList.toggle("is-active", backup);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
-  byId("timeline-tab").setAttribute("aria-selected", String(timeline));
+  byId("timeline-tab").setAttribute("aria-current", timeline ? "page" : "false");
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
   byId("studio-tab").classList.toggle("is-active", studio);
   byId("improvement-tab").classList.toggle("is-active", improvement);

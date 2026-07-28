@@ -104,7 +104,7 @@ Dir.mktmpdir("soul-self-improvement") do |root|
   request = { "schema_version" => "soul.application.v1", "request_id" => "self-improvement-fixture", "operation" => "application.bootstrap", "parameters" => {}, "context" => { "interface" => "dashboard_test" } }
   bootstrap = facade.call(request)
 check.call("application nests Self Assessment beneath Self Improvement",
-           bootstrap.dig("data", "product_tabs") == ["Chat", "Project Timeline", "Self Improvement", "Creative Studios", "Administration"] &&
+           bootstrap.dig("data", "product_tabs") == ["Chat", "Self Improvement", "Creative Studios", "Administration"] &&
              bootstrap.dig("data", "self_improvement_surfaces") == ["Skill Studio", "Self Assessment", "Self Augmentation"] &&
              bootstrap.dig("data", "self_improvement", "host_mutation_available") == false)
 
