@@ -2399,10 +2399,11 @@ async function executeImprovementProposals() {
   state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
 }
 
-function maintenanceStateLabel(status) {
+function maintenanceStateLabel(status, rebootRequired = false) {
+  if (rebootRequired) return "Reboot required";
   return {
     healthy: "Healthy",
-    reachable: "Reachable",
+    reachable: "Online",
     updates_available: "Updates available",
     attention: "Attention",
     offline: "Offline",
@@ -2411,21 +2412,46 @@ function maintenanceStateLabel(status) {
 }
 
 function renderMaintenanceDevice(device) {
-  const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = device.status || "unknown";
+  const rebootRequired = device.reboot?.required === true;
+  const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = rebootRequired ? "reboot_required" : (device.status || "unknown");
+  const inventoryOnly = device.control !== "maintenance";
+  const statusOnly = device.control === "status_only" || device.facts?.management_channel === "icmp_status";
+  const observedAt = device.observed_at ? new Date(device.observed_at) : null;
+  const observedLabel = observedAt && !Number.isNaN(observedAt.getTime()) ? observedAt.toLocaleString() : "not recorded";
   const heading = document.createElement("header");
   const identity = document.createElement("div"); const eyebrow = document.createElement("p"); eyebrow.className = "eyebrow"; eyebrow.textContent = device.address || "address unavailable";
   const title = document.createElement("h3"); title.textContent = device.label || device.id || "Device";
   const role = document.createElement("p"); role.className = "maintenance-device-role"; role.textContent = device.role || "Managed device";
   identity.append(eyebrow, title, role);
-  const stateBadge = document.createElement("span"); stateBadge.className = "maintenance-state-badge"; stateBadge.textContent = maintenanceStateLabel(device.status);
+  const stateBadge = document.createElement("span"); stateBadge.className = "maintenance-state-badge"; stateBadge.textContent = maintenanceStateLabel(device.status, rebootRequired);
   heading.append(identity, stateBadge);
 
+  if (statusOnly) {
+    card.classList.add("maintenance-device-card--status-only");
+    role.remove();
+    const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "quiet-button maintenance-device-refresh";
+    refresh.textContent = "Refresh";
+    refresh.addEventListener("click", () => refreshMaintenanceDevice(device.id, refresh));
+    const controls = document.createElement("div"); controls.className = "maintenance-status-only-controls"; controls.append(stateBadge, refresh);
+    heading.append(controls);
+
+    const evidence = document.createElement("div"); evidence.className = "maintenance-status-only-evidence";
+    const evidenceItems = [
+      ["Checked", observedLabel, "observed"],
+      ["Status probe", device.reachable ? "active" : "unavailable", device.reachable ? "active" : "failed"],
+      ["Network reachability", device.reachable ? "active" : "unavailable", device.reachable ? "active" : "failed"]
+    ];
+    evidenceItems.forEach(([label, value, stateName]) => {
+      const item = document.createElement("span"); item.dataset.state = stateName;
+      const strong = document.createElement("strong"); strong.textContent = label;
+      item.append(strong, document.createTextNode(` · ${value}`)); evidence.append(item);
+    });
+    card.append(heading, evidence);
+    return card;
+  }
+
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
-  const inventoryOnly = device.control !== "maintenance";
-  const statusOnly = device.control === "status_only" || device.facts?.management_channel === "icmp_status";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
-  const observedAt = device.observed_at ? new Date(device.observed_at) : null;
-  const observedLabel = observedAt && !Number.isNaN(observedAt.getTime()) ? observedAt.toLocaleString() : "not recorded";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
@@ -2585,11 +2611,17 @@ function resetMaintenanceEnrollmentPreview() {
 
 function selectMaintenanceCandidate(candidate) {
   resetMaintenanceEnrollmentPreview();
+  resetMaintenanceIgnorePanel();
+  state.maintenanceEnrollmentCandidate = candidate;
   state.maintenanceRemovalPreview = null;
   byId("maintenance-removal-panel").hidden = true;
   byId("maintenance-enrollment-address").value = candidate.address;
   byId("maintenance-enrollment-label").value = candidate.known_device || "";
   byId("maintenance-enrollment-mode").value = "status_only";
+  byId("maintenance-enrollment-policy").value = "fixed";
+  byId("maintenance-enrollment-mac").value = candidate.identity_hints?.mac_address || "";
+  byId("maintenance-enrollment-policy").querySelector('option[value="dhcp_tracked"]').disabled = !candidate.identity_hints?.mac_address;
+  byId("maintenance-enrollment-policy").disabled = false;
   byId("maintenance-enrollment-ssh-alias").value = "";
   byId("maintenance-enrollment-ssh-row").hidden = true;
   byId("maintenance-enrollment-heading").textContent = `Review ${candidate.address}`;
@@ -2598,6 +2630,34 @@ function selectMaintenanceCandidate(candidate) {
     ? "This address is already represented. Enrollment will be blocked unless the existing record is removed or configuration changes."
     : "Choose a label and inventory boundary, then preview the exact private record.";
   byId("maintenance-enrollment-label").focus();
+}
+
+function resetMaintenanceIgnorePanel() {
+  state.maintenanceIgnoreCandidate = null;
+  state.maintenanceIgnorePreview = null;
+  state.maintenanceIgnoreMode = null;
+  byId("maintenance-ignore-panel").hidden = true;
+  byId("maintenance-ignore-scope").hidden = true;
+  byId("maintenance-ignore-scope").textContent = "";
+  byId("execute-maintenance-ignore").disabled = true;
+}
+
+function selectMaintenanceIgnoreCandidate(candidate) {
+  resetMaintenanceEnrollmentPreview(); byId("maintenance-enrollment-panel").hidden = true;
+  state.maintenanceIgnoreCandidate = candidate;
+  state.maintenanceIgnorePreview = null;
+  state.maintenanceIgnoreMode = "ignore";
+  byId("maintenance-ignore-heading").textContent = `Ignore ${candidate.address}`;
+  byId("maintenance-ignore-description").textContent = "Exclude this reviewed identity from future candidate lists. It remains visible and reversible.";
+  byId("maintenance-ignore-label-row").hidden = false;
+  const vendor = candidate.identity_hints?.vendor;
+  byId("maintenance-ignore-label").value = vendor && vendor !== "Locally administered address" ? vendor : `Device at ${candidate.address}`;
+  byId("preview-maintenance-ignore").hidden = false;
+  byId("execute-maintenance-ignore").textContent = "Ignore reviewed candidate";
+  byId("execute-maintenance-ignore").disabled = true;
+  byId("maintenance-ignore-status").textContent = "Name this private exclusion, then preview its exact MAC-first or IP-fallback identity.";
+  byId("maintenance-ignore-panel").hidden = false;
+  byId("maintenance-ignore-label").focus();
 }
 
 function renderMaintenanceDiscoveryCandidates(candidates) {
@@ -2610,10 +2670,100 @@ function renderMaintenanceDiscoveryCandidates(candidates) {
   candidates.forEach((candidate) => {
     const row = document.createElement("article"); row.className = "maintenance-discovery-item";
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = candidate.address;
-    const detail = document.createElement("small"); detail.textContent = candidate.state === "already_configured" ? `Already represented · ${candidate.known_device}` : "Untrusted candidate · not enrolled";
+    const hints = candidate.identity_hints || {};
+    const identity = [hints.vendor, hints.mac_address, hints.interface, ...(hints.neighbor_state || [])].filter(Boolean);
+    const detail = document.createElement("small"); detail.textContent = identity.length
+      ? `Untrusted candidate · ${identity.join(" · ")}`
+      : "Untrusted candidate · no local identity hints available";
     copy.append(title, detail);
-    const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Review";
-    button.addEventListener("click", () => selectMaintenanceCandidate(candidate));
+    const actions = document.createElement("div"); actions.className = "maintenance-discovery-item-actions";
+    const review = document.createElement("button"); review.type = "button"; review.className = "quiet-button"; review.textContent = "Review";
+    review.addEventListener("click", () => selectMaintenanceCandidate(candidate));
+    const ignore = document.createElement("button"); ignore.type = "button"; ignore.className = "quiet-button"; ignore.textContent = "Ignore";
+    ignore.addEventListener("click", () => selectMaintenanceIgnoreCandidate(candidate));
+    actions.append(review, ignore); row.append(copy, actions); list.append(row);
+  });
+}
+
+function maintenanceIgnoreParameters() {
+  const candidate = state.maintenanceIgnoreCandidate || {};
+  return {
+    address: candidate.address,
+    label: byId("maintenance-ignore-label").value.trim(),
+    subnet: candidate.subnet,
+    mac_address: candidate.identity_hints?.mac_address || "",
+    vendor: candidate.identity_hints?.vendor || ""
+  };
+}
+
+async function previewMaintenanceIgnore() {
+  if (!state.maintenanceIgnoreCandidate) return;
+  const status = byId("maintenance-ignore-status"); byId("preview-maintenance-ignore").disabled = true;
+  try {
+    const envelope = await callSoul("maintenance.discovery.ignore.preview", maintenanceIgnoreParameters());
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Ignore preview failed safely."));
+    const data = dataOf(envelope); state.maintenanceIgnorePreview = data;
+    byId("maintenance-ignore-scope").textContent = JSON.stringify(data.device, null, 2);
+    byId("maintenance-ignore-scope").hidden = false;
+    byId("execute-maintenance-ignore").disabled = false;
+    status.textContent = "Review this private exclusion. The device is not contacted and receives no authority.";
+  } catch (error) { status.textContent = error.message; }
+  finally { byId("preview-maintenance-ignore").disabled = false; }
+}
+
+async function previewMaintenanceRestore(record) {
+  resetMaintenanceIgnorePanel();
+  state.maintenanceIgnoreMode = "restore";
+  byId("maintenance-ignore-heading").textContent = `Restore ${record.label}`;
+  byId("maintenance-ignore-description").textContent = "Remove this private exclusion so the identity may appear in a future explicit scan.";
+  byId("maintenance-ignore-label-row").hidden = true;
+  byId("preview-maintenance-ignore").hidden = true;
+  byId("execute-maintenance-ignore").textContent = "Restore reviewed candidate";
+  byId("maintenance-ignore-panel").hidden = false;
+  const status = byId("maintenance-ignore-status"); status.textContent = "Binding the current ignored-device record…";
+  try {
+    const envelope = await callSoul("maintenance.discovery.restore.preview", { identity_key: record.identity_key });
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Restore preview failed safely."));
+    const data = dataOf(envelope); state.maintenanceIgnorePreview = data;
+    byId("maintenance-ignore-scope").textContent = JSON.stringify(data.device, null, 2);
+    byId("maintenance-ignore-scope").hidden = false;
+    byId("execute-maintenance-ignore").disabled = false;
+    status.textContent = "Review this exact exclusion removal. No device is contacted.";
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function executeMaintenanceIgnoreMutation() {
+  const preview = state.maintenanceIgnorePreview;
+  if (!preview || !state.maintenanceIgnoreMode) return;
+  const button = byId("execute-maintenance-ignore"); const status = byId("maintenance-ignore-status"); button.disabled = true;
+  try {
+    const operation = state.maintenanceIgnoreMode === "ignore"
+      ? "maintenance.discovery.ignore.execute"
+      : "maintenance.discovery.restore.execute";
+    const parameters = state.maintenanceIgnoreMode === "ignore"
+      ? Object.assign(maintenanceIgnoreParameters(), { confirmation: preview.confirmation_phrase, expected_digest: preview.expected_digest })
+      : { identity_key: preview.device.identity_key, confirmation: preview.confirmation_phrase, expected_digest: preview.expected_digest };
+    const envelope = await callSoul(operation, parameters);
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Ignored-device mutation failed safely."));
+    renderMaintenanceDiscoveryCandidates([]); resetMaintenanceIgnorePanel(); await loadMaintenanceDiscovery();
+    byId("maintenance-discovery-status").textContent = "Ignored-device state changed. Scan again for a fresh actionable candidate list.";
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+function renderMaintenanceIgnored(records) {
+  state.maintenanceIgnoredDevices = records;
+  byId("maintenance-ignored-count").textContent = String(records.length);
+  const list = byId("maintenance-discovery-ignored"); list.replaceChildren();
+  if (!records.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No devices are excluded from discovery."; list.append(empty); return;
+  }
+  records.forEach((record) => {
+    const row = document.createElement("article"); row.className = "maintenance-discovery-item";
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = record.label;
+    const detail = document.createElement("small"); detail.textContent = `${record.mac_address || record.address} · ${record.vendor || "vendor unavailable"} · ${record.subnet}`;
+    copy.append(title, detail);
+    const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Restore";
+    button.addEventListener("click", () => previewMaintenanceRestore(record));
     row.append(copy, button); list.append(row);
   });
 }
@@ -2635,7 +2785,8 @@ async function previewMaintenanceRemoval(record) {
 function renderMaintenanceDiscoveryRegistry(records) {
   state.maintenanceDiscoveryRegistry = records;
   byId("maintenance-registry-count").textContent = String(records.length);
-  byId("maintenance-discovery-summary").textContent = `${records.length} portable device${records.length === 1 ? "" : "s"} enrolled · discovery remains manual`;
+  const ignoredCount = state.maintenanceIgnoredDevices?.length || 0;
+  byId("maintenance-discovery-summary").textContent = `${records.length} enrolled · ${ignoredCount} ignored · discovery remains manual`;
   const list = byId("maintenance-discovery-registry"); list.replaceChildren();
   if (!records.length) {
     const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No portable devices enrolled on this installation."; list.append(empty); return;
@@ -2644,7 +2795,8 @@ function renderMaintenanceDiscoveryRegistry(records) {
     const row = document.createElement("article"); row.className = "maintenance-discovery-item";
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = record.label;
     const managers = Array(record.facts?.package_managers).join(" · ");
-    const detail = document.createElement("small"); detail.textContent = `${record.address} · ${record.connection_mode === "ssh" ? "SSH inventory" : "status only"}${managers ? ` · ${managers}` : ""}`;
+    const addressPolicy = record.address_policy === "dhcp_tracked" ? `DHCP tracked · ${record.mac_address}` : "fixed address";
+    const detail = document.createElement("small"); detail.textContent = `${record.address} · ${record.connection_mode === "ssh" ? "SSH inventory" : "status only"} · ${addressPolicy}${managers ? ` · ${managers}` : ""}`;
     copy.append(title, detail);
     const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Remove";
     button.addEventListener("click", () => previewMaintenanceRemoval(record));
@@ -2655,14 +2807,19 @@ function renderMaintenanceDiscoveryRegistry(records) {
 async function loadMaintenanceDiscovery() {
   const status = byId("maintenance-discovery-status");
   try {
-    const [dependencyEnvelope, registryEnvelope] = await Promise.all([
+    const [dependencyEnvelope, registryEnvelope, ignoredEnvelope] = await Promise.all([
       callSoul("maintenance.discovery.status"),
-      callSoul("maintenance.discovery.registry")
+      callSoul("maintenance.discovery.registry"),
+      callSoul("maintenance.discovery.ignored")
     ]);
     const dependency = dataOf(dependencyEnvelope);
     byId("maintenance-discovery-dependency").textContent = dependency.available ? "Discovery ready" : "nmap required";
     byId("maintenance-discovery-dependency").dataset.state = dependency.available ? "healthy" : "attention";
+    const subnetInput = byId("maintenance-discovery-subnet");
+    if (!subnetInput.value.trim() && dependency.last_subnet) subnetInput.value = dependency.last_subnet;
     if (registryEnvelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(registryEnvelope, "Private registry could not be read."));
+    if (ignoredEnvelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(ignoredEnvelope, "Ignored-device list could not be read."));
+    renderMaintenanceIgnored(dataOf(ignoredEnvelope).devices || []);
     renderMaintenanceDiscoveryRegistry(dataOf(registryEnvelope).devices || []);
     status.textContent = dependency.available
       ? "Ready for one explicit private-subnet scan. No scan runs automatically."
@@ -2679,18 +2836,24 @@ async function scanMaintenanceSubnet() {
     const envelope = await callSoul("maintenance.discovery.scan", { subnet: byId("maintenance-discovery-subnet").value.trim() }, {}, { signal });
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Subnet scan failed safely."));
     const data = dataOf(envelope); renderMaintenanceDiscoveryCandidates(data.candidates || []);
-    status.textContent = `${data.candidate_count || 0} reachable candidate${data.candidate_count === 1 ? "" : "s"} returned from ${data.subnet}. Results remain in this page session only.`;
+    const excluded = data.represented_count || 0;
+    const ignored = data.ignored_count || 0;
+    status.textContent = `${data.candidate_count || 0} unenrolled candidate${data.candidate_count === 1 ? "" : "s"} returned from ${data.subnet}${excluded ? ` · ${excluded} already represented and excluded` : ""}${ignored ? ` · ${ignored} ignored` : ""}. Results remain in this page session only.`;
   } catch (error) {
     status.textContent = error.name === "TimeoutError" ? "Discovery exceeded its foreground time limit; no background scan remains." : error.message;
   } finally { button.disabled = false; }
 }
 
 function maintenanceEnrollmentParameters() {
+  const candidate = state.maintenanceEnrollmentCandidate || {};
   return {
     address: byId("maintenance-enrollment-address").value,
     label: byId("maintenance-enrollment-label").value.trim(),
     mode: byId("maintenance-enrollment-mode").value,
-    ssh_alias: byId("maintenance-enrollment-ssh-alias").value.trim()
+    ssh_alias: byId("maintenance-enrollment-ssh-alias").value.trim(),
+    address_policy: byId("maintenance-enrollment-policy").value,
+    subnet: candidate.subnet || "",
+    mac_address: byId("maintenance-enrollment-mac").value
   };
 }
 
@@ -2719,7 +2882,9 @@ async function executeMaintenanceEnrollment() {
     }));
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Enrollment was blocked safely."));
     status.textContent = `${dataOf(envelope).device.label} enrolled for inventory only. No maintenance authority was granted.`;
-    resetMaintenanceEnrollmentPreview(); await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+    resetMaintenanceEnrollmentPreview(); renderMaintenanceDiscoveryCandidates([]);
+    await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+    byId("maintenance-discovery-status").textContent = "Enrollment changed the private registry. Scan again when you want a fresh candidate list.";
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -2738,8 +2903,8 @@ async function executeMaintenanceRemoval() {
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "Removal was blocked safely."));
     state.maintenanceRemovalPreview = null; byId("maintenance-removal-panel").hidden = true;
     resetMaintenanceEnrollmentPreview(); byId("maintenance-enrollment-panel").hidden = true;
-    await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
-    byId("maintenance-discovery-status").textContent = `${dataOf(envelope).removed_device.label} removed from the private inventory registry. The device was not contacted.`;
+    renderMaintenanceDiscoveryCandidates([]); await loadMaintenanceDiscovery(); await loadMaintenanceFleet();
+    byId("maintenance-discovery-status").textContent = `${dataOf(envelope).removed_device.label} removed from the private inventory registry. Scan again for a fresh candidate list; the device was not contacted.`;
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -3921,13 +4086,23 @@ byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet
 byId("scan-maintenance-subnet").addEventListener("click", scanMaintenanceSubnet);
 byId("refresh-maintenance-registry").addEventListener("click", loadMaintenanceDiscovery);
 byId("maintenance-enrollment-mode").addEventListener("change", () => {
-  byId("maintenance-enrollment-ssh-row").hidden = byId("maintenance-enrollment-mode").value !== "ssh";
+  const ssh = byId("maintenance-enrollment-mode").value === "ssh";
+  byId("maintenance-enrollment-ssh-row").hidden = !ssh;
+  byId("maintenance-enrollment-policy").disabled = ssh;
+  if (ssh) byId("maintenance-enrollment-policy").value = "fixed";
   resetMaintenanceEnrollmentPreview();
 });
-["maintenance-enrollment-label", "maintenance-enrollment-ssh-alias"].forEach((id) => byId(id).addEventListener("input", resetMaintenanceEnrollmentPreview));
+["maintenance-enrollment-label", "maintenance-enrollment-ssh-alias", "maintenance-enrollment-policy"].forEach((id) => byId(id).addEventListener("input", resetMaintenanceEnrollmentPreview));
 byId("preview-maintenance-enrollment").addEventListener("click", previewMaintenanceEnrollment);
 byId("execute-maintenance-enrollment").addEventListener("click", executeMaintenanceEnrollment);
 byId("execute-maintenance-removal").addEventListener("click", executeMaintenanceRemoval);
+byId("maintenance-ignore-label").addEventListener("input", () => {
+  if (state.maintenanceIgnoreMode === "ignore") {
+    state.maintenanceIgnorePreview = null; byId("maintenance-ignore-scope").hidden = true; byId("execute-maintenance-ignore").disabled = true;
+  }
+});
+byId("preview-maintenance-ignore").addEventListener("click", previewMaintenanceIgnore);
+byId("execute-maintenance-ignore").addEventListener("click", executeMaintenanceIgnoreMutation);
 byId("maintenance-device-confirmation").addEventListener("input", () => {
   const preview = state.maintenanceDevicePreview;
   const expected = preview && (preview.data.confirmation || preview.plan.confirmation);

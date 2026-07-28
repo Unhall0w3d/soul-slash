@@ -230,7 +230,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-discovery-controls { display:grid; grid-template-columns:minmax(260px,1fr) auto auto; gap:10px; align-items:end; margin:17px 0 8px; }
 .maintenance-discovery-controls label,.maintenance-enrollment-fields label { color:#75939D; font:10px/1.4 var(--mono); letter-spacing:.05em; text-transform:uppercase; }
 .maintenance-discovery-controls input,.maintenance-enrollment-fields input,.maintenance-enrollment-fields select { width:100%; margin-top:6px; }
-.maintenance-discovery-columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+.maintenance-discovery-columns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:14px; }
 .maintenance-discovery-columns>section { min-width:0; padding:16px; border:1px solid var(--line); border-radius:3px 16px 3px 12px; background:rgba(8,18,26,.76); }
 .maintenance-discovery-columns h3 { margin:3px 0; color:#B9D6DE; font:400 22px var(--serif); }
 .maintenance-discovery-list { display:grid; gap:7px; max-height:280px; overflow:auto; margin-top:12px; }
@@ -239,21 +239,23 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-discovery-item strong { color:#AFCBD3; font:12px var(--mono); }
 .maintenance-discovery-item small { margin-top:4px; color:#6F8B94; font:9px/1.45 var(--mono); overflow-wrap:anywhere; }
 .maintenance-discovery-item button { flex:none; min-width:74px; }
+.maintenance-discovery-item-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
 .maintenance-enrollment-panel { margin-top:14px; }
 .maintenance-enrollment-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:14px 0; }
 .maintenance-enrollment-panel pre { max-height:290px; overflow:auto; }
 .maintenance-device-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
 .maintenance-device-card { position:relative; display:flex; flex-direction:column; min-width:0; padding:20px; border:1px solid var(--line); border-radius:3px 22px 3px 17px; background:linear-gradient(150deg,rgba(23,35,46,.88),rgba(8,15,22,.96)); overflow:hidden; }
 .maintenance-device-card::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:#546478; }
-.maintenance-device-card[data-state="healthy"]::before { background:var(--cyan); box-shadow:0 0 14px rgba(58,174,223,.75); }
-.maintenance-device-card[data-state="updates_available"]::before { background:var(--gold); box-shadow:0 0 14px rgba(196,161,98,.55); }
-.maintenance-device-card[data-state="attention"]::before,.maintenance-device-card[data-state="offline"]::before { background:var(--danger); box-shadow:0 0 14px rgba(255,23,68,.45); }
+.maintenance-device-card[data-state="healthy"]::before,.maintenance-device-card[data-state="reachable"]::before { background:#55D6A5; box-shadow:0 0 14px rgba(85,214,165,.62); }
+.maintenance-device-card[data-state="updates_available"]::before { background:#E5C45C; box-shadow:0 0 14px rgba(229,196,92,.55); }
+.maintenance-device-card[data-state="attention"]::before,.maintenance-device-card[data-state="offline"]::before,.maintenance-device-card[data-state="reboot_required"]::before { background:var(--danger); box-shadow:0 0 14px rgba(255,23,68,.45); }
 .maintenance-device-card>header { display:flex; justify-content:space-between; gap:15px; }
 .maintenance-device-card h3 { margin:3px 0 5px; color:#C4DCE4; font:400 27px var(--serif); }
 .maintenance-device-role { min-height:2.8em; margin:0; color:#78949D; font-size:11px; line-height:1.45; }
 .maintenance-state-badge { flex:none; height:max-content; padding:6px 8px; border:1px solid rgba(58,174,223,.28); border-radius:10px 2px 10px 2px; color:#8DCBD6; font:var(--type-micro) var(--mono); text-transform:uppercase; }
-[data-state="updates_available"]>.maintenance-state-badge,[data-state="attention"]>.maintenance-state-badge { border-color:rgba(196,161,98,.42); color:var(--gold-light); }
-[data-state="offline"]>.maintenance-state-badge { border-color:rgba(255,23,68,.4); color:#FF7892; }
+[data-state="healthy"] .maintenance-state-badge,[data-state="reachable"] .maintenance-state-badge,.maintenance-state-badge[data-state="healthy"],.maintenance-state-badge[data-state="reachable"] { border-color:rgba(85,214,165,.42); color:#86E8BE; }
+[data-state="updates_available"] .maintenance-state-badge,.maintenance-state-badge[data-state="updates_available"] { border-color:rgba(229,196,92,.48); color:#F1D77B; }
+[data-state="attention"] .maintenance-state-badge,[data-state="offline"] .maintenance-state-badge,[data-state="reboot_required"] .maintenance-state-badge,.maintenance-state-badge[data-state="attention"],.maintenance-state-badge[data-state="offline"],.maintenance-state-badge[data-state="reboot_required"] { border-color:rgba(255,23,68,.4); color:#FF7892; }
 .maintenance-device-metrics { margin:17px 0 14px; }
 .maintenance-device-metrics>div { display:grid; grid-template-columns:68px minmax(0,1fr); gap:9px; padding:8px 0; border-bottom:1px solid rgba(167,123,91,.1); }
 .maintenance-device-metrics dt { color:#637B84; font:var(--type-micro) var(--mono); text-transform:uppercase; }
@@ -266,6 +268,17 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-device-actions .gate-button { width:100%; min-width:0; }
 .maintenance-device-refresh { grid-column:1/-1; }
 .maintenance-status-only { grid-column:1/-1; margin:0; color:#86A5AE; font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; }
+.maintenance-device-card--status-only { grid-column:span 1; min-height:0; padding:14px 15px 13px; }
+.maintenance-device-card--status-only>header { align-items:center; }
+.maintenance-device-card--status-only h3 { margin:2px 0 0; font-size:21px; }
+.maintenance-device-card--status-only .eyebrow { font-size:10px; }
+.maintenance-status-only-controls { display:flex; align-items:center; gap:8px; }
+.maintenance-status-only-controls .maintenance-device-refresh { min-width:70px; min-height:34px; padding:6px 10px; }
+.maintenance-status-only-evidence { display:flex; flex-wrap:wrap; gap:6px 13px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(167,123,91,.1); }
+.maintenance-status-only-evidence span { color:#76939B; font:9px/1.45 var(--mono); text-transform:uppercase; }
+.maintenance-status-only-evidence strong { color:#91ABB3; font-weight:500; }
+.maintenance-status-only-evidence span[data-state="active"] { color:#76CFA6; }
+.maintenance-status-only-evidence span[data-state="failed"] { color:#F17A8E; }
 .maintenance-reboot-button { border-color:rgba(196,161,98,.46); color:var(--gold-light); }
 .maintenance-device-dialog { width:min(760px,calc(100vw - 32px)); }
 .maintenance-device-dialog .clear-dialog-shell { max-height:min(820px,calc(100vh - 48px)); overflow:auto; }

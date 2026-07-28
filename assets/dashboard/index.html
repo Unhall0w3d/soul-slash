@@ -497,7 +497,7 @@
           <button id="refresh-maintenance-fleet" class="gate-button gate-button--gold" type="button">Collect fleet status</button>
         </div>
         <div class="maintenance-fleet-summary" aria-label="Fleet summary">
-          <div><span>Reachable</span><strong id="maintenance-fleet-reachable">—</strong></div>
+          <div><span>Online</span><strong id="maintenance-fleet-reachable">—</strong></div>
           <div><span>Updates</span><strong id="maintenance-fleet-updates">—</strong></div>
           <div><span>Kernel attention</span><strong id="maintenance-fleet-kernels">—</strong></div>
           <div><span>Reboots</span><strong id="maintenance-fleet-reboots">—</strong></div>
@@ -506,7 +506,7 @@
           <summary><span><span class="eyebrow">Portable inventory</span><strong>Discover &amp; enroll a device</strong></span><small id="maintenance-discovery-summary">Open to inspect the bounded local discovery surface.</small></summary>
           <div class="maintenance-discovery-body">
             <div class="maintenance-discovery-intro">
-              <p>Scan one explicit private IPv4 subnet, then review a candidate before enrolling it into this installation's ignored, owner-private registry. Discovery never grants maintenance authority.</p>
+              <p>Scan one explicit private IPv4 subnet, then review a candidate before enrolling or excluding it in this installation's owner-private inventory. Discovery never grants maintenance authority.</p>
               <span id="maintenance-discovery-dependency" class="maintenance-state-badge">Not inspected</span>
             </div>
             <div class="maintenance-discovery-controls">
@@ -524,6 +524,10 @@
                 <div class="card-heading"><div><p class="eyebrow">Private local registry</p><h3>Enrolled devices</h3></div><span id="maintenance-registry-count" class="count-badge">0</span></div>
                 <div id="maintenance-discovery-registry" class="maintenance-discovery-list"><p class="muted">No registry loaded.</p></div>
               </section>
+              <section>
+                <div class="card-heading"><div><p class="eyebrow">Excluded from discovery</p><h3>Ignored devices</h3></div><span id="maintenance-ignored-count" class="count-badge">0</span></div>
+                <div id="maintenance-discovery-ignored" class="maintenance-discovery-list"><p class="muted">No ignored list loaded.</p></div>
+              </section>
             </div>
             <section id="maintenance-enrollment-panel" class="gate-card maintenance-enrollment-panel" hidden>
               <div><p class="eyebrow">Candidate enrollment</p><h3 id="maintenance-enrollment-heading">Review one device</h3><p>Use status-only for reachability. SSH inventory requires an existing literal alias whose HostName is the selected address. Neither mode enables updates or reboot.</p></div>
@@ -531,6 +535,8 @@
                 <label for="maintenance-enrollment-address">Address<input id="maintenance-enrollment-address" type="text" readonly></label>
                 <label for="maintenance-enrollment-label">Display label<input id="maintenance-enrollment-label" type="text" maxlength="80" autocomplete="off"></label>
                 <label for="maintenance-enrollment-mode">Enrollment mode<select id="maintenance-enrollment-mode"><option value="status_only">Status only</option><option value="ssh">Fixed SSH inventory</option></select></label>
+                <label for="maintenance-enrollment-policy">Address policy<select id="maintenance-enrollment-policy"><option value="fixed">Fixed or reserved</option><option value="dhcp_tracked">DHCP tracked by MAC</option></select></label>
+                <label for="maintenance-enrollment-mac">Observed MAC<input id="maintenance-enrollment-mac" type="text" readonly placeholder="unavailable"></label>
                 <label id="maintenance-enrollment-ssh-row" for="maintenance-enrollment-ssh-alias" hidden>SSH alias<input id="maintenance-enrollment-ssh-alias" type="text" maxlength="128" placeholder="literal-host-alias" autocomplete="off" spellcheck="false"></label>
               </div>
               <button id="preview-maintenance-enrollment" class="gate-button" type="button">Preview enrollment</button>
@@ -545,6 +551,14 @@
               <pre id="maintenance-removal-scope" class="clear-preview-list"></pre>
               <button id="execute-maintenance-removal" class="danger-button" type="button">Remove reviewed device</button>
               <p id="maintenance-removal-status" class="dialog-status" role="status" aria-live="polite"></p>
+            </section>
+            <section id="maintenance-ignore-panel" class="gate-card maintenance-enrollment-panel" hidden>
+              <div><p class="eyebrow">Discovery exclusion</p><h3 id="maintenance-ignore-heading">Ignore one candidate</h3><p id="maintenance-ignore-description">Moves one reviewed identity out of future candidate lists. It remains reversible and grants no trust.</p></div>
+              <label id="maintenance-ignore-label-row" for="maintenance-ignore-label">Display label<input id="maintenance-ignore-label" type="text" maxlength="80" autocomplete="off"></label>
+              <button id="preview-maintenance-ignore" class="gate-button" type="button">Preview ignored identity</button>
+              <pre id="maintenance-ignore-scope" class="clear-preview-list" hidden></pre>
+              <button id="execute-maintenance-ignore" class="danger-button" type="button" disabled>Ignore reviewed candidate</button>
+              <p id="maintenance-ignore-status" class="dialog-status" role="status" aria-live="polite"></p>
             </section>
           </div>
         </details>

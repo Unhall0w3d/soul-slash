@@ -84,6 +84,13 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
   ssh_config = File.join(root, "ssh_config")
   File.write(ssh_config, "Host fixture-linux\n  HostName 192.168.50.20\n  User fixture\n")
   File.chmod(0o600, ssh_config)
+  mac_prefix_path = File.join(root, "nmap-mac-prefixes")
+  File.write(mac_prefix_path, "001788 Philips Lighting BV\n")
+  arp_path = File.join(root, "arp")
+  File.write(arp_path, <<~ARP)
+    IP address       HW type     Flags       HW address            Mask     Device
+    192.168.50.20    0x1         0x2         00:17:88:aa:bb:cc     *        fixture0
+  ARP
 
   runner = DiscoveryFakeRunner.new
   service = SoulCore::MaintenanceFleetDiscoveryService.new(
@@ -94,7 +101,9 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
     ssh_config: ssh_config,
     nmap_path: File.join(bin, "nmap"),
     ssh_path: File.join(bin, "ssh"),
-    ping_path: File.join(bin, "ping")
+    ping_path: File.join(bin, "ping"),
+    arp_path: arp_path,
+    mac_prefix_path: mac_prefix_path
   )
 
   status = service.status
@@ -107,20 +116,38 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
   scan_data = scan.fetch("data")
   check.call("one explicit private scan is canonical, bounded, and non-persisted",
              scan["lifecycle_state"] == "complete" &&
+               scan["mutation"] == "last_subnet" &&
                scan_data["subnet"] == "192.168.50.0/24" &&
                scan_data["persisted"] == false &&
-               scan_data["candidate_count"] == 2 &&
+               scan_data["detected_count"] == 2 &&
+               scan_data["candidate_count"] == 1 &&
+               scan_data["represented_count"] == 1 &&
                !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "discovery.json")))
+  preferences_path = File.join(root, "Soul", "private", "host_maintenance", "fleet_discovery_preferences.json")
+  preferences = JSON.parse(File.read(preferences_path))
+  check.call("successful scan remembers only its canonical subnet in owner-private state",
+             File.file?(preferences_path) &&
+               (File.stat(preferences_path).mode & 0o077).zero? &&
+               preferences["last_subnet"] == "192.168.50.0/24" &&
+               (preferences.keys - %w[schema_version updated_at last_subnet]).empty? &&
+               service.status.dig("data", "last_subnet") == "192.168.50.0/24")
   nmap_call = runner.calls.find { |call| call.dig("argv", 0).end_with?("/nmap") }
   check.call("discovery uses one fixed argv with timeout and no shell",
              nmap_call["argv"][1..] == %w[-sn -n --max-retries 1 --host-timeout 2s 192.168.50.0/24] &&
                nmap_call.dig("options", :timeout_seconds) == 30 &&
                !nmap_call["argv"].any? { |part| %w[sh bash zsh -c].include?(part) })
-  known = scan_data["candidates"].find { |candidate| candidate["address"] == "192.168.50.2" }
-  check.call("scan candidates remain untrusted and mark already represented addresses",
-             known["state"] == "already_configured" &&
-               known["known_device"] == "Maven" &&
+  known = scan_data["represented"].find { |candidate| candidate["address"] == "192.168.50.2" }
+  check.call("scan candidates remain untrusted while already represented addresses are excluded",
+             known["known_device"] == "Maven" &&
+               scan_data["candidates"].none? { |candidate| candidate["address"] == "192.168.50.2" } &&
                scan_data["candidates"].all? { |candidate| candidate["trusted"] == false && candidate["mutation_authority"] == false })
+  candidate_hint = scan_data.dig("candidates", 0, "identity_hints")
+  check.call("candidate identity hints come from one bounded local ARP read and OUI data",
+             candidate_hint["mac_address"] == "00:17:88:aa:bb:cc" &&
+               candidate_hint["vendor"] == "Philips Lighting BV" &&
+               candidate_hint["interface"] == "fixture0" &&
+               candidate_hint["neighbor_state"] == ["ARP cached"] &&
+               runner.calls.none? { |call| call.dig("argv", 0).end_with?("/ip") })
 
   rejected = [
     service.discover(subnet: "8.8.8.0/24"),
@@ -131,6 +158,70 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
   check.call("public, loopback, oversized, and shell-shaped scopes fail before a scan",
              rejected.all? { |result| result["lifecycle_state"] == "failed" } &&
                runner.calls.count { |call| call.dig("argv", 0).end_with?("/nmap") } == 1)
+
+  ignore_preview = service.ignore_preview(
+    address: "192.168.50.20",
+    label: "Fixture lamp",
+    subnet: "192.168.50.0/24",
+    mac_address: "00:17:88:aa:bb:cc",
+    vendor: "Philips Lighting BV"
+  )
+  ignored = service.ignore(
+    address: "192.168.50.20",
+    label: "Fixture lamp",
+    subnet: "192.168.50.0/24",
+    mac_address: "00:17:88:aa:bb:cc",
+    vendor: "Philips Lighting BV",
+    confirmation: ignore_preview.dig("data", "confirmation_phrase"),
+    expected_digest: ignore_preview.dig("data", "expected_digest")
+  )
+  ignored_path = File.join(root, "Soul", "private", "host_maintenance", "ignored_devices.json")
+  ignored_scan = service.discover(subnet: "192.168.50.0/24").fetch("data")
+  check.call("reviewed ignore stores one private MAC-first identity and excludes it from candidates",
+             ignored["lifecycle_state"] == "complete" &&
+               ignored["mutation"] == "ignore_one_candidate" &&
+               File.file?(ignored_path) &&
+               (File.stat(ignored_path).mode & 0o077).zero? &&
+               ignored_scan["candidate_count"].zero? &&
+               ignored_scan["ignored_count"] == 1 &&
+               service.ignored.dig("data", "device_count") == 1)
+  restore_preview = service.restore_preview(identity_key: "mac:00:17:88:aa:bb:cc")
+  restored = service.restore(
+    identity_key: "mac:00:17:88:aa:bb:cc",
+    confirmation: restore_preview.dig("data", "confirmation_phrase"),
+    expected_digest: restore_preview.dig("data", "expected_digest")
+  )
+  restored_scan = service.discover(subnet: "192.168.50.0/24").fetch("data")
+  check.call("reviewed restore removes only the ignored record and returns the address as a candidate",
+             restored["lifecycle_state"] == "complete" &&
+               restored["mutation"] == "restore_one_candidate" &&
+               service.ignored.dig("data", "device_count").zero? &&
+               restored_scan["candidate_count"] == 1 &&
+               restored_scan["candidates"].first["address"] == "192.168.50.20")
+
+  dhcp_preview = service.enrollment_preview(
+    address: "192.168.50.20",
+    label: "Fixture lamp",
+    mode: "status_only",
+    address_policy: "dhcp_tracked",
+    subnet: "192.168.50.0/24",
+    mac_address: "00:17:88:aa:bb:cc"
+  )
+  rejected_dhcp_ssh = service.enrollment_preview(
+    address: "192.168.50.20",
+    label: "Fixture Linux",
+    mode: "ssh",
+    ssh_alias: "fixture-linux",
+    address_policy: "dhcp_tracked",
+    subnet: "192.168.50.0/24",
+    mac_address: "00:17:88:aa:bb:cc"
+  )
+  check.call("DHCP tracking is a reviewed MAC-bound option for status-only inventory and never broadens SSH authority",
+             dhcp_preview["lifecycle_state"] == "complete" &&
+               dhcp_preview.dig("data", "device", "address_policy") == "dhcp_tracked" &&
+               dhcp_preview.dig("data", "device", "mac_address") == "00:17:88:aa:bb:cc" &&
+               dhcp_preview.dig("data", "device", "subnet") == "192.168.50.0/24" &&
+               rejected_dhcp_ssh["lifecycle_state"] == "failed")
 
   preview = service.enrollment_preview(
     address: "192.168.50.20", label: "Fixture Linux", mode: "ssh", ssh_alias: "fixture-linux"
@@ -167,12 +258,19 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
     confirmation: preview_data["confirmation_phrase"], expected_digest: preview_data["expected_digest"]
   )
   registry_path = File.join(root, "Soul", "private", "host_maintenance", "discovered_devices.json")
-  check.call("exact enrollment writes one owner-private ignored registry record only",
+  check.call("exact enrollment writes one owner-private registry record only",
              enrolled["lifecycle_state"] == "complete" &&
                enrolled["mutation"] == "one_private_record" &&
                File.file?(registry_path) &&
                (File.stat(registry_path).mode & 0o077).zero? &&
                service.registry.dig("data", "device_count") == 1)
+  rescanned = service.discover(subnet: "192.168.50.0/24").fetch("data")
+  check.call("an enrolled address is excluded from subsequent candidate lists",
+             rescanned["candidate_count"].zero? &&
+               rescanned["represented_count"] == 2 &&
+               rescanned["represented"].any? do |record|
+                 record["address"] == "192.168.50.20" && record["known_device"] == "Fixture Linux"
+               end)
 
   os_release = File.join(root, "os-release")
   File.write(os_release, "PRETTY_NAME=\"Controller Fixture\"\n")
@@ -212,6 +310,13 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
              html.include?('id="scan-maintenance-subnet"') &&
                html.include?("Candidate results are not persisted") &&
                dashboard.include?('const inventoryOnly = device.control !== "maintenance"') &&
+               dashboard.include?("already represented and excluded") &&
+               dashboard.include?("Enrollment changed the private registry") &&
+               dashboard.include?("no local identity hints available") &&
+               dashboard.include?("dependency.last_subnet") &&
+               dashboard.include?('address_policy: byId("maintenance-enrollment-policy").value') &&
+               dashboard.include?('card.classList.add("maintenance-device-card--status-only")') &&
+               dashboard.include?('"Network reachability"') &&
                dashboard.include?("discovered capabilities grant no mutation authority") &&
                !dashboard.include?("setInterval(scanMaintenanceSubnet"))
 end

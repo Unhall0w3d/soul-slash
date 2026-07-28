@@ -2,6 +2,8 @@
 
 require "json"
 require "fileutils"
+require "ipaddr"
+require "rbconfig"
 require "socket"
 require "time"
 
@@ -14,6 +16,10 @@ module SoulCore
     MAX_OUTPUT_BYTES = 256 * 1024
     SSH_PATH = "/usr/bin/ssh"
     PING_PATH = "/usr/bin/ping"
+    NMAP_PATH = "/usr/bin/nmap"
+    ARP_PATH = "/proc/net/arp"
+    SYSTEMD_RUN_PATH = "/usr/bin/systemd-run"
+    MAX_DHCP_RECOVERY_SCANS = 4
     MAX_SNAPSHOT_BYTES = 512 * 1024
     REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
     MAX_ENROLLED_DEVICES = 64
@@ -31,7 +37,12 @@ module SoulCore
       os_release_path: "/etc/os-release",
       hostname_reader: -> { Socket.gethostname },
       process_env: ENV,
-      root: nil
+      root: nil,
+      nmap_path: NMAP_PATH,
+      arp_path: ARP_PATH,
+      systemd_run_path: SYSTEMD_RUN_PATH,
+      ruby_path: RbConfig.ruby,
+      recovery_scheduler: nil
     )
       @runner = runner
       @clock = clock
@@ -39,18 +50,27 @@ module SoulCore
       @os_release_path = File.expand_path(os_release_path)
       @hostname_reader = hostname_reader
       @process_env = process_env.to_h.transform_keys(&:to_s)
+      @root = root && File.expand_path(root)
+      @nmap_path = File.expand_path(nmap_path)
+      @arp_path = File.expand_path(arp_path)
+      @systemd_run_path = File.expand_path(systemd_run_path)
+      @ruby_path = File.expand_path(ruby_path)
+      @recovery_scheduler = recovery_scheduler
       @addresses = {
         "maven" => configured_display_address("SOUL_FLEET_MAVEN_ADDRESS", DEFAULT_ADDRESSES.fetch("maven")),
         "proxmox" => configured_display_address("SOUL_FLEET_FORGE_ADDRESS", DEFAULT_ADDRESSES.fetch("proxmox")),
         "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_ADDRESS", DEFAULT_ADDRESSES.fetch("pihole"))
       }.freeze
-      @snapshot_path = root && File.join(File.expand_path(root), "Soul", "private", "host_maintenance", "fleet_status.json")
-      @registry_path = root && File.join(File.expand_path(root), "Soul", "private", "host_maintenance", "discovered_devices.json")
+      @snapshot_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "fleet_status.json")
+      @registry_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "discovered_devices.json")
+      @pending_recovery_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "dhcp_recovery.json")
       @evidence = []
+      @dhcp_scan_cache = {}
     end
 
     def collect
       @evidence = []
+      @dhcp_scan_cache = {}
       devices = [
         collect_workstation,
         collect_proxmox,
@@ -89,8 +109,9 @@ module SoulCore
       failed("fleet status failed safely: #{safe_text(error.message)}")
     end
 
-    def refresh(device_id:)
+    def refresh(device_id:, schedule_recovery: true)
       @evidence = []
+      @dhcp_scan_cache = {}
       normalized_id = device_id.to_s.strip
       return failed("device id is invalid") unless normalized_id.match?(/\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/)
 
@@ -99,7 +120,7 @@ module SoulCore
       existing = devices.find { |device| device["id"] == normalized_id }
       return failed("device is not present in the current fleet snapshot") unless existing
 
-      refreshed = collect_snapshot_device(existing)
+      refreshed = collect_snapshot_device(existing, schedule_recovery: schedule_recovery)
       observed_at = @clock.call.iso8601
       refreshed["observed_at"] = observed_at
       updated_devices = devices.map { |device| device["id"] == normalized_id ? refreshed : device }
@@ -118,6 +139,45 @@ module SoulCore
       success(data).merge("mutation" => "status_cache")
     rescue StandardError => error
       failed("device status refresh failed safely: #{safe_text(error.message)}")
+    end
+
+    def retry_pending
+      @evidence = []
+      @dhcp_scan_cache = {}
+      pending = pending_recovery_records
+      return success("schema_version" => SCHEMA_VERSION, "retried_device_count" => 0, "reason" => "no DHCP recovery is pending") if pending.empty?
+
+      current = read_snapshot_data
+      devices = Array(current["devices"])
+      retried = []
+      pending.each do |entry|
+        existing = devices.find { |device| device["id"] == entry["device_id"] }
+        record = registry_records.find { |candidate| candidate["id"] == entry["device_id"] }
+        next unless existing && record && record["address_policy"] == "dhcp_tracked"
+
+        refreshed = collect_enrolled_device(record, schedule_recovery: false)
+        refreshed["observed_at"] = @clock.call.iso8601
+        devices = devices.map { |device| device["id"] == entry["device_id"] ? refreshed : device }
+        retried << entry["device_id"]
+      end
+      collected_at = @clock.call.iso8601
+      data = current.merge(
+        "collected_at" => collected_at,
+        "freshness" => "delayed_dhcp_recovery",
+        "read_only" => true,
+        "devices" => devices,
+        "summary" => summarize(devices),
+        "topology" => build_topology(devices),
+        "evidence" => @evidence,
+        "dhcp_recovery" => {"retried_device_ids" => retried, "automatic_retry" => "complete_no_repeat"}
+      )
+      data.delete("source")
+      persist_snapshot(data)
+      clear_pending_recovery
+      success(data).merge("mutation" => "status_cache")
+    rescue StandardError => error
+      clear_pending_recovery
+      failed("delayed DHCP recovery failed safely: #{safe_text(error.message)}")
     end
 
     def snapshot
@@ -145,7 +205,7 @@ module SoulCore
       parsed
     end
 
-    def collect_snapshot_device(existing)
+    def collect_snapshot_device(existing, schedule_recovery: true)
       case existing["id"]
       when "maven" then collect_workstation
       when "proxmox" then collect_proxmox
@@ -160,7 +220,7 @@ module SoulCore
         record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
         raise "enrolled device is no longer present in the private registry" unless record
 
-        collect_enrolled_device(record)
+        collect_enrolled_device(record, schedule_recovery: schedule_recovery)
       end
     end
 
@@ -392,19 +452,26 @@ module SoulCore
       )
     end
 
-    def collect_enrolled_device(record)
+    def collect_enrolled_device(record, schedule_recovery: true)
       stored_facts = record["facts"].is_a?(Hash) ? record["facts"] : {}
       facts = stored_facts.merge(
         "management_channel" => record.fetch("connection_mode") == "ssh" ? "ssh_inventory" : "icmp_status",
         "control_capability" => "inventory_only",
         "mutation_supported" => false,
-        "enrollment_id" => record.fetch("id")
+        "enrollment_id" => record.fetch("id"),
+        "address_policy" => record.fetch("address_policy", "fixed")
       )
-      result = if record.fetch("connection_mode") == "ssh"
-                 enrolled_ssh_reachability(record.fetch("ssh_alias"))
-               else
-                 local_run("enrolled_device.reachability", PING_PATH, "-c", "1", "-W", "2", record.fetch("address"), timeout: 5)
-               end
+      recovery = nil
+      if record["address_policy"] == "dhcp_tracked"
+        record, result, recovery = resolve_dhcp_record(record, schedule_recovery: schedule_recovery)
+        facts = facts.merge(recovery)
+      else
+        result = if record.fetch("connection_mode") == "ssh"
+                   enrolled_ssh_reachability(record.fetch("ssh_alias"))
+                 else
+                   local_run("enrolled_device.reachability", PING_PATH, "-c", "1", "-W", "2", record.fetch("address"), timeout: 5)
+                 end
+      end
       return offline_device(
         record.fetch("id"),
         record.fetch("label"),
@@ -446,6 +513,174 @@ module SoulCore
         control: "inventory_only",
         status: "reachable"
       )
+    end
+
+    def resolve_dhcp_record(record, schedule_recovery:)
+      expected_mac = record.fetch("mac_address")
+      probe = local_run(
+        "enrolled_device.dhcp_current_reachability",
+        PING_PATH, "-c", "1", "-W", "2", record.fetch("address"),
+        timeout: 5
+      )
+      observed_mac = arp_mac_for(record.fetch("address"))
+      if successful?(probe) && observed_mac == expected_mac
+        return [
+          record,
+          probe,
+          {
+            "identity_state" => "verified_current",
+            "reviewed_mac" => expected_mac,
+            "observed_mac" => observed_mac,
+            "dhcp_recovery" => "not_needed"
+          }
+        ]
+      end
+
+      matches = locate_dhcp_mac(record.fetch("subnet"), expected_mac)
+      if matches.length == 1
+        resolved_address = matches.first
+        if resolved_address != record.fetch("address")
+          updated = retarget_dhcp_record(record, resolved_address)
+          if updated
+            refreshed_probe = local_run(
+              "enrolled_device.dhcp_retarget_reachability",
+              PING_PATH, "-c", "1", "-W", "2", resolved_address,
+              timeout: 5
+            )
+            return [
+              updated,
+              refreshed_probe,
+              {
+                "identity_state" => "retargeted",
+                "reviewed_mac" => expected_mac,
+                "observed_mac" => expected_mac,
+                "previous_address" => record.fetch("address"),
+                "dhcp_recovery" => "address_updated"
+              }
+            ]
+          end
+          return [
+            record,
+            failed_result(probe),
+            {
+              "identity_state" => "address_conflict",
+              "reviewed_mac" => expected_mac,
+              "observed_mac" => observed_mac,
+              "possible_address" => resolved_address,
+              "dhcp_recovery" => "blocked_for_human_review"
+            }
+          ]
+        end
+
+        return [
+          record,
+          probe,
+          {
+            "identity_state" => "verified_after_scan",
+            "reviewed_mac" => expected_mac,
+            "observed_mac" => expected_mac,
+            "dhcp_recovery" => "current_address_reconfirmed"
+          }
+        ] if successful?(probe)
+      end
+
+      scheduled = schedule_recovery && queue_pending_recovery(record, matches.length > 1 ? "ambiguous_mac" : "not_found")
+      [
+        record,
+        failed_result(probe),
+        {
+          "identity_state" => matches.length > 1 ? "ambiguous_mac" : (observed_mac.empty? ? "offline" : "mac_mismatch"),
+          "reviewed_mac" => expected_mac,
+          "observed_mac" => observed_mac,
+          "dhcp_recovery" => scheduled ? "retry_scheduled_for_ten_minutes" : "offline_until_next_check",
+          "automatic_retry" => schedule_recovery ? "one" : "complete_no_repeat"
+        }
+      ]
+    end
+
+    def locate_dhcp_mac(subnet, expected_mac)
+      return [] unless File.file?(@nmap_path) && File.executable?(@nmap_path)
+      entries = @dhcp_scan_cache[subnet]
+      unless entries
+        if @dhcp_scan_cache.length >= MAX_DHCP_RECOVERY_SCANS
+          @evidence << {
+            "adapter" => "enrolled_device.dhcp_recovery_scan_budget",
+            "status" => "failed",
+            "exit_status" => nil,
+            "truncated" => false
+          }
+          return []
+        end
+
+        result = @runner.run(
+          @nmap_path,
+          "-sn", "-n", "--max-retries", "1", "--host-timeout", "2s", subnet,
+          timeout_seconds: 30,
+          max_output_bytes: MAX_OUTPUT_BYTES,
+          env: {"LC_ALL" => "C"}
+        )
+        @evidence << {
+          "adapter" => "enrolled_device.dhcp_recovery_scan",
+          "status" => result.status,
+          "exit_status" => result.exit_status,
+          "truncated" => result.truncated == true
+        }
+        entries = result.status == "ok" ? arp_entries : {}
+        @dhcp_scan_cache[subnet] = entries
+      end
+
+      network = IPAddr.new(subnet)
+      entries.filter_map do |address, mac|
+        address if mac == expected_mac && network.include?(IPAddr.new(address))
+      rescue IPAddr::InvalidAddressError
+        nil
+      end.uniq
+    end
+
+    def arp_mac_for(address)
+      arp_entries[address].to_s
+    end
+
+    def arp_entries
+      return {} unless File.file?(@arp_path) && !File.symlink?(@arp_path)
+
+      File.foreach(@arp_path, encoding: "UTF-8").first(MAX_ENROLLED_DEVICES * 8 + 1).drop(1).each_with_object({}) do |line, entries|
+        address, _hardware_type, flags, raw_mac, _mask, _device = line.split(/\s+/, 6)
+        mac = raw_mac.to_s.downcase
+        next unless flags == "0x2" && address.to_s.match?(/\A\d{1,3}(?:\.\d{1,3}){3}\z/)
+        next unless mac.match?(/\A[0-9a-f]{2}(?::[0-9a-f]{2}){5}\z/)
+
+        entries[address] = mac
+      end
+    rescue SystemCallError
+      {}
+    end
+
+    def retarget_dhcp_record(record, new_address)
+      records = registry_records
+      return nil if records.any? { |candidate| candidate["id"] != record["id"] && candidate["address"] == new_address }
+
+      changed_at = @clock.call.iso8601
+      updated = record.merge(
+        "address" => new_address,
+        "address_history" => (
+          Array(record["address_history"]) + [{
+            "from" => record.fetch("address"),
+            "to" => new_address,
+            "changed_at" => changed_at,
+            "reason" => "exact_reviewed_mac_match"
+          }]
+        ).last(8)
+      )
+      persist_registry(records.map { |candidate| candidate["id"] == record["id"] ? updated : candidate })
+      updated
+    end
+
+    def failed_result(result)
+      normalized = result.dup
+      normalized.status = "failed"
+      normalized.exit_status = 1 if normalized.exit_status.to_i.zero?
+      normalized
     end
 
     def build_topology(devices)
@@ -564,10 +799,161 @@ module SoulCore
         next unless record["facts"].is_a?(Hash)
         next if record["connection_mode"] == "ssh" && !record["ssh_alias"].to_s.match?(/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/)
 
-        record
+        policy = record["address_policy"].to_s.empty? ? "fixed" : record["address_policy"].to_s
+        next unless %w[fixed dhcp_tracked].include?(policy)
+        next if policy == "dhcp_tracked" && record["connection_mode"] != "status_only"
+        mac = record["mac_address"].to_s.downcase
+        next if policy == "dhcp_tracked" && !mac.match?(/\A[0-9a-f]{2}(?::[0-9a-f]{2}){5}\z/)
+        subnet = record["subnet"].to_s
+        if policy == "dhcp_tracked"
+          network = IPAddr.new(subnet)
+          next unless network.ipv4? && network.prefix.between?(24, 32) && network.include?(IPAddr.new(record["address"]))
+        end
+        history = Array(record["address_history"]).first(8).filter_map do |event|
+          event.slice("from", "to", "changed_at", "reason") if event.is_a?(Hash)
+        end
+        record.merge(
+          "address_policy" => policy,
+          "mac_address" => policy == "dhcp_tracked" ? mac : "",
+          "subnet" => policy == "dhcp_tracked" ? subnet : "",
+          "address_history" => history
+        )
+      end
+    rescue JSON::ParserError, SystemCallError, IPAddr::InvalidAddressError
+      []
+    end
+
+    def persist_registry(records)
+      raise "fleet registry persistence is not configured" unless @registry_path
+
+      directory = File.dirname(@registry_path)
+      FileUtils.mkdir_p(directory, mode: 0o700)
+      raise "fleet registry directory is unsafe" if File.symlink?(directory)
+
+      File.chmod(0o700, directory)
+      payload = JSON.pretty_generate(
+        "schema_version" => REGISTRY_SCHEMA,
+        "updated_at" => @clock.call.iso8601,
+        "devices" => records
+      )
+      raise "fleet registry exceeds its size bound" if payload.bytesize > MAX_SNAPSHOT_BYTES
+
+      temporary = "#{@registry_path}.tmp-#{Process.pid}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(payload)
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @registry_path)
+      File.chmod(0o600, @registry_path)
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
+
+    def queue_pending_recovery(record, reason)
+      return false unless @pending_recovery_path
+
+      existing = pending_recovery_records
+      already_scheduled = File.file?(@pending_recovery_path) && !existing.empty?
+      entry = {
+        "device_id" => record.fetch("id"),
+        "mac_address" => record.fetch("mac_address"),
+        "subnet" => record.fetch("subnet"),
+        "address" => record.fetch("address"),
+        "reason" => reason,
+        "queued_at" => @clock.call.iso8601,
+        "attempts_remaining" => 1
+      }
+      pending = (existing.reject { |candidate| candidate["device_id"] == record["id"] } + [entry]).first(MAX_ENROLLED_DEVICES)
+      persist_pending_recovery(pending)
+      return true if already_scheduled
+
+      scheduled = schedule_dhcp_recovery
+      clear_pending_recovery unless scheduled
+      scheduled
+    end
+
+    def pending_recovery_records
+      return [] unless @pending_recovery_path && File.file?(@pending_recovery_path) && !File.symlink?(@pending_recovery_path)
+      return [] if File.size(@pending_recovery_path) > MAX_SNAPSHOT_BYTES
+
+      parsed = JSON.parse(File.binread(@pending_recovery_path, MAX_SNAPSHOT_BYTES + 1))
+      return [] unless parsed["schema_version"] == "soul.maintenance.dhcp_recovery.v1" && parsed["devices"].is_a?(Array)
+
+      parsed["devices"].first(MAX_ENROLLED_DEVICES).filter_map do |record|
+        next unless record.is_a?(Hash) && record["device_id"].to_s.match?(/\Amanaged_[a-f0-9]{16}\z/)
+        next unless record["mac_address"].to_s.match?(/\A[0-9a-f]{2}(?::[0-9a-f]{2}){5}\z/)
+        next unless record["attempts_remaining"] == 1
+
+        record.slice("device_id", "mac_address", "subnet", "address", "reason", "queued_at", "attempts_remaining")
       end
     rescue JSON::ParserError, SystemCallError
       []
+    end
+
+    def persist_pending_recovery(records)
+      directory = File.dirname(@pending_recovery_path)
+      FileUtils.mkdir_p(directory, mode: 0o700)
+      raise "DHCP recovery directory is unsafe" if File.symlink?(directory)
+
+      payload = JSON.pretty_generate(
+        "schema_version" => "soul.maintenance.dhcp_recovery.v1",
+        "updated_at" => @clock.call.iso8601,
+        "devices" => records
+      )
+      temporary = "#{@pending_recovery_path}.tmp-#{Process.pid}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(payload)
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @pending_recovery_path)
+      File.chmod(0o600, @pending_recovery_path)
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
+
+    def clear_pending_recovery
+      return unless @pending_recovery_path && File.file?(@pending_recovery_path) && !File.symlink?(@pending_recovery_path)
+
+      File.delete(@pending_recovery_path)
+    rescue SystemCallError
+      nil
+    end
+
+    def schedule_dhcp_recovery
+      return @recovery_scheduler.call if @recovery_scheduler
+      return false unless @root && File.file?(@systemd_run_path) && File.executable?(@systemd_run_path)
+
+      script = File.join(@root, "scripts", "soul-maintenance-fleet-dhcp-recheck")
+      return false unless File.file?(script)
+
+      result = @runner.run(
+        @systemd_run_path,
+        "--user",
+        "--unit=soul-fleet-dhcp-recheck",
+        "--on-active=10m",
+        "--timer-property=AccuracySec=1s",
+        "--collect",
+        "--property=Type=oneshot",
+        "--property=TimeoutStartSec=120",
+        "--property=NoNewPrivileges=yes",
+        "--property=ProtectSystem=strict",
+        "--property=ReadWritePaths=#{File.dirname(@pending_recovery_path)}",
+        "--property=RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6",
+        @ruby_path,
+        script,
+        timeout_seconds: 10,
+        max_output_bytes: 64 * 1024,
+        env: {"LC_ALL" => "C"}
+      )
+      @evidence << {
+        "adapter" => "enrolled_device.dhcp_recovery_schedule",
+        "status" => result.status,
+        "exit_status" => result.exit_status,
+        "truncated" => result.truncated == true
+      }
+      result.status == "ok"
     end
 
     def enrolled_ssh_reachability(target)
