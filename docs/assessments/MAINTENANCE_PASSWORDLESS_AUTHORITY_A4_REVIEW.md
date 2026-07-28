@@ -19,6 +19,9 @@ Status: candidate-complete; root-owned installation and live acceptance pending
   reviewed order and a completed transaction cannot replay before reboot.
 - Extended A2/A3 transaction and receipt evidence with authority mode and zero
   password-prompt accounting.
+- The confined Dashboard verifies the exact installed helper digest and defers
+  the sudoers execution proof to the native desktop handoff. This preserves
+  `NoNewPrivileges`; a missing or changed sudoers rule fails before any update.
 - Kept the foreground terminal for audit, cancellation, bounded execution, and
   failure evidence.
 
@@ -71,6 +74,8 @@ git diff --check
   invalidation call and record zero prompts.
 - Altered vectors and direct pacman execution fail before execution.
 - Native A2/A2B/A3 regressions remain passing.
+- Confined `NoNewPrivileges` status remains usable without claiming that the
+  Dashboard itself can elevate.
 
 ## Local LLM eval results
 

@@ -100,20 +100,24 @@ module SoulCore
       helper_exact = regular_file_exact?(HELPER_PATH, expected.fetch("helper_sha256"), 0o755)
       probe = run(FIXED_PATHS.fetch("sudo"), "-n", HELPER_PATH, "self-check")
       parsed = JSON.parse(probe.fetch("stdout")) if probe["success"]
-      ready = helper_exact && parsed.is_a?(Hash) &&
+      native_verified = helper_exact && parsed.is_a?(Hash) &&
         parsed["version"] == HELPER_VERSION &&
         parsed["helper_sha256"] == expected.fetch("helper_sha256") &&
         parsed["owner_uid"] == @owner_uid &&
         parsed["hostname"] == @hostname
+      confined = helper_exact && !probe["success"] &&
+        probe.fetch("stderr", "").include?("no new privileges")
+      ready = native_verified || confined
       outcome("complete", true, "Maintenance passwordless authority status collected.", {
         "ready" => ready,
         "helper_installed_exact" => helper_exact,
-        "sudoers_authorization_exact" => ready,
+        "sudoers_authorization_exact" => native_verified,
+        "authorization_verification" => native_verified ? "native_self_check" : (confined ? "deferred_to_native_handoff" : "unavailable"),
         "helper_path" => HELPER_PATH,
         "sudoers_path" => SUDOERS_PATH,
         "helper_sha256" => expected.fetch("helper_sha256"),
         "authority_mode" => ready ? "root_owned_passwordless" : "native_prompt",
-        "probe_error" => ready ? "" : bounded(probe.fetch("stderr"))
+        "probe_error" => native_verified ? "" : bounded(probe.fetch("stderr"))
       })
     rescue JSON::ParserError
       outcome("complete", true, "Maintenance passwordless authority status collected.", {
