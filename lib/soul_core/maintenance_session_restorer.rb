@@ -23,20 +23,41 @@ module SoulCore
       def initialize(
         runner: BoundedCommandRunner.new,
         sleeper: ->(seconds) { sleep(seconds) },
-        user_id: Process.uid
+        user_id: Process.uid,
+        runtime_root: nil,
+        home: Dir.home,
+        display_recovery_path: ENV["SOUL_MAINTENANCE_DISPLAY_RECOVERY_SCRIPT"]
       )
         @runner = runner
         @sleeper = sleeper
         @user_id = Integer(user_id)
+        @runtime_root = runtime_root || File.join("/run/user", @user_id.to_s, "hypr")
+        @home = File.expand_path(home)
+        @display_recovery_path = display_recovery_path.to_s
+        @session_environment = nil
       end
 
       def wait_ready(timeout_seconds)
         attempts = [(Integer(timeout_seconds) / 2), 1].max
         attempts.times do
+          discover_session_environment
           return true if json("monitors", expected: Array)&.any?
           @sleeper.call(2)
         end
         false
+      end
+
+      def recover_displays
+        return false unless lua_dispatch('hl.dsp.dpms({ action = "on" })')
+        return true if @display_recovery_path.empty?
+        return false unless safe_display_recovery_path?
+
+        execution = @runner.run(
+          @display_recovery_path,
+          timeout_seconds: 30, max_output_bytes: 32 * 1024,
+          env: @session_environment
+        )
+        execution.success? && !execution.truncated
       end
 
       def windows
@@ -53,10 +74,12 @@ module SoulCore
 
       def launch(entry_id, argv, attempt)
         unit = "soul-restore-#{entry_id.gsub(/[^a-zA-Z0-9_.-]/, "-")}-#{attempt}"
+        environment_options = @session_environment.to_h.sort.map { |key, value| "--setenv=#{key}=#{value}" }
         execution = @runner.run(
           "/usr/bin/systemd-run", "--user", "--quiet", "--collect", "--no-block",
-          "--unit", unit, "--", *argv,
-          timeout_seconds: 10, max_output_bytes: 32 * 1024
+          "--unit", unit, *environment_options, "--", *argv,
+          timeout_seconds: 10, max_output_bytes: 32 * 1024,
+          env: @session_environment
         )
         execution.success?
       end
@@ -82,13 +105,26 @@ module SoulCore
         target = workspace["id"].to_i.positive? ? workspace["id"].to_i.to_s : workspace["name"].to_s
         return false if target.empty? || !target.match?(/\A(?:[1-9][0-9]{0,3}|[A-Za-z0-9_.-]{1,64})\z/)
 
-        return false unless dispatch("movetoworkspacesilent", "#{target},address:#{address}")
-        return false if record["floating"] == true && window["floating"] != true && !dispatch("togglefloating", "address:#{address}")
-        return false if record["pinned"] == true && window["pinned"] != true && !dispatch("pin", "address:#{address}")
+        selector = "address:#{address}"
+        return false unless lua_dispatch(
+          "hl.dsp.window.move({ workspace = #{JSON.generate(target)}, follow = false, window = #{JSON.generate(selector)} })"
+        )
+        if record["floating"] == true && window["floating"] != true
+          return false unless lua_dispatch(
+            "hl.dsp.window.float({ action = \"on\", window = #{JSON.generate(selector)} })"
+          )
+        end
+        if record["pinned"] == true && window["pinned"] != true
+          return false unless lua_dispatch(
+            "hl.dsp.window.pin({ action = \"on\", window = #{JSON.generate(selector)} })"
+          )
+        end
         fullscreen = Integer(record.fetch("fullscreen", 0)) rescue 0
         if fullscreen.positive? && window["fullscreen"].to_i.zero?
-          return false unless dispatch("focuswindow", "address:#{address}")
-          return false unless dispatch("fullscreen", fullscreen.to_s)
+          mode = fullscreen == 1 ? "maximized" : "fullscreen"
+          return false unless lua_dispatch(
+            "hl.dsp.window.fullscreen({ mode = #{JSON.generate(mode)}, action = \"set\", window = #{JSON.generate(selector)} })"
+          )
         end
         true
       end
@@ -96,15 +132,61 @@ module SoulCore
       def activate_workspace(workspace)
         target = workspace["id"].to_i.positive? ? workspace["id"].to_i.to_s : workspace["name"].to_s
         return false if target.empty? || !target.match?(/\A(?:[1-9][0-9]{0,3}|[A-Za-z0-9_.-]{1,64})\z/)
-        dispatch("workspace", target)
+        lua_dispatch("hl.dsp.focus({ workspace = #{JSON.generate(target)} })")
       end
 
       private
 
+      def discover_session_environment
+        candidates = Dir.glob(File.join(@runtime_root, "*")).select do |path|
+          stat = File.lstat(path)
+          stat.directory? && !stat.symlink? && stat.uid == @user_id
+        rescue SystemCallError
+          false
+        end
+        candidates.sort_by { |path| File.mtime(path) }.reverse.first(8).each do |path|
+          signature = File.basename(path)
+          next unless signature.match?(/\A[A-Za-z0-9_.-]{16,200}\z/)
+          lock_path = File.join(path, "hyprland.lock")
+          socket_path = File.join(path, ".socket.sock")
+          lock_stat = File.lstat(lock_path)
+          socket_stat = File.lstat(socket_path)
+          next unless lock_stat.file? && !lock_stat.symlink? && lock_stat.uid == @user_id && lock_stat.size <= 4_096
+          next unless socket_stat.socket? && socket_stat.uid == @user_id
+          pid_text, wayland_display = File.binread(lock_path, 4_096).lines.map(&:strip).first(2)
+          next unless pid_text.to_s.match?(/\A[1-9][0-9]{0,9}\z/)
+          next unless wayland_display.to_s.match?(/\Awayland-[0-9]{1,3}\z/)
+          process_stat = File.stat(File.join("/proc", pid_text))
+          next unless process_stat.uid == @user_id
+          @session_environment = {
+            "XDG_RUNTIME_DIR" => File.dirname(@runtime_root),
+            "HYPRLAND_INSTANCE_SIGNATURE" => signature,
+            "WAYLAND_DISPLAY" => wayland_display
+          }.freeze
+          return true
+        rescue SystemCallError
+          next
+        end
+        @session_environment = nil
+        false
+      end
+
+      def safe_display_recovery_path?
+        path = File.expand_path(@display_recovery_path)
+        stat = File.lstat(path)
+        path.start_with?(@home + File::SEPARATOR) &&
+          stat.file? && !stat.symlink? && stat.uid == @user_id &&
+          (stat.mode & 0o022).zero? && File.executable?(path)
+      rescue SystemCallError
+        false
+      end
+
       def json(subject, expected:)
+        return nil unless @session_environment
         execution = @runner.run(
           "/usr/bin/hyprctl", "-j", subject,
-          timeout_seconds: 5, max_output_bytes: 512 * 1024
+          timeout_seconds: 5, max_output_bytes: 512 * 1024,
+          env: @session_environment
         )
         return nil unless execution.success? && !execution.truncated
         value = JSON.parse(execution.stdout)
@@ -113,10 +195,13 @@ module SoulCore
         nil
       end
 
-      def dispatch(action, *arguments)
+      def lua_dispatch(dispatcher)
+        return false unless @session_environment
+        return false unless dispatcher.to_s.match?(/\Ahl\.dsp\.[A-Za-z0-9_.]+\(.*\)\z/)
         execution = @runner.run(
-          "/usr/bin/hyprctl", "dispatch", action, *arguments,
-          timeout_seconds: 5, max_output_bytes: 16 * 1024
+          "/usr/bin/hyprctl", "eval", "hl.dispatch(#{dispatcher})",
+          timeout_seconds: 5, max_output_bytes: 16 * 1024,
+          env: @session_environment
         )
         execution.success?
       end
@@ -156,7 +241,13 @@ module SoulCore
 
       registry = @rehearsal_service.restore_registry
       raise "restore registry changed after reboot" unless secure_equal?(journal.fetch("restore_registry_digest"), digest(registry))
-      attempts = restore_records(journal.fetch("window_snapshot"), registry)
+      display_recovered = @adapter.recover_displays
+      attempts = [{
+        "kind" => "display",
+        "status" => display_recovered ? "complete" : "failed",
+        "reason" => "wake displays and run the bounded local recovery hook"
+      }]
+      attempts.concat(restore_records(journal.fetch("window_snapshot"), registry))
       active_restored = @adapter.activate_workspace(journal.dig("window_snapshot", "active_workspace") || {})
       attempts << {"kind" => "workspace", "status" => active_restored ? "complete" : "failed", "reason" => "restore previously active workspace"}
       failures = attempts.count { |item| item["status"] != "complete" && item["status"] != "skipped" }

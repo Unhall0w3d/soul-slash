@@ -159,8 +159,12 @@ module SoulCore
     end
 
     def reboot_permitted?
-      stdout, _stderr, status = Open3.capture3("/usr/bin/loginctl", "can-reboot")
-      status.success? && stdout.to_s.strip == "yes"
+      stdout, _stderr, status = Open3.capture3(
+        "/usr/bin/busctl", "--system", "call",
+        "org.freedesktop.login1", "/org/freedesktop/login1",
+        "org.freedesktop.login1.Manager", "CanReboot"
+      )
+      status.success? && stdout.to_s.match?(/\As\s+"(?:yes|challenge)"\s*\z/)
     rescue StandardError
       false
     end
