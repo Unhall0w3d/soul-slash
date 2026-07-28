@@ -13,6 +13,9 @@ root = File.expand_path(options.fetch(:root))
 $LOAD_PATH.unshift(File.join(root, "lib"))
 require "soul_core/maintenance_session_restorer"
 require "soul_core/maintenance_fleet_status_service"
+require "soul_core/env_loader"
+
+SoulCore::EnvLoader.load(File.join(root, ".env"))
 
 result = SoulCore::MaintenanceSessionRestorer.new(root: root).run
 begin

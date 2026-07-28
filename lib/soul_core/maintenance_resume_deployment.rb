@@ -13,7 +13,7 @@ module SoulCore
     def initialize(
       root: Dir.pwd,
       home: Dir.home,
-      ruby_path: RbConfig.ruby,
+      ruby_path: "/usr/bin/ruby",
       systemctl_path: "/usr/bin/systemctl",
       command_runner: nil
     )
@@ -74,12 +74,14 @@ module SoulCore
       exact = File.file?(@unit_path) && !File.symlink?(@unit_path) &&
         File.size(@unit_path) <= 64 * 1024 && File.binread(@unit_path, 64 * 1024) == unit_content
       enabled = run(@systemctl_path, "--user", "is-enabled", UNIT_NAME)
+      enabled_exact = enabled["success"] && enabled["stdout"].to_s.strip == "enabled"
+      enabled_exact ||= enabled_symlink_exact?
       result(true, "complete", "One-shot maintenance resume status collected.", {
         "unit_name" => UNIT_NAME,
         "unit_path" => @unit_path,
         "installed_exact" => exact,
-        "enabled" => enabled["success"] && enabled["stdout"].to_s.strip == "enabled",
-        "ready" => exact && enabled["success"] && enabled["stdout"].to_s.strip == "enabled",
+        "enabled" => enabled_exact,
+        "ready" => exact && enabled_exact,
         "persistent_process" => false,
         "restart_policy" => "none",
         "timer" => false
@@ -119,6 +121,13 @@ module SoulCore
 
     def resume_script = File.join(@root, "scripts", "soul-maintenance-resume")
     def pending_journal = File.join(@root, "Soul", "private", "host_maintenance", "pending_restore.json")
+
+    def enabled_symlink_exact?
+      link = File.join(@home, ".config", "systemd", "user", "default.target.wants", UNIT_NAME)
+      File.symlink?(link) && File.realpath(link) == File.realpath(@unit_path)
+    rescue SystemCallError
+      false
+    end
 
     def ensure_private_directory(directory)
       FileUtils.mkdir_p(directory, mode: 0o700)

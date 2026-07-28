@@ -141,14 +141,29 @@ make maintenance-resume-status
 Installing the unit does not run it. It exits immediately when no pending
 journal exists, has no restart policy or timer, and cannot authenticate, update
 packages, or reboot. A valid post-reboot run waits at most 90 seconds for
-Hyprland, revalidates the restore registry, launches only fixed allowlisted
-applications, skips already-running background entries, places supported
-windows, restores the previously active workspace last, writes a terminal
-receipt, and consumes the journal.
+Hyprland, discovers the owner-controlled compositor socket without relying on
+inherited shell variables, revalidates the restore registry, launches only
+fixed allowlisted applications, skips already-running background entries,
+places supported windows through Hyprland's typed Lua dispatchers, restores the
+previously active workspace last, writes a terminal receipt, and consumes the
+journal. The unit and native handoff use the stable `/usr/bin/ruby` runtime.
 
-Chat and Voice may explain the plan but cannot arm or authorize A3. The first
-live A3 reboot remains a separate supervised human gate even after the
-deterministic candidate and resume-unit installation are reviewed.
+Hosts that require a physical display-link retrain after autologin may provide
+one owner-controlled executable:
+
+```text
+SOUL_MAINTENANCE_DISPLAY_RECOVERY_SCRIPT=/absolute/path/under/the/operators/home
+```
+
+The public default is empty. When configured, the restorer first requests DPMS
+on, then runs that exact regular, owner-owned, non-group/world-writable
+executable with the discovered Hyprland environment and a 30-second bound.
+Failure is recorded for human review; it never broadens the application
+restore registry or gains reboot authority.
+
+Chat and Voice may explain the plan but cannot arm or authorize A3. Each live
+A3 reboot remains a separate supervised human gate even after deterministic
+verification and resume-unit installation.
 
 ## Verification
 

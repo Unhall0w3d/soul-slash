@@ -117,10 +117,12 @@ module SoulCore
 
     def reboot_permitted?
       result = @runner.run(
-        "/usr/bin/loginctl", "can-reboot",
+        "/usr/bin/busctl", "--system", "call",
+        "org.freedesktop.login1", "/org/freedesktop/login1",
+        "org.freedesktop.login1.Manager", "CanReboot",
         timeout_seconds: 5, max_output_bytes: 16 * 1024
       )
-      result.success? && result.stdout.to_s.strip == "yes"
+      result.success? && result.stdout.to_s.match?(/\As\s+"(?:yes|challenge)"\s*\z/)
     end
 
     def read_boot_id

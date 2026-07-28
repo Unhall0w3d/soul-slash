@@ -4,6 +4,7 @@
 require "digest"
 require "fileutils"
 require "json"
+require "socket"
 require "stringio"
 require "tmpdir"
 require "time"
@@ -91,6 +92,7 @@ class A3AdapterFixture
   end
 
   def wait_ready(_seconds) = true
+  def recover_displays = true
   def windows = []
   def process_running?(_identity) = @background_running
   def launch(entry_id, argv, attempt)
@@ -105,6 +107,24 @@ class A3AdapterFixture
   def activate_workspace(workspace)
     @activations << workspace
     true
+  end
+end
+
+class A3HyprlandRunnerFixture
+  attr_reader :calls
+
+  Result = Struct.new(:stdout, :stderr, :exit_status, :status, :truncated, keyword_init: true) do
+    def success? = status == "ok"
+  end
+
+  def initialize
+    @calls = []
+  end
+
+  def run(*argv, **options)
+    @calls << {argv: argv, options: options}
+    stdout = argv.include?("monitors") ? JSON.generate([{"name" => "DP-1"}]) : ""
+    Result.new(stdout: stdout, stderr: "", exit_status: 0, status: "ok", truncated: false)
   end
 end
 
@@ -142,6 +162,36 @@ def transaction(root, clock, registry_digest, mode: "live_reboot")
 end
 
 puts "Maintenance conditional reboot and restore A3 verification:"
+
+Dir.mktmpdir("soul-a3-hyprland") do |runtime_parent|
+  runtime_root = File.join(runtime_parent, "hypr")
+  signature = "fixture_signature_1234567890"
+  instance = File.join(runtime_root, signature)
+  FileUtils.mkdir_p(instance)
+  File.write(File.join(instance, "hyprland.lock"), "#{Process.pid}\nwayland-1\n")
+  UNIXServer.new(File.join(instance, ".socket.sock")).close
+  runner = A3HyprlandRunnerFixture.new
+  adapter = SoulCore::MaintenanceSessionRestorer::HyprlandAdapter.new(
+    runner: runner, sleeper: ->(_seconds) {}, user_id: Process.uid,
+    runtime_root: runtime_root, home: runtime_parent
+  )
+  ready = adapter.wait_ready(2)
+  recovered = adapter.recover_displays
+  placed = adapter.place_window(
+    {"address" => "0xabc", "floating" => false, "pinned" => false, "fullscreen" => 0},
+    {"workspace" => {"id" => 2}, "floating" => true, "pinned" => true, "fullscreen" => 2}
+  )
+  activated = adapter.activate_workspace({"id" => 2})
+  monitor_call = runner.calls.find { |item| item[:argv].include?("monitors") }
+  check.call("one-shot restoration discovers the live Hyprland instance without inherited session variables",
+             ready &&
+             monitor_call.dig(:options, :env, "HYPRLAND_INSTANCE_SIGNATURE") == signature &&
+             monitor_call.dig(:options, :env, "WAYLAND_DISPLAY") == "wayland-1")
+  check.call("one-shot restoration uses current typed Hyprland dispatchers for display and placement",
+             recovered && placed && activated &&
+             runner.calls.none? { |item| item[:argv].include?("dispatch") } &&
+             runner.calls.count { |item| item[:argv].include?("eval") } == 6)
+end
 
 Dir.mktmpdir("soul-a3-runner") do |root|
   fixture = A3RehearsalFixture.new
