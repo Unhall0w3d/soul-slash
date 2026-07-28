@@ -311,6 +311,7 @@ module SoulCore
       when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
+      when "maintenance.fleet.device.refresh" then domain(maintenance_fleet_status.refresh(device_id: required(parameters, "device_id")))
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))

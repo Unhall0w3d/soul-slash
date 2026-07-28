@@ -264,6 +264,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-service-list span[data-state="failed"] { border-color:rgba(255,23,68,.3); color:#E77B8B; }
 .maintenance-device-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:auto; padding-top:15px; border-top:1px solid var(--line); }
 .maintenance-device-actions .gate-button { width:100%; min-width:0; }
+.maintenance-device-refresh { grid-column:1/-1; }
 .maintenance-status-only { grid-column:1/-1; margin:0; color:#86A5AE; font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; }
 .maintenance-reboot-button { border-color:rgba(196,161,98,.46); color:var(--gold-light); }
 .maintenance-device-dialog { width:min(760px,calc(100vw - 32px)); }

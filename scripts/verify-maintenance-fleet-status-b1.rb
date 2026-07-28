@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "fileutils"
 require "tmpdir"
 require "time"
 
@@ -109,6 +110,10 @@ class FleetFacadeStub
         "devices" => []
       }
     }
+  end
+
+  def refresh(device_id:)
+    collect.tap { |result| result["data"]["refreshed_device_id"] = device_id }
   end
 end
 
@@ -234,6 +239,67 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              dashboard.include?('const inventoryOnly = device.control !== "maintenance"') &&
                dashboard.include?("Status only · lifecycle and mutation remain provider-managed") &&
                dashboard.include?("discovered capabilities grant no mutation authority"))
+  check.call("dashboard exposes one-device refresh with a visible observation timestamp",
+             dashboard.include?('callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }') &&
+               dashboard.include?('["Checked", observedLabel]') &&
+               dashboard.include?("only this device was probed"))
+
+  private_root = File.join(root, "private-root")
+  registry_directory = File.join(private_root, "Soul", "private", "host_maintenance")
+  FileUtils.mkdir_p(registry_directory, mode: 0o700)
+  registry_path = File.join(registry_directory, "discovered_devices.json")
+  File.write(registry_path, JSON.pretty_generate({
+    "schema_version" => "soul.maintenance.fleet_registry.v1",
+    "devices" => [{
+      "id" => "managed_0123456789abcdef",
+      "label" => "Test Router",
+      "role" => "Discovered local appliance · status only",
+      "address" => "192.0.2.1",
+      "connection_mode" => "status_only",
+      "control" => "inventory_only",
+      "facts" => {"capability_probe" => "status_only"}
+    }]
+  }))
+  File.chmod(0o600, registry_path)
+  refresh_runner = FleetFakeRunner.new
+  clock_values = [
+    Time.utc(2026, 7, 27, 21, 6, 0),
+    Time.utc(2026, 7, 27, 21, 7, 0)
+  ].each
+  refresh_service = SoulCore::MaintenanceFleetStatusService.new(
+    runner: refresh_runner,
+    clock: -> { clock_values.next },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "maven" },
+    root: private_root
+  )
+  initial = refresh_service.collect
+  calls_before_refresh = refresh_runner.calls.length
+  refreshed = refresh_service.refresh(device_id: "managed_0123456789abcdef")
+  refreshed_router = refreshed.dig("data", "devices").find { |device| device["id"] == "managed_0123456789abcdef" }
+  refresh_calls = refresh_runner.calls.drop(calls_before_refresh)
+  check.call("one-device refresh probes only the selected status-only appliance and replaces its persisted card",
+             initial["lifecycle_state"] == "complete" &&
+               refreshed["lifecycle_state"] == "complete" &&
+               refreshed["mutation"] == "status_cache" &&
+               refreshed.dig("data", "freshness") == "on_demand_device" &&
+               refreshed.dig("data", "refreshed_device_id") == "managed_0123456789abcdef" &&
+               refreshed_router["observed_at"] == "2026-07-27T21:07:00Z" &&
+               refresh_calls.length == 1 &&
+               refresh_calls.first.dig("argv", 0) == "/usr/bin/ping" &&
+               refresh_calls.first.dig("argv", 5) == "192.0.2.1")
+  persisted = JSON.parse(File.read(File.join(registry_directory, "fleet_status.json")))
+  check.call("one-device refresh preserves the fleet and stores its bounded observation",
+             persisted.fetch("devices").length == initial.dig("data", "devices").length &&
+               persisted["refreshed_device_id"] == "managed_0123456789abcdef" &&
+               persisted.fetch("devices").find { |device| device["id"] == "managed_0123456789abcdef" }["observed_at"] == "2026-07-27T21:07:00Z")
+  stale_refresh = refresh_service.refresh(device_id: "managed_ffffffffffffffff")
+  check.call("unknown device refresh fails without probing or changing the snapshot",
+             stale_refresh["lifecycle_state"] == "failed" &&
+               stale_refresh["mutation"] == "none" &&
+               refresh_runner.calls.length == calls_before_refresh + 1 &&
+               JSON.parse(File.read(File.join(registry_directory, "fleet_status.json"))) == persisted)
 
   offline_runner = FleetFakeRunner.new(pihole_offline: true)
   offline = SoulCore::MaintenanceFleetStatusService.new(
@@ -264,6 +330,16 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
   check.call("application contract exposes only the parameterless fleet status operation",
              envelope["lifecycle_state"] == "complete" &&
                envelope.dig("data", "schema_version") == "soul.maintenance.fleet_status.v1")
+  refresh_envelope = facade.call({
+    "schema_version" => "soul.application.v1",
+    "request_id" => "request.fleet.refresh.0001",
+    "operation" => "maintenance.fleet.device.refresh",
+    "parameters" => {"device_id" => "managed_0123456789abcdef"},
+    "context" => {"interface" => "dashboard_test"}
+  })
+  check.call("application contract exposes bounded one-device fleet refresh",
+             refresh_envelope["lifecycle_state"] == "complete" &&
+               refresh_envelope.dig("data", "refreshed_device_id") == "managed_0123456789abcdef")
 end
 
 if errors.empty?
