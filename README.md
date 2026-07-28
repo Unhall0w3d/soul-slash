@@ -8,6 +8,8 @@ The model is not treated as the whole assistant. It supplies language and reason
 
 Soul/ is experimental Linux-first software. It is developed in reviewable slices so new behavior can be inspected, tested, corrected, and explicitly accepted before it becomes durable or production-capable.
 
+Read the NOC Thoughts feature: [How Soul/ Turns an Idea Into a Song](https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html).
+
 ## What exists now
 
 The authenticated dashboard provides:
