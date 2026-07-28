@@ -12,16 +12,23 @@ module SoulCore
   class MaintenanceFleetDiscoveryService
     SCHEMA_VERSION = "soul.maintenance.fleet_discovery.v1"
     REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
+    PREFERENCES_SCHEMA = "soul.maintenance.fleet_discovery_preferences.v1"
+    IGNORED_SCHEMA = "soul.maintenance.fleet_ignored_devices.v1"
     NMAP_PATH = "/usr/bin/nmap"
     SSH_PATH = "/usr/bin/ssh"
     PING_PATH = "/usr/bin/ping"
+    ARP_PATH = "/proc/net/arp"
+    MAC_PREFIX_PATH = "/usr/share/nmap/nmap-mac-prefixes"
     MAX_HOSTS = 256
     MAX_DEVICES = 64
     MAX_FILE_BYTES = 256 * 1024
+    MAX_MAC_PREFIX_BYTES = 2 * 1024 * 1024
     DISCOVERY_TIMEOUT_SECONDS = 30
     SSH_TIMEOUT_SECONDS = 5
     ENROLL_CONFIRMATION = "ENROLL_FLEET_DEVICE"
     REMOVE_CONFIRMATION = "REMOVE_FLEET_DEVICE"
+    IGNORE_CONFIRMATION = "IGNORE_FLEET_CANDIDATE"
+    RESTORE_CONFIRMATION = "RESTORE_FLEET_CANDIDATE"
     PACKAGE_PATHS = {
       "pacman" => %w[/usr/bin/pacman],
       "yay" => %w[/usr/bin/yay],
@@ -44,7 +51,9 @@ module SoulCore
       ssh_config: File.expand_path("~/.ssh/config"),
       nmap_path: NMAP_PATH,
       ssh_path: SSH_PATH,
-      ping_path: PING_PATH
+      ping_path: PING_PATH,
+      arp_path: ARP_PATH,
+      mac_prefix_path: MAC_PREFIX_PATH
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h.transform_keys(&:to_s)
@@ -54,8 +63,12 @@ module SoulCore
       @nmap_path = File.expand_path(nmap_path)
       @ssh_path = File.expand_path(ssh_path)
       @ping_path = File.expand_path(ping_path)
+      @arp_path = File.expand_path(arp_path)
+      @mac_prefix_path = File.expand_path(mac_prefix_path)
       @state_root = File.join(@root, "Soul", "private", "host_maintenance")
       @registry_path = File.join(@state_root, "discovered_devices.json")
+      @preferences_path = File.join(@state_root, "fleet_discovery_preferences.json")
+      @ignored_path = File.join(@state_root, "ignored_devices.json")
     end
 
     def status
@@ -66,6 +79,8 @@ module SoulCore
         "maximum_hosts" => MAX_HOSTS,
         "subnet_bounds" => "/24../32 private IPv4 only",
         "registered_devices" => registry_records.length,
+        "ignored_devices" => ignored_records.length,
+        "last_subnet" => discovery_preferences["last_subnet"],
         "registry_private" => true,
         "background_scanning" => false,
         "mutation_authority" => false
@@ -93,23 +108,43 @@ module SoulCore
 
       known = known_addresses
       addresses = parse_nmap_addresses(result.stdout).select { |address| network.include?(IPAddr.new(address)) }
-      candidates = addresses.first(MAX_HOSTS).map do |address|
-        existing = known[address]
+      bounded_addresses = addresses.first(MAX_HOSTS)
+      identity_hints = neighbor_identity_hints(bounded_addresses)
+      ignored = ignored_records
+      represented = bounded_addresses.filter_map do |address|
+        label = known[address]
+        {"address" => address, "known_device" => label} if label
+      end
+      ignored_detected = bounded_addresses.select do |address|
+        ignored_match?(ignored, address, identity_hints.dig(address, "mac_address"))
+      end
+      candidates = bounded_addresses.reject do |address|
+        known.key?(address) || ignored_detected.include?(address)
+      end.map do |address|
         {
           "candidate_id" => "candidate_#{Digest::SHA256.hexdigest(address)[0, 16]}",
           "address" => address,
-          "state" => existing ? "already_configured" : "available",
-          "known_device" => existing,
+          "state" => "available",
+          "known_device" => nil,
+          "subnet" => canonical_subnet,
+          "identity_hints" => identity_hints.fetch(address, {}),
           "supported_enrollment_modes" => %w[status_only ssh],
           "trusted" => false,
           "mutation_authority" => false
         }
       end
+      persist_last_subnet(canonical_subnet)
       success(
         "schema_version" => SCHEMA_VERSION,
         "subnet" => canonical_subnet,
+        "detected_count" => bounded_addresses.length,
         "candidate_count" => candidates.length,
         "candidates" => candidates,
+        "represented_count" => represented.length,
+        "represented" => represented,
+        "ignored_count" => ignored_detected.length,
+        "preference_persisted" => true,
+        "preference_mutation" => "last_subnet",
         "command" => {
           "adapter" => "nmap_ping_discovery",
           "status" => result.status,
@@ -135,8 +170,112 @@ module SoulCore
       )
     end
 
-    def enrollment_preview(address:, label:, mode:, ssh_alias: nil)
-      scope = enrollment_scope(address: address, label: label, mode: mode, ssh_alias: ssh_alias)
+    def ignored
+      success(
+        "schema_version" => IGNORED_SCHEMA,
+        "devices" => ignored_records,
+        "device_count" => ignored_records.length,
+        "private" => true,
+        "mutation_authority" => false
+      )
+    end
+
+    def ignore_preview(address:, label:, subnet:, mac_address: nil, vendor: nil)
+      scope = ignored_scope(
+        address: address,
+        label: label,
+        subnet: subnet,
+        mac_address: mac_address,
+        vendor: vendor
+      )
+      success(
+        "schema_version" => SCHEMA_VERSION,
+        "device" => scope,
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => IGNORE_CONFIRMATION,
+        "prospective_registry_mutation" => "ignore_one_candidate",
+        "device_mutation" => "none"
+      )
+    rescue ArgumentError => error
+      failed(error.message)
+    end
+
+    def ignore(address:, label:, subnet:, mac_address: nil, vendor: nil, confirmation:, expected_digest:)
+      return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
+      return blocked("exact candidate ignore confirmation is required") unless confirmation.to_s == IGNORE_CONFIRMATION
+
+      preview = ignore_preview(address: address, label: label, subnet: subnet, mac_address: mac_address, vendor: vendor)
+      return preview unless preview["lifecycle_state"] == "complete"
+
+      scope = preview.dig("data", "device")
+      return blocked("ignored candidate evidence changed; preview again") unless secure_compare(expected_digest.to_s, digest(scope))
+
+      records = ignored_records
+      return blocked("candidate identity is already ignored") if records.any? { |record| record["identity_key"] == scope["identity_key"] }
+      return blocked("ignored device list reached its #{MAX_DEVICES}-record bound") if records.length >= MAX_DEVICES
+
+      record = scope.merge("ignored_at" => @clock.call.iso8601)
+      persist_ignored(records + [record])
+      success(
+        "schema_version" => IGNORED_SCHEMA,
+        "device" => record,
+        "device_count" => records.length + 1,
+        "registry_mutation" => "ignore_one_candidate",
+        "device_mutation" => "none"
+      )
+    rescue ArgumentError => error
+      failed(error.message)
+    end
+
+    def restore_preview(identity_key:)
+      record = ignored_records.find { |candidate| candidate["identity_key"] == identity_key.to_s }
+      return failed("ignored fleet candidate was not found") unless record
+
+      scope = record.slice("identity_key", "label", "address", "mac_address", "subnet")
+      success(
+        "schema_version" => SCHEMA_VERSION,
+        "device" => scope,
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => RESTORE_CONFIRMATION,
+        "prospective_registry_mutation" => "restore_one_candidate",
+        "device_mutation" => "none"
+      )
+    end
+
+    def restore(identity_key:, confirmation:, expected_digest:)
+      return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
+      return blocked("exact candidate restore confirmation is required") unless confirmation.to_s == RESTORE_CONFIRMATION
+
+      preview = restore_preview(identity_key: identity_key)
+      return preview unless preview["lifecycle_state"] == "complete"
+
+      scope = preview.dig("data", "device")
+      return blocked("ignored candidate evidence changed; preview again") unless secure_compare(expected_digest.to_s, digest(scope))
+
+      records = ignored_records
+      retained = records.reject { |record| record["identity_key"] == identity_key.to_s }
+      return failed("ignored fleet candidate was not found") if retained.length == records.length
+
+      persist_ignored(retained)
+      success(
+        "schema_version" => IGNORED_SCHEMA,
+        "restored_device" => scope,
+        "device_count" => retained.length,
+        "registry_mutation" => "restore_one_candidate",
+        "device_mutation" => "none"
+      )
+    end
+
+    def enrollment_preview(address:, label:, mode:, ssh_alias: nil, address_policy: "fixed", subnet: nil, mac_address: nil)
+      scope = enrollment_scope(
+        address: address,
+        label: label,
+        mode: mode,
+        ssh_alias: ssh_alias,
+        address_policy: address_policy,
+        subnet: subnet,
+        mac_address: mac_address
+      )
       success(
         "schema_version" => SCHEMA_VERSION,
         "device" => scope,
@@ -149,18 +288,30 @@ module SoulCore
       failed(error.message)
     end
 
-    def enroll(address:, label:, mode:, ssh_alias: nil, confirmation:, expected_digest:)
+    def enroll(address:, label:, mode:, ssh_alias: nil, address_policy: "fixed", subnet: nil, mac_address: nil, confirmation:, expected_digest:)
       return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return blocked("exact fleet enrollment confirmation is required") unless confirmation.to_s == ENROLL_CONFIRMATION
 
-      preview = enrollment_preview(address: address, label: label, mode: mode, ssh_alias: ssh_alias)
+      preview = enrollment_preview(
+        address: address,
+        label: label,
+        mode: mode,
+        ssh_alias: ssh_alias,
+        address_policy: address_policy,
+        subnet: subnet,
+        mac_address: mac_address
+      )
       return preview unless preview["lifecycle_state"] == "complete"
 
       scope = preview.dig("data", "device")
       return blocked("fleet enrollment evidence changed; preview again") unless secure_compare(expected_digest.to_s, digest(scope))
 
       records = registry_records
-      return blocked("fleet device is already enrolled") if records.any? { |record| record["id"] == scope["id"] || record["address"] == scope["address"] }
+      return blocked("fleet device is already enrolled") if records.any? do |record|
+        record["id"] == scope["id"] ||
+          record["address"] == scope["address"] ||
+          (!scope["mac_address"].to_s.empty? && record["mac_address"] == scope["mac_address"])
+      end
       return blocked("fleet registry reached its #{MAX_DEVICES}-device bound") if records.length >= MAX_DEVICES
 
       record = scope.merge("enrolled_at" => @clock.call.iso8601)
@@ -217,7 +368,28 @@ module SoulCore
 
     private
 
-    def enrollment_scope(address:, label:, mode:, ssh_alias:)
+    def ignored_scope(address:, label:, subnet:, mac_address:, vendor:)
+      normalized_address = private_address!(address)
+      network = private_network!(subnet)
+      raise ArgumentError, "ignored candidate address is outside the reviewed subnet" unless network.fetch("network").include?(IPAddr.new(normalized_address))
+
+      normalized_label = label.to_s.strip
+      raise ArgumentError, "ignored candidate label must be 1..80 characters" unless normalized_label.length.between?(1, 80)
+      raise ArgumentError, "ignored candidate label contains unsupported control characters" if normalized_label.match?(/[[:cntrl:]]/)
+
+      normalized_mac = normalize_mac(mac_address)
+      identity_key = normalized_mac.empty? ? "ip:#{normalized_address}" : "mac:#{normalized_mac}"
+      {
+        "identity_key" => identity_key,
+        "label" => safe_text(normalized_label, 80),
+        "address" => normalized_address,
+        "mac_address" => normalized_mac,
+        "vendor" => safe_text(vendor, 120),
+        "subnet" => network.fetch("cidr")
+      }
+    end
+
+    def enrollment_scope(address:, label:, mode:, ssh_alias:, address_policy:, subnet:, mac_address:)
       normalized_address = private_address!(address)
       normalized_label = label.to_s.strip
       raise ArgumentError, "fleet device label must be 1..80 characters" unless normalized_label.length.between?(1, 80)
@@ -225,6 +397,20 @@ module SoulCore
 
       normalized_mode = mode.to_s
       raise ArgumentError, "fleet enrollment mode must be status_only or ssh" unless %w[status_only ssh].include?(normalized_mode)
+      normalized_policy = address_policy.to_s
+      raise ArgumentError, "address policy must be fixed or dhcp_tracked" unless %w[fixed dhcp_tracked].include?(normalized_policy)
+      raise ArgumentError, "DHCP tracking is available only for status-only devices" if normalized_policy == "dhcp_tracked" && normalized_mode != "status_only"
+
+      normalized_mac = normalized_policy == "dhcp_tracked" ? normalize_mac(mac_address) : ""
+      raise ArgumentError, "DHCP tracking requires reviewed MAC evidence" if normalized_policy == "dhcp_tracked" && normalized_mac.empty?
+      normalized_subnet = if normalized_policy == "dhcp_tracked"
+                            network = private_network!(subnet)
+                            raise ArgumentError, "device address is outside the reviewed DHCP subnet" unless network.fetch("network").include?(IPAddr.new(normalized_address))
+
+                            network.fetch("cidr")
+                          else
+                            ""
+                          end
 
       facts = if normalized_mode == "ssh"
                 fingerprint_ssh(normalized_address, ssh_alias)
@@ -232,12 +418,20 @@ module SoulCore
                 fingerprint_status_only(normalized_address)
               end
       normalized_alias = normalized_mode == "ssh" ? ssh_alias.to_s.strip : ""
-      identity = [normalized_address, normalized_mode, normalized_alias].join("\0")
+      identity = if normalized_policy == "dhcp_tracked"
+                   [normalized_mac, normalized_mode, normalized_policy].join("\0")
+                 else
+                   [normalized_address, normalized_mode, normalized_alias].join("\0")
+                 end
       {
         "id" => "managed_#{Digest::SHA256.hexdigest(identity)[0, 16]}",
         "label" => safe_text(normalized_label, 80),
         "address" => normalized_address,
         "connection_mode" => normalized_mode,
+        "address_policy" => normalized_policy,
+        "mac_address" => normalized_mac,
+        "subnet" => normalized_subnet,
+        "address_history" => [],
         "ssh_alias" => normalized_alias,
         "control" => "inventory_only",
         "role" => normalized_mode == "ssh" ? "Discovered Linux device · inventory only" : "Discovered local appliance · status only",
@@ -417,6 +611,55 @@ module SoulCore
       end.uniq.sort_by { |address| IPAddr.new(address).to_i }
     end
 
+    def neighbor_identity_hints(addresses)
+      return {} unless File.file?(@arp_path) && !File.symlink?(@arp_path)
+      wanted = addresses.to_h { |address| [address, true] }
+      selected = File.foreach(@arp_path, encoding: "UTF-8").first(MAX_HOSTS * 4 + 1).drop(1).filter_map do |line|
+        address, _hardware_type, flags, raw_mac, _mask, interface = line.split(/\s+/, 6)
+        next unless wanted[address]
+
+        mac = raw_mac.to_s.downcase
+        next unless mac.match?(/\A[0-9a-f]{2}(?::[0-9a-f]{2}){5}\z/)
+
+        [{"dst" => address, "dev" => interface.to_s.strip, "flags" => flags}, mac]
+      end
+      vendors = mac_vendors(selected.map(&:last))
+      selected.to_h do |row, mac|
+        locally_administered = (mac[0, 2].to_i(16) & 0x02).positive?
+        hint = {
+          "mac_address" => mac,
+          "vendor" => locally_administered ? "Locally administered address" : vendors[mac.delete(":")[0, 6].upcase],
+          "interface" => safe_text(row["dev"], 32),
+          "neighbor_state" => [row["flags"] == "0x2" ? "ARP cached" : "ARP incomplete"]
+        }.compact
+        [row.fetch("dst"), hint]
+      end
+    rescue SystemCallError
+      {}
+    end
+
+    def mac_vendors(addresses)
+      prefixes = addresses.filter_map do |mac|
+        next if (mac[0, 2].to_i(16) & 0x02).positive?
+
+        mac.delete(":")[0, 6].upcase
+      end.uniq
+      return {} if prefixes.empty?
+      return {} unless File.file?(@mac_prefix_path) && !File.symlink?(@mac_prefix_path)
+      return {} if File.size(@mac_prefix_path) > MAX_MAC_PREFIX_BYTES
+
+      wanted = prefixes.to_h { |prefix| [prefix, true] }
+      File.foreach(@mac_prefix_path, encoding: "UTF-8").each_with_object({}) do |line, vendors|
+        match = line.match(/\A([0-9A-F]{6})\s+(.+?)\s*\z/)
+        next unless match && wanted[match[1]]
+
+        vendors[match[1]] = safe_text(match[2], 120)
+        break vendors if vendors.length == wanted.length
+      end
+    rescue SystemCallError
+      {}
+    end
+
     def known_addresses
       configured = {
         @process_env["SOUL_FLEET_MAVEN_ADDRESS"] => "Maven",
@@ -455,6 +698,68 @@ module SoulCore
       []
     end
 
+    def ignored_records
+      return [] unless File.exist?(@ignored_path)
+      return [] if File.symlink?(@ignored_path)
+
+      stat = File.stat(@ignored_path)
+      return [] unless stat.file? && (stat.mode & 0o077).zero? && stat.size <= MAX_FILE_BYTES
+
+      parsed = JSON.parse(File.binread(@ignored_path, MAX_FILE_BYTES + 1))
+      return [] unless parsed["schema_version"] == IGNORED_SCHEMA && parsed["devices"].is_a?(Array)
+
+      parsed["devices"].first(MAX_DEVICES).filter_map do |record|
+        next unless record.is_a?(Hash)
+        next unless record["identity_key"].to_s.match?(/\A(?:mac:[0-9a-f]{2}(?::[0-9a-f]{2}){5}|ip:\d{1,3}(?:\.\d{1,3}){3})\z/)
+        next unless record["label"].to_s.length.between?(1, 80)
+        next unless record["subnet"].to_s.length.between?(9, 18)
+
+        private_address!(record["address"])
+        private_network!(record["subnet"])
+        mac = normalize_mac(record["mac_address"])
+        next if record["identity_key"].start_with?("mac:") && "mac:#{mac}" != record["identity_key"]
+
+        record.slice("identity_key", "label", "address", "mac_address", "vendor", "subnet", "ignored_at")
+      end
+    rescue JSON::ParserError, SystemCallError, ArgumentError
+      []
+    end
+
+    def ignored_match?(records, address, mac_address)
+      normalized_mac = normalize_mac(mac_address)
+      records.any? do |record|
+        if record["identity_key"].start_with?("mac:")
+          !normalized_mac.empty? && record["mac_address"] == normalized_mac
+        else
+          record["address"] == address
+        end
+      end
+    end
+
+    def persist_ignored(records)
+      FileUtils.mkdir_p(@state_root, mode: 0o700)
+      raise "ignored device directory is unsafe" if File.symlink?(@state_root)
+
+      File.chmod(0o700, @state_root)
+      payload = JSON.pretty_generate(
+        "schema_version" => IGNORED_SCHEMA,
+        "updated_at" => @clock.call.iso8601,
+        "devices" => records
+      )
+      raise "ignored device list exceeds its size bound" if payload.bytesize > MAX_FILE_BYTES
+
+      temporary = "#{@ignored_path}.tmp-#{Process.pid}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(payload)
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @ignored_path)
+      File.chmod(0o600, @ignored_path)
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
+
     def normalized_registry_record(record)
       return nil unless record.is_a?(Hash)
       return nil unless record["id"].to_s.match?(/\Amanaged_[a-f0-9]{16}\z/)
@@ -466,9 +771,27 @@ module SoulCore
       return nil if record["connection_mode"] == "ssh" && !record["ssh_alias"].to_s.match?(/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/)
 
       private_address!(record["address"])
-      record.slice(
+      policy = record["address_policy"].to_s.empty? ? "fixed" : record["address_policy"].to_s
+      return nil unless %w[fixed dhcp_tracked].include?(policy)
+      return nil if policy == "dhcp_tracked" && record["connection_mode"] != "status_only"
+      mac = policy == "dhcp_tracked" ? normalize_mac(record["mac_address"]) : ""
+      return nil if policy == "dhcp_tracked" && mac.empty?
+      subnet = policy == "dhcp_tracked" ? private_network!(record["subnet"]).fetch("cidr") : ""
+      history = Array(record["address_history"]).first(8).filter_map do |event|
+        next unless event.is_a?(Hash)
+        next unless event["from"].to_s.match?(/\A\d{1,3}(?:\.\d{1,3}){3}\z/) && event["to"].to_s.match?(/\A\d{1,3}(?:\.\d{1,3}){3}\z/)
+
+        event.slice("from", "to", "changed_at", "reason")
+      end
+      normalized = record.slice(
         "id", "label", "address", "connection_mode", "ssh_alias", "control",
         "role", "facts", "mutation_authority", "enrolled_at"
+      )
+      normalized.merge(
+        "address_policy" => policy,
+        "mac_address" => mac,
+        "subnet" => subnet,
+        "address_history" => history
       )
     rescue ArgumentError
       nil
@@ -498,8 +821,53 @@ module SoulCore
       File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
     end
 
+    def discovery_preferences
+      return {} unless File.file?(@preferences_path) && !File.symlink?(@preferences_path)
+      return {} if File.size(@preferences_path) > 16 * 1024
+
+      parsed = JSON.parse(File.binread(@preferences_path, 16 * 1024 + 1))
+      return {} unless parsed["schema_version"] == PREFERENCES_SCHEMA
+
+      subnet = parsed["last_subnet"].to_s
+      return {} unless private_network!(subnet).fetch("cidr") == subnet
+
+      {"last_subnet" => subnet}
+    rescue JSON::ParserError, SystemCallError, ArgumentError
+      {}
+    end
+
+    def persist_last_subnet(subnet)
+      FileUtils.mkdir_p(@state_root, mode: 0o700)
+      raise "fleet discovery preference directory is unsafe" if File.symlink?(@state_root)
+
+      File.chmod(0o700, @state_root)
+      payload = JSON.pretty_generate(
+        "schema_version" => PREFERENCES_SCHEMA,
+        "updated_at" => @clock.call.iso8601,
+        "last_subnet" => subnet
+      )
+      temporary = "#{@preferences_path}.tmp-#{Process.pid}"
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(payload)
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @preferences_path)
+      File.chmod(0o600, @preferences_path)
+    ensure
+      File.delete(temporary) if defined?(temporary) && temporary && File.exist?(temporary)
+    end
+
     def digest(value)
       Digest::SHA256.hexdigest(JSON.generate(deep_sort(value)))
+    end
+
+    def normalize_mac(value)
+      mac = value.to_s.strip.downcase
+      return "" if mac.empty?
+      raise ArgumentError, "MAC address is invalid" unless mac.match?(/\A[0-9a-f]{2}(?::[0-9a-f]{2}){5}\z/)
+
+      mac
     end
 
     def deep_sort(value)
@@ -523,7 +891,7 @@ module SoulCore
     end
 
     def success(data)
-      {"ok" => true, "lifecycle_state" => "complete", "data" => data, "mutation" => data["registry_mutation"] || "none"}
+      {"ok" => true, "lifecycle_state" => "complete", "data" => data, "mutation" => data["registry_mutation"] || data["preference_mutation"] || "none"}
     end
 
     def awaiting(reason)

@@ -34,8 +34,13 @@ A1 may:
 - accept one explicit RFC1918 IPv4 subnet between `/24` and `/32`;
 - run one foreground, time-bounded, host-count-bounded discovery command after
   an authenticated button click or explicit CLI invocation;
-- return live-address candidates without persisting the scan;
-- distinguish addresses already represented by local fleet configuration;
+- return unenrolled live-address candidates without persisting the scan;
+- count addresses already represented by local fleet configuration separately
+  and exclude them from the actionable candidate list;
+- enrich candidates from one bounded local ARP-table read with ephemeral
+  MAC, OUI vendor, interface, and neighbor-state hints when available;
+- remember only the last successfully scanned canonical subnet in owner-private
+  preference state;
 - preview and execute enrollment of one exact device into an owner-private,
   bounded local registry;
 - support `status_only` enrollment using bounded reachability;
@@ -63,8 +68,8 @@ A1 must not:
 - grant maintenance, reboot, package-update, service-control, or root authority
   to a discovered or enrolled device;
 - turn a detected package manager into an executable update plan;
-- store scan output, MAC addresses, serial numbers, credentials, line identity,
-  call history, or raw SSH output;
+- persist scan output, MAC addresses, serial numbers, credentials, line
+  identity, call history, or raw SSH output;
 - add a service, daemon, watcher, timer, listener, or polling loop.
 
 ## Discovery contract

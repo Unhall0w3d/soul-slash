@@ -19,6 +19,18 @@ Operator.
 - Added exact reviewed registry removal that never contacts the device.
 - Added Administration UI, CLI prerequisite/scan helpers, Makefile targets,
   documentation, and deterministic verification.
+- Corrected post-enrollment candidate semantics: configured and enrolled
+  addresses are counted as represented but excluded from the actionable
+  candidate list, and registry mutations invalidate stale page-session scans.
+- Added one bounded local `/proc/net/arp` read plus Nmap's local OUI data to
+  provide ephemeral candidate MAC/vendor/interface/state hints.
+- Added one owner-private preference containing only the last successfully
+  scanned canonical subnet so the Dashboard can refill the discovery field.
+- Added a reversible owner-private ignored-device list with MAC-first identity
+  matching and IP fallback.
+- Added reviewed MAC/subnet DHCP tracking for status-only inventory, one
+  bounded recovery scan, and exactly one transient ten-minute retry.
+- Added compact status-only cards and semantic green/yellow/red fleet states.
 
 ## Files changed
 
@@ -30,6 +42,7 @@ Operator.
 - `docs/assessments/PORTABLE_FLEET_DISCOVERY_A1_REVIEW.md`
 - `docs/guides/GUIDED_MAINTENANCE.md`
 - `docs/soul/PORTABLE_FLEET_DISCOVERY_A1_BRIEF.md`
+- `docs/soul/FLEET_DHCP_IDENTITY_A3_BRIEF.md`
 - `lib/soul_core/application_contract.rb`
 - `lib/soul_core/application_facade.rb`
 - `lib/soul_core/maintenance_fleet_discovery_service.rb`
@@ -38,6 +51,8 @@ Operator.
 - `scripts/verify-maintenance-device-control-c1.rb`
 - `scripts/verify-maintenance-fleet-discovery-a1.rb`
 - `scripts/verify-maintenance-fleet-status-b1.rb`
+- `scripts/soul-maintenance-fleet-dhcp-recheck`
+- `scripts/verify-maintenance-fleet-dhcp-identity-a3.rb`
 
 Ignored runtime state, if enrolled through the Dashboard:
 
@@ -52,6 +67,7 @@ ruby -c lib/soul_core/maintenance_fleet_status_service.rb
 node --check assets/dashboard/dashboard.js
 ruby scripts/verify-maintenance-fleet-discovery-a1.rb
 ruby scripts/verify-maintenance-fleet-status-b1.rb
+ruby scripts/verify-maintenance-fleet-dhcp-identity-a3.rb
 ruby scripts/verify-maintenance-device-control-c1.rb
 make verify-project-timeline
 make fleet-discovery-check
@@ -68,6 +84,10 @@ The focused verifier proves:
   execution;
 - discovery uses one fixed shell-free `nmap` vector, timeout, and result bound;
 - candidates remain untrusted and non-persisted;
+- configured and enrolled addresses never remain actionable candidates;
+- candidate identity hints require one bounded local neighbor read and are
+  never written to the registry or public source;
+- the remembered subnet preference contains no candidate or device identity;
 - status-only enrollment performs one bounded reachability probe;
 - SSH inventory binds the alias to the selected address and uses only fixed
   BatchMode commands;
@@ -81,9 +101,9 @@ The focused verifier proves:
 ## Live result
 
 The authenticated Dashboard ran one explicit private `/24` scan in under three
-seconds and returned 22 ephemeral candidates. Maven, Forge, Pi-hole, and the
-Cisco phone were correctly marked as already represented. No candidate scan
-was written to disk.
+seconds and returned 22 reachable addresses. Maven, Forge, Pi-hole, and the
+Cisco phone were correctly identified as already represented. No candidate
+scan was written to disk.
 
 A live Forge SSH preview verified the configured alias-to-address binding,
 identified Debian 13, and detected `apt` plus `apt-get`; it was not enrolled.
@@ -93,6 +113,12 @@ no Maintenance or Reboot controls. The reviewed removal deleted that one
 registry record, removed its card, and did not contact or modify the device.
 The registry returned to zero records. A 390-pixel responsive check found no
 horizontal overflow and stacked all discovery controls into one column.
+
+The candidate-filter and identity-hint follow-up was exercised live on Maven.
+One `/24` scan detected 22 reachable addresses, excluded five configured or
+enrolled addresses, and returned 17 actionable candidates. All 17 received
+ephemeral neighbor-table MAC, vendor/address-type, and interface hints; none
+were persisted.
 
 No Proxmox guest was created for A1. Deterministic capability fixtures prove
 discovery semantics without introducing a disposable machine. A real NixOS or

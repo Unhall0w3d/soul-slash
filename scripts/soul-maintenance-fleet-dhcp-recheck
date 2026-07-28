@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+ROOT = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(ROOT, "lib"))
+
+require_relative "../lib/soul_core/env_loader"
+require_relative "../lib/soul_core/maintenance_fleet_status_service"
+
+SoulCore::EnvLoader.load(File.join(ROOT, ".env"))
+result = SoulCore::MaintenanceFleetStatusService.new(root: ROOT).retry_pending
+puts JSON.generate(result)
+exit(result["lifecycle_state"] == "complete" ? 0 : 1)

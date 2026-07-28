@@ -26,11 +26,16 @@ and inspect:
 Every device card also has **Refresh**. It runs only that device's existing
 bounded collector, atomically replaces its card in the private snapshot, and
 updates the visible **Checked** timestamp. It does not rescan the subnet or
-probe any other fleet member. For a status-only appliance, a refresh proves
-only current network reachability; unchanged **Reachable** status is expected
-while the appliance remains online. Firmware, WAN health, client inventory,
-and vendor-cloud state remain unasserted unless a separately reviewed adapter
-provides that evidence.
+probe any other fleet member. Status-only appliances use compact cards: IP,
+assigned display name, semantic status, and **Refresh** remain primary, while a
+small evidence row retains checked time, status-probe state, and network
+reachability. Firmware, WAN health, client inventory, and vendor-cloud state
+remain unasserted unless a separately reviewed adapter provides that evidence.
+
+Card color is evidence-driven: **Healthy** and status-only **Online** are
+green, **Updates available** is yellow, and **Offline** or **Reboot required**
+is red. Managed hosts and status-only appliances retain different vocabulary;
+color does not imply that a status-only appliance has maintenance authority.
 
 An optional Cisco 8851/Webex Calling card is deliberately narrower. It proves
 only bounded network reachability and displays the configured device identity,
@@ -58,17 +63,33 @@ editing public source:
 
 1. Enter one explicit RFC1918 IPv4 subnet from `/24` through `/32`.
 2. Click **Scan subnet**. Soul runs one 30-second-bounded `nmap` host-discovery
-   pass; the candidate list remains in the current page session and is not
-   persisted.
+   pass. Already configured or enrolled addresses are counted and excluded;
+   only unenrolled addresses appear as candidates. The candidate list remains
+   in the current page session and is not persisted. Soul also reads the local
+   kernel ARP table once and shows ephemeral MAC, OUI vendor, interface,
+   and neighbor-state hints when available. These hints can narrow a device
+   family but do not prove device identity.
 3. Select one candidate. A reachable address is untrusted until this explicit
    review.
 4. Choose **Status only**, or **Fixed SSH inventory** with an existing literal
-   OpenSSH `Host` alias whose `HostName` is that exact address.
+   OpenSSH `Host` alias whose `HostName` is that exact address. Status-only
+   enrollment may keep the address fixed or bind it to the reviewed MAC and
+   subnet with **DHCP tracked by MAC**. SSH inventory remains fixed-address.
 5. Preview the exact record. SSH inventory reads a bounded hostname, kernel,
    OS projection, and independently tests fixed executable paths for pacman,
    yay, paru, apt, apt-get, dnf, zypper, apk, Flatpak, Snap, and Nix.
 6. Click **Enroll reviewed device**. The click authorizes one digest-bound
-   write to the ignored owner-private registry.
+   write to the owner-private registry. Enrollment and removal clear
+   the now-stale candidate list; scan again to obtain a fresh list.
+
+Use **Ignore** when an address should not remain in the candidate queue. The
+exact reviewed identity is stored privately, matched by MAC when available and
+IP otherwise, and remains visible in **Ignored devices**. **Restore** removes
+only that exclusion so it can appear in a later explicit scan.
+
+After a successful scan, Soul remembers only the canonical subnet in an
+owner-private `0600` preference file and refills the field on the next page
+load. Candidate addresses, MACs, vendors, and scan results remain ephemeral.
 
 Enrolled cards are `inventory_only`. They can display discovered capabilities
 and expose a bounded card-level refresh, but do not expose Maintenance or
@@ -77,12 +98,24 @@ future adapter must define, test, and receive approval for each mutation
 family. Removing a device removes only its local registry record and sends
 nothing to the target.
 
+For a DHCP-tracked status-only card, Soul compares the recorded address's ARP
+identity with the reviewed MAC. A mismatch or unavailable address triggers one
+bounded scan of the reviewed subnet. Exactly one MAC match retargets only the
+private status record and appends a bounded address-history event. Zero or
+multiple matches do not retarget. One transient user-level oneshot retries ten
+minutes later; a second miss terminates recovery until the next manual or
+noon/midnight collection. There is no sleeper, daemon, repeating ten-minute
+timer, or background polling loop. Devices on the same subnet share one
+recovery scan per invocation, and a collection will scan at most four distinct
+reviewed subnets.
+
 Public bootstrap and troubleshooting:
 
 ```text
 make fleet-discovery-check
 make fleet-discovery-scan FLEET_SUBNET=192.168.1.0/24
 make verify-maintenance-fleet-discovery
+make verify-maintenance-fleet-dhcp-identity
 ```
 
 `nmap` is the only optional discovery dependency. Install it with the host's
@@ -91,6 +124,11 @@ authenticated Dashboard for enrollment. The CLI scan is deliberately
 non-persisting and is useful for setup validation. Subnets, addresses, SSH
 aliases, discovered candidates, and enrollment records never belong in the
 public repository.
+
+Automatic reverse-DNS or mDNS resolution is intentionally omitted: unresolved
+LAN names can consume the full resolver timeout for little evidence. A future
+explicit per-candidate inspection can add bounded service fingerprinting when
+neighbor and vendor hints are insufficient.
 
 The snapshot is private, atomic, and survives Dashboard reloads. The proposed
 owner-level oneshot timer collects it at local noon and midnight. The timer
