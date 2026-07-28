@@ -23,6 +23,15 @@ and inspect:
 - Pi-hole FTL, Unbound, blocking, and DNS-query health; and
 - an evidence-driven architecture map.
 
+Every device card also has **Refresh**. It runs only that device's existing
+bounded collector, atomically replaces its card in the private snapshot, and
+updates the visible **Checked** timestamp. It does not rescan the subnet or
+probe any other fleet member. For a status-only appliance, a refresh proves
+only current network reachability; unchanged **Reachable** status is expected
+while the appliance remains online. Firmware, WAN health, client inventory,
+and vendor-cloud state remain unasserted unless a separately reviewed adapter
+provides that evidence.
+
 An optional Cisco 8851/Webex Calling card is deliberately narrower. It proves
 only bounded network reachability and displays the configured device identity,
 provider-owned lifecycle, and topology relationship. Reachability does not
@@ -61,11 +70,12 @@ editing public source:
 6. Click **Enroll reviewed device**. The click authorizes one digest-bound
    write to the ignored owner-private registry.
 
-Enrolled cards are `inventory_only`. They can display discovered capabilities,
-but do not expose Maintenance or Reboot. Detecting a package manager never
-creates update authority. A separate future adapter must define, test, and
-receive approval for each mutation family. Removing a device removes only its
-local registry record and sends nothing to the target.
+Enrolled cards are `inventory_only`. They can display discovered capabilities
+and expose a bounded card-level refresh, but do not expose Maintenance or
+Reboot. Detecting a package manager never creates update authority. A separate
+future adapter must define, test, and receive approval for each mutation
+family. Removing a device removes only its local registry record and sends
+nothing to the target.
 
 Public bootstrap and troubleshooting:
 

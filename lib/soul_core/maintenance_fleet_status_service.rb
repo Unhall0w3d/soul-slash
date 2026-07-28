@@ -61,23 +61,17 @@ module SoulCore
       registry_records.each do |record|
         devices << collect_enrolled_device(record) unless existing_addresses.include?(record.fetch("address"))
       end
+      collected_at = @clock.call.iso8601
+      devices.each { |device| device["observed_at"] = collected_at }
       topology = build_topology(devices)
-      states = devices.each_with_object(Hash.new(0)) { |device, counts| counts[device.fetch("status")] += 1 }
 
       response = success(
         "schema_version" => SCHEMA_VERSION,
-        "collected_at" => @clock.call.iso8601,
+        "collected_at" => collected_at,
         "freshness" => "on_demand",
         "read_only" => true,
         "devices" => devices,
-        "summary" => {
-          "device_count" => devices.length,
-          "reachable_count" => devices.count { |device| device["reachable"] },
-          "updates_available" => devices.sum { |device| device.dig("updates", "total").to_i },
-          "reboot_required_count" => devices.count { |device| device.dig("reboot", "required") },
-          "kernel_attention_count" => devices.count { |device| device.dig("kernel", "update_required") },
-          "states" => states
-        },
+        "summary" => summarize(devices),
         "topology" => topology,
         "evidence" => @evidence,
         "verification" => {
@@ -95,24 +89,92 @@ module SoulCore
       failed("fleet status failed safely: #{safe_text(error.message)}")
     end
 
+    def refresh(device_id:)
+      @evidence = []
+      normalized_id = device_id.to_s.strip
+      return failed("device id is invalid") unless normalized_id.match?(/\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/)
+
+      current = read_snapshot_data
+      devices = Array(current["devices"])
+      existing = devices.find { |device| device["id"] == normalized_id }
+      return failed("device is not present in the current fleet snapshot") unless existing
+
+      refreshed = collect_snapshot_device(existing)
+      observed_at = @clock.call.iso8601
+      refreshed["observed_at"] = observed_at
+      updated_devices = devices.map { |device| device["id"] == normalized_id ? refreshed : device }
+      data = current.merge(
+        "collected_at" => observed_at,
+        "freshness" => "on_demand_device",
+        "read_only" => true,
+        "devices" => updated_devices,
+        "summary" => summarize(updated_devices),
+        "topology" => build_topology(updated_devices),
+        "evidence" => @evidence,
+        "refreshed_device_id" => refreshed.fetch("id")
+      )
+      data.delete("source")
+      persist_snapshot(data)
+      success(data).merge("mutation" => "status_cache")
+    rescue StandardError => error
+      failed("device status refresh failed safely: #{safe_text(error.message)}")
+    end
+
     def snapshot
-      return unavailable_snapshot("fleet status persistence is not configured") unless @snapshot_path
-      return unavailable_snapshot("no fleet status has been collected yet") unless File.exist?(@snapshot_path)
-      return unavailable_snapshot("fleet status snapshot path is unsafe") if File.symlink?(@snapshot_path)
-
-      stat = File.stat(@snapshot_path)
-      return unavailable_snapshot("fleet status snapshot is not a private regular file") unless stat.file? && (stat.mode & 0o077).zero?
-      return unavailable_snapshot("fleet status snapshot exceeds its size bound") if stat.size > MAX_SNAPSHOT_BYTES
-
-      parsed = JSON.parse(File.binread(@snapshot_path, MAX_SNAPSHOT_BYTES + 1))
-      return unavailable_snapshot("fleet status snapshot schema is unsupported") unless parsed["schema_version"] == SCHEMA_VERSION
-
-      success(parsed.merge("source" => "persisted_snapshot"))
+      success(read_snapshot_data.merge("source" => "persisted_snapshot"))
+    rescue ArgumentError => error
+      unavailable_snapshot(error.message)
     rescue JSON::ParserError, SystemCallError => error
       failed("fleet status snapshot could not be read safely: #{error.class}")
     end
 
     private
+
+    def read_snapshot_data
+      raise ArgumentError, "fleet status persistence is not configured" unless @snapshot_path
+      raise ArgumentError, "no fleet status has been collected yet" unless File.exist?(@snapshot_path)
+      raise ArgumentError, "fleet status snapshot path is unsafe" if File.symlink?(@snapshot_path)
+
+      stat = File.stat(@snapshot_path)
+      raise ArgumentError, "fleet status snapshot is not a private regular file" unless stat.file? && (stat.mode & 0o077).zero?
+      raise ArgumentError, "fleet status snapshot exceeds its size bound" if stat.size > MAX_SNAPSHOT_BYTES
+
+      parsed = JSON.parse(File.binread(@snapshot_path, MAX_SNAPSHOT_BYTES + 1))
+      raise ArgumentError, "fleet status snapshot schema is unsupported" unless parsed["schema_version"] == SCHEMA_VERSION
+
+      parsed
+    end
+
+    def collect_snapshot_device(existing)
+      case existing["id"]
+      when "maven" then collect_workstation
+      when "proxmox" then collect_proxmox
+      when "pihole" then collect_pihole
+      when "cisco-8851"
+        raise "Cisco phone status is no longer configured" unless cisco_phone_enabled?
+
+        collect_cisco_phone
+      else
+        return collect_proxmox if existing.dig("facts", "platform") == "proxmox"
+
+        record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
+        raise "enrolled device is no longer present in the private registry" unless record
+
+        collect_enrolled_device(record)
+      end
+    end
+
+    def summarize(devices)
+      states = devices.each_with_object(Hash.new(0)) { |device, counts| counts[device.fetch("status")] += 1 }
+      {
+        "device_count" => devices.length,
+        "reachable_count" => devices.count { |device| device["reachable"] },
+        "updates_available" => devices.sum { |device| device.dig("updates", "total").to_i },
+        "reboot_required_count" => devices.count { |device| device.dig("reboot", "required") },
+        "kernel_attention_count" => devices.count { |device| device.dig("kernel", "update_required") },
+        "states" => states
+      }
+    end
 
     def collect_workstation
       kernel = local_run("workstation.kernel", "/usr/bin/uname", "-r")

@@ -2422,14 +2422,17 @@ function renderMaintenanceDevice(device) {
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const inventoryOnly = device.control !== "maintenance";
-  const statusOnly = device.control === "status_only";
+  const statusOnly = device.control === "status_only" || device.facts?.management_channel === "icmp_status";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
+  const observedAt = device.observed_at ? new Date(device.observed_at) : null;
+  const observedLabel = observedAt && !Number.isNaN(observedAt.getTime()) ? observedAt.toLocaleString() : "not recorded";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
     ["Updates", inventoryOnly ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
     ["Kernel", inventoryOnly ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
-    ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")]
+    ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
+    ["Checked", observedLabel]
   ];
   facts.forEach(([label, value]) => {
     const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
@@ -2451,6 +2454,10 @@ function renderMaintenanceDevice(device) {
     chip.textContent = `LXC ${piholeContainer.id} · ${piholeContainer.status || "unknown"}`; services.append(chip);
   }
   const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
+  const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "gate-button maintenance-device-refresh";
+  refresh.textContent = "Refresh";
+  refresh.addEventListener("click", () => refreshMaintenanceDevice(device.id, refresh));
+  actions.append(refresh);
   if (inventoryOnly) {
     const notice = document.createElement("p"); notice.className = "maintenance-status-only";
     notice.textContent = statusOnly
@@ -2468,6 +2475,26 @@ function renderMaintenanceDevice(device) {
   }
   card.append(heading, metrics, services, actions);
   return card;
+}
+
+async function refreshMaintenanceDevice(deviceId, button) {
+  const status = byId("maintenance-fleet-status");
+  const originalLabel = button.textContent;
+  button.disabled = true; button.textContent = "Refreshing…";
+  status.textContent = `Refreshing bounded evidence for ${deviceId}…`;
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(45_000) : undefined;
+    const envelope = await callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }, {}, { signal }); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete" || !Array.isArray(data.devices)) throw new Error(envelope.errors?.[0]?.message || data.reason || "Device status refresh failed safely.");
+    renderMaintenanceFleet(data);
+    const refreshed = data.devices.find((device) => device.id === data.refreshed_device_id);
+    status.textContent = `${refreshed?.label || deviceId} checked ${new Date(refreshed?.observed_at || data.collected_at).toLocaleString()} · only this device was probed.`;
+    announce(`${refreshed?.label || "Device"} status refreshed`);
+  } catch (error) {
+    button.disabled = false; button.textContent = originalLabel;
+    status.textContent = error.name === "TimeoutError" ? "Device refresh exceeded its foreground time limit; no background process remains." : error.message;
+  }
 }
 
 function renderMaintenanceTopology(topology) {

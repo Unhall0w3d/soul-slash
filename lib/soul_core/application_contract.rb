@@ -113,6 +113,7 @@ module SoulCore
       "host_improvement.arch_upgrade.handoff" => %w[confirmation expected_digest],
       "host_improvement.plans.verify" => %w[plan_id],
       "maintenance.fleet.status" => [],
+      "maintenance.fleet.device.refresh" => %w[device_id],
       "maintenance.fleet.snapshot" => [],
       "maintenance.discovery.status" => [],
       "maintenance.discovery.scan" => %w[subnet],
