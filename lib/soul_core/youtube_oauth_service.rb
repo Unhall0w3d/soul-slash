@@ -20,32 +20,44 @@ module SoulCore
       "https://www.googleapis.com/auth/youtube.readonly",
       "https://www.googleapis.com/auth/youtube.upload"
     ].freeze
+    ALLOWED_SCOPES = (
+      SCOPES + ["https://www.googleapis.com/auth/youtube.force-ssl"]
+    ).freeze
     CALLBACK_TIMEOUT = 180
     MAX_CREDENTIAL_BYTES = 64 * 1024
 
     class CredentialError < StandardError; end
 
-    def initialize(root: Dir.pwd, api: YouTubeApiClient.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, random: SecureRandom, callback_timeout: CALLBACK_TIMEOUT)
+    def initialize(root: Dir.pwd, api: YouTubeApiClient.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, random: SecureRandom, callback_timeout: CALLBACK_TIMEOUT, scopes: SCOPES, credential_name: "oauth.json", confirmation: CONFIRMATION, operation: "authorize_youtube")
       @root = File.expand_path(root)
       @api = api
       @runner = runner
       @clock = clock
       @random = random
       @callback_timeout = Float(callback_timeout)
+      @scopes = Array(scopes).map(&:to_s).uniq.freeze
+      @credential_name = credential_name.to_s
+      @confirmation = confirmation.to_s
+      @operation = operation.to_s
+      raise ArgumentError, "OAuth scopes are required" if @scopes.empty? || @scopes.any?(&:empty?)
+      raise ArgumentError, "OAuth scopes include an unapproved value" unless (@scopes - ALLOWED_SCOPES).empty?
+      raise ArgumentError, "OAuth credential name is invalid" unless @credential_name.match?(/\A[a-z0-9][a-z0-9._-]*\.json\z/)
+      raise ArgumentError, "OAuth confirmation is required" if @confirmation.empty?
+      raise ArgumentError, "OAuth operation is invalid" unless @operation.match?(/\A[a-z0-9_]+\z/)
     end
 
     def preview(client_path:)
       client = read_client(client_path)
       scope = {
-        "operation" => "authorize_youtube",
+        "operation" => @operation,
         "project_id" => client.fetch("project_id"),
         "application_type" => "desktop",
         "expected_channel_id" => EXPECTED_CHANNEL_ID,
-        "scopes" => SCOPES,
+        "scopes" => @scopes,
         "credential_destination" => credential_path
       }
       outcome("blocked_for_human_review", true, "YouTube authorization requires exact approval and browser consent", data: {
-        "confirmation_phrase" => CONFIRMATION,
+        "confirmation_phrase" => @confirmation,
         "expected_digest" => digest(scope),
         "preview_scope" => scope
       })
@@ -57,14 +69,14 @@ module SoulCore
       return outcome("awaiting_input", false, "confirmation and expected_digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       client = read_client(client_path)
       scope = {
-        "operation" => "authorize_youtube",
+        "operation" => @operation,
         "project_id" => client.fetch("project_id"),
         "application_type" => "desktop",
         "expected_channel_id" => EXPECTED_CHANNEL_ID,
-        "scopes" => SCOPES,
+        "scopes" => @scopes,
         "credential_destination" => credential_path
       }
-      return outcome("blocked_for_human_review", false, "YouTube authorization confirmation did not match") unless confirmation == CONFIRMATION
+      return outcome("blocked_for_human_review", false, "YouTube authorization confirmation did not match") unless confirmation == @confirmation
       return outcome("blocked_for_human_review", false, "YouTube authorization scope changed; preview again") unless secure_compare(expected_digest, digest(scope))
 
       authorization = receive_authorization(client)
@@ -81,7 +93,7 @@ module SoulCore
       granted_scopes = token.fetch("scope", "").split(/\s+/)
       raise CredentialError, "Google did not return a refresh token; revoke the app grant and authorize again" if refresh_token.empty?
       raise CredentialError, "Google did not return an access token" if access_token.empty?
-      raise CredentialError, "Google did not grant the required YouTube scopes" unless (SCOPES - granted_scopes).empty?
+      raise CredentialError, "Google did not grant the required YouTube scopes" unless (@scopes - granted_scopes).empty?
 
       channel = @api.channel(access_token: access_token)
       raise CredentialError, "authorized channel does not match Soul Slash Synthesis" unless channel.fetch("id") == EXPECTED_CHANNEL_ID
@@ -93,7 +105,7 @@ module SoulCore
         "client_secret" => client.fetch("client_secret"),
         "token_uri" => client.fetch("token_uri"),
         "refresh_token" => refresh_token,
-        "scopes" => SCOPES,
+        "scopes" => @scopes,
         "channel_id" => channel.fetch("id"),
         "channel_title" => channel.fetch("title"),
         "authorized_at" => @clock.call.iso8601
@@ -103,7 +115,7 @@ module SoulCore
         "channel_id" => channel.fetch("id"),
         "channel_title" => channel.fetch("title"),
         "credential_path" => credential_path,
-        "scopes" => SCOPES
+        "scopes" => @scopes
       }, mutation: "youtube_oauth_authorized")
     rescue CredentialError, YouTubeApiClient::ApiError, Errno::ENOENT, Errno::EACCES, IOError, SystemCallError => error
       outcome("blocked_for_human_review", false, safe_message(error))
@@ -184,7 +196,7 @@ module SoulCore
         "client_id" => client.fetch("client_id"),
         "redirect_uri" => redirect_uri,
         "response_type" => "code",
-        "scope" => SCOPES.join(" "),
+        "scope" => @scopes.join(" "),
         "access_type" => "offline",
         "prompt" => "consent",
         "state" => state,
@@ -238,7 +250,7 @@ module SoulCore
       raise CredentialError, "YouTube OAuth credential is incomplete" unless required.all? { |key| !credential[key].to_s.empty? }
       raise CredentialError, "YouTube OAuth credential project is invalid" unless credential["project_id"] == PROJECT_ID
       raise CredentialError, "YouTube OAuth credential channel is invalid" unless credential["channel_id"] == EXPECTED_CHANNEL_ID
-      raise CredentialError, "YouTube OAuth credential scopes are invalid" unless (SCOPES - Array(credential["scopes"])).empty?
+      raise CredentialError, "YouTube OAuth credential scopes are invalid" unless (@scopes - Array(credential["scopes"])).empty?
 
       credential
     rescue JSON::ParserError
@@ -247,8 +259,7 @@ module SoulCore
 
     def write_credentials(value)
       directory = File.dirname(credential_path)
-      FileUtils.mkdir_p(directory, mode: 0o700)
-      File.chmod(0o700, directory)
+      secure_credential_directory(directory)
       temporary = "#{credential_path}.tmp-#{Process.pid}-#{@random.hex(4)}"
       File.write(temporary, JSON.pretty_generate(value) + "\n", mode: "wx", perm: 0o600)
       File.rename(temporary, credential_path)
@@ -258,7 +269,22 @@ module SoulCore
     end
 
     def credential_path
-      File.join(@root, "Soul", "runtime", "youtube_auth", "oauth.json")
+      File.join(@root, "Soul", "runtime", "youtube_auth", @credential_name)
+    end
+
+    def secure_credential_directory(path)
+      expanded = File.expand_path(path)
+      raise CredentialError, "YouTube OAuth credential path is outside the Soul root" unless expanded.start_with?(@root + File::SEPARATOR)
+
+      relative = expanded.delete_prefix(@root + File::SEPARATOR)
+      current = @root
+      relative.split(File::SEPARATOR).each do |component|
+        current = File.join(current, component)
+        raise CredentialError, "YouTube OAuth credential path contains a symlink" if File.symlink?(current)
+      end
+      FileUtils.mkdir_p(expanded, mode: 0o700)
+      raise CredentialError, "YouTube OAuth credential path is not a directory" unless File.directory?(expanded) && !File.symlink?(expanded)
+      File.chmod(0o700, expanded)
     end
 
     def google_https?(value)

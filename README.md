@@ -50,7 +50,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
 | Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
-| YouTube Publication | Authorize and upload one exact reviewed package through a foreground human gate | [YouTube Publication](docs/guides/YOUTUBE_PUBLICATION.md) |
+| YouTube Publication | Authorize one exact reviewed upload or synchronize reviewed NOC Thoughts description links through separate foreground human gates | [YouTube Publication](docs/guides/YOUTUBE_PUBLICATION.md) |
 | Visual Studio | Generate, review, revise, and bind private local imagery or short motion scenes | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
 
 ## Design principles

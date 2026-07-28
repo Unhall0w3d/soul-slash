@@ -1,0 +1,46 @@
+{
+  "schema_version": "soul.youtube.description_links.v1",
+  "channel_id": "UCIY6AROma4bbum3jk2kfu-w",
+  "videos": [
+    {
+      "video_id": "ZFA6t2PAqyI",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "Mkx_2QRyKcI",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "q35PDSyTwA0",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "9J2zrAoTfB4",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "BNN0D39P4Ic",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "-ilV0X9-PR8",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "xV-XJT78tn0",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/24/how-soul-slash-turns-an-idea-into-a-song.html"
+    },
+    {
+      "video_id": "863-KXJRfyA",
+      "expected_current_url": "https://nocthoughts.com/",
+      "article_url": "https://nocthoughts.com/2026/07/19/soul-slash-has-more-than-one-brain-now.html"
+    }
+  ]
+}

@@ -109,3 +109,84 @@ make verify-youtube-authenticated-upload
 
 Engineering scope and owner authority are recorded in
 [`YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md`](../soul/YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md).
+
+## Synchronize NOC Thoughts article links
+
+Description synchronization has a separate OAuth credential and confirmation
+gate. It does not exercise the upload path and does not broaden or replace the
+upload credential.
+
+The reviewed initial mapping is:
+
+```text
+config/youtube_description_article_links.json
+```
+
+It identifies the exact video IDs, expected current homepage URL, and intended
+article URL. Review that file before authorization.
+
+Authorize the separate metadata scope with the same owner-only Desktop client
+JSON:
+
+```bash
+scripts/soul-youtube-publisher description-authorize-preview \
+  --client-json ~/Downloads/client_secret_....json
+```
+
+Review the returned scope and execute its exact digest:
+
+```bash
+scripts/soul-youtube-publisher description-authorize-execute \
+  --client-json ~/Downloads/client_secret_....json \
+  --expected-digest <digest-from-preview> \
+  --confirmation AUTHORIZE_YOUTUBE_DESCRIPTION_SYNC
+```
+
+This consent requests `youtube.readonly` and `youtube.force-ssl` and stores the
+refresh token separately at:
+
+```text
+Soul/runtime/youtube_auth/oauth-description-sync.json
+```
+
+Inspect non-secret status:
+
+```bash
+scripts/soul-youtube-publisher description-status
+```
+
+Preview the exact batch against fresh YouTube snippets:
+
+```bash
+scripts/soul-youtube-publisher description-preview \
+  --mapping config/youtube_description_article_links.json
+```
+
+The preview verifies the Soul Slash Synthesis channel and binds every current
+title, category, tag list, supported language field, and before/after
+description digest. It replaces only the URL immediately below the single
+standalone `NOC Thoughts` line. A changed title, tag, category, description,
+mapping, or channel invalidates the digest.
+
+Execute only the reviewed digest:
+
+```bash
+scripts/soul-youtube-publisher description-execute \
+  --mapping config/youtube_description_article_links.json \
+  --expected-digest <digest-from-preview> \
+  --confirmation UPDATE_YOUTUBE_DESCRIPTIONS
+```
+
+Before the first update, Soul writes an owner-only rollback snapshot and an
+atomic progress receipt below ignored
+`Soul/runtime/youtube_description_sync/`. A0 does not automatically restore
+remote metadata. Failure or cancellation stops the remaining batch and
+requires human review.
+
+Description sync sends `part=snippet` only. It preserves title, category, tags,
+and supported language metadata and cannot change upload state, visibility,
+publication, audience, thumbnail, playlist, or channel branding. It adds no
+automatic or scheduled synchronization.
+
+Engineering scope and owner authority are recorded in
+[`YOUTUBE_DESCRIPTION_SYNC_A0_BRIEF.md`](../soul/YOUTUBE_DESCRIPTION_SYNC_A0_BRIEF.md).

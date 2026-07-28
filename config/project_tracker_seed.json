@@ -208,6 +208,23 @@
       "references": "docs/soul/YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md; docs/guides/YOUTUBE_PUBLICATION.md; docs/assessments/YOUTUBE_AUTHENTICATED_UPLOAD_A0_REVIEW.md"
     },
     {
+      "item_id": "track_youtube_description_sync",
+      "title": "Synchronize NOC Thoughts links in YouTube descriptions",
+      "area": "Publication",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "low",
+      "summary": "Replace one exact managed NOC Thoughts URL in each explicitly mapped Soul Slash Synthesis video while preserving all remaining description and snippet metadata.",
+      "acceptance": "Separate metadata OAuth resolves to the expected channel; one previewed batch changes only reviewed URL bytes; private rollback evidence is retained; no upload, status, visibility, or unrelated metadata changes occur.",
+      "source": "Owner-authorized YouTube Description Sync A0",
+      "notes": "The A0 candidate uses a separate youtube.force-ssl credential, exact channel and mapping gates, fresh snippet revalidation, one digest-bound confirmation, sequential progress receipts, and owner-private rollback snapshots. Live OAuth consent and the initial eight-video batch remain human acceptance gates.",
+      "implementation": "YouTubeDescriptionSyncService extends the bounded YouTube API/OAuth transport without changing the upload credential. It updates part=snippet only and reconstructs each writable snippet from current title, category, tags, language, and an exact URL-only description replacement.",
+      "technologies": "Ruby stdlib, OAuth 2.0 installed-app flow with PKCE/state, YouTube Data API v3 videos.list/videos.update, SHA-256 scope binding, owner-only atomic JSON.",
+      "interfaces": "Foreground CLI only in A0: description-status, description-authorize-preview/execute, description-preview/execute.",
+      "commands": "make verify-youtube-description-sync; scripts/soul-youtube-publisher description-status",
+      "references": "docs/soul/YOUTUBE_DESCRIPTION_SYNC_A0_BRIEF.md; docs/guides/YOUTUBE_PUBLICATION.md; docs/assessments/YOUTUBE_DESCRIPTION_SYNC_A0_REVIEW.md"
+    },
+    {
       "item_id": "track_backup_recovery",
       "title": "Backup and disaster-recovery design",
       "area": "Operations",
