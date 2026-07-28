@@ -66,6 +66,36 @@ module SoulCore
       raise ApiError, "YouTube returned an invalid channel response"
     end
 
+    def videos(access_token:, video_ids:)
+      ids = Array(video_ids).map(&:to_s)
+      raise ApiError, "YouTube video lookup requires between 1 and 50 IDs" unless ids.length.between?(1, 50)
+
+      query = URI.encode_www_form(
+        "part" => "snippet",
+        "id" => ids.join(","),
+        "maxResults" => ids.length.to_s
+      )
+      response = request_json(
+        :get,
+        "#{API_ORIGIN}/youtube/v3/videos?#{query}",
+        access_token: access_token
+      )
+      Array(response["items"])
+    end
+
+    def update_video_snippet(access_token:, video_id:, snippet:)
+      response, = request(
+        :put,
+        "#{API_ORIGIN}/youtube/v3/videos?part=snippet",
+        access_token: access_token,
+        body: JSON.generate("id" => video_id, "snippet" => snippet),
+        headers: { "Content-Type" => "application/json; charset=UTF-8" },
+        timeout: REQUEST_TIMEOUT,
+        accepted: [200]
+      )
+      parse_json(response)
+    end
+
     def initiate_upload(access_token:, metadata:, video_size:, mime_type:)
       _response, headers = request(
         :post,

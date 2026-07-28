@@ -6,6 +6,7 @@ require "optparse"
 require_relative "../lib/soul_core/youtube_api_client"
 require_relative "../lib/soul_core/youtube_oauth_service"
 require_relative "../lib/soul_core/youtube_authenticated_upload_service"
+require_relative "../lib/soul_core/youtube_description_sync_service"
 
 ROOT = File.expand_path("..", __dir__)
 
@@ -20,6 +21,7 @@ parser = OptionParser.new do |value|
   value.on("--candidate-id ID", "Finished Music candidate ID") { |id| options[:candidate_id] = id }
   value.on("--visual-id ID", "Reviewed full-length visual ID") { |id| options[:visual_id] = id }
   value.on("--visibility VALUE", "private, unlisted, or public (default: private)") { |visibility| options[:visibility] = visibility }
+  value.on("--mapping PATH", "Reviewed video-to-article mapping JSON") { |path| options[:mapping_path] = path }
   value.on("--confirmation PHRASE", "Exact confirmation phrase") { |confirmation| options[:confirmation] = confirmation }
   value.on("--expected-digest SHA256", "Exact preview digest") { |digest| options[:expected_digest] = digest }
 end
@@ -37,6 +39,8 @@ begin
   api = SoulCore::YouTubeApiClient.new
   oauth = SoulCore::YouTubeOAuthService.new(root: ROOT, api: api)
   upload = SoulCore::YouTubeAuthenticatedUploadService.new(root: ROOT, oauth: oauth, api: api)
+  description_oauth = SoulCore::YouTubeDescriptionSyncService.oauth(root: ROOT, api: api)
+  description_sync = SoulCore::YouTubeDescriptionSyncService.new(root: ROOT, oauth: description_oauth, api: api)
 
   result = case command
            when "status"
@@ -46,6 +50,24 @@ begin
            when "authorize-execute"
              oauth.execute(
                client_path: required(options, :client_path, "--client-json"),
+               confirmation: required(options, :confirmation, "--confirmation"),
+               expected_digest: required(options, :expected_digest, "--expected-digest")
+             )
+           when "description-status"
+             description_oauth.status
+           when "description-authorize-preview"
+             description_oauth.preview(client_path: required(options, :client_path, "--client-json"))
+           when "description-authorize-execute"
+             description_oauth.execute(
+               client_path: required(options, :client_path, "--client-json"),
+               confirmation: required(options, :confirmation, "--confirmation"),
+               expected_digest: required(options, :expected_digest, "--expected-digest")
+             )
+           when "description-preview"
+             description_sync.preview(mapping_path: required(options, :mapping_path, "--mapping"))
+           when "description-execute"
+             description_sync.execute(
+               mapping_path: required(options, :mapping_path, "--mapping"),
                confirmation: required(options, :confirmation, "--confirmation"),
                expected_digest: required(options, :expected_digest, "--expected-digest")
              )
@@ -67,7 +89,7 @@ begin
                progress: ->(event, data) { warn(JSON.generate({ "event" => event, "data" => data })) }
              )
            else
-             raise OptionParser::InvalidArgument, "command must be status, authorize-preview, authorize-execute, upload-preview, or upload-execute"
+             raise OptionParser::InvalidArgument, "command must be status, authorize-preview, authorize-execute, description-status, description-authorize-preview, description-authorize-execute, description-preview, description-execute, upload-preview, or upload-execute"
            end
 
   puts JSON.pretty_generate(result)

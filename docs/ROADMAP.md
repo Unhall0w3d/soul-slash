@@ -17,6 +17,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
+- [~] review exact-channel NOC Thoughts description-link synchronization; live OAuth and one reviewed batch remain open
 - [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
 - [x] Core-aware Chat-native text-to-video generation and review-led native revision from an exact reviewed visual context
 - [x] read-only motion qualification ledger over retained runtime receipts and human reviews
