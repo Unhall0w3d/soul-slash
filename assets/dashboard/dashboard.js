@@ -2526,29 +2526,80 @@ async function refreshMaintenanceDevice(deviceId, button) {
 function renderMaintenanceTopology(topology) {
   const canvas = byId("maintenance-topology"); canvas.replaceChildren();
   const nodes = new Map((topology?.nodes || []).map((node) => [node.id, node]));
-  const hypervisor = (topology?.nodes || []).find((node) => String(node.role || "").includes("Proxmox"));
-  const preferredIds = ["maven", hypervisor?.id, "pihole", "cisco-8851", "webex-calling", "internet"].filter(Boolean);
-  const primaryIds = [...new Set([
-    ...preferredIds.filter((id) => nodes.has(id)),
-    ...(topology?.nodes || []).map((node) => node.id)
-  ])];
-  const chain = document.createElement("div"); chain.className = "maintenance-topology-chain";
-  primaryIds.forEach((id, index) => {
-    const node = nodes.get(id); if (!node) return;
+  const network = topology?.network || {};
+  const makeNode = (node, markerText) => {
     const block = document.createElement("div"); block.className = "maintenance-topology-node"; block.dataset.state = node.status || "unknown";
-    const marker = document.createElement("span"); marker.textContent = String(index + 1).padStart(2, "0");
+    const marker = document.createElement("span"); marker.textContent = markerText;
     const copy = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = node.label; const role = document.createElement("small"); role.textContent = node.role;
     const address = document.createElement("code"); address.textContent = node.address;
-    copy.append(strong, role, address); block.append(marker, copy); chain.append(block);
+    copy.append(strong, role, address); block.append(marker, copy);
+    return block;
+  };
+
+  const map = document.createElement("div"); map.className = "maintenance-network-map";
+  const cloudTier = document.createElement("section"); cloudTier.className = "maintenance-network-tier maintenance-network-cloud";
+  const cloudHeading = document.createElement("div"); cloudHeading.className = "maintenance-network-tier-heading";
+  const cloudEyebrow = document.createElement("p"); cloudEyebrow.className = "eyebrow"; cloudEyebrow.textContent = "External network";
+  const cloudTitle = document.createElement("strong"); cloudTitle.textContent = "WAN & provider cloud";
+  cloudHeading.append(cloudEyebrow, cloudTitle);
+  const cloudNodes = document.createElement("div"); cloudNodes.className = "maintenance-network-cloud-nodes";
+  (network.cloud_node_ids || ["internet"]).forEach((id) => {
+    const node = nodes.get(id); if (node) cloudNodes.append(makeNode(node, "WAN"));
   });
+  cloudTier.append(cloudHeading, cloudNodes);
+
+  const uplink = document.createElement("div"); uplink.className = "maintenance-network-uplink";
+  const uplinkLine = document.createElement("i"); uplinkLine.setAttribute("aria-hidden", "true");
+  const uplinkLabel = document.createElement("span"); uplinkLabel.textContent = "Default route · WAN uplink";
+  uplink.append(uplinkLine, uplinkLabel);
+
+  const gatewayTier = document.createElement("section"); gatewayTier.className = "maintenance-network-tier maintenance-network-gateway";
+  const gatewayHeading = document.createElement("div"); gatewayHeading.className = "maintenance-network-tier-heading";
+  const gatewayEyebrow = document.createElement("p"); gatewayEyebrow.className = "eyebrow"; gatewayEyebrow.textContent = "Network edge";
+  const gatewayTitle = document.createElement("strong"); gatewayTitle.textContent = "Default gateway";
+  gatewayHeading.append(gatewayEyebrow, gatewayTitle);
+  const gatewayNode = nodes.get(network.gateway_node_id);
+  if (gatewayNode) gatewayTier.append(gatewayHeading, makeNode(gatewayNode, "GW"));
+  else gatewayTier.append(gatewayHeading);
+
+  const lanUplink = document.createElement("div"); lanUplink.className = "maintenance-network-uplink maintenance-network-uplink--lan";
+  const lanLine = document.createElement("i"); lanLine.setAttribute("aria-hidden", "true");
+  const lanLabel = document.createElement("span"); lanLabel.textContent = "Local switching & routing";
+  lanUplink.append(lanLine, lanLabel);
+
+  const lan = document.createElement("section"); lan.className = "maintenance-network-lan";
+  const lanHeading = document.createElement("header");
+  const lanIdentity = document.createElement("div"); const lanEyebrow = document.createElement("p"); lanEyebrow.className = "eyebrow"; lanEyebrow.textContent = "Local network";
+  const lanTitle = document.createElement("strong"); lanTitle.textContent = network.subnet || "Subnet unavailable";
+  lanIdentity.append(lanEyebrow, lanTitle);
+  const lanInterface = document.createElement("code"); lanInterface.textContent = network.interface && network.interface !== "unavailable" ? `interface ${network.interface}` : "route evidence unavailable";
+  lanHeading.append(lanIdentity, lanInterface);
+  const lanNodes = document.createElement("div"); lanNodes.className = "maintenance-network-lan-nodes";
+  (network.lan_node_ids || []).forEach((id) => {
+    const node = nodes.get(id); if (node) lanNodes.append(makeNode(node, "LAN"));
+  });
+  if (!lanNodes.childElementCount) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No local device nodes are available.";
+    lanNodes.append(empty);
+  }
+  lan.append(lanHeading, lanNodes);
+  map.append(cloudTier, uplink, gatewayTier, lanUplink, lan);
+
+  const relationships = (topology?.edges || []).filter((edge) => !["route", "wan"].includes(edge.kind));
+  const relationshipSection = document.createElement("section"); relationshipSection.className = "maintenance-topology-relationships";
+  const relationshipHeading = document.createElement("div"); relationshipHeading.className = "maintenance-network-tier-heading";
+  const relationshipEyebrow = document.createElement("p"); relationshipEyebrow.className = "eyebrow"; relationshipEyebrow.textContent = "Operational relationships";
+  const relationshipTitle = document.createElement("strong"); relationshipTitle.textContent = "Management, services & planned paths";
+  relationshipHeading.append(relationshipEyebrow, relationshipTitle);
   const links = document.createElement("div"); links.className = "maintenance-topology-links";
-  (topology?.edges || []).forEach((edge) => {
+  relationships.forEach((edge) => {
     const link = document.createElement("div"); link.dataset.kind = edge.kind || "link";
     const route = document.createElement("span"); route.textContent = `${nodes.get(edge.from)?.label || edge.from} → ${nodes.get(edge.to)?.label || edge.to}`;
     const label = document.createElement("strong"); label.textContent = edge.label || "connected";
     link.append(route, label); links.append(link);
   });
-  canvas.append(chain, links);
+  relationshipSection.append(relationshipHeading, links);
+  canvas.append(map, relationshipSection);
 }
 
 function renderMaintenanceFleet(data) {

@@ -18,9 +18,11 @@ module SoulCore
     PING_PATH = "/usr/bin/ping"
     NMAP_PATH = "/usr/bin/nmap"
     ARP_PATH = "/proc/net/arp"
+    ROUTE_PATH = "/proc/net/route"
     SYSTEMD_RUN_PATH = "/usr/bin/systemd-run"
     MAX_DHCP_RECOVERY_SCANS = 4
     MAX_SNAPSHOT_BYTES = 512 * 1024
+    MAX_ROUTE_BYTES = 64 * 1024
     REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
     MAX_ENROLLED_DEVICES = 64
     SUPPORTED_PACKAGE_MANAGERS = %w[pacman yay paru apt apt-get dnf zypper apk flatpak snap nix].freeze
@@ -40,6 +42,7 @@ module SoulCore
       root: nil,
       nmap_path: NMAP_PATH,
       arp_path: ARP_PATH,
+      route_path: ROUTE_PATH,
       systemd_run_path: SYSTEMD_RUN_PATH,
       ruby_path: RbConfig.ruby,
       recovery_scheduler: nil
@@ -53,6 +56,7 @@ module SoulCore
       @root = root && File.expand_path(root)
       @nmap_path = File.expand_path(nmap_path)
       @arp_path = File.expand_path(arp_path)
+      @route_path = File.expand_path(route_path)
       @systemd_run_path = File.expand_path(systemd_run_path)
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
@@ -686,8 +690,25 @@ module SoulCore
     def build_topology(devices)
       proxmox = devices.find { |device| device.dig("facts", "platform") == "proxmox" }
       proxmox_id = proxmox ? proxmox.fetch("id") : "proxmox"
+      network = local_network_context
+      gateway_device = devices.find { |device| device["address"] == network["gateway_address"] }
+      gateway_node = gateway_device && {
+        "id" => gateway_device.fetch("id"),
+        "label" => gateway_device.fetch("label"),
+        "role" => gateway_device.fetch("role"),
+        "address" => gateway_device.fetch("address"),
+        "status" => gateway_device.fetch("status")
+      }
+      gateway_node ||= {
+        "id" => "default-gateway",
+        "label" => "Default Gateway",
+        "role" => "Local network edge · route evidence only",
+        "address" => network["gateway_address"] || "unavailable",
+        "status" => "unknown"
+      }
+      network["gateway_node_id"] = gateway_node.fetch("id")
       external_nodes = [
-        {"id" => "internet", "label" => "Internet", "role" => "Package sources · recursive DNS roots", "address" => "WAN", "status" => "external"}
+        {"id" => "internet", "label" => "WAN / Internet", "role" => "Package sources · recursive DNS roots", "address" => "cloud", "status" => "external"}
       ]
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         external_nodes << {
@@ -699,6 +720,7 @@ module SoulCore
         }
       end
       edges = [
+        {"from" => gateway_node.fetch("id"), "to" => "internet", "label" => "default route · WAN uplink", "kind" => "wan"},
         {"from" => "maven", "to" => proxmox_id, "label" => "SSH maintenance", "kind" => "management"},
         {"from" => proxmox_id, "to" => "pihole", "label" => "hosts LXC 100", "kind" => "containment"},
         {"from" => "maven", "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
@@ -708,12 +730,19 @@ module SoulCore
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}
       end
+      devices.reject { |device| device["id"] == gateway_node["id"] }.each do |device|
+        edges << {
+          "from" => device.fetch("id"),
+          "to" => gateway_node.fetch("id"),
+          "label" => "default gateway",
+          "kind" => "route"
+        }
+      end
       devices.select { |device| device.fetch("control") == "inventory_only" }.each do |device|
         channel = device.dig("facts", "management_channel") == "ssh_inventory" ? "fixed SSH inventory" : "bounded status probe"
         edges << {"from" => "maven", "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
       end
-      {
-        "nodes" => devices.map do |device|
+      device_nodes = devices.map do |device|
           {
             "id" => device.fetch("id"),
             "label" => device.fetch("label"),
@@ -721,9 +750,87 @@ module SoulCore
             "address" => device.fetch("address"),
             "status" => device.fetch("status")
           }
-        end + external_nodes,
+        end
+      device_nodes << gateway_node unless device_nodes.any? { |node| node["id"] == gateway_node["id"] }
+      network["lan_node_ids"] = device_nodes.reject { |node| node["id"] == gateway_node["id"] }.map { |node| node.fetch("id") }
+      network["cloud_node_ids"] = external_nodes.map { |node| node.fetch("id") }
+      {
+        "layout" => "network_map",
+        "network" => network,
+        "nodes" => device_nodes + external_nodes,
         "edges" => edges
       }
+    end
+
+    def local_network_context
+      return unavailable_network_context unless File.file?(@route_path) && !File.symlink?(@route_path)
+
+      raw_routes = File.binread(@route_path, MAX_ROUTE_BYTES + 1)
+      return unavailable_network_context if raw_routes.bytesize > MAX_ROUTE_BYTES
+
+      rows = raw_routes.encode("UTF-8", invalid: :replace, undef: :replace).lines.first(257).drop(1).filter_map do |line|
+        fields = line.split(/\s+/)
+        next unless fields.length >= 8
+        next unless fields[1].match?(/\A[0-9A-Fa-f]{8}\z/) &&
+                    fields[2].match?(/\A[0-9A-Fa-f]{8}\z/) &&
+                    fields[7].match?(/\A[0-9A-Fa-f]{8}\z/)
+
+        {
+          "interface" => safe_text(fields[0]).byteslice(0, 32).to_s,
+          "destination" => route_hex_to_ipv4(fields[1]),
+          "gateway" => route_hex_to_ipv4(fields[2]),
+          "flags" => fields[3].to_i(16),
+          "metric" => fields[6].to_i,
+          "mask" => route_hex_to_ipv4(fields[7])
+        }
+      end
+      default_route = rows
+        .select { |row| row["destination"] == "0.0.0.0" && row["gateway"] != "0.0.0.0" && (row["flags"] & 0x2).positive? }
+        .min_by { |row| row["metric"] }
+      return unavailable_network_context unless default_route
+
+      connected = rows.filter_map do |row|
+        next unless row["interface"] == default_route["interface"] && row["gateway"] == "0.0.0.0"
+
+        prefix = ipv4_mask_prefix(row["mask"])
+        next unless prefix
+
+        network = IPAddr.new("#{row["destination"]}/#{prefix}")
+        [network, prefix]
+      rescue IPAddr::InvalidAddressError
+        nil
+      end.select { |network, _prefix| network.include?(IPAddr.new(default_route["gateway"])) }
+        .max_by { |_network, prefix| prefix }
+      {
+        "evidence" => "proc_net_route",
+        "interface" => default_route.fetch("interface"),
+        "gateway_address" => default_route.fetch("gateway"),
+        "subnet" => connected ? "#{connected[0]}/#{connected[1]}" : "unavailable"
+      }
+    rescue SystemCallError, IPAddr::InvalidAddressError
+      unavailable_network_context
+    end
+
+    def unavailable_network_context
+      {
+        "evidence" => "unavailable",
+        "interface" => "unavailable",
+        "gateway_address" => nil,
+        "subnet" => "unavailable"
+      }
+    end
+
+    def route_hex_to_ipv4(value)
+      [value].pack("H*").bytes.reverse.join(".")
+    end
+
+    def ipv4_mask_prefix(mask)
+      bits = IPAddr.new(mask).to_i.to_s(2).rjust(32, "0")
+      return nil unless bits.match?(/\A1*0*\z/)
+
+      bits.count("1")
+    rescue IPAddr::InvalidAddressError
+      nil
     end
 
     def device(id:, label:, role:, address:, reachable:, os:, version:, kernel:, updates:, reboot:, services:, facts:, control: "maintenance", status: nil)

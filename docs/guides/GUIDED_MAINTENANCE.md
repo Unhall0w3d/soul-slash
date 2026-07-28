@@ -21,7 +21,21 @@ and inspect:
 - Proxmox LXC `100` state;
 - a unified maintenance-channel indicator on every card;
 - Pi-hole FTL, Unbound, blocking, and DNS-query health; and
-- an evidence-driven architecture map.
+- an evidence-driven local network map.
+
+The map follows the host's current kernel route evidence instead of a
+deployment-specific address embedded in public source:
+
+**WAN / provider cloud → default gateway → local subnet → known devices**
+
+The detected interface and subnet are shown at the LAN boundary. When the
+gateway is already enrolled, that reviewed device supplies its identity and
+status; otherwise the map renders an inert route-evidence node and does not
+claim reachability. Management, containment, DNS, provider, inventory, and
+planned backup relationships remain available beneath the primary route flow
+as supplemental operational context. If route evidence is unavailable or
+malformed, the map keeps known devices visible and labels the route boundary
+unavailable rather than inventing topology.
 
 Every device card also has **Refresh**. It runs only that device's existing
 bounded collector, atomically replaces its card in the private snapshot, and
