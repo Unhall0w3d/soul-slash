@@ -33,6 +33,9 @@ reviewed action.
   preview. Restore-registry identity and window-summary evidence now travel
   beside the package-only A2 plan, so A3 can bind them without making the A2
   maintenance digest depend on changing desktop state.
+- Corrected the reboot-plan renderer to recognize an actual empty command
+  array and visibly disclose **Package maintenance · not included · reboot and
+  restore only** before authorization.
 - Replaced the workstation card label **Maintenance** with the action-oriented
   **Maintain**.
 
@@ -95,7 +98,11 @@ The first live **Reboot** preview then exposed a missing restore-evidence
 projection between the real A2 and A3 services. The repair is covered by the
 foreground and reboot deterministic suites: A2's package digest remains stable
 as windows change, while A3 receives the current restore-registry digest and
-window summary outside that package plan.
+window summary outside that package plan. A second preview verified an enabled
+zero-prompt gate over a backend plan containing `commands: []`,
+`maintenance_replay: false`, five restorable entries, and three unsupported
+entries. It also exposed and prompted repair of the empty-command disclosure
+row before live acceptance.
 
 ## Known weaknesses
 
