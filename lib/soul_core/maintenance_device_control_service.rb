@@ -126,7 +126,7 @@ module SoulCore
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "device_id" => device_id,
-        "device_label" => target.fetch("label"),
+        "device_label" => target_display_label(device_id, target.fetch("label")),
         "address" => target_display_address(device_id),
         "action" => action,
         "ssh_alias" => target.fetch("ssh_alias"),
@@ -507,6 +507,16 @@ module SoulCore
                       end
       value = @process_env[key].to_s.strip
       value.empty? ? fallback : value.byteslice(0, 255).to_s
+    end
+
+    def target_display_label(device_id, fallback)
+      key = case device_id.to_s
+            when "pihole" then "SOUL_FLEET_PIHOLE_LABEL"
+            when "forge" then nil
+            else raise ArgumentError, "device is not available for remote maintenance"
+            end
+      value = key && @process_env[key].to_s.strip
+      value.to_s.empty? ? fallback : value.byteslice(0, 80).to_s
     end
 
     def action!(action)

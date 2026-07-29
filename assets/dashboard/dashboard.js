@@ -2452,11 +2452,12 @@ function renderMaintenanceDevice(device) {
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
+  const readOnlyStatus = inventoryOnly && device.facts?.status_adapter === "dnf5_read_only";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
-    ["Updates", inventoryOnly ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
-    ["Kernel", inventoryOnly ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Updates", inventoryOnly && !readOnlyStatus ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
     ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
     ["Checked", observedLabel]
   ];
@@ -2488,7 +2489,9 @@ function renderMaintenanceDevice(device) {
     const notice = document.createElement("p"); notice.className = "maintenance-status-only";
     notice.textContent = statusOnly
       ? "Status only · lifecycle and mutation remain provider-managed"
-      : "Inventory only · discovered capabilities grant no mutation authority";
+      : (readOnlyStatus
+        ? "DNF5 evidence only · maintenance and reboot authority remain disabled"
+        : "Inventory only · discovered capabilities grant no mutation authority");
     actions.append(notice);
   } else {
     ["maintenance", "reboot"].forEach((action) => {
@@ -3001,6 +3004,12 @@ function maintenanceDeviceDialogDetails(plan) {
   blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
 }
 
+function maintenanceDeviceLabel(deviceId) {
+  return state.maintenanceFleet?.devices?.find((device) => device.id === deviceId)?.label
+    || ({ maven: "Maven", forge: "Forge", pihole: "Pi-hole" }[deviceId])
+    || deviceId;
+}
+
 async function openMaintenanceDeviceAction(deviceId, action) {
   const dialog = byId("maintenance-device-dialog"); const status = byId("maintenance-device-dialog-status");
   state.maintenanceDevicePreview = null;
@@ -3008,7 +3017,8 @@ async function openMaintenanceDeviceAction(deviceId, action) {
   byId("maintenance-device-confirmation-row").hidden = true;
   byId("maintenance-maven-evidence-actions").hidden = true;
   byId("execute-maintenance-device-action").disabled = true;
-  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceId === "maven" ? "Maven" : deviceId === "forge" ? "Forge" : "Pi-hole"}`;
+  const deviceLabel = maintenanceDeviceLabel(deviceId);
+  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceLabel}`;
   if (!dialog.open) dialog.showModal();
   status.textContent = "Collecting a fresh device-scoped preview…";
   try {
@@ -3022,7 +3032,7 @@ async function openMaintenanceDeviceAction(deviceId, action) {
     const data = dataOf(envelope); const plan = data.plan;
     if (!plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
     const normalizedPlan = deviceId === "maven"
-      ? Object.assign({}, plan, { device_id: "maven", device_label: "Maven", action, fleet_wide: false, impact: [] })
+      ? Object.assign({}, plan, { device_id: "maven", device_label: deviceLabel, action, fleet_wide: false, impact: [] })
       : plan;
     maintenanceDeviceDialogDetails(normalizedPlan);
     byId("maintenance-maven-evidence-actions").hidden = deviceId !== "maven";

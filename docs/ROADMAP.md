@@ -36,7 +36,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] review A2 bounded source-attributed local project and document search
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
-- [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; pruning remains disabled
+- [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; Crucible's off-device target is prepared, while remote repository initialization, second-copy execution, and pruning remain disabled
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   Maven; live gates remain disabled by default
@@ -64,8 +64,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation and deletion-aware hold ledger are candidate-complete; retention execution, second-copy, and full-recovery gates remain
-- [ ] reviewed Proxmox/container deployment where it provides a concrete operational benefit
+- [~] backup and disaster-recovery local foundation and deletion-aware hold ledger are candidate-complete; Crucible storage is deployed and reboot-qualified, while retention execution, second-copy, and full-recovery gates remain
+- [~] reviewed Proxmox deployment now provides Crucible, a Fedora 44 KVM backup target and read-only DNF5 laboratory; DNF5 mutation and remote backup initialization remain separate gates
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review
 
