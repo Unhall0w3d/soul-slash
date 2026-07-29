@@ -636,6 +636,7 @@
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery target</p><h2>Repository</h2></div><span id="backup-repository-state" class="count-badge">—</span></div><dl id="backup-repository-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Deletion safety</p><h2>Retention ledger</h2></div><span id="backup-ledger-state" class="count-badge">—</span></div><dl id="backup-ledger-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery evidence</p><h2>Receipts &amp; staging</h2></div><span id="backup-receipt-count" class="count-badge">0</span></div><dl id="backup-evidence-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Off-device continuity</p><h2>Crucible copy</h2></div><span id="backup-replica-state" class="count-badge">—</span></div><dl id="backup-replica-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
       </div>
       <div class="backup-workspace">
         <section class="improvement-card backup-snapshot-card">
@@ -650,6 +651,13 @@
             <div id="backup-create-confirm" hidden><pre id="backup-create-scope" class="clear-preview-list"></pre><button id="execute-backup-create" class="gate-button gate-button--gold" type="button">Create verified backup</button></div>
             <div id="backup-create-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing backup…</span></div>
             <p id="backup-create-status" class="dialog-status" role="status"></p>
+          </section>
+          <section class="gate-card">
+            <div><p class="eyebrow">Verified second copy</p><h3>Copy to Crucible</h3><p>Initializes the exact remote repository when absent, copies only missing Soul snapshots, then verifies repository metadata and exact snapshot coverage. It never deletes remote snapshots.</p></div>
+            <button id="preview-backup-replica" class="gate-button" type="button">Preview Crucible copy</button>
+            <div id="backup-replica-confirm" hidden><pre id="backup-replica-scope" class="clear-preview-list"></pre><button id="execute-backup-replica" class="gate-button gate-button--gold" type="button">Initialize/copy &amp; verify</button></div>
+            <div id="backup-replica-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing Crucible copy…</span></div>
+            <p id="backup-replica-status" class="dialog-status" role="status">Manual only · no remote deletion or schedule.</p>
           </section>
           <section class="gate-card backup-danger-gate">
             <div><p class="eyebrow">Deletion-aware retention</p><h3>Forget selected snapshots</h3><p>Only explicitly selected, non-newest, hold-clear snapshots may be forgotten. Bounded prune and metadata verification follow.</p></div>

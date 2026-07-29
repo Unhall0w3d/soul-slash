@@ -231,6 +231,8 @@ module SoulCore
       when "backup.retention.execute" then domain(backup_administration.retention_execute(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "backup.restore.preview" then domain(backup_administration.restore_preview(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", [])))
       when "backup.restore.execute" then domain(backup_administration.restore_execute(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "backup.replica.preview" then domain(backup_administration.replica_preview(password: required(parameters, "password")))
+      when "backup.replica.execute" then domain(backup_administration.replica_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "project_tracker.snapshot" then domain(project_tracker.snapshot)
       when "project_tracker.items.create" then domain(project_tracker.create(attributes: required(parameters, "item")))
       when "project_tracker.items.update" then domain(project_tracker.update(item_id: required(parameters, "item_id"), attributes: required(parameters, "item"), expected_revision: required(parameters, "expected_revision")))

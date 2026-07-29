@@ -134,9 +134,10 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   staging. The first live encrypted capture passed verification on 2026-07-27.
   Retention remains exact and manual; live-tree promotion is not automated.
 - Crucible provides a reboot-qualified, independently mounted 100 GiB XFS
-  target at `/srv/soul-backup`, reachable through key-only SSH/SFTP. The target
-  directory is prepared but contains no restic repository yet; initialization
-  and second-copy execution remain a separate password-bearing review gate.
+  target at `/srv/soul-backup`, reachable through key-only SSH/SFTP. Backup &
+  Recovery now has a candidate manual password-bearing gate to initialize the
+  encrypted repository, copy missing snapshots, verify metadata, and prove
+  coverage. Remote deletion and nightly execution remain disabled.
 
 ## Runtime topology
 

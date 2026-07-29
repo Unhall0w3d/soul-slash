@@ -2,7 +2,7 @@
 
 Crucible is the optional Fedora KVM guest used for two bounded purposes:
 
-1. an off-device target for a future encrypted restic second copy; and
+1. an off-device target for a manually authorized encrypted restic second copy; and
 2. a live Fedora/DNF5 target for Guided Maintenance qualification.
 
 It does not run Soul, perform automatic updates, schedule backups, or replace
@@ -74,10 +74,14 @@ The mount uses `nodev,nosuid,noexec`. The `restic` directory is owned by
 `souladmin` with mode `0700`. SSH/SFTP is the only transport; the reference
 deployment does not add NFS or SMB.
 
-Preparing the directory does not initialize a repository. Initialization and
-copy require a later exact Dashboard preview, a fresh password supplied for
-one request, and explicit execution. The password must never be stored in Git,
+Preparing the directory does not initialize a repository. **Administration →
+Backup & Recovery → Copy to Crucible** previews and executes the bounded
+initialization/copy/check transaction with a fresh password supplied for one
+page request. The password must never be stored in Git,
 `.env`, receipts, logs, Dashboard persistence, or model context.
+
+This first production candidate never deletes target snapshots and has no
+timer. Nightly reconciliation remains a later, separately reviewed gate.
 
 ## Guided Maintenance state
 
