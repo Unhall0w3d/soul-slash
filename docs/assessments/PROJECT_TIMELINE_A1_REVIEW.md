@@ -84,6 +84,19 @@ not execution authority and cannot silently change project state.
   deliberately not interpreted as an edit.
 - Live visual and interaction review remains pending.
 
+## Dashboard write-path repair · 2026-07-29
+
+Normal-use review exposed that the Dashboard supplied the bounded timeline
+`item` as an object and `expected_revision` as an integer, while the shared
+application contract's generic type branch incorrectly required both values to
+be strings. The service and UI were correct, but the request was rejected
+before reaching the service.
+
+The contract now recognizes the allowlisted `item` object and requires a
+positive integer revision. The focused verifier exercises an actual update
+through `ApplicationFacade`, matching the Dashboard request shape, so service-
+only and snapshot-only tests cannot mask this path again.
+
 ## Memory and lifecycle
 
 - Shared memory keys added: none.
