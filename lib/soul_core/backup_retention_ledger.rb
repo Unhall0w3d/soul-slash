@@ -35,6 +35,8 @@ module SoulCore
         "previous_ledger_digest" => ledger && digest(ledger),
         "snapshot_id" => normalized.fetch("snapshot_id"),
         "verified_at" => normalized.fetch("verified_at"),
+        "source_root_addition_count" => plan.fetch("source_root_additions").length,
+        "source_root_addition_digests" => plan.fetch("source_root_additions").map { |path| path_digest(path) },
         "new_deletion_count" => plan.fetch("new_holds").length,
         "reappeared_path_count" => plan.fetch("reappeared_paths").length,
         "active_hold_count_after" => active_holds(plan.fetch("ledger"), at: Time.iso8601(normalized.fetch("verified_at"))).length,
@@ -70,6 +72,8 @@ module SoulCore
         {
           "snapshot_id" => normalized.fetch("snapshot_id"),
           "ledger_digest" => digest(plan.fetch("ledger")),
+          "source_root_addition_count" => plan.fetch("source_root_additions").length,
+          "source_root_addition_digests" => plan.fetch("source_root_additions").map { |path| path_digest(path) },
           "new_deletion_count" => plan.fetch("new_holds").length,
           "reappeared_path_count" => plan.fetch("reappeared_paths").length,
           "retention_days" => RETENTION_DAYS
@@ -125,6 +129,7 @@ module SoulCore
       if ledger.nil?
         return {
           "ledger" => new_ledger(manifest),
+          "source_root_additions" => [],
           "new_holds" => [],
           "reappeared_paths" => [],
           "mutation" => "backup_retention_ledger_initialized"
@@ -135,14 +140,26 @@ module SoulCore
       manifest_digest = digest(manifest)
       if manifest.fetch("snapshot_id") == previous.fetch("snapshot_id")
         raise ArgumentError, "snapshot replay differs from the recorded manifest" unless manifest_digest == previous.fetch("manifest_digest")
-        return { "ledger" => ledger, "new_holds" => [], "reappeared_paths" => [], "mutation" => "none" }
+        return {
+          "ledger" => ledger,
+          "source_root_additions" => [],
+          "new_holds" => [],
+          "reappeared_paths" => [],
+          "mutation" => "none"
+        }
       end
 
       previous_time = Time.iso8601(previous.fetch("verified_at"))
       current_time = Time.iso8601(manifest.fetch("verified_at"))
       raise ArgumentError, "verified snapshot time must advance monotonically" unless current_time > previous_time
       raise ArgumentError, "repository identity changed; review the backup destination before recording deletions" unless manifest.fetch("repository_id") == previous.fetch("repository_id")
-      raise ArgumentError, "source roots changed; review the backup scope before recording deletions" unless manifest.fetch("source_roots") == previous.fetch("source_roots")
+      previous_roots = previous.fetch("source_roots")
+      current_roots = manifest.fetch("source_roots")
+      removed_roots = previous_roots - current_roots
+      unless removed_roots.empty?
+        raise ArgumentError, "source roots were removed or replaced; review the backup scope before recording deletions"
+      end
+      source_root_additions = current_roots - previous_roots
 
       previous_paths = previous.fetch("paths")
       current_paths = manifest.fetch("paths")
@@ -170,7 +187,13 @@ module SoulCore
         "last_verified_snapshot" => snapshot_record(manifest),
         "holds" => holds
       }
-      { "ledger" => updated, "new_holds" => new_holds, "reappeared_paths" => reappeared_paths, "mutation" => "backup_retention_ledger_updated" }
+      {
+        "ledger" => updated,
+        "source_root_additions" => source_root_additions,
+        "new_holds" => new_holds,
+        "reappeared_paths" => reappeared_paths,
+        "mutation" => "backup_retention_ledger_updated"
+      }
     end
 
     def new_ledger(manifest)

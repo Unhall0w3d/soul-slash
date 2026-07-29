@@ -145,10 +145,22 @@
       "summary": "Review temporary files, failed runs, deleted project residue, logs, caches, private proposals, retained generated artifacts, and encrypted-backup coverage across all active workflows.",
       "acceptance": "Each artifact class has a documented owner, retention boundary, deletion behavior, and deterministic cleanup verification without removing finished exports.",
       "source": "Post-production audit follow-up",
-      "implementation": "Storage & Retention A2 adds a metadata-only census across owner-private state, chats, memory, Music/Visual projects, finished exports, Studio workflows, maintenance, staging, caches, models, helper environments, and the local Knowledge Vault. Backup Manifest Reconciliation A0 adds an exact add-only Dashboard gate shared with the portable Makefile policy. It preserves every owner entry/comment, binds both manifest hashes, shares the backup-operation lock, starts no Restic process, and records only counts/hashes.",
-      "notes": "The latest retained snapshot verifies the local Knowledge Vault, chats, private state, creative projects, and finished exports. Private Git for the Vault is supplementary. The current workstation preview finds five missing durable sources and seven portable exclusions with zero removals. After candidate review: reconcile the owner manifests, create a fresh verified snapshot, confirm required census coverage, then design cleanup execution.",
-      "references": "docs/soul/STORAGE_RETENTION_AND_BACKUP_CENSUS_A2_BRIEF.md; docs/assessments/STORAGE_RETENTION_AND_BACKUP_CENSUS_A2_REVIEW.md; docs/soul/BACKUP_MANIFEST_RECONCILIATION_A0_BRIEF.md; docs/assessments/BACKUP_MANIFEST_RECONCILIATION_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md",
+      "implementation": "Storage & Retention A2 adds a metadata-only census across owner-private state, chats, memory, Music/Visual projects, finished exports, Studio workflows, maintenance, staging, caches, models, helper environments, and the local Knowledge Vault. Backup Manifest Reconciliation A0 adds an exact add-only Dashboard gate shared with the portable Makefile policy. Backup Retention Additive Roots A0 permits only strict verified source-root supersets while preserving fail-closed removal/replacement behavior and existing deletion holds.",
+      "notes": "The current verified snapshot and its Crucible replica contain all 32 required durable artifact classes, including the local Knowledge Vault, chats, private state, creative projects, and finished exports. Private Git for the Vault is supplementary. The additive-root repair must be accepted and one fresh backup completed before the local retention ledger and transaction receipt are considered fully reconciled; cleanup execution remains separately reviewed.",
+      "references": "docs/soul/STORAGE_RETENTION_AND_BACKUP_CENSUS_A2_BRIEF.md; docs/assessments/STORAGE_RETENTION_AND_BACKUP_CENSUS_A2_REVIEW.md; docs/soul/BACKUP_MANIFEST_RECONCILIATION_A0_BRIEF.md; docs/assessments/BACKUP_MANIFEST_RECONCILIATION_A0_REVIEW.md; docs/soul/BACKUP_RETENTION_ADDITIVE_ROOTS_A0_BRIEF.md; docs/soul/BACKUP_AND_RECOVERY.md",
       "commands": "make verify-storage-retention-census; make verify-backup-manifest-reconciliation; make verify-backup-administration"
+    },
+    {
+      "item_id": "track_nightly_drs_backups",
+      "title": "Automate nightly DRS backups at 3:00 AM",
+      "area": "Backup & Recovery",
+      "horizon": "later",
+      "status": "planned",
+      "priority": "high",
+      "summary": "Design reviewed unattended 3:00 AM encrypted capture, verification, and off-device Crucible reconciliation.",
+      "acceptance": "A dedicated brief defines timezone and missed-run behavior, bounded credentials, active-work exclusion, exact lineage, 30-day deletion retention, failure visibility, last-success evidence, and restore rehearsal without enabling automatic prune.",
+      "source": "Operator continuity roadmap",
+      "notes": "Planning only. No timer, scheduler, persistent credential transport, background execution, or unattended authority is approved by this item."
     },
     {
       "item_id": "track_music_long_form",

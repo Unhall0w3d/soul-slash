@@ -36,12 +36,14 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] review A2 bounded source-attributed local project and document search
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
-- [~] review the accepted local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; Crucible's manual initialize/copy/verify gate is candidate-complete, while live acceptance, remote reconciliation, and nightly execution remain
+- [~] review the accepted local encrypted backup, staged restore, and 30-day
+  deletion-aware retention ledger; all 32 required classes are present in the
+  current verified snapshot and accepted Crucible replica, while the bounded
+  strict-additive root repair and one finalizing fresh capture remain
 - [~] review the metadata-only Storage & Retention A2 artifact census and
-  backup-coverage contract; the latest snapshot verifies the local Vault,
-  chats, projects, private state, and finished exports, while one reviewed
-  add-only owner-manifest reconciliation candidate and fresh capture remain
-  before cleanup execution is designed
+  backup-coverage contract; the current snapshot verifies 32/32 required
+  classes with no source or exclusion gaps, while cleanup execution remains a
+  separately reviewed design
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
@@ -75,10 +77,15 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] add a separately reviewed, bounded cleanup executor only after every
   lifecycle-owned or age-reviewable artifact class has an accepted deletion
   contract and protected exports remain outside project deletion boundaries
+- [ ] design 3:00 AM nightly DRS capture, verification, and Crucible
+  reconciliation with bounded credential transport, active-work exclusion,
+  failure evidence, and no automatic prune
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation and Crucible's bounded manual encrypted second copy are accepted; remote retention, nightly reconciliation, and full recovery remain
+- [~] backup and disaster-recovery local foundation and Crucible's bounded
+  manual encrypted second copy are accepted; strict additive-root ledger
+  finalization, nightly reconciliation, and full recovery remain
 - [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review

@@ -189,20 +189,21 @@ automatically synchronized, or treated as approved memory.
 Storage & Retention A2 now provides a read-only artifact-class and backup
 coverage census across Chat, memory, private state, Music/Visual projects,
 finished exports, Studio workflows, maintenance, staging, caches, models, and
-the local Knowledge Vault. The latest retained path manifest verifies the
-Vault, chats, core private state, creative projects, and finished exports.
+the local Knowledge Vault. The current verified path manifest and accepted
+Crucible replica inventory all 32 required durable artifact classes, including
+the Vault, chats, core private state, creative projects, and finished exports.
 Private Git history for the Vault remains supplementary rather than replacing
-Restic. The current owner manifests still require a reviewed reconciliation for
-three newer durable continuity paths and four explicit disposable/cache
-exclusions before a fresh snapshot can prove complete current coverage. No
-cleanup executor or automatic manifest mutation exists.
+Restic.
 
-Backup Manifest Reconciliation A0 is now a candidate add-only Dashboard gate.
-On the current workstation its exact preview finds five missing sources—the
-three newer workflow paths plus two newer maintenance user-unit files—and seven
-portable exclusions. It preserves all owner entries and starts no Restic
-operation. Live reconciliation and the subsequent verified snapshot remain
-Operator review gates.
+Backup Manifest Reconciliation A0 is live-accepted: five durable sources and
+seven portable exclusions were added with zero removal or replacement. The
+first post-reconciliation snapshot and its Crucible copy are safe, but its
+local transaction stopped before retention-ledger and receipt finalization
+because the prior ledger required exact root equality. Backup Retention
+Additive Roots A0 is the bounded repair candidate: it accepts only strict
+verified root supersets, binds additions into approval evidence, preserves
+existing holds, and still blocks every removal or replacement. No cleanup
+executor or automatic manifest mutation exists.
 
 Local Project and Document Search unifies bounded lexical retrieval across
 repository documentation, the configured Knowledge Vault, and canonical Music
