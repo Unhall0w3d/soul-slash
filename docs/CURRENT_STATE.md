@@ -105,8 +105,11 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
   with a SHA-256-bound root helper exposing only self-check, one fixed DNF5
   upgrade, and one fixed reboot. Exact helper status unlocks device-scoped
   Maintenance and Reboot; a missing or invalid helper falls closed to
-  inventory-only. The actual 173-package live update and supervised reboot
-  remain pending Operator acceptance. Operator-managed reservations now
+  inventory-only. The 173-package live update completed with a terminal
+  receipt and zero updates remaining. A post-run correction now compares a
+  freshly probed running kernel with the newest installed kernel instead of
+  trusting DNF5's incomplete reboot signal; the supervised reboot remains
+  pending Operator acceptance. Operator-managed reservations now
   provide stable identities for the workstation, Forge, the Pi-hole appliance,
   and Crucible. Deployment-specific card names remain ignored local
   configuration; public source preserves functional roles and stable IDs.

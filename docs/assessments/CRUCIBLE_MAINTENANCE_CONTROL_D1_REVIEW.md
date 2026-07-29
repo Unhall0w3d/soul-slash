@@ -8,8 +8,8 @@ root-owned helper with three literal operations and routes the existing
 device-scoped preview, confirmation, receipt, lock, and reboot lifecycle
 through that helper.
 
-The 173-package DNF5 transaction and live reboot are intentionally not part of
-this candidate-completion pass. They require the Operator's supervised
+The 173-package DNF5 transaction completed through the Dashboard after the
+initial candidate pass. The live reboot remains a separate Operator-supervised
 Dashboard acceptance.
 
 ## Files changed
@@ -96,7 +96,7 @@ an LLM cannot validate its safety or authorization.
 
 - DNF5 rollback is not provided.
 - A guest update may still require human review of package-manager failure.
-- The first 173-package run and reboot have not yet been accepted live.
+- The 173-package update is accepted; the separate reboot remains untested.
 - The fixed 45-minute maintenance bound may need review if unusually slow
   mirrors make a legitimate update exceed it.
 
@@ -110,10 +110,24 @@ device and exact fixed operations.
 - [x] Confirm Crucible appears under **SSH integrated**.
 - [x] Confirm status-only appliances remain compact under **Status only**.
 - [x] Inspect Maintenance preview: one fixed helper `dnf5-upgrade`.
-- [ ] Execute and observe the 173-package transaction.
-- [ ] Confirm a terminal receipt and refreshed package evidence.
+- [x] Execute and observe the 173-package transaction.
+- [x] Confirm a terminal receipt and refreshed package evidence.
 - [ ] Inspect Reboot preview separately.
 - [ ] Reboot once and confirm changed boot identity and all four readiness
       checks.
 - [ ] Confirm `/srv/soul-backup` remains mounted and backup data is intact.
 - [ ] Approve merge only after the supervised acceptance above.
+
+## Live maintenance result
+
+Receipt `device_receipt_de12d9416cc87d61` completed from
+2026-07-28 22:29:11-04:00 through 22:31:13-04:00. Its one fixed maintenance
+step exited `0`, output remained bounded, and it requested no reboot. Refreshed
+DNF5 evidence reports zero remaining updates.
+
+Post-maintenance review found DNF5's reboot JSON remained false even though
+kernel `7.1.5-200.fc44.x86_64` was installed while `6.19.10-300.fc44.x86_64`
+was running. The candidate now probes the running kernel on every collection
+and treats a newer installed kernel as an independent reboot requirement. This
+prevents a stale enrollment-time kernel or incomplete DNF5 reboot signal from
+presenting a false Healthy state.

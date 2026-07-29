@@ -175,7 +175,8 @@ Dir.mktmpdir("soul-crucible-d1-") do |root|
     case remote
     when ["/usr/bin/dnf5", "--quiet", "check-upgrade"] then result("pkg.x86_64 2.0 updates\n", "", 100, "failed")
     when ["/usr/bin/dnf5", "needs-restarting", "--json"] then result("[]\n")
-    when ["/usr/bin/rpm", "-q", "kernel-core"] then result("kernel-core-1.0\n")
+    when ["/usr/bin/rpm", "-q", "kernel-core"] then result("kernel-core-1.0\nkernel-core-2.0\n")
+    when ["/usr/bin/uname", "-r"] then result("1.0\n")
     when ["/usr/bin/systemctl", "is-active", "sshd"], ["/usr/bin/systemctl", "is-active", "qemu-guest-agent"] then result("active\n")
     when ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-crucible-maintenance", "self-check"]
       result("{\"version\":\"soul-crucible-maintenance-d1-v1\",\"arbitrary_command_forwarding\":false,\"password_storage\":false}\n")
@@ -196,6 +197,12 @@ Dir.mktmpdir("soul-crucible-d1-") do |root|
                device.dig("facts", "status_adapter") == "dnf5_fixed_maintenance" &&
                device.dig("facts", "control_capability") == "fixed_maintenance" &&
                device.dig("facts", "maintenance_authority") == "root_owned_fixed_operations")
+  check.call("newer installed kernel requires reboot even when DNF5 omits it",
+             device.dig("kernel", "running") == "1.0" &&
+               device.dig("kernel", "available") == "2.0" &&
+               device.dig("kernel", "update_required") == true &&
+               device.dig("reboot", "required") == true &&
+               device.dig("reboot", "reason") == "newer installed kernel requires reboot")
 end
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))

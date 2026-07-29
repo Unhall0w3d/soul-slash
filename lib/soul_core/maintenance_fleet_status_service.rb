@@ -576,6 +576,11 @@ module SoulCore
         target,
         "/usr/bin/rpm", "-q", "kernel-core"
       )
+      running_kernel_result = remote_run(
+        "enrolled_device.running_kernel",
+        target,
+        "/usr/bin/uname", "-r"
+      )
       ssh = remote_run(
         "enrolled_device.ssh_service",
         target,
@@ -597,11 +602,16 @@ module SoulCore
       available_kernel = update_rows
         .find { |row| row.fetch("name").start_with?("kernel-core.") }
         &.fetch("version", nil)
-      running_kernel = facts["kernel"].to_s
+      running_kernel = successful?(running_kernel_result) ? output(running_kernel_result) : facts["kernel"].to_s
       installed = output(installed_kernels).lines
         .map(&:strip)
         .filter_map { |line| line.delete_prefix("kernel-core-") unless line.empty? }
-      reboot_required = dnf5_reboot_required?(reboot_result)
+      newest_installed_kernel = installed.max_by { |version| version.scan(/\d+/).map(&:to_i) }
+      kernel_reboot_required = !newest_installed_kernel.to_s.empty? &&
+        !running_kernel.empty? &&
+        running_kernel != newest_installed_kernel
+      dnf_reboot_required = dnf5_reboot_required?(reboot_result)
+      reboot_required = dnf_reboot_required || kernel_reboot_required
       authority_ready = crucible_authority_ready?(authority)
       services = [
         {
@@ -628,13 +638,19 @@ module SoulCore
         version: authority_ready ? "DNF5 · managed evidence" : "DNF5 · read-only evidence",
         kernel: {
           "running" => running_kernel,
-          "available" => available_kernel || installed.last || running_kernel,
-          "update_required" => !available_kernel.to_s.empty?
+          "available" => available_kernel || newest_installed_kernel || running_kernel,
+          "update_required" => !available_kernel.to_s.empty? || kernel_reboot_required
         },
         updates: update_summary(native: update_rows.length, freshness: "live_dnf5_metadata"),
         reboot: {
           "required" => reboot_required,
-          "reason" => reboot_required ? "DNF5 reports a reboot is required" : "DNF5 reports no reboot requirement"
+          "reason" => if dnf_reboot_required
+                        "DNF5 reports a reboot is required"
+                      elsif kernel_reboot_required
+                        "newer installed kernel requires reboot"
+                      else
+                        "DNF5 reports no reboot requirement"
+                      end
         },
         services: services,
         facts: facts.merge(
