@@ -2306,25 +2306,31 @@ function renderModelSummary(report) {
 
 function renderStorageRetention(report) {
   const card = byId("storage-retention-card"); card.hidden = false;
-  const summary = report?.summary || {}; const memory = report?.dashboard_memory || {};
-  byId("storage-retention-state").textContent = `${summary.cleanup_candidate_count || 0} reviewable`;
+  const summary = report?.summary || {}; const memory = report?.dashboard_memory || {}; const backup = report?.backup_coverage || {};
+  byId("storage-retention-state").textContent = `${summary.artifact_class_count || 0} classes · ${backup.uncovered_count || 0} uncovered`;
   renderDefinitionList(byId("storage-retention-summary"), [
     ["Observed", formatBytes(summary.observed_bytes)],
     ["Protected", formatBytes(summary.protected_bytes)],
     ["Candidates", String(summary.cleanup_candidate_count || 0)],
+    ["Backup sources", String(backup.configured_source_count || 0)],
+    ["Required coverage", `${backup.snapshot_verified_count || 0}/${backup.required_class_count || 0} snapshot verified`],
+    ["Coverage gaps", `${backup.uncovered_count || 0} uncovered · ${backup.exclusion_gap_count || 0} exclusion gaps`],
+    ["Latest manifest", backup.latest_manifest ? `${backup.latest_manifest.snapshot_id} · ${formatTime(backup.latest_manifest.verified_at)}` : "not available"],
     ["Dashboard now", formatBytes(memory.current_bytes)],
     ["Dashboard peak", formatBytes(memory.peak_bytes)],
     ["Sampling", memory.point_in_time ? "point-in-time only" : "unavailable"]
   ]);
   const list = byId("storage-retention-categories"); list.replaceChildren();
-  (report?.categories || []).forEach((category) => {
-    const retention = String(category.retention || "unclassified").replaceAll("_", " ");
-    const note = `${formatBytes(category.bytes)} · ${category.entry_count || 0} top-level entries · ${retention}${category.blocked ? ` · ${category.blocked}` : ""}`;
-    list.append(labeledRecord(category.id.replaceAll("_", " "), note, category.retention === "protected" ? "is-available" : "is-warning"));
+  (report?.artifact_classes || []).forEach((artifact) => {
+    const retention = String(artifact.retention || "unclassified").replaceAll("_", " ");
+    const coverage = String(artifact.backup?.status || "not assessed").replaceAll("_", " ");
+    const warning = ["uncovered", "excluded conflict", "exclusion missing"].includes(coverage);
+    const note = `${artifact.owner} · ${formatBytes(artifact.bytes)} · ${retention} · backup ${coverage}${artifact.blocked ? ` · ${artifact.blocked}` : ""}`;
+    list.append(labeledRecord(artifact.id.replaceAll("_", " "), note, warning ? "is-warning" : (coverage === "snapshot verified" ? "is-available" : "")));
   });
-  if (!report?.categories?.length) list.append(labeledRecord("Storage unavailable", "No bounded category evidence was returned.", "is-warning"));
+  if (!report?.artifact_classes?.length) list.append(labeledRecord("Storage unavailable", "No bounded artifact census was returned.", "is-warning"));
   byId("storage-cleanup-scope").hidden = true;
-  byId("storage-cleanup-status").textContent = "Execution is deliberately unavailable in this slice.";
+  byId("storage-cleanup-status").textContent = "Read-only census · cleanup execution remains unavailable.";
 }
 
 async function previewStorageCleanup() {
@@ -2333,7 +2339,7 @@ async function previewStorageCleanup() {
     const envelope = await callSoul("storage_retention.cleanup.preview", { category: byId("storage-cleanup-category").value }); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || dataOf(envelope).reason || "Cleanup preview blocked safely.");
     const data = dataOf(envelope); const output = byId("storage-cleanup-scope"); output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
-    status.textContent = `${data.entry_count || 0} candidate${data.entry_count === 1 ? "" : "s"} · ${formatBytes(data.total_bytes)}. No cleanup execution exists in A1.`;
+    status.textContent = `${data.entry_count || 0} candidate${data.entry_count === 1 ? "" : "s"} · ${formatBytes(data.total_bytes)}. Cleanup execution remains unavailable.`;
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
 }

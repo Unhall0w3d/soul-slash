@@ -6,6 +6,7 @@ require "json"
 require "tmpdir"
 require "time"
 
+require_relative "artifact_retention_census"
 require_relative "bounded_command_runner"
 
 module SoulCore
@@ -37,22 +38,26 @@ module SoulCore
     def inventory
       categories = category_definitions.map { |definition| inspect_category(definition) }
       candidates = PREVIEW_CATEGORIES.to_h { |category| [category, discover(category).length] }
+      census = ArtifactRetentionCensus.new(root: @root, home: @home, temp_root: @temp_root, runner: @runner).inventory
       {
         "status" => "ok",
         "assessment" => "storage",
-        "schema_version" => "soul.storage_retention.v1",
+        "schema_version" => "soul.storage_retention.v2",
         "generated_at" => @clock.call.iso8601,
         "read_only" => true,
         "categories" => categories,
+        "artifact_classes" => census.fetch("artifact_classes"),
+        "backup_coverage" => census.fetch("backup_coverage"),
         "summary" => {
           "observed_bytes" => categories.sum { |item| item.fetch("bytes", 0) },
           "protected_bytes" => categories.select { |item| item["retention"] == "protected" }.sum { |item| item.fetch("bytes", 0) },
           "cleanup_candidate_count" => candidates.values.sum,
-          "preview_categories" => candidates
+          "preview_categories" => candidates,
+          "artifact_class_count" => census.fetch("artifact_classes").length
         },
         "dashboard_memory" => dashboard_memory,
         "cleanup_execution_available" => false,
-        "verification" => { "metadata_only" => true, "symlinks_followed" => false, "files_changed" => false, "background_measurement" => false }
+        "verification" => census.fetch("verification").merge("background_measurement" => false)
       }
     end
 

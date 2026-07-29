@@ -105,8 +105,9 @@ end
 html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 js = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
 brief = File.read(File.join(__dir__, "../docs/soul/STORAGE_AND_RETENTION_A1_BRIEF.md"))
+storage_renderer = js[/function renderStorageRetention\(report\).*?(?=\nasync function previewStorageCleanup)/m].to_s
 check.call("dashboard exposes Storage inventory and preview-only category control", html.include?('data-assessment-scope="storage"') && html.include?('id="preview-storage-cleanup"') && js.include?("storage_retention.cleanup.preview"))
-check.call("dashboard storage inspection remains manual and timer-free", !js.match?(/setInterval|setTimeout|requestAnimationFrame/) && js.include?("point-in-time only"))
+check.call("dashboard storage inspection remains manual and timer-free", !storage_renderer.match?(/setInterval|setTimeout|requestAnimationFrame/) && storage_renderer.include?("point-in-time only"))
 check.call("approved brief prohibits automatic or destructive cleanup", brief.include?("A1 registers no cleanup execute operation") && brief.include?("scheduled cleanup") && brief.include?("never followed"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?

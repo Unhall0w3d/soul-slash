@@ -35,7 +35,7 @@ source_candidates = [
   *%w[memory artifacts identity improvement host_improvement proposals reflection workflows logs].map { |name| File.join(root, "Soul", name) },
   File.join(root, "Soul", "augmentation", "proposals"),
   File.join(root, "Soul", "augmentation", "experiments"),
-  *%w[application artifact_inbox chats conversation_evidence conversation_state executions exports].map { |name| File.join(root, "Soul", "runtime", name) },
+  *%w[application artifact_inbox chats conversation_evidence conversation_state creative_flows executions exports youtube_auth youtube_description_sync].map { |name| File.join(root, "Soul", "runtime", name) },
   File.join(root, "Soul", "runtime", "dashboard_auth", "credentials.json"),
   File.join(root, "Soul", "runtime", "model_runtime", "core_selection.json"),
   File.join(root, "Soul", "runtime", "model_runtime", "selected_profile.json"),
@@ -57,8 +57,15 @@ abort("No default backup sources exist; initialize Soul before configuring backu
 excludes = [
   "*.lock", "*.part", "*.tmp", ".DS_Store", "__pycache__", ".pytest_cache",
   "#{File.join(root, "Soul", "private", "backup", "restores")}/**",
+  "#{File.join(root, "Soul", "private", "creative-inspection")}/**",
+  "#{File.join(root, "Soul", "private", "host_maintenance", "checkupdates_db")}/**",
+  "#{File.join(root, "Soul", "private", "perception", "screen_capture")}/**",
+  "#{File.join(root, "Soul", "private", "perception", "staging")}/**",
+  "#{File.join(root, "Soul", "runtime", "approvals")}/**",
   "#{File.join(root, "Soul", "runtime", "dashboard_auth", "sessions")}/**",
-  "#{File.join(root, "Soul", "runtime")}/**/approval_tokens/**"
+  "#{File.join(root, "Soul", "runtime")}/**/approval_tokens/**",
+  "#{File.join(root, "Soul", "runtime", "model_runtime", "leases")}/**",
+  "#{File.join(root, "Soul", "runtime", "music")}/**"
 ].sort
 
 canonical = lambda do |value|
