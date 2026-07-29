@@ -509,8 +509,12 @@ check.call("Dashboard uses click authority and never collects a sudo password",
            javascript.include?("confirmation: preview.confirmation") &&
              !html.match?(/maintenance[^<]{0,100}password[^<]{0,100}<input/i) &&
              html.include?("No password is collected by the Dashboard"))
-check.call("A2 remains event-driven without polling or reboot controls",
-           !javascript.match?(/maintenance.{0,200}(?:setInterval|setTimeout|WebSocket|EventSource)/m) &&
+check.call("A2 uses only bounded dialog-scoped receipt polling and exposes no combined reboot control",
+           !javascript.match?(/(?:setInterval|WebSocket|EventSource)/) &&
+             javascript.scan("window.setTimeout").length == 1 &&
+             javascript.include?("MAINTENANCE_EVIDENCE_POLL_LIMIT = 120") &&
+             javascript.include?("MAINTENANCE_RECEIPT_POLL_LIMIT = 600") &&
+             javascript.include?("state.maintenanceDeviceFlowToken !== flowToken || !dialog.open") &&
              !html.match?(/<button[^>]*id="[^"]*maintenance[^"]*"[^>]*>\s*Reboot/i))
 
 abort "Maintenance foreground execution A2 verification failed: #{failures.join(', ')}" unless failures.empty?

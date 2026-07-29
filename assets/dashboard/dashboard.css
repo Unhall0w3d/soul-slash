@@ -289,9 +289,6 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-reboot-button { border-color:rgba(196,161,98,.46); color:var(--gold-light); }
 .maintenance-device-dialog { width:min(760px,calc(100vw - 32px)); }
 .maintenance-device-dialog .clear-dialog-shell { max-height:min(820px,calc(100vh - 48px)); overflow:auto; }
-.maintenance-evidence-actions { position:sticky; bottom:0; z-index:2; display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding:12px 0 4px; background:linear-gradient(180deg,rgba(9,20,29,0),rgba(9,20,29,.97) 24%); }
-.maintenance-evidence-actions[hidden] { display:none; }
-.maintenance-evidence-actions .gate-button { width:100%; min-width:0; }
 #maintenance-device-confirmation-row { display:grid; gap:10px; margin-top:18px; }
 #maintenance-device-confirmation-row[hidden] { display:none; }
 .maintenance-topology-card { padding:21px; border:1px solid var(--line); border-radius:3px 20px 3px 16px; background:rgba(5,12,18,.7); }
