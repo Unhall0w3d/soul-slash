@@ -107,13 +107,11 @@ Dir.mktmpdir("soul-device-control-") do |root|
                warden_preview.dig("data", "plan", "device_id") == "pihole" &&
                warden_preview.dig("data", "plan", "ssh_alias") == "pihole-maintenance")
 
-  begin
-    invalid = disabled.preview(device_id: "maven", action: "maintenance")
-    invalid_rejected = invalid["lifecycle_state"] == "awaiting_input"
-  rescue StandardError
-    invalid_rejected = false
+  rejected_workstation_ids = %w[workstation maven].all? do |device_id|
+    disabled.preview(device_id: device_id, action: "maintenance")["lifecycle_state"] == "awaiting_input"
   end
-  check.call("remote service cannot target Maven or a request-supplied host", invalid_rejected)
+  check.call("remote service cannot target the local workstation, its legacy alias, or a request-supplied host",
+             rejected_workstation_ids)
 
   lock_clock = Time.utc(2026, 7, 27, 22, 2, 0)
   lock_case = lambda do |name, process_alive:|
@@ -336,14 +334,23 @@ Dir.mktmpdir("soul-device-control-") do |root|
     "collected_at" => "2026-07-27T22:20:00Z",
     "devices" => [{"id" => "maven"}],
     "summary" => {"device_count" => 1},
-    "topology" => {"nodes" => [], "edges" => []}
+    "topology" => {
+      "network" => {"lan_node_ids" => ["maven"], "cloud_node_ids" => ["internet"]},
+      "nodes" => [{"id" => "maven"}, {"id" => "internet"}],
+      "edges" => [{"from" => "maven", "to" => "internet"}]
+    },
+    "refreshed_device_id" => "maven"
   }
   snapshot_service.send(:persist_snapshot, snapshot_data)
   snapshot = snapshot_service.snapshot
   snapshot_path = File.join(root, "Soul", "private", "host_maintenance", "fleet_status.json")
-  check.call("persisted fleet snapshot is private, atomic, schema-checked, and reloadable",
+  check.call("legacy fleet snapshots are private, schema-checked, and read through the workstation compatibility alias",
              snapshot["lifecycle_state"] == "complete" &&
-               snapshot.dig("data", "devices", 0, "id") == "maven" &&
+               snapshot.dig("data", "devices", 0, "id") == "workstation" &&
+               snapshot.dig("data", "topology", "nodes", 0, "id") == "workstation" &&
+               snapshot.dig("data", "topology", "edges", 0, "from") == "workstation" &&
+               snapshot.dig("data", "topology", "network", "lan_node_ids") == ["workstation"] &&
+               snapshot.dig("data", "refreshed_device_id") == "workstation" &&
                (File.stat(snapshot_path).mode & 0o777) == 0o600 &&
                Dir.glob("#{snapshot_path}.tmp-*").empty?)
 end
@@ -355,11 +362,13 @@ check.call("Dashboard removes visible A1/A2/A3 cards and generates exactly two d
            html.include?('id="maintenance-legacy-controls" hidden') &&
              javascript.include?('["maintenance", "reboot"].forEach') &&
              html.include?('id="maintenance-device-dialog"'))
-check.call("Maven dialog keeps evidence recovery outside the scrolling plan and explains the exact blocker",
-           html.include?('id="maintenance-maven-evidence-actions"') &&
+check.call("workstation dialog keeps evidence recovery outside the scrolling plan and explains the exact blocker",
+           html.include?('id="maintenance-workstation-evidence-actions"') &&
              html.include?('id="refresh-maintenance-device-evidence"') &&
              html.include?('id="recheck-maintenance-device-preflight"') &&
-             javascript.include?("Refresh Maven evidence, then recheck this preflight.") &&
+             javascript.include?("Refresh ${deviceLabel} evidence, then recheck this preflight.") &&
+             javascript.include?("`Refresh ${deviceLabel} evidence`") &&
+             javascript.include?('return deviceId === "maven" ? "workstation" : deviceId;') &&
              javascript.include?("A4 fixed-operation authority · no password prompt"))
 check.call("cards distinguish maintenance channels from status-only probes while Pi-hole OpenSSH duplication is absent",
            javascript.include?('"Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")') &&

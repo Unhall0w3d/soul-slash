@@ -661,8 +661,10 @@ module SoulCore
     end
 
     def known_addresses
+      workstation_address = configured_value("SOUL_FLEET_WORKSTATION_ADDRESS", "SOUL_FLEET_MAVEN_ADDRESS")
+      workstation_label = configured_value("SOUL_FLEET_WORKSTATION_LABEL", "SOUL_FLEET_MAVEN_LABEL", fallback: "Workstation")
       configured = {
-        @process_env["SOUL_FLEET_MAVEN_ADDRESS"] => @process_env.fetch("SOUL_FLEET_MAVEN_LABEL", "Maven"),
+        workstation_address => workstation_label,
         @process_env["SOUL_FLEET_FORGE_ADDRESS"] => "Forge",
         @process_env["SOUL_FLEET_PIHOLE_ADDRESS"] => @process_env.fetch("SOUL_FLEET_PIHOLE_LABEL", "Pi-hole"),
         @process_env["SOUL_FLEET_CISCO_PHONE_ADDRESS"] => @process_env.fetch("SOUL_FLEET_CISCO_PHONE_LABEL", "Cisco 8851")
@@ -672,6 +674,12 @@ module SoulCore
 
         memo[address.to_s] = safe_text(label, 80)
       end.merge(registry_records.to_h { |record| [record.fetch("address"), record.fetch("label")] })
+    end
+
+    def configured_value(key, legacy_key, fallback: "")
+      value = @process_env[key].to_s.strip
+      value = @process_env[legacy_key].to_s.strip if value.empty?
+      value.empty? ? fallback : value
     end
 
     def parse_os_release(value)

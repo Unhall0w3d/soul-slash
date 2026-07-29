@@ -175,7 +175,7 @@ There is no fleet-wide maintenance or reboot action.
 Status-only appliance cards are inventory and observation surfaces, not action
 targets.
 
-Maven delegates to the reviewed A2 visible-terminal maintenance path and A3
+The configured workstation delegates to the reviewed A2 visible-terminal maintenance path and A3
 conditional reboot/restoration path. Forge and Pi-hole use fixed passwordless
 maintenance aliases, fixed command vectors, a global maintenance lock,
 device-specific confirmation, one attempt, and redacted receipts. A Forge
@@ -189,7 +189,7 @@ status. It never retries the reboot request.
 ## Safety engines retained behind the cards
 
 The former A1, A2, and A3 presentation cards are no longer shown. Their
-reviewed backend contracts remain authoritative for Maven: privacy-filtered
+reviewed backend contracts remain authoritative for the workstation: privacy-filtered
 workspace capture, the native desktop handoff, exact package vectors, receipt
 bounds, reboot preconditions, and one-shot restoration are unchanged. Native
 mode retains one sudo prompt. The separately installed A4 authority may replace
@@ -251,11 +251,11 @@ but it does not prevent the zero-command fixture rehearsal from exercising the
 visible terminal and receipt lifecycle. The desktop handoff supplies native
 evidence while preserving the service sandbox.
 
-**Collect fleet status** and Maven's native evidence serve different purposes.
+**Collect fleet status** and the workstation's native evidence serve different purposes.
 Fleet collection inventories cached workstation and remote device state.
-Before Maven maintenance or reboot, use the prominent **Refresh Maven
-evidence** action, let its visible read-only terminal close, then select
-**Recheck Maven preflight**. This preserves the fresh Class-5 authorization
+Before workstation maintenance or reboot, use the prominent **Refresh
+workstation evidence** action, let its visible read-only terminal close, then
+select **Recheck workstation preflight**. This preserves the fresh Class-5 authorization
 gate without hiding its recovery control in the plan scroller.
 
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
@@ -335,7 +335,7 @@ fixed allowlisted applications, skips already-running background entries,
 places supported windows through Hyprland's typed Lua dispatchers, restores the
 previously active workspace last, writes a terminal receipt, and consumes the
 journal. The unit and native handoff use the stable `/usr/bin/ruby` runtime.
-Maven's reviewed registry includes Webex and Teams for Linux as
+The workstation's reviewed registry includes Webex and Teams for Linux as
 `launch_if_absent` entries: they are recorded only when their window or process
 exists before reboot, never launched merely because they are installed, and
 never duplicated if autologin already restored them.

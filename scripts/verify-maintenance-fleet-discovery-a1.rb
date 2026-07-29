@@ -95,7 +95,10 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
   runner = DiscoveryFakeRunner.new
   service = SoulCore::MaintenanceFleetDiscoveryService.new(
     root: root,
-    process_env: {"SOUL_FLEET_MAVEN_ADDRESS" => "192.168.50.2"},
+    process_env: {
+      "SOUL_FLEET_WORKSTATION_ADDRESS" => "192.168.50.2",
+      "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier"
+    },
     runner: runner,
     clock: -> { Time.utc(2026, 7, 28, 12, 0, 0) },
     ssh_config: ssh_config,
@@ -138,7 +141,7 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
                !nmap_call["argv"].any? { |part| %w[sh bash zsh -c].include?(part) })
   known = scan_data["represented"].find { |candidate| candidate["address"] == "192.168.50.2" }
   check.call("scan candidates remain untrusted while already represented addresses are excluded",
-             known["known_device"] == "Maven" &&
+             known["known_device"] == "Atelier" &&
                scan_data["candidates"].none? { |candidate| candidate["address"] == "192.168.50.2" } &&
                scan_data["candidates"].all? { |candidate| candidate["trusted"] == false && candidate["mutation_authority"] == false })
   candidate_hint = scan_data.dig("candidates", 0, "identity_hints")
