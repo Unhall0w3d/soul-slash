@@ -24,7 +24,9 @@ The page has four exact-gated operations:
    `blocked_for_human_review`. It never overwrites live state.
 4. **Copy to Crucible** verifies the fixed SSH/SFTP target, initializes its
    encrypted repository when absent, copies missing `soul-state` snapshots,
-   verifies target metadata, and proves exact source-snapshot coverage.
+   verifies target metadata, and proves exact source-snapshot coverage through
+   restic's preserved original-snapshot lineage. Destination storage IDs differ
+   because the repositories are independently encrypted.
 
 The repository password is entered per dashboard page session. It is sent only
 in the environment of the bounded restic child process. Soul does not place it

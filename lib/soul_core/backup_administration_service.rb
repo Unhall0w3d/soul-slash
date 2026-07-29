@@ -97,9 +97,11 @@ module SoulCore
         "target_state" => preflight.fetch("target_state"),
         "initialize_target" => preflight.fetch("target_state") == "uninitialized",
         "source_snapshot_ids" => preflight.fetch("source_ids"),
+        "source_snapshot_lineage_ids" => preflight.fetch("source_lineage_ids"),
         "target_snapshot_ids" => preflight.fetch("target_ids"),
-        "missing_snapshot_ids" => preflight.fetch("source_ids") - preflight.fetch("target_ids"),
-        "verification" => "target metadata and exact snapshot coverage",
+        "target_snapshot_lineage_ids" => preflight.fetch("target_lineage_ids"),
+        "missing_snapshot_ids" => preflight.fetch("missing_source_ids"),
+        "verification" => "target metadata and exact original-snapshot lineage coverage",
         "remote_deletion" => false,
         "automatic_retry" => false,
         "password_retained" => false
@@ -143,16 +145,19 @@ module SoulCore
       checked = replica_restic(password, "check", timeout: REPLICA_CHECK_TIMEOUT, output: 1024 * 1024)
       raise "Crucible repository verification failed#{restic_failure_suffix(checked)}" unless checked.success?
       target = replica_inventory(password)
-      missing = preview.dig("data", "source_snapshot_ids") - target.fetch("ids")
+      missing = preview.dig("data", "source_snapshot_lineage_ids") - target.fetch("lineage_ids")
       raise "Crucible verification found missing source snapshots" unless missing.empty?
       receipt = write_receipt("replica", {
         "target_repository" => @replica_repository,
         "target_repository_id" => target["repository_id"],
         "source_snapshot_ids" => preview.dig("data", "source_snapshot_ids"),
-        "copied_snapshot_ids" => preview.dig("data", "missing_snapshot_ids"),
+        "source_snapshot_lineage_ids" => preview.dig("data", "source_snapshot_lineage_ids"),
+        "copied_source_snapshot_ids" => preview.dig("data", "missing_snapshot_ids"),
+        "destination_snapshot_ids" => target.fetch("ids"),
+        "destination_snapshot_lineage_ids" => target.fetch("lineage_ids"),
         "target_snapshot_count" => target.fetch("ids").length,
         "remote_deletion" => false,
-        "verification" => "source and target passed"
+        "verification" => "source and target metadata passed; original-snapshot lineage coverage is exact"
       })
       progress&.call("stage" => "complete", "message" => "Crucible second copy verified.")
       complete("Crucible second copy completed and verified", receipt, "backup_replica_verified")
@@ -422,7 +427,15 @@ module SoulCore
       source = snapshot_inventory(password)
       raise ArgumentError, "local backup repository contains no Soul snapshots" if source.empty?
       remote = replica_inventory(password)
-      { "source_ids" => source.map { |item| item.fetch("id") }.sort, "target_ids" => remote.fetch("ids").sort, "target_state" => remote.fetch("state") }
+      target_lineage_ids = remote.fetch("lineage_ids")
+      {
+        "source_ids" => source.map { |item| item.fetch("id") }.sort,
+        "source_lineage_ids" => source.map { |item| item.fetch("lineage_id") }.uniq.sort,
+        "target_ids" => remote.fetch("ids"),
+        "target_lineage_ids" => target_lineage_ids,
+        "missing_source_ids" => source.reject { |item| target_lineage_ids.include?(item.fetch("lineage_id")) }.map { |item| item.fetch("id") }.sort,
+        "target_state" => remote.fetch("state")
+      }
     end
 
     def validate_replica_configuration!
@@ -449,18 +462,24 @@ module SoulCore
 
     def replica_inventory(password)
       result = replica_restic(password, "snapshots", "--json", "--tag", "soul-state", timeout: 60, output: 1024 * 1024)
-      return { "state" => "uninitialized", "ids" => [], "repository_id" => nil } if result.exit_status == 10
+      return { "state" => "uninitialized", "ids" => [], "lineage_ids" => [], "repository_id" => nil } if result.exit_status == 10
       raise ArgumentError, "Crucible repository password was rejected" if result.exit_status == 12
       raise "Crucible snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
       snapshots = JSON.parse(result.stdout)
       raise "Crucible snapshot inventory is invalid" unless snapshots.is_a?(Array) && snapshots.length <= MAX_SNAPSHOTS
-      ids = snapshots.map { |item| item["id"].to_s }
+      identities = snapshots.map { |item| snapshot_identity(item, "Crucible") }
+      ids = identities.map { |item| item.fetch("id") }
       raise "Crucible snapshot inventory contains an invalid ID" unless ids.all? { |id| id.match?(SNAPSHOT_ID) } && ids.uniq.length == ids.length
       config = replica_restic(password, "cat", "config", timeout: 60, output: 1024 * 1024)
       raise "Crucible repository identity failed#{restic_failure_suffix(config)}" unless config.success?
       repository_id = JSON.parse(config.stdout).fetch("id").to_s
       raise "Crucible repository identity is invalid" unless repository_id.match?(SNAPSHOT_ID)
-      { "state" => "ready", "ids" => ids.sort, "repository_id" => repository_id }
+      {
+        "state" => "ready",
+        "ids" => ids.sort,
+        "lineage_ids" => identities.map { |item| item.fetch("lineage_id") }.uniq.sort,
+        "repository_id" => repository_id
+      }
     rescue JSON::ParserError, KeyError
       raise "Crucible repository inventory is invalid"
     end
@@ -500,10 +519,11 @@ module SoulCore
       parsed = JSON.parse(result.stdout)
       raise "snapshot inventory is invalid" unless parsed.is_a?(Array) && parsed.length <= MAX_SNAPSHOTS
       parsed.map do |item|
-        id = item["id"].to_s
-        raise "snapshot inventory contains an invalid ID" unless id.match?(SNAPSHOT_ID)
+        identity = snapshot_identity(item, "local")
+        id = identity.fetch("id")
         {
           "id" => id, "short_id" => id[0, 8], "time" => Time.iso8601(item.fetch("time")).utc.iso8601,
+          "original_id" => identity["original_id"], "lineage_id" => identity.fetch("lineage_id"),
           "hostname" => item["hostname"].to_s.byteslice(0, 120),
           "paths" => Array(item["paths"]).first(64).map { |path| display_path(path.to_s) },
           "tags" => Array(item["tags"]).first(16).map(&:to_s)
@@ -512,6 +532,18 @@ module SoulCore
     rescue JSON::ParserError, KeyError, ArgumentError => error
       raise ArgumentError, error.message if error.message.include?("password")
       raise "snapshot inventory is invalid"
+    end
+
+    def snapshot_identity(item, label)
+      raise "#{label} snapshot inventory is invalid" unless item.is_a?(Hash)
+      id = item["id"].to_s
+      original_id = item["original"].to_s
+      original_id = nil if original_id.empty?
+      raise "#{label} snapshot inventory contains an invalid ID" unless id.match?(SNAPSHOT_ID)
+      if original_id && !original_id.match?(SNAPSHOT_ID)
+        raise "#{label} snapshot inventory contains an invalid original ID"
+      end
+      { "id" => id, "original_id" => original_id, "lineage_id" => original_id || id }
     end
 
     def build_snapshot_manifest(password, snapshot_id)
