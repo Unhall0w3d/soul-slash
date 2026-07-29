@@ -60,7 +60,8 @@ module SoulCore
         "risk_class" => "class_5",
         "owner_uid" => Process.uid,
         "force_database_refresh" => a2.fetch("force_database_refresh"),
-        "commands" => a2.fetch("commands"),
+        "commands" => [],
+        "maintenance_replay" => false,
         "flatpak_installations" => a2.fetch("flatpak_installations"),
         "restore_registry_digest" => a2.fetch("restore_registry_digest"),
         "window_restore_summary" => a2.fetch("window_restore_summary"),
@@ -112,7 +113,7 @@ module SoulCore
 
       transaction = build_transaction(plan)
       handoff = @desktop_handoff.reserve_transaction(transaction)
-      outcome("complete", true, "A3 maintenance reboot terminal reserved", {
+      outcome("complete", true, "A3 reboot and restore terminal reserved", {
         "handoff" => handoff,
         "plan" => plan,
         "reboot_requested" => false
@@ -152,17 +153,12 @@ module SoulCore
         "deadline_at" => (@clock.call + HANDOFF_START_TTL_SECONDS).iso8601,
         "plan_digest" => plan.fetch("expected_digest"),
         "force_database_refresh" => plan.fetch("force_database_refresh"),
-        "commands" => foreground_materialize_commands(plan.fetch("commands"), id),
+        "commands" => [],
         "reboot_allowed" => true,
         "source_boot_id" => plan.fetch("source_boot_id"),
         "restore_registry_digest" => plan.fetch("restore_registry_digest"),
         "result_path" => File.join(@transactions_root, "#{id}.result.json")
       }.merge(privilege)
-    end
-
-    def foreground_materialize_commands(commands, id)
-      return @foreground_service.materialize_live_commands(commands, id) if @foreground_service.respond_to?(:materialize_live_commands)
-      commands
     end
 
     def foreground_privilege_fields(id)

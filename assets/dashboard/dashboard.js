@@ -3018,6 +3018,7 @@ function maintenanceDeviceDialogDetails(plan) {
     rows.push(["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false
       ? "A4 fixed-operation authority · no password prompt"
       : "one native sudo prompt"]);
+    if (plan.action === "reboot" && Array(plan.commands).length === 0) rows.push(["Package maintenance", "not included · reboot and restore only"]);
   }
   rows.forEach(([label, value]) => details.append(labeledRecord(label, value)));
   (plan.commands || []).forEach((command, index) => details.append(labeledRecord(`Fixed step ${index + 1}`, (command.argv || []).join(" "))));

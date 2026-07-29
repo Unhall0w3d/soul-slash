@@ -26,6 +26,9 @@ reviewed action.
   collection and card render.
 - Kept reboot outside the maintenance completion path. The reboot button
   obtains its own A3 preview, restore journal, digest, and approval.
+- Corrected the legacy A3 executor so the separately presented reboot action
+  requires an empty package-command list. A3 now captures, reboots, and
+  restores without replaying `yay` or Flatpak.
 - Replaced the workstation card label **Maintenance** with the action-oriented
   **Maintain**.
 
@@ -34,8 +37,16 @@ reviewed action.
 - `assets/dashboard/dashboard.js`
 - `assets/dashboard/index.html`
 - `assets/dashboard/dashboard.css`
+- `lib/soul_core/maintenance_reboot_restore_service.rb`
+- `lib/soul_core/maintenance_transaction_runner.rb`
+- `docs/soul/schemas/maintenance_transaction.schema.json`
 - `scripts/verify-maintenance-device-control-c1.rb`
 - `scripts/verify-maintenance-foreground-execution-a2.rb`
+- `scripts/verify-maintenance-reboot-restore-a3.rb`
+- `scripts/verify-maintenance-passwordless-authority-a4.rb`
+- `docs/soul/MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md`
+- `docs/assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md`
+- `docs/assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md`
 - `docs/guides/GUIDED_MAINTENANCE.md`
 - `docs/CURRENT_STATE.md`
 - `docs/ROADMAP.md`
@@ -110,6 +121,7 @@ gate are unchanged.
 - [ ] Clicking **Maintain** opens one visible bounded transaction.
 - [ ] A complete exact receipt refreshes the workstation card automatically.
 - [ ] Maintenance does not reboot.
+- [ ] Reboot runs no `yay`, pacman, or Flatpak command.
 - [ ] A reported reboot requirement leaves **Reboot** as a separate action.
 - [ ] The separately approved workstation reboot restores the reviewed
   applications and display state.

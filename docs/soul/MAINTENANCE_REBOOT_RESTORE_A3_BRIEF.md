@@ -1,17 +1,21 @@
 # Maintenance Conditional Reboot and Restore A3 Brief
 
 Status: human-approved for implementation and deterministic rehearsal on
-2026-07-27; live reboot not authorized
+2026-07-27; amended by the Operator's separate Maintain/Reboot authority
+decision on 2026-07-29
 
 ## Outcome
 
 Extend **Administration → Guided Maintenance** with one separately disabled,
-digest-bound A3 transaction that can continue the reviewed A2 update sequence,
-record a fresh privacy-filtered Hyprland snapshot, request one conditional
-reboot, and perform one bounded post-login restoration attempt.
+digest-bound A3 transaction that records a fresh privacy-filtered Hyprland
+snapshot, requests one conditional reboot, and performs one bounded post-login
+restoration attempt.
 
 A3 must not weaken or replace A2. The existing A2 live-update path remains a
-non-rebooting operation with its own disabled-by-default gate.
+non-rebooting operation with its own disabled-by-default gate. The 2026-07-29
+Operator decision further separates these actions: A3 must not replay A2
+package or Flatpak commands. **Maintain** updates; **Reboot** captures,
+reboots, and restores.
 
 ## Authority boundary
 
@@ -26,17 +30,17 @@ non-rebooting operation with its own disabled-by-default gate.
 
 ## Foreground transaction
 
-The A3 terminal revalidates and executes only the fixed A2 update vectors. It
-then:
+The A3 terminal binds current A2-derived host, disk, lock, active-work, and
+native evidence as conservative preflight input, but executes no package
+command. It:
 
-1. verifies every update command completed;
-2. verifies no package lock or declared Soul non-interruptible work remains;
-3. captures a fresh allowlisted Hyprland snapshot;
-4. verifies the current boot ID and the installed one-shot resume unit;
-5. verifies logind reports reboot available;
-6. writes one owner-private, digest-bound pending journal;
-7. requests reboot once with `/usr/bin/sudo -n /usr/bin/systemctl reboot`; and
-8. invalidates the transaction sudo ticket.
+1. verifies no package lock or declared Soul non-interruptible work remains;
+2. captures a fresh allowlisted Hyprland snapshot;
+3. verifies the current boot ID and the installed one-shot resume unit;
+4. verifies logind reports reboot available;
+5. writes one owner-private, digest-bound pending journal;
+6. requests reboot once with `/usr/bin/sudo -n /usr/bin/systemctl reboot`; and
+7. invalidates the transaction sudo ticket.
 
 Any failed or stale postcondition stops without reboot. There is no automatic
 retry.

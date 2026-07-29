@@ -346,7 +346,8 @@ Flatpak uses its native `--noninteractive` system update.
 
 The visible terminal remains an audit and cancellation surface. Package-manager
 errors stop the transaction; there is no model-driven prompt answering or
-automatic retry. A3 reboot still requires its exact pending restore journal.
+automatic retry. A3 reboot still requires its exact pending restore journal,
+but it contains no package or Flatpak command and never repeats maintenance.
 The package-only A2 path completed supervised live acceptance on 2026-07-29:
 Arch/AUR and system Flatpak both completed with zero password prompts and no
 reboot request. A3 zero-prompt reboot/restoration acceptance remains separate.

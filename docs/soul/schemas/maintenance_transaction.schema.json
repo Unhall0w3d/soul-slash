@@ -15,7 +15,14 @@
     "force_database_refresh": {"type": "boolean"},
     "handoff_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "reboot_allowed": {"type": "boolean"},
-    "commands": {"type": "array", "minItems": 1, "maxItems": 4}
+    "commands": {"type": "array", "minItems": 0, "maxItems": 4}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"mode": {"const": "live_reboot"}}, "required": ["mode"]},
+      "then": {"properties": {"commands": {"maxItems": 0}}},
+      "else": {"properties": {"commands": {"minItems": 1}}}
+    }
+  ],
   "additionalProperties": true
 }
