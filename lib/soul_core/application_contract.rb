@@ -128,6 +128,8 @@ module SoulCore
       "maintenance.discovery.ignore.execute" => %w[address label subnet mac_address vendor confirmation expected_digest],
       "maintenance.discovery.restore.preview" => %w[identity_key],
       "maintenance.discovery.restore.execute" => %w[identity_key confirmation expected_digest],
+      "maintenance.discovery.ssh_alias.preview" => %w[address ssh_alias ssh_user identity_file],
+      "maintenance.discovery.ssh_alias.execute" => %w[address ssh_alias ssh_user identity_file confirmation expected_digest],
       "maintenance.discovery.enroll.preview" => %w[address label mode ssh_alias address_policy subnet mac_address],
       "maintenance.discovery.enroll.execute" => %w[address label mode ssh_alias address_policy subnet mac_address confirmation expected_digest],
       "maintenance.discovery.remove.preview" => %w[device_id],

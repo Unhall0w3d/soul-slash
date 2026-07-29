@@ -53,6 +53,26 @@ A1 may:
 - preview and remove one exact enrolled registry record;
 - expose dependency checking and one explicit scan through Makefile targets.
 
+## Approved guided SSH-alias extension
+
+The Operator subsequently approved extending the authenticated Dashboard
+enrollment flow when a selected SSH alias is not yet present. The extension
+may:
+
+- request one validated literal alias, remote user, and existing private-key
+  path under the owner SSH directory;
+- derive `HostName` only from the exact reviewed private candidate address;
+- preview one fixed, non-interactive OpenSSH stanza and bind it to the current
+  SSH-config digest;
+- append that exact stanza to the owner SSH config only after a separate
+  authenticated button click and digest revalidation; and
+- return control to the existing SSH fingerprint and enrollment gates.
+
+The extension must not collect or store passwords, private-key contents, host
+key material, arbitrary SSH options, shell text, or commands. The private key
+and trusted host key must already exist. Alias creation grants no device
+mutation or enrollment authority by itself.
+
 ## Explicitly excluded
 
 A1 must not:
@@ -60,8 +80,10 @@ A1 must not:
 - scan automatically on page load, on a timer, or in a background process;
 - accept public, loopback, link-local, multicast, IPv6, or more-than-256-host
   networks;
-- accept request-supplied executables, flags, ports, shell text, SSH options,
-  usernames, passwords, keys, or arbitrary commands;
+- accept request-supplied executables, flags, ports, shell text, arbitrary SSH
+  options, passwords, key contents, or arbitrary commands; the approved guided
+  extension accepts only one validated SSH user and one existing owner-private
+  key path;
 - authenticate to a discovered address automatically;
 - infer that an open or responding address is trusted;
 - enroll every discovery result automatically;

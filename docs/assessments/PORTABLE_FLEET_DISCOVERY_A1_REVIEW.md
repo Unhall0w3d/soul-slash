@@ -1,7 +1,8 @@
 # Portable Fleet Discovery and Enrollment A1 Review
 
 Status: candidate-complete; live acceptance passed; merge pre-approved by the
-Operator.
+Operator. Guided missing-alias extension is candidate-complete and awaiting
+live acceptance.
 
 ## What was implemented
 
@@ -31,6 +32,10 @@ Operator.
 - Added reviewed MAC/subnet DHCP tracking for status-only inventory, one
   bounded recovery scan, and exactly one transient ten-minute retry.
 - Added compact status-only cards and semantic green/yellow/red fleet states.
+- Added a separately gated missing-alias prerequisite that requests one
+  portable account and one existing owner-private key path, derives HostName
+  from the selected candidate, previews a fixed non-interactive stanza, and
+  atomically appends it only after digest-bound approval.
 
 ## Files changed
 
@@ -76,6 +81,16 @@ ruby bin/soul config validate
 git diff --check
 ```
 
+Guided alias extension verification also ran:
+
+```text
+ruby -c lib/soul_core/maintenance_fleet_discovery_service.rb
+ruby -c lib/soul_core/application_facade.rb
+node --check assets/dashboard/dashboard.js
+ruby scripts/verify-maintenance-fleet-discovery-a1.rb
+git diff --check
+```
+
 ## Deterministic results
 
 The focused verifier proves:
@@ -91,6 +106,9 @@ The focused verifier proves:
 - status-only enrollment performs one bounded reachability probe;
 - SSH inventory binds the alias to the selected address and uses only fixed
   BatchMode commands;
+- missing-alias setup rejects key paths outside the owner SSH directory,
+  previews one fixed stanza, blocks changed evidence and duplicate aliases,
+  and preserves mode `0600` on atomic append;
 - every supported package-manager family can be detected concurrently without
   consulting the distro identifier;
 - changed preview evidence fails closed;
@@ -137,6 +155,8 @@ grants authority.
 - A status-only DHCP address can move; stable addressing is recommended.
 - SSH enrollment intentionally does not support wildcard-only aliases, included
   SSH config fragments, DNS `HostName` values, or interactive authentication.
+  Guided alias setup does not copy a public key or enroll a host key; those
+  trust prerequisites remain explicit operator actions.
 - Package-manager detection proves executable presence only; it does not prove
   repository health, privilege, update semantics, reboot behavior, or adapter
   safety.
@@ -153,7 +173,7 @@ memory.
 ## Lifecycle states touched
 
 - discovery/status/registry: `complete`, `failed`
-- enrollment/removal: `complete`, `awaiting_input`,
+- alias setup/enrollment/removal: `complete`, `awaiting_input`,
   `blocked_for_human_review`, `failed`
 - device: `reachable`, `offline`
 
@@ -163,7 +183,8 @@ service, or timer was added.
 ## Risk classification
 
 Class 2 local-network reads and Class 2 owner-private inventory registry
-mutations. No device mutation authority.
+mutations. The guided prerequisite adds one Class 2 owner SSH-config append.
+No device mutation authority.
 
 ## Human review checklist
 
@@ -179,3 +200,7 @@ mutations. No device mutation authority.
 - [x] Remove the test record and confirm the device itself is untouched.
 - [x] Confirm Maven, Forge, Pi-hole, and Cisco phone behavior is unchanged.
 - [x] Confirm narrow/mobile layout remains usable.
+- [ ] With a reviewed test host, preview and add one missing literal SSH alias.
+- [ ] Confirm the stanza contains only the reviewed address, user, key path,
+      and fixed non-interactive options.
+- [ ] Confirm the alias gate alone does not enroll or mutate the device.

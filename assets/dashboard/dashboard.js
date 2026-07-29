@@ -21,6 +21,7 @@ state.maintenanceDeviceFlowToken = 0;
 state.maintenanceDiscoveryCandidates = [];
 state.maintenanceDiscoveryRegistry = [];
 state.maintenanceEnrollmentPreview = null;
+state.maintenanceSshAliasPreview = null;
 state.maintenanceRemovalPreview = null;
 state.chatProgress = new Map();
 state.localChatRequests = new Set();
@@ -2724,6 +2725,12 @@ function resetMaintenanceEnrollmentPreview() {
   byId("maintenance-enrollment-scope").textContent = "";
 }
 
+function resetMaintenanceSshAliasPreview() {
+  state.maintenanceSshAliasPreview = null;
+  byId("maintenance-ssh-alias-confirm").hidden = true;
+  byId("maintenance-ssh-alias-scope").textContent = "";
+}
+
 function selectMaintenanceCandidate(candidate) {
   resetMaintenanceEnrollmentPreview();
   resetMaintenanceIgnorePanel();
@@ -2739,6 +2746,10 @@ function selectMaintenanceCandidate(candidate) {
   byId("maintenance-enrollment-policy").disabled = false;
   byId("maintenance-enrollment-ssh-alias").value = "";
   byId("maintenance-enrollment-ssh-row").hidden = true;
+  byId("maintenance-ssh-alias-setup").hidden = true;
+  byId("maintenance-ssh-user").value = "";
+  byId("maintenance-ssh-identity").value = "";
+  resetMaintenanceSshAliasPreview();
   byId("maintenance-enrollment-heading").textContent = `Review ${candidate.address}`;
   byId("maintenance-enrollment-panel").hidden = false;
   byId("maintenance-enrollment-status").textContent = candidate.state === "already_configured"
@@ -2987,6 +2998,45 @@ function maintenanceEnrollmentParameters() {
   };
 }
 
+function maintenanceSshAliasParameters() {
+  return {
+    address: byId("maintenance-enrollment-address").value,
+    ssh_alias: byId("maintenance-enrollment-ssh-alias").value.trim(),
+    ssh_user: byId("maintenance-ssh-user").value.trim(),
+    identity_file: byId("maintenance-ssh-identity").value.trim()
+  };
+}
+
+async function previewMaintenanceSshAlias() {
+  const button = byId("preview-maintenance-ssh-alias"); const status = byId("maintenance-ssh-alias-status");
+  button.disabled = true; resetMaintenanceSshAliasPreview(); status.textContent = "Validating one bounded SSH stanza against the current owner config…";
+  try {
+    const envelope = await callSoul("maintenance.discovery.ssh_alias.preview", maintenanceSshAliasParameters());
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "SSH alias preview failed safely."));
+    const data = dataOf(envelope); state.maintenanceSshAliasPreview = data;
+    byId("maintenance-ssh-alias-scope").textContent = data.ssh_alias.stanza;
+    byId("maintenance-ssh-alias-confirm").hidden = false;
+    status.textContent = "Review the exact literal Host stanza. This gate only appends the alias; enrollment remains separate.";
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function executeMaintenanceSshAlias() {
+  if (!state.maintenanceSshAliasPreview) return;
+  const button = byId("execute-maintenance-ssh-alias"); const status = byId("maintenance-ssh-alias-status");
+  button.disabled = true; status.textContent = "Revalidating and appending one literal Host stanza…";
+  try {
+    const preview = state.maintenanceSshAliasPreview;
+    const envelope = await callSoul("maintenance.discovery.ssh_alias.execute", Object.assign(maintenanceSshAliasParameters(), {
+      confirmation: preview.confirmation_phrase,
+      expected_digest: preview.expected_digest
+    }));
+    if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "SSH alias creation was blocked safely."));
+    resetMaintenanceSshAliasPreview();
+    status.textContent = `Alias ${dataOf(envelope).ssh_alias.alias} added. Preview enrollment when key authentication and host trust are ready.`;
+  } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
 async function previewMaintenanceEnrollment() {
   const button = byId("preview-maintenance-enrollment"); const status = byId("maintenance-enrollment-status");
   button.disabled = true; resetMaintenanceEnrollmentPreview(); status.textContent = "Collecting bounded reachability and capability evidence…";
@@ -2997,7 +3047,13 @@ async function previewMaintenanceEnrollment() {
     byId("maintenance-enrollment-scope").textContent = JSON.stringify(data.device, null, 2);
     byId("maintenance-enrollment-confirm").hidden = false;
     status.textContent = "Review the exact inventory-only record. Clicking Enroll supplies authority for this private registry write only.";
-  } catch (error) { status.textContent = error.message; }
+  } catch (error) {
+    status.textContent = error.message;
+    if (byId("maintenance-enrollment-mode").value === "ssh" && error.message.includes("exact literal Host entry")) {
+      byId("maintenance-ssh-alias-setup").hidden = false;
+      byId("maintenance-ssh-user").focus();
+    }
+  }
   finally { button.disabled = false; }
 }
 
@@ -4384,11 +4440,16 @@ byId("refresh-maintenance-registry").addEventListener("click", loadMaintenanceDi
 byId("maintenance-enrollment-mode").addEventListener("change", () => {
   const ssh = byId("maintenance-enrollment-mode").value === "ssh";
   byId("maintenance-enrollment-ssh-row").hidden = !ssh;
+  byId("maintenance-ssh-alias-setup").hidden = !ssh;
   byId("maintenance-enrollment-policy").disabled = ssh;
   if (ssh) byId("maintenance-enrollment-policy").value = "fixed";
   resetMaintenanceEnrollmentPreview();
+  resetMaintenanceSshAliasPreview();
 });
 ["maintenance-enrollment-label", "maintenance-enrollment-ssh-alias", "maintenance-enrollment-policy"].forEach((id) => byId(id).addEventListener("input", resetMaintenanceEnrollmentPreview));
+["maintenance-enrollment-ssh-alias", "maintenance-ssh-user", "maintenance-ssh-identity"].forEach((id) => byId(id).addEventListener("input", resetMaintenanceSshAliasPreview));
+byId("preview-maintenance-ssh-alias").addEventListener("click", previewMaintenanceSshAlias);
+byId("execute-maintenance-ssh-alias").addEventListener("click", executeMaintenanceSshAlias);
 byId("preview-maintenance-enrollment").addEventListener("click", previewMaintenanceEnrollment);
 byId("execute-maintenance-enrollment").addEventListener("click", executeMaintenanceEnrollment);
 byId("execute-maintenance-removal").addEventListener("click", executeMaintenanceRemoval);
