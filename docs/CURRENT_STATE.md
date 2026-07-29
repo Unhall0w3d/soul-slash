@@ -93,7 +93,19 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
-- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The accepted A3 path adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. On Maven, the reviewed resume unit and display-recovery hook completed a supervised end-to-end update, reboot, DP-3 recovery, and exact Codex/Opera workspace restoration on 2026-07-28. Both live gates remain disabled outside an exact supervised transaction. Portable status-only devices retain compact LAN cards; the current Apple-mobile candidate can additionally attach a privacy-filtered wired product/iOS/battery projection after an exact reviewed private-MAC match, without granting device mutation authority.
+- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded, one-password terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. A2 live execution remains disabled by default and always stops before reboot. The accepted A3 path adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. On the Operator's workstation, the reviewed resume unit and display-recovery hook completed a supervised end-to-end update, reboot, DP-3 recovery, and exact Codex/Opera workspace restoration on 2026-07-28. Both live gates remain disabled outside an exact supervised transaction. Portable status-only devices retain compact LAN cards; the current Apple-mobile candidate can additionally attach a privacy-filtered wired product/iOS/battery projection after an exact reviewed private-MAC match, without granting device mutation authority.
+- Fleet status now emits the portable canonical device ID `workstation`. The
+  former `maven` ID and `SOUL_FLEET_MAVEN_*` environment names remain bounded
+  read aliases for existing private state; newly written snapshots, topology,
+  refresh results, and tracked examples use `workstation` and
+  `SOUL_FLEET_WORKSTATION_*`.
+- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its first
+  integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
+  evidence while retaining inventory-only control. DNF5 maintenance and reboot
+  gates remain deliberately unavailable. Operator-managed reservations now
+  provide stable identities for the workstation, Forge, the Pi-hole appliance,
+  and Crucible. Deployment-specific card names remain ignored local
+  configuration; public source preserves functional roles and stable IDs.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -121,6 +133,10 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   deletion-detection hold, and restores only into isolated owner-private
   staging. The first live encrypted capture passed verification on 2026-07-27.
   Retention remains exact and manual; live-tree promotion is not automated.
+- Crucible provides a reboot-qualified, independently mounted 100 GiB XFS
+  target at `/srv/soul-backup`, reachable through key-only SSH/SFTP. The target
+  directory is prepared but contains no restic repository yet; initialization
+  and second-copy execution remain a separate password-bearing review gate.
 
 ## Runtime topology
 
@@ -136,8 +152,10 @@ Core changes are click-authorized and lease-revalidated. Before a conversational
 
 `make dashboard` runs a foreground loopback development instance. The reviewed optional deployment installs explicit user services for the loopback dashboard and Caddy HTTPS on one exact LAN address. Installation is preview-first, requires a changed administrator password and exact confirmation, and leaves firewall, DHCP, router, and client certificate trust to the Operator.
 
-Proxmox, Internet exposure, and multi-user accounts remain separate future
-tracks. Backup & Recovery now has a candidate-complete encrypted local
+Hosting Soul itself on Proxmox, Internet exposure, and multi-user accounts
+remain separate future tracks. Forge currently hosts the Warden Pi-hole
+appliance and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now
+has a candidate-complete encrypted local
 foundation and one verified live capture; retention execution, a second copy,
 live-tree promotion, and full disaster-recovery qualification remain separate
 review gates.

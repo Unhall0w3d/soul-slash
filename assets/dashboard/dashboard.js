@@ -2478,11 +2478,12 @@ function renderMaintenanceDevice(device) {
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
+  const readOnlyStatus = inventoryOnly && device.facts?.status_adapter === "dnf5_read_only";
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
-    ["Updates", inventoryOnly ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
-    ["Kernel", inventoryOnly ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer installed"}` : " · current"}`],
+    ["Updates", inventoryOnly && !readOnlyStatus ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
     ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
     ["Checked", observedLabel]
   ];
@@ -2514,7 +2515,9 @@ function renderMaintenanceDevice(device) {
     const notice = document.createElement("p"); notice.className = "maintenance-status-only";
     notice.textContent = statusOnly
       ? "Status only · lifecycle and mutation remain provider-managed"
-      : "Inventory only · discovered capabilities grant no mutation authority";
+      : (readOnlyStatus
+        ? "DNF5 evidence only · maintenance and reboot authority remain disabled"
+        : "Inventory only · discovered capabilities grant no mutation authority");
     actions.append(notice);
   } else {
     ["maintenance", "reboot"].forEach((action) => {
@@ -3007,12 +3010,12 @@ async function executeMaintenanceRemoval() {
 function maintenanceDeviceDialogDetails(plan) {
   const details = byId("maintenance-device-dialog-details"); details.replaceChildren();
   const rows = [
-    ["Device", `${plan.device_label || "Maven"}${plan.address ? ` · ${plan.address}` : ""}`],
+    ["Device", `${plan.device_label || "Workstation"}${plan.address ? ` · ${plan.address}` : ""}`],
     ["Action", plan.action || "maintenance"],
-    ["Scope", plan.fleet_wide === false ? "one device only" : "Maven reviewed local transaction"],
+    ["Scope", plan.fleet_wide === false ? "one device only" : "reviewed local workstation transaction"],
     ["Automatic retry", "none"]
   ];
-  if (plan.device_id === "maven") {
+  if (canonicalMaintenanceDeviceId(plan.device_id) === "workstation") {
     rows.push(["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false
       ? "A4 fixed-operation authority · no password prompt"
       : "one native sudo prompt"]);
@@ -3028,19 +3031,34 @@ function maintenanceDeviceDialogDetails(plan) {
   blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
 }
 
+function canonicalMaintenanceDeviceId(deviceId) {
+  return deviceId === "maven" ? "workstation" : deviceId;
+}
+
+function maintenanceDeviceLabel(deviceId) {
+  const canonicalId = canonicalMaintenanceDeviceId(deviceId);
+  return state.maintenanceFleet?.devices?.find((device) => canonicalMaintenanceDeviceId(device.id) === canonicalId)?.label
+    || ({ workstation: "Workstation", forge: "Forge", pihole: "Pi-hole" }[canonicalId])
+    || canonicalId;
+}
+
 async function openMaintenanceDeviceAction(deviceId, action) {
+  deviceId = canonicalMaintenanceDeviceId(deviceId);
   const dialog = byId("maintenance-device-dialog"); const status = byId("maintenance-device-dialog-status");
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";
   byId("maintenance-device-confirmation-row").hidden = true;
-  byId("maintenance-maven-evidence-actions").hidden = true;
+  byId("maintenance-workstation-evidence-actions").hidden = true;
   byId("execute-maintenance-device-action").disabled = true;
-  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceId === "maven" ? "Maven" : deviceId === "forge" ? "Forge" : "Pi-hole"}`;
+  const deviceLabel = maintenanceDeviceLabel(deviceId);
+  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceLabel}`;
+  byId("refresh-maintenance-device-evidence").textContent = `Refresh ${deviceLabel} evidence`;
+  byId("recheck-maintenance-device-preflight").textContent = `Recheck ${deviceLabel} preflight`;
   if (!dialog.open) dialog.showModal();
   status.textContent = "Collecting a fresh device-scoped preview…";
   try {
     let envelope;
-    if (deviceId === "maven") {
+    if (deviceId === "workstation") {
       envelope = await callSoul(action === "maintenance" ? "maintenance.execution.preview" : "maintenance.reboot_restore.preview", { force_database_refresh: "false" });
     } else {
       envelope = await callSoul("maintenance.device.preview", { device_id: deviceId, action });
@@ -3048,21 +3066,21 @@ async function openMaintenanceDeviceAction(deviceId, action) {
     lifecycle(envelope);
     const data = dataOf(envelope); const plan = data.plan;
     if (!plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
-    const normalizedPlan = deviceId === "maven"
-      ? Object.assign({}, plan, { device_id: "maven", device_label: "Maven", action, fleet_wide: false, impact: [] })
+    const normalizedPlan = deviceId === "workstation"
+      ? Object.assign({}, plan, { device_id: "workstation", device_label: deviceLabel, action, fleet_wide: false, impact: [] })
       : plan;
     maintenanceDeviceDialogDetails(normalizedPlan);
-    byId("maintenance-maven-evidence-actions").hidden = deviceId !== "maven";
+    byId("maintenance-workstation-evidence-actions").hidden = deviceId !== "workstation";
     state.maintenanceDevicePreview = { deviceId, action, data, plan: normalizedPlan };
-    const available = deviceId === "maven" ? plan.execution_available === true : plan.live_execution_enabled === true;
+    const available = deviceId === "workstation" ? plan.execution_available === true : plan.live_execution_enabled === true;
     const confirmation = data.confirmation || plan.confirmation;
     byId("maintenance-device-confirmation-phrase").textContent = confirmation || "—";
     byId("maintenance-device-confirmation-row").hidden = false;
     const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
     status.textContent = available
       ? `Review the exact ${action} plan, then type its device-specific confirmation.`
-      : (deviceId === "maven"
-        ? `Maven is blocked: ${blockers.join(" · ") || "A2/A3 preflight is incomplete"}. Refresh Maven evidence, then recheck this preflight.`
+      : (deviceId === "workstation"
+        ? `${deviceLabel} is blocked: ${blockers.join(" · ") || "A2/A3 preflight is incomplete"}. Refresh ${deviceLabel} evidence, then recheck this preflight.`
         : "Remote live execution remains locally disabled pending candidate review.");
     byId("execute-maintenance-device-action").disabled = !available;
   } catch (error) {
@@ -3070,25 +3088,26 @@ async function openMaintenanceDeviceAction(deviceId, action) {
   }
 }
 
-async function refreshMavenDeviceEvidence() {
+async function refreshWorkstationDeviceEvidence() {
   const preview = state.maintenanceDevicePreview; const status = byId("maintenance-device-dialog-status");
-  if (!preview || preview.deviceId !== "maven") return;
+  if (!preview || canonicalMaintenanceDeviceId(preview.deviceId) !== "workstation") return;
+  const deviceLabel = maintenanceDeviceLabel("workstation");
   byId("refresh-maintenance-device-evidence").disabled = true;
-  status.textContent = "Reserving one visible read-only Maven evidence terminal…";
+  status.textContent = `Reserving one visible read-only ${deviceLabel} evidence terminal…`;
   try {
     const evidenceEnvelope = await callSoul("maintenance.evidence.reserve"); lifecycle(evidenceEnvelope);
     const evidence = dataOf(evidenceEnvelope);
-    if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || "Maven evidence handoff is unavailable.");
+    if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || `${deviceLabel} evidence handoff is unavailable.`);
     launchMaintenanceUri(evidence.launch_uri);
-    status.textContent = "Native evidence terminal requested. When it closes, select Recheck Maven preflight.";
+    status.textContent = `Native evidence terminal requested. When it closes, select Recheck ${deviceLabel} preflight.`;
   } catch (error) { status.textContent = error.message; }
   finally { byId("refresh-maintenance-device-evidence").disabled = false; }
 }
 
-async function recheckMavenDevicePreflight() {
+async function recheckWorkstationDevicePreflight() {
   const preview = state.maintenanceDevicePreview;
-  if (!preview || preview.deviceId !== "maven") return;
-  await openMaintenanceDeviceAction("maven", preview.action);
+  if (!preview || canonicalMaintenanceDeviceId(preview.deviceId) !== "workstation") return;
+  await openMaintenanceDeviceAction("workstation", preview.action);
 }
 
 async function executeMaintenanceDeviceAction() {
@@ -3101,7 +3120,7 @@ async function executeMaintenanceDeviceAction() {
   byId("execute-maintenance-device-action").disabled = true;
   try {
     let envelope;
-    if (preview.deviceId === "maven") {
+    if (canonicalMaintenanceDeviceId(preview.deviceId) === "workstation") {
       const operation = preview.action === "maintenance" ? "maintenance.execution.execute" : "maintenance.reboot_restore.execute";
       envelope = await callSoul(operation, {
         force_database_refresh: "false",
@@ -3109,9 +3128,9 @@ async function executeMaintenanceDeviceAction() {
         expected_digest: preview.data.expected_digest
       });
       const data = dataOf(envelope); lifecycle(envelope);
-      if (!data.handoff?.launch_uri) throw new Error(envelope.errors?.[0]?.message || "Maven transaction stopped safely.");
+      if (!data.handoff?.launch_uri) throw new Error(envelope.errors?.[0]?.message || "Workstation transaction stopped safely.");
       launchMaintenanceUri(data.handoff.launch_uri);
-      status.textContent = "The visible Maven terminal owns this one device transaction. Its successful completion refreshes the persisted fleet snapshot.";
+      status.textContent = `The visible ${maintenanceDeviceLabel("workstation")} terminal owns this one-device transaction. Its successful completion refreshes the persisted fleet snapshot.`;
     } else {
       envelope = await callNdjson("/api/v1/administration-stream", "maintenance.device.execute", {
         device_id: preview.deviceId,
@@ -4201,12 +4220,12 @@ byId("execute-maintenance-ignore").addEventListener("click", executeMaintenanceI
 byId("maintenance-device-confirmation").addEventListener("input", () => {
   const preview = state.maintenanceDevicePreview;
   const expected = preview && (preview.data.confirmation || preview.plan.confirmation);
-  const available = preview && (preview.deviceId === "maven" ? preview.plan.execution_available === true : preview.plan.live_execution_enabled === true);
+  const available = preview && (canonicalMaintenanceDeviceId(preview.deviceId) === "workstation" ? preview.plan.execution_available === true : preview.plan.live_execution_enabled === true);
   byId("execute-maintenance-device-action").disabled = !available || byId("maintenance-device-confirmation").value !== expected;
 });
 byId("execute-maintenance-device-action").addEventListener("click", executeMaintenanceDeviceAction);
-byId("refresh-maintenance-device-evidence").addEventListener("click", refreshMavenDeviceEvidence);
-byId("recheck-maintenance-device-preflight").addEventListener("click", recheckMavenDevicePreflight);
+byId("refresh-maintenance-device-evidence").addEventListener("click", refreshWorkstationDeviceEvidence);
+byId("recheck-maintenance-device-preflight").addEventListener("click", recheckWorkstationDevicePreflight);
 byId("maintenance-device-dialog").addEventListener("close", () => {
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";

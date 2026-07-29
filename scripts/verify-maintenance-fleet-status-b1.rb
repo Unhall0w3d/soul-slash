@@ -134,7 +134,14 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" },
+    hostname_reader: -> { "atelier" },
+    process_env: {
+      "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
+      "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
+      "SOUL_FLEET_MAVEN_ADDRESS" => "legacy.example.test",
+      "SOUL_FLEET_MAVEN_LABEL" => "Legacy Maven",
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+    },
     route_path: route_path
   )
   result = service.collect
@@ -148,11 +155,13 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                data["read_only"] == true &&
                data.dig("verification", "background_polling") == false)
   check.call("workstation update and kernel evidence is normalized",
-             devices.dig("maven", "updates", "total") == 4 &&
-               devices.dig("maven", "updates", "freshness") == "cached_pacman_metadata" &&
-               devices.dig("maven", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
-               devices.dig("maven", "kernel", "available") == "7.1.5-1" &&
-               devices.dig("maven", "kernel", "update_required") == true)
+             devices.dig("workstation", "label") == "Atelier" &&
+               devices.dig("workstation", "address") == "atelier.example.test" &&
+               devices.dig("workstation", "updates", "total") == 4 &&
+               devices.dig("workstation", "updates", "freshness") == "cached_pacman_metadata" &&
+               devices.dig("workstation", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
+               devices.dig("workstation", "kernel", "available") == "7.1.5-1" &&
+               devices.dig("workstation", "kernel", "update_required") == true)
   check.call("Proxmox discovers Forge and exposes cached package, kernel, and LXC 100 evidence",
              devices.dig("forge", "label") == "Forge" &&
                devices.dig("forge", "updates", "native") == 1 &&
@@ -161,7 +170,9 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("forge", "facts", "pihole_container", "id") == 100 &&
                devices.dig("forge", "facts", "pihole_container", "status") == "running")
   check.call("Pi-hole exposes versions, DNS health, services, and package evidence",
-             devices.dig("pihole", "version").include?("Core v6.4.3") &&
+             devices.dig("pihole", "label") == "Warden" &&
+               devices.dig("pihole", "role").include?("Pi-hole DNS filtering") &&
+               devices.dig("pihole", "version").include?("Core v6.4.3") &&
                devices.dig("pihole", "updates", "native") == 2 &&
                devices.dig("pihole", "facts", "blocking_enabled") == true &&
                devices.dig("pihole", "services").all? { |service_record| service_record["state"] == "active" })
@@ -175,7 +186,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                data.dig("topology", "network", "subnet") == "192.168.50.0/24" &&
                data.dig("topology", "network", "gateway_node_id") == "default-gateway" &&
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "wan" && edge["from"] == "default-gateway" } &&
-               data.dig("topology", "edges").any? { |edge| edge["kind"] == "route" && edge["from"] == "maven" && edge["to"] == "default-gateway" } &&
+               data.dig("topology", "edges").any? { |edge| edge["kind"] == "route" && edge["from"] == "workstation" && edge["to"] == "default-gateway" } &&
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "backup_planned" } &&
                data.dig("topology", "nodes").map { |node| node["id"] }.include?("pihole"))
   check.call("only fixed aliases and bounded no-password SSH options are used",
@@ -194,8 +205,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
 
   phone_env = {
     "SOUL_FLEET_MAVEN_ADDRESS" => "maven.example.test",
+    "SOUL_FLEET_MAVEN_LABEL" => "Workstation",
     "SOUL_FLEET_FORGE_ADDRESS" => "forge.example.test",
     "SOUL_FLEET_PIHOLE_ADDRESS" => "pihole.example.test",
+    "SOUL_FLEET_PIHOLE_LABEL" => "DNS Warden",
     "SOUL_FLEET_CISCO_PHONE_ENABLED" => "true",
     "SOUL_FLEET_CISCO_PHONE_ADDRESS" => "phone.example.test",
     "SOUL_FLEET_CISCO_PHONE_LABEL" => "Desk Phone"
@@ -206,7 +219,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { Time.utc(2026, 7, 27, 21, 3, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" },
+    hostname_reader: -> { "legacy-hostname" },
     process_env: phone_env
   ).collect
   phone_data = with_phone.fetch("data")
@@ -220,6 +233,9 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                phone.dig("facts", "registration_status") == "not assessed" &&
                phone_runner.calls.count { |call| call.dig("argv", 0) == "/usr/bin/ping" } == 1 &&
                phone_runner.calls.find { |call| call.dig("argv", 0) == "/usr/bin/ping" }.dig("options", :timeout_seconds) == 5)
+  check.call("legacy Maven environment variables remain read-compatible while output stays canonical",
+             phone_data.fetch("devices").find { |device| device["id"] == "workstation" }["address"] == "maven.example.test" &&
+               phone_data.fetch("devices").none? { |device| device["id"] == "maven" })
   check.call("phone topology distinguishes local reachability from unasserted Webex state",
              phone_data.dig("summary", "device_count") == 4 &&
                phone_data.dig("topology", "nodes").any? { |node| node["id"] == "webex-calling" && node["status"] == "external" } &&
@@ -237,7 +253,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { Time.utc(2026, 7, 27, 21, 4, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" },
+    hostname_reader: -> { "atelier" },
     process_env: phone_env
   ).collect.dig("data", "devices").find { |device| device["id"] == "cisco-8851" }
   check.call("unreachable Cisco phone remains visible and status-only",
@@ -275,13 +291,13 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { Time.utc(2026, 7, 27, 21, 2, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" },
+    hostname_reader: -> { "atelier" },
     route_path: File.join(root, "missing-route")
   ).collect.fetch("data")
   check.call("missing route evidence degrades safely without hiding known devices",
              missing_route_data.dig("topology", "network", "evidence") == "unavailable" &&
                missing_route_data.dig("topology", "network", "gateway_address").nil? &&
-               missing_route_data.dig("topology", "nodes").any? { |node| node["id"] == "maven" })
+               missing_route_data.dig("topology", "nodes").any? { |node| node["id"] == "workstation" })
 
   private_root = File.join(root, "private-root")
   registry_directory = File.join(private_root, "Soul", "private", "host_maintenance")
@@ -303,6 +319,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
   refresh_runner = FleetFakeRunner.new
   clock_values = [
     Time.utc(2026, 7, 27, 21, 6, 0),
+    Time.utc(2026, 7, 27, 21, 6, 30),
     Time.utc(2026, 7, 27, 21, 7, 0)
   ].each
   refresh_service = SoulCore::MaintenanceFleetStatusService.new(
@@ -310,10 +327,15 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { clock_values.next },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" },
+    hostname_reader: -> { "atelier" },
     root: private_root
   )
   initial = refresh_service.collect
+  legacy_workstation_refresh = refresh_service.refresh(device_id: "maven")
+  check.call("legacy Maven refresh requests resolve to the canonical workstation identity",
+             legacy_workstation_refresh["lifecycle_state"] == "complete" &&
+               legacy_workstation_refresh.dig("data", "refreshed_device_id") == "workstation" &&
+               legacy_workstation_refresh.dig("data", "devices").none? { |device| device["id"] == "maven" })
   calls_before_refresh = refresh_runner.calls.length
   refreshed = refresh_service.refresh(device_id: "managed_0123456789abcdef")
   refreshed_router = refreshed.dig("data", "devices").find { |device| device["id"] == "managed_0123456789abcdef" }
@@ -346,7 +368,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     clock: -> { Time.utc(2026, 7, 27, 21, 5, 0) },
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
-    hostname_reader: -> { "maven" }
+    hostname_reader: -> { "atelier" }
   ).collect
   offline_pihole = offline.dig("data", "devices").find { |device| device["id"] == "pihole" }
   check.call("one unreachable device remains visible without hiding healthy-device evidence or retrying",
