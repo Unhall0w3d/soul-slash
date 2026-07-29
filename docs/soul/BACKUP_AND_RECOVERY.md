@@ -191,6 +191,10 @@ repository, preserves repository identity and snapshot inventory, verifies the
 new password, rejects the old password, and attempts rollback if the second
 repository cannot complete. It writes no credential or rotation receipt.
 
+The first live dual-repository rotation was accepted on 2026-07-29. Both
+repositories preserved three tagged snapshots, accepted the replacement
+password, and rejected the previous password without requiring rollback.
+
 ## Verification
 
 Run the deterministic fixture:

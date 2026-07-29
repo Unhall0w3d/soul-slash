@@ -1,6 +1,6 @@
 # Backup Credential Rotation A0 Review
 
-Status: candidate implementation; live rotation deferred until the Operator returns
+Status: live accepted on Maven
 
 ## Implemented
 
@@ -54,6 +54,23 @@ boundaries are deterministic contracts.
   password and one on the old password. Both human-known credentials remain
   sufficient for bounded recovery.
 
+## Live acceptance
+
+On 2026-07-29 the Operator launched the local interactive gate, supplied the
+exact confirmation and both credentials only through the echo-disabled
+terminal, and completed the dual-repository rotation. The bounded process
+exited successfully after proving that:
+
+- the local and Crucible repository identities remained unchanged;
+- all three tagged snapshots remained present in each repository;
+- the replacement password opened both repositories;
+- the previous password opened neither repository; and
+- no rollback or manual recovery was required.
+
+No password, access-key identifier, or snapshot identifier was written to this
+artifact, the private Project Timeline, process arguments, files, receipts,
+browser state, or Git.
+
 ## Memory, lifecycle, and risk
 
 No memory keys or durable secret state are used. The operation terminates as
@@ -64,8 +81,8 @@ access credentials are replaced, although backup content is not mutated.
 
 - [x] Fixture rotation passes with different local and replica repository IDs.
 - [x] No password appears in argv, environment, files, receipts, logs, or Git.
-- [ ] Live preflight confirms one key and unchanged snapshot inventory on both
+- [x] Live preflight confirms one key and unchanged snapshot inventory on both
   repositories.
-- [ ] Live rotation accepts the new password and rejects the old password on
+- [x] Live rotation accepts the new password and rejects the old password on
   both repositories.
-- [ ] Project Timeline records completion without private key or snapshot IDs.
+- [x] Project Timeline records completion without private key or snapshot IDs.
