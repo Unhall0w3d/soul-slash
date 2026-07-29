@@ -40,12 +40,15 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
-- [~] A4's digest-bound root-owned fixed-operation authority is live-accepted
+- [x] A4's digest-bound root-owned fixed-operation authority is live-accepted
   for zero-prompt A2 workstation maintenance. Its uniform device-card UX now
   automates stale native-evidence recovery and exact-receipt card refresh while
   preserving a distinct reboot-only action that rejects package-command replay;
-  the separate A3
-  maintenance/reboot/restoration acceptance remains
+  the separate zero-prompt A3 reboot completed on 2026-07-29 without replaying
+  maintenance
+- [ ] refine individual allowlisted post-login application restoration during
+  natural future reboots; this does not block the accepted maintenance,
+  passwordless-authority, reboot, display-recovery, or workspace lifecycle
 
 ## Qualified expansion candidates
 
