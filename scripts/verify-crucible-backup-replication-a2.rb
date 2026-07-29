@@ -53,7 +53,9 @@ class CrucibleBackupRunner
     when "snapshots"
       result(JSON.generate(remote ? @remote : @source))
     when "copy"
-      @remote = @source.map(&:dup)
+      @remote = @source.map.with_index do |snapshot, index|
+        snapshot.merge("id" => (index.zero? ? "c" : "d") * 64, "original" => snapshot.fetch("id"))
+      end
       result("copied")
     when "check"
       result("verified")
@@ -124,9 +126,18 @@ Dir.mktmpdir("soul-crucible-copy-") do |root|
   check.call("approved gate initializes, copies, verifies, proves coverage, and records one receipt",
              completed["ok"] && completed["mutation"] == "backup_replica_verified" &&
                completed.dig("data", "target_snapshot_count") == 2 &&
+               completed.dig("data", "source_snapshot_ids") == ["a" * 64, "b" * 64] &&
+               completed.dig("data", "destination_snapshot_ids") == ["c" * 64, "d" * 64] &&
+               completed.dig("data", "destination_snapshot_lineage_ids") == ["a" * 64, "b" * 64] &&
                runner.calls.any? { |call| call["argv"].include?("init") } &&
                runner.calls.any? { |call| call["argv"].include?("copy") } &&
                runner.calls.any? { |call| call["argv"].include?("check") })
+
+  reconciled = service.replica_preview(password: password)
+  check.call("post-copy preview recognizes destination IDs through preserved original lineage",
+             reconciled["ok"] && reconciled.dig("data", "target_snapshot_ids") == ["c" * 64, "d" * 64] &&
+               reconciled.dig("data", "target_snapshot_lineage_ids") == ["a" * 64, "b" * 64] &&
+               reconciled.dig("data", "missing_snapshot_ids") == [])
 
   runner.target_identity = "directory,root,755\n"
   unsafe = service.replica_preview(password: password)

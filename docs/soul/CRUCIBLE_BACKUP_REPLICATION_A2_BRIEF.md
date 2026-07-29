@@ -14,8 +14,11 @@ restic target when absent, copies the workstation repository's missing
 - Require the repository password for one page request and never retain it.
 - Verify Crucible's target is a mode `0700` directory owned by the configured
   non-root account.
-- Bind preview to the local repository identity and exact source, target, and
-  missing snapshot IDs.
+- Bind preview to the local repository identity and exact source, target,
+  original-snapshot lineage, and missing source snapshot IDs. Restic assigns
+  new destination snapshot IDs during `copy`; coverage therefore compares the
+  preserved `original` lineage ID rather than incorrectly requiring storage IDs
+  from two independently encrypted repositories to match.
 - Initialize only an uninitialized target.
 - Verify source metadata, run one `restic copy`, verify target metadata, and
   perform one post-copy inventory.
@@ -47,6 +50,6 @@ delete local or remote backup data.
 - [x] Preview is digest-bound to exact snapshot inventories.
 - [x] Password is child-environment-only and never persisted.
 - [x] Shared lock prevents overlapping backup administration.
-- [x] Post-copy check and coverage proof are required.
+- [x] Post-copy check and original-snapshot lineage coverage proof are required.
 - [x] Deletion, scheduling, and automatic retry are absent.
 - [ ] Operator live-tests initialization and first copy from the Dashboard.
