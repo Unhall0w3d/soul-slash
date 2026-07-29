@@ -362,14 +362,22 @@ check.call("Dashboard removes visible A1/A2/A3 cards and generates exactly two d
            html.include?('id="maintenance-legacy-controls" hidden') &&
              javascript.include?('["maintenance", "reboot"].forEach') &&
              html.include?('id="maintenance-device-dialog"'))
-check.call("workstation dialog keeps evidence recovery outside the scrolling plan and explains the exact blocker",
-           html.include?('id="maintenance-workstation-evidence-actions"') &&
-             html.include?('id="refresh-maintenance-device-evidence"') &&
-             html.include?('id="recheck-maintenance-device-preflight"') &&
-             javascript.include?("Refresh ${deviceLabel} evidence, then recheck this preflight.") &&
-             javascript.include?("`Refresh ${deviceLabel} evidence`") &&
+check.call("workstation dialog automatically refreshes evidence with bounded polling and retains one reviewed click gate",
+           !html.include?('id="maintenance-workstation-evidence-actions"') &&
+             !html.include?('id="refresh-maintenance-device-evidence"') &&
+             !html.include?('id="recheck-maintenance-device-preflight"') &&
+             javascript.include?("MAINTENANCE_EVIDENCE_POLL_LIMIT = 120") &&
+             javascript.include?("MAINTENANCE_RECEIPT_POLL_LIMIT = 600") &&
+             javascript.include?("refreshWorkstationEvidenceAndWait") &&
+             javascript.include?("waitForWorkstationMaintenanceReceipt") &&
+             javascript.include?('prefillApprovalGate("maintenance-device-confirmation", "execute-maintenance-device-action"') &&
              javascript.include?('return deviceId === "maven" ? "workstation" : deviceId;') &&
              javascript.include?("A4 fixed-operation authority · no password prompt"))
+check.call("workstation maintenance refreshes fleet evidence after its exact receipt while reboot remains separate",
+           javascript.include?('if (preview.action === "maintenance")') &&
+             javascript.include?("await loadMaintenanceFleet()") &&
+             javascript.include?("reboot remains a separate action") &&
+             javascript.include?('["maintenance", "reboot"].forEach'))
 check.call("cards distinguish maintenance channels from status-only probes while Pi-hole OpenSSH duplication is absent",
            javascript.include?('"Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")') &&
              javascript.include?('const inventoryOnly = device.control !== "maintenance"') &&

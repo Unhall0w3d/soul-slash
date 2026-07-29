@@ -16,6 +16,7 @@ state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
 state.maintenanceDevicePreview = null;
+state.maintenanceDeviceFlowToken = 0;
 state.maintenanceDiscoveryCandidates = [];
 state.maintenanceDiscoveryRegistry = [];
 state.maintenanceEnrollmentPreview = null;
@@ -2513,7 +2514,7 @@ function renderMaintenanceDevice(device) {
     const controlDeviceId = device.facts?.control_target_id || device.id;
     ["maintenance", "reboot"].forEach((action) => {
       const button = document.createElement("button"); button.type = "button"; button.className = action === "reboot" ? "gate-button maintenance-reboot-button" : "gate-button gate-button--gold";
-      button.textContent = action === "reboot" ? "Reboot" : "Maintenance";
+      button.textContent = action === "reboot" ? "Reboot" : "Maintain";
       button.disabled = !device.reachable;
       button.addEventListener("click", () => openMaintenanceDeviceAction(controlDeviceId, action));
       actions.append(button);
@@ -3043,76 +3044,118 @@ function maintenanceDeviceLabel(deviceId) {
     || canonicalId;
 }
 
+const MAINTENANCE_EVIDENCE_POLL_LIMIT = 120;
+const MAINTENANCE_RECEIPT_POLL_LIMIT = 600;
+const maintenancePollDelay = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+function maintenanceDeviceBlockers(plan) {
+  return plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
+}
+
+function workstationEvidenceNeedsRefresh(plan) {
+  return maintenanceDeviceBlockers(plan).some((blocker) =>
+    /native package evidence|package update evidence|package assessment/i.test(String(blocker))
+  );
+}
+
+async function fetchMaintenanceDevicePreview(deviceId, action) {
+  const envelope = deviceId === "workstation"
+    ? await callSoul(action === "maintenance" ? "maintenance.execution.preview" : "maintenance.reboot_restore.preview", { force_database_refresh: "false" })
+    : await callSoul("maintenance.device.preview", { device_id: deviceId, action });
+  lifecycle(envelope);
+  const data = dataOf(envelope);
+  if (!data.plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
+  return data;
+}
+
+function presentMaintenanceDevicePreview(deviceId, action, data, deviceLabel) {
+  const plan = data.plan;
+  const normalizedPlan = deviceId === "workstation"
+    ? Object.assign({}, plan, { device_id: "workstation", device_label: deviceLabel, action, fleet_wide: false, impact: [] })
+    : plan;
+  const available = deviceId === "workstation" ? plan.execution_available === true : plan.live_execution_enabled === true;
+  const confirmation = data.confirmation || plan.confirmation;
+  maintenanceDeviceDialogDetails(normalizedPlan);
+  state.maintenanceDevicePreview = { deviceId, action, data, plan: normalizedPlan };
+  byId("maintenance-device-confirmation-phrase").textContent = confirmation || "—";
+  byId("maintenance-device-confirmation-row").hidden = !available;
+  byId("execute-maintenance-device-action").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceLabel}`;
+  prefillApprovalGate("maintenance-device-confirmation", "execute-maintenance-device-action", confirmation, available);
+  const blockers = maintenanceDeviceBlockers(plan);
+  byId("maintenance-device-dialog-status").textContent = available
+    ? `Review the exact ${action} plan. Clicking ${action === "reboot" ? "Reboot" : "Maintain"} authorizes only this device-scoped operation.`
+    : `${deviceLabel} is blocked: ${blockers.join(" · ") || "the reviewed preflight is incomplete"}.`;
+  return available;
+}
+
+async function refreshWorkstationEvidenceAndWait(action, deviceLabel, flowToken) {
+  const dialog = byId("maintenance-device-dialog");
+  const progress = byId("maintenance-device-progress");
+  const status = byId("maintenance-device-dialog-status");
+  showGenerationProgress(progress, `Refreshing ${deviceLabel}`, "Collecting current native package evidence in one visible bounded handoff…");
+  const evidenceEnvelope = await callSoul("maintenance.evidence.reserve");
+  lifecycle(evidenceEnvelope);
+  const evidence = dataOf(evidenceEnvelope);
+  if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || `${deviceLabel} evidence handoff is unavailable.`);
+  launchMaintenanceUri(evidence.launch_uri);
+  status.textContent = `Native evidence collection opened. ${deviceLabel} will become review-ready here when the handoff closes.`;
+
+  let latest = null;
+  for (let attempt = 0; attempt < MAINTENANCE_EVIDENCE_POLL_LIMIT; attempt += 1) {
+    await maintenancePollDelay(1_000);
+    if (state.maintenanceDeviceFlowToken !== flowToken || !dialog.open) return null;
+    latest = await fetchMaintenanceDevicePreview("workstation", action);
+    if (latest.plan.execution_available === true || !workstationEvidenceNeedsRefresh(latest.plan)) return latest;
+    showGenerationProgress(progress, `Refreshing ${deviceLabel}`, `Waiting for native evidence · ${attempt + 1} / ${MAINTENANCE_EVIDENCE_POLL_LIMIT}`);
+  }
+  if (latest) presentMaintenanceDevicePreview("workstation", action, latest, deviceLabel);
+  throw new Error(`Native evidence did not become ready within ${MAINTENANCE_EVIDENCE_POLL_LIMIT} seconds. No Dashboard poll remains.`);
+}
+
 async function openMaintenanceDeviceAction(deviceId, action) {
   deviceId = canonicalMaintenanceDeviceId(deviceId);
   const dialog = byId("maintenance-device-dialog"); const status = byId("maintenance-device-dialog-status");
+  const flowToken = ++state.maintenanceDeviceFlowToken;
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";
   byId("maintenance-device-confirmation-row").hidden = true;
-  byId("maintenance-workstation-evidence-actions").hidden = true;
   byId("execute-maintenance-device-action").disabled = true;
   const deviceLabel = maintenanceDeviceLabel(deviceId);
   byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceLabel}`;
-  byId("refresh-maintenance-device-evidence").textContent = `Refresh ${deviceLabel} evidence`;
-  byId("recheck-maintenance-device-preflight").textContent = `Recheck ${deviceLabel} preflight`;
   if (!dialog.open) dialog.showModal();
   status.textContent = "Collecting a fresh device-scoped preview…";
   try {
-    let envelope;
-    if (deviceId === "workstation") {
-      envelope = await callSoul(action === "maintenance" ? "maintenance.execution.preview" : "maintenance.reboot_restore.preview", { force_database_refresh: "false" });
-    } else {
-      envelope = await callSoul("maintenance.device.preview", { device_id: deviceId, action });
+    let data = await fetchMaintenanceDevicePreview(deviceId, action);
+    if (state.maintenanceDeviceFlowToken !== flowToken || !dialog.open) return;
+    if (deviceId === "workstation" && data.plan.execution_available !== true && workstationEvidenceNeedsRefresh(data.plan)) {
+      data = await refreshWorkstationEvidenceAndWait(action, deviceLabel, flowToken);
+      if (!data || state.maintenanceDeviceFlowToken !== flowToken || !dialog.open) return;
     }
-    lifecycle(envelope);
-    const data = dataOf(envelope); const plan = data.plan;
-    if (!plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
-    const normalizedPlan = deviceId === "workstation"
-      ? Object.assign({}, plan, { device_id: "workstation", device_label: deviceLabel, action, fleet_wide: false, impact: [] })
-      : plan;
-    maintenanceDeviceDialogDetails(normalizedPlan);
-    byId("maintenance-workstation-evidence-actions").hidden = deviceId !== "workstation";
-    state.maintenanceDevicePreview = { deviceId, action, data, plan: normalizedPlan };
-    const available = deviceId === "workstation" ? plan.execution_available === true : plan.live_execution_enabled === true;
-    const confirmation = data.confirmation || plan.confirmation;
-    byId("maintenance-device-confirmation-phrase").textContent = confirmation || "—";
-    byId("maintenance-device-confirmation-row").hidden = false;
-    const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
-    status.textContent = available
-      ? `Review the exact ${action} plan, then type its device-specific confirmation.`
-      : (deviceId === "workstation"
-        ? `${deviceLabel} is blocked: ${blockers.join(" · ") || "A2/A3 preflight is incomplete"}. Refresh ${deviceLabel} evidence, then recheck this preflight.`
-        : "Remote live execution remains locally disabled pending candidate review.");
-    byId("execute-maintenance-device-action").disabled = !available;
+    presentMaintenanceDevicePreview(deviceId, action, data, deviceLabel);
   } catch (error) {
     status.textContent = error.message;
+  } finally {
+    if (state.maintenanceDeviceFlowToken === flowToken) hideGenerationProgress(byId("maintenance-device-progress"));
   }
 }
 
-async function refreshWorkstationDeviceEvidence() {
-  const preview = state.maintenanceDevicePreview; const status = byId("maintenance-device-dialog-status");
-  if (!preview || canonicalMaintenanceDeviceId(preview.deviceId) !== "workstation") return;
-  const deviceLabel = maintenanceDeviceLabel("workstation");
-  byId("refresh-maintenance-device-evidence").disabled = true;
-  status.textContent = `Reserving one visible read-only ${deviceLabel} evidence terminal…`;
-  try {
-    const evidenceEnvelope = await callSoul("maintenance.evidence.reserve"); lifecycle(evidenceEnvelope);
-    const evidence = dataOf(evidenceEnvelope);
-    if (!evidence.launch_uri) throw new Error(evidenceEnvelope.errors?.[0]?.message || `${deviceLabel} evidence handoff is unavailable.`);
-    launchMaintenanceUri(evidence.launch_uri);
-    status.textContent = `Native evidence terminal requested. When it closes, select Recheck ${deviceLabel} preflight.`;
-  } catch (error) { status.textContent = error.message; }
-  finally { byId("refresh-maintenance-device-evidence").disabled = false; }
-}
-
-async function recheckWorkstationDevicePreflight() {
-  const preview = state.maintenanceDevicePreview;
-  if (!preview || canonicalMaintenanceDeviceId(preview.deviceId) !== "workstation") return;
-  await openMaintenanceDeviceAction("workstation", preview.action);
+async function waitForWorkstationMaintenanceReceipt(transactionId, deviceLabel, flowToken) {
+  const dialog = byId("maintenance-device-dialog");
+  const progress = byId("maintenance-device-progress");
+  for (let attempt = 0; attempt < MAINTENANCE_RECEIPT_POLL_LIMIT; attempt += 1) {
+    await maintenancePollDelay(3_000);
+    if (state.maintenanceDeviceFlowToken !== flowToken || !dialog.open) return null;
+    const envelope = await callSoul("maintenance.execution.receipts", { limit: 30 });
+    const receipt = (dataOf(envelope).receipts || []).find((record) => record.transaction_id === transactionId);
+    if (receipt) return receipt;
+    showGenerationProgress(progress, `Maintaining ${deviceLabel}`, `Visible transaction active · receipt check ${attempt + 1} / ${MAINTENANCE_RECEIPT_POLL_LIMIT}`);
+  }
+  throw new Error(`${deviceLabel} maintenance exceeded the 30-minute Dashboard receipt window. The terminal owns the authoritative result.`);
 }
 
 async function executeMaintenanceDeviceAction() {
   const preview = state.maintenanceDevicePreview; if (!preview) return;
+  const flowToken = state.maintenanceDeviceFlowToken;
   const confirmation = byId("maintenance-device-confirmation").value;
   const expected = preview.data.confirmation || preview.plan.confirmation;
   if (confirmation !== expected) return;
@@ -3131,7 +3174,18 @@ async function executeMaintenanceDeviceAction() {
       const data = dataOf(envelope); lifecycle(envelope);
       if (!data.handoff?.launch_uri) throw new Error(envelope.errors?.[0]?.message || "Workstation transaction stopped safely.");
       launchMaintenanceUri(data.handoff.launch_uri);
-      status.textContent = `The visible ${maintenanceDeviceLabel("workstation")} terminal owns this one-device transaction. Its successful completion refreshes the persisted fleet snapshot.`;
+      if (preview.action === "maintenance") {
+        const deviceLabel = maintenanceDeviceLabel("workstation");
+        status.textContent = `The visible ${deviceLabel} terminal owns this one-device transaction. Completion will refresh this card automatically.`;
+        const receipt = await waitForWorkstationMaintenanceReceipt(data.handoff.transaction_id, deviceLabel, flowToken);
+        if (!receipt) return;
+        if (receipt.lifecycle_state !== "complete") throw new Error(`${deviceLabel} maintenance ${String(receipt.lifecycle_state || "failed").replaceAll("_", " ")}; review the retained receipt.`);
+        await loadMaintenanceFleet();
+        status.textContent = `${deviceLabel} maintenance completed. Current evidence is reflected on its card; reboot remains a separate action.`;
+        announce(`${deviceLabel} maintenance complete`);
+      } else {
+        status.textContent = `The visible ${maintenanceDeviceLabel("workstation")} reboot terminal owns this exact transaction. Maintenance was not inferred or repeated.`;
+      }
     } else {
       envelope = await callNdjson("/api/v1/administration-stream", "maintenance.device.execute", {
         device_id: preview.deviceId,
@@ -4272,11 +4326,11 @@ byId("maintenance-device-confirmation").addEventListener("input", () => {
   byId("execute-maintenance-device-action").disabled = !available || byId("maintenance-device-confirmation").value !== expected;
 });
 byId("execute-maintenance-device-action").addEventListener("click", executeMaintenanceDeviceAction);
-byId("refresh-maintenance-device-evidence").addEventListener("click", refreshWorkstationDeviceEvidence);
-byId("recheck-maintenance-device-preflight").addEventListener("click", recheckWorkstationDevicePreflight);
 byId("maintenance-device-dialog").addEventListener("close", () => {
+  state.maintenanceDeviceFlowToken += 1;
   state.maintenanceDevicePreview = null;
   byId("maintenance-device-confirmation").value = "";
+  hideGenerationProgress(byId("maintenance-device-progress"));
 });
 byId("preview-maintenance-execution").addEventListener("click", previewMaintenanceExecution);
 byId("refresh-maintenance-evidence").addEventListener("click", refreshNativeMaintenanceEvidence);

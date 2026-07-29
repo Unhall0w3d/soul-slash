@@ -296,12 +296,23 @@ but it does not prevent the zero-command fixture rehearsal from exercising the
 visible terminal and receipt lifecycle. The desktop handoff supplies native
 evidence while preserving the service sandbox.
 
-**Collect fleet status** and the workstation's native evidence serve different purposes.
-Fleet collection inventories cached workstation and remote device state.
-Before workstation maintenance or reboot, use the prominent **Refresh
-workstation evidence** action, let its visible read-only terminal close, then
-select **Recheck workstation preflight**. This preserves the fresh Class-5 authorization
-gate without hiding its recovery control in the plan scroller.
+**Collect fleet status** and the workstation's native evidence serve different
+purposes. Fleet collection inventories cached workstation and remote device
+state. Selecting **Maintain** or **Reboot** on the workstation now collects a
+fresh device-scoped preview and, when native package evidence is stale or
+missing, opens one visible read-only evidence handoff automatically. A bounded
+Dashboard poll rechecks that evidence for at most two minutes and then presents
+the exact reviewed action. The approval phrase is prefilled and read-only:
+clicking the final action button is the human authorization.
+
+For **Maintain**, the visible terminal remains the authoritative foreground
+transaction. The Dashboard follows only its exact transaction ID for at most
+30 minutes. When its retained receipt completes, the fleet card refreshes
+automatically. Maintenance never infers, requests, or chains a reboot. If
+current evidence reports a reboot requirement, **Reboot** remains a distinct
+card action with a new preview, digest, restore journal, and approval click.
+Closing the dialog stops its browser-side polling without canceling or
+backgrounding the terminal-owned operation.
 
 A2 always stops before reboot. It cannot install or invoke the A3 post-login
 restorer. Its package-only approval digest therefore does not bind the current
@@ -339,6 +350,8 @@ automatic retry. A3 reboot still requires its exact pending restore journal.
 The package-only A2 path completed supervised live acceptance on 2026-07-29:
 Arch/AUR and system Flatpak both completed with zero password prompts and no
 reboot request. A3 zero-prompt reboot/restoration acceptance remains separate.
+The uniform device-card UX is deterministic-test complete; its separate live
+workstation reboot acceptance is intentionally left to the Operator.
 
 Review and deployment commands:
 
