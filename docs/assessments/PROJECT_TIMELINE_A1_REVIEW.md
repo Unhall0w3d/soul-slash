@@ -97,6 +97,9 @@ positive integer revision. The focused verifier exercises an actual update
 through `ApplicationFacade`, matching the Dashboard request shape, so service-
 only and snapshot-only tests cannot mask this path again.
 
+Live outcome: approved by the Operator after successfully moving an existing
+item from Later to Now through the Dashboard editor on 2026-07-29.
+
 ## Memory and lifecycle
 
 - Shared memory keys added: none.
