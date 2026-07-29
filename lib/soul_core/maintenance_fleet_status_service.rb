@@ -26,9 +26,11 @@ module SoulCore
     MAX_ROUTE_BYTES = 64 * 1024
     REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
     MAX_ENROLLED_DEVICES = 64
+    WORKSTATION_ID = "workstation"
+    LEGACY_WORKSTATION_ID = "maven"
     SUPPORTED_PACKAGE_MANAGERS = %w[pacman yay paru apt apt-get dnf zypper apk flatpak snap nix].freeze
     DEFAULT_ADDRESSES = {
-      "maven" => "local",
+      WORKSTATION_ID => "local",
       "proxmox" => "proxmox-maintenance",
       "pihole" => "pihole-maintenance"
     }.freeze
@@ -62,12 +64,20 @@ module SoulCore
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
       @addresses = {
-        "maven" => configured_display_address("SOUL_FLEET_MAVEN_ADDRESS", DEFAULT_ADDRESSES.fetch("maven")),
+        WORKSTATION_ID => configured_display_value(
+          "SOUL_FLEET_WORKSTATION_ADDRESS",
+          legacy_key: "SOUL_FLEET_MAVEN_ADDRESS",
+          fallback: DEFAULT_ADDRESSES.fetch(WORKSTATION_ID)
+        ),
         "proxmox" => configured_display_address("SOUL_FLEET_FORGE_ADDRESS", DEFAULT_ADDRESSES.fetch("proxmox")),
         "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_ADDRESS", DEFAULT_ADDRESSES.fetch("pihole"))
       }.freeze
       @labels = {
-        "maven" => configured_display_address("SOUL_FLEET_MAVEN_LABEL", "Maven"),
+        WORKSTATION_ID => configured_display_value(
+          "SOUL_FLEET_WORKSTATION_LABEL",
+          legacy_key: "SOUL_FLEET_MAVEN_LABEL",
+          fallback: "Workstation"
+        ),
         "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_LABEL", "Pi-hole")
       }.freeze
       @snapshot_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "fleet_status.json")
@@ -121,7 +131,7 @@ module SoulCore
     def refresh(device_id:, schedule_recovery: true)
       @evidence = []
       @dhcp_scan_cache = {}
-      normalized_id = device_id.to_s.strip
+      normalized_id = canonical_device_id(device_id.to_s.strip)
       return failed("device id is invalid") unless normalized_id.match?(/\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/)
 
       current = read_snapshot_data
@@ -211,12 +221,12 @@ module SoulCore
       parsed = JSON.parse(File.binread(@snapshot_path, MAX_SNAPSHOT_BYTES + 1))
       raise ArgumentError, "fleet status snapshot schema is unsupported" unless parsed["schema_version"] == SCHEMA_VERSION
 
-      parsed
+      canonicalize_snapshot_data(parsed)
     end
 
     def collect_snapshot_device(existing, schedule_recovery: true)
-      case existing["id"]
-      when "maven" then collect_workstation
+      case canonical_device_id(existing["id"])
+      when WORKSTATION_ID then collect_workstation
       when "proxmox" then collect_proxmox
       when "pihole" then collect_pihole
       when "cisco-8851"
@@ -275,10 +285,10 @@ module SoulCore
       )
 
       device(
-        id: "maven",
-        label: @labels.fetch("maven"),
+        id: WORKSTATION_ID,
+        label: @labels.fetch(WORKSTATION_ID),
         role: "Hyprland workstation · maintenance controller",
-        address: @addresses.fetch("maven"),
+        address: @addresses.fetch(WORKSTATION_ID),
         reachable: true,
         os: os_release_summary,
         version: output(local_run("workstation.hyprland_version", "/usr/bin/hyprland", "-v")).lines.first.to_s.strip,
@@ -834,11 +844,11 @@ module SoulCore
       end
       edges = [
         {"from" => gateway_node.fetch("id"), "to" => "internet", "label" => "default route · WAN uplink", "kind" => "wan"},
-        {"from" => "maven", "to" => proxmox_id, "label" => "SSH maintenance", "kind" => "management"},
+        {"from" => WORKSTATION_ID, "to" => proxmox_id, "label" => "SSH maintenance", "kind" => "management"},
         {"from" => proxmox_id, "to" => "pihole", "label" => "hosts LXC 100", "kind" => "containment"},
-        {"from" => "maven", "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
+        {"from" => WORKSTATION_ID, "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
         {"from" => "pihole", "to" => "internet", "label" => "Unbound recursion · Quad9 fallback", "kind" => "upstream"},
-        {"from" => "maven", "to" => proxmox_id, "label" => "second-copy target · planned", "kind" => "backup_planned"}
+        {"from" => WORKSTATION_ID, "to" => proxmox_id, "label" => "second-copy target · planned", "kind" => "backup_planned"}
       ]
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}
@@ -853,7 +863,7 @@ module SoulCore
       end
       devices.select { |device| device.fetch("control") == "inventory_only" }.each do |device|
         channel = device.dig("facts", "management_channel") == "ssh_inventory" ? "fixed SSH inventory" : "bounded status probe"
-        edges << {"from" => "maven", "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
+        edges << {"from" => WORKSTATION_ID, "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
       end
       device_nodes = devices.map do |device|
           {
@@ -1210,6 +1220,56 @@ module SoulCore
     def configured_display_address(key, fallback)
       value = @process_env[key].to_s.strip
       safe_text(value.empty? ? fallback : value)
+    end
+
+    def configured_display_value(key, legacy_key:, fallback:)
+      value = @process_env[key].to_s.strip
+      value = @process_env[legacy_key].to_s.strip if value.empty?
+      safe_text(value.empty? ? fallback : value)
+    end
+
+    def canonical_device_id(value)
+      return nil if value.nil?
+
+      value.to_s == LEGACY_WORKSTATION_ID ? WORKSTATION_ID : value.to_s
+    end
+
+    def canonicalize_snapshot_data(parsed)
+      devices = Array(parsed["devices"]).map do |device|
+        next device unless device.is_a?(Hash)
+
+        device.merge("id" => canonical_device_id(device["id"]))
+      end
+      topology = parsed["topology"].is_a?(Hash) ? parsed["topology"] : {}
+      nodes = Array(topology["nodes"]).map do |node|
+        node.is_a?(Hash) ? node.merge("id" => canonical_device_id(node["id"])) : node
+      end
+      edges = Array(topology["edges"]).map do |edge|
+        next edge unless edge.is_a?(Hash)
+
+        edge.merge(
+          "from" => canonical_device_id(edge["from"]),
+          "to" => canonical_device_id(edge["to"])
+        )
+      end
+      network = topology["network"].is_a?(Hash) ? topology["network"].dup : nil
+      if network
+        network["gateway_node_id"] = canonical_device_id(network["gateway_node_id"]) if network.key?("gateway_node_id")
+        network["lan_node_ids"] = Array(network["lan_node_ids"]).map { |id| canonical_device_id(id) } if network.key?("lan_node_ids")
+        network["cloud_node_ids"] = Array(network["cloud_node_ids"]).map { |id| canonical_device_id(id) } if network.key?("cloud_node_ids")
+      end
+      canonical = parsed.merge(
+        "devices" => devices,
+        "topology" => topology.merge("nodes" => nodes, "edges" => edges)
+      )
+      canonical["topology"]["network"] = network if network
+      canonical["refreshed_device_id"] = canonical_device_id(parsed["refreshed_device_id"]) if parsed.key?("refreshed_device_id")
+      if parsed.dig("dhcp_recovery", "retried_device_ids").is_a?(Array)
+        canonical["dhcp_recovery"] = parsed["dhcp_recovery"].merge(
+          "retried_device_ids" => parsed.dig("dhcp_recovery", "retried_device_ids").map { |id| canonical_device_id(id) }
+        )
+      end
+      canonical
     end
 
     def valid_network_address?(value)

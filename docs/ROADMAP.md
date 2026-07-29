@@ -39,9 +39,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] review the candidate-complete local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; Crucible's off-device target is prepared, while remote repository initialization, second-copy execution, and pruning remain disabled
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
-  Maven; live gates remain disabled by default
+  the workstation; live gates remain disabled by default
 - [~] review and install A4's digest-bound root-owned fixed-operation authority
-  for zero-password, deterministic Maven maintenance; live acceptance remains
+  for zero-password, deterministic workstation maintenance; live acceptance remains
   pending
 
 ## Qualified expansion candidates
