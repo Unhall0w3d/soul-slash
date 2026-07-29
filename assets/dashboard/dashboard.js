@@ -2411,11 +2411,25 @@ function maintenanceStateLabel(status, rebootRequired = false) {
   }[status] || "Unknown";
 }
 
+function maintenanceDeviceIsStatusOnly(device) {
+  return device.control === "status_only" || device.facts?.management_channel === "icmp_status";
+}
+
+function maintenanceDeviceDisplayOrder(devices) {
+  return Array.from(devices || [])
+    .map((device, sourceIndex) => ({ device, sourceIndex }))
+    .sort((left, right) => {
+      const statusDifference = Number(maintenanceDeviceIsStatusOnly(left.device)) - Number(maintenanceDeviceIsStatusOnly(right.device));
+      return statusDifference || left.sourceIndex - right.sourceIndex;
+    })
+    .map(({ device }) => device);
+}
+
 function renderMaintenanceDevice(device) {
   const rebootRequired = device.reboot?.required === true;
   const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = rebootRequired ? "reboot_required" : (device.status || "unknown");
   const inventoryOnly = device.control !== "maintenance";
-  const statusOnly = device.control === "status_only" || device.facts?.management_channel === "icmp_status";
+  const statusOnly = maintenanceDeviceIsStatusOnly(device);
   const observedAt = device.observed_at ? new Date(device.observed_at) : null;
   const observedLabel = observedAt && !Number.isNaN(observedAt.getTime()) ? observedAt.toLocaleString() : "not recorded";
   const heading = document.createElement("header");
@@ -2441,6 +2455,18 @@ function renderMaintenanceDevice(device) {
       ["Status probe", device.reachable ? "active" : "unavailable", device.reachable ? "active" : "failed"],
       ["Network reachability", device.reachable ? "active" : "unavailable", device.reachable ? "active" : "failed"]
     ];
+    const mobile = device.facts?.apple_mobile_inventory;
+    if (mobile) {
+      const available = mobile.state === "available";
+      evidenceItems.push(["Apple inventory", available ? "trusted USB" : String(mobile.state || "unavailable").replaceAll("_", " "), available ? "active" : "unavailable"]);
+      if (available) {
+        const build = mobile.build_version ? ` (${mobile.build_version})` : "";
+        evidenceItems.push(["Device", `${mobile.device_name || "iPhone"} · ${mobile.product_type || "model unavailable"} · iOS ${mobile.product_version || "unavailable"}${build}`, "active"]);
+        const battery = Number.isInteger(mobile.battery_percent) ? `${mobile.battery_percent}%` : "unavailable";
+        const power = mobile.battery_is_charging === true ? "charging" : (mobile.external_power_connected === true ? "external power" : "not charging");
+        evidenceItems.push(["Battery", `${battery} · ${power}`, mobile.battery_percent != null && mobile.battery_percent < 20 ? "failed" : "active"]);
+      }
+    }
     evidenceItems.forEach(([label, value, stateName]) => {
       const item = document.createElement("span"); item.dataset.state = stateName;
       const strong = document.createElement("strong"); strong.textContent = label;
@@ -2610,7 +2636,7 @@ function renderMaintenanceFleet(data) {
   byId("maintenance-fleet-kernels").textContent = String(summary.kernel_attention_count ?? 0);
   byId("maintenance-fleet-reboots").textContent = String(summary.reboot_required_count ?? 0);
   const grid = byId("maintenance-device-grid"); grid.replaceChildren();
-  (data.devices || []).forEach((device) => grid.append(renderMaintenanceDevice(device)));
+  maintenanceDeviceDisplayOrder(data.devices).forEach((device) => grid.append(renderMaintenanceDevice(device)));
   if (!data.devices?.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No device evidence returned."; grid.append(empty); }
   renderMaintenanceTopology(data.topology);
   state.maintenanceFleetLoaded = true;
@@ -2861,7 +2887,8 @@ function renderMaintenanceDiscoveryRegistry(records) {
     const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = record.label;
     const managers = Array(record.facts?.package_managers).join(" · ");
     const addressPolicy = record.address_policy === "dhcp_tracked" ? `DHCP tracked · ${record.mac_address}` : "fixed address";
-    const detail = document.createElement("small"); detail.textContent = `${record.address} · ${record.connection_mode === "ssh" ? "SSH inventory" : "status only"} · ${addressPolicy}${managers ? ` · ${managers}` : ""}`;
+    const adapter = record.inventory_adapter === "apple_mobile" ? " · Apple wired inventory" : "";
+    const detail = document.createElement("small"); detail.textContent = `${record.address} · ${record.connection_mode === "ssh" ? "SSH inventory" : "status only"} · ${addressPolicy}${adapter}${managers ? ` · ${managers}` : ""}`;
     copy.append(title, detail);
     const button = document.createElement("button"); button.type = "button"; button.className = "quiet-button"; button.textContent = "Remove";
     button.addEventListener("click", () => previewMaintenanceRemoval(record));

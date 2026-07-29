@@ -51,6 +51,37 @@ green, **Updates available** is yellow, and **Offline** or **Reboot required**
 is red. Managed hosts and status-only appliances retain different vocabulary;
 color does not imply that a status-only appliance has maintenance authority.
 
+### Optional Apple mobile inventory
+
+An enrolled DHCP-tracked iPhone can gain a bounded wired inventory projection
+after its first exact match between the private Wi-Fi MAC reviewed during
+enrollment and the current-network identity reported by the same unlocked,
+trusted phone over USB.
+
+Install `usbmuxd` and `libimobiledevice` through the host distribution. On
+Arch-family systems:
+
+```bash
+sudo pacman -S usbmuxd libimobiledevice
+make apple-mobile-inventory-check
+```
+
+Connect the phone with a data-capable cable, accept Apple's **Trust This
+Computer** prompt, keep it unlocked, and select **Refresh** on its fleet card.
+Soul retains only device name, product type, iOS/build, architecture, and a
+small battery/charging projection. UDID, serial, IMEI, phone number, accounts,
+applications, files, pairing material, and raw command output are not returned
+or persisted.
+
+Once the exact match succeeds, the private registry remembers only that this
+record uses the `apple_mobile` inventory adapter. Later refreshes without the
+cable preserve truthful LAN status and report wired inventory as unavailable.
+The adapter never waits for unlock or trust and never changes phone settings.
+
+`netmuxd` is not required. Network iPhone inventory remains unsupported until a
+separate reviewed adapter can prove a reliable paired Wi-Fi session without a
+persistent daemon or listener.
+
 An optional Cisco 8851/Webex Calling card is deliberately narrower. It proves
 only bounded network reachability and displays the configured device identity,
 provider-owned lifecycle, and topology relationship. Reachability does not
@@ -136,6 +167,7 @@ make fleet-discovery-check
 make fleet-discovery-scan FLEET_SUBNET=192.168.1.0/24
 make verify-maintenance-fleet-discovery
 make verify-maintenance-fleet-dhcp-identity
+make verify-apple-mobile-fleet-inventory
 ```
 
 `nmap` is the only optional discovery dependency. Install it with the host's

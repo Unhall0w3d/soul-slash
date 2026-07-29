@@ -8,6 +8,7 @@ require "socket"
 require "time"
 
 require_relative "bounded_command_runner"
+require_relative "apple_mobile_inventory_adapter"
 
 module SoulCore
   class MaintenanceFleetStatusService
@@ -45,7 +46,8 @@ module SoulCore
       route_path: ROUTE_PATH,
       systemd_run_path: SYSTEMD_RUN_PATH,
       ruby_path: RbConfig.ruby,
-      recovery_scheduler: nil
+      recovery_scheduler: nil,
+      apple_mobile_inventory_adapter: nil
     )
       @runner = runner
       @clock = clock
@@ -60,6 +62,7 @@ module SoulCore
       @systemd_run_path = File.expand_path(systemd_run_path)
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
+      @apple_mobile_inventory_adapter = apple_mobile_inventory_adapter || AppleMobileInventoryAdapter.new(runner: @runner)
       @addresses = {
         "maven" => configured_display_address("SOUL_FLEET_MAVEN_ADDRESS", DEFAULT_ADDRESSES.fetch("maven")),
         "proxmox" => configured_display_address("SOUL_FLEET_FORGE_ADDRESS", DEFAULT_ADDRESSES.fetch("proxmox")),
@@ -70,11 +73,13 @@ module SoulCore
       @pending_recovery_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "dhcp_recovery.json")
       @evidence = []
       @dhcp_scan_cache = {}
+      @apple_mobile_inventory_scan = nil
     end
 
     def collect
       @evidence = []
       @dhcp_scan_cache = {}
+      @apple_mobile_inventory_scan = nil
       devices = [
         collect_workstation,
         collect_proxmox,
@@ -116,6 +121,7 @@ module SoulCore
     def refresh(device_id:, schedule_recovery: true)
       @evidence = []
       @dhcp_scan_cache = {}
+      @apple_mobile_inventory_scan = nil
       normalized_id = device_id.to_s.strip
       return failed("device id is invalid") unless normalized_id.match?(/\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/)
 
@@ -490,6 +496,9 @@ module SoulCore
         .map { |value| safe_text(value) }
         .select { |value| SUPPORTED_PACKAGE_MANAGERS.include?(value) }
         .uniq
+      if (mobile_inventory = apple_mobile_inventory_for(record))
+        facts = facts.merge("apple_mobile_inventory" => mobile_inventory)
+      end
       services = [
         {
           "id" => record.fetch("connection_mode") == "ssh" ? "ssh_inventory" : "network_reachability",
@@ -497,6 +506,13 @@ module SoulCore
           "state" => "active"
         }
       ]
+      if mobile_inventory
+        services << {
+          "id" => "apple_mobile_inventory",
+          "label" => "Apple wired inventory",
+          "state" => mobile_inventory["state"] == "available" ? "active" : "unavailable"
+        }
+      end
       device(
         id: record.fetch("id"),
         label: record.fetch("label"),
@@ -600,6 +616,53 @@ module SoulCore
           "automatic_retry" => schedule_recovery ? "one" : "complete_no_repeat"
         }
       ]
+    end
+
+    def apple_mobile_inventory_for(record)
+      return nil unless record["connection_mode"] == "status_only"
+      return nil unless record["address_policy"] == "dhcp_tracked"
+
+      reviewed_mac = record["mac_address"].to_s.downcase
+      bound = record["inventory_adapter"] == "apple_mobile"
+      scan = apple_mobile_inventory_scan
+      projection = scan.fetch("devices", {})[reviewed_mac]
+      if projection
+        bind_apple_mobile_adapter(record) unless bound
+        return projection.merge(
+          "adapter" => "apple_mobile",
+          "identity_match" => "reviewed_private_wifi_mac"
+        )
+      end
+      return nil unless bound
+
+      {
+        "state" => scan.fetch("state", "unavailable"),
+        "connection" => "unavailable",
+        "adapter" => "apple_mobile",
+        "identity_match" => "previously_reviewed",
+        "battery_percent" => nil,
+        "battery_is_charging" => nil,
+        "external_power_connected" => nil,
+        "fully_charged" => nil
+      }
+    end
+
+    def apple_mobile_inventory_scan
+      return @apple_mobile_inventory_scan if @apple_mobile_inventory_scan
+
+      reviewed_macs = registry_records.filter_map do |record|
+        record["mac_address"] if record["connection_mode"] == "status_only" &&
+                                  record["address_policy"] == "dhcp_tracked"
+      end
+      @apple_mobile_inventory_scan = @apple_mobile_inventory_adapter.discover(reviewed_macs: reviewed_macs)
+    end
+
+    def bind_apple_mobile_adapter(record)
+      records = registry_records
+      updated = records.map do |candidate|
+        candidate["id"] == record["id"] ? candidate.merge("inventory_adapter" => "apple_mobile") : candidate
+      end
+      persist_registry(updated)
     end
 
     def locate_dhcp_mac(subnet, expected_mac)
@@ -923,6 +986,7 @@ module SoulCore
           "address_policy" => policy,
           "mac_address" => policy == "dhcp_tracked" ? mac : "",
           "subnet" => policy == "dhcp_tracked" ? subnet : "",
+          "inventory_adapter" => record["inventory_adapter"] == "apple_mobile" ? "apple_mobile" : "",
           "address_history" => history
         )
       end

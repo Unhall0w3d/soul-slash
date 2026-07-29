@@ -433,6 +433,7 @@ module SoulCore
         "subnet" => normalized_subnet,
         "address_history" => [],
         "ssh_alias" => normalized_alias,
+        "inventory_adapter" => "",
         "control" => "inventory_only",
         "role" => normalized_mode == "ssh" ? "Discovered Linux device · inventory only" : "Discovered local appliance · status only",
         "facts" => facts,
@@ -785,13 +786,14 @@ module SoulCore
       end
       normalized = record.slice(
         "id", "label", "address", "connection_mode", "ssh_alias", "control",
-        "role", "facts", "mutation_authority", "enrolled_at"
+        "role", "facts", "mutation_authority", "enrolled_at", "inventory_adapter"
       )
       normalized.merge(
         "address_policy" => policy,
         "mac_address" => mac,
         "subnet" => subnet,
-        "address_history" => history
+        "address_history" => history,
+        "inventory_adapter" => record["inventory_adapter"] == "apple_mobile" ? "apple_mobile" : ""
       )
     rescue ArgumentError
       nil

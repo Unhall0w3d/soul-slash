@@ -257,6 +257,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              dashboard.include?('callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }') &&
                dashboard.include?('["Checked", observedLabel]') &&
                dashboard.include?("only this device was probed"))
+  check.call("dashboard keeps SSH-integrated inventory ahead of compact status-only cards",
+             dashboard.include?("function maintenanceDeviceDisplayOrder(devices)") &&
+               dashboard.include?("Number(maintenanceDeviceIsStatusOnly(left.device))") &&
+               dashboard.include?("maintenanceDeviceDisplayOrder(data.devices).forEach"))
   check.call("dashboard presents route flow as WAN to gateway to LAN and keeps secondary relationships below",
              dashboard.include?("maintenance-network-map") &&
                dashboard.include?("WAN & provider cloud") &&
