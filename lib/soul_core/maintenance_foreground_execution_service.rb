@@ -151,7 +151,11 @@ module SoulCore
         "plan" => plan,
         "expected_digest" => expected_digest,
         "confirmation" => CONFIRMATION,
-        "read_only" => true
+        "read_only" => true,
+        "restore_evidence" => {
+          "restore_registry_digest" => base.fetch("restore_registry_digest"),
+          "window_restore_summary" => base.fetch("window_snapshot").slice("restorable_count", "unsupported_count")
+        }
       })
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)

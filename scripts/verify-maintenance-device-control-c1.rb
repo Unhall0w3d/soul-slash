@@ -374,9 +374,10 @@ check.call("workstation dialog automatically refreshes evidence with bounded pol
              javascript.include?('return deviceId === "maven" ? "workstation" : deviceId;') &&
              javascript.include?("A4 fixed-operation authority · no password prompt"))
 check.call("workstation maintenance refreshes fleet evidence after its exact receipt while reboot remains separate",
-           javascript.include?('if (preview.action === "maintenance")') &&
+             javascript.include?('if (preview.action === "maintenance")') &&
              javascript.include?("await loadMaintenanceFleet()") &&
              javascript.include?("reboot remains a separate action") &&
+             javascript.include?("Array.isArray(plan.commands) && plan.commands.length === 0") &&
              javascript.include?("not included · reboot and restore only") &&
              javascript.include?('["maintenance", "reboot"].forEach'))
 check.call("cards distinguish maintenance channels from status-only probes while Pi-hole OpenSSH duplication is absent",

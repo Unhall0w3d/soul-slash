@@ -41,6 +41,10 @@ live gates disabled
   snapshot and skipped if already running after autologin.
 - Stabilized the A3 review digest by binding the already normalized A2 plan
   digest and exact A3 blockers instead of volatile raw free-space byte counts.
+- Preserved A2's package-only digest boundary while restoring the real A3
+  integration: the foreground service projects current restore-registry and
+  window-summary evidence beside, rather than inside, the A2 plan. A3 binds
+  that read-only evidence into its own independently reviewed digest.
   Raw disk evidence remains visible in every preview.
 
 ## Files changed

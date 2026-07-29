@@ -48,6 +48,10 @@ module SoulCore
       base = @foreground_service.preview(force_database_refresh: force_database_refresh)
       return base unless base["ok"]
       a2 = base.dig("data", "plan")
+      restore_evidence = base.dig("data", "restore_evidence") || {
+        "restore_registry_digest" => a2.fetch("restore_registry_digest"),
+        "window_restore_summary" => a2.fetch("window_restore_summary")
+      }
       resume = @resume_deployment.status.dig("data") || {}
       blockers = Array(a2.dig("preflight", "live_blockers")).dup
       blockers << "reviewed one-shot resume unit is not installed and enabled" unless resume["ready"]
@@ -63,8 +67,8 @@ module SoulCore
         "commands" => [],
         "maintenance_replay" => false,
         "flatpak_installations" => a2.fetch("flatpak_installations"),
-        "restore_registry_digest" => a2.fetch("restore_registry_digest"),
-        "window_restore_summary" => a2.fetch("window_restore_summary"),
+        "restore_registry_digest" => restore_evidence.fetch("restore_registry_digest"),
+        "window_restore_summary" => restore_evidence.fetch("window_restore_summary"),
         "source_boot_id" => source_boot_id,
         "resume_unit" => resume.slice("unit_name", "installed_exact", "enabled", "ready", "persistent_process", "restart_policy", "timer"),
         "authority" => a2.fetch("authority", {}),
