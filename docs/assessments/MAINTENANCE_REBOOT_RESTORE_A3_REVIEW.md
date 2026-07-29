@@ -1,7 +1,8 @@
 # Maintenance Conditional Reboot and Restore A3 Review
 
-Status: accepted on Maven after two supervised live reboots; local and public
-live gates disabled
+Status: accepted on the Operator workstation after supervised native and
+zero-prompt live reboots; individual application restoration remains
+non-blocking refinement; public live gates disabled
 
 ## Implementation summary
 
@@ -17,8 +18,9 @@ live gates disabled
   transactions now require an empty command list and reject any attempted
   package-maintenance replay. Historical accepted A3 transactions included
   updates; future **Reboot** actions do not.
-- Added one exact reboot vector:
-  `/usr/bin/sudo -n /usr/bin/systemctl reboot`.
+- Added one authority-mode-specific exact reboot vector: native-prompt mode
+  uses `/usr/bin/sudo -n /usr/bin/systemctl reboot`; A4 uses its
+  transaction-bound root helper.
 - Added one bounded post-login restorer that verifies owner, digest, boot
   change, deadline, restore-registry revision, and retry limits before launching
   or placing an application.
@@ -39,6 +41,8 @@ live gates disabled
   window classes and process names are allowlisted with fixed launch vectors;
   each is restored only when represented in the pre-reboot window/process
   snapshot and skipped if already running after autologin.
+- Corrected Webex restoration to use the same fixed Wayland environment as the
+  Operator's successful desktop-menu entry.
 - Stabilized the A3 review digest by binding the already normalized A2 plan
   digest and exact A3 blockers instead of volatile raw free-space byte counts.
 - Preserved A2's package-only digest boundary while restoring the real A3
@@ -148,6 +152,17 @@ Live evidence on Maven, 2026-07-27 and 2026-07-28:
   on monitor 1; and
 - absent qBittorrent and then-unallowlisted Webex/Teams were not launched.
 
+The separate zero-prompt reboot-only transaction
+`maintenance_tx_a3fdcd872f2e0ecb` completed on 2026-07-29 with no package
+commands, no password prompt, a changed boot identity, display recovery, and
+active-workspace restoration. Teams, Vesktop, and Codex restored. Webex and
+Opera stopped as two bounded application records: Webex lacked its reviewed
+Wayland environment, while Opera rejected a stale singleton lock containing
+the former `maven` hostname. The Webex vector is corrected; the three Opera
+links were quarantined reversibly and Opera recreated current `atelier` locks.
+Winboat, LACT, xfreerdp, and the maintenance terminal remained visibly
+unsupported rather than being silently attempted.
+
 ## Local LLM eval results
 
 None. Reboot authority, fixed command vectors, journal integrity, application
@@ -161,6 +176,9 @@ delegated to a model.
   the complete path passed its supervised rerun.
 - Exact window placement continues to depend on application class stability
   and compositor timing.
+- Individual application launchers can retain their own state or environment
+  constraints. Their bounded failure does not invalidate an otherwise
+  successful reboot, display recovery, or workspace lifecycle.
 - Browser tabs, documents, unsaved work, application-internal state, and
   terminal commands are intentionally not captured or reconstructed.
 - Browser session recovery remains the browser's responsibility.
@@ -239,6 +257,8 @@ Live reboot performed on Maven: yes, two supervised requests
   absent qBittorrent remains unlaunched.
 - [x] Review Maven's exact Webex and Teams for Linux class/process identities
   and launch vectors.
-- [ ] Confirm a later supervised reboot restores Webex and Teams only when
-  present in the pre-reboot snapshot.
+- [~] The 2026-07-29 reboot proved conditional Teams restoration. Webex was
+  present but its internal binary did not create a window without the
+  Operator's reviewed Wayland environment; the registry is corrected and will
+  be observed during a natural future reboot without blocking A3 acceptance.
 - [x] Accept the repaired candidate after supervised evidence.

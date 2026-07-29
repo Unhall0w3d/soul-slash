@@ -68,7 +68,7 @@
       "entry_id": "communication.webex",
       "identities": ["webex"],
       "process_identities": ["ciscocollabhost"],
-      "argv": ["/opt/Webex/bin/CiscoCollabHost"],
+      "argv": ["/usr/bin/env", "QT_QPA_PLATFORM=wayland", "/opt/Webex/bin/CiscoCollabHost"],
       "maximum_instances": 1,
       "title_policy": "omit",
       "startup_policy": "launch_if_absent"

@@ -460,15 +460,15 @@
       "interfaces": "Administration → Guided Maintenance; A1 rehearsal; A2 execution preview, desktop handoff, receipts, and live gate; candidate A3 typed preview/status and reviewed one-shot resume-unit setup.",
       "commands": "make verify-maintenance-rehearsal\nmake verify-maintenance-foreground-execution\nmake verify-maintenance-desktop-handoff\nmake maintenance-handoff-check\nmake verify-maintenance-reboot-restore\nmake maintenance-resume-plan\nmake maintenance-resume-status",
       "references": "docs/soul/MAINTENANCE_REBOOT_RESTORE_A0_BRIEF.md\ndocs/soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md\ndocs/soul/MAINTENANCE_DESKTOP_HANDOFF_A2B_BRIEF.md\ndocs/soul/MAINTENANCE_REBOOT_RESTORE_A3_BRIEF.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SELF_ASSESSMENT.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A1_REVIEW.md\ndocs/assessments/MAINTENANCE_FOREGROUND_EXECUTION_A2_REVIEW.md\ndocs/assessments/MAINTENANCE_DESKTOP_HANDOFF_A2B_REVIEW.md\ndocs/assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md",
-      "acceptance": "A1/A2/A2B deterministic and live acceptance passed. The initial 2026-07-27 A3 restoration failed closed and exposed missing compositor identity. After repair, historical supervised transaction maintenance_tx_c81e6cfe1b15e3cc completed on 2026-07-28 with one password prompt, updates, reboot, Limine and SDDM autologin, both monitors awake, exact Codex/Opera restoration, four complete restore actions, and zero failures. A3 has since been separated from maintenance and deterministic checks prove reboot-only transactions reject package-command replay. Absent qBittorrent remained unlaunched. Webex and Teams exact registry detection passes; a later supervised reboot-only run remains required to accept their conditional restoration and the final UX.",
+      "acceptance": "A1/A2/A2B deterministic and live acceptance passed. The initial 2026-07-27 A3 restoration failed closed and exposed missing compositor identity. After repair, historical supervised transaction maintenance_tx_c81e6cfe1b15e3cc completed on 2026-07-28 with one password prompt, updates, reboot, Limine and SDDM autologin, both monitors awake, exact Codex/Opera restoration, four complete restore actions, and zero failures. A3 has since been separated from maintenance and deterministic checks prove reboot-only transactions reject package-command replay. On 2026-07-29 the zero-prompt reboot-only path completed with no package replay; Teams, Vesktop, Codex, display recovery, and active workspace restoration passed. Webex and Opera failed as bounded application records and remain non-blocking refinements for a natural future reboot.",
       "source": "Human-approved Class-5 brief, 2026-07-27"
     },
     {
       "item_id": "track_maintenance_passwordless_authority",
       "title": "Unattended fixed-operation workstation maintenance authority",
       "area": "Administration",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Replace the workstation's routine sudo and package questions with one digest-bound root-owned helper that exposes only fixed full-update and A3 reboot operations.",
       "implementation": "A4 v3 is installed on the Operator's workstation while native one-password maintenance remains the public default. The opt-in path installs one SHA-256-bound root helper and sudoers rule, runs fixed-policy yay 13.0.1 as the desktop owner, confines its privileged pacman bridge to the exact active transaction and yay PID/start identity through at most three exact sudo ancestors, uses Flatpak noninteractive policy, records zero password prompts, and rejects arbitrary callers, commands, alternate roots, removals, and database operations. The desktop handoff atomically claims the transaction at the canonical ID-derived path required by the helper.",
@@ -476,8 +476,25 @@
       "interfaces": "Administration → Guided Maintenance device cards; Maintain automatically recovers stale native evidence, presents one prefilled exact click gate, follows the exact terminal receipt, and refreshes the card; Reboot remains a separate reviewed action. Makefile plan, status, install, uninstall, and verifier targets; ignored SOUL_MAINTENANCE_PASSWORDLESS configuration.",
       "commands": "make verify-maintenance-passwordless-authority\nmake maintenance-authority-plan\nmake maintenance-authority-status",
       "references": "docs/soul/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md\ndocs/assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
-      "acceptance": "A4 v3 exact helper installation and deterministic verification passed. On 2026-07-29 a supervised A2 transaction completed the Arch/AUR full upgrade and system Flatpak update with zero password prompts, no reboot request, a closed sudo lifecycle, and one redacted receipt. The uniform device-card UX has deterministic coverage for bounded automatic evidence recovery, click authorization, exact-receipt completion, automatic card refresh, and separate reboot authority. Earlier failed receipts exposed and preserved fail-closed root-AUR, canonical handoff-path, and sudo-monitor ancestry defects. Complete a later supervised zero-prompt A3 maintenance/reboot/restoration transaction through the uniform UX before final authority acceptance.",
+      "acceptance": "A4 v3 exact helper installation and deterministic verification passed. On 2026-07-29 a supervised A2 transaction completed the Arch/AUR full upgrade and system Flatpak update with zero password prompts, no reboot request, a closed sudo lifecycle, and one redacted receipt. Later that day the separately reviewed A3 path completed a zero-prompt reboot with no package replay, a changed boot identity, display recovery, and bounded one-shot restoration. Two application-specific restoration records stopped for review without invalidating the accepted fixed-operation authority or reboot lifecycle.",
       "source": "Operator-authorized A4 implementation, 2026-07-28"
+    },
+    {
+      "item_id": "track_post_login_application_restoration",
+      "title": "Post-login application restoration refinement",
+      "area": "Administration",
+      "horizon": "later",
+      "status": "planned",
+      "priority": "medium",
+      "summary": "Refine individual allowlisted application launch and placement during natural future reboots without holding the accepted maintenance and reboot lifecycle open.",
+      "implementation": "The bounded one-shot restorer already reports each application independently. The 2026-07-29 zero-prompt reboot isolated two application-level failures: Webex required its reviewed Wayland environment, and Opera rejected a stale singleton lock left by the workstation hostname migration. The Webex launch vector is corrected. The local Opera links were quarantined reversibly rather than deleted or generalized into automatic profile mutation. Winboat, LACT, xfreerdp, and maintenance terminals remain explicitly unsupported pending separate safe launch contracts.",
+      "technologies": "Ruby bounded one-shot restorer; reviewed JSON restore registry; systemd-run user transient units; Hyprland typed placement; application-owned desktop launch environments.",
+      "interfaces": "Administration → Guided Maintenance → Reboot; retained private restore journal and redacted receipt; project timeline.",
+      "commands": "make verify-maintenance-reboot-restore\njournalctl --user -u soul-maintenance-resume.service",
+      "references": "docs/assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
+      "acceptance": "During naturally appropriate reboots, confirm Webex and Opera launch and place only when represented before reboot. Do not schedule repeated reboots solely for this refinement. Any new application requires an exact identity, fixed launch vector, duplicate protection, bounded placement, and human review.",
+      "source": "Operator direction and retained zero-prompt reboot evidence, 2026-07-29",
+      "notes": "Non-blocking follow-up. The maintenance, A4 authority, reboot-only boundary, display recovery, and workspace lifecycle are accepted."
     }
   ]
 }

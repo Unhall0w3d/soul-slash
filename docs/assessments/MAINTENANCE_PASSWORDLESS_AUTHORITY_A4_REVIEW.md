@@ -1,7 +1,7 @@
 # Maintenance Passwordless Authority A4 Review
 
-Status: A2 live-accepted on 2026-07-29 with A4 v3; separate reboot-only A3
-restoration acceptance remains pending
+Status: A2 maintenance and separate reboot-only A3 live-accepted on 2026-07-29
+with A4 v3; individual application restoration remains non-blocking refinement
 
 ## What was implemented
 
@@ -139,9 +139,10 @@ model.
   root-owned AUR builds, a handoff/canonical transaction-path mismatch, and
   sudo's additional monitor ancestry. A4 v3 repairs all three without
   broadening the fixed-operation surface.
-- A later supervised reboot-only A3 restoration run must still prove the same
-  zero-prompt authority across its journal-gated reboot boundary. A3 now
-  rejects package-command replay.
+- The zero-prompt A3 authority and reboot boundary are accepted. The first
+  successful reboot-only receipt retained two bounded application failures
+  (Webex and Opera); these do not broaden or invalidate A4 and remain
+  application-level follow-up for a natural future reboot.
 
 ## Memory keys added or used
 

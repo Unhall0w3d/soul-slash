@@ -119,8 +119,9 @@ accepted and the legacy direct vector is rejected in passwordless mode.
   terminal and retained receipt remain authoritative.
 - The browser cannot cancel the terminal-owned transaction by closing the
   dialog.
-- A live zero-prompt A3 workstation reboot/restoration through this exact UX
-  remains pending Operator acceptance.
+- The live zero-prompt A3 workstation reboot through this UX is accepted.
+  Individual allowlisted applications can still fail independently and stop
+  for review; Webex and Opera remain non-blocking restoration refinements.
 
 ## Memory and lifecycle
 
