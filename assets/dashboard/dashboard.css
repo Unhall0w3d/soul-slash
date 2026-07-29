@@ -268,7 +268,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-device-actions .gate-button { width:100%; min-width:0; }
 .maintenance-device-refresh { grid-column:1/-1; }
 .maintenance-status-only { grid-column:1/-1; margin:0; color:#86A5AE; font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; }
-.maintenance-device-card--status-only { grid-column:span 1; min-height:0; padding:14px 15px 13px; }
+.maintenance-device-card--status-only { grid-column:span 1; align-self:start; min-height:0; padding:14px 15px 13px; }
 .maintenance-device-card--status-only>header { align-items:center; }
 .maintenance-device-card--status-only h3 { margin:2px 0 0; font-size:21px; }
 .maintenance-device-card--status-only .eyebrow { font-size:10px; }
