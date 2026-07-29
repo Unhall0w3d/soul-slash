@@ -22,6 +22,8 @@ module SoulCore
     LOCK_SCHEMA = "soul.maintenance.operation_lock.v1"
     LOCK_RECOVERY_GRACE_SECONDS = 30
     MAX_LOCK_BYTES = 4096
+    CRUCIBLE_HELPER_PATH = "/usr/local/libexec/soul-crucible-maintenance"
+    CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
 
     TARGETS = {
       "forge" => {
@@ -89,6 +91,39 @@ module SoulCore
             "stdout_includes" => ["FTL is listening", "blocking is enabled"]
           }
         ]
+      },
+      "crucible" => {
+        "label" => "Crucible",
+        "ssh_alias" => "crucible-maintenance",
+        "impact" => ["Crucible backup storage is unavailable while the guest reboots"],
+        "maintenance" => [
+          ["/usr/bin/sudo", "-n", CRUCIBLE_HELPER_PATH, "dnf5-upgrade"]
+        ],
+        "reboot" => [
+          "/usr/bin/sudo", "-n", CRUCIBLE_HELPER_PATH, "reboot"
+        ],
+        "reboot_readiness" => [
+          {
+            "label" => "SSH and QEMU guest agent",
+            "argv" => ["/usr/bin/systemctl", "is-active", "sshd", "qemu-guest-agent"],
+            "stdout_includes" => ["active\nactive"]
+          },
+          {
+            "label" => "DNF5 package manager",
+            "argv" => ["/usr/bin/dnf5", "--version"],
+            "stdout_includes" => ["dnf5 version"]
+          },
+          {
+            "label" => "Backup storage mount",
+            "argv" => ["/usr/bin/findmnt", "--noheadings", "--output", "TARGET", "/srv/soul-backup"],
+            "stdout_includes" => ["/srv/soul-backup"]
+          },
+          {
+            "label" => "Fixed Crucible authority",
+            "argv" => ["/usr/bin/sudo", "-n", CRUCIBLE_HELPER_PATH, "self-check"],
+            "stdout_includes" => [CRUCIBLE_AUTHORITY_VERSION]
+          }
+        ]
       }
     }.freeze
 
@@ -122,7 +157,7 @@ module SoulCore
     def preview(device_id:, action:)
       target = target!(device_id)
       action = action!(action)
-      commands = action == "maintenance" ? target.fetch("maintenance") : [["/usr/bin/systemctl", "reboot"]]
+      commands = action == "maintenance" ? target.fetch("maintenance") : [target.fetch("reboot", ["/usr/bin/systemctl", "reboot"])]
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "device_id" => device_id,
@@ -226,7 +261,7 @@ module SoulCore
 
       progress&.call({"stage" => "rebooting", "message" => "Sending the single reviewed reboot request to #{plan.fetch('device_label')}."})
       reboot_result = remote_run(
-        plan.fetch("ssh_alias"), "/usr/bin/systemctl", "reboot",
+        plan.fetch("ssh_alias"), *plan.fetch("commands").fetch(0).fetch("argv"),
         timeout: 15,
         accepted_exit_statuses: [0, 255]
       )
@@ -503,6 +538,7 @@ module SoulCore
       key, fallback = case device_id.to_s
                       when "forge" then ["SOUL_FLEET_FORGE_ADDRESS", "proxmox-maintenance"]
                       when "pihole" then ["SOUL_FLEET_PIHOLE_ADDRESS", "pihole-maintenance"]
+                      when "crucible" then ["SOUL_FLEET_CRUCIBLE_ADDRESS", "crucible-maintenance"]
                       else raise ArgumentError, "device is not available for remote maintenance"
                       end
       value = @process_env[key].to_s.strip
@@ -512,6 +548,7 @@ module SoulCore
     def target_display_label(device_id, fallback)
       key = case device_id.to_s
             when "pihole" then "SOUL_FLEET_PIHOLE_LABEL"
+            when "crucible" then "SOUL_FLEET_CRUCIBLE_LABEL"
             when "forge" then nil
             else raise ArgumentError, "device is not available for remote maintenance"
             end

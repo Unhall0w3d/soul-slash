@@ -586,6 +586,12 @@ module SoulCore
         target,
         "/usr/bin/systemctl", "is-active", "qemu-guest-agent"
       )
+      authority = remote_run(
+        "enrolled_device.crucible_authority",
+        target,
+        "/usr/bin/sudo", "-n", "/usr/local/libexec/soul-crucible-maintenance", "self-check",
+        timeout: 10
+      )
 
       update_rows = dnf5_update_rows(updates_result)
       available_kernel = update_rows
@@ -596,6 +602,7 @@ module SoulCore
         .map(&:strip)
         .filter_map { |line| line.delete_prefix("kernel-core-") unless line.empty? }
       reboot_required = dnf5_reboot_required?(reboot_result)
+      authority_ready = crucible_authority_ready?(authority)
       services = [
         {
           "id" => "dnf5_evidence",
@@ -603,7 +610,12 @@ module SoulCore
           "state" => successful?(updates_result) ? "active" : "failed"
         },
         service_record("SSH", ssh),
-        service_record("QEMU guest agent", guest_agent)
+        service_record("QEMU guest agent", guest_agent),
+        {
+          "id" => "crucible_authority",
+          "label" => "Crucible authority",
+          "state" => authority_ready ? "active" : "unavailable"
+        }
       ]
 
       device(
@@ -613,7 +625,7 @@ module SoulCore
         address: record.fetch("address"),
         reachable: true,
         os: facts["os_pretty_name"].to_s.empty? ? "Fedora Linux" : facts["os_pretty_name"],
-        version: "DNF5 · read-only evidence",
+        version: authority_ready ? "DNF5 · managed evidence" : "DNF5 · read-only evidence",
         kernel: {
           "running" => running_kernel,
           "available" => available_kernel || installed.last || running_kernel,
@@ -628,13 +640,28 @@ module SoulCore
         facts: facts.merge(
           "reachability" => "reachable",
           "package_managers" => package_managers,
-          "status_adapter" => "dnf5_read_only",
+          "status_adapter" => authority_ready ? "dnf5_fixed_maintenance" : "dnf5_read_only",
+          "control_target_id" => "crucible",
+          "control_capability" => authority_ready ? "fixed_maintenance" : "inventory_only",
+          "maintenance_authority" => authority_ready ? "root_owned_fixed_operations" : "unavailable",
           "dnf5_update_evidence" => successful?(updates_result) ? "available" : "unavailable",
           "installed_kernel_count" => installed.length,
-          "mutation_supported" => false
+          "mutation_supported" => authority_ready
         ),
-        control: "inventory_only"
+        control: authority_ready ? "maintenance" : "inventory_only"
       )
+    end
+
+    def crucible_authority_ready?(result)
+      return false unless successful?(result)
+
+      parsed = JSON.parse(result.stdout.to_s)
+      parsed.is_a?(Hash) &&
+        parsed["version"] == "soul-crucible-maintenance-d1-v1" &&
+        parsed["arbitrary_command_forwarding"] == false &&
+        parsed["password_storage"] == false
+    rescue JSON::ParserError
+      false
     end
 
     def dnf5_update_rows(result)

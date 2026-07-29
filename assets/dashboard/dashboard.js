@@ -2415,16 +2415,6 @@ function maintenanceDeviceIsStatusOnly(device) {
   return device.control === "status_only" || device.facts?.management_channel === "icmp_status";
 }
 
-function maintenanceDeviceDisplayOrder(devices) {
-  return Array.from(devices || [])
-    .map((device, sourceIndex) => ({ device, sourceIndex }))
-    .sort((left, right) => {
-      const statusDifference = Number(maintenanceDeviceIsStatusOnly(left.device)) - Number(maintenanceDeviceIsStatusOnly(right.device));
-      return statusDifference || left.sourceIndex - right.sourceIndex;
-    })
-    .map(({ device }) => device);
-}
-
 function renderMaintenanceDevice(device) {
   const rebootRequired = device.reboot?.required === true;
   const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = rebootRequired ? "reboot_required" : (device.status || "unknown");
@@ -2520,11 +2510,12 @@ function renderMaintenanceDevice(device) {
         : "Inventory only · discovered capabilities grant no mutation authority");
     actions.append(notice);
   } else {
+    const controlDeviceId = device.facts?.control_target_id || device.id;
     ["maintenance", "reboot"].forEach((action) => {
       const button = document.createElement("button"); button.type = "button"; button.className = action === "reboot" ? "gate-button maintenance-reboot-button" : "gate-button gate-button--gold";
       button.textContent = action === "reboot" ? "Reboot" : "Maintenance";
       button.disabled = !device.reachable;
-      button.addEventListener("click", () => openMaintenanceDeviceAction(device.id, action));
+      button.addEventListener("click", () => openMaintenanceDeviceAction(controlDeviceId, action));
       actions.append(button);
     });
   }
@@ -2638,9 +2629,16 @@ function renderMaintenanceFleet(data) {
   byId("maintenance-fleet-updates").textContent = String(summary.updates_available ?? 0);
   byId("maintenance-fleet-kernels").textContent = String(summary.kernel_attention_count ?? 0);
   byId("maintenance-fleet-reboots").textContent = String(summary.reboot_required_count ?? 0);
-  const grid = byId("maintenance-device-grid"); grid.replaceChildren();
-  maintenanceDeviceDisplayOrder(data.devices).forEach((device) => grid.append(renderMaintenanceDevice(device)));
-  if (!data.devices?.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No device evidence returned."; grid.append(empty); }
+  const managedGrid = byId("maintenance-managed-device-grid"); const statusGrid = byId("maintenance-status-device-grid");
+  managedGrid.replaceChildren(); statusGrid.replaceChildren();
+  const managedDevices = (data.devices || []).filter((device) => !maintenanceDeviceIsStatusOnly(device));
+  const statusDevices = (data.devices || []).filter(maintenanceDeviceIsStatusOnly);
+  managedDevices.forEach((device) => managedGrid.append(renderMaintenanceDevice(device)));
+  statusDevices.forEach((device) => statusGrid.append(renderMaintenanceDevice(device)));
+  byId("maintenance-managed-count").textContent = String(managedDevices.length);
+  byId("maintenance-presence-count").textContent = String(statusDevices.length);
+  if (!managedDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No SSH-integrated systems returned."; managedGrid.append(empty); }
+  if (!statusDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No status-only devices returned."; statusGrid.append(empty); }
   renderMaintenanceTopology(data.topology);
   state.maintenanceFleetLoaded = true;
 }
@@ -3037,8 +3035,11 @@ function canonicalMaintenanceDeviceId(deviceId) {
 
 function maintenanceDeviceLabel(deviceId) {
   const canonicalId = canonicalMaintenanceDeviceId(deviceId);
-  return state.maintenanceFleet?.devices?.find((device) => canonicalMaintenanceDeviceId(device.id) === canonicalId)?.label
-    || ({ workstation: "Workstation", forge: "Forge", pihole: "Pi-hole" }[canonicalId])
+  return state.maintenanceFleet?.devices?.find((device) =>
+    canonicalMaintenanceDeviceId(device.id) === canonicalId ||
+    canonicalMaintenanceDeviceId(device.facts?.control_target_id) === canonicalId
+  )?.label
+    || ({ workstation: "Workstation", forge: "Forge", pihole: "Pi-hole", crucible: "Crucible" }[canonicalId])
     || canonicalId;
 }
 

@@ -9,8 +9,8 @@ Open it from **Administration → Guided Maintenance**.
 ## Infrastructure control plane
 
 The page begins with the newest persisted fleet snapshot for the workstation,
-the dynamically discovered Proxmox node, the Pi-hole DNS appliance, and any
-optional status-only appliances configured by the Operator. Deployment-specific
+the dynamically discovered Proxmox node, the Pi-hole DNS appliance, Crucible
+when enrolled, and optional status-only appliances configured by the Operator. Deployment-specific
 display names (for example, **Warden**) come from ignored local configuration;
 the public repository retains stable functional identities and no private
 addresses.
@@ -48,6 +48,11 @@ assigned display name, semantic status, and **Refresh** remain primary, while a
 small evidence row retains checked time, status-probe state, and network
 reachability. Firmware, WAN health, client inventory, and vendor-cloud state
 remain unasserted unless a separately reviewed adapter provides that evidence.
+
+The card surface is split by actual integration depth. **SSH integrated**
+contains rich managed or inventory-only Linux cards. **Status only** contains
+compact LAN-presence cards. The two grids are independent, so a short
+status-only card never stretches to the height of a managed system beside it.
 
 Card color is evidence-driven: **Healthy** and status-only **Online** are
 green, **Updates available** is yellow, and **Offline** or **Reboot required**
@@ -195,7 +200,7 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one mutable workstation, Forge, or Pi-hole appliance card
+choose exactly one mutable workstation, Forge, Pi-hole, or qualified Crucible card
 → choose Maintenance or Reboot
 → inspect the exact device, commands, confirmation, and dependency impact
 → authorize only that digest
@@ -212,6 +217,14 @@ conditional reboot/restoration path. Forge and Pi-hole use fixed passwordless
 maintenance aliases, fixed command vectors, a global maintenance lock,
 device-specific confirmation, one attempt, and redacted receipts. A Forge
 reboot explicitly discloses that Pi-hole LXC `100` is interrupted.
+
+Crucible remains inventory-only until its separately reviewed D1 authority
+self-check succeeds. Once qualified, its card uses the same digest-bound
+device dialog but can call only the root-owned helper's exact `dnf5-upgrade`
+or `reboot` operation. The Fedora update never requests a reboot. Crucible
+reboot readiness additionally requires SSH, the QEMU guest agent, DNF5,
+`/srv/soul-backup`, and the helper self-check. See
+[`CRUCIBLE_FEDORA.md`](CRUCIBLE_FEDORA.md).
 
 Remote maintenance never reboots automatically. A remote reboot records the
 old boot identity, sends one reboot request, holds off, performs bounded

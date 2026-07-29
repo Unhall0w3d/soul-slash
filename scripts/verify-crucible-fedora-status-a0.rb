@@ -41,6 +41,8 @@ class CrucibleStatusRunner
     when ["/usr/bin/systemctl", "is-active", "sshd"],
          ["/usr/bin/systemctl", "is-active", "qemu-guest-agent"]
       result("active\n")
+    when ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-crucible-maintenance", "self-check"]
+      result("", "authority unavailable", 1, "failed")
     else
       result("", "unexpected command", 127, "failed")
     end
@@ -94,10 +96,11 @@ check.call("SSH and guest-agent readiness are normalized",
            device.fetch("services").map { |row| [row["label"], row["state"]] } == [
              ["DNF5 evidence", "active"],
              ["SSH", "active"],
-             ["QEMU guest agent", "active"]
+             ["QEMU guest agent", "active"],
+             ["Crucible authority", "unavailable"]
            ])
 check.call("all commands are fixed, shell-free, bounded SSH calls",
-           runner.calls.length == 5 &&
+           runner.calls.length == 6 &&
              runner.calls.all? do |call|
                argv = call.fetch("argv")
                argv.include?("BatchMode=yes") &&

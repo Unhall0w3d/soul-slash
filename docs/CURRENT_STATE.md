@@ -99,13 +99,20 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
   read aliases for existing private state; newly written snapshots, topology,
   refresh results, and tracked examples use `workstation` and
   `SOUL_FLEET_WORKSTATION_*`.
-- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its first
+- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its base
   integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
-  evidence while retaining inventory-only control. DNF5 maintenance and reboot
-  gates remain deliberately unavailable. Operator-managed reservations now
+  evidence. The D1 candidate replaces cloud-init's broad passwordless rule
+  with a SHA-256-bound root helper exposing only self-check, one fixed DNF5
+  upgrade, and one fixed reboot. Exact helper status unlocks device-scoped
+  Maintenance and Reboot; a missing or invalid helper falls closed to
+  inventory-only. The actual 173-package live update and supervised reboot
+  remain pending Operator acceptance. Operator-managed reservations now
   provide stable identities for the workstation, Forge, the Pi-hole appliance,
   and Crucible. Deployment-specific card names remain ignored local
   configuration; public source preserves functional roles and stable IDs.
+- Guided Maintenance now separates rich **SSH integrated** cards from compact
+  **Status only** network-presence cards. Each surface lays out independently,
+  preserving compact status-only rows as the fleet grows.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios

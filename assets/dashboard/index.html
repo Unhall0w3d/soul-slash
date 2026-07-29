@@ -562,8 +562,21 @@
             </section>
           </div>
         </details>
-        <div id="maintenance-device-grid" class="maintenance-device-grid">
-          <p class="muted">Collect fleet status to inspect the workstation, hypervisor, DNS appliance, and enrolled devices.</p>
+        <div id="maintenance-device-surfaces" class="maintenance-device-surfaces">
+          <section class="maintenance-device-surface" aria-labelledby="maintenance-managed-heading">
+            <div class="card-heading"><div><p class="eyebrow">Managed systems</p><h2 id="maintenance-managed-heading">SSH integrated</h2></div><span id="maintenance-managed-count" class="count-badge">0</span></div>
+            <p class="maintenance-device-surface-copy">Rich package, kernel, service, and reviewed lifecycle evidence.</p>
+            <div id="maintenance-managed-device-grid" class="maintenance-device-grid">
+              <p class="muted">Collect fleet status to inspect integrated systems.</p>
+            </div>
+          </section>
+          <section class="maintenance-device-surface maintenance-device-surface--presence" aria-labelledby="maintenance-presence-heading">
+            <div class="card-heading"><div><p class="eyebrow">Observed network</p><h2 id="maintenance-presence-heading">Status only</h2></div><span id="maintenance-presence-count" class="count-badge">0</span></div>
+            <p class="maintenance-device-surface-copy">Compact reachability evidence for enrolled devices without SSH authority.</p>
+            <div id="maintenance-status-device-grid" class="maintenance-device-grid maintenance-device-grid--status">
+              <p class="muted">Collect fleet status to inspect network presence.</p>
+            </div>
+          </section>
         </div>
         <section class="maintenance-topology-card" aria-labelledby="maintenance-topology-heading">
           <div class="card-heading"><div><p class="eyebrow">Network path</p><h2 id="maintenance-topology-heading">Operations topology</h2></div><span class="count-badge">route evidence</span></div>
