@@ -36,6 +36,11 @@ reviewed action.
 - Corrected the reboot-plan renderer to recognize an actual empty command
   array and visibly disclose **Package maintenance · not included · reboot and
   restore only** before authorization.
+- Repaired the native desktop handoff's A4 boundary after the first Operator
+  execution attempt failed closed. Passwordless A3 reservations now require
+  the exact transaction-bound root-helper reboot vector; the legacy direct
+  `systemctl reboot` vector remains valid only for native-prompt mode and is
+  rejected under A4.
 - Replaced the workstation card label **Maintenance** with the action-oriented
   **Maintain**.
 
@@ -102,7 +107,10 @@ window summary outside that package plan. A second preview verified an enabled
 zero-prompt gate over a backend plan containing `commands: []`,
 `maintenance_replay: false`, five restorable entries, and three unsupported
 entries. It also exposed and prompted repair of the empty-command disclosure
-row before live acceptance.
+row before live acceptance. The first Operator authorization then failed before
+mutation because the desktop handoff retained the pre-A4 reboot-vector
+allowlist. Deterministic A2B coverage now proves the exact A4 helper vector is
+accepted and the legacy direct vector is rejected in passwordless mode.
 
 ## Known weaknesses
 

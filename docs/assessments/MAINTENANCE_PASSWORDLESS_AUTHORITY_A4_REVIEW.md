@@ -117,6 +117,13 @@ model.
 
 ## Known weaknesses
 
+- The first reboot-only transaction attempted through the uniform Atelier UX
+  failed closed before mutation because the desktop handoff still expected the
+  pre-A4 direct `systemctl reboot` vector. The handoff now selects its exact
+  reboot allowlist from `authority_mode`, with deterministic coverage for both
+  accepting the A4 helper vector and rejecting the legacy direct vector under
+  passwordless authority.
+
 - Passwordless local authority cannot distinguish the Dashboard from another
   process already running as the same desktop owner. Such a process may request
   the same fixed full-maintenance preview, but cannot create a valid reviewed

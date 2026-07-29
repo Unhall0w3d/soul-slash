@@ -107,6 +107,29 @@ def fixture_transaction(root, now)
   }
 end
 
+def fixture_passwordless_reboot_transaction(root, now)
+  id = "maintenance_tx_1111222233334444"
+  {
+    "schema_version" => "soul.maintenance.transaction.v1",
+    "transaction_id" => id,
+    "mode" => "live_reboot",
+    "owner_uid" => Process.uid,
+    "created_at" => now.iso8601,
+    "deadline_at" => (now + 600).iso8601,
+    "plan_digest" => "e" * 64,
+    "commands" => [],
+    "authority_mode" => "root_owned_passwordless",
+    "sudo_validation_argv" => [],
+    "sudo_refresh_argv" => [],
+    "sudo_invalidate_argv" => [],
+    "reboot_allowed" => true,
+    "reboot_argv" => ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "reboot", id],
+    "source_boot_id" => "1" * 36,
+    "restore_registry_digest" => "f" * 64,
+    "result_path" => File.join(root, "Soul", "private", "host_maintenance", "transactions", "#{id}.result.json")
+  }
+end
+
 puts "Maintenance desktop handoff A2B verification:"
 
 now = Time.utc(2026, 7, 27, 18, 0, 0)
@@ -179,6 +202,30 @@ Dir.mktmpdir("soul-maintenance-a2b") do |root|
                receipt["reboot_requested"] == false && receipt["redacted"] == true)
   check.call("transaction reservation cannot be replayed",
              handoff.handle_uri(reservation.fetch("launch_uri"))["lifecycle_state"] == "failed")
+
+  reboot_transaction = fixture_passwordless_reboot_transaction(root, now)
+  reboot_reservation = handoff.reserve_transaction(reboot_transaction)
+  reboot_reservation_path = File.join(
+    root, "Soul", "private", "host_maintenance", "transactions",
+    "#{reboot_transaction.fetch('transaction_id')}.reserved.json"
+  )
+  check.call("passwordless reboot reservation accepts only the exact A4 helper vector",
+             reboot_reservation.fetch("launch_uri").start_with?("soul-maintenance://transaction/#{reboot_transaction.fetch('transaction_id')}/") &&
+               JSON.parse(File.read(reboot_reservation_path)).fetch("reboot_argv") ==
+                 ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "reboot", reboot_transaction.fetch("transaction_id")])
+
+  altered_reboot = fixture_passwordless_reboot_transaction(root, now).merge(
+    "transaction_id" => "maintenance_tx_5555666677778888",
+    "reboot_argv" => ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"],
+    "result_path" => File.join(root, "Soul", "private", "host_maintenance", "transactions", "maintenance_tx_5555666677778888.result.json")
+  )
+  begin
+    handoff.reserve_transaction(altered_reboot)
+    altered_reboot_rejected = false
+  rescue StandardError
+    altered_reboot_rejected = true
+  end
+  check.call("passwordless reboot reservation rejects the legacy direct systemctl vector", altered_reboot_rejected)
 
   tampered_evidence = JSON.parse(File.read(evidence_path))
   tampered_evidence["package_evidence"]["managers"]["pacman"]["updates"]["count"] = 99

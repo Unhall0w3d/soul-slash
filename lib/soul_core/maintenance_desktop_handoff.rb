@@ -289,7 +289,12 @@ module SoulCore
       expected_reboot = transaction["mode"] == "live_reboot"
       raise "maintenance transaction reboot authority is invalid" unless transaction["reboot_allowed"] == expected_reboot
       if expected_reboot
-        raise "maintenance transaction reboot vector is invalid" unless transaction["reboot_argv"] == ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+        expected_reboot_argv = if transaction["authority_mode"] == "root_owned_passwordless"
+          ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "reboot", transaction.fetch("transaction_id")]
+        else
+          ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+        end
+        raise "maintenance transaction reboot vector is invalid" unless transaction["reboot_argv"] == expected_reboot_argv
         raise "maintenance transaction restore registry digest is invalid" unless transaction["restore_registry_digest"].to_s.match?(/\A[a-f0-9]{64}\z/)
       end
       deadline = Time.iso8601(transaction.fetch("deadline_at"))
