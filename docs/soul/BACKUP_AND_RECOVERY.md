@@ -7,7 +7,7 @@ watcher, daemon, automatic retry, or unattended restore.
 
 ## What the dashboard does
 
-The page has three exact-gated operations:
+The page has four exact-gated operations:
 
 1. **Create a backup** validates the recovery mount and allow-listed sources,
    refuses active creative/model work, captures one tagged restic snapshot,
@@ -22,6 +22,9 @@ The page has three exact-gated operations:
    paths into a new owner-private staging directory with restic verification.
    It inventories and hashes the result, then stops as
    `blocked_for_human_review`. It never overwrites live state.
+4. **Copy to Crucible** verifies the fixed SSH/SFTP target, initializes its
+   encrypted repository when absent, copies missing `soul-state` snapshots,
+   verifies target metadata, and proves exact source-snapshot coverage.
 
 The repository password is entered per dashboard page session. It is sent only
 in the environment of the bounded restic child process. Soul does not place it
@@ -37,6 +40,11 @@ encrypted repository yourself. Configure only non-secret locations in `.env`:
 SOUL_BACKUP_MOUNT=/mnt/soul-backup
 SOUL_BACKUP_REPOSITORY=/mnt/soul-backup/restic
 SOUL_BACKUP_MAX_REPACK_SIZE=4G
+SOUL_BACKUP_REPLICA_REPOSITORY=sftp:crucible-maintenance:/srv/soul-backup/restic
+SOUL_BACKUP_REPLICA_SSH_ALIAS=crucible-maintenance
+SOUL_BACKUP_REPLICA_TARGET_PATH=/srv/soul-backup/restic
+SOUL_BACKUP_REPLICA_OWNER=souladmin
+SOUL_BACKUP_REPLICA_SSH_CONFIG=~/.ssh/config
 ```
 
 `SOUL_BACKUP_MAX_REPACK_SIZE` accepts a bounded value such as `512M`, `1G`, or
@@ -156,8 +164,10 @@ backup scope.
 
 This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
-and location, so it is not an offline or off-site copy. A second independent
-copy and a complete disaster rehearsal remain later work.
+and location. The manual Crucible gate provides an independently hosted
+encrypted second copy. It intentionally does not yet delete remote snapshots
+or run nightly; live acceptance, exact reconciliation, noninteractive
+credential handling, and a complete disaster rehearsal remain later work.
 
 ## Verification
 

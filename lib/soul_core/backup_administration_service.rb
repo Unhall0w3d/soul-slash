@@ -15,6 +15,7 @@ module SoulCore
     BACKUP_CONFIRMATION = "CREATE_VERIFIED_BACKUP"
     RETENTION_CONFIRMATION = "FORGET_SELECTED_BACKUP_SNAPSHOTS"
     RESTORE_CONFIRMATION = "STAGE_BACKUP_RESTORE"
+    REPLICA_CONFIRMATION = "COPY_VERIFIED_BACKUP_TO_CRUCIBLE"
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     MAX_PASSWORD_BYTES = 1024
     MAX_SNAPSHOTS = 100
@@ -25,6 +26,8 @@ module SoulCore
     CHECK_TIMEOUT = 1200
     RETENTION_TIMEOUT = 3600
     RESTORE_TIMEOUT = 3600
+    REPLICA_TIMEOUT = 3600
+    REPLICA_CHECK_TIMEOUT = 1800
 
     def initialize(root: Dir.pwd, home: Dir.home, process_env: ENV, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) })
       @root = File.expand_path(root)
@@ -43,6 +46,11 @@ module SoulCore
       @receipt_root = File.join(@state_root, "receipts")
       @restore_root = File.join(@state_root, "restores")
       @operation_lock_path = File.join(@state_root, "operation.lock")
+      @replica_repository = @env.fetch("SOUL_BACKUP_REPLICA_REPOSITORY", "sftp:crucible-maintenance:/srv/soul-backup/restic").to_s
+      @replica_ssh_alias = @env.fetch("SOUL_BACKUP_REPLICA_SSH_ALIAS", "crucible-maintenance").to_s
+      @replica_target_path = @env.fetch("SOUL_BACKUP_REPLICA_TARGET_PATH", "/srv/soul-backup/restic").to_s
+      @replica_owner = @env.fetch("SOUL_BACKUP_REPLICA_OWNER", "souladmin").to_s
+      @replica_ssh_config = File.expand_path(@env.fetch("SOUL_BACKUP_REPLICA_SSH_CONFIG", File.join(@home, ".ssh", "config")).to_s)
       @ledger = BackupRetentionLedger.new(ledger_path: @ledger_path, clock: @clock)
       raise ArgumentError, "backup state must remain inside the project root" unless within?(@state_root, @root)
       validate_private_state_root!
@@ -66,6 +74,7 @@ module SoulCore
           "snapshots" => snapshots,
           "receipt_count" => regular_json_count(@receipt_root),
           "restore_count" => regular_directory_count(@restore_root),
+          "replica" => replica_status(validated_password),
           "manual_only" => true,
           "password_retained" => false
         }
@@ -76,6 +85,84 @@ module SoulCore
       blocked("backup status failed safely: #{safe_error(error)}")
     ensure
       validated_password&.replace("\0" * validated_password.bytesize)
+    end
+
+    def replica_preview(password:)
+      password = validate_password(password)
+      preflight = replica_preflight(password)
+      scope = {
+        "operation" => "backup_replica_copy",
+        "source_repository_fingerprint" => repository_fingerprint,
+        "target_repository" => @replica_repository,
+        "target_state" => preflight.fetch("target_state"),
+        "initialize_target" => preflight.fetch("target_state") == "uninitialized",
+        "source_snapshot_ids" => preflight.fetch("source_ids"),
+        "target_snapshot_ids" => preflight.fetch("target_ids"),
+        "missing_snapshot_ids" => preflight.fetch("source_ids") - preflight.fetch("target_ids"),
+        "verification" => "target metadata and exact snapshot coverage",
+        "remote_deletion" => false,
+        "automatic_retry" => false,
+        "password_retained" => false
+      }
+      complete("exact Crucible second-copy transaction prepared", scope.merge(
+        "expected_digest" => digest(scope), "confirmation_phrase" => REPLICA_CONFIRMATION
+      ))
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("Crucible copy preview failed safely: #{safe_error(error)}")
+    ensure
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
+    end
+
+    def replica_execute(password:, confirmation:, expected_digest:, progress: nil)
+      password = validate_password(password)
+      return awaiting("exact Crucible copy confirmation is required") unless confirmation.to_s == REPLICA_CONFIRMATION
+      operation_lock = acquire_operation_lock
+      return blocked("another backup administration operation is already active") unless operation_lock
+      preview = replica_preview(password: password)
+      return preview unless preview["ok"]
+      return blocked("Crucible copy preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
+
+      progress&.call("stage" => "source_verify", "message" => "Verifying local repository metadata before transmission…")
+      source_check = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024)
+      raise "local repository verification failed#{restic_failure_suffix(source_check)}" unless source_check.success?
+      if preview.dig("data", "initialize_target")
+        progress&.call("stage" => "initialize", "message" => "Initializing the exact encrypted Crucible repository…")
+        initialized = replica_restic(password, "init", timeout: 120)
+        raise "Crucible repository initialization failed#{restic_failure_suffix(initialized)}" unless initialized.success?
+      end
+      progress&.call("stage" => "copy", "message" => "Copying missing Soul snapshots to Crucible…")
+      copied = replica_restic(
+        password, "copy", "--from-repo", @repository, "--tag", "soul-state",
+        timeout: REPLICA_TIMEOUT, output: 2 * 1024 * 1024,
+        extra_env: { "RESTIC_FROM_PASSWORD" => password }
+      )
+      raise "Crucible snapshot copy failed#{restic_failure_suffix(copied)}" unless copied.success?
+      progress&.call("stage" => "verify", "message" => "Verifying Crucible repository metadata and snapshot coverage…")
+      checked = replica_restic(password, "check", timeout: REPLICA_CHECK_TIMEOUT, output: 1024 * 1024)
+      raise "Crucible repository verification failed#{restic_failure_suffix(checked)}" unless checked.success?
+      target = replica_inventory(password)
+      missing = preview.dig("data", "source_snapshot_ids") - target.fetch("ids")
+      raise "Crucible verification found missing source snapshots" unless missing.empty?
+      receipt = write_receipt("replica", {
+        "target_repository" => @replica_repository,
+        "target_repository_id" => target["repository_id"],
+        "source_snapshot_ids" => preview.dig("data", "source_snapshot_ids"),
+        "copied_snapshot_ids" => preview.dig("data", "missing_snapshot_ids"),
+        "target_snapshot_count" => target.fetch("ids").length,
+        "remote_deletion" => false,
+        "verification" => "source and target passed"
+      })
+      progress&.call("stage" => "complete", "message" => "Crucible second copy verified.")
+      complete("Crucible second copy completed and verified", receipt, "backup_replica_verified")
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      failed("Crucible copy failed safely: #{safe_error(error)}")
+    ensure
+      release_operation_lock(operation_lock)
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
     end
 
     def backup_preview(password:)
@@ -300,6 +387,91 @@ module SoulCore
     end
 
     private
+
+    def replica_status(password)
+      validate_replica_configuration!
+      target = replica_target_status
+      return {
+        "configured" => true, "target" => @replica_repository, "transport" => "SFTP over fixed SSH alias",
+        "state" => "locked", "target_ready" => target["ready"], "password_retained" => false,
+        "automatic_copy" => false, "remote_deletion" => false
+      } unless password
+      inventory = replica_inventory(password)
+      {
+        "configured" => true, "target" => @replica_repository, "transport" => "SFTP over fixed SSH alias",
+        "state" => inventory.fetch("state"), "target_ready" => target["ready"],
+        "snapshot_count" => inventory.fetch("ids").length, "repository_id" => inventory["repository_id"],
+        "password_retained" => false, "automatic_copy" => false, "remote_deletion" => false
+      }
+    rescue StandardError => error
+      {
+        "configured" => false, "target" => @replica_repository, "state" => "unavailable",
+        "reason" => safe_error(error), "password_retained" => false,
+        "automatic_copy" => false, "remote_deletion" => false
+      }
+    end
+
+    def replica_preflight(password)
+      raise ArgumentError, "restic is unavailable" unless @runner.which("restic")
+      validate_replica_configuration!
+      mount = mount_status
+      raise ArgumentError, "local backup target is not mounted" unless mount["mounted"] && mount["expected_target"]
+      raise ArgumentError, "local backup repository is unavailable" unless File.directory?(@repository) && !File.symlink?(@repository)
+      target = replica_target_status
+      raise ArgumentError, "Crucible backup target identity is invalid" unless target["ready"]
+      source = snapshot_inventory(password)
+      raise ArgumentError, "local backup repository contains no Soul snapshots" if source.empty?
+      remote = replica_inventory(password)
+      { "source_ids" => source.map { |item| item.fetch("id") }.sort, "target_ids" => remote.fetch("ids").sort, "target_state" => remote.fetch("state") }
+    end
+
+    def validate_replica_configuration!
+      raise ArgumentError, "Crucible SSH alias is invalid" unless @replica_ssh_alias.match?(/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/)
+      raise ArgumentError, "Crucible target owner is invalid" unless @replica_owner.match?(/\A[a-z_][a-z0-9_-]{0,31}\z/)
+      raise ArgumentError, "Crucible target path is invalid" unless @replica_target_path.start_with?("/") && File.expand_path(@replica_target_path) == @replica_target_path
+      raise ArgumentError, "Crucible SSH config is unavailable" unless regular_file?(@replica_ssh_config) && File.readable?(@replica_ssh_config)
+      raise ArgumentError, "Crucible SSH config permissions are unsafe" unless (File.stat(@replica_ssh_config).mode & 0o022).zero?
+      expected = "sftp:#{@replica_ssh_alias}:#{@replica_target_path}"
+      raise ArgumentError, "Crucible repository must match its fixed SSH alias and target path" unless @replica_repository == expected
+    end
+
+    def replica_target_status
+      raise ArgumentError, "ssh is unavailable" unless @runner.which("ssh")
+      result = @runner.run(
+        "ssh", "-F", @replica_ssh_config, "-o", "BatchMode=yes", "-o", "PasswordAuthentication=no", "-o", "ConnectTimeout=5",
+        @replica_ssh_alias, "--", "/usr/bin/stat", "--format=%F,%U,%a", @replica_target_path,
+        timeout_seconds: 10, max_output_bytes: 4096
+      )
+      raise "Crucible backup target is unreachable" unless result.success?
+      kind, owner, mode = result.stdout.strip.split(",", 3)
+      { "ready" => kind == "directory" && owner == @replica_owner && mode == "700", "kind" => kind, "owner" => owner, "mode" => mode }
+    end
+
+    def replica_inventory(password)
+      result = replica_restic(password, "snapshots", "--json", "--tag", "soul-state", timeout: 60, output: 1024 * 1024)
+      return { "state" => "uninitialized", "ids" => [], "repository_id" => nil } if result.exit_status == 10
+      raise ArgumentError, "Crucible repository password was rejected" if result.exit_status == 12
+      raise "Crucible snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
+      snapshots = JSON.parse(result.stdout)
+      raise "Crucible snapshot inventory is invalid" unless snapshots.is_a?(Array) && snapshots.length <= MAX_SNAPSHOTS
+      ids = snapshots.map { |item| item["id"].to_s }
+      raise "Crucible snapshot inventory contains an invalid ID" unless ids.all? { |id| id.match?(SNAPSHOT_ID) } && ids.uniq.length == ids.length
+      config = replica_restic(password, "cat", "config", timeout: 60, output: 1024 * 1024)
+      raise "Crucible repository identity failed#{restic_failure_suffix(config)}" unless config.success?
+      repository_id = JSON.parse(config.stdout).fetch("id").to_s
+      raise "Crucible repository identity is invalid" unless repository_id.match?(SNAPSHOT_ID)
+      { "state" => "ready", "ids" => ids.sort, "repository_id" => repository_id }
+    rescue JSON::ParserError, KeyError
+      raise "Crucible repository inventory is invalid"
+    end
+
+    def replica_restic(password, *args, timeout:, output: 256 * 1024, extra_env: {})
+      @runner.run(
+        "restic", "-o", "sftp.command=ssh -F #{@replica_ssh_config} #{@replica_ssh_alias} -s sftp", "--repo", @replica_repository, *args,
+        timeout_seconds: timeout, max_output_bytes: output,
+        env: { "RESTIC_PASSWORD" => password }.merge(extra_env)
+      )
+    end
 
     def backup_preflight(password)
       raise ArgumentError, "restic is unavailable" unless @runner.which("restic")

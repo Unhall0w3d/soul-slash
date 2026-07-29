@@ -11,7 +11,7 @@ state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
-Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupBusy: false });
+Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupBusy: false });
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
@@ -3988,6 +3988,15 @@ function renderBackupStatus(payload) {
     "Snapshot access": payload.snapshot_access || "locked",
     "Live promotion": "External human procedure"
   });
+  const replica = payload.replica || {};
+  byId("backup-replica-state").textContent = replica.state === "ready" ? "VERIFIED" : (replica.state === "uninitialized" ? "EMPTY" : replica.state === "locked" ? "LOCKED" : "ATTENTION");
+  renderBackupFacts(byId("backup-replica-details"), {
+    "Target": replica.target || "Unavailable",
+    "State": replica.state || "unavailable",
+    "Snapshots": replica.snapshot_count ?? "unlock to inspect",
+    "Automation": "Disabled",
+    "Remote deletion": "Disabled"
+  });
   renderBackupSnapshots(payload.snapshots);
   const status = !payload.available ? "Restic is unavailable."
     : !payload.configured ? "Backup source and exclusion manifests need configuration."
@@ -4011,8 +4020,8 @@ async function loadBackupAdministration({ unlock = false } = {}) {
 }
 
 function resetBackupPreviews() {
-  state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null;
-  ["backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm"].forEach((id) => { byId(id).hidden = true; });
+  state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null;
+  ["backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm"].forEach((id) => { byId(id).hidden = true; });
 }
 
 function selectedBackupSnapshotIds() {
@@ -4059,6 +4068,44 @@ async function executeBackupCreate() {
     resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
   } catch (error) { byId("backup-create-status").textContent = error.message; }
   finally { state.backupBusy = false; byId("execute-backup-create").disabled = false; hideGenerationProgress(progress); }
+}
+
+async function previewBackupReplica() {
+  byId("preview-backup-replica").disabled = true;
+  try {
+    const envelope = await callSoul("backup.replica.preview", { password: backupPassword() });
+    state.backupReplicaPreview = backupResult(envelope);
+    byId("backup-replica-scope").textContent = JSON.stringify({
+      target_repository: state.backupReplicaPreview.target_repository,
+      target_state: state.backupReplicaPreview.target_state,
+      initialize_target: state.backupReplicaPreview.initialize_target,
+      source_snapshot_count: state.backupReplicaPreview.source_snapshot_ids.length,
+      target_snapshot_count: state.backupReplicaPreview.target_snapshot_ids.length,
+      missing_snapshot_ids: state.backupReplicaPreview.missing_snapshot_ids,
+      remote_deletion: false,
+      automatic_retry: false
+    }, null, 2);
+    byId("backup-replica-confirm").hidden = false;
+    byId("backup-replica-status").textContent = "Exact initialize/copy/verify scope prepared. Clicking the gold gate supplies authority.";
+  } catch (error) { byId("backup-replica-status").textContent = error.message; }
+  finally { byId("preview-backup-replica").disabled = false; }
+}
+
+async function executeBackupReplica() {
+  if (!state.backupReplicaPreview || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-replica").disabled = true;
+  const progress = byId("backup-replica-progress");
+  try {
+    showGenerationProgress(progress, { stage: "preparing", message: "Revalidating local and Crucible repository identities." });
+    const envelope = await callNdjson("/api/v1/administration-stream", "backup.replica.execute", {
+      password: backupPassword(), confirmation: state.backupReplicaPreview.confirmation_phrase,
+      expected_digest: state.backupReplicaPreview.expected_digest
+    }, {}, (event) => showGenerationProgress(progress, event));
+    const result = backupResult(envelope);
+    byId("backup-replica-status").textContent = `Crucible verified with ${result.target_snapshot_count || 0} Soul snapshots.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
+  } catch (error) { byId("backup-replica-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-replica").disabled = false; hideGenerationProgress(progress); }
 }
 
 async function previewBackupRetention() {
@@ -4218,6 +4265,8 @@ byId("forget-backup-password").addEventListener("click", () => {
 });
 byId("preview-backup-create").addEventListener("click", previewBackupCreate);
 byId("execute-backup-create").addEventListener("click", executeBackupCreate);
+byId("preview-backup-replica").addEventListener("click", previewBackupReplica);
+byId("execute-backup-replica").addEventListener("click", executeBackupReplica);
 byId("preview-backup-retention").addEventListener("click", previewBackupRetention);
 byId("execute-backup-retention").addEventListener("click", executeBackupRetention);
 byId("preview-backup-restore").addEventListener("click", previewBackupRestore);
