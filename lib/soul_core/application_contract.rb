@@ -112,6 +112,7 @@ module SoulCore
       "self_improvement.proposals.preview" => [],
       "self_improvement.proposals.execute" => %w[confirmation expected_digest],
       "storage_retention.cleanup.preview" => %w[category],
+      "storage_retention.cleanup.execute" => %w[category confirmation expected_digest],
       "host_improvement.plans.list" => %w[limit],
       "host_improvement.arch_upgrade.preview" => [],
       "host_improvement.arch_upgrade.handoff" => %w[confirmation expected_digest],

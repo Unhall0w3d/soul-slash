@@ -83,6 +83,18 @@ module SoulCore
       failed("storage cleanup preview exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
     end
 
+    def storage_cleanup_execute(category:, confirmation:, expected_digest:)
+      bounded_assessment do
+        storage_assessor.execute(
+          category: category,
+          confirmation: confirmation,
+          expected_digest: expected_digest
+        )
+      end
+    rescue Timeout::Error
+      failed("storage cleanup exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
+    end
+
     def proposal_preview
       report = proposal_generator.generate(write_files: false)
       payload = proposal_payload(report)

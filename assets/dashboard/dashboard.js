@@ -12,6 +12,7 @@ Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectVie
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupBusy: false });
+state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
@@ -2329,19 +2330,48 @@ function renderStorageRetention(report) {
     list.append(labeledRecord(artifact.id.replaceAll("_", " "), note, warning ? "is-warning" : (coverage === "snapshot verified" ? "is-available" : "")));
   });
   if (!report?.artifact_classes?.length) list.append(labeledRecord("Storage unavailable", "No bounded artifact census was returned.", "is-warning"));
+  state.storageCleanupPreview = null;
   byId("storage-cleanup-scope").hidden = true;
-  byId("storage-cleanup-status").textContent = "Read-only census · cleanup execution remains unavailable.";
+  byId("execute-storage-cleanup").hidden = true;
+  byId("execute-storage-cleanup").disabled = true;
+  byId("storage-cleanup-status").textContent = "Select a category to inspect its current exact scope.";
 }
 
 async function previewStorageCleanup() {
-  const button = byId("preview-storage-cleanup"); const status = byId("storage-cleanup-status"); button.disabled = true; status.textContent = "Binding current metadata into one exact read-only scope…";
+  const button = byId("preview-storage-cleanup"); const execute = byId("execute-storage-cleanup"); const status = byId("storage-cleanup-status");
+  state.storageCleanupPreview = null; execute.hidden = true; execute.disabled = true; button.disabled = true; status.textContent = "Binding current metadata into one exact scope…";
   try {
     const envelope = await callSoul("storage_retention.cleanup.preview", { category: byId("storage-cleanup-category").value }); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || dataOf(envelope).reason || "Cleanup preview blocked safely.");
     const data = dataOf(envelope); const output = byId("storage-cleanup-scope"); output.hidden = false; output.textContent = JSON.stringify(data, null, 2);
-    status.textContent = `${data.entry_count || 0} candidate${data.entry_count === 1 ? "" : "s"} · ${formatBytes(data.total_bytes)}. Cleanup execution remains unavailable.`;
+    state.storageCleanupPreview = data;
+    execute.hidden = !data.execution_available;
+    execute.disabled = !data.execution_available;
+    status.textContent = data.execution_available
+      ? `${data.entry_count || 0} exact candidate${data.entry_count === 1 ? "" : "s"} · ${formatBytes(data.total_bytes)}. Review every entry before removal.`
+      : "No eligible candidates were found. Nothing can be removed.";
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
+}
+
+async function executeStorageCleanup() {
+  const preview = state.storageCleanupPreview; const button = byId("execute-storage-cleanup"); const status = byId("storage-cleanup-status");
+  if (!preview?.execution_available) return;
+  button.disabled = true; byId("preview-storage-cleanup").disabled = true; status.textContent = "Revalidating and removing the exact reviewed scope…";
+  try {
+    const envelope = await callSoul("storage_retention.cleanup.execute", {
+      category: preview.category,
+      confirmation: preview.confirmation_phrase,
+      expected_digest: preview.expected_digest
+    });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || dataOf(envelope).reason || "Cleanup failed safely.");
+    const data = dataOf(envelope); const removed = data.removed_count || 0; const bytes = data.removed_bytes || 0;
+    state.storageCleanupPreview = null; button.hidden = true; byId("storage-cleanup-scope").hidden = true;
+    await refreshSelfImprovement("storage");
+    byId("storage-cleanup-status").textContent = `${removed} exact candidate${removed === 1 ? "" : "s"} removed · ${formatBytes(bytes)}. Point-in-time census refreshed.`;
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = !state.storageCleanupPreview?.execution_available; byId("preview-storage-cleanup").disabled = false; }
 }
 
 function renderRecommendations(records) {
@@ -4465,6 +4495,7 @@ byId("preview-improvement-proposals").addEventListener("click", previewImproveme
 byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });
 byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);
 byId("preview-storage-cleanup").addEventListener("click", previewStorageCleanup);
+byId("execute-storage-cleanup").addEventListener("click", executeStorageCleanup);
 byId("preview-host-plan").addEventListener("click", previewHostPlan);
 byId("host-plan-confirmation").addEventListener("input", () => { byId("create-host-plan").disabled = !state.hostPlanPreview || byId("host-plan-confirmation").value !== state.hostPlanPreview.confirmation_phrase; });
 byId("create-host-plan").addEventListener("click", createHostPlan);

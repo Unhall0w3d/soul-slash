@@ -37,13 +37,13 @@ This roadmap tracks product bodies rather than the repository's historical phase
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [~] review the accepted local encrypted backup, staged restore, and 30-day
-  deletion-aware retention ledger; all 32 required classes are present in the
-  current verified snapshot and accepted Crucible replica, while the bounded
-  strict-additive root repair and one finalizing fresh capture remain
+  deletion-aware retention ledger; all 32 required classes, the final
+  strict-additive ledger, matching receipt, and accepted Crucible replica are
+  verified
 - [~] review the metadata-only Storage & Retention A2 artifact census and
   backup-coverage contract; the current snapshot verifies 32/32 required
-  classes with no source or exclusion gaps, while cleanup execution remains a
-  separately reviewed design
+  classes with no source or exclusion gaps; A3 adds a separately review-gated
+  exact executor for only three accepted disposable/age-review categories
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
@@ -74,9 +74,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
   remain separately qualified
 - [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
-- [ ] add a separately reviewed, bounded cleanup executor only after every
-  lifecycle-owned or age-reviewable artifact class has an accepted deletion
-  contract and protected exports remain outside project deletion boundaries
+- [~] review the bounded cleanup A3 candidate for allowlisted old temporary
+  residue, old regular project logs, and failed partial Music quarantine only;
+  broader lifecycle-owned or capacity-bounded cleanup remains unavailable
 - [ ] design 3:00 AM nightly DRS capture, verification, and Crucible
   reconciliation with bounded credential transport, active-work exclusion,
   failure evidence, and no automatic prune

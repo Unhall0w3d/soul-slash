@@ -426,12 +426,13 @@
           <div id="storage-retention-categories" class="recommendation-list storage-retention-categories"><p class="muted">No storage classifications loaded.</p></div>
         </div>
         <section class="gate-card storage-preview-gate">
-          <div><p class="eyebrow">Read-only scope binding</p><h3>Inspect age-review candidates</h3><p>The census retains A1's exact candidate previews, but it cannot delete or move anything.</p></div>
+          <div><p class="eyebrow">Exact cleanup authority</p><h3>Inspect age-review candidates</h3><p>Preview binds one current, owner-local scope. Execution revalidates every path and tree before removing only the reviewed candidates.</p></div>
           <label for="storage-cleanup-category">Candidate category</label>
           <select id="storage-cleanup-category"><option value="temp_review_artifacts">Temporary review artifacts · older than 24 hours</option><option value="expired_project_logs">Project logs · older than 30 days</option><option value="failed_music_quarantine">Failed music quarantine · older than 24 hours</option></select>
           <button id="preview-storage-cleanup" class="gate-button" type="button">Preview exact scope</button>
           <pre id="storage-cleanup-scope" class="diagnostic-output" hidden></pre>
-          <p id="storage-cleanup-status" class="dialog-status" role="status">Read-only census · cleanup execution remains unavailable.</p>
+          <button id="execute-storage-cleanup" class="danger-button" type="button" hidden disabled>Remove exact reviewed scope</button>
+          <p id="storage-cleanup-status" class="dialog-status" role="status">Select a category to inspect its current exact scope.</p>
         </section>
       </section>
 

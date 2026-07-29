@@ -60,9 +60,9 @@ Dir.mktmpdir("soul-storage-a1-") do |sandbox|
   File.write(File.join(production, "model.gguf"), "model")
   old_log = File.join(logs, "old.json"); File.write(old_log, "old log"); File.utime(old, old, old_log)
   File.write(File.join(logs, "current.json"), "current log")
-  failure = File.join(quarantine, "failure.json"); File.write(failure, "failure"); File.utime(old, old, quarantine)
+  failure = File.join(quarantine, "failure.json"); File.write(failure, "failure"); File.utime(old, old, failure); File.utime(old, old, quarantine)
 
-  known = File.join(temp, "soul-acestep-cpp-review-old"); Dir.mkdir(known); File.write(File.join(known, "trace"), "trace"); File.utime(old, old, known)
+  known = File.join(temp, "soul-acestep-cpp-review-old"); Dir.mkdir(known); known_trace = File.join(known, "trace"); File.write(known_trace, "trace"); File.utime(old, old, known_trace); File.utime(old, old, known)
   recent = File.join(temp, "soul-whisper-recent"); Dir.mkdir(recent); File.write(File.join(recent, "trace"), "trace")
   unknown = File.join(temp, "soul-mystery-state"); Dir.mkdir(unknown); File.write(File.join(unknown, "state"), "state"); File.utime(old, old, unknown)
 
@@ -78,7 +78,7 @@ Dir.mktmpdir("soul-storage-a1-") do |sandbox|
   temp_preview = assessor.preview(category: "temp_review_artifacts")
   temp_entries = temp_preview.dig("data", "entries")
   check.call("temporary preview includes only owned allowlisted aged entries", temp_preview["lifecycle_state"] == "complete" && temp_entries.length == 1 && temp_entries.first["path"].end_with?("soul-acestep-cpp-review-old"))
-  check.call("preview binds exact scope but exposes no execution", temp_preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/) && temp_preview.dig("data", "execution_available") == false)
+  check.call("preview binds exact scope for the later A3 execution gate", temp_preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/) && temp_preview.dig("data", "execution_available") == true)
 
   log_preview = assessor.preview(category: "expired_project_logs")
   check.call("log preview includes old regular files but not current logs", log_preview.dig("data", "entries").length == 1 && log_preview.dig("data", "entries", 0, "path").end_with?("old.json"))
@@ -94,10 +94,10 @@ Dir.mktmpdir("soul-storage-a1-") do |sandbox|
   service = SoulCore::SelfImprovementService.new(root: root, storage_assessor: assessor, environment_assessor: Object.new, assessment_timeout_seconds: 2)
   storage = service.refresh(scope: "storage")
   check.call("Self Assessment exposes Storage as an explicit foreground scope", SoulCore::SelfImprovementService::SCOPES.include?("storage") && storage["lifecycle_state"] == "complete" && storage.dig("data", "assessment_scope") == "storage")
-  check.call("application contract exposes preview without execute", SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.preview") && !SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.execute"))
+  check.call("application contract retains preview and adds the exact A3 execute gate", SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.preview") && SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.execute"))
   facade = SoulCore::ApplicationFacade.new(root: root, self_improvement_service: service)
   envelope = facade.call({ "schema_version" => "soul.application.v1", "request_id" => "storage-preview-fixture", "operation" => "storage_retention.cleanup.preview", "parameters" => { "category" => "temp_review_artifacts" }, "context" => { "interface" => "dashboard_test" } })
-  check.call("application facade dispatches the read-only preview contract", envelope["lifecycle_state"] == "complete" && envelope.dig("data", "execution_available") == false)
+  check.call("application facade dispatches the exact preview contract", envelope["lifecycle_state"] == "complete" && envelope.dig("data", "execution_available") == true)
 
   check.call("read-only assessment and previews changed no fixture content", File.read(old_log) == "old log" && File.read(failure) == "failure" && File.directory?(known) && File.directory?(quarantine))
 end
@@ -105,10 +105,11 @@ end
 html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 js = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
 brief = File.read(File.join(__dir__, "../docs/soul/STORAGE_AND_RETENTION_A1_BRIEF.md"))
+execute_brief = File.read(File.join(__dir__, "../docs/soul/BOUNDED_STORAGE_CLEANUP_A3_BRIEF.md"))
 storage_renderer = js[/function renderStorageRetention\(report\).*?(?=\nasync function previewStorageCleanup)/m].to_s
-check.call("dashboard exposes Storage inventory and preview-only category control", html.include?('data-assessment-scope="storage"') && html.include?('id="preview-storage-cleanup"') && js.include?("storage_retention.cleanup.preview"))
+check.call("dashboard exposes Storage inventory plus separate preview and execute controls", html.include?('data-assessment-scope="storage"') && html.include?('id="preview-storage-cleanup"') && html.include?('id="execute-storage-cleanup"') && js.include?("storage_retention.cleanup.preview") && js.include?("storage_retention.cleanup.execute"))
 check.call("dashboard storage inspection remains manual and timer-free", !storage_renderer.match?(/setInterval|setTimeout|requestAnimationFrame/) && storage_renderer.include?("point-in-time only"))
-check.call("approved brief prohibits automatic or destructive cleanup", brief.include?("A1 registers no cleanup execute operation") && brief.include?("scheduled cleanup") && brief.include?("never followed"))
+check.call("A1 remains historical and A3 separately prohibits automatic cleanup", brief.include?("A1 registers no cleanup execute operation") && execute_brief.include?("No cleanup runs automatically") && execute_brief.include?("timer, scheduler, watcher, daemon"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?
 puts "Storage and Retention A1 is candidate-ready for human review."
