@@ -6,6 +6,8 @@
 - Added exact public Host/Origin validation and `Secure` cookies only for requests arriving through the configured HTTPS authority.
 - Added a preview-first portable installer for exactly two user services: the Soul dashboard and a Caddy HTTPS reverse proxy.
 - Added Caddy internal TLS on an exact assigned IPv4 address and unprivileged port `8443`.
+- Added an optional strictly validated DNS public authority for Caddy TLS and
+  dashboard Host/Origin checks while retaining the exact assigned-IPv4 bind.
 - Disabled the Caddy admin API, automatic HTTP redirect listener, HTTP/3, remote ACME, on-demand TLS, and active health checks.
 - Added bounded systemd restart policies, owner-only rendered files, deterministic prerequisite gates, rollback, status, and uninstall behavior.
 - Corrected dashboard hardening to permit `AF_UNIX` for bounded communication
@@ -58,6 +60,7 @@ make dashboard-service-plan
 make dashboard-service-install
 make dashboard-service-uninstall
 scripts/soul-dashboard-service plan --lan-host <assigned-ip> --https-port 8443
+scripts/soul-dashboard-service plan --lan-host <assigned-ip> --public-host <private-dns-name> --https-port 8443
 scripts/soul-dashboard-service install --lan-host <assigned-ip> --https-port 8443 --confirmation INSTALL_SOUL_LAN_SERVICES
 scripts/soul-dashboard-service status
 curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt https://<assigned-ip>:8443/
@@ -65,7 +68,19 @@ curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt -H 'Origin: ht
 curl http://127.0.0.1:4567/
 curl --connect-timeout 3 http://<assigned-ip>:4567/
 openssl s_client -connect <assigned-ip>:8443 -CAfile ~/.local/share/caddy/pki/authorities/local/root.crt -verify_return_error
+curl --cacert ~/.local/share/caddy/pki/authorities/local/root.crt https://<private-dns-name>:8443/
+openssl s_client -connect <private-dns-name>:8443 -servername <private-dns-name> -CAfile ~/.local/share/caddy/pki/authorities/local/root.crt -verify_return_error
 ```
+
+The 2026-07-29 private-DNS activation used the confirmed installer with an
+owner-local hostname. Caddy validation and service restart completed, both
+approved user services reported active, certificate-validated HTTPS returned
+HTTP 200, and the leaf certificate exposed exactly the reviewed DNS SAN.
+Soul remained reachable on loopback while direct LAN access to port `4567`
+was refused. The focused deployment assessment passed every deterministic
+check. Chained legacy dashboard verifiers still assert that no timer exists
+anywhere in the subsequently expanded dashboard; those pre-existing
+cross-phase failures are unrelated to the deployment or hostname changes.
 
 The 2026-07-16 refresh-health repair was applied through the same confirmed
 installer. Live verification then reported both status operations `complete`,
@@ -87,6 +102,10 @@ The corrected installation completed at `2026-07-15T21:48:13Z`. Both allowlisted
 The deployment assessor verifies:
 
 - wildcard, loopback, invalid, and unassigned addresses fail closed;
+- wildcard, unqualified, malformed, injected, and mismatched-IP public
+  authorities fail closed;
+- a normalized DNS public authority drives the certificate and application
+  origin while Caddy remains bound to the exact assigned IPv4 address;
 - privileged, colliding, invalid, and out-of-range ports fail closed;
 - the valid plan returns `blocked_for_human_review` without writes;
 - the bootstrap-password state blocks deployment;
@@ -117,7 +136,11 @@ Not run. Network binding, TLS, authentication, persistence, path safety, and lif
 
 ## Known weaknesses
 
-- The initial URL uses a LAN IP and port `8443`. If DHCP changes the address, Caddy fails closed until the local configuration is deliberately regenerated. A router-side DHCP reservation is recommended but not automated.
+- The listener always uses an exact LAN IP and port `8443`. The public URL may
+  use that IP or one reviewed private DNS hostname. If the address or record
+  changes, Caddy fails closed until the local configuration is deliberately
+  regenerated. A router-side DHCP reservation is recommended but not
+  automated.
 - Each client must explicitly trust the private Caddy root CA. This is manageable for personal devices but not a substitute for a public-domain certificate architecture.
 - The installer does not alter the host firewall. A restrictive firewall may require a separate human-approved TCP `8443` rule for the trusted LAN.
 - The installer uses the current repository path. Moving or deleting the checkout breaks the Soul service until it is reinstalled from the new path.
@@ -160,6 +183,8 @@ Primary documentation reviewed:
 - [x] Soul remains reachable only on loopback port `4567`; direct LAN connection is refused.
 - [x] Caddy listens on the reviewed assigned address and TCP port `8443`.
 - [x] Local HTTPS responds with a verified Caddy chain whose leaf SAN is exactly the assigned address.
+- [x] Optional DNS authority responds with a verified Caddy chain whose leaf
+  SAN is exactly the reviewed private hostname.
 - [x] The public root CA is installed on a selected client device.
 - [x] The client browser reports a trusted HTTPS connection without bypassing a warning.
 - [x] Anonymous LAN access stays blurred and private application calls return `authentication_required` with HTTP 401.

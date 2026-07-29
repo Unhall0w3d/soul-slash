@@ -44,7 +44,7 @@ The existing systemd user manager and user lingering may be used. No root-owned 
 
 Caddy may remain running as the second user service to terminate TLS and reverse proxy to Soul. It may maintain its internal certificate authority and renew its local leaf/intermediate certificates as part of that approved service. The Caddy admin API, automatic HTTP redirect listener, active health checks, HTTP/3, remote ACME, telemetry, and on-demand TLS are disabled or unused.
 
-The initial deployment uses unprivileged TCP port `8443`; it does not grant `CAP_NET_BIND_SERVICE`, bind port 80/443, or run Caddy as root. Caddy must bind the exact configured LAN address rather than a wildcard address.
+The initial deployment uses unprivileged TCP port `8443`; it does not grant `CAP_NET_BIND_SERVICE`, bind port 80/443, or run Caddy as root. Caddy must bind the exact configured LAN address rather than a wildcard address. The operator may optionally supply one validated DNS hostname as the public TLS and application authority while the listener remains bound to that exact IPv4 address. Soul does not create or alter the corresponding DNS record.
 
 ## Portable configuration
 
@@ -68,6 +68,7 @@ The installer must terminate `blocked_for_human_review` or fail without enabling
 - Caddy is already installed from an operator-approved source;
 - the Soul project root and Ruby executable are absolute and present;
 - the LAN bind value is one exact non-loopback IPv4 address assigned to this host;
+- an optional public DNS hostname is normalized, contains at least two strict DNS labels, and cannot contain wildcards, ports, paths, or Caddyfile syntax;
 - HTTPS port is between 1024 and 65535 and is not Soul's loopback port;
 - the dashboard credential exists, is owner-only, and no longer requires bootstrap password replacement;
 - Caddy validates the rendered Caddyfile before service installation;

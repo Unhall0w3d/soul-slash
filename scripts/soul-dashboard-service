@@ -10,6 +10,7 @@ until ARGV.empty?
   argument = ARGV.shift
   case argument
   when "--lan-host" then options[:lan_host] = ARGV.shift
+  when "--public-host" then options[:public_host] = ARGV.shift
   when "--https-port" then options[:https_port] = ARGV.shift
   when "--confirmation" then options[:confirmation] = ARGV.shift
   else
@@ -21,15 +22,15 @@ end
 deployment = SoulCore::DashboardDeployment.new(root: File.expand_path("..", __dir__))
 result = case command
          when "plan"
-           deployment.plan(lan_host: options[:lan_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT)
+           deployment.plan(lan_host: options[:lan_host], public_host: options[:public_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT)
          when "install"
-           deployment.install(lan_host: options[:lan_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT, confirmation: options[:confirmation])
+           deployment.install(lan_host: options[:lan_host], public_host: options[:public_host], https_port: options[:https_port] || SoulCore::DashboardDeployment::DEFAULT_HTTPS_PORT, confirmation: options[:confirmation])
          when "status"
            deployment.status
          when "uninstall"
            deployment.uninstall(confirmation: options[:confirmation])
          else
-           warn "Usage: scripts/soul-dashboard-service plan|install|status|uninstall [--lan-host IP] [--https-port PORT] [--confirmation PHRASE]"
+           warn "Usage: scripts/soul-dashboard-service plan|install|status|uninstall [--lan-host IP] [--public-host DNS_NAME] [--https-port PORT] [--confirmation PHRASE]"
            exit 1
          end
 

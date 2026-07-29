@@ -325,10 +325,10 @@
       "status": "done",
       "priority": "low",
       "summary": "Seven-day authenticated local Dashboard, optional reviewed LAN boundary, and Daily, AMD-Free, and Music Core transitions are implemented.",
-      "implementation": "A Ruby HTTP application serves the authenticated local Dashboard and application API. Password bootstrap/change, salted credentials, CSRF protection, seven-day sessions, Caddy LAN TLS guidance, responsive mobile Chat, model-runtime leases, digest-bound manual Core transitions, and terminal completion of accepted bounded streams preserve a loopback-first authority boundary.",
+      "implementation": "A Ruby HTTP application serves the authenticated local Dashboard and application API. Password bootstrap/change, salted credentials, CSRF protection, seven-day sessions, Caddy LAN TLS with an optional validated private-DNS authority over the exact-IP bind, responsive mobile Chat, model-runtime leases, digest-bound manual Core transitions, and terminal completion of accepted bounded streams preserve a loopback-first authority boundary.",
       "technologies": "Ruby dashboard server and services; vanilla JavaScript/HTML/CSS; systemd user units for the explicitly installed persistent deployment; Caddy for optional LAN HTTPS; Ollama/Vulkan and llama.cpp/CUDA model runtimes.",
       "interfaces": "Dashboard top bar Core selector, Self Assessment runtime cards, Makefile setup/status targets, and Ruby application operations.",
-      "commands": "make dashboard\nmake dashboard-service-status\nmake model-runtime-amd-status\nmake model-runtime-startup-status",
+      "commands": "make dashboard\nmake dashboard-service-plan LAN_HOST=<assigned-ip> [DASHBOARD_PUBLIC_HOST=<dns-name>]\nmake dashboard-service-status\nmake model-runtime-amd-status\nmake model-runtime-startup-status",
       "references": "docs/GETTING_STARTED.md\ndocs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md\ndocs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md",
       "acceptance": "Authentication, refresh persistence, active-work checks, model identity, and manual Core selection continue to pass regression review.",
       "source": "Implemented foundations"

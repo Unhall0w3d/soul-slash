@@ -1,6 +1,6 @@
 # Local systemd and LAN HTTPS Deployment
 
-This deployment keeps Soul itself on loopback and places a Caddy-managed HTTPS endpoint on one exact address assigned to the current Linux machine.
+This deployment keeps Soul itself on loopback and places a Caddy-managed HTTPS endpoint on one exact address assigned to the current Linux machine. An optional private DNS hostname may provide the TLS and application authority without changing that exact listener bind.
 
 ```text
 LAN browser → https://<assigned-ip>:8443 → Caddy → http://127.0.0.1:4567 → Soul
@@ -27,6 +27,14 @@ Use the machine's exact assigned LAN address:
 make dashboard-service-plan LAN_HOST=192.168.1.50
 ```
 
+If a reviewed private DNS record already maps to that address:
+
+```bash
+make dashboard-service-plan \
+  LAN_HOST=192.168.1.50 \
+  DASHBOARD_PUBLIC_HOST=soul.home.arpa
+```
+
 The plan validates the address, port, Caddy and systemd executables, administrator credential state, exact rendered paths, and rollback boundary. It writes nothing and returns `blocked_for_human_review` with the confirmation phrase.
 
 ## Install
@@ -36,8 +44,13 @@ After reviewing the exact plan:
 ```bash
 make dashboard-service-install \
   LAN_HOST=192.168.1.50 \
+  DASHBOARD_PUBLIC_HOST=soul.home.arpa \
   CONFIRM=INSTALL_SOUL_LAN_SERVICES
 ```
+
+Use the same `DASHBOARD_PUBLIC_HOST` in preview and install. Omit it from both
+commands when the assigned IPv4 address itself should remain the public HTTPS
+authority.
 
 The foreground installer validates the generated Caddyfile before writing local files, renders owner-only configuration, reloads the user manager, and enables exactly:
 
@@ -65,7 +78,7 @@ If service activation fails, both services are disabled and stopped. Private dat
 
 The environment file contains only the loopback bind, loopback port, and exact public HTTPS origin. Existing provider/model configuration remains in the ignored project `.env`.
 
-To use a different unprivileged HTTPS port in the plan and install targets, set `DASHBOARD_HTTPS_PORT=<port>` on both Make invocations. Machine-specific values are invocation-only and are not committed.
+To use a different unprivileged HTTPS port in the plan and install targets, set `DASHBOARD_HTTPS_PORT=<port>` on both Make invocations. `DASHBOARD_PUBLIC_HOST` accepts one normalized DNS hostname and rejects wildcards, URL syntax, unqualified names, and mismatched IP addresses. Machine-specific values are invocation-only and are not committed. Soul never creates the DNS record.
 
 ## Status and logs
 
@@ -95,7 +108,7 @@ Installing a private CA grants it trust on that device. Restrict the Caddy state
 ## Security boundary
 
 - Soul continues rejecting wildcard and LAN bind addresses.
-- Only the configured HTTPS Host and Origin are added to the browser allowlist.
+- Only the configured HTTPS Host and Origin—assigned IP or optional reviewed DNS hostname—are added to the browser allowlist.
 - Remote session cookies are `Secure`, `HttpOnly`, `SameSite=Strict`, and host-only.
 - Caddy's admin API, automatic HTTP redirect listener, HTTP/3, active health checking, remote ACME, and on-demand TLS are not used.
 - The deployment does not change router, DNS, DHCP, firewall, or Internet exposure.
