@@ -1,0 +1,27 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+readonly VERSION="soul-crucible-maintenance-d1-v1"
+
+fail_closed() {
+  printf '%s\n' "$1" >&2
+  exit 64
+}
+
+[[ "$(id -u)" == "0" ]] || fail_closed "root authority is required"
+[[ "$#" == "1" ]] || fail_closed "argument count is invalid"
+
+case "$1" in
+  self-check)
+    printf '{"version":"%s","arbitrary_command_forwarding":false,"password_storage":false}\n' "$VERSION"
+    ;;
+  dnf5-upgrade)
+    exec /usr/bin/dnf5 -y upgrade --refresh
+    ;;
+  reboot)
+    exec /usr/bin/systemctl reboot
+    ;;
+  *)
+    fail_closed "operation is invalid"
+    ;;
+esac

@@ -85,23 +85,51 @@ timer. Nightly reconciliation remains a later, separately reviewed gate.
 
 ## Guided Maintenance state
 
-The first Dashboard integration is deliberately read-only. A Crucible card may
-collect:
+Crucible always begins as a read-only SSH inventory card. It collects:
 
 - live DNF5 available-update counts;
 - running and available kernel evidence;
 - DNF5 reboot evidence;
 - SSH and QEMU guest-agent state.
 
-The card does not expose Maintenance or Reboot buttons. DNF5 mutation,
-privilege delegation, rollback, reboot, and readiness checks require their own
-reviewed gate.
+Maintenance and Reboot appear only after installing the separately reviewed
+D1 authority. This authority stores no password and does not grant direct
+passwordless access to DNF5, systemctl, a shell, or an interpreter. It installs
+one root-owned, SHA-256-bound helper that accepts exactly:
+
+- `self-check`;
+- `dnf5-upgrade`, which runs `/usr/bin/dnf5 -y upgrade --refresh`; or
+- `reboot`, which runs `/usr/bin/systemctl reboot`.
+
+Review and install it from the owner workstation:
+
+```bash
+make verify-crucible-maintenance-control
+make crucible-maintenance-authority-plan
+make crucible-maintenance-authority-install \
+  EXPECTED_DIGEST=<reviewed digest> \
+  CONFIRM=INSTALL_CRUCIBLE_MAINTENANCE_AUTHORITY
+make crucible-maintenance-authority-status
+```
+
+The one-time bootstrap replaces Fedora cloud-init's broad
+`souladmin NOPASSWD:ALL` rule with the exact helper operations. The Dashboard
+will continue to show Crucible as inventory-only if the helper self-check is
+missing or invalid.
+
+Maintenance is one foreground, device-scoped DNF5 transaction with a terminal
+receipt and no automatic reboot. Reboot remains a separate digest-bound gate.
+After one reboot request, Soul requires a changed boot identity plus active
+SSH and QEMU guest agent, working DNF5, the `/srv/soul-backup` mount, and the
+exact authority self-check. It never retries the reboot request.
 
 ## Verification
 
 ```bash
 make verify-crucible-fedora-status
+make verify-crucible-maintenance-control
 make verify-maintenance-fleet-status
+make verify-maintenance-device-control
 ```
 
 For the live guest, confirm cloud-init completion, a changed boot ID after a
