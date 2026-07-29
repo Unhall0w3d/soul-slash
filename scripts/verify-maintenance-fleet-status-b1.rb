@@ -263,6 +263,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
 
   source = File.read(File.join(__dir__, "../lib/soul_core/maintenance_fleet_status_service.rb"))
   dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
+  stylesheet = File.read(File.join(__dir__, "../assets/dashboard/dashboard.css"))
   check.call("public service defaults contain no operator-specific RFC1918 addresses",
              !source.match?(/\b192\.168\.\d{1,3}\.\d{1,3}\b/))
   check.call("dashboard suppresses mutation controls for status-only and inventory-only devices",
@@ -273,6 +274,11 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              dashboard.include?('callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }') &&
                dashboard.include?('["Checked", observedLabel]') &&
                dashboard.include?("only this device was probed"))
+  check.call("dashboard keeps SSH-integrated inventory ahead of compact status-only cards",
+             dashboard.include?("function maintenanceDeviceDisplayOrder(devices)") &&
+               dashboard.include?("Number(maintenanceDeviceIsStatusOnly(left.device))") &&
+               dashboard.include?("maintenanceDeviceDisplayOrder(data.devices).forEach") &&
+               stylesheet.match?(/\.maintenance-device-card--status-only\s*\{[^}]*align-self:start/))
   check.call("dashboard presents route flow as WAN to gateway to LAN and keeps secondary relationships below",
              dashboard.include?("maintenance-network-map") &&
                dashboard.include?("WAN & provider cloud") &&

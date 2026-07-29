@@ -268,16 +268,17 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-device-actions .gate-button { width:100%; min-width:0; }
 .maintenance-device-refresh { grid-column:1/-1; }
 .maintenance-status-only { grid-column:1/-1; margin:0; color:#86A5AE; font:10px/1.5 var(--mono); text-transform:uppercase; letter-spacing:.06em; }
-.maintenance-device-card--status-only { grid-column:span 1; min-height:0; padding:14px 15px 13px; }
+.maintenance-device-card--status-only { grid-column:span 1; align-self:start; min-height:0; padding:14px 15px 13px; }
 .maintenance-device-card--status-only>header { align-items:center; }
 .maintenance-device-card--status-only h3 { margin:2px 0 0; font-size:21px; }
 .maintenance-device-card--status-only .eyebrow { font-size:10px; }
 .maintenance-status-only-controls { display:flex; align-items:center; gap:8px; }
 .maintenance-status-only-controls .maintenance-device-refresh { min-width:70px; min-height:34px; padding:6px 10px; }
 .maintenance-status-only-evidence { display:flex; flex-wrap:wrap; gap:6px 13px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(167,123,91,.1); }
-.maintenance-status-only-evidence span { color:#76939B; font:9px/1.45 var(--mono); text-transform:uppercase; }
+.maintenance-status-only-evidence span { color:#76939B; font:10px/1.45 var(--mono); text-transform:uppercase; }
 .maintenance-status-only-evidence strong { color:#91ABB3; font-weight:500; }
 .maintenance-status-only-evidence span[data-state="active"] { color:#76CFA6; }
+.maintenance-status-only-evidence span[data-state="unavailable"] { color:#D8BD72; }
 .maintenance-status-only-evidence span[data-state="failed"] { color:#F17A8E; }
 .maintenance-reboot-button { border-color:rgba(196,161,98,.46); color:var(--gold-light); }
 .maintenance-device-dialog { width:min(760px,calc(100vw - 32px)); }
