@@ -80,6 +80,12 @@ Dir.mktmpdir("soul-backup-retention-") do |sandbox|
   check.call("exact manifest replay is idempotent",
     replay["ok"] && replay["mutation"] == "none" && replay.dig("data", "new_deletion_count").zero?)
 
+  altered_replay = initial.merge("paths" => (initial.fetch("paths") - [paths[:chat]]))
+  altered_replay_result = service.observe_preview(manifest: altered_replay)
+  check.call("an altered manifest cannot replay a recorded snapshot ID",
+    altered_replay_result["lifecycle_state"] == "awaiting_input" &&
+      altered_replay_result["reason"].include?("snapshot replay differs"))
+
   second_time = current_time + (5 * 24 * 60 * 60)
   second = manifest.call(id: "b", at: second_time, entries: [paths[:tracker], paths[:music]])
   deletion_preview = service.observe_preview(manifest: second)
@@ -158,12 +164,82 @@ Dir.mktmpdir("soul-backup-retention-") do |sandbox|
     new_hold.fetch("detected_at") == fifth_time.iso8601 &&
       new_hold.fetch("protective_snapshot_id") == snapshot_id.call("d"))
 
-  changed_roots = manifest.call(id: "1", at: fifth_time + 60, entries: [paths[:tracker]], roots: ["/home/operator/Projects"])
-  root_result = service.observe_preview(manifest: changed_roots)
-  check.call("source-root changes cannot be interpreted as deletion",
-    root_result["lifecycle_state"] == "awaiting_input" && root_result["reason"].include?("source roots changed"))
+  added_root = "/home/operator/.config/soul"
+  added_path = "#{added_root}/runtime.env"
+  sixth_time = fifth_time + 60
+  expanded = manifest.call(
+    id: "1",
+    at: sixth_time,
+    entries: [paths[:tracker], paths[:music], added_path],
+    roots: [root, added_root]
+  )
+  expanded_preview = service.observe_preview(manifest: expanded)
+  prior_ledger = JSON.parse(File.read(ledger_path))
+  prior_hold = prior_ledger.fetch("holds").first
+  check.call("strict source-root additions are disclosed and bound into preview",
+    expanded_preview["ok"] &&
+      expanded_preview.dig("data", "source_root_addition_count") == 1 &&
+      expanded_preview.dig("data", "source_root_addition_digests") == [Digest::SHA256.hexdigest(added_root)] &&
+      expanded_preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/))
 
-  failed_check = manifest.call(id: "2", at: fifth_time + 60, entries: [paths[:tracker]], result: "failed")
+  expanded_result = service.observe_execute(
+    manifest: expanded,
+    confirmation: expanded_preview.dig("data", "confirmation_phrase"),
+    expected_digest: expanded_preview.dig("data", "expected_digest")
+  )
+  expanded_ledger = JSON.parse(File.read(ledger_path))
+  check.call("approved additive expansion advances roots without resetting deletion holds",
+    expanded_result["ok"] &&
+      expanded_result.dig("data", "source_root_addition_count") == 1 &&
+      expanded_ledger.dig("last_verified_snapshot", "source_roots") == [added_root, root].sort &&
+      expanded_ledger.fetch("holds").first == prior_hold)
+
+  seventh_time = sixth_time + 60
+  added_root_deletion = manifest.call(
+    id: "8",
+    at: seventh_time,
+    entries: [paths[:tracker], paths[:music]],
+    roots: [root, added_root]
+  )
+  added_root_deletion_preview = service.observe_preview(manifest: added_root_deletion)
+  added_root_deletion_result = service.observe_execute(
+    manifest: added_root_deletion,
+    confirmation: added_root_deletion_preview.dig("data", "confirmation_phrase"),
+    expected_digest: added_root_deletion_preview.dig("data", "expected_digest")
+  )
+  expanded_ledger = JSON.parse(File.read(ledger_path))
+  added_path_hold = expanded_ledger.fetch("holds").find { |hold| hold.fetch("path") == added_path }
+  check.call("a later deletion inside the added root receives the normal 30-day protection",
+    added_root_deletion_result["ok"] &&
+      added_path_hold.fetch("protective_snapshot_id") == snapshot_id.call("1") &&
+      Time.iso8601(added_path_hold.fetch("hold_until")) - Time.iso8601(added_path_hold.fetch("detected_at")) == 30 * 24 * 60 * 60)
+
+  removal = manifest.call(
+    id: "6",
+    at: seventh_time + 60,
+    entries: [paths[:tracker], paths[:music]],
+    roots: [root]
+  )
+  root_result = service.observe_preview(manifest: removal)
+  check.call("source-root removal cannot be interpreted as deletion",
+    root_result["lifecycle_state"] == "awaiting_input" &&
+      root_result["reason"].include?("removed or replaced") &&
+      JSON.parse(File.read(ledger_path)) == expanded_ledger)
+
+  replacement_root = "/home/operator/.local/share/soul"
+  replacement = manifest.call(
+    id: "7",
+    at: seventh_time + 60,
+    entries: [paths[:tracker], paths[:music], "#{replacement_root}/state.json"],
+    roots: [root, replacement_root]
+  )
+  replacement_result = service.observe_preview(manifest: replacement)
+  check.call("source-root replacement remains blocked even when root count is unchanged",
+    replacement_result["lifecycle_state"] == "awaiting_input" &&
+      replacement_result["reason"].include?("removed or replaced") &&
+      JSON.parse(File.read(ledger_path)) == expanded_ledger)
+
+  failed_check = manifest.call(id: "2", at: seventh_time + 60, entries: [paths[:tracker]], result: "failed")
   verification_result = service.observe_preview(manifest: failed_check)
   check.call("unverified snapshots cannot advance deletion detection",
     verification_result["lifecycle_state"] == "awaiting_input" && verification_result["reason"].include?("verification"))
@@ -173,12 +249,12 @@ Dir.mktmpdir("soul-backup-retention-") do |sandbox|
   check.call("clock rollback cannot advance the ledger",
     rollback_result["lifecycle_state"] == "awaiting_input" && rollback_result["reason"].include?("monotonically"))
 
-  outside = manifest.call(id: "4", at: fifth_time + 60, entries: ["/etc/shadow"])
+  outside = manifest.call(id: "4", at: seventh_time + 60, entries: ["/etc/shadow"])
   outside_result = service.observe_preview(manifest: outside)
   check.call("paths outside the verified source roots are rejected",
     outside_result["lifecycle_state"] == "awaiting_input" && outside_result["reason"].include?("escapes"))
 
-  changed_repository = manifest.call(id: "5", at: fifth_time + 60, entries: paths.values).merge("repository_id" => "9" * 64)
+  changed_repository = manifest.call(id: "5", at: seventh_time + 60, entries: paths.values, roots: [root, added_root]).merge("repository_id" => "9" * 64)
   repository_result = service.observe_preview(manifest: changed_repository)
   check.call("repository identity changes cannot join one deletion ledger",
     repository_result["lifecycle_state"] == "awaiting_input" && repository_result["reason"].include?("repository identity changed"))

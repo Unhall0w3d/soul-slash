@@ -169,16 +169,19 @@ that still contains a recently deleted file.
 For every verified snapshot, Soul records:
 
 - repository identity;
-- unchanged source roots;
+- source roots, allowing only a strict verified superset of the preceding set;
 - the sorted path inventory;
 - snapshot ID and verification time;
 - holds created for paths present in the preceding snapshot but absent now.
 
 Each hold protects the preceding snapshot until 30 full days after detection.
 Later captures do not reset the clock. A verified reappearance resolves the
-hold. Retention fails closed when the ledger is absent/corrupt, repository or
-source identity changes, verification fails, or a selected snapshot is
-protected. A hold expiring permits review; it does not itself delete anything.
+hold. An additive source-root expansion is disclosed by count and path digest
+and bound into the exact observation approval. Removing or replacing any prior
+root remains blocked because that could otherwise be misread as mass deletion.
+Retention also fails closed when the ledger is absent/corrupt, repository
+identity changes, verification fails, or a selected snapshot is protected. A
+hold expiring permits review; it does not itself delete anything.
 
 The ledger, manifests, and receipts are owner-private:
 
