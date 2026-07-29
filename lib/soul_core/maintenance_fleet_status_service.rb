@@ -920,6 +920,8 @@ module SoulCore
     def build_topology(devices)
       proxmox = devices.find { |device| device.dig("facts", "platform") == "proxmox" }
       proxmox_id = proxmox ? proxmox.fetch("id") : "proxmox"
+      second_copy = devices.find { |device| device.dig("facts", "control_target_id") == "crucible" }
+      second_copy_id = second_copy ? second_copy.fetch("id") : proxmox_id
       network = local_network_context
       gateway_device = devices.find { |device| device["address"] == network["gateway_address"] }
       gateway_node = gateway_device && {
@@ -955,7 +957,12 @@ module SoulCore
         {"from" => proxmox_id, "to" => "pihole", "label" => "hosts LXC 100", "kind" => "containment"},
         {"from" => WORKSTATION_ID, "to" => "pihole", "label" => "primary DNS", "kind" => "dns"},
         {"from" => "pihole", "to" => "internet", "label" => "Unbound recursion · Quad9 fallback", "kind" => "upstream"},
-        {"from" => WORKSTATION_ID, "to" => proxmox_id, "label" => "second-copy target · planned", "kind" => "backup_planned"}
+        {
+          "from" => WORKSTATION_ID,
+          "to" => second_copy_id,
+          "label" => second_copy ? "encrypted second copy · active" : "second-copy target · planned",
+          "kind" => second_copy ? "backup" : "backup_planned"
+        }
       ]
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}

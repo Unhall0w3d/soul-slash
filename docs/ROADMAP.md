@@ -40,9 +40,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
-- [~] review and install A4's digest-bound root-owned fixed-operation authority
-  for zero-password, deterministic workstation maintenance; live acceptance remains
-  pending
+- [~] A4's digest-bound root-owned fixed-operation authority is live-accepted
+  for zero-prompt A2 workstation maintenance; the separate A3
+  maintenance/reboot/restoration acceptance remains
 
 ## Qualified expansion candidates
 
@@ -64,8 +64,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation is accepted; Crucible storage is deployed and its bounded manual second-copy gate is candidate-complete, while live second-copy acceptance, nightly reconciliation, and full recovery remain
-- [~] reviewed Proxmox deployment now provides Crucible, a Fedora 44 KVM backup target and read-only DNF5 laboratory; DNF5 mutation and remote backup initialization remain separate gates
+- [~] backup and disaster-recovery local foundation and Crucible's bounded manual encrypted second copy are accepted; remote retention, nightly reconciliation, and full recovery remain
+- [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review
 

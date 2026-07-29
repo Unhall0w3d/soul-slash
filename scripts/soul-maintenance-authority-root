@@ -18,6 +18,7 @@ OWNER_NAME = @@OWNER_NAME@@
 OWNER_HOME = @@OWNER_HOME@@
 QUALIFIED_HOSTNAME = @@HOSTNAME@@
 QUALIFIED_YAY_VERSION = @@YAY_VERSION@@
+MAX_SUDO_ANCESTRY_DEPTH = 3
 
 HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
 STATE_ROOT = "/run/soul-maintenance-authority"
@@ -292,13 +293,20 @@ def validate_pacman_bridge!(state, transaction, operations, argv)
     yay["start_ticks"] == active["yay_start_ticks"] &&
     yay["exe"] == File.realpath(PATHS.fetch("yay"))
 
-  caller_parent = process_identity(Process.ppid)
-  ancestry_matches = caller_parent["pid"] == yay["pid"]
-  unless ancestry_matches
-    fail_closed("pacman bridge caller is not sudo") unless caller_parent["exe"] == File.realpath(PATHS.fetch("sudo"))
-    ancestry_matches = caller_parent["ppid"] == yay["pid"]
+  ancestor = process_identity(Process.ppid)
+  ancestry_matches = false
+  (MAX_SUDO_ANCESTRY_DEPTH + 1).times do
+    if ancestor["pid"] == yay["pid"]
+      ancestry_matches =
+        ancestor["start_ticks"] == yay["start_ticks"] &&
+        ancestor["exe"] == yay["exe"]
+      break
+    end
+    break unless ancestor["exe"] == File.realpath(PATHS.fetch("sudo"))
+
+    ancestor = process_identity(ancestor["ppid"])
   end
-  fail_closed("pacman bridge is not descended from active yay") unless ancestry_matches
+  fail_closed("pacman bridge is not descended through bounded sudo ancestry from active yay") unless ancestry_matches
 
   fail_closed("pacman bridge command is empty") unless argv.is_a?(Array) && argv.length.between?(2, 256)
   fail_closed("pacman bridge executable changed") unless argv.first == PATHS.fetch("pacman")

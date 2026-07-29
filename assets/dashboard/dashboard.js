@@ -2609,7 +2609,7 @@ function renderMaintenanceTopology(topology) {
   const relationshipSection = document.createElement("section"); relationshipSection.className = "maintenance-topology-relationships";
   const relationshipHeading = document.createElement("div"); relationshipHeading.className = "maintenance-network-tier-heading";
   const relationshipEyebrow = document.createElement("p"); relationshipEyebrow.className = "eyebrow"; relationshipEyebrow.textContent = "Operational relationships";
-  const relationshipTitle = document.createElement("strong"); relationshipTitle.textContent = "Management, services & planned paths";
+  const relationshipTitle = document.createElement("strong"); relationshipTitle.textContent = "Management, services & data paths";
   relationshipHeading.append(relationshipEyebrow, relationshipTitle);
   const links = document.createElement("div"); links.className = "maintenance-topology-links";
   relationships.forEach((edge) => {

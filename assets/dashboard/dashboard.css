@@ -327,6 +327,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .maintenance-topology-relationships { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
 .maintenance-topology-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:7px; margin-top:10px; }
 .maintenance-topology-links>div { padding:9px 10px; border-left:2px solid rgba(58,174,223,.45); background:rgba(58,174,223,.035); }
+.maintenance-topology-links>div[data-kind="backup"],
 .maintenance-topology-links>div[data-kind="backup_planned"] { border-left-color:var(--gold); background:rgba(196,161,98,.035); }
 .maintenance-topology-links span,.maintenance-topology-links strong { display:block; }
 .maintenance-topology-links span { color:#617B85; font:9px var(--mono); text-transform:uppercase; }

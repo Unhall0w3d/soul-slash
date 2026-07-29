@@ -309,7 +309,7 @@ window/workspace restoration inventory; closing the evidence terminal does not
 invalidate the reviewed update plan. A3 captures and binds its own fresh
 restore state separately before reboot.
 
-## A4 unattended fixed-operation authority candidate
+## A4 unattended fixed-operation authority
 
 A4 removes the routine password and package questions without storing a
 password and without granting passwordless access to yay, pacman, Flatpak,
@@ -327,14 +327,18 @@ fixed, target-free policy: no clean rebuild, no diff review, no PKGBUILD edit,
 upgrade the reviewed set, retain make dependencies, and proceed
 noninteractively. During that exact active operation, yay's pacman calls return
 through a helper bridge bound to its recorded PID/start identity. The bridge
-rejects removal, database operations, alternate roots/configuration paths, and
-non-pacman execution. The public surface still accepts no executable, package
-target, path, option, or free-form answer. Flatpak uses its native
-`--noninteractive` system update.
+permits only a short bounded chain of exact sudo monitor processes before that
+recorded yay identity, and rejects removal, database operations, alternate
+roots/configuration paths, and non-pacman execution. The public surface still
+accepts no executable, package target, path, option, or free-form answer.
+Flatpak uses its native `--noninteractive` system update.
 
 The visible terminal remains an audit and cancellation surface. Package-manager
 errors stop the transaction; there is no model-driven prompt answering or
 automatic retry. A3 reboot still requires its exact pending restore journal.
+The package-only A2 path completed supervised live acceptance on 2026-07-29:
+Arch/AUR and system Flatpak both completed with zero password prompts and no
+reboot request. A3 zero-prompt reboot/restoration acceptance remains separate.
 
 Review and deployment commands:
 
