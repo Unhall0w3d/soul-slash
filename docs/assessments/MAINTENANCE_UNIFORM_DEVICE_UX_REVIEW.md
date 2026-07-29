@@ -29,6 +29,10 @@ reviewed action.
 - Corrected the legacy A3 executor so the separately presented reboot action
   requires an empty package-command list. A3 now captures, reboots, and
   restores without replaying `yay` or Flatpak.
+- Repaired the live A2-to-A3 integration boundary exposed by the Atelier
+  preview. Restore-registry identity and window-summary evidence now travel
+  beside the package-only A2 plan, so A3 can bind them without making the A2
+  maintenance digest depend on changing desktop state.
 - Replaced the workstation card label **Maintenance** with the action-oriented
   **Maintain**.
 
@@ -37,6 +41,7 @@ reviewed action.
 - `assets/dashboard/dashboard.js`
 - `assets/dashboard/index.html`
 - `assets/dashboard/dashboard.css`
+- `lib/soul_core/maintenance_foreground_execution_service.rb`
 - `lib/soul_core/maintenance_reboot_restore_service.rb`
 - `lib/soul_core/maintenance_transaction_runner.rb`
 - `docs/soul/schemas/maintenance_transaction.schema.json`
@@ -85,6 +90,12 @@ installed native handler. The open dialog advanced automatically to the
 reviewed A4 plan, displayed the fixed helper vectors, and exposed an enabled
 read-only **Maintain Atelier** click gate. The dialog was closed without
 executing maintenance.
+
+The first live **Reboot** preview then exposed a missing restore-evidence
+projection between the real A2 and A3 services. The repair is covered by the
+foreground and reboot deterministic suites: A2's package digest remains stable
+as windows change, while A3 receives the current restore-registry digest and
+window summary outside that package plan.
 
 ## Known weaknesses
 

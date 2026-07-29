@@ -240,7 +240,10 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
     "package-only maintenance digest ignores changing window and workspace inventory",
     first_window_plan.dig("data", "expected_digest") == second_window_plan.dig("data", "expected_digest") &&
       !first_window_plan.dig("data", "plan").key?("window_restore_summary") &&
-      !first_window_plan.dig("data", "plan").key?("restore_registry_digest")
+      !first_window_plan.dig("data", "plan").key?("restore_registry_digest") &&
+      first_window_plan.dig("data", "restore_evidence", "restore_registry_digest") == "b" * 64 &&
+      first_window_plan.dig("data", "restore_evidence", "window_restore_summary", "restorable_count") == 1 &&
+      second_window_plan.dig("data", "restore_evidence", "window_restore_summary", "restorable_count") == 2
   )
 
   confined_service = SoulCore::MaintenanceForegroundExecutionService.new(
