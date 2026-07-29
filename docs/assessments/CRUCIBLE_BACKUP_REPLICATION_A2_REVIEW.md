@@ -1,6 +1,6 @@
 # Crucible Backup Replication A2 Review
 
-Status: candidate implementation; human review required
+Status: live accepted on Maven
 
 ## Implemented
 
@@ -42,8 +42,12 @@ vectors, and snapshot coverage are deterministic contracts.
 
 ## Known weaknesses
 
-- Live initialization and transfer speed remain untested until the Operator
-  supplies the password through the Dashboard.
+- During the first live acceptance pass, a browser accessibility inspection
+  unexpectedly surfaced the masked password input's current value to the
+  assisting model. It did not enter commands, receipts, logs, persisted browser
+  state, or Git, and later automation remained scoped away from the credential
+  field. The repository credential must nevertheless be rotated as a separate
+  local, interactive administration action.
 - The first accepted slice performs no remote deletion, so Crucible can retain
   snapshots later removed locally.
 - Nightly execution requires a separate reviewed noninteractive credential and
@@ -66,6 +70,21 @@ fixture cannot regress to the invalid same-ID assumption. The broader Backup
 Administration, Project Timeline, portable configuration, and live fast-model
 checks remain passing.
 
+## Live acceptance
+
+On 2026-07-29 the Operator completed a fresh encrypted local capture and the
+manual Crucible copy gate through Administration → Backup & Recovery. The
+target initialized as an independent encrypted repository, received all three
+local snapshots, passed repository metadata verification, and exposed the
+cross-repository ID mismatch that prompted the lineage repair above.
+
+After deploying the repair, a fresh Dashboard preview reported three source
+snapshots, three destination snapshots, and no missing source lineages. The
+bounded copy/check gate then completed without transferring duplicate data and
+recorded a private verified receipt. The page-held repository password was
+forgotten immediately afterward. Snapshot and receipt identifiers remain in
+owner-private state rather than this repository.
+
 ## Memory, state, and lifecycle
 
 No memory keys are used. Receipts use existing owner-private backup state.
@@ -80,7 +99,9 @@ Class 4 encrypted off-device storage mutation. No destructive operation exists.
 
 - [x] Deterministic verification passes.
 - [x] Existing local backup behavior remains passing.
-- [x] No secrets appear in arguments, receipts, browser persistence, or Git.
+- [x] No secrets appear in arguments, receipts, persisted browser state, or Git.
 - [x] No deletion, scheduler, or background retry was added.
-- [ ] Live initialize/copy/check and repaired lineage reconciliation through
+- [x] Live initialize/copy/check and repaired lineage reconciliation through
   the Dashboard.
+- [ ] Rotate the local and Crucible repository credentials through a bounded
+  local interactive procedure; do not enter replacement credentials in Chat.

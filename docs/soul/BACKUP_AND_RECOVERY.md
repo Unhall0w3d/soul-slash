@@ -167,9 +167,11 @@ backup scope.
 This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
 and location. The manual Crucible gate provides an independently hosted
-encrypted second copy. It intentionally does not yet delete remote snapshots
-or run nightly; live acceptance, exact reconciliation, noninteractive
-credential handling, and a complete disaster rehearsal remain later work.
+encrypted second copy. The manual initialize/copy/check path and exact
+cross-repository lineage reconciliation were live-accepted on 2026-07-29. It
+intentionally does not yet delete remote snapshots or run nightly;
+noninteractive credential handling, remote retention policy, and a complete
+disaster rehearsal remain later work.
 
 ## Verification
 
