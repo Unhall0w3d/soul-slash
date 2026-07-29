@@ -1,6 +1,6 @@
 # Chat Progress Summaries A1 Human Review
 
-status: candidate_complete
+status: validated
 risk: Class 1 - owner-local operational state and read-only projection
 
 ## What was implemented
@@ -71,13 +71,25 @@ recovery, not model routing or response content.
 
 ## Human review checklist
 
-- [ ] Submit a message and confirm it appears before Soul's response.
-- [ ] Confirm `sending` changes to accepted only after the server accepts it.
-- [ ] Confirm one working summary updates in place rather than accumulating.
-- [ ] Navigate to another conversation and back during a longer exchange.
-- [ ] Reload during an accepted exchange and confirm active progress recovers.
-- [ ] Confirm the terminal assistant message replaces the working card.
-- [ ] Confirm the conversation rail active marker is readable and unobtrusive.
-- [ ] Confirm ordinary drafting remains possible while sending is disabled.
-- [ ] Confirm no private prompt or model-response text appears in the receipt
+- [x] Submit a message and confirm it appears before Soul's response.
+- [x] Confirm `sending` changes to accepted only after the server accepts it.
+- [x] Confirm one working summary updates in place rather than accumulating.
+- [x] Navigate to another conversation and back during a longer exchange.
+- [x] Reload during an accepted exchange and confirm active progress recovers.
+- [x] Confirm the terminal assistant message replaces the working card.
+- [x] Confirm the conversation rail active marker is readable and unobtrusive.
+- [x] Confirm ordinary drafting remains possible while sending is disabled.
+- [x] Confirm no private prompt or model-response text appears in the receipt
   progress projection.
+
+## Human review outcome
+
+```text
+Outcome: approved
+Reviewer: Operator
+Date: 2026-07-29
+Decision summary: Accepted through normal Dashboard Chat use, including the
+  provisional message, event-derived working card, navigation/reload recovery,
+  terminal reconciliation, and bounded privacy behavior.
+Required changes: none
+```
