@@ -74,7 +74,23 @@ Conditional reboot and the one-shot post-login restorer require A3.
 
 ## Storage and retention
 
-The Storage view classifies data before any cleanup system is considered. Production models, private memory, projects, accepted pilots, and finished exports are protected categories. Current cleanup manifests are preview-only; this surface has no general deletion executor.
+The Storage view classifies data before cleanup. Production models, private
+memory, chats, projects, accepted candidates and pilots, finished exports,
+credentials, backup evidence, and the Knowledge Vault are protected.
+
+Three deliberately narrow categories have an exact cleanup gate:
+
+- known Soul review residue in the system temporary directory older than
+  24 hours;
+- regular project log files older than 30 days;
+- failed `.candidate_*.partial` Music quarantine directories older than
+  24 hours when no Music lease is active.
+
+Select a category, preview every exact entry, then use the separate destructive
+button if the scope is correct. Execution repeats discovery and requires the
+same digest, ownership, age, path, type, inode, and symlink-free tree. Changed
+or oversized scopes fail closed. Cleanup is foreground-only and never runs on
+a timer, at startup, or as part of an assessment refresh.
 
 ## What Self Assessment cannot do
 
@@ -83,7 +99,7 @@ It cannot:
 - install, update, downgrade, or remove packages;
 - reboot, schedule a reboot, or change services;
 - download or delete models;
-- delete project data or memory;
+- delete protected project data or memory;
 - implement or promote skills;
 - apply a recommendation merely because an assessment found it useful.
 

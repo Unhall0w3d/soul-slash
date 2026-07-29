@@ -197,13 +197,19 @@ Restic.
 
 Backup Manifest Reconciliation A0 is live-accepted: five durable sources and
 seven portable exclusions were added with zero removal or replacement. The
-first post-reconciliation snapshot and its Crucible copy are safe, but its
-local transaction stopped before retention-ledger and receipt finalization
-because the prior ledger required exact root equality. Backup Retention
-Additive Roots A0 is the bounded repair candidate: it accepts only strict
-verified root supersets, binds additions into approval evidence, preserves
-existing holds, and still blocks every removal or replacement. No cleanup
-executor or automatic manifest mutation exists.
+strict-additive retention repair is merged and live. The final verified
+snapshot, canonical retention ledger, owner-private receipt, and accepted
+Crucible replica agree; all 32 required artifact classes are verified with no
+coverage or exclusion gaps.
+
+Bounded Storage Cleanup A3 is a candidate foreground executor for only three
+accepted categories: allowlisted temporary review residue older than 24 hours,
+regular project logs older than 30 days, and failed partial Music quarantine
+trees older than 24 hours with no active Music lease. Preview binds a
+metadata-only recursive identity; execute revalidates exact scope, stages in
+the same parent, verifies inode identity, and removes only the reviewed trees.
+Protected data and every other artifact class remain non-executable. No
+automatic cleanup or manifest mutation exists.
 
 Local Project and Document Search unifies bounded lexical retrieval across
 repository documentation, the configured Knowledge Vault, and canonical Music

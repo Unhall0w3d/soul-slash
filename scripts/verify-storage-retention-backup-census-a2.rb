@@ -169,15 +169,18 @@ end
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 brief = File.read(File.expand_path("../docs/soul/STORAGE_RETENTION_AND_BACKUP_CENSUS_A2_BRIEF.md", __dir__))
-check.call("Dashboard exposes artifact-class and backup coverage without cleanup execution",
-           html.include?("Read-only census") &&
+execute_brief = File.read(File.expand_path("../docs/soul/BOUNDED_STORAGE_CLEANUP_A3_BRIEF.md", __dir__))
+check.call("Dashboard keeps artifact census separate from the later bounded cleanup gate",
+           html.include?("point-in-time metadata") &&
              javascript.include?("artifact_classes") &&
              javascript.include?("snapshot_verified_count") &&
-             !SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.execute"))
-check.call("approved A2 brief preserves non-destructive foreground boundaries",
+             SoulCore::ApplicationContract::OPERATIONS.key?("storage_retention.cleanup.execute") &&
+             execute_brief.include?("No other artifact class becomes executable"))
+check.call("approved A2 census remains non-destructive while A3 is separately foreground-only",
            brief.include?("No cleanup execute operation is added") &&
              brief.include?("No backup, restore, replication, retention, or Git network operation runs") &&
-             brief.include?("Automatic edits to an existing owner backup manifest"))
+             brief.include?("Automatic edits to an existing owner backup manifest") &&
+             execute_brief.include?("No cleanup runs automatically"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?
 puts "Storage, Retention, and Backup Census A2 is candidate-ready for human review."
