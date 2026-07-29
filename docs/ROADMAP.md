@@ -37,6 +37,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
 - [~] review the accepted local encrypted backup, staged restore, and 30-day deletion-aware retention ledger; Crucible's manual initialize/copy/verify gate is candidate-complete, while live acceptance, remote reconciliation, and nightly execution remain
+- [~] review the metadata-only Storage & Retention A2 artifact census and
+  backup-coverage contract; the latest snapshot verifies the local Vault,
+  chats, projects, private state, and finished exports, while one reviewed
+  owner-manifest reconciliation and fresh capture remain before cleanup
+  execution is designed
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
@@ -67,6 +72,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
   remain separately qualified
 - [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
+- [ ] add a separately reviewed, bounded cleanup executor only after every
+  lifecycle-owned or age-reviewable artifact class has an accepted deletion
+  contract and protected exports remain outside project deletion boundaries
 
 ## Separate deployment tracks
 

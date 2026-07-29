@@ -186,6 +186,17 @@ explicit note as a candidate through an exact review gate. Obsidian is an
 optional human surface rather than a dependency. The vault is never watched,
 automatically synchronized, or treated as approved memory.
 
+Storage & Retention A2 now provides a read-only artifact-class and backup
+coverage census across Chat, memory, private state, Music/Visual projects,
+finished exports, Studio workflows, maintenance, staging, caches, models, and
+the local Knowledge Vault. The latest retained path manifest verifies the
+Vault, chats, core private state, creative projects, and finished exports.
+Private Git history for the Vault remains supplementary rather than replacing
+Restic. The current owner manifests still require a reviewed reconciliation for
+three newer durable continuity paths and four explicit disposable/cache
+exclusions before a fresh snapshot can prove complete current coverage. No
+cleanup executor or automatic manifest mutation exists.
+
 Local Project and Document Search unifies bounded lexical retrieval across
 repository documentation, the configured Knowledge Vault, and canonical Music
 and Visual project briefs. Results retain source adapters, canonical

@@ -83,6 +83,44 @@ exclusions omit session state, approval tokens, temporary files, and staged
 restores. Models, caches, helper environments, and other reproducible large
 material are not included by default.
 
+### Durable coverage contract
+
+The portable source defaults include the durable owner state that is intentionally
+absent from the public repository:
+
+- Chat transcripts, conversation evidence, shared memory, and owner-private
+  configuration/state;
+- Music and Visual Studio projects, references, candidates, and retained
+  workflow state;
+- Skill Studio, Self Assessment, Self Augmentation, proposals, experiments,
+  reflections, and reviewed artifacts;
+- finished Music exports under `~/Music/soul-music`;
+- the configured local Knowledge Vault, normally
+  `~/Knowledge/soul-vault`;
+- durable application receipts, artifact inbox state, executions, exports,
+  creative-flow continuity, and YouTube authorization/description-sync state.
+
+The Knowledge Vault's private Git repository is supplementary version history.
+It does not replace inclusion of the local Vault in encrypted Restic snapshots.
+Conversely, reproducible model weights and helper environments, active leases,
+browser sessions, approval tokens, request-private screen/creative-inspection
+staging, maintenance package caches, partial files, and restore staging are
+excluded from the default snapshot scope.
+
+**Self Assessment → Storage & Retention** compares the owner source/exclusion
+manifests with the latest retained path manifest. Its read-only census reports
+each artifact class's owner, retention boundary, deletion behavior, and backup
+state as latest-snapshot verified, configured but not yet verified, deliberately
+excluded, reproducible/manual-review material, or uncovered. It reads metadata
+and path inventories only; it does not accept a Restic password, inspect private
+content, change manifests, create a backup, or remove anything.
+
+Portable setup never overwrites an existing owner manifest. When the census
+finds a new durable path or missing exclusion, review and edit the owner
+manifests first, then create and verify a fresh snapshot through the normal
+Dashboard gate. Coverage is not considered proven merely because a parent
+directory exists locally.
+
 ## Dashboard flow
 
 1. Confirm no Music/Visual generation or model transition is active.
@@ -201,10 +239,12 @@ Run the deterministic fixture:
 
 ```sh
 make verify-backup-administration
+make verify-storage-retention-census
 ```
 
 It exercises locked status, exact capture authority, repository verification,
 manifest/ledger evidence, newest/minimum retention protection, dry-run and
 exact prune, staged restore, operation concurrency, application/dashboard
-contracts, and password non-persistence. See
+contracts, password non-persistence, and the metadata-only artifact coverage
+census. See
 `docs/soul/BACKUP_ADMINISTRATION_A2_REVIEW.md` for the human review checklist.
