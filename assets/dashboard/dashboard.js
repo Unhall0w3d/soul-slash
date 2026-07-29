@@ -3004,6 +3004,12 @@ function maintenanceDeviceDialogDetails(plan) {
   blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
 }
 
+function maintenanceDeviceLabel(deviceId) {
+  return state.maintenanceFleet?.devices?.find((device) => device.id === deviceId)?.label
+    || ({ maven: "Maven", forge: "Forge", pihole: "Pi-hole" }[deviceId])
+    || deviceId;
+}
+
 async function openMaintenanceDeviceAction(deviceId, action) {
   const dialog = byId("maintenance-device-dialog"); const status = byId("maintenance-device-dialog-status");
   state.maintenanceDevicePreview = null;
@@ -3011,7 +3017,8 @@ async function openMaintenanceDeviceAction(deviceId, action) {
   byId("maintenance-device-confirmation-row").hidden = true;
   byId("maintenance-maven-evidence-actions").hidden = true;
   byId("execute-maintenance-device-action").disabled = true;
-  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceId === "maven" ? "Maven" : deviceId === "forge" ? "Forge" : "Pi-hole"}`;
+  const deviceLabel = maintenanceDeviceLabel(deviceId);
+  byId("maintenance-device-dialog-title").textContent = `${action === "reboot" ? "Reboot" : "Maintain"} ${deviceLabel}`;
   if (!dialog.open) dialog.showModal();
   status.textContent = "Collecting a fresh device-scoped preview…";
   try {
@@ -3025,7 +3032,7 @@ async function openMaintenanceDeviceAction(deviceId, action) {
     const data = dataOf(envelope); const plan = data.plan;
     if (!plan) throw new Error(envelope.errors?.[0]?.message || "Device preview failed safely.");
     const normalizedPlan = deviceId === "maven"
-      ? Object.assign({}, plan, { device_id: "maven", device_label: "Maven", action, fleet_wide: false, impact: [] })
+      ? Object.assign({}, plan, { device_id: "maven", device_label: deviceLabel, action, fleet_wide: false, impact: [] })
       : plan;
     maintenanceDeviceDialogDetails(normalizedPlan);
     byId("maintenance-maven-evidence-actions").hidden = deviceId !== "maven";

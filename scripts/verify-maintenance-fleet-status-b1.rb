@@ -135,6 +135,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     ssh_config: File.join(root, "ssh_config"),
     os_release_path: os_release,
     hostname_reader: -> { "maven" },
+    process_env: {
+      "SOUL_FLEET_MAVEN_LABEL" => "Helm",
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+    },
     route_path: route_path
   )
   result = service.collect
@@ -148,7 +152,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                data["read_only"] == true &&
                data.dig("verification", "background_polling") == false)
   check.call("workstation update and kernel evidence is normalized",
-             devices.dig("maven", "updates", "total") == 4 &&
+             devices.dig("maven", "label") == "Helm" &&
+               devices.dig("maven", "updates", "total") == 4 &&
                devices.dig("maven", "updates", "freshness") == "cached_pacman_metadata" &&
                devices.dig("maven", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
                devices.dig("maven", "kernel", "available") == "7.1.5-1" &&
@@ -161,7 +166,9 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("forge", "facts", "pihole_container", "id") == 100 &&
                devices.dig("forge", "facts", "pihole_container", "status") == "running")
   check.call("Pi-hole exposes versions, DNS health, services, and package evidence",
-             devices.dig("pihole", "version").include?("Core v6.4.3") &&
+             devices.dig("pihole", "label") == "Warden" &&
+               devices.dig("pihole", "role").include?("Pi-hole DNS filtering") &&
+               devices.dig("pihole", "version").include?("Core v6.4.3") &&
                devices.dig("pihole", "updates", "native") == 2 &&
                devices.dig("pihole", "facts", "blocking_enabled") == true &&
                devices.dig("pihole", "services").all? { |service_record| service_record["state"] == "active" })
@@ -194,8 +201,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
 
   phone_env = {
     "SOUL_FLEET_MAVEN_ADDRESS" => "maven.example.test",
+    "SOUL_FLEET_MAVEN_LABEL" => "Workstation",
     "SOUL_FLEET_FORGE_ADDRESS" => "forge.example.test",
     "SOUL_FLEET_PIHOLE_ADDRESS" => "pihole.example.test",
+    "SOUL_FLEET_PIHOLE_LABEL" => "DNS Warden",
     "SOUL_FLEET_CISCO_PHONE_ENABLED" => "true",
     "SOUL_FLEET_CISCO_PHONE_ADDRESS" => "phone.example.test",
     "SOUL_FLEET_CISCO_PHONE_LABEL" => "Desk Phone"

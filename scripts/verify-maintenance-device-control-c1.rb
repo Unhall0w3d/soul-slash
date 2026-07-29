@@ -82,7 +82,8 @@ Dir.mktmpdir("soul-device-control-") do |root|
   disabled_runner = C1Runner.new
   disabled = SoulCore::MaintenanceDeviceControlService.new(
     root: root, fleet_status_service: fleet, runner: disabled_runner,
-    clock: -> { Time.utc(2026, 7, 27, 22, 0, 0) }, sleeper: ->(_seconds) {}, live_execution_enabled: false
+    clock: -> { Time.utc(2026, 7, 27, 22, 0, 0) }, sleeper: ->(_seconds) {}, live_execution_enabled: false,
+    process_env: {"SOUL_FLEET_PIHOLE_LABEL" => "Warden"}
   )
   forge_preview = disabled.preview(device_id: "forge", action: "maintenance")
   forge_plan = forge_preview.dig("data", "plan")
@@ -100,6 +101,11 @@ Dir.mktmpdir("soul-device-control-") do |root|
   )
   check.call("remote mutation remains disabled by default",
              disabled_result["lifecycle_state"] == "blocked_for_human_review" && disabled_runner.calls.empty?)
+  warden_preview = disabled.preview(device_id: "pihole", action: "maintenance")
+  check.call("deployment label changes presentation without changing the fixed Pi-hole target",
+             warden_preview.dig("data", "plan", "device_label") == "Warden" &&
+               warden_preview.dig("data", "plan", "device_id") == "pihole" &&
+               warden_preview.dig("data", "plan", "ssh_alias") == "pihole-maintenance")
 
   begin
     invalid = disabled.preview(device_id: "maven", action: "maintenance")

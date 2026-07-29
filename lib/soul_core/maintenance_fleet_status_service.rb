@@ -66,6 +66,10 @@ module SoulCore
         "proxmox" => configured_display_address("SOUL_FLEET_FORGE_ADDRESS", DEFAULT_ADDRESSES.fetch("proxmox")),
         "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_ADDRESS", DEFAULT_ADDRESSES.fetch("pihole"))
       }.freeze
+      @labels = {
+        "maven" => configured_display_address("SOUL_FLEET_MAVEN_LABEL", "Maven"),
+        "pihole" => configured_display_address("SOUL_FLEET_PIHOLE_LABEL", "Pi-hole")
+      }.freeze
       @snapshot_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "fleet_status.json")
       @registry_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "discovered_devices.json")
       @pending_recovery_path = @root && File.join(@root, "Soul", "private", "host_maintenance", "dhcp_recovery.json")
@@ -272,7 +276,7 @@ module SoulCore
 
       device(
         id: "maven",
-        label: "Maven",
+        label: @labels.fetch("maven"),
         role: "Hyprland workstation · maintenance controller",
         address: @addresses.fetch("maven"),
         reachable: true,
@@ -359,7 +363,8 @@ module SoulCore
 
     def collect_pihole
       reachable = remote_run("pihole.reachability", "pihole-maintenance", "/usr/bin/hostname")
-      return offline_device("pihole", "Pi-hole", "DNS filtering · Unbound resolver · LXC 100", @addresses.fetch("pihole"), reachable) unless successful?(reachable)
+      role = "Pi-hole DNS filtering · Unbound resolver · LXC 100"
+      return offline_device("pihole", @labels.fetch("pihole"), role, @addresses.fetch("pihole"), reachable) unless successful?(reachable)
 
       version = remote_run("pihole.version", "pihole-maintenance", "/usr/local/bin/pihole", "-v")
       status = remote_run("pihole.status", "pihole-maintenance", "/usr/local/bin/pihole", "status")
@@ -394,8 +399,8 @@ module SoulCore
 
       device(
         id: "pihole",
-        label: "Pi-hole",
-        role: "DNS filtering · Unbound resolver · LXC 100",
+        label: @labels.fetch("pihole"),
+        role: role,
         address: @addresses.fetch("pihole"),
         reachable: true,
         os: "Debian 13 (LXC)",

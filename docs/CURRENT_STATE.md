@@ -97,7 +97,10 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 - **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its first
   integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
   evidence while retaining inventory-only control. DNF5 maintenance and reboot
-  gates remain deliberately unavailable.
+  gates remain deliberately unavailable. Operator-managed reservations now
+  provide stable identities for the workstation, Forge, the Pi-hole appliance,
+  and Crucible. Deployment-specific card names remain ignored local
+  configuration; public source preserves functional roles and stable IDs.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -144,8 +147,10 @@ Core changes are click-authorized and lease-revalidated. Before a conversational
 
 `make dashboard` runs a foreground loopback development instance. The reviewed optional deployment installs explicit user services for the loopback dashboard and Caddy HTTPS on one exact LAN address. Installation is preview-first, requires a changed administrator password and exact confirmation, and leaves firewall, DHCP, router, and client certificate trust to the Operator.
 
-Proxmox, Internet exposure, and multi-user accounts remain separate future
-tracks. Backup & Recovery now has a candidate-complete encrypted local
+Hosting Soul itself on Proxmox, Internet exposure, and multi-user accounts
+remain separate future tracks. Forge currently hosts the Warden Pi-hole
+appliance and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now
+has a candidate-complete encrypted local
 foundation and one verified live capture; retention execution, a second copy,
 live-tree promotion, and full disaster-recovery qualification remain separate
 review gates.

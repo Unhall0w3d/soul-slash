@@ -24,12 +24,28 @@ Status: candidate-complete; human review required
   empty owner-only `restic` directory.
 - Rebooted Crucible once and verified a changed boot ID, cloud-init completion,
   service readiness, and persistent backup-disk mounting.
+- Qualified the Operator's reserved-address migration for the workstation,
+  Forge, the Pi-hole appliance, and Crucible without placing literal private
+  addresses in public source.
+- Added configurable workstation and Pi-hole-appliance display labels so a
+  deployment can present names such as **Warden** while stable internal IDs,
+  fixed SSH targets, and Pi-hole functional evidence remain unchanged.
+- Migrated and live-verified Soul's loopback-backed HTTPS Dashboard at the
+  workstation's reserved address, including a replacement IP SAN certificate
+  and exact public-origin validation.
 
 ## Files changed
 
 - `Makefile`
+- `.env.example`
 - `assets/dashboard/dashboard.js`
+- `assets/dashboard/index.html`
+- `lib/soul_core/configuration_schema.rb`
+- `lib/soul_core/maintenance_device_control_service.rb`
+- `lib/soul_core/maintenance_fleet_discovery_service.rb`
 - `lib/soul_core/maintenance_fleet_status_service.rb`
+- `scripts/verify-maintenance-device-control-c1.rb`
+- `scripts/verify-maintenance-fleet-status-b1.rb`
 - `scripts/verify-crucible-fedora-status-a0.rb`
 - `docs/guides/CRUCIBLE_FEDORA.md`
 - `docs/soul/CRUCIBLE_FEDORA_BACKUP_MAINTENANCE_A0_BRIEF.md`
@@ -43,6 +59,8 @@ Owner-local changes remain outside Git:
 - the dedicated private/public key pair;
 - the pinned SSH host key;
 - the literal `crucible-maintenance` SSH alias;
+- deployment-specific addresses and display labels;
+- Soul's user-owned Caddy bind and Dashboard public origin;
 - the enrolled-device registry record; and
 - the persisted fleet snapshot.
 
@@ -66,6 +84,7 @@ ruby -c lib/soul_core/maintenance_fleet_status_service.rb
 ruby -c scripts/verify-crucible-fedora-status-a0.rb
 make verify-crucible-fedora-status
 make verify-maintenance-fleet-status
+make verify-maintenance-device-control
 git diff --check
 ```
 
@@ -73,6 +92,7 @@ git diff --check
 
 - Fedora-specific status verifier: passed.
 - Existing maintenance fleet regression verifier: passed.
+- Existing maintenance device-control regression verifier: passed.
 - Ruby syntax checks: passed.
 - Diff whitespace validation: passed.
 
@@ -96,6 +116,13 @@ The Fedora verifier proves:
 - The controlled reboot produced a different boot ID.
 - `/srv/soul-backup` returned after reboot with the reviewed hardening options.
 - `/srv/soul-backup/restic` remained owned by `souladmin` with mode `0700`.
+- Reserved addresses were live-qualified for the workstation, Forge, Warden,
+  and Crucible.
+- Forge and Warden's source-restricted maintenance keys were rebound to the
+  workstation's reserved source address.
+- Soul's Dashboard and HTTPS proxy were active at the workstation reservation;
+  the authenticated landing page returned HTTP 200 and the replacement
+  certificate contained the correct IP SAN.
 
 ## Local LLM evals
 
@@ -104,8 +131,6 @@ cannot validate disk identity, authorization, package safety, or persistence.
 
 ## Known weaknesses and deferred gates
 
-- The initial DHCP address must receive an Operator-managed reservation before
-  the fixed SSH alias is treated as durable.
 - The off-device restic repository is intentionally not initialized.
 - No snapshot has been copied to Crucible yet.
 - DNF5 Maintenance and Reboot controls remain disabled.
@@ -143,7 +168,8 @@ Crucible system disk were outside that mutation.
 - [ ] The card shows Fedora, DNF5 evidence, kernel attention, and both active
   services.
 - [ ] The card offers Refresh but no Maintenance or Reboot action.
-- [ ] The Operator creates or confirms a DHCP reservation.
+- [x] Operator-managed reservations are in place and live-qualified.
+- [ ] Deployment-specific labels render correctly in Guided Maintenance.
 - [ ] The off-device directory remains uninitialized until the next exact gate.
 - [ ] Review the separate second-copy repository gate.
 - [ ] Review the separate DNF5 mutation and reboot gate.

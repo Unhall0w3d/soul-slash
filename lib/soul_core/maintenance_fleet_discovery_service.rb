@@ -662,9 +662,9 @@ module SoulCore
 
     def known_addresses
       configured = {
-        @process_env["SOUL_FLEET_MAVEN_ADDRESS"] => "Maven",
+        @process_env["SOUL_FLEET_MAVEN_ADDRESS"] => @process_env.fetch("SOUL_FLEET_MAVEN_LABEL", "Maven"),
         @process_env["SOUL_FLEET_FORGE_ADDRESS"] => "Forge",
-        @process_env["SOUL_FLEET_PIHOLE_ADDRESS"] => "Pi-hole",
+        @process_env["SOUL_FLEET_PIHOLE_ADDRESS"] => @process_env.fetch("SOUL_FLEET_PIHOLE_LABEL", "Pi-hole"),
         @process_env["SOUL_FLEET_CISCO_PHONE_ADDRESS"] => @process_env.fetch("SOUL_FLEET_CISCO_PHONE_LABEL", "Cisco 8851")
       }
       configured.each_with_object({}) do |(address, label), memo|

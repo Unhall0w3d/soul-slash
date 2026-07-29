@@ -139,7 +139,7 @@ network bridge, router, DHCP service, or public firewall.
 - [x] Verify the Fedora image byte size and SHA-256.
 - [x] Review VMID, CPU, memory, disk, bridge, cloud-init, and autostart plan.
 - [x] Confirm the guest boots and accepts only the dedicated SSH key.
-- [ ] Review the assigned address and optionally create a DHCP reservation.
+- [x] Review the assigned address and create an Operator-managed DHCP reservation.
 - [x] Confirm DNF5 evidence is read-only and no mutation controls exist.
 - [x] Separately review the 100 GiB data-disk format and SSH/SFTP transport plan.
 - [ ] Separately review second-copy and DNF5 mutation adapters.

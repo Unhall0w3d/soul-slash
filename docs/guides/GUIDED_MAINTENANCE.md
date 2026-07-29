@@ -8,9 +8,12 @@ Open it from **Administration → Guided Maintenance**.
 
 ## Infrastructure control plane
 
-The page begins with the newest persisted fleet snapshot for the Maven
-workstation, the dynamically discovered Proxmox node, the Pi-hole LXC, and any
-optional status-only appliances configured by the Operator.
+The page begins with the newest persisted fleet snapshot for the workstation,
+the dynamically discovered Proxmox node, the Pi-hole DNS appliance, and any
+optional status-only appliances configured by the Operator. Deployment-specific
+display names (for example, **Warden**) come from ignored local configuration;
+the public repository retains stable functional identities and no private
+addresses.
 Click **Collect fleet status** to replace it with a fresh bounded collection
 and inspect:
 
@@ -160,7 +163,7 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one mutable Maven, Forge, or Pi-hole card
+choose exactly one mutable workstation, Forge, or Pi-hole appliance card
 → choose Maintenance or Reboot
 → inspect the exact device, commands, confirmation, and dependency impact
 → authorize only that digest
