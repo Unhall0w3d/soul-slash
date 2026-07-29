@@ -197,6 +197,13 @@ three newer durable continuity paths and four explicit disposable/cache
 exclusions before a fresh snapshot can prove complete current coverage. No
 cleanup executor or automatic manifest mutation exists.
 
+Backup Manifest Reconciliation A0 is now a candidate add-only Dashboard gate.
+On the current workstation its exact preview finds five missing sources—the
+three newer workflow paths plus two newer maintenance user-unit files—and seven
+portable exclusions. It preserves all owner entries and starts no Restic
+operation. Live reconciliation and the subsequent verified snapshot remain
+Operator review gates.
+
 Local Project and Document Search unifies bounded lexical retrieval across
 repository documentation, the configured Knowledge Vault, and canonical Music
 and Visual project briefs. Results retain source adapters, canonical

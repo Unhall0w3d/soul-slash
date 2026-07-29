@@ -40,8 +40,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] review the metadata-only Storage & Retention A2 artifact census and
   backup-coverage contract; the latest snapshot verifies the local Vault,
   chats, projects, private state, and finished exports, while one reviewed
-  owner-manifest reconciliation and fresh capture remain before cleanup
-  execution is designed
+  add-only owner-manifest reconciliation candidate and fresh capture remain
+  before cleanup execution is designed
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default

@@ -7,6 +7,7 @@ require "securerandom"
 require "socket"
 require "time"
 
+require_relative "backup_manifest_policy"
 require_relative "backup_retention_ledger"
 require_relative "bounded_command_runner"
 
@@ -16,6 +17,7 @@ module SoulCore
     RETENTION_CONFIRMATION = "FORGET_SELECTED_BACKUP_SNAPSHOTS"
     RESTORE_CONFIRMATION = "STAGE_BACKUP_RESTORE"
     REPLICA_CONFIRMATION = "COPY_VERIFIED_BACKUP_TO_CRUCIBLE"
+    MANIFEST_RECONCILIATION_CONFIRMATION = "RECONCILE_BACKUP_MANIFESTS"
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     MAX_PASSWORD_BYTES = 1024
     MAX_SNAPSHOTS = 100
@@ -51,6 +53,7 @@ module SoulCore
       @replica_target_path = @env.fetch("SOUL_BACKUP_REPLICA_TARGET_PATH", "/srv/soul-backup/restic").to_s
       @replica_owner = @env.fetch("SOUL_BACKUP_REPLICA_OWNER", "souladmin").to_s
       @replica_ssh_config = File.expand_path(@env.fetch("SOUL_BACKUP_REPLICA_SSH_CONFIG", File.join(@home, ".ssh", "config")).to_s)
+      @manifest_policy = BackupManifestPolicy.new(root: @root, home: @home)
       @ledger = BackupRetentionLedger.new(ledger_path: @ledger_path, clock: @clock)
       raise ArgumentError, "backup state must remain inside the project root" unless within?(@state_root, @root)
       validate_private_state_root!
@@ -74,6 +77,7 @@ module SoulCore
           "snapshots" => snapshots,
           "receipt_count" => regular_json_count(@receipt_root),
           "restore_count" => regular_directory_count(@restore_root),
+          "manifest_reconciliation" => manifest_reconciliation_summary,
           "replica" => replica_status(validated_password),
           "manual_only" => true,
           "password_retained" => false
@@ -85,6 +89,54 @@ module SoulCore
       blocked("backup status failed safely: #{safe_error(error)}")
     ensure
       validated_password&.replace("\0" * validated_password.bytesize)
+    end
+
+    def manifest_reconciliation_preview
+      scope = manifest_reconciliation_scope
+      complete("exact add-only backup manifest reconciliation prepared", manifest_reconciliation_view(scope).merge(
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => MANIFEST_RECONCILIATION_CONFIRMATION
+      ))
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("backup manifest reconciliation preview failed safely: #{safe_error(error)}")
+    end
+
+    def manifest_reconciliation_execute(confirmation:, expected_digest:)
+      return awaiting("exact backup manifest reconciliation confirmation is required") unless confirmation.to_s == MANIFEST_RECONCILIATION_CONFIRMATION
+      operation_lock = acquire_operation_lock
+      return blocked("another backup administration operation is already active") unless operation_lock
+
+      scope = manifest_reconciliation_scope
+      return blocked("backup manifest reconciliation preview digest is stale or invalid") unless secure_equal?(expected_digest, digest(scope))
+      if scope.fetch("source_additions").empty? && scope.fetch("exclusion_additions").empty?
+        return complete("backup manifests already match the portable policy", manifest_reconciliation_view(scope))
+      end
+
+      source_before = manifest_body(@sources_path)
+      exclusion_before = manifest_body(@excludes_path)
+      source_after = append_manifest_lines(source_before, scope.fetch("source_additions"))
+      exclusion_after = append_manifest_lines(exclusion_before, scope.fetch("exclusion_additions"))
+      write_manifest_pair(source_after, exclusion_after, source_before, exclusion_before)
+
+      verified = manifest_reconciliation_scope
+      raise "backup manifest reconciliation did not reach the reviewed policy" unless verified.fetch("source_additions").empty? && verified.fetch("exclusion_additions").empty?
+      receipt = write_manifest_reconciliation_receipt(scope)
+      complete("backup manifests reconciled; create a fresh verified snapshot to prove coverage", {
+        "source_addition_count" => scope.fetch("source_additions").length,
+        "exclusion_addition_count" => scope.fetch("exclusion_additions").length,
+        "source_manifest_digest" => Digest::SHA256.file(@sources_path).hexdigest,
+        "exclusion_manifest_digest" => Digest::SHA256.file(@excludes_path).hexdigest,
+        "receipt_id" => receipt.fetch("receipt_id"),
+        "snapshot_verification_required" => true
+      }, "backup_manifests_reconciled")
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      failed("backup manifest reconciliation failed safely: #{safe_error(error)}")
+    ensure
+      release_operation_lock(operation_lock)
     end
 
     def replica_preview(password:)
@@ -392,6 +444,116 @@ module SoulCore
     end
 
     private
+
+    def manifest_reconciliation_summary
+      scope = manifest_reconciliation_scope
+      {
+        "state" => scope.fetch("source_additions").empty? && scope.fetch("exclusion_additions").empty? ? "current" : "review_required",
+        "source_addition_count" => scope.fetch("source_additions").length,
+        "exclusion_addition_count" => scope.fetch("exclusion_additions").length,
+        "snapshot_verification_required" => !scope.fetch("source_additions").empty?
+      }
+    rescue StandardError => error
+      { "state" => "unavailable", "reason" => safe_error(error), "snapshot_verification_required" => false }
+    end
+
+    def manifest_reconciliation_scope
+      current_sources = safe_manifest_lines(@sources_path)
+      current_exclusions = safe_manifest_lines(@excludes_path)
+      policy_sources = @manifest_policy.sources
+      policy_exclusions = @manifest_policy.exclusions
+      {
+        "operation" => "backup_manifest_reconciliation",
+        "source_manifest_digest" => Digest::SHA256.file(@sources_path).hexdigest,
+        "exclusion_manifest_digest" => Digest::SHA256.file(@excludes_path).hexdigest,
+        "source_additions" => policy_sources - current_sources,
+        "exclusion_additions" => policy_exclusions - current_exclusions,
+        "source_removals" => [],
+        "exclusion_removals" => [],
+        "replace_existing" => false,
+        "restic_operation" => false,
+        "password_required" => false,
+        "snapshot_verification_required" => true,
+        "automatic_retry" => false
+      }
+    end
+
+    def manifest_reconciliation_view(scope)
+      {
+        "operation" => scope.fetch("operation"),
+        "source_additions" => scope.fetch("source_additions").map { |path| display_path(path) },
+        "exclusion_additions" => scope.fetch("exclusion_additions").map { |pattern| display_pattern(pattern) },
+        "source_removals" => [],
+        "exclusion_removals" => [],
+        "changes_required" => !scope.fetch("source_additions").empty? || !scope.fetch("exclusion_additions").empty?,
+        "replace_existing" => false,
+        "restic_operation" => false,
+        "password_required" => false,
+        "snapshot_verification_required" => true,
+        "automatic_retry" => false
+      }
+    end
+
+    def manifest_body(path)
+      raise ArgumentError, "backup manifest is unavailable: #{display_path(path)}" unless regular_file?(path)
+      raise ArgumentError, "backup manifest exceeds size limit" if File.size(path) > 256 * 1024
+      raise ArgumentError, "backup manifest must be owner-only" unless (File.stat(path).mode & 0o077).zero?
+      File.binread(path)
+    end
+
+    def append_manifest_lines(body, additions)
+      return body if additions.empty?
+      prefix = body.empty? || body.end_with?("\n") ? body : "#{body}\n"
+      prefix + additions.join("\n") + "\n"
+    end
+
+    def write_manifest_pair(source_body, exclusion_body, source_before, exclusion_before)
+      source_written = false
+      atomic_text(@sources_path, source_body)
+      source_written = true
+      atomic_text(@excludes_path, exclusion_body)
+    rescue StandardError
+      atomic_text(@sources_path, source_before) if source_written
+      atomic_text(@excludes_path, exclusion_before) if regular_file?(@excludes_path) && File.binread(@excludes_path) != exclusion_before
+      raise
+    end
+
+    def atomic_text(path, body)
+      temporary = "#{path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+      begin
+        File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+          file.write(body)
+          file.flush
+          file.fsync
+        end
+        File.rename(temporary, path)
+      ensure
+        FileUtils.rm_f(temporary)
+      end
+    end
+
+    def write_manifest_reconciliation_receipt(scope)
+      FileUtils.mkdir_p(@receipt_root, mode: 0o700)
+      timestamp = @clock.call.utc
+      receipt = {
+        "schema_version" => "soul.backup_manifest_reconciliation_receipt.v1",
+        "receipt_id" => "manifest_reconciliation_#{timestamp.strftime('%Y%m%dT%H%M%SZ')}_#{@id_generator.call}",
+        "operation" => "manifest_reconciliation",
+        "completed_at" => timestamp.iso8601,
+        "source_addition_count" => scope.fetch("source_additions").length,
+        "exclusion_addition_count" => scope.fetch("exclusion_additions").length,
+        "source_additions_digest" => digest(scope.fetch("source_additions")),
+        "exclusion_additions_digest" => digest(scope.fetch("exclusion_additions")),
+        "snapshot_verification_required" => true,
+        "restic_operation" => false
+      }
+      atomic_json(File.join(@receipt_root, "#{receipt.fetch("receipt_id")}.json"), receipt)
+      receipt
+    end
+
+    def display_pattern(pattern)
+      pattern.to_s.gsub(@root, "[PROJECT_ROOT]").gsub(@home, "~")
+    end
 
     def replica_status(password)
       validate_replica_configuration!

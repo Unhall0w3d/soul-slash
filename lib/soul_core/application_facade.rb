@@ -225,6 +225,8 @@ module SoulCore
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
       when "backup.status" then domain(backup_administration.status(password: parameters["password"]))
+      when "backup.manifests.reconcile.preview" then domain(backup_administration.manifest_reconciliation_preview)
+      when "backup.manifests.reconcile.execute" then domain(backup_administration.manifest_reconciliation_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "backup.create.preview" then domain(backup_administration.backup_preview(password: required(parameters, "password")))
       when "backup.create.execute" then domain(backup_administration.backup_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "backup.retention.preview" then domain(backup_administration.retention_preview(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids")))

@@ -655,6 +655,12 @@
         </section>
         <div class="backup-actions">
           <section class="gate-card">
+            <div><p class="eyebrow">Owner manifest policy</p><h3>Reconcile backup scope</h3><p>Adds only missing paths from the current portable policy. Existing sources, exclusions, comments, and encrypted history remain untouched.</p></div>
+            <button id="preview-backup-manifests" class="gate-button" type="button">Preview manifest additions</button>
+            <div id="backup-manifest-confirm" hidden><pre id="backup-manifest-scope" class="clear-preview-list"></pre><button id="execute-backup-manifests" class="gate-button gate-button--gold" type="button">Add reviewed entries</button></div>
+            <p id="backup-manifest-status" class="dialog-status" role="status">No password or Restic operation is used. A fresh verified backup remains a separate gate.</p>
+          </section>
+          <section class="gate-card">
             <div><p class="eyebrow">Verified capture</p><h3>Create a backup</h3><p>Captures the owner allow-list, verifies repository metadata, derives the exact snapshot inventory, and records deletion holds.</p></div>
             <button id="preview-backup-create" class="gate-button" type="button">Preview backup</button>
             <div id="backup-create-confirm" hidden><pre id="backup-create-scope" class="clear-preview-list"></pre><button id="execute-backup-create" class="gate-button gate-button--gold" type="button">Create verified backup</button></div>
