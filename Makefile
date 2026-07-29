@@ -121,6 +121,9 @@ help:
 > @echo "  make backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_SOUL_BACKUP_MANIFESTS"
 > @echo "  make verify-backup-administration  Verify capture, retention, and staged restore gates"
 > @echo "  make verify-crucible-backup-replication  Verify bounded off-device initialize/copy/check gates"
+> @echo "  make backup-credential-rotation-plan  Preview the fixed local + Crucible rotation scope"
+> @echo "  make backup-credential-rotate  Rotate both repository passwords in a local terminal"
+> @echo "  make verify-backup-credential-rotation  Test secure transport, verification, and rollback"
 > @echo "  make knowledge-vault-status  Inspect the optional external Markdown vault"
 > @echo "  make knowledge-vault-init-preview  Preview the portable starter structure"
 > @echo "  make knowledge-vault-init EXPECTED_DIGEST=... CONFIRM=INITIALIZE_KNOWLEDGE_VAULT"
@@ -493,6 +496,16 @@ verify-backup-administration:
 .PHONY: verify-crucible-backup-replication
 verify-crucible-backup-replication:
 > @ruby scripts/verify-crucible-backup-replication-a2.rb
+
+.PHONY: backup-credential-rotation-plan backup-credential-rotate verify-backup-credential-rotation
+backup-credential-rotation-plan:
+> @ruby scripts/soul-backup-credential-rotation plan
+
+backup-credential-rotate:
+> @ruby scripts/soul-backup-credential-rotation rotate
+
+verify-backup-credential-rotation:
+> @ruby scripts/verify-backup-credential-rotation-a0.rb
 
 music-reference-tooling-check:
 > @ruby scripts/soul-music-reference-tooling check --root "$(PROJECT_ROOT)" --python "$(MUSIC_REFERENCE_PYTHON)" --yt-dlp-version "$(MUSIC_REFERENCE_YTDLP_VERSION)" --essentia-version "$(MUSIC_REFERENCE_ESSENTIA_VERSION)"
