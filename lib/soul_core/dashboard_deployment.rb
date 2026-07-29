@@ -37,11 +37,11 @@ module SoulCore
       @backup_mount, @backup_mount_valid = resolve_backup_mount(backup_mount)
     end
 
-    def plan(lan_host:, https_port: DEFAULT_HTTPS_PORT)
-      validation = validate(lan_host, https_port)
+    def plan(lan_host:, https_port: DEFAULT_HTTPS_PORT, public_host: nil)
+      validation = validate(lan_host, https_port, public_host)
       return validation unless validation.ok
 
-      host = validation.details.fetch("lan_host")
+      host = validation.details.fetch("public_host")
       port = validation.details.fetch("https_port")
       origin = "https://#{host}:#{port}"
       Result.new(
@@ -61,14 +61,18 @@ module SoulCore
       )
     end
 
-    def install(lan_host:, https_port: DEFAULT_HTTPS_PORT, confirmation: nil)
-      planned = plan(lan_host: lan_host, https_port: https_port)
+    def install(lan_host:, https_port: DEFAULT_HTTPS_PORT, public_host: nil, confirmation: nil)
+      planned = plan(lan_host: lan_host, https_port: https_port, public_host: public_host)
       return planned unless planned.ok
       unless confirmation == CONFIRM_INSTALL
         return Result.new(ok: false, lifecycle_state: "awaiting_input", message: "Exact installation confirmation is required.", details: planned.details)
       end
 
-      contents = rendered_contents(lan_host: planned.details.fetch("lan_host"), https_port: planned.details.fetch("https_port"))
+      contents = rendered_contents(
+        lan_host: planned.details.fetch("lan_host"),
+        public_host: planned.details.fetch("public_host"),
+        https_port: planned.details.fetch("https_port")
+      )
       validation = validate_caddy(contents.fetch("caddyfile"))
       return validation unless validation.ok
 
@@ -137,8 +141,11 @@ module SoulCore
       Result.new(ok: services.values.all? { |value| value.fetch("query_ok") }, lifecycle_state: "complete", message: "Service status collected.", details: { "services" => services })
     end
 
-    def rendered_contents(lan_host:, https_port: DEFAULT_HTTPS_PORT)
-      origin = "https://#{lan_host}:#{https_port}"
+    def rendered_contents(lan_host:, https_port: DEFAULT_HTTPS_PORT, public_host: nil)
+      authority = normalized_public_host(public_host, lan_host)
+      raise ArgumentError, "public host is invalid" unless authority
+
+      origin = "https://#{authority}:#{https_port}"
       {
         "environment" => <<~ENVFILE,
           SOUL_DASHBOARD_BIND_HOST=127.0.0.1
@@ -237,7 +244,7 @@ module SoulCore
 
     private
 
-    def validate(lan_host, https_port)
+    def validate(lan_host, https_port, public_host)
       errors = []
       address = begin
         IPAddr.new(lan_host.to_s)
@@ -245,7 +252,9 @@ module SoulCore
         nil
       end
       port = Integer(https_port.to_s, 10) rescue nil
+      authority = normalized_public_host(public_host, address&.to_s)
       errors << "LAN host must be one exact assigned non-loopback IPv4 address." unless address&.ipv4? && !address.loopback? && !address.to_i.zero? && @assigned_addresses.include?(address.to_s)
+      errors << "Public host must be the assigned LAN IPv4 address or one normalized DNS hostname." unless authority
       errors << "HTTPS port must be an unprivileged port between 1024 and 65535." unless port&.between?(1024, 65_535)
       errors << "HTTPS port must differ from Soul's loopback port." if port == SOUL_PORT
       errors << "Caddy is not installed in PATH." unless @caddy_path && File.file?(@caddy_path) && File.executable?(@caddy_path)
@@ -257,7 +266,44 @@ module SoulCore
 
       return Result.new(ok: false, lifecycle_state: "failed", message: errors.first, details: { "errors" => errors }) unless errors.empty?
 
-      Result.new(ok: true, lifecycle_state: "complete", message: "Deployment prerequisites are valid.", details: { "lan_host" => address.to_s, "https_port" => port, "caddy_path" => @caddy_path, "systemctl_path" => @systemctl_path, "ruby_path" => @ruby_path, "project_root" => @root })
+      Result.new(
+        ok: true,
+        lifecycle_state: "complete",
+        message: "Deployment prerequisites are valid.",
+        details: {
+          "lan_host" => address.to_s,
+          "public_host" => authority,
+          "https_port" => port,
+          "caddy_path" => @caddy_path,
+          "systemctl_path" => @systemctl_path,
+          "ruby_path" => @ruby_path,
+          "project_root" => @root
+        }
+      )
+    end
+
+    def normalized_public_host(value, lan_host)
+      candidate = value.to_s.strip
+      candidate = lan_host.to_s if candidate.empty?
+      return nil if candidate.empty?
+
+      begin
+        address = IPAddr.new(candidate)
+        return candidate if address.ipv4? && candidate == lan_host
+
+        return nil
+      rescue IPAddr::InvalidAddressError
+        # Continue with strict DNS hostname validation.
+      end
+
+      hostname = candidate.downcase.delete_suffix(".")
+      return nil if hostname.empty? || hostname.length > 253
+
+      labels = hostname.split(".")
+      return nil if labels.length < 2
+      return nil unless labels.all? { |label| label.match?(/\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z/) }
+
+      hostname
     end
 
     def authentication_errors

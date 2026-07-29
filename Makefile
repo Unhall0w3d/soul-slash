@@ -11,6 +11,7 @@ LOCAL_MAKEFILE ?= $(PROJECT_ROOT)/Makefile.local
 
 ENV_FILE ?= $(PROJECT_ROOT)/.env
 LAN_HOST ?=
+DASHBOARD_PUBLIC_HOST ?=
 DASHBOARD_HTTPS_PORT ?= 8443
 CONFIRM ?=
 LLAMACPP_MODEL_FILE ?= Qwen3-8B-Q4_K_M.gguf
@@ -154,8 +155,8 @@ help:
 > @echo "Dashboard targets:"
 > @echo "  make dashboard         Run the authenticated dashboard in the foreground"
 > @echo "  make dashboard-reset-admin  Reset admin access to the forced-change bootstrap gate"
-> @echo "  make dashboard-service-plan LAN_HOST=<assigned-ip>"
-> @echo "  make dashboard-service-install LAN_HOST=<assigned-ip> CONFIRM=INSTALL_SOUL_LAN_SERVICES"
+> @echo "  make dashboard-service-plan LAN_HOST=<assigned-ip> [DASHBOARD_PUBLIC_HOST=<dns-name>]"
+> @echo "  make dashboard-service-install LAN_HOST=<assigned-ip> [DASHBOARD_PUBLIC_HOST=<dns-name>] CONFIRM=INSTALL_SOUL_LAN_SERVICES"
 > @echo "  make dashboard-service-status"
 > @echo "  make dashboard-service-logs"
 > @echo "  make dashboard-service-uninstall CONFIRM=REMOVE_SOUL_LAN_SERVICES"
@@ -600,12 +601,12 @@ dashboard-reset-admin:
 
 dashboard-service-plan:
 > @test -n "$(LAN_HOST)" || { echo "LAN_HOST is required; use: make $@ LAN_HOST=<assigned-ip>"; exit 2; }
-> @scripts/soul-dashboard-service plan --lan-host "$(LAN_HOST)" --https-port "$(DASHBOARD_HTTPS_PORT)"
+> @scripts/soul-dashboard-service plan --lan-host "$(LAN_HOST)" $(if $(strip $(DASHBOARD_PUBLIC_HOST)),--public-host "$(DASHBOARD_PUBLIC_HOST)",) --https-port "$(DASHBOARD_HTTPS_PORT)"
 
 dashboard-service-install:
 > @test -n "$(LAN_HOST)" || { echo "LAN_HOST is required; run dashboard-service-plan first."; exit 2; }
 > @test "$(CONFIRM)" = "INSTALL_SOUL_LAN_SERVICES" || { echo "Review the plan, then set CONFIRM=INSTALL_SOUL_LAN_SERVICES."; exit 2; }
-> @scripts/soul-dashboard-service install --lan-host "$(LAN_HOST)" --https-port "$(DASHBOARD_HTTPS_PORT)" --confirmation "$(CONFIRM)"
+> @scripts/soul-dashboard-service install --lan-host "$(LAN_HOST)" $(if $(strip $(DASHBOARD_PUBLIC_HOST)),--public-host "$(DASHBOARD_PUBLIC_HOST)",) --https-port "$(DASHBOARD_HTTPS_PORT)" --confirmation "$(CONFIRM)"
 
 dashboard-service-status:
 > @scripts/soul-dashboard-service status

@@ -50,6 +50,9 @@ module SoulCore
           rejected_hosts = ["0.0.0.0", "127.0.0.1", "192.168.50.11", "not-an-ip"]
           checks["plan_rejects_wildcard_loopback_unassigned_and_invalid_hosts"] = rejected_hosts.all? { |host| !deployment.plan(lan_host: host).ok }
           checks["plan_rejects_privileged_colliding_and_invalid_ports"] = [443, 4567, 70_000, "bad"].all? { |port| !deployment.plan(lan_host: "192.168.50.10", https_port: port).ok }
+          rejected_public_hosts = ["soul", "*.home.arpa", "soul..home.arpa", "-soul.home.arpa", "soul.home.arpa:8443", "192.168.50.11"]
+          checks["plan_rejects_unqualified_wildcard_malformed_and_mismatched_public_hosts"] =
+            rejected_public_hosts.all? { |host| !deployment.plan(lan_host: "192.168.50.10", public_host: host).ok }
 
           plan = deployment.plan(lan_host: "192.168.50.10", https_port: 8443)
           checks["valid_plan_is_review_blocked_and_portable"] =
@@ -57,6 +60,12 @@ module SoulCore
             plan.details["public_origin"] == "https://192.168.50.10:8443" &&
             plan.details["soul_bind"] == "127.0.0.1:4567" &&
             plan.details["confirmation_phrase"] == DashboardDeployment::CONFIRM_INSTALL
+
+          named_plan = deployment.plan(lan_host: "192.168.50.10", public_host: "Soul.Home.Arpa.", https_port: 8443)
+          checks["valid_dns_public_host_is_normalized_without_changing_exact_bind"] =
+            named_plan.ok && named_plan.details["public_host"] == "soul.home.arpa" &&
+            named_plan.details["public_origin"] == "https://soul.home.arpa:8443" &&
+            named_plan.details["lan_host"] == "192.168.50.10"
 
           contents = deployment.rendered_contents(lan_host: "192.168.50.10", https_port: 8443)
           combined = contents.values.join("\n")
@@ -67,6 +76,12 @@ module SoulCore
             contents["caddyfile"].include?("tls internal") &&
             contents["caddyfile"].include?("admin off") &&
             !contents["caddyfile"].include?("0.0.0.0")
+          named_contents = deployment.rendered_contents(lan_host: "192.168.50.10", public_host: "soul.home.arpa", https_port: 8443)
+          checks["dns_public_host_drives_tls_and_application_origin_while_bind_remains_exact"] =
+            named_contents["environment"].include?("SOUL_DASHBOARD_PUBLIC_ORIGIN=https://soul.home.arpa:8443") &&
+            named_contents["caddyfile"].include?("https://soul.home.arpa:8443") &&
+            named_contents["caddyfile"].include?("bind 192.168.50.10") &&
+            !named_contents["caddyfile"].include?("bind soul.home.arpa")
           checks["rendered_services_are_bounded_and_have_no_polling_or_extra_units"] =
             contents["soul_unit"].include?("Restart=on-failure") && contents["proxy_unit"].include?("Restart=on-failure") &&
             contents["soul_unit"].include?("WorkingDirectory=#{temporary_root}") && !contents["soul_unit"].include?("WorkingDirectory=\"") &&
@@ -156,8 +171,8 @@ module SoulCore
     def remote_http_checks(checks, root)
       auth = DashboardAuthentication.new(root: root, iterations: 1_000)
       facade = NullFacade.new
-      app = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: "127.0.0.1", port: 4567, csrf_token: "deploy-csrf", authentication: auth, public_origin: "https://192.168.50.10:8443")
-      public_headers = { "Host" => "192.168.50.10:8443", "Origin" => "https://192.168.50.10:8443", "Content-Type" => "application/json", "X-Soul-CSRF" => "deploy-csrf" }
+      app = DashboardHttpApplication.new(root: @root, facade: facade, bind_host: "127.0.0.1", port: 4567, csrf_token: "deploy-csrf", authentication: auth, public_origin: "https://soul.home.arpa:8443")
+      public_headers = { "Host" => "soul.home.arpa:8443", "Origin" => "https://soul.home.arpa:8443", "Content-Type" => "application/json", "X-Soul-CSRF" => "deploy-csrf" }
       rejected = app.call(method: "GET", target: "/", headers: { "Host" => "192.168.50.11:8443" })
       wrong_origin = app.call(method: "POST", target: "/auth/v1/login", headers: public_headers.merge("Origin" => "https://evil.example"), body: JSON.generate({ "username" => "admin", "password" => "Fixture deployment password 2026" }))
       login = app.call(method: "POST", target: "/auth/v1/login", headers: public_headers, body: JSON.generate({ "username" => "admin", "password" => "Fixture deployment password 2026" }))

@@ -396,13 +396,27 @@ The reviewed Linux deployment keeps Soul on loopback and uses Caddy for HTTPS on
    make dashboard-service-plan LAN_HOST=<assigned-lan-ip>
    ```
 
+   If the operator has already created a private DNS record for that exact
+   address, the reviewed public authority may use it without changing the
+   listener bind:
+
+   ```bash
+   make dashboard-service-plan \
+     LAN_HOST=<assigned-lan-ip> \
+     DASHBOARD_PUBLIC_HOST=<private-dns-name>
+   ```
+
 5. After reviewing the plan, install exactly the two approved user services:
 
    ```bash
    make dashboard-service-install \
      LAN_HOST=<assigned-lan-ip> \
+     DASHBOARD_PUBLIC_HOST=<private-dns-name> \
      CONFIRM=INSTALL_SOUL_LAN_SERVICES
    ```
+
+   Omit `DASHBOARD_PUBLIC_HOST` from both commands to retain the assigned-IP
+   HTTPS origin.
 
 6. If UFW denies incoming traffic, add a rule limited to the trusted LAN and exact host rather than allowing the port globally:
 
@@ -410,7 +424,7 @@ The reviewed Linux deployment keeps Soul on loopback and uses Caddy for HTTPS on
    sudo ufw allow from <trusted-lan-cidr> to <assigned-lan-ip> port 8443 proto tcp comment 'Soul dashboard LAN HTTPS'
    ```
 
-7. Copy only `~/.local/share/caddy/pki/authorities/local/root.crt` to each selected device, install it as a trusted CA, and verify the browser shows no certificate warning at `https://<assigned-lan-ip>:8443/`. Never copy Caddy's private CA key.
+7. Copy only `~/.local/share/caddy/pki/authorities/local/root.crt` to each selected device, install it as a trusted CA, and verify the browser shows no certificate warning at the exact planned URL. Never copy Caddy's private CA key.
 8. Verify login, refresh, and logout from the client device. Check local service state with `make dashboard-service-status` and logs with `make dashboard-service-logs`.
 
 Soul does not change the firewall, router, DHCP, client trust store, or Internet exposure automatically. Full security boundaries and rollback instructions are in `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`.
