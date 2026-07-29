@@ -173,6 +173,24 @@ intentionally does not yet delete remote snapshots or run nightly;
 noninteractive credential handling, remote retention policy, and a complete
 disaster rehearsal remain later work.
 
+### Rotating both repository passwords
+
+Repository password rotation is intentionally excluded from the Dashboard so
+browser inspection cannot observe the credential field. Preview the fixed
+scope, then run the bounded interactive terminal operation:
+
+```sh
+make backup-credential-rotation-plan
+make backup-credential-rotate
+```
+
+The rotation requires exact `ROTATE_BACKUP_CREDENTIALS` confirmation, reads
+both passwords with terminal echo disabled, and supplies them to restic only
+through inherited anonymous file descriptors. It requires one access key per
+repository, preserves repository identity and snapshot inventory, verifies the
+new password, rejects the old password, and attempts rollback if the second
+repository cannot complete. It writes no credential or rotation receipt.
+
 ## Verification
 
 Run the deterministic fixture:
