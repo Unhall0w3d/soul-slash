@@ -105,13 +105,13 @@
       "item_id": "track_persona_fidelity",
       "title": "Refine persona fidelity across Daily and fallback chat models",
       "area": "Chat + Persona",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "medium",
       "summary": "Improve the fresh-machine-soul voice while avoiding unnecessary scene narration, tool-output corruption, and model-specific drift.",
       "acceptance": "Representative conversations retain Soul's identity naturally; structured results stay structurally valid; persona-off and re-enable controls remain reliable.",
       "source": "Persona Fidelity A1",
-      "notes": "A1 implements profile version 9, balanced Gemma and compact Qwen projections of one identity, explicit diagnostic/menu/scene restraint, a deterministic exact microphone-check acknowledgement, and reversible conversation-local persona expression controls. Deterministic verification passes. Matched temporary-state production-budget runs scored 41/41 on Gemma Daily Core and 41/41 on Qwen AMD-Free Core; Operator conversation review remains required."
+      "notes": "A1 implements profile version 9, balanced Gemma and compact Qwen projections of one identity, explicit diagnostic/menu/scene restraint, a deterministic exact microphone-check acknowledgement, and reversible conversation-local persona expression controls. Deterministic verification passes. Matched temporary-state production-budget runs scored 41/41 on Gemma Daily Core and 41/41 on Qwen AMD-Free Core. The Operator completed and approved live conversation review on 2026-07-29."
     },
     {
       "item_id": "track_visual_screen_completion",
