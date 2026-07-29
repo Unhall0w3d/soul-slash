@@ -1,8 +1,8 @@
 # Portable Fleet Discovery and Enrollment A1 Review
 
 Status: candidate-complete; live acceptance passed; merge pre-approved by the
-Operator. Guided missing-alias extension is candidate-complete and awaiting
-live acceptance.
+Operator. Guided missing-alias extension was live-accepted against Foundry on
+2026-07-29 and awaits PR merge approval.
 
 ## What was implemented
 
@@ -132,6 +132,16 @@ registry record, removed its card, and did not contact or modify the device.
 The registry returned to zero records. A 390-pixel responsive check found no
 horizontal overflow and stacked all discovery controls into one column.
 
+The guided missing-alias extension was then exercised against the new Foundry
+Proxmox host at its reviewed private address. The Dashboard previewed and
+appended the exact `foundry` stanza using the existing Proxmox maintenance key.
+The first public-key bootstrap correctly failed closed because the new host key
+was not yet trusted. One explicit terminal `ssh-copy-id` invocation using
+`StrictHostKeyChecking=accept-new` established first-use host trust and copied
+the public key. The subsequent Dashboard enrollment completed, verified the
+alias-to-address binding, identified Debian 13 and a PVE kernel, and presented
+Foundry as generic inventory-only SSH evidence with no mutation controls.
+
 The candidate-filter and identity-hint follow-up was exercised live on Maven.
 One `/24` scan detected 22 reachable addresses, excluded five configured or
 enrolled addresses, and returned 17 actionable candidates. All 17 received
@@ -200,7 +210,7 @@ No device mutation authority.
 - [x] Remove the test record and confirm the device itself is untouched.
 - [x] Confirm Maven, Forge, Pi-hole, and Cisco phone behavior is unchanged.
 - [x] Confirm narrow/mobile layout remains usable.
-- [ ] With a reviewed test host, preview and add one missing literal SSH alias.
-- [ ] Confirm the stanza contains only the reviewed address, user, key path,
+- [x] With a reviewed test host, preview and add one missing literal SSH alias.
+- [x] Confirm the stanza contains only the reviewed address, user, key path,
       and fixed non-interactive options.
-- [ ] Confirm the alias gate alone does not enroll or mutate the device.
+- [x] Confirm the alias gate alone does not enroll or mutate the device.

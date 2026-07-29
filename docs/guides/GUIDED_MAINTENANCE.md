@@ -163,6 +163,19 @@ future adapter must define, test, and receive approval for each mutation
 family. Removing a device removes only its local registry record and sends
 nothing to the target.
 
+An enrolled fixed-SSH host with reviewed `-pve` kernel evidence and a fixed
+`pveversion` executable receives a richer read-only Proxmox projection:
+version, cached-metadata APT updates, running and selected kernels, reboot
+marker, and bounded LXC/QEMU guest summaries. Its card remains
+`inventory_only`; platform recognition never creates Maintain, Reboot, or
+guest-control authority.
+
+If a previously enrolled SSH device suddenly appears offline while still
+answering ping, test its literal alias directly. A changed host key is treated
+as an identity failure, not ordinary downtime. Verify the new fingerprint
+against an independent management path before replacing a dedicated
+`known_hosts` entry.
+
 The SSH prerequisite has its own digest-bound gate. It accepts only a portable
 literal alias, one account name, the reviewed candidate address, and an
 existing mode-`0600` private-key path confined beneath the owner SSH directory.

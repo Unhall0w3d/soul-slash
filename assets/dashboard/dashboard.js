@@ -2506,7 +2506,7 @@ function renderMaintenanceDevice(device) {
 
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
-  const readOnlyStatus = inventoryOnly && device.facts?.status_adapter === "dnf5_read_only";
+  const readOnlyStatus = inventoryOnly && ["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter);
   const facts = [
     ["Platform", device.os || "unavailable"],
     ["Version", device.version || "unavailable"],
@@ -2534,6 +2534,12 @@ function renderMaintenanceDevice(device) {
     const chip = document.createElement("span"); chip.dataset.state = piholeContainer.status === "running" ? "active" : "failed";
     chip.textContent = `LXC ${piholeContainer.id} · ${piholeContainer.status || "unknown"}`; services.append(chip);
   }
+  if (device.facts?.status_adapter === "proxmox_read_only") {
+    (device.facts?.guests || []).forEach((guest) => {
+      const chip = document.createElement("span"); chip.dataset.state = guest.status === "running" ? "active" : "unavailable";
+      chip.textContent = `${String(guest.type || "guest").toUpperCase()} ${guest.id} · ${guest.name || "unnamed"} · ${guest.status || "unknown"}`; services.append(chip);
+    });
+  }
   const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
   const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "gate-button maintenance-device-refresh";
   refresh.textContent = "Refresh";
@@ -2544,7 +2550,7 @@ function renderMaintenanceDevice(device) {
     notice.textContent = statusOnly
       ? "Status only · lifecycle and mutation remain provider-managed"
       : (readOnlyStatus
-        ? "DNF5 evidence only · maintenance and reboot authority remain disabled"
+        ? `${device.facts?.status_adapter === "proxmox_read_only" ? "Proxmox" : "DNF5"} evidence only · maintenance and reboot authority remain disabled`
         : "Inventory only · discovered capabilities grant no mutation authority");
     actions.append(notice);
   } else {
@@ -2729,6 +2735,8 @@ function resetMaintenanceSshAliasPreview() {
   state.maintenanceSshAliasPreview = null;
   byId("maintenance-ssh-alias-confirm").hidden = true;
   byId("maintenance-ssh-alias-scope").textContent = "";
+  byId("maintenance-ssh-bootstrap-command").hidden = true;
+  byId("maintenance-ssh-bootstrap-command").textContent = "";
 }
 
 function selectMaintenanceCandidate(candidate) {
@@ -3032,8 +3040,14 @@ async function executeMaintenanceSshAlias() {
       expected_digest: preview.expected_digest
     }));
     if (envelope.lifecycle_state !== "complete") throw new Error(maintenanceDiscoveryError(envelope, "SSH alias creation was blocked safely."));
+    const parameters = maintenanceSshAliasParameters();
+    const publicKey = parameters.identity_file.startsWith("~/.ssh/")
+      ? `$HOME/.ssh/${parameters.identity_file.slice("~/.ssh/".length)}.pub`
+      : `${parameters.identity_file}.pub`;
     resetMaintenanceSshAliasPreview();
-    status.textContent = `Alias ${dataOf(envelope).ssh_alias.alias} added. Preview enrollment when key authentication and host trust are ready.`;
+    byId("maintenance-ssh-bootstrap-command").textContent = `ssh-copy-id -F /dev/null -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o StrictHostKeyChecking=accept-new -i "${publicKey}" ${parameters.ssh_user}@${parameters.address}`;
+    byId("maintenance-ssh-bootstrap-command").hidden = false;
+    status.textContent = `Alias ${dataOf(envelope).ssh_alias.alias} added. For a new host, run the displayed terminal command once; then preview enrollment.`;
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
 

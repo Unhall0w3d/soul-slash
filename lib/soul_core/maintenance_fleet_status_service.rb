@@ -240,8 +240,6 @@ module SoulCore
 
         collect_cisco_phone
       else
-        return collect_proxmox if existing.dig("facts", "platform") == "proxmox"
-
         record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
         raise "enrolled device is no longer present in the private registry" unless record
 
@@ -517,6 +515,9 @@ module SoulCore
           package_managers.include?("dnf")
         return collect_fedora_inventory_device(record, facts, package_managers)
       end
+      if record.fetch("connection_mode") == "ssh" && enrolled_proxmox?(record, facts)
+        return collect_enrolled_proxmox_device(record, facts, package_managers)
+      end
       if (mobile_inventory = apple_mobile_inventory_for(record))
         facts = facts.merge("apple_mobile_inventory" => mobile_inventory)
       end
@@ -553,6 +554,86 @@ module SoulCore
         facts: facts.merge("reachability" => "reachable", "package_managers" => package_managers),
         control: "inventory_only",
         status: "reachable"
+      )
+    end
+
+    def enrolled_proxmox?(record, facts)
+      return false unless facts["kernel"].to_s.end_with?("-pve")
+
+      probe = remote_run(
+        "enrolled_device.proxmox_probe",
+        record.fetch("ssh_alias"),
+        "/usr/bin/test", "-x", "/usr/bin/pveversion",
+        accepted_exit_statuses: [0, 1]
+      )
+      probe.exit_status == 0
+    end
+
+    def collect_enrolled_proxmox_device(record, facts, package_managers)
+      target = record.fetch("ssh_alias")
+      version = remote_run("enrolled_proxmox.version", target, "/usr/bin/pveversion")
+      kernel = remote_run("enrolled_proxmox.kernel", target, "/usr/bin/uname", "-r")
+      boot_kernels = remote_run("enrolled_proxmox.boot_kernels", target, "/usr/sbin/proxmox-boot-tool", "kernel", "list")
+      updates_result = remote_run(
+        "enrolled_proxmox.native_updates",
+        target,
+        "/usr/bin/apt-get", "-s", "-o", "Debug::NoLocking=1", "dist-upgrade",
+        timeout: 30
+      )
+      reboot_file = remote_run(
+        "enrolled_proxmox.reboot_required",
+        target,
+        "/usr/bin/test", "-e", "/var/run/reboot-required",
+        accepted_exit_statuses: [0, 1]
+      )
+      guests_result = remote_run(
+        "enrolled_proxmox.guest_inventory",
+        target,
+        "/usr/bin/pvesh", "get", "/cluster/resources", "--type", "vm", "--output-format", "json"
+      )
+      running_kernel = output(kernel)
+      available_kernel = newest_proxmox_kernel(output(boot_kernels))
+      kernel_update = !available_kernel.empty? && running_kernel != available_kernel
+      guests = parse_json_array(output(guests_result)).filter_map do |guest|
+        next unless %w[lxc qemu].include?(guest["type"])
+
+        {
+          "id" => guest["vmid"],
+          "type" => guest["type"],
+          "name" => safe_text(guest["name"]),
+          "status" => safe_text(guest["status"]),
+          "tags" => safe_text(guest["tags"]),
+          "memory_bytes" => integer(guest["mem"]),
+          "max_memory_bytes" => integer(guest["maxmem"]),
+          "uptime_seconds" => integer(guest["uptime"])
+        }
+      end
+      enriched_facts = facts.merge(
+        "platform" => "proxmox",
+        "management_channel" => "ssh_inventory",
+        "control_capability" => "inventory_only",
+        "mutation_supported" => false,
+        "status_adapter" => "proxmox_read_only",
+        "package_managers" => package_managers,
+        "guests" => guests
+      )
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: "Proxmox VE hypervisor · inventory only",
+        address: record.fetch("address"),
+        reachable: true,
+        os: "Proxmox VE on Debian",
+        version: output(version),
+        kernel: kernel_summary(running_kernel, available_kernel, kernel_update),
+        updates: update_summary(native: apt_update_count(updates_result), freshness: "cached_apt_metadata"),
+        reboot: {
+          "required" => reboot_file.exit_status == 0 || kernel_update,
+          "reason" => reboot_file.exit_status == 0 ? "reboot-required marker exists" : (kernel_update ? "newer Proxmox kernel is installed" : "no reboot evidence")
+        },
+        services: [{"id" => "ssh_inventory", "label" => "SSH inventory", "state" => "active"}],
+        facts: enriched_facts,
+        control: "inventory_only"
       )
     end
 
