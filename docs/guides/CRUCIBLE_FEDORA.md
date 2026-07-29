@@ -64,7 +64,7 @@ The independent backup disk is XFS-mounted by UUID at:
 /srv/soul-backup
 ```
 
-The future encrypted repository target is:
+The encrypted repository target is:
 
 ```text
 sftp:crucible-maintenance:/srv/soul-backup/restic
@@ -77,11 +77,19 @@ deployment does not add NFS or SMB.
 Preparing the directory does not initialize a repository. **Administration →
 Backup & Recovery → Copy to Crucible** previews and executes the bounded
 initialization/copy/check transaction with a fresh password supplied for one
-page request. The password must never be stored in Git,
-`.env`, receipts, logs, Dashboard persistence, or model context.
+page request. The password must never be stored in Git, `.env`, receipts,
+logs, or Dashboard persistence.
 
-This first production candidate never deletes target snapshots and has no
-timer. Nightly reconciliation remains a later, separately reviewed gate.
+The live gate initialized Crucible's independently encrypted repository,
+copied all three local snapshots, passed repository checks, and proved exact
+source coverage through restic's preserved original-snapshot lineage. A
+subsequent local terminal gate rotated both repository passwords after a
+browser-inspection incident; both repositories accepted the replacement,
+rejected the previous password, and preserved all snapshots.
+
+The accepted manual path never deletes target snapshots and has no timer.
+Remote retention, nightly reconciliation, and full recovery rehearsal remain
+later, separately reviewed gates.
 
 ## Guided Maintenance state
 
@@ -122,6 +130,19 @@ receipt and no automatic reboot. Reboot remains a separate digest-bound gate.
 After one reboot request, Soul requires a changed boot identity plus active
 SSH and QEMU guest agent, working DNF5, the `/srv/soul-backup` mount, and the
 exact authority self-check. It never retries the reboot request.
+
+## Live acceptance
+
+Crucible is validated for both reviewed roles:
+
+- D1 installed the exact fixed-operation authority and removed broad
+  cloud-init sudo access;
+- a 173-package DNF5 update completed, followed by a separate reboot;
+- the guest returned on its newer kernel and passed SSH/QEMU guest-agent,
+  DNF5, backup-mount, and authority readiness;
+- the XFS target remained mounted with the reviewed hardening options; and
+- the encrypted second-copy repository now contains all three accepted local
+  snapshots.
 
 ## Verification
 

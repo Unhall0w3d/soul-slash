@@ -189,6 +189,26 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "route" && edge["from"] == "workstation" && edge["to"] == "default-gateway" } &&
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "backup_planned" } &&
                data.dig("topology", "nodes").map { |node| node["id"] }.include?("pihole"))
+  crucible_topology = service.send(
+    :build_topology,
+    data.fetch("devices") + [{
+      "id" => "managed_0123456789abcdef",
+      "label" => "Crucible",
+      "role" => "Fedora backup target",
+      "address" => "192.168.50.2",
+      "status" => "healthy",
+      "control" => "maintenance",
+      "facts" => {"control_target_id" => "crucible"}
+    }]
+  )
+  check.call("an enrolled Crucible replaces the planned Proxmox backup edge with its active encrypted second-copy path",
+             crucible_topology.fetch("edges").any? do |edge|
+               edge["kind"] == "backup" &&
+                 edge["from"] == "workstation" &&
+                 edge["to"] == "managed_0123456789abcdef" &&
+                 edge["label"] == "encrypted second copy · active"
+             end &&
+               crucible_topology.fetch("edges").none? { |edge| edge["kind"] == "backup_planned" })
   check.call("only fixed aliases and bounded no-password SSH options are used",
              runner.calls.select { |call| call.dig("argv", 0) == "/usr/bin/ssh" }.all? do |call|
                argv = call["argv"]
@@ -286,6 +306,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                dashboard.include?("WAN & provider cloud") &&
                dashboard.include?("Default gateway") &&
                dashboard.include?("Local switching & routing") &&
+               dashboard.include?("Management, services & data paths") &&
                dashboard.include?('!["route", "wan"].includes(edge.kind)'))
 
   missing_route_data = SoulCore::MaintenanceFleetStatusService.new(

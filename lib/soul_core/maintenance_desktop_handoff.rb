@@ -193,7 +193,7 @@ module SoulCore
     end
 
     def pending_live_digest?(digest_value)
-      Dir.glob(File.join(@transactions_root, "maintenance_tx_*.{reserved,claimed}.json")).any? do |path|
+      transaction_reservation_paths.any? do |path|
         transaction = read_json(path, TRANSACTION_SCHEMA)
         %w[live live_reboot].include?(transaction["mode"]) && secure_equal?(transaction["plan_digest"], digest_value)
       rescue StandardError
@@ -378,13 +378,27 @@ module SoulCore
     end
 
     def claimed_transaction_path(id)
-      File.join(@transactions_root, "#{id}.claimed.json")
+      # The root-owned A4 helper accepts only this canonical, ID-derived path.
+      # Reservation state remains visibly suffixed until the single-use URI
+      # atomically claims it here.
+      File.join(@transactions_root, "#{id}.json")
+    end
+
+    def transaction_reservation_paths
+      canonical = Dir.glob(File.join(@transactions_root, "maintenance_tx_*.json")).select do |path|
+        File.basename(path).match?(/\Amaintenance_tx_[a-f0-9]{16}\.json\z/)
+      end
+      (
+        Dir.glob(File.join(@transactions_root, "maintenance_tx_*.reserved.json")) +
+        Dir.glob(File.join(@transactions_root, "maintenance_tx_*.claimed.json")) +
+        canonical
+      ).uniq
     end
 
     def reservation_paths
       (
         Dir.glob(File.join(@reservations_root, "maintenance_evidence_*.json")) +
-        Dir.glob(File.join(@transactions_root, "maintenance_tx_*.{reserved,claimed}.json"))
+        transaction_reservation_paths
       ).uniq
     end
 

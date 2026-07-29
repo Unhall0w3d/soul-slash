@@ -173,6 +173,8 @@ Dir.mktmpdir("soul-maintenance-a2b") do |root|
   receipt = JSON.parse(File.read(receipt_path))
   check.call("desktop transaction terminates with one redacted receipt and no reboot",
              completed["lifecycle_state"] == "complete" && transaction_runner.calls.length == 1 &&
+               transaction_runner.calls.first.first.end_with?("/maintenance_tx_fedcba9876543210.json") &&
+               !transaction_runner.calls.first.first.include?(".claimed.json") &&
                receipt["password_prompts"] == 1 && receipt["sudo_ticket_invalidated"] &&
                receipt["reboot_requested"] == false && receipt["redacted"] == true)
   check.call("transaction reservation cannot be replayed",

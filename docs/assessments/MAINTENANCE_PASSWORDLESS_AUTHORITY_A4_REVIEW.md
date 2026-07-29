@@ -1,8 +1,7 @@
 # Maintenance Passwordless Authority A4 Review
 
-Status: revision candidate; A4 v1 installed, first live A2 exposed an
-unprivileged-yay defect, and A4 v2 installation plus live acceptance are
-pending
+Status: A2 live-accepted on 2026-07-29 with A4 v3; separate A3
+maintenance/reboot/restoration acceptance remains pending
 
 ## What was implemented
 
@@ -17,9 +16,10 @@ pending
 - Added yay 13.0.1 native unattended policy flags: decline clean rebuilds,
   diffs, PKGBUILD edits, and make-dependency removal; select the reviewed
   upgrade set; proceed without routine input.
-- A4 v2 runs yay under the qualified desktop UID/GID instead of root. Its
+- A4 v3 runs yay under the qualified desktop UID/GID instead of root. Its
   privileged pacman calls return through a transaction-scoped helper bridge
-  that is accepted only while descended from the exact active yay process.
+  that is accepted only through a bounded chain of exact sudo processes
+  descended from the exact active yay PID/start identity.
   The bridge rejects removals, pacman database operations, alternate roots,
   alternate database/cache/hook/log/keyring paths, changed configuration,
   non-package-manager executables, and calls outside the active reviewed
@@ -48,6 +48,7 @@ pending
 - `lib/soul_core/application_facade.rb`
 - `lib/soul_core/configuration_schema.rb`
 - `lib/soul_core/maintenance_foreground_execution_service.rb`
+- `lib/soul_core/maintenance_desktop_handoff.rb`
 - `lib/soul_core/maintenance_passwordless_authority.rb`
 - `lib/soul_core/maintenance_reboot_restore_service.rb`
 - `lib/soul_core/maintenance_transaction_runner.rb`
@@ -88,8 +89,9 @@ git diff --check
 - Caller-controlled executables, package targets, paths, flags, and answers
   are rejected.
 - The generated helper drops UID, GID, and supplementary-group authority
-  before starting yay; only its recorded PID/start identity can invoke the
-  constrained pacman bridge.
+  before starting yay; only its recorded PID/start identity, reached through
+  at most three exact sudo ancestors, can invoke the constrained pacman
+  bridge.
 - Passwordless transactions contain no sudo validation, keeper, or
   invalidation call and record zero prompts.
 - Altered vectors and direct pacman execution fail before execution.
@@ -100,6 +102,12 @@ git diff --check
   leaving only a disabled device-action button.
 - Changing windows or workspaces between A2 preview and click leaves the
   package-only digest stable.
+- The native desktop handoff atomically claims a reviewed transaction at the
+  canonical ID-derived path required by the root helper; the suffixed
+  reservation remains single-use and cannot replay.
+- The supervised 2026-07-29 A2 run completed the Arch/AUR full upgrade and
+  system Flatpak update with zero password prompts, no reboot request, a
+  closed sudo lifecycle, and one redacted terminal receipt.
 
 ## Local LLM eval results
 
@@ -120,9 +128,12 @@ model.
   resolved by the qualified native policy stop the transaction.
 - The helper is version-qualified to yay 13.0.1. A yay update intentionally
   disables A4 until a new helper is reviewed and installed.
-- The first A4 v1 A2 run failed before package mutation because yay was
-  launched as root. That receipt was retained. A fresh live A2 and later A3
-  acceptance run remain required after A4 v2 installation.
+- Earlier retained failures exposed three fail-closed integration defects:
+  root-owned AUR builds, a handoff/canonical transaction-path mismatch, and
+  sudo's additional monitor ancestry. A4 v3 repairs all three without
+  broadening the fixed-operation surface.
+- A later supervised A3 maintenance/reboot/restoration run must still prove
+  the same zero-prompt authority across its journal-gated reboot boundary.
 
 ## Memory keys added or used
 
@@ -154,8 +165,9 @@ no password and exposes no general command runner.
 - [x] Inspect and install the A4 v1 helper and sudoers plan.
 - [x] Confirm A4 v1 exact self-check and arbitrary-operation rejection.
 - [x] Enable the ignored local A4 flag.
-- [ ] Inspect and install the corrected A4 v2 helper and sudoers plan.
-- [ ] Run one supervised A2 no-change or low-change transaction with zero
+- [x] Inspect and install the corrected A4 v3 helper and sudoers plan.
+- [x] Run one supervised A2 transaction with zero
   prompts.
 - [ ] Run one later A3 update/reboot/restore transaction with zero prompts.
-- [ ] Accept, revise, or uninstall A4.
+- [x] Accept A4 for package-only A2 maintenance.
+- [ ] Accept, revise, or uninstall A4 for A3 after the separate reboot test.

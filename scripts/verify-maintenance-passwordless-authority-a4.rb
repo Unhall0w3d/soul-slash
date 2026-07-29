@@ -49,7 +49,7 @@ check.call(
     helper.include?("fail_closed(\"argument count is invalid\")") &&
     helper.include?("transaction command vector is invalid") &&
     helper.include?("pacman bridge executable changed") &&
-    helper.include?("pacman bridge is not descended from active yay") &&
+    helper.include?("pacman bridge is not descended through bounded sudo ancestry from active yay") &&
     !helper.include?("system(*ARGV)") &&
     !helper.include?("eval(") &&
     !helper.include?("`")
@@ -69,7 +69,9 @@ check.call(
   "pacman bridge is limited to active yay ancestry and rejects dangerous database or path controls",
   helper.include?("active_arch_update") &&
     helper.include?("yay_start_ticks") &&
-    helper.include?("caller_parent[\"ppid\"] == yay[\"pid\"]") &&
+    helper.include?("MAX_SUDO_ANCESTRY_DEPTH = 3") &&
+    helper.include?("ancestor[\"exe\"] == File.realpath(PATHS.fetch(\"sudo\"))") &&
+    helper.include?("ancestor[\"start_ticks\"] == yay[\"start_ticks\"]") &&
     %w[--remove --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir].all? { |flag| helper.include?(flag) } &&
     helper.include?("pacman bridge configuration changed")
 )
