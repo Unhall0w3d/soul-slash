@@ -108,8 +108,10 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
   inventory-only. The 173-package live update completed with a terminal
   receipt and zero updates remaining. A post-run correction now compares a
   freshly probed running kernel with the newest installed kernel instead of
-  trusting DNF5's incomplete reboot signal; the supervised reboot remains
-  pending Operator acceptance. Operator-managed reservations now
+  trusting DNF5's incomplete reboot signal. The separately authorized reboot
+  returned with a new boot identity, passed all four readiness checks, and now
+  reports the current `7.1.5` kernel, zero updates, and Healthy state.
+  Operator-managed reservations now
   provide stable identities for the workstation, Forge, the Pi-hole appliance,
   and Crucible. Deployment-specific card names remain ignored local
   configuration; public source preserves functional roles and stable IDs.

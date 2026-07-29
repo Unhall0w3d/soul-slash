@@ -109,4 +109,4 @@ stretched by a managed or SSH-integrated card.
 - [x] Live Crucible card exposes separate Maintenance and Reboot previews.
 - [x] Operator reviews and starts the 173-package maintenance action.
 - [x] Operator reviews its receipt and refreshed DNF5 evidence.
-- [ ] Operator separately authorizes reboot if the refreshed card recommends it.
+- [x] Operator separately authorizes reboot if the refreshed card recommends it.

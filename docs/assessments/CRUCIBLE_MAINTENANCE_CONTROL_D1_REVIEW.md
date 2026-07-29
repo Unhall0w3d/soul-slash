@@ -96,7 +96,7 @@ an LLM cannot validate its safety or authorization.
 
 - DNF5 rollback is not provided.
 - A guest update may still require human review of package-manager failure.
-- The 173-package update is accepted; the separate reboot remains untested.
+- The 173-package update and separate reboot are live-accepted.
 - The fixed 45-minute maintenance bound may need review if unusually slow
   mirrors make a legitimate update exceed it.
 
@@ -112,10 +112,10 @@ device and exact fixed operations.
 - [x] Inspect Maintenance preview: one fixed helper `dnf5-upgrade`.
 - [x] Execute and observe the 173-package transaction.
 - [x] Confirm a terminal receipt and refreshed package evidence.
-- [ ] Inspect Reboot preview separately.
-- [ ] Reboot once and confirm changed boot identity and all four readiness
+- [x] Inspect Reboot preview separately.
+- [x] Reboot once and confirm changed boot identity and all four readiness
       checks.
-- [ ] Confirm `/srv/soul-backup` remains mounted and backup data is intact.
+- [x] Confirm `/srv/soul-backup` remains mounted and backup data is intact.
 - [ ] Approve merge only after the supervised acceptance above.
 
 ## Live maintenance result
@@ -131,3 +131,16 @@ was running. The candidate now probes the running kernel on every collection
 and treats a newer installed kernel as an independent reboot requirement. This
 prevents a stale enrollment-time kernel or incomplete DNF5 reboot signal from
 presenting a false Healthy state.
+
+## Live reboot result
+
+Receipt `device_receipt_aea88b989d8df1ba` completed from
+2026-07-28 23:48:52-04:00 through 23:49:07-04:00. Exactly one reboot request
+was issued. The first reconnect observed a new boot identity and all four fixed
+readiness checks passed: SSH/QEMU guest agent, DNF5, backup mount, and exact
+authority.
+
+The refreshed card is Healthy with zero updates, running and newest installed
+kernel `7.1.5-200.fc44.x86_64`, no reboot requirement, and active exact
+maintenance authority. Independent SSH verification confirmed both services,
+the XFS backup mount with `nosuid,nodev,noexec`, and the helper self-check.

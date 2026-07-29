@@ -655,6 +655,7 @@ module SoulCore
         services: services,
         facts: facts.merge(
           "reachability" => "reachable",
+          "kernel" => running_kernel,
           "package_managers" => package_managers,
           "status_adapter" => authority_ready ? "dnf5_fixed_maintenance" : "dnf5_read_only",
           "control_target_id" => "crucible",

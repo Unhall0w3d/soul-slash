@@ -199,6 +199,7 @@ Dir.mktmpdir("soul-crucible-d1-") do |root|
                device.dig("facts", "maintenance_authority") == "root_owned_fixed_operations")
   check.call("newer installed kernel requires reboot even when DNF5 omits it",
              device.dig("kernel", "running") == "1.0" &&
+               device.dig("facts", "kernel") == "1.0" &&
                device.dig("kernel", "available") == "2.0" &&
                device.dig("kernel", "update_required") == true &&
                device.dig("reboot", "required") == true &&
