@@ -11,7 +11,7 @@ state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
-Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupBusy: false });
+Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupBusy: false });
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
@@ -4056,6 +4056,7 @@ function renderBackupSnapshots(snapshots) {
 
 function renderBackupStatus(payload) {
   const mount = payload.mount || {};
+  const manifests = payload.manifest_reconciliation || {};
   const ready = payload.available && payload.configured && mount.mounted && mount.writable && mount.expected_target;
   byId("backup-repository-state").textContent = ready ? "READY" : "ATTENTION";
   renderBackupFacts(byId("backup-repository-details"), {
@@ -4063,7 +4064,10 @@ function renderBackupStatus(payload) {
     "Mount": mount.target || "Unavailable",
     "Filesystem": mount.filesystem || "Unavailable",
     "Write state": mount.mounted ? (mount.writable ? "writable" : "read only") : "not mounted",
-    "Configuration": payload.configured ? `${payload.source_count} sources` : "not configured"
+    "Configuration": payload.configured ? `${payload.source_count} sources` : "not configured",
+    "Manifest policy": manifests.state === "current" ? "current" : manifests.state === "review_required"
+      ? `${manifests.source_addition_count || 0} sources · ${manifests.exclusion_addition_count || 0} exclusions to review`
+      : "unavailable"
   });
   byId("backup-ledger-state").textContent = payload.ledger_present ? "PRESENT" : "BASELINE";
   renderBackupFacts(byId("backup-ledger-details"), {
@@ -4111,8 +4115,8 @@ async function loadBackupAdministration({ unlock = false } = {}) {
 }
 
 function resetBackupPreviews() {
-  state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null;
-  ["backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm"].forEach((id) => { byId(id).hidden = true; });
+  state.backupManifestPreview = null; state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null;
+  ["backup-manifest-confirm", "backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm"].forEach((id) => { byId(id).hidden = true; });
 }
 
 function selectedBackupSnapshotIds() {
@@ -4125,6 +4129,43 @@ function selectedBackupRestoreId() {
 
 function backupRestorePaths() {
   return byId("backup-restore-paths").value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+async function previewBackupManifestReconciliation() {
+  byId("preview-backup-manifests").disabled = true;
+  try {
+    const envelope = await callSoul("backup.manifests.reconcile.preview");
+    state.backupManifestPreview = backupResult(envelope);
+    byId("backup-manifest-scope").textContent = JSON.stringify({
+      source_additions: state.backupManifestPreview.source_additions,
+      exclusion_additions: state.backupManifestPreview.exclusion_additions,
+      removals: 0,
+      replaces_existing: false,
+      starts_restic: false,
+      fresh_snapshot_required: state.backupManifestPreview.snapshot_verification_required
+    }, null, 2);
+    byId("backup-manifest-confirm").hidden = false;
+    byId("execute-backup-manifests").disabled = !state.backupManifestPreview.changes_required;
+    byId("backup-manifest-status").textContent = state.backupManifestPreview.changes_required
+      ? "Exact add-only scope prepared. The click updates manifests only; it does not create a backup."
+      : "Owner manifests already match the current portable policy.";
+  } catch (error) { byId("backup-manifest-status").textContent = error.message; }
+  finally { byId("preview-backup-manifests").disabled = false; }
+}
+
+async function executeBackupManifestReconciliation() {
+  if (!state.backupManifestPreview || !state.backupManifestPreview.changes_required || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-manifests").disabled = true;
+  try {
+    const envelope = await callSoul("backup.manifests.reconcile.execute", {
+      confirmation: state.backupManifestPreview.confirmation_phrase,
+      expected_digest: state.backupManifestPreview.expected_digest
+    });
+    const result = backupResult(envelope);
+    byId("backup-manifest-status").textContent = `${result.source_addition_count || 0} sources and ${result.exclusion_addition_count || 0} exclusions added. Create a fresh verified backup to prove coverage.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: backupPassword().length > 0 });
+  } catch (error) { byId("backup-manifest-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-manifests").disabled = false; }
 }
 
 async function previewBackupCreate() {
@@ -4354,6 +4395,8 @@ byId("forget-backup-password").addEventListener("click", () => {
   byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);
   byId("backup-status").textContent = "Repository password forgotten; encrypted history is locked.";
 });
+byId("preview-backup-manifests").addEventListener("click", previewBackupManifestReconciliation);
+byId("execute-backup-manifests").addEventListener("click", executeBackupManifestReconciliation);
 byId("preview-backup-create").addEventListener("click", previewBackupCreate);
 byId("execute-backup-create").addEventListener("click", executeBackupCreate);
 byId("preview-backup-replica").addEventListener("click", previewBackupReplica);

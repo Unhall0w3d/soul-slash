@@ -121,6 +121,28 @@ manifests first, then create and verify a fresh snapshot through the normal
 Dashboard gate. Coverage is not considered proven merely because a parent
 directory exists locally.
 
+### Reconciling an existing installation
+
+Initial Makefile setup and the Dashboard reconciliation gate derive from the
+same tracked portable policy. When Soul gains a new durable continuity path or
+an explicit disposable/cache exclusion:
+
+1. Open **Administration → Backup & Recovery**.
+2. Select **Preview manifest additions**.
+3. Review every exact source and exclusion line. The preview must show zero
+   removals, no replacement, no password, and no Restic operation.
+4. Select **Add reviewed entries**.
+5. Unlock the repository separately and create a fresh verified backup.
+6. Return to **Self Assessment → Storage & Retention** and confirm required
+   coverage is latest-snapshot verified.
+
+Reconciliation preserves existing sources, exclusions, comments, and blank
+lines. It binds both manifest hashes and the current policy into one digest,
+shares the Backup Administration operation lock, writes owner-only files, and
+records only counts/hashes in a private receipt. Drift or concurrent backup
+work blocks it. Adding a source to the allow-list is not itself evidence that
+the source has been captured.
+
 ## Dashboard flow
 
 1. Confirm no Music/Visual generation or model transition is active.
@@ -239,6 +261,7 @@ Run the deterministic fixture:
 
 ```sh
 make verify-backup-administration
+make verify-backup-manifest-reconciliation
 make verify-storage-retention-census
 ```
 

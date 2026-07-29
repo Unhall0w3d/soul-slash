@@ -52,6 +52,8 @@ module SoulCore
       "inbox.dismiss" => %w[chat_id delivery_id],
       "system_status.refresh" => [],
       "backup.status" => %w[password],
+      "backup.manifests.reconcile.preview" => [],
+      "backup.manifests.reconcile.execute" => %w[confirmation expected_digest],
       "backup.create.preview" => %w[password],
       "backup.create.execute" => %w[password confirmation expected_digest],
       "backup.retention.preview" => %w[password snapshot_ids],
