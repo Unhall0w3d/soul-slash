@@ -10,7 +10,7 @@ Branch: `agent/persona-fidelity-a1`
 
 Date: 2026-07-27
 
-Status: `needs_review`
+Status: `validated`
 
 ## Implementation summary
 
@@ -170,28 +170,30 @@ New memory store added: no
   composer toggle.
 - Deterministic skill and evidence responses retain their bounded renderers;
   this slice does not post-process them to add personality.
-- Operator conversation review remains open.
+- Operator conversation review was completed and approved on 2026-07-29.
 
 ## Human review checklist
 
 ```text
-[ ] Gemma casual response is Soul-specific without scene narration
-[ ] Qwen casual response avoids diagnostics, menus, and repeated Operator address
-[ ] Both models handle success, support, identity, and affect naturally
-[ ] Neither model invents environment, access, execution, or side effects
-[ ] Persona disable affects only the active conversation
-[ ] Neutral mode is concise and operationally unchanged
-[ ] Persona re-enable restores Soul's voice
-[ ] Structured creative and skill results remain valid
-[ ] No authority or persistence boundary changed
+[x] Gemma casual response is Soul-specific without scene narration
+[x] Qwen casual response avoids diagnostics, menus, and repeated Operator address
+[x] Both models handle success, support, identity, and affect naturally
+[x] Neither model invents environment, access, execution, or side effects
+[x] Persona disable affects only the active conversation
+[x] Neutral mode is concise and operationally unchanged
+[x] Persona re-enable restores Soul's voice
+[x] Structured creative and skill results remain valid
+[x] No authority or persistence boundary changed
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: Operator
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-29
+Decision summary: The previously completed live review is accepted. Persona
+  Fidelity A1 meets the representative-conversation, structured-output, and
+  conversation-local control expectations.
+Required changes: none
 ```

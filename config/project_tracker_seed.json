@@ -105,13 +105,13 @@
       "item_id": "track_persona_fidelity",
       "title": "Refine persona fidelity across Daily and fallback chat models",
       "area": "Chat + Persona",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "medium",
       "summary": "Improve the fresh-machine-soul voice while avoiding unnecessary scene narration, tool-output corruption, and model-specific drift.",
       "acceptance": "Representative conversations retain Soul's identity naturally; structured results stay structurally valid; persona-off and re-enable controls remain reliable.",
       "source": "Persona Fidelity A1",
-      "notes": "A1 implements profile version 9, balanced Gemma and compact Qwen projections of one identity, explicit diagnostic/menu/scene restraint, a deterministic exact microphone-check acknowledgement, and reversible conversation-local persona expression controls. Deterministic verification passes. Matched temporary-state production-budget runs scored 41/41 on Gemma Daily Core and 41/41 on Qwen AMD-Free Core; Operator conversation review remains required."
+      "notes": "A1 implements profile version 9, balanced Gemma and compact Qwen projections of one identity, explicit diagnostic/menu/scene restraint, a deterministic exact microphone-check acknowledgement, and reversible conversation-local persona expression controls. Deterministic verification passes. Matched temporary-state production-budget runs scored 41/41 on Gemma Daily Core and 41/41 on Qwen AMD-Free Core. The Operator completed and approved live conversation review on 2026-07-29."
     },
     {
       "item_id": "track_visual_screen_completion",
@@ -401,8 +401,8 @@
       "item_id": "track_chat_progress_summaries",
       "title": "Refine conversational progress summaries and multi-message flow",
       "area": "Chat",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "medium",
       "summary": "Review the candidate durable ordinary-Chat progress flow: immediate provisional text, server acceptance, one event-derived working card, and load-driven recovery after navigation or body-stream disconnect.",
       "implementation": "Ordinary Chat sends persist bounded lifecycle state and summary fields in the existing owner-local request receipt ledger. A read-only chats.progress operation reconstructs fresh active state when the Dashboard or a conversation loads. The Dashboard renders submitted text before streaming, marks it accepted after the server records it, updates one working card, scopes terminal reconciliation to the originating conversation, and performs one honest post-disconnect reconciliation.",
@@ -411,7 +411,8 @@
       "commands": "make verify-chat-progress-summaries\nruby scripts/verify-responsive-chat-and-web-research.rb",
       "references": "docs/soul/CHAT_PROGRESS_SUMMARIES_A1_BRIEF.md\ndocs/assessments/CHAT_PROGRESS_SUMMARIES_A1_REVIEW.md\ndocs/soul/IN_PROCESS_APPLICATION_API.md",
       "acceptance": "Progress is timely, derived from actual lifecycle events, readable in Chat, resilient to navigation/reload, and never invents work or exposes private payloads. Automatic reattachment, Voice narration, and standalone Studio/Administration progress remain later slices.",
-      "source": "Human-approved Chat Progress Summaries A1 brief, 2026-07-27"
+      "source": "Human-approved Chat Progress Summaries A1 brief, 2026-07-27",
+      "notes": "A1 deterministic verification passes. The Operator approved the visual, navigation/reload, terminal reconciliation, and privacy behavior through normal Dashboard use on 2026-07-29. Automatic reattachment and broader progress surfaces remain separately deferred."
     },
     {
       "item_id": "track_fleet_maintenance_control",

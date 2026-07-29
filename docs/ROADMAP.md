@@ -27,8 +27,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 ## Near-term refinement
 
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
-- [ ] refine persona fidelity across supported chat models without corrupting structured tool output
-- [~] review durable event-derived Chat progress summaries; automatic stream
+- [x] refine persona fidelity across supported chat models without corrupting structured tool output
+- [x] review durable event-derived Chat progress summaries; automatic stream
   reattachment and broader Studio/administration progress remain deferred
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects

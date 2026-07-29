@@ -228,7 +228,6 @@ The foundational Conversational Soul milestone is complete. Deployment/Core orch
 
 Near-term work is expected to concentrate on:
 
-- final human review of version-9 persona fidelity on Gemma and Qwen;
 - interruption-aware duplex voice beyond the reviewed push-to-talk,
   per-message speech, and visible local wake-word presence paths;
 - production hardening and documentation of creative workflows;
