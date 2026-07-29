@@ -361,8 +361,10 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "start_seconds" || key == "end_seconds"
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
-        elsif key == "filters" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
+        elsif key == "filters" || key == "item" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
+        elsif key == "expected_revision"
+          return "expected_revision must be a positive integer" unless value.is_a?(Integer) && value.positive?
         elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else

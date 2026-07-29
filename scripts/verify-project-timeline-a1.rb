@@ -107,6 +107,24 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
   check.call("dashboard facade exposes the same ledger",
              envelope["lifecycle_state"] == "complete" &&
                envelope.dig("data", "revision") == service.snapshot.dig("data", "revision"))
+
+  current_item = service.find(created_item.fetch("item_id")).fetch("item")
+  update_request = {
+    "schema_version" => "soul.application.v1",
+    "request_id" => "timeline-test-0002",
+    "operation" => "project_tracker.items.update",
+    "parameters" => {
+      "item_id" => current_item.fetch("item_id"),
+      "item" => { "horizon" => "now" },
+      "expected_revision" => current_item.fetch("revision")
+    },
+    "context" => { "interface" => "dashboard_test" }
+  }
+  update_envelope = facade.call(update_request)
+  check.call("dashboard editor contract accepts an item object and integer revision",
+             update_envelope["lifecycle_state"] == "complete" &&
+               update_envelope.dig("data", "item", "horizon") == "now" &&
+               update_envelope.dig("data", "item", "revision") == current_item.fetch("revision") + 1)
 end
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
