@@ -1,7 +1,7 @@
 # Maintenance Passwordless Authority A4 Review
 
-Status: A2 live-accepted on 2026-07-29 with A4 v3; separate A3
-maintenance/reboot/restoration acceptance remains pending
+Status: A2 live-accepted on 2026-07-29 with A4 v3; separate reboot-only A3
+restoration acceptance remains pending
 
 ## What was implemented
 
@@ -132,8 +132,9 @@ model.
   root-owned AUR builds, a handoff/canonical transaction-path mismatch, and
   sudo's additional monitor ancestry. A4 v3 repairs all three without
   broadening the fixed-operation surface.
-- A later supervised A3 maintenance/reboot/restoration run must still prove
-  the same zero-prompt authority across its journal-gated reboot boundary.
+- A later supervised reboot-only A3 restoration run must still prove the same
+  zero-prompt authority across its journal-gated reboot boundary. A3 now
+  rejects package-command replay.
 
 ## Memory keys added or used
 
@@ -168,6 +169,7 @@ no password and exposes no general command runner.
 - [x] Inspect and install the corrected A4 v3 helper and sudoers plan.
 - [x] Run one supervised A2 transaction with zero
   prompts.
-- [ ] Run one later A3 update/reboot/restore transaction with zero prompts.
+- [ ] Run one later A3 reboot/restore transaction with zero prompts and no
+  package commands.
 - [x] Accept A4 for package-only A2 maintenance.
 - [ ] Accept, revise, or uninstall A4 for A3 after the separate reboot test.

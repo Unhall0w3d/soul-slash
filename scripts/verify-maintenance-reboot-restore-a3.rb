@@ -147,9 +147,9 @@ def transaction(root, clock, registry_digest, mode: "live_reboot")
     "created_at" => clock.call.iso8601,
     "deadline_at" => (clock.call + 600).iso8601,
     "plan_digest" => "a" * 64,
-    "commands" => [
+    "commands" => (mode == "live_reboot" ? [] : [
       {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}
-    ],
+    ]),
     "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
     "sudo_refresh_argv" => ["/usr/bin/sudo", "-n", "-v"],
     "sudo_invalidate_argv" => ["/usr/bin/sudo", "-k"],
@@ -255,6 +255,9 @@ Dir.mktmpdir("soul-a3-runner") do |root|
              result["password_prompts"] == 1 && result["sudo_ticket_invalidated"] == true &&
              calls.count { |argv| argv == ["/usr/bin/sudo", "-v"] } == 1 &&
              calls.include?(["/usr/bin/sudo", "-k"]))
+  check.call("A3 reboot is separate from maintenance and runs no package command",
+             tx.fetch("commands").empty? &&
+               calls.none? { |argv| argv.include?("/usr/bin/yay") || argv.include?("/usr/bin/flatpak") })
 
   adapter = A3AdapterFixture.new
   restorer = SoulCore::MaintenanceSessionRestorer.new(
@@ -482,8 +485,11 @@ Dir.mktmpdir("soul-a3-service") do |root|
   reserved = enabled.execute(force_database_refresh: false, expected_digest: ready.dig("data", "expected_digest"), confirmation: SoulCore::MaintenanceRebootRestoreService::CONFIRMATION)
   check.call("enabled A3 reserves only one exact desktop handoff and does not reboot in the Dashboard",
              ready.dig("data", "plan", "execution_available") == true &&
+             ready.dig("data", "plan", "maintenance_replay") == false &&
+             ready.dig("data", "plan", "commands") == [] &&
              reserved["lifecycle_state"] == "complete" &&
              handoff.transaction["mode"] == "live_reboot" &&
+             handoff.transaction["commands"] == [] &&
              handoff.transaction["reboot_argv"] == SoulCore::MaintenanceRebootRestoreService::FIXED_REBOOT_ARGV &&
              reserved.dig("data", "reboot_requested") == false)
   check.call("safe raw disk-space fluctuations do not invalidate an exact A3 review",

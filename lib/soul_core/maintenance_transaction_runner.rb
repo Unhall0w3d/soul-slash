@@ -234,7 +234,12 @@ module SoulCore
       ]
       raise "sudo lifecycle vectors are invalid" unless actual_privilege == expected_privilege
       commands = transaction.fetch("commands")
-      raise "maintenance command count is invalid" unless commands.is_a?(Array) && commands.length.between?(1, 3)
+      raise "maintenance commands are invalid" unless commands.is_a?(Array)
+      if transaction.fetch("mode") == "live_reboot"
+        raise "A3 reboot must not replay maintenance commands" unless commands.empty?
+      else
+        raise "maintenance command count is invalid" unless commands.length.between?(1, 3)
+      end
       commands.each do |command|
         argv = command.fetch("argv")
         allowed = case command.fetch("adapter")

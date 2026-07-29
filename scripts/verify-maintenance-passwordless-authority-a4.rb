@@ -214,15 +214,10 @@ Dir.mktmpdir("soul-a4-runner") do |temporary|
   check.call("runner rejects direct pacman or altered vectors before execution", hostile_result["lifecycle_state"] == "failed" && hostile_calls.empty?)
 
   reboot_id = "maintenance_tx_1111111111111111"
-  reboot_commands = [{
-    "adapter" => "arch_and_aur.full_upgrade",
-    "argv" => ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "arch-update", reboot_id],
-    "shell" => false
-  }]
   reboot_transaction = transaction.merge(
     "transaction_id" => reboot_id,
     "mode" => "live_reboot",
-    "commands" => reboot_commands,
+    "commands" => [],
     "reboot_allowed" => true,
     "reboot_argv" => ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "reboot", reboot_id],
     "result_path" => File.join(transaction_root, "#{reboot_id}.result.json")
@@ -245,7 +240,7 @@ Dir.mktmpdir("soul-a4-runner") do |temporary|
     reboot_result["lifecycle_state"] == "awaiting_login" &&
       reboot_result["password_prompts"] == 0 &&
       reboot_result["reboot_requested"] == true &&
-      reboot_calls == [reboot_commands.first.fetch("argv"), reboot_transaction.fetch("reboot_argv")]
+      reboot_calls == [reboot_transaction.fetch("reboot_argv")]
   )
 end
 

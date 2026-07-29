@@ -377,6 +377,7 @@ check.call("workstation maintenance refreshes fleet evidence after its exact rec
            javascript.include?('if (preview.action === "maintenance")') &&
              javascript.include?("await loadMaintenanceFleet()") &&
              javascript.include?("reboot remains a separate action") &&
+             javascript.include?("not included · reboot and restore only") &&
              javascript.include?('["maintenance", "reboot"].forEach'))
 check.call("cards distinguish maintenance channels from status-only probes while Pi-hole OpenSSH duplication is absent",
            javascript.include?('"Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")') &&

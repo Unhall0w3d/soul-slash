@@ -43,7 +43,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] A4's digest-bound root-owned fixed-operation authority is live-accepted
   for zero-prompt A2 workstation maintenance. Its uniform device-card UX now
   automates stale native-evidence recovery and exact-receipt card refresh while
-  preserving a distinct reboot action; the separate A3
+  preserving a distinct reboot-only action that rejects package-command replay;
+  the separate A3
   maintenance/reboot/restoration acceptance remains
 
 ## Qualified expansion candidates

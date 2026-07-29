@@ -12,8 +12,11 @@ live gates disabled
 - Extended the existing single-use desktop handoff with a distinct
   `live_reboot` transaction while preserving the non-rebooting A2 path.
 - Extended the visible foreground runner to write a durable restore journal
-  only after every fixed update command succeeds and all reboot postconditions
-  revalidate.
+  only after all reboot postconditions revalidate.
+- Applied the Operator's 2026-07-29 separation decision: `live_reboot`
+  transactions now require an empty command list and reject any attempted
+  package-maintenance replay. Historical accepted A3 transactions included
+  updates; future **Reboot** actions do not.
 - Added one exact reboot vector:
   `/usr/bin/sudo -n /usr/bin/systemctl reboot`.
 - Added one bounded post-login restorer that verifies owner, digest, boot
@@ -188,10 +191,10 @@ No runner or restorer remains silently active after its explicit bound.
 
 Class 5.
 
-The candidate can update packages and request a host reboot only when its
-separate local gate is enabled and one exact Dashboard digest is authorized.
-The public and local default remains disabled. The resume unit has no privilege
-or reboot authority.
+The candidate can request a host reboot only when its separate local gate is
+enabled and one exact Dashboard digest is authorized. It cannot update
+packages. The public and local default remains disabled. The resume unit has no
+privilege or reboot authority.
 
 ## Safety and persistence check
 
