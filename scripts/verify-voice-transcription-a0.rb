@@ -143,8 +143,21 @@ js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 server = File.read(File.expand_path("../lib/soul_core/dashboard_server.rb", __dir__))
 check.call("Chat exposes one labeled push-to-talk control", html.include?('id="record-voice"') && html.include?('aria-label="Start push-to-talk recording"'))
-check.call("browser capture is explicit, finite, and enters the ordinary Chat submit path", js.include?("getUserMedia") && js.include?("MediaRecorder") && js.include?("elapsed >= 60") && js.include?("insertVoiceTranscript") && js.include?("voiceRoundTripPending") && js.include?('byId("composer").requestSubmit()') && js.include?('callSoulStream("chats.send"'))
-check.call("only a voice-originated turn speaks its terminal assistant reply", js.match?(/const voiceRoundTrip = state\.voiceRoundTripPending[\s\S]{0,4000}if \(voiceRoundTrip\)[\s\S]{0,500}synthesizeMessageSpeech/))
+check.call(
+  "browser capture is explicit, finite, and enters the ordinary Chat submit path",
+  js.include?("getUserMedia") &&
+    js.include?("MediaRecorder") &&
+    js.include?("elapsed >= 60") &&
+    js.include?("insertVoiceTranscript") &&
+    js.include?("state.voiceRoundTripPending = true") &&
+    js.include?('byId("composer").requestSubmit()') &&
+    js.match?(/callSoulStream\(\s*"chats\.send"/)
+)
+check.call(
+  "only a voice-originated turn speaks its terminal assistant reply",
+  js.match?(/const voiceRoundTrip = state\.voiceRoundTripPending; state\.voiceRoundTripPending = false;/) &&
+    js.match?(/if \(voiceRoundTrip && state\.activeChat\?\.id === chatId\)[\s\S]{0,1000}synthesizeMessageSpeech/)
+)
 check.call("leaving Chat visibly cancels capture", js.include?('cancelVoiceRecording("Voice capture stopped because Chat was closed.")'))
 check.call("voice UI has visible and reduced-motion-aware recording state", css.include?("voice-capture-pulse") && css.include?(".voice-button[aria-pressed=\"true\"]"))
 check.call("server grants voice its exact bounded body ceiling", server.include?('when "/api/v1/voice/transcribe" then VOICE_BODY_LIMIT') && server.include?("VOICE_BODY_LIMIT = 8 * 1024 * 1024"))

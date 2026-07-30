@@ -107,7 +107,7 @@ SOUL_FLEET_CISCO_PHONE_LABEL=Cisco 8851
 Use a DHCP reservation if the phone should retain a stable address. Cisco
 documents richer read-only Product Information and Status pages when phone web
 access is enabled; Soul does not enable, authenticate to, or retain those pages
-in this slice.
+in the present supported boundary.
 
 ## Portable discovery and enrollment
 
@@ -255,12 +255,12 @@ LAN names can consume the full resolver timeout for little evidence. A future
 explicit per-candidate inspection can add bounded service fingerprinting when
 neighbor and vendor hints are insufficient.
 
-The snapshot is private, atomic, and survives Dashboard reloads. The proposed
-owner-level oneshot timer collects it at local noon and midnight. The timer
-cannot maintain or reboot anything and has no persistent worker or polling
-loop. Workstation pacman and remote APT counts use currently cached system
-metadata and are labeled as such. An offline device remains visible without
-hiding evidence from the other devices.
+The snapshot is private, atomic, and survives Dashboard reloads. When separately
+installed, the owner-level oneshot timer collects it at local noon and
+midnight. The timer cannot maintain or reboot anything and has no persistent
+worker or polling loop. Workstation pacman and remote APT counts use currently
+cached system metadata and are labeled as such. An offline device remains
+visible without hiding evidence from the other devices.
 
 ## Device-scoped flow
 
@@ -322,7 +322,7 @@ credentials, and common secret query values are removed before the
 owner-private receipt is written. The Dashboard shows this bounded evidence in
 the same device dialog; it does not retry, repair, or reinterpret the command.
 
-## Safety engines retained behind the cards
+## Maintenance, Reboot, and Session Restore A1
 
 The former A1, A2, and A3 presentation cards are no longer shown. Their
 reviewed backend contracts remain authoritative for the workstation: privacy-filtered
@@ -331,11 +331,11 @@ bounds, reboot preconditions, and one-shot restoration are unchanged. Native
 mode retains one sudo prompt. The separately installed A4 authority may replace
 that prompt only with a digest-bound root-owned fixed-operation helper.
 
-## A2 foreground candidate
+## Maintenance Foreground Execution A2
 
 The human-approved A2 contract is documented in
 [`MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md`](../soul/MAINTENANCE_FOREGROUND_EXECUTION_A2_BRIEF.md).
-The candidate implementation adds:
+The reviewed implementation provides:
 
 - a fresh digest-bound package, disk, active-work, and restore preflight;
 - `yay --sudoflags=-n -Syu` or the explicitly selected `-Syyu` variant;
@@ -411,7 +411,7 @@ window/workspace restoration inventory; closing the evidence terminal does not
 invalidate the reviewed update plan. A3 captures and binds its own fresh
 restore state separately before reboot.
 
-## A4 unattended fixed-operation authority
+## Maintenance Passwordless Authority A4
 
 A4 removes the routine password and package questions without storing a
 password and without granting passwordless access to yay, pacman, Flatpak,
@@ -441,9 +441,10 @@ automatic retry. A3 reboot still requires its exact pending restore journal,
 but it contains no package or Flatpak command and never repeats maintenance.
 The package-only A2 path completed supervised live acceptance on 2026-07-29:
 Arch/AUR and system Flatpak both completed with zero password prompts and no
-reboot request. A3 zero-prompt reboot/restoration acceptance remains separate.
-The uniform device-card UX is deterministic-test complete; its separate live
-workstation reboot acceptance is intentionally left to the Operator.
+reboot request. The distinct A3 reboot-only path then completed supervised live
+acceptance with zero password prompts, empty package-command vectors, and no
+package replay. The uniform device-card UX remains human-reviewed at each
+transaction.
 
 Review and deployment commands:
 
@@ -462,11 +463,13 @@ desktop owner can then request the same fixed full-maintenance operation; it
 still cannot turn that authority into an arbitrary root command. Remove the
 authority with the exact `REMOVE_SOUL_MAINTENANCE_AUTHORITY` Make target gate.
 
-## A3 conditional reboot candidate
+## Maintenance Conditional Reboot and Restore A3
 
-A3 is a separate disabled-by-default gate. It reuses the fixed A2 update
-vectors, then captures a fresh privacy-filtered restore map and writes one
-boot-bound journal before requesting a reboot. The tracked and local default is:
+A3 is a separate disabled-by-default reboot-only gate. It requires the package
+transaction to have ended, rejects any non-empty package, AUR, or Flatpak
+command vectors, captures a fresh privacy-filtered restore map, and writes one
+boot-bound journal before requesting exactly one reboot. It cannot replay A2
+maintenance. The tracked and local default is:
 
 ```text
 SOUL_MAINTENANCE_A3_LIVE=false
@@ -506,6 +509,12 @@ on, then runs that exact regular, owner-owned, non-group/world-writable
 executable with the discovered Hyprland environment and a 30-second bound.
 Failure is recorded for human review; it never broadens the application
 restore registry or gains reboot authority.
+
+The zero-prompt reboot-only transaction completed supervised live acceptance on
+2026-07-29 with no package replay. Teams, Vesktop, Codex, displays, and
+workspace state restored. Webex and Opera reported bounded
+application-specific failures; refining those restorations remains
+non-blocking work during natural future reboots.
 
 Chat and Voice may explain the plan but cannot arm or authorize A3. Each live
 A3 reboot remains a separate supervised human gate even after deterministic

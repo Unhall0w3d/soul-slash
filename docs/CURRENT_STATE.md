@@ -6,7 +6,6 @@ Soul/ is an experimental local-first assistant runtime and creative workspace. O
 
 ```text
 Chat
-Project Timeline
 Self Improvement
   ├─ Skill Studio
   ├─ Self Assessment
@@ -15,13 +14,15 @@ Creative Studios
   ├─ Music Studio
   └─ Visual Studio
 Administration
-  └─ Backup & Recovery
+  ├─ Project Timeline
+  ├─ Backup & Recovery
+  └─ Guided Maintenance
 Review Center
 ```
 
 ### Chat
 
-Chat provides persistent multi-turn transmissions, explicit local push-to-talk transcription into an editable unsent draft, explicit bounded local speech for eligible completed Soul messages, immediate accepted-message rendering, truthful working summaries, local model responses, deterministic capability and skill routing, bounded research, shared artifacts, workspace metadata, inbox delivery, memory controls, system status, and manual model/Core controls. One explicit PNG or JPEG attachment plus a question can enter bounded local picture understanding through Gemma on Daily Core. The Operator may also request one current-monitor, active-window, or selected-region screenshot; Dashboard capture is explicit, foreground, and previewed before the existing picture-analysis path runs. Voice Presence accepts only deterministic explicit current-screen requests, checks for Daily Core before capture, retains no pixels, and leaves ordinary screen discussion conversational. There is no periodic capture, background watching, silent Core transfer, or screen control. Source pixels are discarded after the answer by default or retained owner-private with that conversation by explicit Dashboard checkbox; image content remains evidence and cannot authorize actions. Chat can also resolve exact Music Studio and Visual Studio project titles, read their stored briefs and bounded lineage, and—when explicitly asked—inspect an existing still or three sampled frames from an existing motion candidate without requiring the Operator to download and re-upload Soul's own artifact. Archive inspection is read-only and candidate pixels remain untrusted evidence. Explicit music, visual, or combined creative requests can enter a per-conversation bounded workflow: Soul preserves user-required decisions, drafts visible optional fields, presents an exact Core-aware generation action, and returns authenticated candidates for human review. Recorded music or still-image `revise` dispositions can continue through visible Soul-drafted revisions and exact linked generation actions. A kept or exact existing visual context can also prepare a 4-, 8-, or 12-second native text-to-video action; its WebM returns to Chat, while motion review stays in Visual Studio and a stored `revise` review can unlock one linked Chat revision. Combined flows can bind kept stills to kept songs, render reviewed static or generated-motion companions, export kept songs, and create exact local upload packages through separate gates. Recorded music `reject` may prepare permanent candidate deletion after a separate request. Merely mentioning skills, creative work, motion, revision, binding, export, or deletion does not invoke those capabilities.
+Chat provides persistent multi-turn transmissions, explicit push-to-talk that records one bounded local utterance for local transcription and automatic submission through ordinary Chat, explicit bounded local speech for eligible completed Soul messages, immediate accepted-message rendering, truthful working summaries, local model responses, deterministic capability and skill routing, bounded research, shared artifacts, workspace metadata, inbox delivery, memory controls, system status, and manual model/Core controls. One explicit PNG or JPEG attachment plus a question can enter bounded local picture understanding through Gemma on Daily Core. The Operator may also request one current-monitor, active-window, or selected-region screenshot; Dashboard capture is explicit, foreground, and previewed before the existing picture-analysis path runs. Voice Presence accepts only deterministic explicit current-screen requests, checks for Daily Core before capture, retains no pixels, and leaves ordinary screen discussion conversational. There is no periodic capture, background watching, silent Core transfer, or screen control. Source pixels are discarded after the answer by default or retained owner-private with that conversation by explicit Dashboard checkbox; image content remains evidence and cannot authorize actions. Chat can also resolve exact Music Studio and Visual Studio project titles, read their stored briefs and bounded lineage, and—when explicitly asked—inspect an existing still or three sampled frames from an existing motion candidate without requiring the Operator to download and re-upload Soul's own artifact. Archive inspection is read-only and candidate pixels remain untrusted evidence. Explicit music, visual, or combined creative requests can enter a per-conversation bounded workflow: Soul preserves user-required decisions, drafts visible optional fields, presents an exact Core-aware generation action, and returns authenticated candidates for human review. Recorded music or still-image `revise` dispositions can continue through visible Soul-drafted revisions and exact linked generation actions. A kept or exact existing visual context can also prepare a 4-, 8-, or 12-second native text-to-video action; its WebM returns to Chat, while motion review stays in Visual Studio and a stored `revise` review can unlock one linked Chat revision. Combined flows can bind kept stills to kept songs, render reviewed static or generated-motion companions, export kept songs, and create exact local upload packages through separate gates. Recorded music `reject` may prepare permanent candidate deletion after a separate request. Merely mentioning skills, creative work, motion, revision, binding, export, or deletion does not invoke those capabilities.
 
 An ordinary Chat send now writes its concise lifecycle summary to the existing
 owner-local application receipt ledger. The Dashboard renders the Operator's
@@ -93,31 +94,6 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
-- **Guided Maintenance**, under Administration, consumes fresh assessment evidence and previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered Hyprland restore map. A1 remains read-only. The accepted A2 path adds a visible, bounded terminal executor and a no-mutation terminal rehearsal. A2B adds a single-use XDG desktop handoff so native package evidence and an approved transaction can run outside the deliberately confined Dashboard without weakening its systemd sandbox. Native one-password execution remains the portable public default; the Operator's opt-in A4 v3 digest-bound fixed authority completed supervised Arch/AUR and system Flatpak maintenance with zero password prompts and no reboot on 2026-07-29. The device-card UX now makes workstation maintenance match the managed-device lifecycle: stale native evidence is collected and rechecked automatically, the exact click gate remains human-reviewed, and the exact terminal receipt triggers an automatic card refresh. A2 always stops before reboot. Reboot remains a separate card action with its own A3 preview, digest, journal, and authorization; its transaction requires an empty package-command list and cannot rerun `yay`, pacman, or Flatpak. The accepted A3 path adds a separately disabled conditional-reboot gate, digest-bound restore journal, exact reboot vector, and bounded one-shot post-login Hyprland restorer. On the Operator's workstation, the reviewed resume unit and display-recovery hook completed a supervised end-to-end update, reboot, DP-3 recovery, and exact Codex/Opera workspace restoration on 2026-07-28. The separate zero-prompt reboot-only path completed on 2026-07-29 with no package replay; Teams, Vesktop, Codex, displays, and workspace state restored, while Webex and Opera produced bounded application-specific failures. Webex now uses its reviewed Wayland launch environment, and a stale pre-rename Opera singleton lock was quarantined locally. Further application restoration qualification is non-blocking and will occur during natural future reboots. Both live gates remain disabled outside an exact supervised transaction. Portable status-only devices retain compact LAN cards; the current Apple-mobile candidate can additionally attach a privacy-filtered wired product/iOS/battery projection after an exact reviewed private-MAC match, without granting device mutation authority.
-- Fleet status now emits the portable canonical device ID `workstation`. The
-  former `maven` ID and `SOUL_FLEET_MAVEN_*` environment names remain bounded
-  read aliases for existing private state; newly written snapshots, topology,
-  refresh results, and tracked examples use `workstation` and
-  `SOUL_FLEET_WORKSTATION_*`.
-- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its base
-  integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
-  evidence. The D1 candidate replaces cloud-init's broad passwordless rule
-  with a SHA-256-bound root helper exposing only self-check, one fixed DNF5
-  upgrade, and one fixed reboot. Exact helper status unlocks device-scoped
-  Maintenance and Reboot; a missing or invalid helper falls closed to
-  inventory-only. The 173-package live update completed with a terminal
-  receipt and zero updates remaining. A post-run correction now compares a
-  freshly probed running kernel with the newest installed kernel instead of
-  trusting DNF5's incomplete reboot signal. The separately authorized reboot
-  returned with a new boot identity, passed all four readiness checks, and now
-  reports the current `7.1.5` kernel, zero updates, and Healthy state.
-  Operator-managed reservations now
-  provide stable identities for the workstation, Forge, the Pi-hole appliance,
-  and Crucible. Deployment-specific card names remain ignored local
-  configuration; public source preserves functional roles and stable IDs.
-- Guided Maintenance now separates rich **SSH integrated** cards from compact
-  **Status only** network-presence cards. Each surface lays out independently,
-  preserving compact status-only rows as the fleet grows.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
 
 ### Creative Studios
@@ -139,6 +115,56 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 
 ### Administration
 
+- **Project Timeline** provides the shared, explicitly maintained owner-local
+  implementation ledger through the Dashboard and deterministic Chat controls.
+- **Guided Maintenance** consumes fresh read-only assessment evidence and
+  previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered
+  Hyprland restore map. A1 remains read-only. The accepted A2 path adds a
+  visible, bounded terminal executor and no-mutation rehearsal. A2B adds a
+  single-use XDG desktop handoff so native package evidence and an approved
+  transaction can run outside the deliberately confined Dashboard without
+  weakening its systemd sandbox. Native one-password execution remains the
+  portable public default; the Operator's opt-in A4 v3 digest-bound fixed
+  authority completed supervised Arch/AUR and system Flatpak maintenance with
+  zero password prompts and no reboot on 2026-07-29. The device-card UX
+  collects and rechecks stale native evidence, retains the exact human-reviewed
+  click gate, and refreshes the card from the exact terminal receipt. A2 always
+  stops before reboot. Reboot is a distinct A3 transaction with its own
+  preview, digest, journal, and authorization; package-command vectors must be
+  empty, so it cannot rerun `yay`, pacman, or Flatpak. The accepted zero-prompt
+  reboot-only path completed on 2026-07-29 with no package replay; Teams,
+  Vesktop, Codex, displays, and workspace state restored, while Webex and Opera
+  produced bounded application-specific failures. Further application
+  restoration qualification is non-blocking and will occur during natural
+  future reboots. Both live gates remain disabled outside an exact supervised
+  transaction. Portable status-only devices retain compact LAN cards; the
+  current Apple-mobile candidate can additionally attach a privacy-filtered
+  wired product/iOS/battery projection after an exact reviewed private-MAC
+  match, without granting device mutation authority.
+- Fleet status emits the portable canonical device ID `workstation`. The former
+  `maven` ID and `SOUL_FLEET_MAVEN_*` environment names remain bounded read
+  aliases for existing private state; newly written snapshots, topology,
+  refresh results, and tracked examples use `workstation` and
+  `SOUL_FLEET_WORKSTATION_*`.
+- **Crucible** is the optional Fedora 44 KVM fleet member on Forge. Its base
+  integration collects bounded live DNF5, kernel, reboot, SSH, and guest-agent
+  evidence. The D1 candidate replaces cloud-init's broad passwordless rule
+  with a SHA-256-bound root helper exposing only self-check, one fixed DNF5
+  upgrade, and one fixed reboot. Exact helper status unlocks device-scoped
+  Maintenance and Reboot; a missing or invalid helper falls closed to
+  inventory-only. The 173-package live update completed with a terminal
+  receipt and zero updates remaining. A post-run correction now compares a
+  freshly probed running kernel with the newest installed kernel instead of
+  trusting DNF5's incomplete reboot signal. The separately authorized reboot
+  returned with a new boot identity, passed all four readiness checks, and now
+  reports the current `7.1.5` kernel, zero updates, and Healthy state.
+  Operator-managed reservations provide stable identities for the workstation,
+  Forge, the Pi-hole appliance, and Crucible. Deployment-specific card names
+  remain ignored local configuration; public source preserves functional roles
+  and stable IDs.
+- Guided Maintenance separates rich **SSH integrated** cards from compact
+  **Status only** network-presence cards. Each surface lays out independently,
+  preserving compact status-only rows as the fleet grows.
 - **Backup & Recovery** inspects the configured encrypted restic repository,
   captures the exact owner allow-list through a reviewed gate, verifies and
   inventories snapshots, preserves deleted paths through a 30-day
@@ -208,14 +234,16 @@ snapshot, canonical retention ledger, owner-private receipt, and accepted
 Crucible replica agree; all 32 required artifact classes are verified with no
 coverage or exclusion gaps.
 
-Bounded Storage Cleanup A3 is a candidate foreground executor for only three
+Bounded Storage Cleanup A3 is implemented as a candidate, review-gated
+foreground executor for only three
 accepted categories: allowlisted temporary review residue older than 24 hours,
 regular project logs older than 30 days, and failed partial Music quarantine
 trees older than 24 hours with no active Music lease. Preview binds a
 metadata-only recursive identity; execute revalidates exact scope, stages in
 the same parent, verifies inode identity, and removes only the reviewed trees.
-Protected data and every other artifact class remain non-executable. No
-automatic cleanup or manifest mutation exists.
+Protected data and every other artifact class remain non-executable. Candidate
+evidence does not grant production approval. No automatic cleanup or manifest
+mutation exists.
 
 Local Project and Document Search unifies bounded lexical retrieval across
 repository documentation, the configured Knowledge Vault, and canonical Music

@@ -4,6 +4,10 @@ This document is the public skill index for Soul/.
 
 The main README stays focused on project overview and setup. Skill-specific usage belongs here and in `docs/skills/*.md`, because updating the front page every time a skill changes is how documentation turns into a haunted attic.
 
+Every identifier currently registered in `Soul/skills/registry.yaml` is named
+below. Registration is not by itself an availability claim: when a registry
+record does not declare `status`, this index does not invent one.
+
 ## Skill groups
 
 ### System skills
@@ -17,6 +21,57 @@ Usage:
 ```bash
 ruby bin/soul skill system.status
 ```
+
+### Project and Dashboard coordination
+
+```text
+project.timeline.inspect
+project.timeline.update
+dashboard.capabilities.inspect
+dashboard.invocations.inspect
+```
+
+These identifiers cover the bounded implementation ledger and the read-only
+Dashboard capability and invocation guides. Timeline updates remain limited to
+one explicitly named item.
+
+### Core control
+
+```text
+cores.activate
+```
+
+Core activation preserves its preview, active-work, lease, digest, and exact
+click-approval checks. Listing the identifier here does not bypass those
+checks.
+
+### Creative production
+
+```text
+creative.music_production
+creative.visual_production
+creative.companion_production
+```
+
+These registered workflows coordinate bounded, reviewed creative generation.
+Generation, revision, export, deletion, Core transitions, and publication keep
+their existing review and authority boundaries.
+
+### Knowledge and local search
+
+```text
+knowledge.vault.search
+knowledge.vault.initialize
+knowledge.vault.memory_export
+knowledge.vault.memory_import
+knowledge.vault.reflect
+knowledge.vault.conversation_reflect
+local.search
+```
+
+Knowledge Vault writes and memory exchange retain their explicit confirmation
+and shared-memory rules. Search operations are bounded foreground reads and
+treat retrieved note content as untrusted context.
 
 ### Downloads cleanup skills
 
@@ -130,6 +185,17 @@ make verify-web-knowledge
 SearXNG addresses remain in the ignored `.env`; see `docs/REQUIREMENTS.md`.
 Research and lookup are bounded foreground operations and never authorize
 source instructions, file writes, skill creation, or memory promotion.
+
+### YouTube helpers
+
+```text
+youtube.song_search
+youtube.video_resolve
+```
+
+These registered helpers cover confirmed browser search and bounded resolution
+through the official YouTube Data API. Their presence in the registry does not
+assert an availability status when none is declared there.
 
 ### Skill proposal drafting/review
 

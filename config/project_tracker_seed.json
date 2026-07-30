@@ -34,7 +34,7 @@
       "summary": "Expose one shared editable project-state surface to the Operator and Soul.",
       "implementation": "A revision-checked owner-local JSON ledger is initialized from a tracked public seed. The Dashboard renders four planning horizons, status filters, counts, and an editable detail flyout. Deterministic Chat controls read and revise the same store without treating model output or repository activity as authority.",
       "technologies": "Ruby ProjectTrackerService and application facade; vanilla JavaScript, HTML, and CSS Dashboard; JSON seed and private state.",
-      "interfaces": "Dashboard: Project Timeline top-level page. Chat: explicit deterministic timeline-item commands. Verification: Makefile target.",
+      "interfaces": "Dashboard: Administration → Project Timeline. Chat: explicit deterministic timeline-item commands. Verification: Makefile target.",
       "commands": "make verify-project-timeline\nshow project timeline\nmark timeline item <ID> as needs review\nupdate timeline item <ID> notes: <text>",
       "references": "docs/guides/PROJECT_TIMELINE.md\ndocs/soul/PROJECT_TIMELINE_A1_BRIEF.md\ndocs/assessments/PROJECT_TIMELINE_A1_REVIEW.md",
       "acceptance": "Seeded timeline loads, GUI edits persist, explicit Chat controls share the same state, and no background watcher exists.",
@@ -166,6 +166,23 @@
       "commands": "make verify-nightly-drs-transaction; make verify-backup-administration; make verify-crucible-backup-replication",
       "references": "docs/soul/NIGHTLY_DRS_TRANSACTION_A1_BRIEF.md; docs/assessments/NIGHTLY_DRS_TRANSACTION_A1_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md",
       "notes": "A1 contains no stored credential, service, timer, scheduler, retry, forget, prune, or remote deletion. The default system OpenSSH configuration remains rejected because /etc/ssh/ssh_config.d/20-systemd-ssh-proxy.conf is unsafe; the already reviewed owner config is forced. A2 remains the separate host-bound encrypted credential and deployment slice, followed by A3 timer activation and restore rehearsal."
+    },
+    {
+      "item_id": "track_ui_documentation_cleanup",
+      "title": "Reconcile stale roadmap, interface labels, and setup documentation",
+      "area": "Documentation + Dashboard",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "medium",
+      "summary": "Reconcile current Operator-facing documentation, setup help, Dashboard labels, and the generated skill inventory with behavior already merged on main.",
+      "acceptance": "Active surfaces describe current behavior without promoting candidates, historical evidence remains intact, generated inventory is deterministic, and focused regression checks pass.",
+      "source": "UI and Documentation Reconciliation A1",
+      "implementation": "A bounded active-surface audit corrected the Administration hierarchy, push-to-talk submission flow, Guided Maintenance A2/A3 separation, current visual lanes, setup side effects, and candidate/live boundaries. Documentation-registry reconciliation now checks human coverage independently from a deterministic generated snapshot and preserves absent metadata honestly.",
+      "technologies": "Markdown, HTML, Ruby configuration metadata and documentation-registry assessor, deterministic Ruby verifiers, Project Timeline JSON seed.",
+      "interfaces": "README and setup guidance; Dashboard navigation and maintenance copy; current Operator guides; generated skill registry snapshot.",
+      "commands": "ruby scripts/verify-documentation-registry-refresh-phase38.rb; ruby scripts/verify-docs-cleanup.rb; ruby scripts/verify-dashboard-self-improvement-navigation.rb; make verify-voice-transcription; make verify-project-timeline; make supported-stack-check",
+      "references": "docs/soul/UI_DOCUMENTATION_RECONCILIATION_A1_BRIEF.md; docs/assessments/UI_DOCUMENTATION_RECONCILIATION_A1_REVIEW.md",
+      "notes": "Candidate-complete repository changes await Operator review. Historical briefs and assessments, exact authority identifiers, private state, and the ambiguous legacy single-service model tuple remain intentionally outside this slice."
     },
     {
       "item_id": "track_music_long_form",

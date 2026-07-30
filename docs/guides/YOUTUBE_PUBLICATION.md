@@ -5,6 +5,12 @@ operator-authorized YouTube upload. This is an optional foreground workflow;
 it does not run from the Dashboard, at startup, on a schedule, or after package
 export.
 
+The commands below are merged and executable, but authenticated upload and
+description synchronization remain owner-authorized A0 candidates with live
+acceptance still open. Command availability and deterministic tests do not
+count as live acceptance; every remote mutation retains its exact foreground
+preview and human gate.
+
 ## Boundaries
 
 - The existing Music candidate must already be kept, exported, paired with a

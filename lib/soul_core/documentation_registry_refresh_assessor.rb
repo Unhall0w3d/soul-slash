@@ -38,30 +38,38 @@ module SoulCore
 
       missing_input_docs = INPUT_DOC_PATHS.select { |path| docs[path].nil? }
       snapshot_present = File.exist?(full(OUTPUT_DOC_PATH))
-
-      documented_ids = documented_skill_ids(docs)
       registry_ids = skill_records.map { |skill| skill["id"] }.compact.sort
-
+      documented_ids = documented_skill_ids(docs, registry_ids)
       missing_from_docs = registry_ids - documented_ids
-      stale_in_docs = documented_ids - registry_ids
+      expected_snapshot = snapshot_body(skill_records)
+      snapshot_current = snapshot_present && docs[OUTPUT_DOC_PATH] == expected_snapshot
 
       blockers = []
       blockers << "Missing skill registry: #{REGISTRY_PATH}" unless File.exist?(full(REGISTRY_PATH))
       blockers << "YAML is unavailable; cannot parse #{REGISTRY_PATH}" unless yaml_available?
       blockers << "No skills could be extracted from #{REGISTRY_PATH}" if skill_records.empty?
       blockers << "Missing input documentation file(s): #{missing_input_docs.join(', ')}" unless missing_input_docs.empty?
-      blockers << "Documented stale skill id(s): #{stale_in_docs.join(', ')}" unless stale_in_docs.empty?
 
       warnings = []
-      warnings << "Skill id(s) missing from documentation snapshot/docs: #{missing_from_docs.join(', ')}" unless missing_from_docs.empty?
+      warnings << "Skill id(s) missing from human documentation: #{missing_from_docs.join(', ')}" unless missing_from_docs.empty?
       warnings << "Snapshot document has not been generated yet: #{OUTPUT_DOC_PATH}" unless snapshot_present
+      warnings << "Snapshot is stale relative to #{REGISTRY_PATH}: #{OUTPUT_DOC_PATH}" if snapshot_present && !snapshot_current
+
+      current = blockers.empty? && warnings.empty?
 
       {
         "ok" => blockers.empty?,
         "assessment" => "documentation_registry_refresh",
         "generated_at" => Time.now.iso8601,
         "root" => @root,
-        "status" => blockers.empty? ? "ready" : "blocked",
+        "status" => if !blockers.empty?
+                      "blocked"
+                    elsif current
+                      "ready"
+                    else
+                      "needs_refresh"
+                    end,
+        "current" => current,
         "registry" => {
           "path" => REGISTRY_PATH,
           "present" => File.exist?(full(REGISTRY_PATH)),
@@ -73,15 +81,17 @@ module SoulCore
           "skills_doc_path" => SKILLS_DOC_PATH,
           "snapshot_path" => OUTPUT_DOC_PATH,
           "snapshot_present" => snapshot_present,
+          "snapshot_current" => snapshot_current,
           "missing_input_docs" => missing_input_docs,
+          "human_documentation_paths" => INPUT_DOC_PATHS,
           "documented_skill_ids" => documented_ids,
           "missing_from_docs" => missing_from_docs,
-          "stale_in_docs" => stale_in_docs
+          "human_documentation_complete" => missing_input_docs.empty? && missing_from_docs.empty?
         },
         "skill_records" => skill_records,
         "warnings" => warnings,
         "blockers" => blockers,
-        "recommendations" => recommendations(blockers, warnings, snapshot_present),
+        "recommendations" => recommendations(blockers, warnings, snapshot_present, snapshot_current),
         "verification" => {
           "read_only" => true,
           "no_registry_changes" => true,
@@ -127,10 +137,12 @@ module SoulCore
 
     def generate_snapshot
       report = assess
-      return [false, "Assessment is blocked: #{report.fetch('blockers').join('; ')}"] unless report["ok"]
+      return [false, "Assessment is blocked: #{report.fetch('blockers').join('; ')}"] unless report.fetch("blockers").empty?
 
-      body = snapshot_body(report)
+      body = snapshot_body(report.fetch("skill_records"))
       path = full(OUTPUT_DOC_PATH)
+      return [true, "#{OUTPUT_DOC_PATH} is already current"] if File.exist?(path) && File.read(path) == body
+
       File.write(path, body)
       [true, "Wrote #{OUTPUT_DOC_PATH}"]
     end
@@ -175,31 +187,33 @@ module SoulCore
 
       {
         "id" => id.to_s,
-        "name" => (data["name"] || data[:name] || id).to_s,
-        "description" => (data["description"] || data[:description] || data["summary"] || data[:summary] || "").to_s,
-        "category" => (data["category"] || data[:category] || data["group"] || data[:group] || "uncategorized").to_s,
-        "status" => (data["status"] || data[:status] || "unknown").to_s
-      }
+      }.tap do |record|
+        copy_metadata(record, "name", data["name"] || data[:name])
+        copy_metadata(record, "description", data["description"] || data[:description] || data["summary"] || data[:summary])
+        copy_metadata(record, "category", data["category"] || data[:category] || data["group"] || data[:group])
+        copy_metadata(record, "status", data["status"] || data[:status])
+      end
     end
 
-    def documented_skill_ids(docs)
-      # Architecture documentation legitimately names classes, configuration
-      # keys, file extensions, and stable API aliases in inline code. The skill
-      # index and generated registry snapshot are the authoritative surfaces
-      # for skill-ID drift; scanning every backticked token produces false
-      # stale-skill blockers such as `.env` and `soul-local-chat`.
-      content = [docs[SKILLS_DOC_PATH], docs[OUTPUT_DOC_PATH]].compact.join("\n")
-      content.scan(/`([a-zA-Z][a-zA-Z0-9_-]*(?:\.[a-zA-Z0-9_-]+)+)`/).flatten.uniq.sort
+    def copy_metadata(record, key, value)
+      return if value.nil? || value.to_s.strip.empty?
+
+      record[key] = value.to_s
     end
 
-    def snapshot_body(report)
-      skills = report.fetch("skill_records")
-      generated_at = Time.now.iso8601
+    def documented_skill_ids(docs, registry_ids)
+      # Only human-maintained source documents count as human documentation.
+      # Match the known registry IDs literally, with skill-ID boundaries, so
+      # arbitrary inline-code tokens are never inferred to be skill IDs.
+      content = INPUT_DOC_PATHS.filter_map { |path| docs[path] }.join("\n")
+      registry_ids.select do |id|
+        content.match?(/(?<![A-Za-z0-9_.-])#{Regexp.escape(id)}(?![A-Za-z0-9_.-])/)
+      end.sort
+    end
 
+    def snapshot_body(skills)
       lines = []
       lines << "# Skill Registry Snapshot"
-      lines << ""
-      lines << "Generated: #{generated_at}"
       lines << ""
       lines << "Source registry:"
       lines << ""
@@ -207,7 +221,7 @@ module SoulCore
       lines << REGISTRY_PATH
       lines << "```"
       lines << ""
-      lines << "This document is a generated documentation snapshot of the active skill registry. It is intended to reduce documentation drift without changing skill behavior."
+      lines << "This document is a deterministic projection of the registered skill records. Registration does not imply availability when the source record does not declare an availability status."
       lines << ""
       lines << "## Summary"
       lines << ""
@@ -223,13 +237,16 @@ module SoulCore
         lines << "### `#{skill['id']}`"
         lines << ""
         lines << "```text"
-        lines << "name: #{skill['name']}"
-        lines << "category: #{skill['category']}"
-        lines << "status: #{skill['status']}"
+        lines << "name: #{skill.fetch('name', 'not declared')}"
+        lines << "category: #{skill.fetch('category', 'not declared')}"
+        lines << "status: #{skill.fetch('status', 'registered (availability not declared)')}"
         lines << "```"
-        unless skill["description"].empty?
+        if skill.key?("description")
           lines << ""
           lines << skill["description"]
+        else
+          lines << ""
+          lines << "Description not declared in the registry."
         end
         lines << ""
       end
@@ -247,11 +264,11 @@ module SoulCore
       lines.join("\n")
     end
 
-    def recommendations(blockers, warnings, snapshot_present)
+    def recommendations(blockers, warnings, snapshot_present, snapshot_current)
       recs = []
       recs << "Resolve blockers before treating documentation as current." unless blockers.empty?
-      recs << "Generate or refresh #{OUTPUT_DOC_PATH} with ruby bin/soul improve documentation-registry-refresh." if blockers.empty? && !snapshot_present
-      recs << "Review warnings after snapshot generation." unless warnings.empty?
+      recs << "Generate or refresh #{OUTPUT_DOC_PATH} with ruby bin/soul improve documentation-registry-refresh." if blockers.empty? && (!snapshot_present || !snapshot_current)
+      recs << "Review human-documentation coverage and snapshot synchronization warnings." unless warnings.empty?
       recs << "Keep this refresh documentation-only; do not mutate skill registry entries from this command."
       recs << "Documentation registry surface appears ready." if blockers.empty? && warnings.empty?
       recs

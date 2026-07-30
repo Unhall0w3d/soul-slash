@@ -17,6 +17,7 @@ The authenticated dashboard provides:
 - **Chat** — persistent transmissions, explicit local push-to-talk transcription, bounded per-message local speech, visible five-second Voice Presence follow-ups, deterministic voice-mediated screen requests, immediate message rendering, local-model responses, bounded skill routing, read-only Creative Studio archive awareness, picture and explicit one-shot screen understanding, memory, artifacts, workspace, inbox, system status, model runtime controls, and exact-gated Core switching;
 - **Self Improvement** — Skill Studio, Self Assessment, and Self Augmentation behind one navigation group;
 - **Creative Studios** — Music Studio and Visual Studio with local generation, evidence, revision, lineage, and export flows;
+- **Administration** — Project Timeline, Backup & Recovery, and Guided Maintenance with separate review gates for every mutation;
 - **Review Center** — redacted pending-approval and recent bounded-execution evidence without granting approval authority.
 
 The supported local runtime topology currently includes:
@@ -38,7 +39,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Surface | Purpose | Guide |
 | --- | --- | --- |
 | Chat + Creative Studios | Collaboratively gather creative briefs, generate candidates through exact actions, and return playable/viewable results to Chat | [Conversational Creative Workflows](docs/guides/CONVERSATIONAL_CREATIVE_WORKFLOWS.md) |
-| Voice Input | Record one bounded local utterance and review its editable transcript before sending | [Voice Input](docs/guides/VOICE_INPUT.md) |
+| Voice Input | Record one bounded local utterance for local transcription and automatic submission through ordinary Chat | [Voice Input](docs/guides/VOICE_INPUT.md) |
 | Voice Output | Speak one eligible Soul response locally through an explicit bounded control | [Voice Output](docs/guides/VOICE_OUTPUT.md) |
 | Voice Presence | Open a visible local “Hey Soul” wake window for bounded spoken turns | [Voice Presence](docs/guides/VOICE_PRESENCE.md) |
 | Picture Understanding | Attach one local PNG or JPEG to Chat and ask Soul what it can observe | [Picture Understanding](docs/guides/PICTURE_UNDERSTANDING.md) |
@@ -127,7 +128,9 @@ Recommended:
 - a supported GPU runtime
 - Caddy for the optional protected LAN deployment
 
-Music and visual tooling is optional, hardware-dependent, separately planned, and never installed by the base setup without its own confirmation gates. See [Getting Started](docs/GETTING_STARTED.md).
+Music and visual tooling is optional, hardware-dependent, separately configured
+and installed, and never installed by the base setup without its own
+confirmation gates. See [Getting Started](docs/GETTING_STARTED.md).
 
 ## Quick start
 

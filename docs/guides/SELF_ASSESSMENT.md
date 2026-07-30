@@ -40,14 +40,21 @@ On the supported Arch/CachyOS host path, Self Assessment can prepare a fresh, di
 ## Guided maintenance evidence
 
 Self Assessment supplies the read-only package and host evidence consumed by
-the separate **Administration → Guided Maintenance** surface. That A1 surface
-previews and rehearses a future end-to-end transaction:
+the current **Administration → Guided Maintenance** surface. The read-only A1
+path previews and rehearses package maintenance and a privacy-filtered
+restoration map. Package maintenance and reboot are separate reviewed
+transactions:
 
 ```text
-yay full upgrade
+read-only evidence
+→ separately authorized A2 package transaction:
+  yay full upgrade
 → Flatpak update
+→ stop before reboot
+→ separately authorized A3 reboot-only transaction:
+  empty package-command vectors
 → privacy-filtered Hyprland window snapshot
-→ conditional reboot
+→ one exact reboot request
 → one-shot workspace restoration after SDDM auto-login
 ```
 
@@ -69,8 +76,9 @@ rehearsal simulates the declared lifecycle and reports blockers. It requests no
 password, writes no operational state, launches nothing, and cannot reboot.
 
 See [Guided Maintenance](GUIDED_MAINTENANCE.md) for its controls and boundaries.
-Actual authentication and updates require a separately reviewed A2 gate.
-Conditional reboot and the one-shot post-login restorer require A3.
+Actual authentication and updates require the separately reviewed A2 gate.
+Reboot and the one-shot post-login restorer require a distinct A3 gate, whose
+empty package vectors prevent maintenance replay.
 
 ## Storage and retention
 
@@ -78,7 +86,9 @@ The Storage view classifies data before cleanup. Production models, private
 memory, chats, projects, accepted candidates and pilots, finished exports,
 credentials, backup evidence, and the Knowledge Vault are protected.
 
-Three deliberately narrow categories have an exact cleanup gate:
+Storage Cleanup A3 implements three deliberately narrow categories as a
+candidate behind an exact preview, digest, and destructive review gate. Its
+implementation and deterministic evidence do not grant production approval:
 
 - known Soul review residue in the system temporary directory older than
   24 hours;
