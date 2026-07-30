@@ -200,9 +200,9 @@ Core changes are click-authorized and lease-revalidated. Before a conversational
 
 `make dashboard` runs a foreground loopback development instance. The reviewed optional deployment installs explicit user services for the loopback dashboard and Caddy HTTPS on one exact LAN address. An optional validated private DNS hostname may provide the certificate and application authority without changing that exact-IP bind. Installation is preview-first, requires a changed administrator password and exact confirmation, and leaves DNS records, firewall, DHCP, router, and client certificate trust to the Operator.
 
-Hosting Soul itself on Proxmox, Internet exposure, and multi-user accounts
-remain separate future tracks. Forge currently hosts the Warden Pi-hole
-appliance
+Hosting Soul itself on Proxmox and Internet exposure remain separate future
+tracks. Multi-user accounts are a deliberate non-goal: Soul is designed as a
+single-Operator experience. Forge currently hosts the Warden Pi-hole appliance
 and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now has an
 accepted encrypted local foundation, verified live captures, and an accepted
 encrypted second copy on Crucible. The supervised DRS transaction,

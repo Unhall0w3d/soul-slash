@@ -88,9 +88,12 @@ This roadmap tracks product bodies rather than the repository's historical phase
   second copy, supervised DRS, and the live-qualified nightly credential/timer
   are accepted; remote retention and full isolated recovery rehearsal remain
 - [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
-- [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review
 
 ## Deliberate non-goals
 
-Soul does not currently pursue autonomous production mutation, unattended self-improvement, automatic package installation, silent skill promotion, always-resident creative models, background generation queues, or automatic public publishing.
+Soul does not pursue multi-user accounts or family sign-ups. It remains a
+single-Operator experience. Soul also does not currently pursue autonomous
+production mutation, unattended self-improvement, automatic package
+installation, silent skill promotion, always-resident creative models,
+background generation queues, or automatic public publishing.
