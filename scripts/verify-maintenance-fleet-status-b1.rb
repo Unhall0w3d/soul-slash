@@ -19,11 +19,12 @@ end
 class FleetFakeRunner
   attr_reader :calls
 
-  def initialize(pihole_offline: false, phone_offline: false, checkupdates_unavailable: false, checkupdates_empty: false)
+  def initialize(pihole_offline: false, phone_offline: false, fresh_sync_unavailable: false, fresh_sync_failed: false, fresh_query_empty: false)
     @pihole_offline = pihole_offline
     @phone_offline = phone_offline
-    @checkupdates_unavailable = checkupdates_unavailable
-    @checkupdates_empty = checkupdates_empty
+    @fresh_sync_unavailable = fresh_sync_unavailable
+    @fresh_sync_failed = fresh_sync_failed
+    @fresh_query_empty = fresh_query_empty
     @calls = []
   end
 
@@ -31,9 +32,13 @@ class FleetFakeRunner
     argv = command.flatten.map(&:to_s)
     @calls << {"argv" => argv, "options" => options}
     return ok("7.1.4-1-cachyos-eevdf-lto\n") if argv == ["/usr/bin/uname", "-r"]
-    if argv == ["/usr/bin/checkupdates", "--nocolor"]
-      return unavailable("checkupdates is unavailable") if @checkupdates_unavailable
-      return failed("", 2) if @checkupdates_empty
+    if argv[0, 3] == ["/usr/bin/fakeroot", "/usr/bin/pacman", "-Sy"]
+      return unavailable("fakeroot is unavailable") if @fresh_sync_unavailable
+      return failed("repository metadata could not be fetched", 1) if @fresh_sync_failed
+      return ok("")
+    end
+    if argv[0, 2] == ["/usr/bin/pacman", "-Qu"] && argv.include?("--dbpath")
+      return failed("", 1) if @fresh_query_empty
       return ok("linux-cachyos 7.1.4 -> 7.1.5\nruby 4.0 -> 4.1\n")
     end
     return ok("cached-package 1 -> 2\n") if argv == ["/usr/bin/pacman", "-Qu"]
@@ -155,7 +160,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
       "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
       "SOUL_FLEET_MAVEN_ADDRESS" => "legacy.example.test",
       "SOUL_FLEET_MAVEN_LABEL" => "Legacy Maven",
-      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden",
+      "INVOCATION_ID" => "dashboard-service-fixture"
     },
     route_path: route_path
   )
@@ -186,9 +192,29 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("workstation", "kernel", "available") == "7.1.5-1" &&
                devices.dig("workstation", "kernel", "update_required") == true)
   check.call("workstation refresh uses isolated fresh pacman metadata without changing the live sync database",
-             runner.calls.any? { |call| call["argv"] == ["/usr/bin/checkupdates", "--nocolor"] } &&
-               runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Sy"] || call["argv"] == ["/usr/bin/pacman", "-Syy"] })
-  fallback_runner = FleetFakeRunner.new(checkupdates_unavailable: true)
+             begin
+               sync = runner.calls.find { |call| call["argv"][0, 3] == ["/usr/bin/fakeroot", "/usr/bin/pacman", "-Sy"] }
+               query = runner.calls.find { |call| call["argv"][0, 2] == ["/usr/bin/pacman", "-Qu"] && call["argv"].include?("--dbpath") }
+               database_path = sync && sync["argv"][sync["argv"].index("--dbpath") + 1]
+               sync &&
+                 query &&
+                 database_path.start_with?(Dir.tmpdir + "/soul-pacman-status-") &&
+                 query["argv"][query["argv"].index("--dbpath") + 1] == database_path &&
+                 sync["argv"].include?("--disable-sandbox") &&
+                 sync["argv"].include?("--logfile") &&
+                 !File.exist?(database_path) &&
+                 runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Sy"] || call["argv"] == ["/usr/bin/pacman", "-Syy"] }
+             end)
+  unsandboxed_service = SoulCore::MaintenanceFleetStatusService.new(
+    runner: FleetFakeRunner.new,
+    os_release_path: os_release,
+    process_env: {},
+    route_path: route_path
+  )
+  check.call("full pacman downloader sandbox disable is limited to a systemd service invocation",
+             service.send(:pacman_download_sandbox_option) == "--disable-sandbox" &&
+               unsandboxed_service.send(:pacman_download_sandbox_option) == "--disable-sandbox-filesystem")
+  fallback_runner = FleetFakeRunner.new(fresh_sync_unavailable: true)
   fallback = SoulCore::MaintenanceFleetStatusService.new(
     runner: fallback_runner,
     clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
@@ -198,16 +224,17 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     process_env: {
       "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
       "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
-      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden",
+      "INVOCATION_ID" => "dashboard-service-fixture"
     },
     route_path: route_path
   ).collect
   fallback_workstation = fallback.dig("data", "devices").find { |device| device["id"] == "workstation" }
-  check.call("missing checkupdates degrades explicitly to cached pacman evidence",
+  check.call("missing temporary-sync tooling degrades explicitly to cached pacman evidence",
              fallback_workstation.dig("updates", "freshness") == "cached_pacman_metadata" &&
                fallback_workstation.dig("updates", "native") == 1 &&
                fallback_runner.calls.any? { |call| call["argv"] == ["/usr/bin/pacman", "-Qu"] })
-  empty_runner = FleetFakeRunner.new(checkupdates_empty: true)
+  empty_runner = FleetFakeRunner.new(fresh_query_empty: true)
   empty = SoulCore::MaintenanceFleetStatusService.new(
     runner: empty_runner,
     clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
@@ -217,12 +244,13 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     process_env: {
       "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
       "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
-      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden",
+      "INVOCATION_ID" => "dashboard-service-fixture"
     },
     route_path: route_path
   ).collect
   empty_workstation = empty.dig("data", "devices").find { |device| device["id"] == "workstation" }
-  check.call("checkupdates exit 2 is a successful fresh zero-update result",
+  check.call("temporary pacman query exit 1 is a successful fresh zero-update result",
              empty_workstation.dig("updates", "freshness") == "fresh_pacman_metadata" &&
                empty_workstation.dig("updates", "channels").find { |channel| channel["id"] == "native" } == {
                  "id" => "native",
@@ -232,6 +260,30 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                  "status" => "complete"
                } &&
                empty_runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Qu"] })
+  failed_sync_runner = FleetFakeRunner.new(fresh_sync_failed: true)
+  failed_sync = SoulCore::MaintenanceFleetStatusService.new(
+    runner: failed_sync_runner,
+    clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "atelier" },
+    process_env: {
+      "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
+      "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden",
+      "INVOCATION_ID" => "dashboard-service-fixture"
+    },
+    route_path: route_path
+  ).collect
+  failed_sync_workstation = failed_sync.dig("data", "devices").find { |device| device["id"] == "workstation" }
+  check.call("failed fresh repository sync remains unavailable without stale cached substitution",
+             failed_sync_workstation.dig("updates", "channels").find { |channel| channel["id"] == "native" } == {
+               "id" => "native",
+               "label" => "pacman",
+               "manager" => "pacman",
+               "status" => "unavailable"
+             } &&
+               failed_sync_runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Qu"] })
   check.call("Proxmox discovers Forge and exposes cached package, kernel, and LXC 100 evidence",
              devices.dig("forge", "label") == "Forge" &&
                devices.dig("forge", "updates", "native") == 1 &&

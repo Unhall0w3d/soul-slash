@@ -19,6 +19,11 @@ The Dashboard appends **fresh** or **cached metadata** to the package-channel
 summary. Existing AUR, Flatpak, APT, and DNF5 query behavior and every
 maintenance/reboot gate remain unchanged.
 
+A10 supersedes only the stock `checkupdates` command mechanism after live
+Dashboard testing exposed its incompatibility with the service's private
+temporary namespace. A9's isolated-database, non-mutating outcome remains
+unchanged.
+
 ## Files changed
 
 - `assets/dashboard/dashboard.js`
