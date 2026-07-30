@@ -365,6 +365,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
   refresh_runner = FleetFakeRunner.new
   clock_values = [
     Time.utc(2026, 7, 27, 21, 6, 0),
+    Time.utc(2026, 7, 27, 21, 6, 10),
     Time.utc(2026, 7, 27, 21, 6, 15),
     Time.utc(2026, 7, 27, 21, 6, 30),
     Time.utc(2026, 7, 27, 21, 7, 0)
@@ -378,6 +379,16 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     root: private_root
   )
   initial = refresh_service.collect
+  calls_before_forge_refresh = refresh_runner.calls.length
+  forge_refresh = refresh_service.refresh(device_id: "forge")
+  refreshed_forge = forge_refresh.dig("data", "devices").find { |device| device["id"] == "forge" }
+  forge_refresh_calls = refresh_runner.calls.drop(calls_before_forge_refresh)
+  check.call("one-device refresh routes the collected Forge hostname back through the built-in Proxmox adapter",
+             forge_refresh["lifecycle_state"] == "complete" &&
+               forge_refresh.dig("data", "refreshed_device_id") == "forge" &&
+               refreshed_forge.dig("facts", "maintenance_adapter") == "proxmox_apt" &&
+               forge_refresh_calls.any? { |call| call["argv"].include?("proxmox-maintenance") } &&
+               forge_refresh_calls.none? { |call| call["argv"].include?("foundry") })
   foundry = initial.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
   check.call("an enrolled PVE kernel and executable promote one SSH record to rich read-only Proxmox inventory",
              foundry["label"] == "Foundry" &&

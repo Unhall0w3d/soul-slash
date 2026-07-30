@@ -242,10 +242,19 @@ module SoulCore
         collect_cisco_phone
       else
         record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
-        raise "enrolled device is no longer present in the private registry" unless record
+        return collect_enrolled_device(record, schedule_recovery: schedule_recovery) if record
+        return collect_proxmox if built_in_proxmox_snapshot_device?(existing)
 
-        collect_enrolled_device(record, schedule_recovery: schedule_recovery)
+        raise "enrolled device is no longer present in the private registry"
       end
+    end
+
+    def built_in_proxmox_snapshot_device?(device)
+      facts = device["facts"].is_a?(Hash) ? device["facts"] : {}
+      facts["platform"] == "proxmox" &&
+        facts["management_channel"] == "ssh" &&
+        facts["enrollment_id"].to_s.empty? &&
+        device["address"] == @addresses.fetch("proxmox")
     end
 
     def summarize(devices)
