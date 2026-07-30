@@ -661,6 +661,7 @@
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Deletion safety</p><h2>Retention ledger</h2></div><span id="backup-ledger-state" class="count-badge">—</span></div><dl id="backup-ledger-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery evidence</p><h2>Receipts &amp; staging</h2></div><span id="backup-receipt-count" class="count-badge">0</span></div><dl id="backup-evidence-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Off-device continuity</p><h2>Crucible copy</h2></div><span id="backup-replica-state" class="count-badge">—</span></div><dl id="backup-replica-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Combined recovery path</p><h2>DRS transaction</h2></div><span id="backup-drs-state" class="count-badge">—</span></div><dl id="backup-drs-details" class="improvement-details"><div><dt>State</dt><dd>Not run</dd></div></dl></section>
       </div>
       <div class="backup-workspace">
         <section class="improvement-card backup-snapshot-card">
@@ -669,6 +670,13 @@
           <div id="backup-snapshot-list" class="backup-snapshot-list"><p class="muted">Enter the repository password to inspect encrypted history.</p></div>
         </section>
         <div class="backup-actions">
+          <section class="gate-card">
+            <div><p class="eyebrow">Supervised DRS transaction</p><h3>Capture locally, reconcile off-device</h3><p>Creates one verified local snapshot, advances deletion evidence, copies missing lineage to Crucible, and verifies the new snapshot off-device. Local success is preserved and disclosed if Crucible cannot complete.</p></div>
+            <button id="preview-backup-drs" class="gate-button" type="button">Preview DRS transaction</button>
+            <div id="backup-drs-confirm" hidden><pre id="backup-drs-scope" class="clear-preview-list"></pre><button id="execute-backup-drs" class="gate-button gate-button--gold" type="button">Create &amp; reconcile</button></div>
+            <div id="backup-drs-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing supervised DRS transaction…</span></div>
+            <p id="backup-drs-status" class="dialog-status" role="status">Supervised only · no stored credential, schedule, automatic retry, or pruning.</p>
+          </section>
           <section class="gate-card">
             <div><p class="eyebrow">Owner manifest policy</p><h3>Reconcile backup scope</h3><p>Adds only missing paths from the current portable policy. Existing sources, exclusions, comments, and encrypted history remain untouched.</p></div>
             <button id="preview-backup-manifests" class="gate-button" type="button">Preview manifest additions</button>

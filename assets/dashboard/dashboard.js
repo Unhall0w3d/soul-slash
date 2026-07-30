@@ -11,7 +11,7 @@ state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
-Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupBusy: false });
+Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
 state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
@@ -4192,6 +4192,16 @@ function renderBackupStatus(payload) {
     "Automation": "Disabled",
     "Remote deletion": "Disabled"
   });
+  const drs = payload.drs || {};
+  byId("backup-drs-state").textContent = drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
+  renderBackupFacts(byId("backup-drs-details"), {
+    "Last result": drs.state || "not run",
+    "Local": drs.local_state || "not run",
+    "Crucible": drs.replica_state || "not run",
+    "Completed": drs.completed_at || "not yet",
+    "Schedule": "Disabled",
+    "Credential": "Never retained"
+  });
   renderBackupSnapshots(payload.snapshots);
   const status = !payload.available ? "Restic is unavailable."
     : !payload.configured ? "Backup source and exclusion manifests need configuration."
@@ -4215,8 +4225,8 @@ async function loadBackupAdministration({ unlock = false } = {}) {
 }
 
 function resetBackupPreviews() {
-  state.backupManifestPreview = null; state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null;
-  ["backup-manifest-confirm", "backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm"].forEach((id) => { byId(id).hidden = true; });
+  state.backupManifestPreview = null; state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null; state.backupDrsPreview = null;
+  ["backup-manifest-confirm", "backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm", "backup-drs-confirm"].forEach((id) => { byId(id).hidden = true; });
 }
 
 function selectedBackupSnapshotIds() {
@@ -4283,6 +4293,50 @@ async function previewBackupCreate() {
     byId("backup-create-status").textContent = "Exact capture scope prepared. Clicking the gold gate supplies the displayed authority.";
   } catch (error) { byId("backup-create-status").textContent = error.message; }
   finally { byId("preview-backup-create").disabled = false; }
+}
+
+async function previewBackupDrs() {
+  byId("preview-backup-drs").disabled = true;
+  try {
+    const envelope = await callSoul("backup.drs.preview", { password: backupPassword() });
+    state.backupDrsPreview = backupResult(envelope);
+    const local = state.backupDrsPreview.local_capture?.data || {};
+    const replica = state.backupDrsPreview.replica_preflight || {};
+    byId("backup-drs-scope").textContent = JSON.stringify({
+      sources: local.sources,
+      estimated_bytes: local.estimated_bytes,
+      prior_snapshot_id: local.prior_snapshot_id,
+      replica_preflight: replica.lifecycle_state,
+      replica_reason: replica.reason,
+      stage_order: state.backupDrsPreview.stage_order,
+      local_success_survives_replica_failure: true,
+      automatic_retention: false,
+      remote_deletion: false,
+      automatic_retry: false,
+      scheduled: false
+    }, null, 2);
+    byId("backup-drs-confirm").hidden = false;
+    byId("backup-drs-status").textContent = "Exact supervised transaction prepared. One click authorizes one local capture and one Crucible reconciliation attempt.";
+  } catch (error) { byId("backup-drs-status").textContent = error.message; }
+  finally { byId("preview-backup-drs").disabled = false; }
+}
+
+async function executeBackupDrs() {
+  if (!state.backupDrsPreview || state.backupBusy) return;
+  state.backupBusy = true; byId("execute-backup-drs").disabled = true;
+  const progress = byId("backup-drs-progress");
+  try {
+    showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact supervised DRS transaction." });
+    const envelope = await callNdjson("/api/v1/administration-stream", "backup.drs.execute", {
+      password: backupPassword(),
+      confirmation: state.backupDrsPreview.confirmation_phrase,
+      expected_digest: state.backupDrsPreview.expected_digest
+    }, {}, (event) => showGenerationProgress(progress, event));
+    const result = backupResult(envelope);
+    byId("backup-drs-status").textContent = `Snapshot ${result.snapshot_id?.slice(0, 12) || "created"} and exact Crucible lineage verified.`;
+    resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
+  } catch (error) { byId("backup-drs-status").textContent = error.message; }
+  finally { state.backupBusy = false; byId("execute-backup-drs").disabled = false; hideGenerationProgress(progress); }
 }
 
 async function executeBackupCreate() {
@@ -4504,6 +4558,8 @@ byId("preview-backup-manifests").addEventListener("click", previewBackupManifest
 byId("execute-backup-manifests").addEventListener("click", executeBackupManifestReconciliation);
 byId("preview-backup-create").addEventListener("click", previewBackupCreate);
 byId("execute-backup-create").addEventListener("click", executeBackupCreate);
+byId("preview-backup-drs").addEventListener("click", previewBackupDrs);
+byId("execute-backup-drs").addEventListener("click", executeBackupDrs);
 byId("preview-backup-replica").addEventListener("click", previewBackupReplica);
 byId("execute-backup-replica").addEventListener("click", executeBackupReplica);
 byId("preview-backup-retention").addEventListener("click", previewBackupRetention);

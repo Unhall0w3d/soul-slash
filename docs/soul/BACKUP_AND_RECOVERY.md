@@ -7,7 +7,7 @@ watcher, daemon, automatic retry, or unattended restore.
 
 ## What the dashboard does
 
-The page has four exact-gated operations:
+The page has five exact-gated operations:
 
 1. **Create a backup** validates the recovery mount and allow-listed sources,
    refuses active creative/model work, captures one tagged restic snapshot,
@@ -27,6 +27,11 @@ The page has four exact-gated operations:
    verifies target metadata, and proves exact source-snapshot coverage through
    restic's preserved original-snapshot lineage. Destination storage IDs differ
    because the repositories are independently encrypted.
+5. **Run a supervised DRS transaction** performs one fresh verified local
+   capture and one exact Crucible reconciliation under a single reviewed
+   parent gate. The local snapshot remains valid and is reported as a partial
+   result if Crucible becomes unavailable. It never retries, forgets, prunes,
+   or deletes remote data.
 
 The repository password is entered per dashboard page session. It is sent only
 in the environment of the bounded restic child process. Soul does not place it
@@ -155,6 +160,12 @@ the source has been captured.
 7. Keep the page open while its request-bound progress stream runs. The
    operation does not detach into a background process.
 
+The supervised DRS gate is the transaction foundation for later reviewed
+nightly execution. In A1 it still uses the page-session password and remains
+manual. It records a terminal parent receipt showing local and Crucible state,
+while the component capture and replica receipts retain their exact evidence.
+No credential, service, timer, or schedule is installed.
+
 If the target is read-only, on the wrong filesystem, missing, or if configured
 sources are unavailable, backup creation fails before restic capture.
 
@@ -231,10 +242,12 @@ This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
 and location. The manual Crucible gate provides an independently hosted
 encrypted second copy. The manual initialize/copy/check path and exact
-cross-repository lineage reconciliation were live-accepted on 2026-07-29. It
-intentionally does not yet delete remote snapshots or run nightly;
-noninteractive credential handling, remote retention policy, and a complete
-disaster rehearsal remain later work.
+cross-repository lineage reconciliation were live-accepted on 2026-07-29. The
+supervised DRS A1 candidate composes capture and replication without storing
+its password or enabling a schedule. It intentionally does not delete remote
+snapshots or run nightly; noninteractive credential handling, timer
+activation, remote retention policy, and a complete disaster rehearsal remain
+later work.
 
 ### Rotating both repository passwords
 
