@@ -88,3 +88,46 @@ Low, read-only local-network observation with private status-cache mutation.
 
 Live acceptance was completed by the Operator on 2026-07-28. The individual
 Amplifi refresh worked through the intended Dashboard flow.
+
+## Forge hostname refresh repair
+
+Status: candidate complete; human review required
+
+Date: 2026-07-29
+
+The built-in Proxmox collector stores the remote node hostname as the card ID.
+Forge therefore appears as `forge`, while the refresh dispatcher previously
+recognized only the internal collector key `proxmox`. An individual Forge
+refresh fell through to the enrolled-device registry and failed safely without
+updating its observation time.
+
+The repair recognizes a persisted built-in Proxmox card by its exact configured
+address plus the existing `platform: proxmox`, SSH-management, and
+non-enrollment evidence. Enrolled Proxmox devices retain registry priority, so
+Foundry continues through its reviewed enrolled adapter and cannot be
+substituted with Forge.
+
+Files changed:
+
+```text
+lib/soul_core/maintenance_fleet_status_service.rb
+scripts/verify-maintenance-fleet-status-b1.rb
+docs/assessments/FLEET_DEVICE_REFRESH_A2_REVIEW.md
+```
+
+Lifecycle states remain `complete` and `failed`. No memory key, credential,
+service, timer, listener, retry, mutation authority, or background operation
+was added. The status-cache replacement remains the only mutation.
+
+Human review:
+
+```text
+[x] Forge Refresh returns and advances its Checked timestamp
+[x] Forge still exposes its existing fixed Maintenance and Reboot controls
+[x] Foundry still refreshes through its enrolled alias
+```
+
+The repaired backend path completed a bounded live Forge refresh on 2026-07-29:
+Healthy, zero updates, no reboot required, and a new observation time. The
+Operator separately confirmed that Foundry's maintenance and reboot lifecycle
+completed normally through its enrolled path.
