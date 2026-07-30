@@ -156,12 +156,12 @@ After a successful scan, Soul remembers only the canonical subnet in an
 owner-private `0600` preference file and refills the field on the next page
 load. Candidate addresses, MACs, vendors, and scan results remain ephemeral.
 
-Enrolled cards are `inventory_only`. They can display discovered capabilities
-and expose a bounded card-level refresh, but do not expose Maintenance or
-Reboot. Detecting a package manager never creates update authority. A separate
-future adapter must define, test, and receive approval for each mutation
-family. Removing a device removes only its local registry record and sends
-nothing to the target.
+Enrolled cards are `inventory_only` by default. They can display discovered
+capabilities and expose a bounded card-level refresh, but do not expose
+Maintenance or Reboot. Detecting a package manager never creates update
+authority. A separate adapter must define, test, and receive approval for each
+mutation family. Removing a device removes only its local registry record and
+sends nothing to the target.
 
 An enrolled fixed-SSH host with reviewed `-pve` kernel evidence and a fixed
 `pveversion` executable receives a richer read-only Proxmox projection:
@@ -169,6 +169,25 @@ version, cached-metadata APT updates, running and selected kernels, reboot
 marker, and bounded LXC/QEMU guest summaries. Its card remains
 `inventory_only`; platform recognition never creates Maintain, Reboot, or
 guest-control authority.
+
+An explicitly reviewed Foundry deployment may opt one exactly matching enrolled
+Proxmox SSH alias into the fixed device controller:
+
+```text
+SOUL_FLEET_FOUNDRY_CONTROL_ENABLED=true
+SOUL_FLEET_FOUNDRY_SSH_ALIAS=foundry
+SOUL_FLEET_FOUNDRY_ADDRESS=foundry
+SOUL_FLEET_FOUNDRY_LABEL=Foundry
+```
+
+The public default is disabled. The alias must be a literal `Host` entry
+already configured with its reviewed identity, key, and host-key policy.
+Foundry maintenance runs only fixed APT update and distribution-upgrade
+vectors. Reboot sends one request and requires a changed boot identity,
+`pveversion`, and active `pveproxy`, `pvedaemon`, and `pvestatd` services.
+Every action still requires a fresh Dashboard preview and its exact
+device-specific gate; there is no guest mutation, automatic reboot, or retry.
+See `docs/soul/FOUNDRY_PROXMOX_CONTROL_A6_BRIEF.md`.
 
 If a previously enrolled SSH device suddenly appears offline while still
 answering ping, test its literal alias directly. A changed host key is treated
