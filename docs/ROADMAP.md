@@ -32,7 +32,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
   reattachment and broader Studio/administration progress remain deferred
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
-- [ ] remove remaining implementation-phase labels and stale UI/documentation language
+- [~] reconcile remaining implementation-phase labels and stale active UI/documentation language
 - [~] review A2 bounded source-attributed local project and document search
   with balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles

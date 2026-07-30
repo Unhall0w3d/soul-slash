@@ -1,14 +1,12 @@
 # Skill Registry Snapshot
 
-Generated: 2026-07-27T15:54:08-04:00
-
 Source registry:
 
 ```text
 Soul/skills/registry.yaml
 ```
 
-This document is a generated documentation snapshot of the active skill registry. It is intended to reduce documentation drift without changing skill behavior.
+This document is a deterministic projection of the registered skill records. Registration does not imply availability when the source record does not declare an availability status.
 
 ## Summary
 
@@ -22,9 +20,9 @@ registry_path: Soul/skills/registry.yaml
 ### `chats.clear`
 
 ```text
-name: chats.clear
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Preview and archive active conversations by exact title or all conversations so they leave the active list without deleting transcripts.
@@ -32,9 +30,9 @@ Preview and archive active conversations by exact title or all conversations so 
 ### `chats.forget`
 
 ```text
-name: chats.forget
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Permanently delete one exact local conversation and logically forget shared memories derived from it.
@@ -42,9 +40,9 @@ Permanently delete one exact local conversation and logically forget shared memo
 ### `cloud.providers.list`
 
 ```text
-name: cloud.providers.list
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 List configured cloud LLM providers without making network calls.
@@ -52,9 +50,9 @@ List configured cloud LLM providers without making network calls.
 ### `cloud.providers.test`
 
 ```text
-name: cloud.providers.test
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Run bounded smoke tests for configured cloud LLM providers.
@@ -62,7 +60,7 @@ Run bounded smoke tests for configured cloud LLM providers.
 ### `cores.activate`
 
 ```text
-name: cores.activate
+name: not declared
 category: runtime_control
 status: available
 ```
@@ -72,7 +70,7 @@ Preview and activate one configured Core without rebooting while preserving acti
 ### `creative.companion_production`
 
 ```text
-name: creative.companion_production
+name: not declared
 category: creative_studios
 status: available
 ```
@@ -82,7 +80,7 @@ Coordinate supported reviewed music, still, and native-motion work through exact
 ### `creative.music_production`
 
 ```text
-name: creative.music_production
+name: not declared
 category: creative_studios
 status: available
 ```
@@ -92,7 +90,7 @@ Gather a music brief through chat, preserve user-required decisions, generate an
 ### `creative.visual_production`
 
 ```text
-name: creative.visual_production
+name: not declared
 category: creative_studios
 status: available
 ```
@@ -102,7 +100,7 @@ Gather or draft a visual brief through chat, generate and review a local still, 
 ### `dashboard.capabilities.inspect`
 
 ```text
-name: dashboard.capabilities.inspect
+name: not declared
 category: project_coordination
 status: available
 ```
@@ -112,7 +110,7 @@ Explain which Dashboard surfaces currently have bounded conversational mappings,
 ### `dashboard.invocations.inspect`
 
 ```text
-name: dashboard.invocations.inspect
+name: not declared
 category: project_coordination
 status: available
 ```
@@ -122,9 +120,9 @@ Read the curated invocation guide, including required inputs, Core needs, approv
 ### `downloads.cleanup_plan`
 
 ```text
-name: downloads.cleanup_plan
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Read-only human-oriented cleanup plan based on downloads.inspect.
@@ -132,9 +130,9 @@ Read-only human-oriented cleanup plan based on downloads.inspect.
 ### `downloads.inspect`
 
 ```text
-name: downloads.inspect
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Read-only Downloads inspection and cleanup-candidate planning.
@@ -142,9 +140,9 @@ Read-only Downloads inspection and cleanup-candidate planning.
 ### `downloads.move_to_trash`
 
 ```text
-name: downloads.move_to_trash
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Approval-gated move-to-trash execution based on a verified downloads.cleanup_plan.
@@ -152,9 +150,9 @@ Approval-gated move-to-trash execution based on a verified downloads.cleanup_pla
 ### `downloads.restore_last_cleanup`
 
 ```text
-name: downloads.restore_last_cleanup
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Approval-gated restore of the latest successful Downloads cleanup from Trash.
@@ -162,7 +160,7 @@ Approval-gated restore of the latest successful Downloads cleanup from Trash.
 ### `knowledge.vault.conversation_reflect`
 
 ```text
-name: knowledge.vault.conversation_reflect
+name: not declared
 category: knowledge
 status: available
 ```
@@ -172,7 +170,7 @@ Explicitly inspect one bounded local conversation, draft one review-only reusabl
 ### `knowledge.vault.initialize`
 
 ```text
-name: knowledge.vault.initialize
+name: not declared
 category: knowledge
 status: available
 ```
@@ -182,7 +180,7 @@ Create the reviewed portable starter structure in one configured external Markdo
 ### `knowledge.vault.memory_export`
 
 ```text
-name: knowledge.vault.memory_export
+name: not declared
 category: knowledge
 status: available
 ```
@@ -192,7 +190,7 @@ Project approved canonical Soul memory into a clearly marked generated Markdown 
 ### `knowledge.vault.memory_import`
 
 ```text
-name: knowledge.vault.memory_import
+name: not declared
 category: knowledge
 status: available
 ```
@@ -202,7 +200,7 @@ Import one explicitly selected bounded Markdown note as a candidate in Soul's ex
 ### `knowledge.vault.reflect`
 
 ```text
-name: knowledge.vault.reflect
+name: not declared
 category: knowledge
 status: available
 ```
@@ -212,7 +210,7 @@ Classify one explicit durable-knowledge candidate, report its correct canonical 
 ### `knowledge.vault.search`
 
 ```text
-name: knowledge.vault.search
+name: not declared
 category: knowledge
 status: available
 ```
@@ -222,7 +220,7 @@ Search one configured external Markdown vault through a bounded foreground read 
 ### `local.search`
 
 ```text
-name: local.search
+name: not declared
 category: knowledge
 status: available
 ```
@@ -232,7 +230,7 @@ Search reviewed repository documentation, Knowledge Vault notes, and canonical M
 ### `project.timeline.inspect`
 
 ```text
-name: project.timeline.inspect
+name: not declared
 category: project_coordination
 status: available
 ```
@@ -242,7 +240,7 @@ Read the shared owner-local implementation ledger, including explicit horizons, 
 ### `project.timeline.update`
 
 ```text
-name: project.timeline.update
+name: not declared
 category: project_coordination
 status: available
 ```
@@ -252,9 +250,9 @@ Create or revise one explicitly named implementation-ledger item through the Das
 ### `skill.brief.draft`
 
 ```text
-name: skill.brief.draft
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Draft a review-only Soul/ skill proposal using a configured cloud provider.
@@ -262,9 +260,9 @@ Draft a review-only Soul/ skill proposal using a configured cloud provider.
 ### `skill.brief.review`
 
 ```text
-name: skill.brief.review
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Review a Soul/ skill proposal and write a review-only artifact.
@@ -272,9 +270,9 @@ Review a Soul/ skill proposal and write a review-only artifact.
 ### `system.status`
 
 ```text
-name: system.status
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Read-only local system and Soul runtime status check.
@@ -282,9 +280,9 @@ Read-only local system and Soul runtime status check.
 ### `weather.report`
 
 ```text
-name: weather.report
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Read-only weather report with temperature, humidity, air quality, and optional 3-day outlook.
@@ -292,9 +290,9 @@ Read-only weather report with temperature, humidity, air quality, and optional 3
 ### `web.lookup`
 
 ```text
-name: web.lookup
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general research backend.
@@ -302,9 +300,9 @@ Bounded DuckDuckGo Instant Answer lookup for narrow orientation; not a general r
 ### `web.research`
 
 ```text
-name: web.research
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
@@ -312,9 +310,9 @@ Bounded foreground public-web search and HTTPS source retrieval with provenance 
 ### `youtube.song_search`
 
 ```text
-name: youtube.song_search
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Open a YouTube search for a requested song in the default Linux browser after confirmation.
@@ -322,9 +320,9 @@ Open a YouTube search for a requested song in the default Linux browser after co
 ### `youtube.video_resolve`
 
 ```text
-name: youtube.video_resolve
-category: uncategorized
-status: unknown
+name: not declared
+category: not declared
+status: registered (availability not declared)
 ```
 
 Resolve a song/search query to a YouTube video candidate using the official YouTube Data API.

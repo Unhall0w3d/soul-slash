@@ -84,7 +84,7 @@ removes those retained pixels. Archiving the conversation does not delete them.
   or details are unreadable.
 - UI labels must be copied literally from pixels/OCR, never renamed or
   semantically guessed.
-- PNG and JPEG are the only accepted formats in this slice.
+- PNG and JPEG are the only accepted formats in the present supported boundary.
 - Animated images, SVG, PDF, URLs, camera capture, and continuous observation
   are unavailable.
 - Screen understanding captures only one explicitly requested monitor, active

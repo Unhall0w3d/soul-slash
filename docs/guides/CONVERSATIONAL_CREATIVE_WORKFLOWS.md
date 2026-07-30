@@ -159,11 +159,11 @@ fact that publication is excluded. The action click authorizes the disclosed
 transition to AMD-Free Core and one bounded render. The resulting WebM returns
 as an authenticated player and remains a Visual Studio motion candidate.
 
-Motion review remains in Visual Studio for this slice. After the Operator
-records `revise`, an explicit Chat request can prepare one linked native-motion
-revision using replacement direction, a new seed, and either the original
-duration or another explicitly selected supported duration. The prior motion
-candidate remains immutable.
+Motion review remains in Visual Studio at the present boundary. After the
+Operator records `revise`, an explicit Chat request can prepare one linked
+native-motion revision using replacement direction, a new seed, and either the
+original duration or another explicitly selected supported duration. The prior
+motion candidate remains immutable.
 
 ## Present boundary
 

@@ -60,7 +60,7 @@
         <button id="creative-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="creative-menu">Creative Studios <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="creative-menu" class="self-improvement-menu" role="menu" aria-label="Creative Studio surfaces" hidden>
           <button id="music-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="music-panel"><strong>Music Studio</strong><span>Composition, candidates, listening evidence, and visual companions</span></button>
-          <button id="visual-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="visual-panel"><strong>Visual Studio</strong><span>Local still drafts now; motion after measured qualification</span></button>
+          <button id="visual-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="visual-panel"><strong>Visual Studio</strong><span>Qualified local still and short-motion creation lanes</span></button>
         </div>
       </div>
       <div id="administration-navigation" class="tab-menu">
@@ -490,11 +490,11 @@
     <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
       <header class="improvement-header">
         <div><p class="eyebrow">Infrastructure operations</p><h1>Guided Maintenance</h1><p>One bounded control room for mutable hosts and status-only local appliances—observe first, authorize exact supported changes second.</p></div>
-        <div class="improvement-boundary"><strong>Device-scoped maintenance fabric</strong><span>Select one node → review → authorize → verify</span><small>No fleet-wide action exists. Status persists and is recollected at noon, midnight, and after successful device work.</small></div>
+        <div class="improvement-boundary"><strong>Device-scoped maintenance fabric</strong><span>Select one node → review → authorize → verify</span><small>No fleet-wide action exists. Status persists; separately installed collection runs at noon, midnight, and after successful device work.</small></div>
       </header>
       <section class="maintenance-fleet-overview" aria-labelledby="maintenance-fleet-heading">
         <div class="maintenance-fleet-toolbar">
-          <div><p class="eyebrow">Persisted infrastructure evidence</p><h2 id="maintenance-fleet-heading">Maintenance control plane</h2><p>Each card owns its maintenance and reboot scope. Collect now, or use the most recent persisted noon/midnight snapshot.</p></div>
+          <div><p class="eyebrow">Persisted infrastructure evidence</p><h2 id="maintenance-fleet-heading">Maintenance control plane</h2><p>Each card owns its maintenance and reboot scope. Collect now, or use the most recent persisted snapshot; noon/midnight collection occurs only when separately installed.</p></div>
           <button id="refresh-maintenance-fleet" class="gate-button gate-button--gold" type="button">Collect fleet status</button>
         </div>
         <div class="maintenance-fleet-summary" aria-label="Fleet summary">
@@ -626,8 +626,8 @@
       </section>
       <section class="improvement-card host-plan-card" aria-labelledby="maintenance-execution-heading">
         <div class="card-heading"><div><p class="eyebrow">Foreground execution · A2</p><h2 id="maintenance-execution-heading">One-password terminal transaction</h2></div><span id="maintenance-execution-state" class="count-badge">review gated</span></div>
-        <p class="card-note">Revalidate the exact plan, then open a visible no-mutation terminal rehearsal or a separately armed A2 update. A2 is accepted on this host and always stops before reboot.</p>
-        <div class="host-plan-actions"><button id="refresh-maintenance-evidence" class="gate-button" type="button">Refresh native evidence</button><button id="preview-maintenance-execution" class="gate-button" type="button">Review A2 transaction</button><button id="rehearse-maintenance-execution" class="gate-button" type="button" disabled>Open terminal rehearsal</button><button id="execute-maintenance" class="gate-button gate-button--gold" type="button" disabled>Live update unavailable</button><button id="refresh-maintenance-receipt" class="gate-button" type="button">Refresh receipt</button></div>
+        <p class="card-note">Revalidate the exact plan, then open a visible no-mutation terminal rehearsal or a separately armed A2 update. A2 always stops before reboot.</p>
+        <div class="host-plan-actions"><button id="refresh-maintenance-evidence" class="gate-button" type="button">Refresh native evidence</button><button id="preview-maintenance-execution" class="gate-button" type="button">Review A2 transaction</button><button id="rehearse-maintenance-execution" class="gate-button" type="button" disabled>Open terminal rehearsal</button><button id="execute-maintenance" class="gate-button gate-button--gold" type="button" disabled>Awaiting A2 preview</button><button id="refresh-maintenance-receipt" class="gate-button" type="button">Refresh receipt</button></div>
         <div id="maintenance-execution-details" class="recommendation-list"><p class="muted">No A2 transaction reviewed.</p></div>
         <div id="maintenance-execution-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Foreground transaction</strong><span data-generation-message>The visible maintenance terminal owns this bounded operation.</span></div>
         <p id="maintenance-execution-status" class="dialog-status" role="status">Native evidence and transaction terminals are local-desktop handoffs. No password is collected by the Dashboard.</p>
@@ -635,13 +635,13 @@
       </section>
       <section class="improvement-card host-plan-card" aria-labelledby="maintenance-reboot-heading">
         <div class="card-heading"><div><p class="eyebrow">Conditional reboot · A3</p><h2 id="maintenance-reboot-heading">One-shot workspace restoration</h2></div><span id="maintenance-reboot-state" class="count-badge">review gated</span></div>
-        <p class="card-note">A3 repeats the exact reviewed update transaction, captures a fresh privacy-filtered window map, requests one reboot only after every postcondition passes, and consumes one boot-bound restoration journal after login.</p>
-        <div class="host-plan-actions"><button id="preview-maintenance-reboot" class="gate-button" type="button">Review A3 transaction</button><button id="execute-maintenance-reboot" class="gate-button gate-button--gold" type="button" disabled>Live reboot unavailable</button><button id="refresh-maintenance-reboot-status" class="gate-button" type="button">Refresh A3 status</button></div>
+        <p class="card-note">A3 is a distinct reboot-only transaction with empty package-command vectors. It captures a fresh privacy-filtered window map, requests one reboot after its own preconditions pass, and consumes one boot-bound restoration journal after login.</p>
+        <div class="host-plan-actions"><button id="preview-maintenance-reboot" class="gate-button" type="button">Review A3 transaction</button><button id="execute-maintenance-reboot" class="gate-button gate-button--gold" type="button" disabled>Awaiting A3 preview</button><button id="refresh-maintenance-reboot-status" class="gate-button" type="button">Refresh A3 status</button></div>
         <div id="maintenance-reboot-details" class="recommendation-list"><p class="muted">No A3 transaction reviewed.</p></div>
-        <div id="maintenance-reboot-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Conditional reboot</strong><span data-generation-message>The visible maintenance terminal owns the bounded update and reboot gate.</span></div>
+        <div id="maintenance-reboot-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Conditional reboot</strong><span data-generation-message>The visible maintenance terminal owns the bounded reboot and restoration gate.</span></div>
         <p id="maintenance-reboot-status" class="dialog-status" role="status">The one-shot resume unit and live A3 gate remain separately reviewed. No password is collected here.</p>
       </section>
-      <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>A3 remains disabled by default</h2></div><p>The authenticated Dashboard click can authorize only one exact digest after local arming. Chat and Voice cannot authorize reboot. The visible terminal owns the single native password prompt; the resume unit cannot update, authenticate, or reboot.</p></aside>
+      <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>A3 remains disabled by default</h2></div><p>The authenticated Dashboard click can authorize only one exact digest after local arming. Chat and Voice cannot authorize reboot. The visible terminal owns any native password prompt; the separately installed A4 fixed authority may provide the reviewed zero-prompt path. The resume unit cannot update, authenticate, or reboot.</p></aside>
       </div>
     </section>
 

@@ -17,6 +17,11 @@ cd soul-slash
 make check
 ```
 
+`make check` normalizes the executable bit on tracked `scripts/soul-*.sh`
+helpers before checking tools. `make detect`, `make setup`, and the related
+runtime targets perform the same repository-local normalization before they
+run.
+
 Required tools:
 
 - Ruby
@@ -500,11 +505,11 @@ ruby bin/soul reflection reject latest --reason "Not useful"
 
 ```text
 make help             Show available targets
-make check            Check required/recommended local tools only
+make check            Normalize tracked script modes, then check local tools
 make detect           Detect runtimes, endpoints, config, and local GGUF models
 make defaults-show    Show supported model defaults and override points
 make supported-stack-check  Inspect every supported creative runtime lane
-make setup            Guided runtime setup
+make setup            Normalize tracked script modes, then guide runtime setup
 make setup-llamacpp   Configure llama.cpp provider
 make setup-ollama     Configure Ollama provider
 make music-check      Check optional Music pilot tools; does not install
@@ -620,9 +625,10 @@ make voice-transcription-install \
   CONFIRM=INSTALL_SOUL_MUSIC_TRANSCRIPTION
 ```
 
-The recording is limited to sixty seconds and eight MiB, transcribed on CPU,
-inserted as an editable unsent composer draft, and deleted with its normalized
-WAV and raw recognition output before the request returns. See
+The recording is limited to sixty seconds and eight MiB and transcribed on CPU.
+The Dashboard inserts the returned transcript and submits it once through the
+ordinary Chat path; the recording, normalized WAV, and raw recognition output
+are deleted before the transcription request returns. See
 `docs/guides/VOICE_INPUT.md` for use and portable override details.
 
 Chat speech output is a separate optional local install. Its default is

@@ -24,10 +24,11 @@ Voice Input A0 adds no second conversation path. Browser audio enters one
 authenticated, same-origin, CSRF-protected route with independent size and
 duration bounds, is normalized through FFmpeg, and is transcribed by the same
 pinned CPU whisper.cpp runtime used for music evidence. The temporary audio and
-raw recognition output are removed before an editable transcript is returned.
-Only a later explicit Send turns that draft into an ordinary conversation
-message. Voice therefore inherits the existing intent, skill, Core, memory, and
-confirmation boundaries instead of bypassing them.
+raw recognition output are removed before the transcript is returned. The
+Dashboard inserts that transcript and submits it once through the ordinary Chat
+form; the transcription service itself never sends a message. Voice therefore
+inherits the existing intent, skill, Core, memory, and confirmation boundaries
+instead of bypassing them.
 
 Voice Output A0 likewise creates no second assistant path. An eligible completed
 Soul message enters one authenticated, same-origin, CSRF-protected route after

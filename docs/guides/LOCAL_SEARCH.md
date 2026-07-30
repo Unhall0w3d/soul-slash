@@ -4,6 +4,11 @@ Local Search gives Soul one read-only query across reviewed material it already
 stores. It is useful when the Operator remembers a concept but not which note,
 brief, or document contains it.
 
+The Chat and command-line search surfaces below are merged and available for
+foreground use. Search results remain reference evidence, and Core eval results
+do not promote retrieved text into authority or approved memory. Any durable
+use still follows the separate reviewed memory workflow.
+
 ## Sources
 
 The initial source adapters are:
