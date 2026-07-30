@@ -47,6 +47,20 @@ make verify-maintenance-device-control
 - The reviewed MAC acquired its reserved final address, its SSH fingerprint
   remained unchanged, and the ordinary digest-bound alias and fleet-enrollment
   gates created the owner-private Temper record.
+- Initial post-enrollment live qualification failed closed because refresh
+  reachability still tried only `/usr/bin/hostname` and `/bin/hostname`.
+  The adapter now includes the immutable NixOS hostname path, with a
+  deterministic full-refresh regression before live maintenance was retried.
+- The next qualification reached Temper but rejected the unwrapped
+  `/run/current-system/sw/bin/sudo` binary. All authority calls now use
+  NixOS's setuid `/run/wrappers/bin/sudo`, and the deterministic preview binds
+  that exact path.
+- The final merged-adapter acceptance exposed a healthy maintenance card,
+  zero current Nix source updates, matching active/booted generations, and
+  active SSH, QEMU guest agent, and fixed authority evidence. Exact
+  `MAINTAIN_TEMPER` execution completed as private receipt
+  `device_receipt_180795accefb5a6b` with one fixed upgrade call, no reboot,
+  and no automatic retry.
 
 ## Local LLM eval
 

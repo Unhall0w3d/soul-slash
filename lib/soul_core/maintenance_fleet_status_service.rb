@@ -834,7 +834,7 @@ module SoulCore
       authority = remote_run(
         "enrolled_device.nixos_authority",
         target,
-        "/run/current-system/sw/bin/sudo", "-n",
+        "/run/wrappers/bin/sudo", "-n",
         "/run/current-system/sw/bin/soul-nixos-maintenance", "self-check",
         timeout: 10
       )
@@ -1702,7 +1702,15 @@ module SoulCore
       primary = remote_run("enrolled_device.reachability", target, "/usr/bin/hostname", timeout: 5)
       return primary if successful?(primary)
 
-      remote_run("enrolled_device.reachability_fallback", target, "/bin/hostname", timeout: 5)
+      fallback = remote_run("enrolled_device.reachability_fallback", target, "/bin/hostname", timeout: 5)
+      return fallback if successful?(fallback)
+
+      remote_run(
+        "enrolled_device.reachability_nixos",
+        target,
+        "/run/current-system/sw/bin/hostname",
+        timeout: 5
+      )
     end
 
     def cisco_phone_address

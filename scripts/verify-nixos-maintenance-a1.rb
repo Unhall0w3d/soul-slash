@@ -92,13 +92,13 @@ class NixosRunner
       result("active\n")
     when ["/run/current-system/sw/bin/systemctl", "is-active", "sshd", "qemu-guest-agent"]
       result("active\nactive\n")
-    when ["/run/current-system/sw/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "self-check"]
+    when ["/run/wrappers/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "self-check"]
       result("{\"version\":\"soul-nixos-maintenance-a1-v1\",\"flake\":\"/etc/nixos#temper\",\"arbitrary_command_forwarding\":false,\"password_storage\":false}\n")
-    when ["/run/current-system/sw/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "generation-match"]
+    when ["/run/wrappers/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "generation-match"]
       result("matched\n")
-    when ["/run/current-system/sw/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "upgrade"]
+    when ["/run/wrappers/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "upgrade"]
       result("upgrade complete\n")
-    when ["/run/current-system/sw/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "reboot"]
+    when ["/run/wrappers/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "reboot"]
       result("", "", 255, "failed")
     else
       if remote.length == 3 && remote[0, 2] == ["/run/current-system/sw/bin/test", "-x"]
@@ -143,22 +143,26 @@ Dir.mktmpdir("soul-nixos-a1-") do |root|
       "SOUL_FLEET_TEMPER_SSH_ALIAS" => "temper"
     }
   )
-  device = fleet.send(
-    :collect_nixos_inventory_device,
-    {
-      "id" => "managed_temper",
-      "label" => "Temper",
-      "role" => "NixOS maintenance laboratory",
-      "address" => "192.168.50.80",
-      "ssh_alias" => "temper"
-    },
-    {
+  nixos_record = {
+    "id" => "managed_temper",
+    "label" => "Temper",
+    "role" => "NixOS maintenance laboratory",
+    "address" => "192.168.50.80",
+    "connection_mode" => "ssh",
+    "address_policy" => "fixed",
+    "ssh_alias" => "temper",
+    "facts" => {
+      "os_id" => "nixos",
       "os_pretty_name" => "NixOS 26.05 (Yarara)",
       "kernel" => "6.18.40",
+      "package_managers" => ["nix"],
       "enrollment_id" => "managed_temper"
-    },
-    ["nix"]
-  )
+    }
+  }
+  device = fleet.send(:collect_enrolled_device, nixos_record)
+  check.call("fleet refresh reaches NixOS through its immutable hostname path",
+             device["reachable"] == true &&
+               runner.calls.any? { |call| call.fetch("argv").last == "/run/current-system/sw/bin/hostname" })
   check.call("live Nix branch evidence produces one native Nix update channel",
              device.dig("updates", "native") == 1 &&
                device.dig("updates", "channels", 0, "label") == "Nix" &&
@@ -177,22 +181,7 @@ Dir.mktmpdir("soul-nixos-a1-") do |root|
     ssh_config: ssh_config,
     process_env: {}
   )
-  disabled_device = disabled_fleet.send(
-    :collect_nixos_inventory_device,
-    {
-      "id" => "managed_temper",
-      "label" => "Temper",
-      "role" => "NixOS maintenance laboratory",
-      "address" => "192.168.50.80",
-      "ssh_alias" => "temper"
-    },
-    {
-      "os_pretty_name" => "NixOS 26.05 (Yarara)",
-      "kernel" => "6.18.40",
-      "enrollment_id" => "managed_temper"
-    },
-    ["nix"]
-  )
+  disabled_device = disabled_fleet.send(:collect_enrolled_device, nixos_record)
   check.call("a valid helper remains inventory-only while the local Temper authority switch is disabled",
              disabled_device["control"] == "inventory_only" &&
                disabled_device.dig("facts", "mutation_supported") == false &&
@@ -220,7 +209,7 @@ Dir.mktmpdir("soul-nixos-a1-") do |root|
              preview.dig("data", "confirmation") == "MAINTAIN_TEMPER" &&
                preview.dig("data", "plan", "maintenance_adapter") == "nixos_flake" &&
                preview.dig("data", "plan", "commands") == [{
-               "argv" => ["/run/current-system/sw/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "upgrade"]
+               "argv" => ["/run/wrappers/bin/sudo", "-n", "/run/current-system/sw/bin/soul-nixos-maintenance", "upgrade"]
                }])
   check.call("Temper reboot preview binds its immutable boot identity and three readiness checks",
              reboot_preview.dig("data", "plan", "boot_identity", "argv") == [
@@ -244,7 +233,7 @@ Dir.mktmpdir("soul-nixos-a1-") do |root|
   )
   maintenance_calls = runner.calls.drop(calls_before).count do |call|
     call.fetch("argv").last(4) == [
-      "/run/current-system/sw/bin/sudo", "-n",
+      "/run/wrappers/bin/sudo", "-n",
       "/run/current-system/sw/bin/soul-nixos-maintenance", "upgrade"
     ]
   end

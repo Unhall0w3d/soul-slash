@@ -155,10 +155,10 @@ module SoulCore
         "ssh_alias" => "temper",
         "impact" => [],
         "maintenance" => [
-          ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "upgrade"]
+          ["/run/wrappers/bin/sudo", "-n", NIXOS_HELPER_PATH, "upgrade"]
         ],
         "reboot" => [
-          "/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "reboot"
+          "/run/wrappers/bin/sudo", "-n", NIXOS_HELPER_PATH, "reboot"
         ],
         "boot_identity" => [
           "/run/current-system/sw/bin/cat", "/proc/sys/kernel/random/boot_id"
@@ -171,12 +171,12 @@ module SoulCore
           },
           {
             "label" => "Fixed NixOS authority",
-            "argv" => ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "self-check"],
+            "argv" => ["/run/wrappers/bin/sudo", "-n", NIXOS_HELPER_PATH, "self-check"],
             "stdout_includes" => [NIXOS_AUTHORITY_VERSION]
           },
           {
             "label" => "Active and booted NixOS generations",
-            "argv" => ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "generation-match"],
+            "argv" => ["/run/wrappers/bin/sudo", "-n", NIXOS_HELPER_PATH, "generation-match"],
             "stdout_includes" => ["matched"]
           }
         ]
