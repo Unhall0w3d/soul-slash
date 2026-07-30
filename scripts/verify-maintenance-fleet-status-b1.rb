@@ -41,13 +41,13 @@ class FleetFakeRunner
       return ok("64 bytes from #{argv.fetch(5)}: time=0.4 ms\n")
     end
 
-    target_index = argv.index { |value| %w[proxmox-maintenance pihole-maintenance].include?(value) }
+    target_index = argv.index { |value| %w[proxmox-maintenance pihole-maintenance foundry].include?(value) }
     return failed("unexpected command", 127) unless target_index
 
     target = argv[target_index]
     remote = argv[(target_index + 1)..]
     return failed("network unavailable", 255) if @pihole_offline && target == "pihole-maintenance"
-    return proxmox(remote) if target == "proxmox-maintenance"
+    return proxmox(remote, target == "foundry" ? "foundry" : "forge") if %w[proxmox-maintenance foundry].include?(target)
     return pihole(remote) if target == "pihole-maintenance"
 
     failed("unexpected target", 127)
@@ -55,8 +55,9 @@ class FleetFakeRunner
 
   private
 
-  def proxmox(remote)
-    return ok("forge\n") if remote == ["/usr/bin/hostname"]
+  def proxmox(remote, node_name)
+    return ok("#{node_name}\n") if remote == ["/usr/bin/hostname"]
+    return ok("") if remote == ["/usr/bin/test", "-x", "/usr/bin/pveversion"]
     return ok("pve-manager/9.2.5/fixture (running kernel: 7.0.2-6-pve)\n") if remote == ["/usr/bin/pveversion"]
     return ok("7.0.2-6-pve\n") if remote == ["/usr/bin/uname", "-r"]
     if remote == ["/usr/sbin/proxmox-boot-tool", "kernel", "list"]
@@ -66,7 +67,8 @@ class FleetFakeRunner
     return failed("", 1) if remote == ["/usr/bin/test", "-e", "/var/run/reboot-required"]
     if remote == ["/usr/bin/pvesh", "get", "/cluster/resources", "--type", "vm", "--output-format", "json"]
       return ok(JSON.generate([{
-        "vmid" => 100, "type" => "lxc", "node" => "forge", "name" => "pihole", "status" => "running", "tags" => "adblock;community-script",
+        "vmid" => node_name == "foundry" ? 201 : 100, "type" => node_name == "foundry" ? "qemu" : "lxc", "node" => node_name,
+        "name" => node_name == "foundry" ? "lab-fixture" : "pihole", "status" => "running", "tags" => node_name == "foundry" ? "lab" : "adblock;community-script",
         "mem" => 64 * 1024 * 1024, "maxmem" => 512 * 1024 * 1024, "uptime" => 7200
       }]))
     end
@@ -336,12 +338,28 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
       "connection_mode" => "status_only",
       "control" => "inventory_only",
       "facts" => {"capability_probe" => "status_only"}
+    }, {
+      "id" => "managed_1111111111111111",
+      "label" => "Foundry",
+      "role" => "Discovered Linux device · inventory only",
+      "address" => "192.0.2.7",
+      "connection_mode" => "ssh",
+      "ssh_alias" => "foundry",
+      "control" => "inventory_only",
+      "facts" => {
+        "platform" => "linux",
+        "os_id" => "debian",
+        "os_pretty_name" => "Debian GNU/Linux 13 (trixie)",
+        "kernel" => "7.0.2-6-pve",
+        "package_managers" => ["apt", "apt-get"]
+      }
     }]
   }))
   File.chmod(0o600, registry_path)
   refresh_runner = FleetFakeRunner.new
   clock_values = [
     Time.utc(2026, 7, 27, 21, 6, 0),
+    Time.utc(2026, 7, 27, 21, 6, 15),
     Time.utc(2026, 7, 27, 21, 6, 30),
     Time.utc(2026, 7, 27, 21, 7, 0)
   ].each
@@ -354,6 +372,28 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
     root: private_root
   )
   initial = refresh_service.collect
+  foundry = initial.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
+  check.call("an enrolled PVE kernel and executable promote one SSH record to rich read-only Proxmox inventory",
+             foundry["label"] == "Foundry" &&
+               foundry["control"] == "inventory_only" &&
+               foundry["role"] == "Proxmox VE hypervisor · inventory only" &&
+               foundry["version"].include?("pve-manager/9.2.5") &&
+               foundry.dig("updates", "freshness") == "cached_apt_metadata" &&
+               foundry.dig("kernel", "available") == "7.0.14-6-pve" &&
+               foundry.dig("facts", "platform") == "proxmox" &&
+               foundry.dig("facts", "status_adapter") == "proxmox_read_only" &&
+               foundry.dig("facts", "mutation_supported") == false &&
+               foundry.dig("facts", "guests", 0, "type") == "qemu")
+  calls_before_foundry_refresh = refresh_runner.calls.length
+  foundry_refresh = refresh_service.refresh(device_id: "managed_1111111111111111")
+  refreshed_foundry = foundry_refresh.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
+  foundry_refresh_calls = refresh_runner.calls.drop(calls_before_foundry_refresh)
+  check.call("one-device refresh retains the enrolled Foundry identity instead of substituting Forge",
+             foundry_refresh["lifecycle_state"] == "complete" &&
+               refreshed_foundry["label"] == "Foundry" &&
+               refreshed_foundry["id"] == "managed_1111111111111111" &&
+               foundry_refresh_calls.all? { |call| call["argv"].include?("foundry") } &&
+               foundry_refresh_calls.none? { |call| call["argv"].include?("proxmox-maintenance") })
   legacy_workstation_refresh = refresh_service.refresh(device_id: "maven")
   check.call("legacy Maven refresh requests resolve to the canonical workstation identity",
              legacy_workstation_refresh["lifecycle_state"] == "complete" &&

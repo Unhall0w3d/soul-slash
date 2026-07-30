@@ -124,10 +124,16 @@ editing public source:
    family but do not prove device identity.
 3. Select one candidate. A reachable address is untrusted until this explicit
    review.
-4. Choose **Status only**, or **Fixed SSH inventory** with an existing literal
-   OpenSSH `Host` alias whose `HostName` is that exact address. Status-only
-   enrollment may keep the address fixed or bind it to the reviewed MAC and
-   subnet with **DHCP tracked by MAC**. SSH inventory remains fixed-address.
+4. Choose **Status only**, or **Fixed SSH inventory** with a literal OpenSSH
+   `Host` alias whose `HostName` is that exact address. If the alias is missing,
+   provide the remote account and an existing private key under `~/.ssh`,
+   preview the exact fixed stanza, and click **Add reviewed SSH alias**. This
+   appends only that stanza to the owner config; it does not copy the public
+   key, trust a host key, authenticate, or enroll the device. The target must
+   already trust the public key and its host key must already be present in
+   `known_hosts`. Status-only enrollment may keep the address fixed or bind it
+   to the reviewed MAC and subnet with **DHCP tracked by MAC**. SSH inventory
+   remains fixed-address.
 5. Preview the exact record. SSH inventory reads a bounded hostname, kernel,
    OS projection, and independently tests fixed executable paths for pacman,
    yay, paru, apt, apt-get, dnf, zypper, apk, Flatpak, Snap, and Nix.
@@ -156,6 +162,25 @@ Reboot. Detecting a package manager never creates update authority. A separate
 future adapter must define, test, and receive approval for each mutation
 family. Removing a device removes only its local registry record and sends
 nothing to the target.
+
+An enrolled fixed-SSH host with reviewed `-pve` kernel evidence and a fixed
+`pveversion` executable receives a richer read-only Proxmox projection:
+version, cached-metadata APT updates, running and selected kernels, reboot
+marker, and bounded LXC/QEMU guest summaries. Its card remains
+`inventory_only`; platform recognition never creates Maintain, Reboot, or
+guest-control authority.
+
+If a previously enrolled SSH device suddenly appears offline while still
+answering ping, test its literal alias directly. A changed host key is treated
+as an identity failure, not ordinary downtime. Verify the new fingerprint
+against an independent management path before replacing a dedicated
+`known_hosts` entry.
+
+The SSH prerequisite has its own digest-bound gate. It accepts only a portable
+literal alias, one account name, the reviewed candidate address, and an
+existing mode-`0600` private-key path confined beneath the owner SSH directory.
+It cannot accept passwords, key contents, ports, commands, or arbitrary SSH
+options. A second, unchanged enrollment preview is always required afterward.
 
 For a DHCP-tracked status-only card, Soul compares the recorded address's ARP
 identity with the reviewed MAC. A mismatch or unavailable address triggers one

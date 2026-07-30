@@ -29,6 +29,7 @@ module SoulCore
     REMOVE_CONFIRMATION = "REMOVE_FLEET_DEVICE"
     IGNORE_CONFIRMATION = "IGNORE_FLEET_CANDIDATE"
     RESTORE_CONFIRMATION = "RESTORE_FLEET_CANDIDATE"
+    SSH_ALIAS_CONFIRMATION = "ADD_FLEET_SSH_ALIAS"
     PACKAGE_PATHS = {
       "pacman" => %w[/usr/bin/pacman],
       "yay" => %w[/usr/bin/yay],
@@ -288,6 +289,55 @@ module SoulCore
       failed(error.message)
     end
 
+    def ssh_alias_preview(address:, ssh_alias:, ssh_user:, identity_file:)
+      scope = ssh_alias_scope(
+        address: address,
+        ssh_alias: ssh_alias,
+        ssh_user: ssh_user,
+        identity_file: identity_file
+      )
+      success(
+        "schema_version" => SCHEMA_VERSION,
+        "ssh_alias" => scope,
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => SSH_ALIAS_CONFIRMATION,
+        "prospective_ssh_config_mutation" => "append_one_literal_host",
+        "device_mutation" => "none",
+        "credentials_stored" => false
+      )
+    rescue ArgumentError => error
+      failed(error.message)
+    end
+
+    def add_ssh_alias(address:, ssh_alias:, ssh_user:, identity_file:, confirmation:, expected_digest:)
+      return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
+      return blocked("exact SSH alias confirmation is required") unless confirmation.to_s == SSH_ALIAS_CONFIRMATION
+
+      preview = ssh_alias_preview(
+        address: address,
+        ssh_alias: ssh_alias,
+        ssh_user: ssh_user,
+        identity_file: identity_file
+      )
+      return preview unless preview["lifecycle_state"] == "complete"
+
+      scope = preview.dig("data", "ssh_alias")
+      return blocked("SSH config evidence changed; preview the alias again") unless secure_compare(expected_digest.to_s, digest(scope))
+
+      append_ssh_alias(scope)
+      success(
+        "schema_version" => SCHEMA_VERSION,
+        "ssh_alias" => scope.reject { |key, _value| key == "config_digest" },
+        "ssh_config_mutation" => "append_one_literal_host",
+        "device_mutation" => "none",
+        "credentials_stored" => false
+      )
+    rescue ArgumentError => error
+      failed(error.message)
+    rescue SystemCallError => error
+      failed("SSH alias could not be written safely: #{error.class}")
+    end
+
     def enroll(address:, label:, mode:, ssh_alias: nil, address_policy: "fixed", subnet: nil, mac_address: nil, confirmation:, expected_digest:)
       return awaiting("confirmation and preview digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return blocked("exact fleet enrollment confirmation is required") unless confirmation.to_s == ENROLL_CONFIRMATION
@@ -367,6 +417,87 @@ module SoulCore
     end
 
     private
+
+    def ssh_alias_scope(address:, ssh_alias:, ssh_user:, identity_file:)
+      normalized_address = private_address!(address)
+      alias_name = validated_ssh_alias!(ssh_alias)
+      raise ArgumentError, "SSH alias already exists as a literal Host entry" if literal_ssh_alias?(alias_name)
+
+      user = ssh_user.to_s.strip
+      raise ArgumentError, "SSH user must be one portable account name" unless user.match?(/\A[a-z_][a-z0-9_-]{0,31}\z/i)
+
+      identity = validated_identity_file!(identity_file)
+      config_digest = current_ssh_config_digest
+      block = [
+        "Host #{alias_name}",
+        "    HostName #{normalized_address}",
+        "    User #{user}",
+        "    IdentityFile #{identity.fetch("display")}",
+        "    IdentitiesOnly yes",
+        "    BatchMode yes",
+        "    PasswordAuthentication no",
+        "    StrictHostKeyChecking yes",
+        "    ServerAliveInterval 30",
+        "    ServerAliveCountMax 3"
+      ].join("\n")
+      {
+        "alias" => alias_name,
+        "hostname" => normalized_address,
+        "user" => user,
+        "identity_file" => identity.fetch("display"),
+        "config_digest" => config_digest,
+        "stanza" => block
+      }
+    end
+
+    def validated_identity_file!(value)
+      display = value.to_s.strip
+      raise ArgumentError, "SSH identity file is required" if display.empty?
+      raise ArgumentError, "SSH identity file contains unsupported characters" unless display.match?(%r{\A(?:~/\.ssh/|/)[A-Za-z0-9_./-]+\z})
+
+      expanded = File.expand_path(display)
+      ssh_root = File.realpath(File.dirname(@ssh_config))
+      resolved = File.realpath(expanded)
+      raise ArgumentError, "SSH identity file must remain under the owner SSH directory" unless resolved.start_with?("#{ssh_root}/")
+      raise ArgumentError, "SSH identity file must be a regular non-symlink file" unless File.file?(expanded) && !File.symlink?(expanded)
+      raise ArgumentError, "SSH identity file must be owned by the current user" unless File.stat(expanded).uid == Process.uid
+      raise ArgumentError, "SSH identity file permissions must exclude group and other access" unless (File.stat(expanded).mode & 0o077).zero?
+
+      {"display" => display, "resolved" => resolved}
+    rescue Errno::ENOENT, Errno::EACCES
+      raise ArgumentError, "SSH identity file must already exist under the owner SSH directory"
+    end
+
+    def current_ssh_config_digest
+      raise ArgumentError, "owner SSH config is unavailable" unless File.file?(@ssh_config) && !File.symlink?(@ssh_config)
+      raise ArgumentError, "owner SSH config exceeds the bounded size" if File.size(@ssh_config) > MAX_FILE_BYTES
+      raise ArgumentError, "owner SSH config must be owned by the current user" unless File.stat(@ssh_config).uid == Process.uid
+      raise ArgumentError, "owner SSH config permissions must exclude group and other access" unless (File.stat(@ssh_config).mode & 0o077).zero?
+
+      Digest::SHA256.hexdigest(File.binread(@ssh_config))
+    end
+
+    def append_ssh_alias(scope)
+      raise ArgumentError, "SSH alias already exists as a literal Host entry" if literal_ssh_alias?(scope.fetch("alias"))
+      raise ArgumentError, "SSH config evidence changed; preview the alias again" unless secure_compare(scope.fetch("config_digest"), current_ssh_config_digest)
+
+      directory = File.dirname(@ssh_config)
+      temporary = File.join(directory, ".#{File.basename(@ssh_config)}.soul-#{Process.pid}-#{Thread.current.object_id}")
+      content = File.binread(@ssh_config)
+      content = "#{content}\n" unless content.empty? || content.end_with?("\n")
+      content = "#{content}\n#{scope.fetch("stanza")}\n"
+      raise ArgumentError, "resulting SSH config exceeds the bounded size" if content.bytesize > MAX_FILE_BYTES
+
+      File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write(content)
+        file.flush
+        file.fsync
+      end
+      File.rename(temporary, @ssh_config)
+      File.chmod(0o600, @ssh_config)
+    ensure
+      File.delete(temporary) if temporary && File.exist?(temporary)
+    end
 
     def ignored_scope(address:, label:, subnet:, mac_address:, vendor:)
       normalized_address = private_address!(address)
@@ -901,7 +1032,8 @@ module SoulCore
     end
 
     def success(data)
-      {"ok" => true, "lifecycle_state" => "complete", "data" => data, "mutation" => data["registry_mutation"] || data["preference_mutation"] || "none"}
+      mutation = data["registry_mutation"] || data["preference_mutation"] || data["ssh_config_mutation"] || "none"
+      {"ok" => true, "lifecycle_state" => "complete", "data" => data, "mutation" => mutation}
     end
 
     def awaiting(reason)

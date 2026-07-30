@@ -84,6 +84,9 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
   ssh_config = File.join(root, "ssh_config")
   File.write(ssh_config, "Host fixture-linux\n  HostName 192.168.50.20\n  User fixture\n")
   File.chmod(0o600, ssh_config)
+  identity_file = File.join(root, "fixture_identity")
+  File.write(identity_file, "fixture private key material is never read\n")
+  File.chmod(0o600, identity_file)
   mac_prefix_path = File.join(root, "nmap-mac-prefixes")
   File.write(mac_prefix_path, "001788 Philips Lighting BV\n")
   arp_path = File.join(root, "arp")
@@ -226,6 +229,70 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
                dhcp_preview.dig("data", "device", "subnet") == "192.168.50.0/24" &&
                rejected_dhcp_ssh["lifecycle_state"] == "failed")
 
+  alias_preview = service.ssh_alias_preview(
+    address: "192.168.50.21",
+    ssh_alias: "guided-linux",
+    ssh_user: "fixture",
+    identity_file: identity_file
+  )
+  alias_data = alias_preview.fetch("data")
+  check.call("missing SSH alias setup previews one fixed non-interactive stanza without reading key contents",
+             alias_preview["lifecycle_state"] == "complete" &&
+               alias_preview["mutation"] == "none" &&
+               alias_data.dig("ssh_alias", "hostname") == "192.168.50.21" &&
+               alias_data.dig("ssh_alias", "stanza").include?("Host guided-linux\n") &&
+               alias_data.dig("ssh_alias", "stanza").include?("BatchMode yes") &&
+               alias_data["credentials_stored"] == false)
+  outside_identity_root = Dir.mktmpdir("soul-outside-identity-")
+  outside_identity = File.join(outside_identity_root, "key")
+  File.write(outside_identity, "outside fixture\n")
+  File.chmod(0o600, outside_identity)
+  rejected_identity = service.ssh_alias_preview(
+    address: "192.168.50.21",
+    ssh_alias: "outside-key-linux",
+    ssh_user: "fixture",
+    identity_file: outside_identity
+  )
+  FileUtils.remove_entry(outside_identity_root)
+  check.call("SSH alias setup rejects identity paths outside the owner SSH directory",
+             rejected_identity["lifecycle_state"] == "failed")
+  stale_alias = service.add_ssh_alias(
+    address: "192.168.50.21",
+    ssh_alias: "guided-linux",
+    ssh_user: "changed-user",
+    identity_file: identity_file,
+    confirmation: alias_data["confirmation_phrase"],
+    expected_digest: alias_data["expected_digest"]
+  )
+  check.call("changed SSH alias input is rejected by the preview digest",
+             stale_alias["lifecycle_state"] == "blocked_for_human_review" &&
+               !File.read(ssh_config).include?("Host guided-linux"))
+  added_alias = service.add_ssh_alias(
+    address: "192.168.50.21",
+    ssh_alias: "guided-linux",
+    ssh_user: "fixture",
+    identity_file: identity_file,
+    confirmation: alias_data["confirmation_phrase"],
+    expected_digest: alias_data["expected_digest"]
+  )
+  config_after_alias = File.read(ssh_config)
+  check.call("approved SSH alias setup atomically appends only the reviewed literal Host block",
+             added_alias["lifecycle_state"] == "complete" &&
+               added_alias["mutation"] == "append_one_literal_host" &&
+               config_after_alias.scan(/^Host guided-linux$/).length == 1 &&
+               config_after_alias.include?("    HostName 192.168.50.21\n") &&
+               config_after_alias.include?("    IdentityFile #{identity_file}\n") &&
+               (File.stat(ssh_config).mode & 0o077).zero?)
+  duplicate_alias = service.ssh_alias_preview(
+    address: "192.168.50.21",
+    ssh_alias: "guided-linux",
+    ssh_user: "fixture",
+    identity_file: identity_file
+  )
+  check.call("an existing literal alias cannot be overwritten or duplicated",
+             duplicate_alias["lifecycle_state"] == "failed" &&
+               File.read(ssh_config).scan(/^Host guided-linux$/).length == 1)
+
   preview = service.enrollment_preview(
     address: "192.168.50.20", label: "Fixture Linux", mode: "ssh", ssh_alias: "fixture-linux"
   )
@@ -306,6 +373,15 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
              envelope["lifecycle_state"] == "complete" &&
                envelope.dig("data", "subnet") == "192.168.50.20/32" &&
                envelope.dig("data", "mutation_authority") == false)
+  facade_alias = facade.call(request("maintenance.discovery.ssh_alias.preview", {
+    "address" => "192.168.50.22",
+    "ssh_alias" => "facade-linux",
+    "ssh_user" => "fixture",
+    "identity_file" => identity_file
+  }))
+  check.call("application contract exposes the separately gated SSH alias prerequisite",
+             facade_alias["lifecycle_state"] == "complete" &&
+               facade_alias.dig("data", "ssh_alias", "alias") == "facade-linux")
 
   dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
   html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
@@ -318,6 +394,9 @@ Dir.mktmpdir("soul-fleet-discovery-") do |root|
                dashboard.include?("no local identity hints available") &&
                dashboard.include?("dependency.last_subnet") &&
                dashboard.include?('address_policy: byId("maintenance-enrollment-policy").value') &&
+               dashboard.include?('"maintenance.discovery.ssh_alias.preview"') &&
+               dashboard.include?('"maintenance.discovery.ssh_alias.execute"') &&
+               html.include?('id="maintenance-ssh-alias-setup"') &&
                dashboard.include?('card.classList.add("maintenance-device-card--status-only")') &&
                dashboard.include?('"Network reachability"') &&
                dashboard.include?("discovered capabilities grant no mutation authority") &&

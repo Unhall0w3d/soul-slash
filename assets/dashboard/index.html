@@ -531,7 +531,7 @@
               </section>
             </div>
             <section id="maintenance-enrollment-panel" class="gate-card maintenance-enrollment-panel" hidden>
-              <div><p class="eyebrow">Candidate enrollment</p><h3 id="maintenance-enrollment-heading">Review one device</h3><p>Use status-only for reachability. SSH inventory requires an existing literal alias whose HostName is the selected address. Neither mode enables updates or reboot.</p></div>
+              <div><p class="eyebrow">Candidate enrollment</p><h3 id="maintenance-enrollment-heading">Review one device</h3><p>Use status-only for reachability. SSH inventory uses one exact literal alias whose HostName is the selected address. Soul can prepare a missing alias below without storing credentials. Neither mode enables updates or reboot.</p></div>
               <div class="maintenance-enrollment-fields">
                 <label for="maintenance-enrollment-address">Address<input id="maintenance-enrollment-address" type="text" readonly></label>
                 <label for="maintenance-enrollment-label">Display label<input id="maintenance-enrollment-label" type="text" maxlength="80" autocomplete="off"></label>
@@ -539,6 +539,20 @@
                 <label for="maintenance-enrollment-policy">Address policy<select id="maintenance-enrollment-policy"><option value="fixed">Fixed or reserved</option><option value="dhcp_tracked">DHCP tracked by MAC</option></select></label>
                 <label for="maintenance-enrollment-mac">Observed MAC<input id="maintenance-enrollment-mac" type="text" readonly placeholder="unavailable"></label>
                 <label id="maintenance-enrollment-ssh-row" for="maintenance-enrollment-ssh-alias" hidden>SSH alias<input id="maintenance-enrollment-ssh-alias" type="text" maxlength="128" placeholder="literal-host-alias" autocomplete="off" spellcheck="false"></label>
+              </div>
+              <div id="maintenance-ssh-alias-setup" class="gate-card" hidden>
+                <div><p class="eyebrow">SSH prerequisite</p><h3>Add a missing literal alias</h3><p>Provide the remote account and an existing private key under <code>~/.ssh</code>. The selected candidate supplies HostName. Passwords, key contents, and arbitrary SSH options are never accepted.</p></div>
+                <div class="maintenance-enrollment-fields">
+                  <label for="maintenance-ssh-user">SSH user<input id="maintenance-ssh-user" type="text" maxlength="32" placeholder="root" autocomplete="off" spellcheck="false"></label>
+                  <label for="maintenance-ssh-identity">Existing identity file<input id="maintenance-ssh-identity" type="text" maxlength="240" placeholder="~/.ssh/id_ed25519_device" autocomplete="off" spellcheck="false"></label>
+                </div>
+                <button id="preview-maintenance-ssh-alias" class="quiet-button" type="button">Preview SSH alias</button>
+                <div id="maintenance-ssh-alias-confirm" hidden>
+                  <pre id="maintenance-ssh-alias-scope" class="clear-preview-list"></pre>
+                  <button id="execute-maintenance-ssh-alias" class="gate-button gate-button--gold" type="button">Add reviewed SSH alias</button>
+                </div>
+                <pre id="maintenance-ssh-bootstrap-command" class="clear-preview-list" hidden></pre>
+                <p id="maintenance-ssh-alias-status" class="dialog-status" role="status" aria-live="polite">The target must already trust the selected public key and its host key must already be present in known_hosts.</p>
               </div>
               <button id="preview-maintenance-enrollment" class="gate-button" type="button">Preview enrollment</button>
               <div id="maintenance-enrollment-confirm" hidden>
