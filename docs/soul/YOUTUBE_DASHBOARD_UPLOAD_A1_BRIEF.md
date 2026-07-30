@@ -21,8 +21,9 @@ After a reviewed Music candidate and visual companion have produced an exact
 local YouTube package, Music Studio may show:
 
 1. non-secret OAuth status;
-2. a local path field for the Operator-supplied Desktop OAuth client JSON when
-   authorization is not configured;
+2. a bounded list of locally detected, already-valid owner-only Desktop OAuth
+   client JSON files plus a manual local path field when authorization is not
+   configured;
 3. the exact authorization preview and one click-authorized foreground consent
    operation;
 4. the authenticated channel title and ID;
@@ -41,6 +42,10 @@ video.
 - The Dashboard never receives, stores, renders, logs, or returns client
   secrets, authorization codes, access tokens, refresh tokens, or
   Authorization headers.
+- Discovery examines at most 64 direct children of the Operator's Downloads
+  directory, accepts only the standard Google Desktop client filename shape,
+  and returns only validated path, filename, project, and application type.
+  It never recursively scans, follows symlinks, or returns client contents.
 - The OAuth client path is passed only to the existing A0 validator. The file
   must remain a regular non-symlink owner-only Desktop client JSON for the
   exact `soul-slash-local-publisher` Google project.
