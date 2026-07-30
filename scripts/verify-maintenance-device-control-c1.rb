@@ -90,6 +90,27 @@ class C1Runner
   end
 end
 
+class C1RepositoryFailureRunner
+  attr_reader :calls
+
+  def initialize
+    @calls = []
+  end
+
+  def run(*command, **options)
+    argv = command.flatten.map(&:to_s)
+    @calls << {"argv" => argv, "options" => options}
+    stderr = <<~ERROR
+      Err:4 https://reader:private@example.invalid/debian/pve?token=very-secret trixie InRelease
+        401 Unauthorized
+      \e[31mE: The repository requires a valid subscription.\e[0m
+    ERROR
+    SoulCore::BoundedCommandRunner::Result.new(
+      stdout: "", stderr: stderr, exit_status: 100, status: "failed", truncated: false
+    )
+  end
+end
+
 puts "Maintenance device control C1 verification:"
 
 Dir.mktmpdir("soul-device-control-") do |root|
@@ -106,6 +127,8 @@ Dir.mktmpdir("soul-device-control-") do |root|
              forge_preview["lifecycle_state"] == "complete" &&
                forge_plan["device_id"] == "forge" &&
                forge_plan["fleet_wide"] == false &&
+               forge_plan["maintenance_adapter"] == "proxmox_apt" &&
+               forge_plan["lifecycle_contract"] == "device_scoped_v1" &&
                forge_plan["ssh_alias"] == "proxmox-maintenance" &&
                forge_plan["commands"].all? { |entry| entry["argv"].first.start_with?("/usr/") })
 
@@ -151,6 +174,8 @@ Dir.mktmpdir("soul-device-control-") do |root|
                foundry_plan["ssh_alias"] == "foundry" &&
                foundry_plan["address"] == "192.0.2.7" &&
                foundry_plan["device_label"] == "Foundry" &&
+               foundry_plan["maintenance_adapter"] == "proxmox_apt" &&
+               foundry_plan["lifecycle_contract"] == "device_scoped_v1" &&
                foundry_plan["commands"].map { |entry| entry["argv"] } ==
                  SoulCore::MaintenanceDeviceControlService::FOUNDRY_MAINTENANCE &&
                foundry_plan["confirmation"] == "MAINTAIN_FOUNDRY")
@@ -168,9 +193,65 @@ Dir.mktmpdir("soul-device-control-") do |root|
   )
   check.call("Foundry maintenance executes only its two fixed shell-free commands",
              foundry_done["lifecycle_state"] == "complete" &&
+               foundry_done.dig("data", "receipt", "maintenance_adapter") == "proxmox_apt" &&
+               foundry_done.dig("data", "receipt", "lifecycle_contract") == "device_scoped_v1" &&
                foundry_runner.calls.length == 2 &&
                foundry_runner.calls.all? { |call| call["argv"].include?("foundry") } &&
                foundry_runner.calls.none? { |call| call["argv"].any? { |part| %w[sh bash zsh -c].include?(part) } })
+
+  repository_failure_runner = C1RepositoryFailureRunner.new
+  repository_failure = SoulCore::MaintenanceDeviceControlService.new(
+    root: File.join(root, "foundry-repository-failure"),
+    fleet_status_service: C1FleetStub.new,
+    runner: repository_failure_runner,
+    clock: -> { Time.utc(2026, 7, 27, 22, 1, 15) },
+    sleeper: ->(_seconds) {},
+    live_execution_enabled: true,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry"
+    },
+    id_generator: -> { "repositoryfailurefixture" }
+  )
+  repository_failure_preview = repository_failure.preview(device_id: "foundry", action: "maintenance")
+  repository_failure_result = repository_failure.execute(
+    device_id: "foundry", action: "maintenance",
+    confirmation: repository_failure_preview.dig("data", "confirmation"),
+    expected_digest: repository_failure_preview.dig("data", "expected_digest")
+  )
+  repository_failure_receipt = repository_failure_result.dig("data", "receipt")
+  repository_diagnostic = repository_failure_receipt.dig("evidence", 0, "diagnostic")
+  check.call("a failed fixed step stops once with a classified, private, redacted diagnostic receipt",
+             repository_failure_result["lifecycle_state"] == "failed" &&
+               repository_failure_runner.calls.length == 1 &&
+               repository_failure_receipt["summary"].include?("repository") &&
+               repository_diagnostic["code"] == "repository_authorization" &&
+               repository_diagnostic["excerpt"].include?("[REDACTED]@") &&
+               repository_diagnostic["excerpt"].include?("token=[REDACTED]") &&
+               !repository_diagnostic["excerpt"].include?("private") &&
+               !repository_diagnostic["excerpt"].include?("very-secret") &&
+               repository_diagnostic["excerpt"].bytesize <= SoulCore::MaintenanceDeviceControlService::MAX_DIAGNOSTIC_EXCERPT_BYTES)
+
+  diagnostic_cases = {
+    "package_manager_lock" => "E: Could not get lock /var/lib/dpkg/lock-frontend",
+    "name_resolution" => "Temporary failure resolving 'deb.debian.org'",
+    "storage_exhausted" => "write error: No space left on device",
+    "package_state_interrupted" => "dpkg was interrupted, you must manually run 'dpkg --configure -a'",
+    "network_unavailable" => "Failed to connect to mirror.example: Connection timed out",
+    "nonzero_exit" => "package manager reported an unclassified failure"
+  }
+  classifications_match = diagnostic_cases.all? do |expected, stderr|
+    result = SoulCore::BoundedCommandRunner::Result.new(
+      stdout: "", stderr: stderr, exit_status: 1, status: "failed", truncated: false
+    )
+    repository_failure.send(:command_evidence, "fixture", result).dig("diagnostic", "code") == expected
+  end
+  timeout_result = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "", exit_status: nil, status: "timeout", truncated: false
+  )
+  check.call("shared diagnostics cover package locks, DNS, storage, interrupted state, network, timeout, and fallback",
+             classifications_match &&
+               repository_failure.send(:command_evidence, "fixture", timeout_result).dig("diagnostic", "code") == "command_timeout")
 
   foundry_reboot_runner = C1Runner.new(reconnect: true)
   foundry_reboot = SoulCore::MaintenanceDeviceControlService.new(
@@ -497,6 +578,9 @@ check.call("Dashboard loads persisted status and contains no fleet-wide mutation
              !html.match?(/Maintain fleet|Reboot fleet/i))
 check.call("remote execution uses the bounded administration stream with progress",
            javascript.include?('callNdjson("/api/v1/administration-stream", "maintenance.device.execute"') &&
+             javascript.include?("presentMaintenanceReceiptFailure") &&
+             javascript.include?('["Adapter", plan.maintenance_adapter') &&
+             javascript.include?('["Lifecycle", plan.lifecycle_contract') &&
              javascript.include?("Fixed verification") &&
              http.include?("maintenance.device.execute"))
 

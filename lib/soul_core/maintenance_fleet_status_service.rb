@@ -304,6 +304,8 @@ module SoulCore
         facts: {
           "hostname" => safe_text(@hostname_reader.call),
           "management_channel" => "local",
+          "maintenance_adapter" => "arch_pacman",
+          "maintenance_lifecycle" => "device_scoped_v1",
           "flatpak_applicable" => flatpak_user.status != "unavailable" || flatpak_system.status != "unavailable"
         }
       )
@@ -370,6 +372,8 @@ module SoulCore
           "hostname" => node_name,
           "platform" => "proxmox",
           "management_channel" => "ssh",
+          "maintenance_adapter" => "proxmox_apt",
+          "maintenance_lifecycle" => "device_scoped_v1",
           "containers" => containers,
           "pihole_container" => containers.find { |record| record["id"] == 100 }
         }
@@ -430,6 +434,8 @@ module SoulCore
         facts: {
           "hostname" => output(reachable),
           "management_channel" => "ssh",
+          "maintenance_adapter" => "debian_apt_pihole",
+          "maintenance_lifecycle" => "device_scoped_v1",
           "ssh_state" => output(ssh),
           "blocking_enabled" => output(status).include?("Pi-hole blocking is enabled"),
           "dns_answer" => output(dns),
@@ -616,6 +622,8 @@ module SoulCore
         "control_target_id" => foundry_control ? "foundry" : nil,
         "control_capability" => foundry_control ? "fixed_maintenance" : "inventory_only",
         "maintenance_authority" => foundry_control ? "reviewed_root_ssh_fixed_operations" : "unavailable",
+        "maintenance_adapter" => foundry_control ? "proxmox_apt" : nil,
+        "maintenance_lifecycle" => foundry_control ? "device_scoped_v1" : nil,
         "mutation_supported" => foundry_control,
         "status_adapter" => foundry_control ? "proxmox_fixed_maintenance" : "proxmox_read_only",
         "package_managers" => package_managers,
@@ -753,6 +761,8 @@ module SoulCore
           "control_target_id" => "crucible",
           "control_capability" => authority_ready ? "fixed_maintenance" : "inventory_only",
           "maintenance_authority" => authority_ready ? "root_owned_fixed_operations" : "unavailable",
+          "maintenance_adapter" => authority_ready ? "fedora_dnf5" : nil,
+          "maintenance_lifecycle" => authority_ready ? "device_scoped_v1" : nil,
           "dnf5_update_evidence" => successful?(updates_result) ? "available" : "unavailable",
           "installed_kernel_count" => installed.length,
           "mutation_supported" => authority_ready

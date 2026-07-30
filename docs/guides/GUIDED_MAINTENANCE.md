@@ -189,6 +189,27 @@ Every action still requires a fresh Dashboard preview and its exact
 device-specific gate; there is no guest mutation, automatic reboot, or retry.
 See `docs/soul/FOUNDRY_PROXMOX_CONTROL_A6_BRIEF.md`.
 
+An unsubscribed, non-production Proxmox VE node must use Proxmox's
+`pve-no-subscription` repository rather than the authenticated enterprise PVE
+or Ceph repositories. For Proxmox VE 9 on Debian 13, the reviewed deb822 source
+is:
+
+```text
+Types: deb
+URIs: http://download.proxmox.com/debian/pve
+Suites: trixie
+Components: pve-no-subscription
+Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+```
+
+Repository selection remains an installation responsibility and is never
+changed automatically during enrollment or maintenance. A repository repair
+must preserve the prior files, use a separately reviewed host-specific plan,
+and stop before package installation. Foundry's initial repair followed that
+boundary: the enterprise sources were backed up and disabled, metadata refresh
+and a simulated upgrade succeeded, and the real upgrade remained behind a new
+Dashboard gate.
+
 If a previously enrolled SSH device suddenly appears offline while still
 answering ping, test its literal alias directly. A changed host key is treated
 as an identity failure, not ordinary downtime. Verify the new fingerprint
@@ -244,9 +265,9 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one mutable workstation, Forge, Pi-hole, or qualified Crucible card
+choose exactly one mutable workstation, Forge, Pi-hole, qualified Crucible, or qualified Foundry card
 → choose Maintenance or Reboot
-→ inspect the exact device, commands, confirmation, and dependency impact
+→ inspect the exact device, platform adapter, commands, confirmation, and dependency impact
 → authorize only that digest
 → wait for bounded completion or reconnect verification
 → replace the persisted fleet snapshot
@@ -256,11 +277,28 @@ There is no fleet-wide maintenance or reboot action.
 Status-only appliance cards are inventory and observation surfaces, not action
 targets.
 
-The configured workstation delegates to the reviewed A2 visible-terminal maintenance path and A3
-conditional reboot/restoration path. Forge and Pi-hole use fixed passwordless
-maintenance aliases, fixed command vectors, a global maintenance lock,
-device-specific confirmation, one attempt, and redacted receipts. A Forge
-reboot explicitly discloses that Pi-hole LXC `100` is interrupted.
+The Dashboard presents one `device_scoped_v1` lifecycle across the supported
+families. The platform adapter supplies only fixed commands, readiness checks,
+and impact evidence:
+
+- `arch_pacman` for the configured workstation;
+- `proxmox_apt` for Forge and qualified Foundry nodes;
+- `debian_apt_pihole` for the Pi-hole appliance; and
+- `fedora_dnf5` for qualified Crucible hosts.
+
+Adapter recognition never grants authority. Enrollment and monitoring remain
+read-only until the adapter's separately reviewed mutation prerequisites are
+satisfied. Once qualified, every family uses the same card, exact preview,
+prefilled click authorization, global operation lock, bounded lifecycle,
+owner-private receipt, and post-success status recollection. New operating
+systems extend this adapter layer rather than creating a new approval flow.
+
+The configured workstation delegates to the reviewed A2 visible-terminal
+maintenance path and A3 conditional reboot/restoration path. Forge, qualified
+Foundry, and Pi-hole use fixed passwordless maintenance aliases, fixed command
+vectors, a global maintenance lock, device-specific confirmation, one attempt,
+and redacted receipts. A Forge reboot explicitly discloses that Pi-hole LXC
+`100` is interrupted.
 
 Crucible remains inventory-only until its separately reviewed D1 authority
 self-check succeeds. Once qualified, its card uses the same digest-bound
@@ -274,6 +312,15 @@ Remote maintenance never reboots automatically. A remote reboot records the
 old boot identity, sends one reboot request, holds off, performs bounded
 reconnect checks, requires a changed boot identity, and then recollects fleet
 status. It never retries the reboot request.
+
+If a fixed command fails, the same receipt format records a stable diagnostic
+class, a short explanation, and at most 480 bytes of sanitized command output.
+The shared classifier covers repository authorization, package-manager locks,
+name resolution, storage exhaustion, interrupted package state, network
+failure, timeout, and an unclassified nonzero exit. Terminal controls, URL
+credentials, and common secret query values are removed before the
+owner-private receipt is written. The Dashboard shows this bounded evidence in
+the same device dialog; it does not retry, repair, or reinterpret the command.
 
 ## Safety engines retained behind the cards
 

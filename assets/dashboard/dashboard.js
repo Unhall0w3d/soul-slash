@@ -2509,6 +2509,7 @@ function renderMaintenanceDevice(device) {
   const readOnlyStatus = inventoryOnly && ["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter);
   const facts = [
     ["Platform", device.os || "unavailable"],
+    ["Maintenance adapter", device.facts?.maintenance_adapter ? String(device.facts.maintenance_adapter).replaceAll("_", " ") : (inventoryOnly ? "not authorized" : "fixed platform adapter")],
     ["Version", device.version || "unavailable"],
     ["Updates", inventoryOnly && !readOnlyStatus ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
     ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
@@ -3118,6 +3119,8 @@ function maintenanceDeviceDialogDetails(plan) {
     ["Device", `${plan.device_label || "Workstation"}${plan.address ? ` · ${plan.address}` : ""}`],
     ["Action", plan.action || "maintenance"],
     ["Scope", plan.fleet_wide === false ? "one device only" : "reviewed local workstation transaction"],
+    ["Adapter", plan.maintenance_adapter || (canonicalMaintenanceDeviceId(plan.device_id) === "workstation" ? "arch_pacman" : "fixed platform adapter")],
+    ["Lifecycle", plan.lifecycle_contract || "device_scoped_v1"],
     ["Automatic retry", "none"]
   ];
   if (canonicalMaintenanceDeviceId(plan.device_id) === "workstation") {
@@ -3137,6 +3140,16 @@ function maintenanceDeviceDialogDetails(plan) {
   (plan.impact || []).forEach((impact) => details.append(labeledRecord("Dependency impact", impact)));
   const blockers = plan.preflight?.live_blockers || plan.preflight?.a3_blockers || plan.preflight?.blockers || [];
   blockers.forEach((blocker) => details.append(labeledRecord("Blocker", blocker)));
+}
+
+function presentMaintenanceReceiptFailure(receipt) {
+  const details = byId("maintenance-device-dialog-details");
+  const failed = [...(receipt?.evidence || [])].reverse().find((entry) => entry?.diagnostic);
+  if (failed?.diagnostic) {
+    details.append(labeledRecord("Failure class", `${failed.diagnostic.code || "nonzero_exit"} · ${failed.diagnostic.summary || "The fixed command failed."}`));
+    if (failed.diagnostic.excerpt) details.append(labeledRecord("Bounded diagnostic", failed.diagnostic.excerpt));
+  }
+  return receipt?.summary || failed?.diagnostic?.summary || "Device operation stopped safely.";
 }
 
 function canonicalMaintenanceDeviceId(deviceId) {
@@ -3303,7 +3316,7 @@ async function executeMaintenanceDeviceAction() {
         expected_digest: preview.data.expected_digest
       }, {}, (event) => showGenerationProgress(progress, event));
       const data = dataOf(envelope); lifecycle(envelope);
-      if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || data.receipt?.summary || "Device operation stopped safely.");
+      if (envelope.lifecycle_state !== "complete") throw new Error(presentMaintenanceReceiptFailure(data.receipt));
       if (data.fleet?.devices) renderMaintenanceFleet(data.fleet);
       status.textContent = data.receipt?.summary || "Device operation completed and fleet status was refreshed.";
     }
