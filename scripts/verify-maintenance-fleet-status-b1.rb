@@ -19,9 +19,11 @@ end
 class FleetFakeRunner
   attr_reader :calls
 
-  def initialize(pihole_offline: false, phone_offline: false)
+  def initialize(pihole_offline: false, phone_offline: false, checkupdates_unavailable: false, checkupdates_empty: false)
     @pihole_offline = pihole_offline
     @phone_offline = phone_offline
+    @checkupdates_unavailable = checkupdates_unavailable
+    @checkupdates_empty = checkupdates_empty
     @calls = []
   end
 
@@ -29,7 +31,12 @@ class FleetFakeRunner
     argv = command.flatten.map(&:to_s)
     @calls << {"argv" => argv, "options" => options}
     return ok("7.1.4-1-cachyos-eevdf-lto\n") if argv == ["/usr/bin/uname", "-r"]
-    return ok("linux-cachyos 7.1.4 -> 7.1.5\nruby 4.0 -> 4.1\n") if argv == ["/usr/bin/pacman", "-Qu"]
+    if argv == ["/usr/bin/checkupdates", "--nocolor"]
+      return unavailable("checkupdates is unavailable") if @checkupdates_unavailable
+      return failed("", 2) if @checkupdates_empty
+      return ok("linux-cachyos 7.1.4 -> 7.1.5\nruby 4.0 -> 4.1\n")
+    end
+    return ok("cached-package 1 -> 2\n") if argv == ["/usr/bin/pacman", "-Qu"]
     return ok("fixture-aur 1 -> 2\n") if argv == ["/usr/bin/yay", "-Qua"]
     return ok("org.example.App\t2\tstable\n") if argv.include?("--user") && argv.include?("remote-ls")
     return ok("") if argv.include?("--system") && argv.include?("remote-ls")
@@ -99,6 +106,12 @@ class FleetFakeRunner
       stdout: "", stderr: stderr, exit_status: exit_status, status: "failed", truncated: false
     )
   end
+
+  def unavailable(stderr)
+    SoulCore::BoundedCommandRunner::Result.new(
+      stdout: "", stderr: stderr, exit_status: nil, status: "unavailable", truncated: false
+    )
+  end
 end
 
 class FleetFacadeStub
@@ -160,7 +173,7 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              devices.dig("workstation", "label") == "Atelier" &&
                devices.dig("workstation", "address") == "atelier.example.test" &&
                devices.dig("workstation", "updates", "total") == 4 &&
-               devices.dig("workstation", "updates", "freshness") == "cached_pacman_metadata" &&
+               devices.dig("workstation", "updates", "freshness") == "fresh_pacman_metadata" &&
                devices.dig("workstation", "updates", "channels").map { |channel| [channel["id"], channel["label"], channel["count"], channel["status"]] } == [
                  ["native", "pacman", 2, "complete"],
                  ["aur", "AUR", 1, "complete"],
@@ -172,6 +185,53 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("workstation", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
                devices.dig("workstation", "kernel", "available") == "7.1.5-1" &&
                devices.dig("workstation", "kernel", "update_required") == true)
+  check.call("workstation refresh uses isolated fresh pacman metadata without changing the live sync database",
+             runner.calls.any? { |call| call["argv"] == ["/usr/bin/checkupdates", "--nocolor"] } &&
+               runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Sy"] || call["argv"] == ["/usr/bin/pacman", "-Syy"] })
+  fallback_runner = FleetFakeRunner.new(checkupdates_unavailable: true)
+  fallback = SoulCore::MaintenanceFleetStatusService.new(
+    runner: fallback_runner,
+    clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "atelier" },
+    process_env: {
+      "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
+      "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+    },
+    route_path: route_path
+  ).collect
+  fallback_workstation = fallback.dig("data", "devices").find { |device| device["id"] == "workstation" }
+  check.call("missing checkupdates degrades explicitly to cached pacman evidence",
+             fallback_workstation.dig("updates", "freshness") == "cached_pacman_metadata" &&
+               fallback_workstation.dig("updates", "native") == 1 &&
+               fallback_runner.calls.any? { |call| call["argv"] == ["/usr/bin/pacman", "-Qu"] })
+  empty_runner = FleetFakeRunner.new(checkupdates_empty: true)
+  empty = SoulCore::MaintenanceFleetStatusService.new(
+    runner: empty_runner,
+    clock: -> { Time.utc(2026, 7, 27, 21, 0, 0) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "atelier" },
+    process_env: {
+      "SOUL_FLEET_WORKSTATION_ADDRESS" => "atelier.example.test",
+      "SOUL_FLEET_WORKSTATION_LABEL" => "Atelier",
+      "SOUL_FLEET_PIHOLE_LABEL" => "Warden"
+    },
+    route_path: route_path
+  ).collect
+  empty_workstation = empty.dig("data", "devices").find { |device| device["id"] == "workstation" }
+  check.call("checkupdates exit 2 is a successful fresh zero-update result",
+             empty_workstation.dig("updates", "freshness") == "fresh_pacman_metadata" &&
+               empty_workstation.dig("updates", "channels").find { |channel| channel["id"] == "native" } == {
+                 "id" => "native",
+                 "label" => "pacman",
+                 "manager" => "pacman",
+                 "count" => 0,
+                 "status" => "complete"
+               } &&
+               empty_runner.calls.none? { |call| call["argv"] == ["/usr/bin/pacman", "-Qu"] })
   check.call("Proxmox discovers Forge and exposes cached package, kernel, and LXC 100 evidence",
              devices.dig("forge", "label") == "Forge" &&
                devices.dig("forge", "updates", "native") == 1 &&
@@ -355,6 +415,9 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                dashboard.include?("canonicalMaintenancePackageManagers") &&
                dashboard.include?("evidence requires refresh") &&
                dashboard.include?('channel.status === "complete"') &&
+               dashboard.include?('freshness.startsWith("fresh_")') &&
+               dashboard.include?('freshness.startsWith("live_")') &&
+               dashboard.include?("cached metadata") &&
                !dashboard.include?('${device.updates?.aur ?? 0} AUR') &&
                !dashboard.include?('${device.updates?.flatpak ?? 0} Flatpak'))
   check.call("dashboard exposes one-device refresh with a visible observation timestamp",

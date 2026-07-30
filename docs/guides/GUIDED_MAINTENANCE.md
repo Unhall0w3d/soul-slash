@@ -268,9 +268,15 @@ neighbor and vendor hints are insufficient.
 The snapshot is private, atomic, and survives Dashboard reloads. When separately
 installed, the owner-level oneshot timer collects it at local noon and
 midnight. The timer cannot maintain or reboot anything and has no persistent
-worker or polling loop. Workstation pacman and remote APT counts use currently
-cached system metadata and are labeled as such. An offline device remains
-visible without hiding evidence from the other devices.
+worker or polling loop. Atelier uses `checkupdates --nocolor` so a per-device
+refresh downloads current pacman metadata into an isolated temporary database
+without changing pacman's live sync database or requiring sudo. If
+`checkupdates` from `pacman-contrib` is unavailable, Atelier falls back to
+explicitly cached `pacman -Qu` evidence. Remote APT counts remain cached because
+refreshing APT metadata is a privileged maintenance mutation; DNF5, AUR, and
+Flatpak retain their existing on-demand queries. The Dashboard labels fresh
+and cached evidence. An offline device remains visible without hiding evidence
+from the other devices.
 
 ## Device-scoped flow
 
