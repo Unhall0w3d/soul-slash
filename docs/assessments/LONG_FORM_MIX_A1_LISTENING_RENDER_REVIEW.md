@@ -83,6 +83,11 @@ exports.
 - All manifest checks passed.
 - No silence was detected around either transition window at the bounded
   threshold used for inspection.
+- The Operator revised the title to `Biome Change`, creating child plan
+  `mix_1cd6427ce0caa2ab` without altering the original plan or render.
+- The exact `Biome Change` editor handoff completed under
+  `~/Music/soul-music/mixes/biome-change-mix_1cd6427ce0caa2ab`; its three
+  source masters, EDL, cue sheet, README, and checksum manifest all verified.
 - Live review exposed a plain-text `429` during handoff preview. The inactive
   mix player now uses `preload="none"`, overload responses are presented as a
   readable retry message instead of a JSON parser exception, and the still
@@ -130,4 +135,5 @@ mutation.
 - [ ] Listen through the complete candidate
 - [ ] Review the transition near 00:37.8–00:39.3
 - [ ] Review the transition near 02:56.4–02:58.9
+- [x] Complete and checksum-verify the renamed plan's editor handoff
 - [ ] Decide whether to accept the sequence or create a revised immutable plan
