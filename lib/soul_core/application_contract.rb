@@ -62,6 +62,8 @@ module SoulCore
       "backup.restore.execute" => %w[password snapshot_id paths confirmation expected_digest],
       "backup.replica.preview" => %w[password],
       "backup.replica.execute" => %w[password confirmation expected_digest],
+      "backup.drs.preview" => %w[password],
+      "backup.drs.execute" => %w[password confirmation expected_digest],
       "project_tracker.snapshot" => [],
       "project_tracker.items.create" => %w[item],
       "project_tracker.items.update" => %w[item_id item expected_revision],

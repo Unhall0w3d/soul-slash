@@ -152,6 +152,11 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   coverage through original-snapshot lineage. Both repository passwords were
   subsequently rotated through a local echo-disabled gate. Remote deletion
   and nightly execution remain disabled.
+- Nightly DRS Transaction A1 is candidate-complete as a supervised manual
+  transaction: one exact gate creates and verifies a local snapshot, advances
+  deletion evidence, reconciles missing lineage to Crucible, and records a
+  terminal parent result. Credential persistence and the 3:00 AM timer remain
+  unimplemented and unauthorized in A1.
 
 ## Runtime topology
 
@@ -171,9 +176,10 @@ Hosting Soul itself on Proxmox, Internet exposure, and multi-user accounts
 remain separate future tracks. Forge currently hosts the Warden Pi-hole
 appliance and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now
 has an accepted encrypted local foundation, verified live captures, and an
-accepted encrypted second copy on Crucible. Remote retention, live-tree
-promotion, and full disaster-recovery qualification remain separate review
-gates.
+accepted encrypted second copy on Crucible. The supervised DRS transaction is
+candidate-complete, while encrypted unattended credentials, timer activation,
+remote retention, live-tree promotion, and full disaster-recovery
+qualification remain separate review gates.
 
 ## Memory, artifacts, and deletion
 

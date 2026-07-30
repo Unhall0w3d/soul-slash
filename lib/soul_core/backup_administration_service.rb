@@ -17,6 +17,7 @@ module SoulCore
     RETENTION_CONFIRMATION = "FORGET_SELECTED_BACKUP_SNAPSHOTS"
     RESTORE_CONFIRMATION = "STAGE_BACKUP_RESTORE"
     REPLICA_CONFIRMATION = "COPY_VERIFIED_BACKUP_TO_CRUCIBLE"
+    DRS_CONFIRMATION = "CREATE_AND_REPLICATE_VERIFIED_DRS_BACKUP"
     MANIFEST_RECONCILIATION_CONFIRMATION = "RECONCILE_BACKUP_MANIFESTS"
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     MAX_PASSWORD_BYTES = 1024
@@ -77,6 +78,7 @@ module SoulCore
           "snapshots" => snapshots,
           "receipt_count" => regular_json_count(@receipt_root),
           "restore_count" => regular_directory_count(@restore_root),
+          "drs" => latest_drs_status,
           "manifest_reconciliation" => manifest_reconciliation_summary,
           "replica" => replica_status(validated_password),
           "manual_only" => true,
@@ -298,6 +300,143 @@ module SoulCore
       password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
     end
 
+    def drs_preview(password:)
+      password = validate_password(password)
+      local = backup_preview(password: password)
+      return local unless local["ok"]
+
+      replica = replica_preview(password: password)
+      scope = {
+        "operation" => "backup_drs_transaction",
+        "local_capture" => component_scope(local),
+        "replica_preflight" => component_scope(replica),
+        "stage_order" => %w[local_capture local_verify deletion_ledger replica_copy replica_verify],
+        "new_snapshot_lineage_required_on_replica" => true,
+        "local_success_survives_replica_failure" => true,
+        "automatic_retention" => false,
+        "remote_deletion" => false,
+        "automatic_retry" => false,
+        "scheduled" => false,
+        "password_retained" => false
+      }
+      complete("exact supervised DRS transaction prepared", scope.merge(
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => DRS_CONFIRMATION
+      ))
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("DRS preview failed safely: #{safe_error(error)}")
+    ensure
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
+    end
+
+    def drs_execute(password:, confirmation:, expected_digest:, progress: nil)
+      password = validate_password(password)
+      return awaiting("exact DRS confirmation is required") unless confirmation.to_s == DRS_CONFIRMATION
+
+      reviewed = drs_preview(password: password)
+      return reviewed unless reviewed["ok"]
+      reviewed_scope = reviewed.fetch("data").reject { |key, _value| %w[expected_digest confirmation_phrase].include?(key) }
+      return blocked("DRS preview digest is stale or invalid") unless secure_equal?(expected_digest, digest(reviewed_scope))
+
+      progress&.call("stage" => "local_preview", "message" => "Revalidating the exact local capture scope…")
+      local_preview = backup_preview(password: password)
+      unless local_preview["ok"]
+        receipt = write_drs_receipt(
+          state: "failed", local: component_result(local_preview), replica: {"state" => "not_attempted"},
+          reason: local_preview["reason"], mutation: "none"
+        )
+        return failed("DRS local preflight failed safely: #{local_preview['reason']}", {"drs_receipt" => receipt})
+      end
+
+      progress&.call("stage" => "local_capture", "message" => "Creating and verifying the encrypted local recovery snapshot…")
+      local = backup_execute(
+        password: password,
+        confirmation: local_preview.dig("data", "confirmation_phrase"),
+        expected_digest: local_preview.dig("data", "expected_digest"),
+        progress: progress
+      )
+      unless local["ok"]
+        receipt = write_drs_receipt(
+          state: "failed", local: component_result(local), replica: {"state" => "not_attempted"},
+          reason: local["reason"], mutation: local.fetch("mutation", "none")
+        )
+        return failed("DRS local capture failed safely: #{local['reason']}", {"drs_receipt" => receipt}, local.fetch("mutation", "none"))
+      end
+
+      snapshot_id = local.dig("data", "snapshot_id").to_s
+      raise "verified local capture did not return one snapshot ID" unless snapshot_id.match?(SNAPSHOT_ID)
+
+      progress&.call("stage" => "replica_preview", "message" => "Binding the fresh local lineage to the exact Crucible copy…")
+      replica_gate = replica_preview(password: password)
+      unless replica_gate["ok"]
+        receipt = write_drs_receipt(
+          state: "partial", local: successful_local_component(local),
+          replica: component_result(replica_gate), reason: replica_gate["reason"],
+          mutation: "backup_snapshot_created_replica_incomplete"
+        )
+        return failed(
+          "local backup verified but Crucible reconciliation failed safely: #{replica_gate['reason']}",
+          {"snapshot_id" => snapshot_id, "drs_receipt" => receipt, "review_required" => true},
+          "backup_snapshot_created_replica_incomplete"
+        )
+      end
+
+      progress&.call("stage" => "replica_copy", "message" => "Copying and verifying missing lineage on Crucible…")
+      replica = replica_execute(
+        password: password,
+        confirmation: replica_gate.dig("data", "confirmation_phrase"),
+        expected_digest: replica_gate.dig("data", "expected_digest"),
+        progress: progress
+      )
+      unless replica["ok"]
+        receipt = write_drs_receipt(
+          state: "partial", local: successful_local_component(local),
+          replica: component_result(replica), reason: replica["reason"],
+          mutation: "backup_snapshot_created_replica_incomplete"
+        )
+        return failed(
+          "local backup verified but Crucible reconciliation failed safely: #{replica['reason']}",
+          {"snapshot_id" => snapshot_id, "drs_receipt" => receipt, "review_required" => true},
+          "backup_snapshot_created_replica_incomplete"
+        )
+      end
+
+      lineage = Array(replica.dig("data", "destination_snapshot_lineage_ids"))
+      raise "Crucible verification omitted the newly captured snapshot lineage" unless lineage.include?(snapshot_id)
+
+      receipt = write_drs_receipt(
+        state: "complete",
+        local: successful_local_component(local),
+        replica: successful_replica_component(replica),
+        reason: "local snapshot and exact Crucible lineage verified",
+        mutation: "backup_drs_verified"
+      )
+      raise "DRS parent receipt could not be recorded" unless receipt
+
+      progress&.call("stage" => "complete", "message" => "Local and Crucible recovery lineage verified.")
+      complete(
+        "verified DRS transaction completed",
+        {
+          "snapshot_id" => snapshot_id,
+          "target_snapshot_count" => replica.dig("data", "target_snapshot_count"),
+          "destination_snapshot_lineage_ids" => lineage,
+          "drs_receipt" => receipt,
+          "automatic_retention" => false,
+          "remote_deletion" => false,
+          "scheduled" => false
+        },
+        "backup_drs_verified"
+      )
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      failed("DRS transaction failed safely: #{safe_error(error)}")
+    ensure
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
+    end
+
     def retention_preview(password:, snapshot_ids:)
       password = validate_password(password)
       selected = normalize_snapshot_ids(snapshot_ids, maximum: MAX_RETENTION_SELECTION)
@@ -444,6 +583,78 @@ module SoulCore
     end
 
     private
+
+    def component_scope(outcome)
+      {
+        "lifecycle_state" => outcome.fetch("lifecycle_state"),
+        "reason" => outcome.fetch("reason", ""),
+        "data" => outcome.fetch("data", {}).reject { |key, _value| key == "confirmation_phrase" }
+      }
+    end
+
+    def component_result(outcome)
+      {
+        "state" => outcome["ok"] ? "complete" : outcome.fetch("lifecycle_state", "failed"),
+        "reason" => outcome.fetch("reason", "").to_s.slice(0, 240),
+        "mutation" => outcome.fetch("mutation", "none")
+      }
+    end
+
+    def successful_local_component(outcome)
+      {
+        "state" => "complete",
+        "snapshot_id" => outcome.dig("data", "snapshot_id"),
+        "receipt_id" => outcome.dig("data", "receipt_id"),
+        "verification" => outcome.dig("data", "verification")
+      }
+    end
+
+    def successful_replica_component(outcome)
+      {
+        "state" => "complete",
+        "receipt_id" => outcome.dig("data", "receipt_id"),
+        "target_snapshot_count" => outcome.dig("data", "target_snapshot_count"),
+        "destination_snapshot_lineage_ids" => Array(outcome.dig("data", "destination_snapshot_lineage_ids"))
+      }
+    end
+
+    def write_drs_receipt(state:, local:, replica:, reason:, mutation:)
+      receipt = write_receipt("drs", {
+        "state" => state,
+        "local" => local,
+        "replica" => replica,
+        "reason" => reason.to_s.slice(0, 240),
+        "mutation" => mutation,
+        "automatic_retention" => false,
+        "remote_deletion" => false,
+        "automatic_retry" => false,
+        "scheduled" => false,
+        "password_retained" => false
+      })
+      {"receipt_id" => receipt.fetch("receipt_id"), "state" => state}
+    rescue StandardError
+      nil
+    end
+
+    def latest_drs_status
+      candidates = Dir.glob(File.join(@receipt_root, "drs_*.json")).select { |path| regular_file?(path) && File.size(path) <= 128 * 1024 }
+      path = candidates.max_by { |candidate| [File.mtime(candidate).to_f, candidate] }
+      return {"state" => "not_run", "scheduled" => false, "password_retained" => false} unless path
+
+      receipt = JSON.parse(File.binread(path, 128 * 1024))
+      raise "DRS receipt schema is invalid" unless receipt["schema_version"] == "soul.backup_receipt.v1" && receipt["operation"] == "drs"
+      {
+        "state" => receipt.fetch("state", "unknown"),
+        "completed_at" => receipt["completed_at"],
+        "receipt_id" => receipt["receipt_id"],
+        "local_state" => receipt.dig("local", "state"),
+        "replica_state" => receipt.dig("replica", "state"),
+        "scheduled" => false,
+        "password_retained" => false
+      }
+    rescue JSON::ParserError, KeyError, SystemCallError
+      {"state" => "invalid", "scheduled" => false, "password_retained" => false}
+    end
 
     def manifest_reconciliation_summary
       scope = manifest_reconciliation_scope
@@ -966,8 +1177,8 @@ module SoulCore
       { "ok" => false, "lifecycle_state" => "blocked_for_human_review", "reason" => reason, "data" => {}, "mutation" => "none" }
     end
 
-    def failed(reason)
-      { "ok" => false, "lifecycle_state" => "failed", "reason" => reason, "data" => {}, "mutation" => "none" }
+    def failed(reason, data = {}, mutation = "none")
+      { "ok" => false, "lifecycle_state" => "failed", "reason" => reason, "data" => data, "mutation" => mutation }
     end
   end
 end
