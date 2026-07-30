@@ -266,8 +266,8 @@
 
     <section id="mix-panel" class="tab-panel mix-panel" role="tabpanel" aria-labelledby="mix-tab" hidden>
       <header class="studio-header music-header">
-        <div><p class="eyebrow">Continuity workshop</p><h1>Mix Studio</h1><p>Arrange finished Soul compositions into an exact, reviewable timeline before moving into a conventional editor or DAW.</p></div>
-        <div class="studio-boundary"><strong>Stereo-source handoff</strong><span>Finished exports → immutable EDL → cue sheet → editor package</span><small>A0 does not render a mix, separate stems, or claim to create a native DAW project.</small></div>
+        <div><p class="eyebrow">Continuity workshop</p><h1>Mix Studio</h1><p>Arrange finished Soul compositions into an exact timeline, hear the transitions, and decide what deserves final export.</p></div>
+        <div class="studio-boundary"><strong>Review before release</strong><span>Finished exports → immutable EDL → listening candidate → Operator decision</span><small>Listening renders remain review evidence. Soul does not infer acceptance or alter finished source masters.</small></div>
       </header>
       <div class="mix-layout">
         <aside class="mix-plans">
@@ -289,15 +289,26 @@
           <section id="mix-detail-card" class="gate-card mix-detail-card" hidden>
             <div><p class="eyebrow">Exact timeline</p><h3 id="mix-detail-title">Mix plan</h3><p id="mix-detail-summary"></p></div>
             <div id="mix-cue-list" class="mix-cue-list"></div>
+            <section class="mix-render-card">
+              <div><p class="eyebrow">Listening candidate</p><h3>Hear the sealed timeline</h3><p>Render the exact trims and crossfades in the foreground. This is review evidence—not a final export or automatic approval.</p></div>
+              <button id="preview-mix-render" class="gate-button" type="button">Preview listening render</button>
+              <div id="mix-render-confirm" hidden><pre id="mix-render-scope" class="diagnostic-output"></pre><button id="execute-mix-render" class="gate-button gate-button--gold" type="button">Render exact listening candidate</button></div>
+              <div id="mix-render-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong>Rendering sealed timeline</strong><span>Applying exact trims and transitions in the foreground.</span></div>
+              <div id="mix-render-player" class="mix-render-player" hidden>
+                <audio id="mix-render-audio" controls preload="metadata"></audio>
+                <div><a id="mix-render-flac" class="gate-button" href="#">Open lossless FLAC</a><span id="mix-render-meta"></span></div>
+              </div>
+              <p id="mix-render-status" class="dialog-status" role="status"></p>
+            </section>
             <button id="preview-mix-handoff" class="gate-button" type="button">Preview editor handoff</button>
             <div id="mix-handoff-confirm" hidden><pre id="mix-handoff-scope" class="diagnostic-output"></pre><button id="export-mix-handoff" class="gate-button gate-button--gold" type="button">Export exact handoff</button></div>
             <p id="mix-handoff-status" class="dialog-status" role="status"></p>
           </section>
         </section>
         <aside class="mix-boundary">
-          <p class="eyebrow">A0 boundary</p><h2>Truthful structure</h2>
-          <dl><div><dt>Inputs</dt><dd>Checksum-verified stereo masters</dd></div><div><dt>Plan</dt><dd>Immutable JSON EDL</dd></div><div><dt>Timing</dt><dd>Exact trims and crossfades</dd></div><div><dt>Export</dt><dd>Sources, cues, metadata, checksums</dd></div></dl>
-          <p>No inferred stems. No destructive source edits. No automatic publication.</p>
+          <p class="eyebrow">A1 boundary</p><h2>Truthful continuity</h2>
+          <dl><div><dt>Inputs</dt><dd>Checksum-verified stereo masters</dd></div><div><dt>Plan</dt><dd>Immutable JSON EDL</dd></div><div><dt>Review</dt><dd>Bounded FLAC and MP3 listening candidate</dd></div><div><dt>Handoff</dt><dd>Sources, cues, metadata, checksums</dd></div></dl>
+          <p>No inferred stems. No destructive source edits. No automatic acceptance or publication.</p>
         </aside>
       </div>
     </section>

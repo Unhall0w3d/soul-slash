@@ -143,5 +143,5 @@ operations; no external publishing, no background execution).
 - [x] Review path and symlink protections in handoff destination handling
 - [ ] Review timeline status updates in private tracker and decide whether both items
   should be promoted together
-- [ ] Seal one real plan and inspect its exact timeline
-- [ ] Preview, authorize, and inspect one real handoff package
+- [x] Seal one real plan and inspect its exact timeline
+- [x] Preview, authorize, and inspect one real handoff package

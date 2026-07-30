@@ -4,7 +4,7 @@ Mix Studio is Soul/'s bounded continuity surface for arranging already-finished
 compositions. It records an exact running order without changing the finished
 songs and prepares a portable package for a conventional audio editor or DAW.
 
-## A0 workflow
+## Workflow
 
 1. Open **Creative Studios → Mix Studio**.
 2. Choose finished masters from **Eligible sources**.
@@ -18,6 +18,11 @@ songs and prepares a portable package for a conventional audio editor or DAW.
 7. Select **Preview editor handoff**.
 8. Review the bound paths, source hashes, cues, and destination.
 9. Select **Export exact handoff** to authorize that reviewed digest.
+10. Select **Preview listening render** and inspect the exact render scope.
+11. Select **Render exact listening candidate** to create the private FLAC/MP3
+    review artifacts.
+12. Listen in the dashboard and decide whether the plan should be revised or
+    considered for a later final export.
 
 Changing a sealed plan means creating another plan. The original remains as
 lineage evidence.
@@ -70,13 +75,28 @@ README.md           intent, limitations, and reconstruction guidance
 checksums.sha256    sha256sum-compatible package checksums
 ```
 
-## A0 limitations
+## Listening candidates
 
-Mix Studio A0 does not render the final long-form mix. It does not separate
-stems, reconstruct instrument tracks, or create a native FL Studio, Ableton,
-Logic, or other proprietary project. It provides verified stereo sources and
-precise edit instructions so the operator can perform final assembly without
-losing lineage.
+The A1 listening lane renders the sealed trims and crossfades in the foreground
+from the same checksum-verified stereo masters. It writes private, immutable
+review artifacts beneath `Soul/private/mix_renders`:
+
+```text
+master.flac         lossless 48 kHz stereo listening render
+listening.mp3       320 kbps dashboard proxy
+render.json         exact plan, render profile, measurements, and hashes
+checksums.sha256    output integrity manifest
+```
+
+The MP3 is available only through the authenticated Dashboard ranged-media
+route. Rendering does not mark the mix accepted and does not create a release
+master.
+
+## Limitations
+
+Mix Studio does not separate stems, reconstruct instrument tracks, or create a
+native FL Studio, Ableton, Logic, or other proprietary project. The A1 render is
+listening evidence, not a mastered or accepted final export.
 
 It also does not publish, schedule work, run in the background, or alter the
 finished source exports.
@@ -85,4 +105,5 @@ finished source exports.
 
 - [Long-form Mix Studio A0 Brief](../soul/LONG_FORM_MIX_A0_BRIEF.md)
 - [Long-form Mix Studio A0 Review](../assessments/LONG_FORM_MIX_A0_REVIEW.md)
+- [Long-form Mix Studio A1 Listening Render Brief](../soul/LONG_FORM_MIX_A1_LISTENING_RENDER_BRIEF.md)
 - [Music Studio](MUSIC_STUDIO.md)

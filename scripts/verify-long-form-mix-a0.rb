@@ -281,7 +281,7 @@ dashboard_js = File.read(File.join(__dir__, "..", "assets", "dashboard", "dashbo
 dashboard_css = File.read(File.join(__dir__, "..", "assets", "dashboard", "dashboard.css"), encoding: "UTF-8")
 brief = File.read(File.join(__dir__, "..", "docs", "soul", "LONG_FORM_MIX_A0_BRIEF.md"), encoding: "UTF-8")
 check(failures, "dashboard exposes Mix Studio navigation and panel", dashboard_html.include?('id="mix-tab"') && dashboard_html.include?('id="mix-panel"'))
-check(failures, "dashboard states stereo-source limitations", dashboard_html.include?("does not render a mix") && dashboard_html.include?("No inferred stems"))
+check(failures, "dashboard states stereo-source limitations", dashboard_html.include?("No inferred stems") && dashboard_html.include?("No destructive source edits"))
 check(failures, "dashboard wires all mix operations", %w[mix.sources.list mix.projects.list mix.projects.get mix.projects.create mix.handoff.preview mix.handoff.execute].all? { |operation| dashboard_js.include?(operation) })
 check(failures, "dashboard includes responsive mix styling", dashboard_css.include?(".mix-layout") && dashboard_css.include?(".mix-sequence-fields"))
 check(failures, "brief preserves exact export gate", brief.include?("EXPORT_MIX_HANDOFF"))

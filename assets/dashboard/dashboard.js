@@ -20,7 +20,7 @@ state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
-Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null });
+Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
@@ -4703,12 +4703,17 @@ function resetMixComposer() {
   state.selectedMixPlan = null;
   state.mixSequence = [];
   state.mixHandoffPreview = null;
+  state.mixRenderPreview = null;
   byId("mix-title").value = "";
   byId("mix-intent").value = "";
   byId("mix-workbench-title").textContent = "New mix plan";
   byId("mix-plan-state").textContent = "Draft";
   byId("mix-detail-card").hidden = true;
   byId("mix-handoff-confirm").hidden = true;
+  byId("mix-render-confirm").hidden = true;
+  byId("mix-render-player").hidden = true;
+  byId("mix-render-audio").removeAttribute("src");
+  byId("mix-render-audio").load();
   byId("mix-form-status").textContent = "";
   renderMixSequence();
 }
@@ -4809,8 +4814,11 @@ function renderMixPlans() {
 }
 
 function renderMixPlanDetail(plan) {
-  state.selectedMixPlan = plan; state.mixHandoffPreview = null;
+  state.selectedMixPlan = plan; state.mixHandoffPreview = null; state.mixRenderPreview = null;
   byId("mix-detail-card").hidden = false; byId("mix-handoff-confirm").hidden = true;
+  byId("mix-render-confirm").hidden = true; byId("mix-render-player").hidden = true;
+  byId("mix-render-audio").removeAttribute("src"); byId("mix-render-audio").load();
+  byId("mix-render-status").textContent = "Inspecting listening-render evidence…";
   byId("mix-detail-title").textContent = plan.title;
   byId("mix-detail-summary").textContent = `${plan.intent} · ${plan.sequence.length} verified sources · ${formatMixTime(plan.total_duration_seconds)}`;
   const cues = byId("mix-cue-list"); cues.replaceChildren();
@@ -4824,11 +4832,36 @@ function renderMixPlanDetail(plan) {
   });
 }
 
+function renderMixListeningCandidate(render) {
+  const mixId = render.mix_id || state.selectedMixPlan?.mix_id;
+  if (!mixId) return;
+  const audio = byId("mix-render-audio");
+  audio.src = `/api/v1/mix/audio/${encodeURIComponent(mixId)}/mp3`;
+  byId("mix-render-flac").href = `/api/v1/mix/audio/${encodeURIComponent(mixId)}/flac`;
+  byId("mix-render-meta").textContent = `${formatMixTime(render.duration_seconds || state.selectedMixPlan?.total_duration_seconds)} · 48 kHz stereo · review candidate`;
+  byId("mix-render-player").hidden = false;
+  byId("mix-render-confirm").hidden = true;
+  byId("mix-render-status").textContent = "Listening candidate ready. Review the transitions before deciding whether this mix deserves final export.";
+}
+
+async function loadMixRenderStatus(mixId) {
+  try {
+    const envelope = await callSoul("mix.render.status", { mix_id: mixId }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Listening-render status is unavailable"));
+    const render = dataOf(envelope).render;
+    if (render) renderMixListeningCandidate(render);
+    else byId("mix-render-status").textContent = "No listening candidate has been rendered for this exact plan.";
+  } catch (error) {
+    byId("mix-render-status").textContent = error.message;
+  }
+}
+
 async function selectMixPlan(mixId) {
   try {
     const envelope = await callSoul("mix.projects.get", { mix_id: mixId }); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Mix plan could not be opened"));
     renderMixPlanDetail(dataOf(envelope).mix);
+    await loadMixRenderStatus(mixId);
   } catch (error) { showError(error); }
 }
 
@@ -4913,6 +4946,49 @@ async function exportMixHandoff() {
   finally { button.disabled = false; }
 }
 
+async function previewMixRender() {
+  if (!state.selectedMixPlan) return;
+  const button = byId("preview-mix-render"); button.disabled = true;
+  byId("mix-render-status").textContent = "Binding the listening render to the sealed timeline and exact source hashes…";
+  try {
+    const envelope = await callSoul("mix.render.preview", { mix_id: state.selectedMixPlan.mix_id }); lifecycle(envelope);
+    if (!["blocked_for_human_review", "complete"].includes(envelope.lifecycle_state)) throw new Error(mixFailure(envelope, "Listening-render preview failed safely"));
+    const data = dataOf(envelope);
+    if (data.render) {
+      renderMixListeningCandidate(data.render);
+      return;
+    }
+    state.mixRenderPreview = data;
+    byId("mix-render-scope").textContent = JSON.stringify(data.preview_scope, null, 2);
+    byId("mix-render-confirm").hidden = false;
+    byId("mix-render-status").textContent = "Review the exact foreground render. Clicking render authorizes this digest only.";
+  } catch (error) { byId("mix-render-status").textContent = error.message; showError(error); }
+  finally { button.disabled = false; }
+}
+
+async function executeMixRender() {
+  if (!state.selectedMixPlan || !state.mixRenderPreview) return;
+  const button = byId("execute-mix-render"); button.disabled = true;
+  showGenerationProgress(byId("mix-render-progress"), { stage: "rendering", message: "Applying exact trims and crossfades in the foreground." });
+  byId("mix-render-status").textContent = "Rendering the sealed timeline without changing its source masters…";
+  try {
+    const envelope = await callSoul("mix.render.execute", {
+      mix_id: state.selectedMixPlan.mix_id,
+      confirmation: state.mixRenderPreview.confirmation_phrase,
+      expected_digest: state.mixRenderPreview.expected_digest
+    });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Listening render failed safely"));
+    state.mixRenderPreview = null;
+    renderMixListeningCandidate(dataOf(envelope).render);
+    emitSoulNotification("music_ready", `mix:${state.selectedMixPlan.mix_id}`);
+  } catch (error) {
+    byId("mix-render-status").textContent = error.message; showError(error); emitSoulNotification("attention");
+  } finally {
+    hideGenerationProgress(byId("mix-render-progress")); button.disabled = false;
+  }
+}
+
 byId("review-activity-tab").addEventListener("click", () => switchReviewView("activity"));
 document.querySelectorAll("[data-activity-filter]").forEach((button) => button.addEventListener("click", () => filterReviewActivity(button.dataset.activityFilter)));
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
@@ -4930,6 +5006,8 @@ byId("visual-tab").addEventListener("click", () => switchTab("visual"));
 byId("mix-tab").addEventListener("click", () => switchTab("mix"));
 byId("new-mix-plan").addEventListener("click", resetMixComposer);
 byId("mix-plan-form").addEventListener("submit", createMixPlan);
+byId("preview-mix-render").addEventListener("click", previewMixRender);
+byId("execute-mix-render").addEventListener("click", executeMixRender);
 byId("preview-mix-handoff").addEventListener("click", previewMixHandoff);
 byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));

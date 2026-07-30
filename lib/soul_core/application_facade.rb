@@ -50,6 +50,7 @@ require_relative "youtube_oauth_service"
 require_relative "youtube_authenticated_upload_service"
 require_relative "music_project_deletion_service"
 require_relative "long_form_mix_service"
+require_relative "long_form_mix_render_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
@@ -108,6 +109,7 @@ module SoulCore
       youtube_authenticated_upload_service: nil,
       music_project_deletion_service: nil,
       long_form_mix_service: nil,
+      long_form_mix_render_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
       music_reference_synthesis_service: nil,
@@ -159,6 +161,7 @@ module SoulCore
       @youtube_authenticated_upload_service = youtube_authenticated_upload_service
       @music_project_deletion_service = music_project_deletion_service
       @long_form_mix_service = long_form_mix_service
+      @long_form_mix_render_service = long_form_mix_render_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
       @music_reference_synthesis_service = music_reference_synthesis_service
@@ -198,6 +201,10 @@ module SoulCore
 
     def music_visual_artifact_path(project_id:, candidate_id:, visual_id:, artifact:)
       music_visual_companion.artifact_path(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, artifact: artifact)
+    end
+
+    def mix_artifact_path(mix_id:, artifact:)
+      long_form_mix_render.artifact_path(mix_id: mix_id, artifact: artifact)
     end
 
     def visual_artifact_path(project_id:, candidate_id:)
@@ -386,6 +393,9 @@ module SoulCore
       when "mix.projects.create" then domain(long_form_mix.create(plan: required(parameters, "plan")))
       when "mix.handoff.preview" then domain(long_form_mix.handoff_preview(mix_id: required(parameters, "mix_id")))
       when "mix.handoff.execute" then domain(long_form_mix.handoff_execute(mix_id: required(parameters, "mix_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "mix.render.status" then domain(long_form_mix_render.status(mix_id: required(parameters, "mix_id")))
+      when "mix.render.preview" then domain(long_form_mix_render.preview(mix_id: required(parameters, "mix_id")))
+      when "mix.render.execute" then domain(long_form_mix_render.execute(mix_id: required(parameters, "mix_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.references.list" then domain(music_reference_library.inventory(limit: bounded_limit(parameters["limit"], 500)))
       when "music.references.get" then domain(music_reference_library.inspect(identifier: required(parameters, "reference_id")))
       when "music.references.delete.preview" then domain(music_reference_library.deletion_preview(identifier: required(parameters, "reference_id")))
@@ -983,6 +993,10 @@ module SoulCore
 
     def long_form_mix
       @long_form_mix_service ||= LongFormMixService.new(root: @root)
+    end
+
+    def long_form_mix_render
+      @long_form_mix_render_service ||= LongFormMixRenderService.new(root: @root, mix_service: long_form_mix)
     end
 
     def project_release
