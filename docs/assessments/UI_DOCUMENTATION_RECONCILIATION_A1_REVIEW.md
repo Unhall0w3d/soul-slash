@@ -167,23 +167,23 @@ Skill-private memory store added: no
 ## Human review checklist
 
 ```text
-[ ] Matches the approved brief
-[ ] Active surfaces describe current behavior
-[ ] Candidate and live-acceptance boundaries remain truthful
-[ ] Historical evidence and authority names remain intact
-[ ] No unapproved scope expansion
-[ ] No persistence or background behavior was added
-[ ] Confirmation and destructive-action gates are unchanged
-[ ] Deterministic checks are meaningful and scoped
-[ ] Public seed contains no owner-private information
+[x] Matches the approved brief
+[x] Active surfaces describe current behavior
+[x] Candidate and live-acceptance boundaries remain truthful
+[x] Historical evidence and authority names remain intact
+[x] No unapproved scope expansion
+[x] No persistence or background behavior was added
+[x] Confirmation and destructive-action gates are unchanged
+[x] Deterministic checks are meaningful and scoped
+[x] Public seed contains no owner-private information
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved and merged
 Reviewer: Operator
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-29
+Decision summary: Candidate approved without requested changes; PR #84 merged.
+Required changes: none
 ```

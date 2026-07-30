@@ -6,8 +6,8 @@
       "item_id": "track_voice_live_validation",
       "title": "Validate Voice Presence, natural follow-up, and dashboard recognition",
       "area": "Voice + Perception",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Run the deferred at-computer wake, five-second follow-up, and dashboard self-recognition tests.",
       "acceptance": "Normal wake pacing is reliable; false wakes remain tolerable; follow-ups preserve continuity; Soul explains the visible dashboard without inventing state.",
@@ -182,7 +182,7 @@
       "interfaces": "README and setup guidance; Dashboard navigation and maintenance copy; current Operator guides; generated skill registry snapshot.",
       "commands": "ruby scripts/verify-documentation-registry-refresh-phase38.rb; ruby scripts/verify-docs-cleanup.rb; ruby scripts/verify-dashboard-self-improvement-navigation.rb; make verify-voice-transcription; make verify-project-timeline; make supported-stack-check",
       "references": "docs/soul/UI_DOCUMENTATION_RECONCILIATION_A1_BRIEF.md; docs/assessments/UI_DOCUMENTATION_RECONCILIATION_A1_REVIEW.md",
-      "notes": "Candidate-complete repository changes await Operator review. Historical briefs and assessments, exact authority identifiers, private state, and the ambiguous legacy single-service model tuple remain intentionally outside this slice."
+      "notes": "The Operator approved the candidate and PR #84 merged on 2026-07-29. Historical briefs and assessments, exact authority identifiers, private state, and the ambiguous legacy single-service model tuple remain intentionally outside this slice."
     },
     {
       "item_id": "track_music_long_form",
