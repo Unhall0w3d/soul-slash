@@ -279,6 +279,24 @@ module SoulCore
       native_count = line_count(native, empty_exit_statuses: [0, 2])
       aur_count = line_count(aur)
       flatpak_count = line_count(flatpak_user) + line_count(flatpak_system)
+      update_channels = [
+        assessed_update_channel(
+          id: "native", label: "pacman", manager: "pacman",
+          results: [native], count: native_count
+        ),
+        assessed_update_channel(
+          id: "aur", label: "AUR", manager: "yay",
+          results: [aur], count: aur_count, optional: true
+        ),
+        assessed_update_channel(
+          id: "flatpak", label: "Flatpak", manager: "flatpak",
+          results: [flatpak_user, flatpak_system], count: flatpak_count, optional: true
+        )
+      ].compact
+      package_managers = []
+      package_managers << "pacman" unless native.status == "unavailable"
+      package_managers << "yay" unless aur.status == "unavailable"
+      package_managers << "flatpak" unless [flatpak_user, flatpak_system].all? { |result| result.status == "unavailable" }
       running_kernel = output(kernel)
       available_kernel = output(installed_kernel).split(/\s+/, 2)[1].to_s
       kernel_update = !available_kernel.empty? && !running_kernel.start_with?(available_kernel)
@@ -286,6 +304,7 @@ module SoulCore
         native: native_count,
         aur: aur_count,
         flatpak: flatpak_count,
+        channels: update_channels,
         freshness: "cached_pacman_metadata"
       )
 
@@ -306,6 +325,7 @@ module SoulCore
           "management_channel" => "local",
           "maintenance_adapter" => "arch_pacman",
           "maintenance_lifecycle" => "device_scoped_v1",
+          "package_managers" => package_managers,
           "flatpak_applicable" => flatpak_user.status != "unavailable" || flatpak_system.status != "unavailable"
         }
       )
@@ -362,7 +382,16 @@ module SoulCore
         os: "Proxmox VE on Debian",
         version: output(version),
         kernel: kernel_summary(running_kernel, available_kernel, kernel_update),
-        updates: update_summary(native: apt_update_count(updates_result), freshness: "cached_apt_metadata"),
+        updates: update_summary(
+          native: apt_update_count(updates_result),
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "APT", manager: "apt",
+              results: [updates_result], count: apt_update_count(updates_result)
+            )
+          ],
+          freshness: "cached_apt_metadata"
+        ),
         reboot: {
           "required" => reboot_file.exit_status == 0 || kernel_update,
           "reason" => reboot_file.exit_status == 0 ? "reboot-required marker exists" : (kernel_update ? "newer Proxmox kernel is installed" : "no reboot evidence")
@@ -374,6 +403,7 @@ module SoulCore
           "management_channel" => "ssh",
           "maintenance_adapter" => "proxmox_apt",
           "maintenance_lifecycle" => "device_scoped_v1",
+          "package_managers" => ["apt"],
           "containers" => containers,
           "pihole_container" => containers.find { |record| record["id"] == 100 }
         }
@@ -425,7 +455,16 @@ module SoulCore
         os: "Debian 13 (LXC)",
         version: pihole_version_summary(output(version)),
         kernel: {"running" => "inherited from hypervisor", "available" => "managed by hypervisor", "update_required" => false},
-        updates: update_summary(native: apt_update_count(updates_result), freshness: "cached_apt_metadata"),
+        updates: update_summary(
+          native: apt_update_count(updates_result),
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "APT", manager: "apt",
+              results: [updates_result], count: apt_update_count(updates_result)
+            )
+          ],
+          freshness: "cached_apt_metadata"
+        ),
         reboot: {
           "required" => reboot_file.exit_status == 0,
           "reason" => reboot_file.exit_status == 0 ? "reboot-required marker exists" : "no container reboot marker"
@@ -436,6 +475,7 @@ module SoulCore
           "management_channel" => "ssh",
           "maintenance_adapter" => "debian_apt_pihole",
           "maintenance_lifecycle" => "device_scoped_v1",
+          "package_managers" => ["apt"],
           "ssh_state" => output(ssh),
           "blocking_enabled" => output(status).include?("Pi-hole blocking is enabled"),
           "dns_answer" => output(dns),
@@ -638,7 +678,16 @@ module SoulCore
         os: "Proxmox VE on Debian",
         version: output(version),
         kernel: kernel_summary(running_kernel, available_kernel, kernel_update),
-        updates: update_summary(native: apt_update_count(updates_result), freshness: "cached_apt_metadata"),
+        updates: update_summary(
+          native: apt_update_count(updates_result),
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "APT", manager: "apt",
+              results: [updates_result], count: apt_update_count(updates_result)
+            )
+          ],
+          freshness: "cached_apt_metadata"
+        ),
         reboot: {
           "required" => reboot_file.exit_status == 0 || kernel_update,
           "reason" => reboot_file.exit_status == 0 ? "reboot-required marker exists" : (kernel_update ? "newer Proxmox kernel is installed" : "no reboot evidence")
@@ -741,7 +790,16 @@ module SoulCore
           "available" => available_kernel || newest_installed_kernel || running_kernel,
           "update_required" => !available_kernel.to_s.empty? || kernel_reboot_required
         },
-        updates: update_summary(native: update_rows.length, freshness: "live_dnf5_metadata"),
+        updates: update_summary(
+          native: update_rows.length,
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "DNF5", manager: "dnf5",
+              results: [updates_result], count: update_rows.length
+            )
+          ],
+          freshness: "live_dnf5_metadata"
+        ),
         reboot: {
           "required" => reboot_required,
           "reason" => if dnf_reboot_required
@@ -1174,9 +1232,10 @@ module SoulCore
 
     def device(id:, label:, role:, address:, reachable:, os:, version:, kernel:, updates:, reboot:, services:, facts:, control: "maintenance", status: nil)
       service_attention = services.any? { |service| service["state"] != "active" }
+      update_attention = Array(updates["channels"]).any? { |channel| channel["status"] == "unavailable" }
       status ||= if !reachable
                    "offline"
-                 elsif service_attention || reboot["required"] || kernel["update_required"]
+                 elsif service_attention || update_attention || reboot["required"] || kernel["update_required"]
                    "attention"
                  elsif updates["total"].positive?
                    "updates_available"
@@ -1556,15 +1615,32 @@ module SoulCore
       output(result).lines.count { |line| line.start_with?("Inst ") }
     end
 
-    def update_summary(native: 0, aur: 0, flatpak: 0, freshness:)
+    def assessed_update_channel(id:, label:, manager:, results:, count:, optional: false)
+      observations = Array(results)
+      return nil if optional && observations.all? { |result| result.status == "unavailable" }
+
+      complete = !observations.empty? && observations.all? { |result| result.status == "ok" }
+      channel = {
+        "id" => id,
+        "label" => label,
+        "manager" => manager,
+        "status" => complete ? "complete" : "unavailable"
+      }
+      channel["count"] = integer(count) if complete
+      channel
+    end
+
+    def update_summary(native: 0, aur: 0, flatpak: 0, channels: [], freshness:)
       native_count = integer(native)
       aur_count = integer(aur)
       flatpak_count = integer(flatpak)
+      normalized_channels = Array(channels).compact
       {
         "native" => native_count,
         "aur" => aur_count,
         "flatpak" => flatpak_count,
-        "total" => native_count + aur_count + flatpak_count,
+        "channels" => normalized_channels,
+        "total" => normalized_channels.sum { |channel| channel["status"] == "complete" ? integer(channel["count"]) : 0 },
         "freshness" => freshness
       }
     end

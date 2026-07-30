@@ -161,6 +161,12 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("workstation", "address") == "atelier.example.test" &&
                devices.dig("workstation", "updates", "total") == 4 &&
                devices.dig("workstation", "updates", "freshness") == "cached_pacman_metadata" &&
+               devices.dig("workstation", "updates", "channels").map { |channel| [channel["id"], channel["label"], channel["count"], channel["status"]] } == [
+                 ["native", "pacman", 2, "complete"],
+                 ["aur", "AUR", 1, "complete"],
+                 ["flatpak", "Flatpak", 1, "complete"]
+               ] &&
+               devices.dig("workstation", "facts", "package_managers") == %w[pacman yay flatpak] &&
                devices.dig("workstation", "facts", "maintenance_adapter") == "arch_pacman" &&
                devices.dig("workstation", "facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                devices.dig("workstation", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
@@ -169,6 +175,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
   check.call("Proxmox discovers Forge and exposes cached package, kernel, and LXC 100 evidence",
              devices.dig("forge", "label") == "Forge" &&
                devices.dig("forge", "updates", "native") == 1 &&
+               devices.dig("forge", "updates", "channels") == [{
+                 "id" => "native", "label" => "APT", "manager" => "apt", "status" => "complete", "count" => 1
+               }] &&
+               devices.dig("forge", "facts", "package_managers") == ["apt"] &&
                devices.dig("forge", "kernel", "available") == "7.0.14-6-pve" &&
                devices.dig("forge", "kernel", "update_required") == true &&
                devices.dig("forge", "facts", "maintenance_adapter") == "proxmox_apt" &&
@@ -180,6 +190,10 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("pihole", "role").include?("Pi-hole DNS filtering") &&
                devices.dig("pihole", "version").include?("Core v6.4.3") &&
                devices.dig("pihole", "updates", "native") == 2 &&
+               devices.dig("pihole", "updates", "channels") == [{
+                 "id" => "native", "label" => "APT", "manager" => "apt", "status" => "complete", "count" => 2
+               }] &&
+               devices.dig("pihole", "facts", "package_managers") == ["apt"] &&
                devices.dig("pihole", "facts", "maintenance_adapter") == "debian_apt_pihole" &&
                devices.dig("pihole", "facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                devices.dig("pihole", "facts", "blocking_enabled") == true &&
@@ -197,6 +211,44 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "route" && edge["from"] == "workstation" && edge["to"] == "default-gateway" } &&
                data.dig("topology", "edges").any? { |edge| edge["kind"] == "backup_planned" } &&
                data.dig("topology", "nodes").map { |node| node["id"] }.include?("pihole"))
+
+  failed_update_result = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "fixture failure", exit_status: 1, status: "failed", truncated: false
+  )
+  unavailable_update_result = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "missing", exit_status: nil, status: "unavailable", truncated: false
+  )
+  failed_channel = service.send(
+    :assessed_update_channel,
+    id: "native", label: "APT", manager: "apt",
+    results: [failed_update_result], count: 0
+  )
+  missing_optional_channel = service.send(
+    :assessed_update_channel,
+    id: "snap", label: "Snap", manager: "snap",
+    results: [unavailable_update_result], count: 0, optional: true
+  )
+  check.call("failed evidence is unavailable without a zero count while unsupported optional channels are omitted",
+             failed_channel == {
+               "id" => "native", "label" => "APT", "manager" => "apt", "status" => "unavailable"
+             } &&
+               !failed_channel.key?("count") &&
+               missing_optional_channel.nil?)
+  failed_update_device = service.send(
+    :device,
+    id: "failed-update-fixture", label: "Failed update fixture", role: "fixture",
+    address: "local", reachable: true, os: "fixture", version: "fixture",
+    kernel: {"running" => "fixture", "available" => "fixture", "update_required" => false},
+    updates: {
+      "native" => 0, "aur" => 0, "flatpak" => 0, "total" => 0,
+      "freshness" => "fixture", "channels" => [failed_channel]
+    },
+    reboot: {"required" => false, "reason" => "fixture"},
+    services: [], facts: {}
+  )
+  check.call("unavailable update evidence marks a managed card for attention instead of healthy zero updates",
+             failed_update_device["status"] == "attention")
+
   crucible_topology = service.send(
     :build_topology,
     data.fetch("devices") + [{
@@ -298,6 +350,13 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
              dashboard.include?('const inventoryOnly = device.control !== "maintenance"') &&
                dashboard.include?("Status only · lifecycle and mutation remain provider-managed") &&
                dashboard.include?("discovered capabilities grant no mutation authority"))
+  check.call("dashboard renders assessed source labels, omits unsupported channels, and degrades legacy snapshots conservatively",
+             dashboard.include?("formatMaintenanceUpdates") &&
+               dashboard.include?("canonicalMaintenancePackageManagers") &&
+               dashboard.include?("evidence requires refresh") &&
+               dashboard.include?('channel.status === "complete"') &&
+               !dashboard.include?('${device.updates?.aur ?? 0} AUR') &&
+               !dashboard.include?('${device.updates?.flatpak ?? 0} Flatpak'))
   check.call("dashboard exposes one-device refresh with a visible observation timestamp",
              dashboard.include?('callSoul("maintenance.fleet.device.refresh", { device_id: deviceId }') &&
                dashboard.include?('["Checked", observedLabel]') &&
@@ -385,6 +444,9 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                foundry["role"] == "Proxmox VE hypervisor · inventory only" &&
                foundry["version"].include?("pve-manager/9.2.5") &&
                foundry.dig("updates", "freshness") == "cached_apt_metadata" &&
+               foundry.dig("updates", "channels") == [{
+                 "id" => "native", "label" => "APT", "manager" => "apt", "status" => "complete", "count" => 1
+               }] &&
                foundry.dig("kernel", "available") == "7.0.14-6-pve" &&
                foundry.dig("facts", "platform") == "proxmox" &&
                foundry.dig("facts", "status_adapter") == "proxmox_read_only" &&

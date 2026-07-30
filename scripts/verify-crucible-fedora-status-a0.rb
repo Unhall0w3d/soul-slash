@@ -84,6 +84,9 @@ device = service.send(:collect_fedora_inventory_device, record, facts, ["dnf"])
 
 check.call("DNF5 exit 100 is accepted and update rows are counted",
            device.dig("updates", "native") == 2 &&
+             device.dig("updates", "channels") == [{
+               "id" => "native", "label" => "DNF5", "manager" => "dnf5", "status" => "complete", "count" => 2
+             }] &&
              device.dig("updates", "freshness") == "live_dnf5_metadata")
 check.call("available kernel evidence is distinguished from reboot evidence",
            device.dig("kernel", "running") == "6.19.10-300.fc44.x86_64" &&
@@ -114,8 +117,8 @@ check.call("all commands are fixed, shell-free, bounded SSH calls",
 
 dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
 check.call("Dashboard presents live DNF5 evidence without mutation controls",
-           dashboard.include?('device.facts?.status_adapter === "dnf5_read_only"') &&
-             dashboard.include?("DNF5 evidence only · maintenance and reboot authority remain disabled"))
+           dashboard.include?('["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter)') &&
+             dashboard.include?('"Proxmox" : "DNF5"} evidence only · maintenance and reboot authority remain disabled'))
 
 if errors.empty?
   puts "Crucible Fedora status A0 verification passed."

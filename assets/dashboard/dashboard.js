@@ -2453,6 +2453,50 @@ function maintenanceDeviceIsStatusOnly(device) {
   return device.control === "status_only" || device.facts?.management_channel === "icmp_status";
 }
 
+function canonicalMaintenanceManagerLabel(manager) {
+  return {
+    apt: "APT",
+    "apt-get": "APT",
+    dnf: "DNF",
+    dnf5: "DNF5",
+    pacman: "pacman",
+    yay: "AUR",
+    paru: "AUR",
+    flatpak: "Flatpak",
+    snap: "Snap",
+    zypper: "Zypper",
+    apk: "APK",
+    nix: "Nix"
+  }[String(manager || "").toLowerCase()] || String(manager || "Package manager");
+}
+
+function legacyMaintenanceUpdateManager(device) {
+  const adapter = device.facts?.maintenance_adapter || device.facts?.status_adapter || "";
+  if (adapter.includes("dnf5") || device.facts?.package_managers?.includes("dnf")) return "DNF5";
+  if (adapter.includes("apt") || adapter.includes("proxmox") || ["forge", "pihole"].includes(device.id)) return "APT";
+  if (adapter.includes("arch") || ["workstation", "maven"].includes(device.id)) return "pacman";
+  return "Package";
+}
+
+function formatMaintenanceUpdates(device, inventoryOnly, readOnlyStatus) {
+  if (inventoryOnly && !readOnlyStatus) return `${device.facts?.management_channel === "icmp_status" ? "provider-managed" : "not queried"} · inventory only`;
+  const updates = device.updates || {};
+  if (!Array.isArray(updates.channels)) return `${legacyMaintenanceUpdateManager(device)} evidence requires refresh`;
+  if (!updates.channels.length) {
+    if (updates.freshness === "provider_managed") return "provider-managed";
+    if (updates.freshness === "unavailable") return "unavailable";
+    return "not queried";
+  }
+  return updates.channels.map((channel) => {
+    const label = channel.label || canonicalMaintenanceManagerLabel(channel.manager);
+    return channel.status === "complete" ? `${label} ${channel.count ?? 0}` : `${label} unavailable`;
+  }).join(" · ");
+}
+
+function canonicalMaintenancePackageManagers(managers) {
+  return [...new Set(managers.map(canonicalMaintenanceManagerLabel))];
+}
+
 function renderMaintenanceDevice(device) {
   const rebootRequired = device.reboot?.required === true;
   const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = rebootRequired ? "reboot_required" : (device.status || "unknown");
@@ -2511,7 +2555,7 @@ function renderMaintenanceDevice(device) {
     ["Platform", device.os || "unavailable"],
     ["Maintenance adapter", device.facts?.maintenance_adapter ? String(device.facts.maintenance_adapter).replaceAll("_", " ") : (inventoryOnly ? "not authorized" : "fixed platform adapter")],
     ["Version", device.version || "unavailable"],
-    ["Updates", inventoryOnly && !readOnlyStatus ? `${statusOnly ? "provider-managed" : "not queried"} · inventory only` : `${device.updates?.total ?? 0} total · ${device.updates?.native ?? 0} native · ${device.updates?.aur ?? 0} AUR · ${device.updates?.flatpak ?? 0} Flatpak`],
+    ["Updates", formatMaintenanceUpdates(device, inventoryOnly, readOnlyStatus)],
     ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
     ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
     ["Checked", observedLabel]
@@ -2524,7 +2568,7 @@ function renderMaintenanceDevice(device) {
   const services = document.createElement("div"); services.className = "maintenance-service-list";
   const channel = document.createElement("span"); channel.dataset.state = device.reachable ? "active" : "failed";
   channel.textContent = `${statusOnly ? "Status probe" : (inventoryOnly ? "Inventory probe" : "Maintenance channel")} · ${device.reachable ? "active" : "unavailable"}`; services.append(channel);
-  packageManagers.forEach((manager) => {
+  canonicalMaintenancePackageManagers(packageManagers).forEach((manager) => {
     const chip = document.createElement("span"); chip.dataset.state = "active"; chip.textContent = `${manager} detected`; services.append(chip);
   });
   (device.services || []).forEach((service) => {

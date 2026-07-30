@@ -18,7 +18,8 @@ Click **Collect fleet status** to replace it with a fresh bounded collection
 and inspect:
 
 - device reachability, platform, and versions;
-- native, AUR, and applicable Flatpak update counts;
+- source-labeled update counts only for package channels actually assessed on
+  that device;
 - running and available kernel evidence;
 - reboot indicators;
 - Proxmox LXC `100` state;
@@ -58,6 +59,15 @@ Card color is evidence-driven: **Healthy** and status-only **Online** are
 green, **Updates available** is yellow, and **Offline** or **Reboot required**
 is red. Managed hosts and status-only appliances retain different vocabulary;
 color does not imply that a status-only appliance has maintenance authority.
+
+Update rows name the assessed source rather than using a generic `native`
+label: pacman and applicable AUR/Flatpak channels on Atelier, APT on
+Debian/Proxmox systems, and DNF5 on Fedora. Unsupported channels are omitted.
+Zero means that the named channel was queried successfully and returned no
+updates. A failed query is shown as unavailable, while inventory-only systems
+whose updates were not queried say so directly. Detected executables such as
+`apt` and `apt-get` are canonicalized into one presentation label; detection
+alone never creates update evidence or maintenance authority.
 
 ### Optional Apple mobile inventory
 
