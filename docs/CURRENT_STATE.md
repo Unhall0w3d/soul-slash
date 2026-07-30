@@ -12,7 +12,8 @@ Self Improvement
   └─ Self Augmentation
 Creative Studios
   ├─ Music Studio
-  └─ Visual Studio
+  ├─ Visual Studio
+  └─ Mix Studio
 Administration
   ├─ Project Timeline
   ├─ Backup & Recovery
@@ -100,6 +101,14 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 - **Music Studio** stores immutable project briefs and candidate lineage; supports exact whole-second AMD Vulkan ACE-Step generation from 30 seconds through 5 minutes plus a fixed 10-minute option; preserves exact `[Instrumental]` no-vocal conditioning while allowing bounded instrumental movement timing in Sound and Structure; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies. A short/long variable-duration qualification passed technically at 43 and 248 seconds; musical acceptance remains human review.
 - **Visual Studio** provides bounded local FLUX.2 Vulkan still generation, review, guided image edits, Wan 2.2 image-guided motion, FastWan 2.2 native text-to-video, immutable revision lineage, candidate/project deletion, and exact binding to a Music candidate.
+- **Mix Studio A0** inventories only keep-reviewed finished exports whose stereo
+  master and supporting metadata still match their recorded hashes. It creates
+  immutable edit decision lists with bounded trims, incoming crossfades,
+  transition notes, and deterministic cue timing. An exact click gate can copy
+  the verified stereo masters with a JSON EDL, CSV cue sheet, README, and
+  `sha256sum`-compatible manifest for a conventional editor. It does not render
+  audio, infer stems, or claim a native DAW project. The candidate is awaiting
+  Operator review.
 - The read-only motion qualification ledger compares retained duration, frame,
   delivery, elapsed-time, and human-review evidence without automatically
   declaring any profile aesthetically qualified.

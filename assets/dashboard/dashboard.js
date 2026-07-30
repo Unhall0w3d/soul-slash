@@ -1,7 +1,18 @@
 "use strict";
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
-const TAB_LOCATIONS = Object.freeze({ chat: "#chat-panel", timeline: "#timeline-panel", studio: "#studio-panel", improvement: "#improvement-panel", augmentation: "#augmentation-panel", music: "#music-panel", visual: "#visual-panel", maintenance: "#maintenance-panel", backup: "#backup-panel" });
+const TAB_LOCATIONS = Object.freeze({
+  chat: "#chat-panel",
+  timeline: "#timeline-panel",
+  studio: "#studio-panel",
+  improvement: "#improvement-panel",
+  augmentation: "#augmentation-panel",
+  music: "#music-panel",
+  visual: "#visual-panel",
+  mix: "#mix-panel",
+  maintenance: "#maintenance-panel",
+  backup: "#backup-panel"
+});
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
@@ -9,6 +20,7 @@ state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
+Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
@@ -468,10 +480,11 @@ function switchTab(name, { updateLocation = true } = {}) {
   const augmentation = name === "augmentation";
   const music = name === "music";
   const visual = name === "visual";
+  const mix = name === "mix";
   const maintenance = name === "maintenance";
   const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
-  const creative = music || visual;
+  const creative = music || visual || mix;
   const administration = timeline || maintenance || backup;
   byId("chat-panel").hidden = !chat;
   byId("timeline-panel").hidden = !timeline;
@@ -480,6 +493,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("augmentation-panel").hidden = !augmentation;
   byId("music-panel").hidden = !music;
   byId("visual-panel").hidden = !visual;
+  byId("mix-panel").hidden = !mix;
   byId("maintenance-panel").hidden = !maintenance;
   byId("backup-panel").hidden = !backup;
   byId("chat-tab").classList.toggle("is-active", chat);
@@ -491,6 +505,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("creative-tab").classList.toggle("is-active", creative);
   byId("music-tab").classList.toggle("is-active", music);
   byId("visual-tab").classList.toggle("is-active", visual);
+  byId("mix-tab").classList.toggle("is-active", mix);
   byId("administration-tab").classList.toggle("is-active", administration);
   byId("maintenance-tab").classList.toggle("is-active", maintenance);
   byId("backup-tab").classList.toggle("is-active", backup);
@@ -506,6 +521,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("creative-tab").setAttribute("aria-selected", String(creative));
   byId("music-tab").setAttribute("aria-current", music ? "page" : "false");
   byId("visual-tab").setAttribute("aria-current", visual ? "page" : "false");
+  byId("mix-tab").setAttribute("aria-current", mix ? "page" : "false");
   byId("administration-tab").setAttribute("aria-selected", String(administration));
   byId("maintenance-tab").setAttribute("aria-current", maintenance ? "page" : "false");
   byId("backup-tab").setAttribute("aria-current", backup ? "page" : "false");
@@ -518,6 +534,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (augmentation && state.authenticated && !state.augmentationLoaded) loadSelfAugmentation();
   if (music && state.authenticated && !state.musicLoaded) loadMusicStudio();
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
+  if (mix && state.authenticated && !state.mixLoaded) loadMixStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
   if (maintenance && state.authenticated) {
     if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
@@ -4667,6 +4684,231 @@ byId("review-center-button").addEventListener("click", openReviewCenter);
 byId("close-review-center").addEventListener("click", closeReviewCenter);
 byId("refresh-review-center").addEventListener("click", loadReviewCenter);
 byId("review-approvals-tab").addEventListener("click", () => switchReviewView("approvals"));
+function mixFailure(envelope, fallback) {
+  return envelope?.errors?.[0]?.message || envelope?.data?.reason || fallback;
+}
+
+function formatMixTime(value) {
+  const total = Math.max(0, Number(value) || 0);
+  const minutes = Math.floor(total / 60);
+  const seconds = (total - (minutes * 60)).toFixed(3).replace(/\.?0+$/, "");
+  return `${minutes}:${seconds.padStart(2, "0")}`;
+}
+
+function resetMixComposer() {
+  state.selectedMixPlan = null;
+  state.mixSequence = [];
+  state.mixHandoffPreview = null;
+  byId("mix-title").value = "";
+  byId("mix-intent").value = "";
+  byId("mix-workbench-title").textContent = "New mix plan";
+  byId("mix-plan-state").textContent = "Draft";
+  byId("mix-detail-card").hidden = true;
+  byId("mix-handoff-confirm").hidden = true;
+  byId("mix-form-status").textContent = "";
+  renderMixSequence();
+}
+
+function renderMixSources() {
+  const list = byId("mix-source-list"); list.replaceChildren();
+  byId("mix-source-count").textContent = String(state.mixSources.length);
+  if (!state.mixSources.length) {
+    const empty = document.createElement("p"); empty.className = "muted";
+    empty.textContent = "No checksum-verified, keep-reviewed finished exports are eligible yet.";
+    list.append(empty); return;
+  }
+  state.mixSources.forEach((source) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = "mix-source";
+    const title = document.createElement("strong"); title.textContent = source.project_title || source.source_id;
+    const detail = document.createElement("small");
+    detail.textContent = `${formatMixTime(source.duration_seconds)} · ${source.candidate_id} · exported ${source.exported_at || "unknown"}`;
+    button.append(title, detail);
+    button.addEventListener("click", () => {
+      state.mixSequence.push({
+        project_id: source.project_id,
+        candidate_id: source.candidate_id,
+        source_id: source.source_id,
+        project_title: source.project_title || source.source_id,
+        trim_start_seconds: 0,
+        trim_end_seconds: Number(source.duration_seconds),
+        crossfade_seconds: state.mixSequence.length ? 2 : 0,
+        transition_note: ""
+      });
+      renderMixSequence();
+    });
+    list.append(button);
+  });
+}
+
+function moveMixItem(index, offset) {
+  const target = index + offset;
+  if (target < 0 || target >= state.mixSequence.length) return;
+  const [item] = state.mixSequence.splice(index, 1);
+  state.mixSequence.splice(target, 0, item);
+  state.mixSequence[0].crossfade_seconds = 0;
+  renderMixSequence();
+}
+
+function mixNumberField(labelText, value, min, max, onChange) {
+  const label = document.createElement("label"); label.textContent = labelText;
+  const input = document.createElement("input"); input.type = "number"; input.step = "0.001"; input.min = String(min); input.max = String(max); input.value = String(value);
+  input.addEventListener("change", () => onChange(Number(input.value)));
+  label.append(input); return label;
+}
+
+function renderMixSequence() {
+  const list = byId("mix-sequence-list"); list.replaceChildren();
+  byId("mix-sequence-count").textContent = String(state.mixSequence.length);
+  if (!state.mixSequence.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "Add at least one verified master.";
+    list.append(empty); return;
+  }
+  state.mixSequence.forEach((item, index) => {
+    const row = document.createElement("article"); row.className = "mix-sequence-item";
+    const heading = document.createElement("div"); heading.className = "mix-sequence-heading";
+    const title = document.createElement("strong"); title.textContent = `${index + 1}. ${item.project_title || item.source_id}`;
+    const actions = document.createElement("div"); actions.className = "mix-sequence-actions";
+    [["↑", -1], ["↓", 1]].forEach(([text, offset]) => {
+      const button = document.createElement("button"); button.type = "button"; button.textContent = text;
+      button.disabled = offset < 0 ? index === 0 : index === state.mixSequence.length - 1;
+      button.addEventListener("click", () => moveMixItem(index, offset)); actions.append(button);
+    });
+    const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Remove";
+    remove.addEventListener("click", () => { state.mixSequence.splice(index, 1); if (state.mixSequence[0]) state.mixSequence[0].crossfade_seconds = 0; renderMixSequence(); });
+    actions.append(remove); heading.append(title, actions);
+    const fields = document.createElement("div"); fields.className = "mix-sequence-fields";
+    fields.append(
+      mixNumberField("Start trim", item.trim_start_seconds, 0, item.trim_end_seconds, (value) => { item.trim_start_seconds = value; }),
+      mixNumberField("End trim", item.trim_end_seconds, 0, item.trim_end_seconds, (value) => { item.trim_end_seconds = value; }),
+      mixNumberField("Incoming crossfade", index === 0 ? 0 : item.crossfade_seconds, 0, index === 0 ? 0 : 10, (value) => { item.crossfade_seconds = index === 0 ? 0 : value; })
+    );
+    const note = document.createElement("label"); note.className = "mix-sequence-note"; note.textContent = "Transition note";
+    const noteInput = document.createElement("input"); noteInput.maxLength = 1200; noteInput.value = item.transition_note || "";
+    noteInput.addEventListener("input", () => { item.transition_note = noteInput.value; }); note.append(noteInput);
+    row.append(heading, fields, note); list.append(row);
+  });
+}
+
+function renderMixPlans() {
+  const list = byId("mix-plan-list"); list.replaceChildren();
+  byId("mix-plan-count").textContent = String(state.mixPlans.length);
+  if (!state.mixPlans.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No immutable mix plans yet.";
+    list.append(empty); return;
+  }
+  state.mixPlans.forEach((plan) => {
+    const button = document.createElement("button"); button.type = "button"; button.className = "studio-item";
+    const title = document.createElement("strong"); title.textContent = plan.title;
+    const detail = document.createElement("small"); detail.textContent = `${plan.sequence?.length || 0} sources · ${formatMixTime(plan.total_duration_seconds)}`;
+    button.append(title, detail); button.addEventListener("click", () => selectMixPlan(plan.mix_id)); list.append(button);
+  });
+}
+
+function renderMixPlanDetail(plan) {
+  state.selectedMixPlan = plan; state.mixHandoffPreview = null;
+  byId("mix-detail-card").hidden = false; byId("mix-handoff-confirm").hidden = true;
+  byId("mix-detail-title").textContent = plan.title;
+  byId("mix-detail-summary").textContent = `${plan.intent} · ${plan.sequence.length} verified sources · ${formatMixTime(plan.total_duration_seconds)}`;
+  const cues = byId("mix-cue-list"); cues.replaceChildren();
+  plan.timeline_seconds.forEach((cue, index) => {
+    const item = plan.sequence[index];
+    const row = document.createElement("div"); row.className = "mix-cue";
+    const copy = document.createElement("div"); const strong = document.createElement("strong"); strong.textContent = `${index + 1}. ${item.source_id}`;
+    const note = document.createElement("small"); note.textContent = item.transition_note || "No transition note";
+    const timing = document.createElement("code"); timing.textContent = `${formatMixTime(cue.start_seconds)} → ${formatMixTime(cue.end_seconds)}`;
+    copy.append(strong, note); row.append(copy, timing); cues.append(row);
+  });
+}
+
+async function selectMixPlan(mixId) {
+  try {
+    const envelope = await callSoul("mix.projects.get", { mix_id: mixId }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Mix plan could not be opened"));
+    renderMixPlanDetail(dataOf(envelope).mix);
+  } catch (error) { showError(error); }
+}
+
+async function loadMixStudio() {
+  state.mixLoaded = true;
+  byId("mix-form-status").textContent = "Inspecting finished exports and immutable plans…";
+  try {
+    const [sourceEnvelope, planEnvelope] = await Promise.all([
+      callSoul("mix.sources.list", { limit: 100 }),
+      callSoul("mix.projects.list", { limit: 100 })
+    ]);
+    lifecycle(sourceEnvelope);
+    if (sourceEnvelope.lifecycle_state !== "complete") throw new Error(mixFailure(sourceEnvelope, "Finished source inspection failed safely"));
+    if (planEnvelope.lifecycle_state !== "complete") throw new Error(mixFailure(planEnvelope, "Mix plan inventory failed safely"));
+    state.mixSources = dataOf(sourceEnvelope).sources || [];
+    state.mixPlans = dataOf(planEnvelope).mixes || [];
+    renderMixSources(); renderMixPlans(); renderMixSequence();
+    byId("mix-form-status").textContent = `${state.mixSources.length} eligible finished exports available.`;
+  } catch (error) {
+    state.mixLoaded = false; byId("mix-form-status").textContent = error.message; showError(error);
+  }
+}
+
+async function createMixPlan(event) {
+  event.preventDefault();
+  const button = byId("save-mix-plan"); button.disabled = true;
+  byId("mix-form-status").textContent = "Validating exact source lineage and timeline…";
+  try {
+    const sequence = state.mixSequence.map((item, index) => ({
+      project_id: item.project_id, candidate_id: item.candidate_id, source_id: item.source_id,
+      trim_start_seconds: Number(item.trim_start_seconds), trim_end_seconds: Number(item.trim_end_seconds),
+      crossfade_seconds: index === 0 ? 0 : Number(item.crossfade_seconds), transition_note: item.transition_note || ""
+    }));
+    const envelope = await callSoul("mix.projects.create", { plan: { title: byId("mix-title").value, intent: byId("mix-intent").value, sequence } });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Mix plan was not created"));
+    const plan = dataOf(envelope).mix;
+    state.mixPlans = [plan, ...state.mixPlans.filter((entry) => entry.mix_id !== plan.mix_id)];
+    renderMixPlans(); renderMixPlanDetail(plan);
+    byId("mix-plan-state").textContent = "Immutable";
+    byId("mix-form-status").textContent = "Immutable mix plan sealed. Changes require a new plan.";
+  } catch (error) { byId("mix-form-status").textContent = error.message; showError(error); }
+  finally { button.disabled = false; }
+}
+
+async function previewMixHandoff() {
+  if (!state.selectedMixPlan) return;
+  const button = byId("preview-mix-handoff"); button.disabled = true;
+  byId("mix-handoff-status").textContent = "Binding the handoff to exact sources, cues, and checksums…";
+  try {
+    const envelope = await callSoul("mix.handoff.preview", { mix_id: state.selectedMixPlan.mix_id }); lifecycle(envelope);
+    if (!["blocked_for_human_review", "complete"].includes(envelope.lifecycle_state)) throw new Error(mixFailure(envelope, "Handoff preview failed safely"));
+    const data = dataOf(envelope);
+    if (data.package) {
+      byId("mix-handoff-confirm").hidden = true;
+      byId("mix-handoff-status").textContent = `Exact package already exists at ${data.package.destination}.`;
+      return;
+    }
+    state.mixHandoffPreview = data;
+    byId("mix-handoff-scope").textContent = JSON.stringify(data.preview_scope, null, 2);
+    byId("mix-handoff-confirm").hidden = false;
+    byId("mix-handoff-status").textContent = "Review the exact package. Clicking export authorizes this digest only.";
+  } catch (error) { byId("mix-handoff-status").textContent = error.message; showError(error); }
+  finally { button.disabled = false; }
+}
+
+async function exportMixHandoff() {
+  if (!state.selectedMixPlan || !state.mixHandoffPreview) return;
+  const button = byId("export-mix-handoff"); button.disabled = true;
+  byId("mix-handoff-status").textContent = "Copying and checksum-verifying the bounded editor package…";
+  try {
+    const envelope = await callSoul("mix.handoff.execute", {
+      mix_id: state.selectedMixPlan.mix_id,
+      confirmation: state.mixHandoffPreview.confirmation_phrase,
+      expected_digest: state.mixHandoffPreview.expected_digest
+    });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Editor handoff failed safely"));
+    state.mixHandoffPreview = null; byId("mix-handoff-confirm").hidden = true;
+    byId("mix-handoff-status").textContent = `Editor handoff ready at ${dataOf(envelope).package.destination}.`;
+  } catch (error) { byId("mix-handoff-status").textContent = error.message; showError(error); }
+  finally { button.disabled = false; }
+}
+
 byId("review-activity-tab").addEventListener("click", () => switchReviewView("activity"));
 document.querySelectorAll("[data-activity-filter]").forEach((button) => button.addEventListener("click", () => filterReviewActivity(button.dataset.activityFilter)));
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
@@ -4681,6 +4923,11 @@ byId("improvement-tab").addEventListener("click", () => switchTab("improvement")
 byId("augmentation-tab").addEventListener("click", () => switchTab("augmentation"));
 byId("music-tab").addEventListener("click", () => switchTab("music"));
 byId("visual-tab").addEventListener("click", () => switchTab("visual"));
+byId("mix-tab").addEventListener("click", () => switchTab("mix"));
+byId("new-mix-plan").addEventListener("click", resetMixComposer);
+byId("mix-plan-form").addEventListener("submit", createMixPlan);
+byId("preview-mix-handoff").addEventListener("click", previewMixHandoff);
+byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet);

@@ -61,6 +61,7 @@
         <div id="creative-menu" class="self-improvement-menu" role="menu" aria-label="Creative Studio surfaces" hidden>
           <button id="music-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="music-panel"><strong>Music Studio</strong><span>Composition, candidates, listening evidence, and visual companions</span></button>
           <button id="visual-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="visual-panel"><strong>Visual Studio</strong><span>Qualified local still and short-motion creation lanes</span></button>
+          <button id="mix-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="mix-panel"><strong>Mix Studio</strong><span>Immutable sequencing, exact cues, and portable editor handoff</span></button>
         </div>
       </div>
       <div id="administration-navigation" class="tab-menu">
@@ -260,6 +261,44 @@
           <section id="visual-project-delete" class="gate-card visual-delete-card" hidden><div><p class="eyebrow">Image archive</p><h3>Delete this visual project</h3><p>Permanently removes this brief, its immutable revisions, candidates, images, logs, and reviews. Music companions already bound from a candidate remain untouched.</p></div><button id="preview-visual-project-delete" class="danger-button" type="button">Preview project deletion</button><div id="visual-project-delete-confirm" hidden><pre id="visual-project-delete-scope" class="diagnostic-output"></pre><button id="execute-visual-project-delete" class="danger-button" type="button">Delete exact project</button></div><p id="visual-project-delete-status" class="dialog-status" role="status"></p></section>
         </section>
         <aside class="visual-motion-boundary"><p class="eyebrow">Motion lane</p><h2>Generated scenes</h2><strong>Qualified locally · two paths</strong><p>Animate a kept still, or begin from a cinematic direction and let FastWan create the scene itself. Every four-, eight-, or twelve-second study remains a review candidate before it can accompany music.</p><dl><div><dt>Image guided</dt><dd>Wan 2.2</dd></div><div><dt>Text to video</dt><dd>FastWan 2.2</dd></div><div><dt>Native output</dt><dd>24 fps · 4, 8, or 12 sec</dd></div><div><dt>Execution</dt><dd>Bounded local render</dd></div></dl><div id="visual-native-motion-gate" class="visual-candidate-gate"><label>Native scene direction<textarea id="visual-native-motion-instruction" rows="8" maxlength="8000" placeholder="Describe the evolving scene, camera behavior, lighting, atmosphere, and broad progression. This is not a still-image prompt."></textarea></label><label>Scene seed<input id="visual-native-motion-seed" type="number" min="0" max="2147483647" value="42"></label><label>Duration<select id="visual-native-motion-duration"><option value="4">4 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label><button id="preview-native-motion" class="gate-button gate-button--gold" type="button" disabled>Preview native video</button><div id="visual-native-motion-confirm" hidden></div><p id="visual-native-motion-status" class="dialog-status" role="status">Select or create a visual project first.</p></div><section class="motion-qualification-card" aria-labelledby="motion-qualification-title"><div><p class="eyebrow">Measured evidence</p><h3 id="motion-qualification-title">Qualification ledger</h3></div><button id="refresh-motion-qualification" class="gate-button" type="button">Refresh evidence</button><div id="motion-qualification-summary"><p class="muted">Review retained render cost and human ratings without automatic aesthetic approval.</p></div><p id="motion-qualification-status" class="dialog-status" role="status"></p></section></aside>
+      </div>
+    </section>
+
+    <section id="mix-panel" class="tab-panel mix-panel" role="tabpanel" aria-labelledby="mix-tab" hidden>
+      <header class="studio-header music-header">
+        <div><p class="eyebrow">Continuity workshop</p><h1>Mix Studio</h1><p>Arrange finished Soul compositions into an exact, reviewable timeline before moving into a conventional editor or DAW.</p></div>
+        <div class="studio-boundary"><strong>Stereo-source handoff</strong><span>Finished exports → immutable EDL → cue sheet → editor package</span><small>A0 does not render a mix, separate stems, or claim to create a native DAW project.</small></div>
+      </header>
+      <div class="mix-layout">
+        <aside class="mix-plans">
+          <div class="studio-list-heading"><div><p class="eyebrow">Sequence archive</p><h2>Mix plans</h2></div><span id="mix-plan-count" class="count-badge">0</span></div>
+          <button id="new-mix-plan" class="gate-button" type="button">New mix plan</button>
+          <div id="mix-plan-list" class="studio-list"><p class="muted">Open the workshop to inspect plans.</p></div>
+        </aside>
+        <section class="mix-workbench">
+          <form id="mix-plan-form" class="music-form mix-form">
+            <div class="studio-detail-heading"><div><p class="eyebrow">Immutable edit decision list</p><h2 id="mix-workbench-title">New mix plan</h2></div><span id="mix-plan-state" class="maturity-chip">Draft</span></div>
+            <div class="mix-form-grid"><label>Title<input id="mix-title" maxlength="120" required></label><label>Intent<input id="mix-intent" maxlength="2000" required></label></div>
+            <div class="mix-source-workspace">
+              <section><div class="studio-detail-heading"><div><p class="eyebrow">Verified masters</p><h3>Eligible sources</h3></div><span id="mix-source-count" class="count-badge">0</span></div><div id="mix-source-list" class="mix-source-list"><p class="muted">Inspecting finished exports.</p></div></section>
+              <section><div class="studio-detail-heading"><div><p class="eyebrow">Running order</p><h3>Sequence</h3></div><span id="mix-sequence-count" class="count-badge">0</span></div><div id="mix-sequence-list" class="mix-sequence-list"><p class="muted">Add at least one verified master.</p></div></section>
+            </div>
+            <button id="save-mix-plan" class="gate-button gate-button--gold" type="submit">Seal immutable plan</button>
+            <p id="mix-form-status" class="dialog-status" role="status"></p>
+          </form>
+          <section id="mix-detail-card" class="gate-card mix-detail-card" hidden>
+            <div><p class="eyebrow">Exact timeline</p><h3 id="mix-detail-title">Mix plan</h3><p id="mix-detail-summary"></p></div>
+            <div id="mix-cue-list" class="mix-cue-list"></div>
+            <button id="preview-mix-handoff" class="gate-button" type="button">Preview editor handoff</button>
+            <div id="mix-handoff-confirm" hidden><pre id="mix-handoff-scope" class="diagnostic-output"></pre><button id="export-mix-handoff" class="gate-button gate-button--gold" type="button">Export exact handoff</button></div>
+            <p id="mix-handoff-status" class="dialog-status" role="status"></p>
+          </section>
+        </section>
+        <aside class="mix-boundary">
+          <p class="eyebrow">A0 boundary</p><h2>Truthful structure</h2>
+          <dl><div><dt>Inputs</dt><dd>Checksum-verified stereo masters</dd></div><div><dt>Plan</dt><dd>Immutable JSON EDL</dd></div><div><dt>Timing</dt><dd>Exact trims and crossfades</dd></div><div><dt>Export</dt><dd>Sources, cues, metadata, checksums</dd></div></dl>
+          <p>No inferred stems. No destructive source edits. No automatic publication.</p>
+        </aside>
       </div>
     </section>
 

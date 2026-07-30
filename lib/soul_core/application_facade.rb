@@ -49,6 +49,7 @@ require_relative "music_publication_package_service"
 require_relative "youtube_oauth_service"
 require_relative "youtube_authenticated_upload_service"
 require_relative "music_project_deletion_service"
+require_relative "long_form_mix_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
@@ -106,6 +107,7 @@ module SoulCore
       youtube_oauth_service: nil,
       youtube_authenticated_upload_service: nil,
       music_project_deletion_service: nil,
+      long_form_mix_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
       music_reference_synthesis_service: nil,
@@ -156,6 +158,7 @@ module SoulCore
       @youtube_oauth_service = youtube_oauth_service
       @youtube_authenticated_upload_service = youtube_authenticated_upload_service
       @music_project_deletion_service = music_project_deletion_service
+      @long_form_mix_service = long_form_mix_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
       @music_reference_synthesis_service = music_reference_synthesis_service
@@ -377,6 +380,12 @@ module SoulCore
       when "music.projects.restore" then domain(project_release.restore(kind: "music", project_id: required(parameters, "project_id")))
       when "music.projects.delete.preview" then domain(music_project_deletion.preview(project_id: required(parameters, "project_id")))
       when "music.projects.delete.execute" then domain(music_project_deletion.execute(project_id: required(parameters, "project_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "mix.sources.list" then domain(long_form_mix.sources(limit: bounded_limit(parameters["limit"], LongFormMixService::MAX_LIMIT)))
+      when "mix.projects.list" then domain(long_form_mix.list(limit: bounded_limit(parameters["limit"], LongFormMixService::MAX_LIMIT)))
+      when "mix.projects.get" then domain(long_form_mix.get(mix_id: required(parameters, "mix_id")))
+      when "mix.projects.create" then domain(long_form_mix.create(plan: required(parameters, "plan")))
+      when "mix.handoff.preview" then domain(long_form_mix.handoff_preview(mix_id: required(parameters, "mix_id")))
+      when "mix.handoff.execute" then domain(long_form_mix.handoff_execute(mix_id: required(parameters, "mix_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "music.references.list" then domain(music_reference_library.inventory(limit: bounded_limit(parameters["limit"], 500)))
       when "music.references.get" then domain(music_reference_library.inspect(identifier: required(parameters, "reference_id")))
       when "music.references.delete.preview" then domain(music_reference_library.deletion_preview(identifier: required(parameters, "reference_id")))
@@ -468,7 +477,7 @@ module SoulCore
         "operations" => Contract::OPERATIONS.keys,
         "product_tabs" => ["Chat", "Self Improvement", "Creative Studios", "Administration"],
         "administration_surfaces" => ["Project Timeline", "Backup & Recovery", "Guided Maintenance"],
-        "creative_surfaces" => ["Music Studio", "Visual Studio"],
+        "creative_surfaces" => ["Music Studio", "Visual Studio", "Mix Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
           "ok" => report.fetch("ok"),
@@ -970,6 +979,10 @@ module SoulCore
 
     def music_project_deletion
       @music_project_deletion_service ||= MusicProjectDeletionService.new(root: @root)
+    end
+
+    def long_form_mix
+      @long_form_mix_service ||= LongFormMixService.new(root: @root)
     end
 
     def project_release

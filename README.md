@@ -16,7 +16,7 @@ The authenticated dashboard provides:
 
 - **Chat** — persistent transmissions, explicit local push-to-talk transcription, bounded per-message local speech, visible five-second Voice Presence follow-ups, deterministic voice-mediated screen requests, immediate message rendering, local-model responses, bounded skill routing, read-only Creative Studio archive awareness, picture and explicit one-shot screen understanding, memory, artifacts, workspace, inbox, system status, model runtime controls, and exact-gated Core switching;
 - **Self Improvement** — Skill Studio, Self Assessment, and Self Augmentation behind one navigation group;
-- **Creative Studios** — Music Studio and Visual Studio with local generation, evidence, revision, lineage, and export flows;
+- **Creative Studios** — Music Studio, Visual Studio, and Mix Studio with local generation, evidence, revision, lineage, sequencing, and export flows;
 - **Administration** — Project Timeline, Backup & Recovery, and Guided Maintenance with separate review gates for every mutation;
 - **Review Center** — redacted pending-approval and recent bounded-execution evidence without granting approval authority.
 
@@ -28,7 +28,7 @@ The supported local runtime topology currently includes:
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
-Music Studio supports exact whole-second projects from 30 seconds through 5 minutes plus a fixed 10-minute option, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. An owner-authorized A0 candidate can upload one exact package through a foreground OAuth and confirmation gate; private is the default and publication remains a human decision. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study.
+Music Studio supports exact whole-second projects from 30 seconds through 5 minutes plus a fixed 10-minute option, FLAC/MP3 candidates, persistent generation jobs, vocal evidence, revision lineage, lawful reference profiles, reviewed still or generated-motion companions, finished-song export, and exact local YouTube upload packages. An owner-authorized A0 candidate can upload one exact package through a foreground OAuth and confirmation gate; private is the default and publication remains a human decision. Visual Studio provides bounded local still generation, guided edits, image-to-video, native text-to-video, review, deletion, and exact binding to Music candidates. Long-form motion repeats one accepted short study. Mix Studio A0 arranges checksum-verified finished stereo masters into an immutable EDL and exports sources, cues, metadata, and checksums for a conventional editor without claiming stems or a native DAW project.
 
 For a concise implementation and boundary map, see [Current State](docs/CURRENT_STATE.md).
 
@@ -54,6 +54,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
 | Music Studio | Create, analyze, revise, review, finish, and package local compositions | [Music Studio](docs/guides/MUSIC_STUDIO.md) |
+| Mix Studio | Arrange finished stereo masters into an immutable sequence and export a portable editor handoff | [Mix Studio](docs/guides/MIX_STUDIO.md) |
 | YouTube Publication | Authorize one exact reviewed upload or synchronize reviewed NOC Thoughts description links through separate foreground human gates | [YouTube Publication](docs/guides/YOUTUBE_PUBLICATION.md) |
 | Visual Studio | Generate, review, revise, and bind private local imagery or short motion scenes | [Visual Studio](docs/guides/VISUAL_STUDIO.md) |
 
