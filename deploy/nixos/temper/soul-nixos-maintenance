@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly VERSION="soul-nixos-maintenance-a1-v1"
+readonly FLAKE="/etc/nixos#temper"
+readonly LOCK="/etc/nixos/flake.lock"
+
+fail_closed() {
+  printf '%s\n' "$1" >&2
+  exit 64
+}
+
+[[ "$(id -u)" == "0" ]] || fail_closed "root authority is required"
+[[ "$#" == "1" ]] || fail_closed "argument count is invalid"
+
+case "$1" in
+  self-check)
+    printf '{"version":"%s","flake":"%s","arbitrary_command_forwarding":false,"password_storage":false}\n' \
+      "$VERSION" "$FLAKE"
+    ;;
+  generation-match)
+    [[ "$(readlink -f /run/current-system)" == "$(readlink -f /run/booted-system)" ]] ||
+      fail_closed "active and booted generations differ"
+    printf 'matched\n'
+    ;;
+  upgrade)
+    [[ -f "$LOCK" && ! -L "$LOCK" ]] || fail_closed "flake lock is unavailable or unsafe"
+    backup="$(mktemp /tmp/soul-nixos-flake-lock.XXXXXX)"
+    cleanup() {
+      rm -f "$backup"
+    }
+    restore() {
+      cp -- "$backup" "$LOCK"
+      cleanup
+    }
+    trap restore ERR INT TERM
+    cp -- "$LOCK" "$backup"
+    nix flake update --flake /etc/nixos
+    nixos-rebuild switch --flake "$FLAKE"
+    trap - ERR INT TERM
+    cleanup
+    ;;
+  reboot)
+    exec systemctl reboot
+    ;;
+  *)
+    fail_closed "operation is invalid"
+    ;;
+esac

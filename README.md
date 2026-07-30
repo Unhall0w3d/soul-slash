@@ -49,6 +49,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
 | Guided Maintenance | Preview and rehearse the reviewed Arch/AUR, Flatpak, reboot, and Hyprland restoration flow from Administration | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
 | Crucible Fedora Guest | Add an optional off-device backup target and read-only DNF5 maintenance laboratory on Proxmox | [Crucible Fedora](docs/guides/CRUCIBLE_FEDORA.md) |
+| Temper NixOS Guest | Prove declarative Nix flake updates, system generations, and bounded reboot behavior on Proxmox | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md#nixos-laboratory-target) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |

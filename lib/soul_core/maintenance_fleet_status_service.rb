@@ -16,6 +16,7 @@ module SoulCore
     SCHEMA_VERSION = "soul.maintenance.fleet_status.v1"
     COMMAND_TIMEOUT_SECONDS = 20
     DNF5_STATUS_TIMEOUT_SECONDS = 120
+    NIX_STATUS_TIMEOUT_SECONDS = 45
     CHECKUPDATES_TIMEOUT_SECONDS = 90
     MAX_OUTPUT_BYTES = 256 * 1024
     SSH_PATH = "/usr/bin/ssh"
@@ -638,6 +639,11 @@ module SoulCore
           package_managers.include?("dnf")
         return collect_fedora_inventory_device(record, facts, package_managers)
       end
+      if record.fetch("connection_mode") == "ssh" &&
+          facts["os_id"] == "nixos" &&
+          package_managers.include?("nix")
+        return collect_nixos_inventory_device(record, facts, package_managers)
+      end
       if record.fetch("connection_mode") == "ssh" && enrolled_proxmox?(record, facts)
         return collect_enrolled_proxmox_device(record, facts, package_managers)
       end
@@ -779,6 +785,160 @@ module SoulCore
 
       configured_alias = @process_env.fetch("SOUL_FLEET_FOUNDRY_SSH_ALIAS", "foundry").to_s.strip
       configured_alias.match?(SSH_ALIAS_PATTERN) && record["ssh_alias"].to_s == configured_alias
+    end
+
+    def collect_nixos_inventory_device(record, facts, package_managers)
+      target = record.fetch("ssh_alias")
+      nixos_version = remote_run(
+        "enrolled_device.nixos_version",
+        target,
+        "/run/current-system/sw/bin/nixos-version"
+      )
+      running_kernel_result = remote_run(
+        "enrolled_device.nixos_kernel",
+        target,
+        "/run/current-system/sw/bin/uname", "-r"
+      )
+      current_generation = remote_run(
+        "enrolled_device.nixos_current_generation",
+        target,
+        "/run/current-system/sw/bin/readlink", "-f", "/run/current-system"
+      )
+      booted_generation = remote_run(
+        "enrolled_device.nixos_booted_generation",
+        target,
+        "/run/current-system/sw/bin/readlink", "-f", "/run/booted-system"
+      )
+      lock_result = remote_run(
+        "enrolled_device.nixos_flake_lock",
+        target,
+        "/run/current-system/sw/bin/cat", "/etc/nixos/flake.lock"
+      )
+      upstream_result = remote_run(
+        "enrolled_device.nixos_upstream",
+        target,
+        "/run/current-system/sw/bin/git", "ls-remote",
+        "https://github.com/NixOS/nixpkgs.git", "refs/heads/nixos-26.05",
+        timeout: NIX_STATUS_TIMEOUT_SECONDS
+      )
+      ssh = remote_run(
+        "enrolled_device.nixos_ssh_service",
+        target,
+        "/run/current-system/sw/bin/systemctl", "is-active", "sshd"
+      )
+      guest_agent = remote_run(
+        "enrolled_device.nixos_guest_agent",
+        target,
+        "/run/current-system/sw/bin/systemctl", "is-active", "qemu-guest-agent"
+      )
+      authority = remote_run(
+        "enrolled_device.nixos_authority",
+        target,
+        "/run/current-system/sw/bin/sudo", "-n",
+        "/run/current-system/sw/bin/soul-nixos-maintenance", "self-check",
+        timeout: 10
+      )
+
+      locked_revision = nixpkgs_locked_revision(lock_result)
+      upstream_revision = nixpkgs_upstream_revision(upstream_result)
+      update_available = !locked_revision.empty? &&
+        !upstream_revision.empty? &&
+        locked_revision != upstream_revision
+      current = output(current_generation)
+      booted = output(booted_generation)
+      reboot_required = !current.empty? && !booted.empty? && current != booted
+      authority_ready = nixos_authority_ready?(authority)
+      control_ready = authority_ready && temper_control_authorized?(record)
+      channel_results = [lock_result, upstream_result]
+
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: record.fetch("role"),
+        address: record.fetch("address"),
+        reachable: true,
+        os: facts["os_pretty_name"].to_s.empty? ? "NixOS" : facts["os_pretty_name"],
+        version: successful?(nixos_version) ? output(nixos_version) : "NixOS · version unavailable",
+        kernel: {
+          "running" => successful?(running_kernel_result) ? output(running_kernel_result) : facts["kernel"].to_s,
+          "available" => reboot_required ? "new system generation active" : "running generation",
+          "update_required" => reboot_required
+        },
+        updates: update_summary(
+          native: update_available ? 1 : 0,
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "Nix", manager: "nix",
+              results: channel_results, count: update_available ? 1 : 0
+            )
+          ],
+          freshness: successful?(upstream_result) ? "live_nixpkgs_branch" : "nixpkgs_status_unavailable"
+        ),
+        reboot: {
+          "required" => reboot_required,
+          "reason" => reboot_required ? "active NixOS generation differs from the booted generation" : "active and booted NixOS generations match"
+        },
+        services: [
+          service_record("SSH", ssh),
+          service_record("QEMU guest agent", guest_agent),
+          {
+            "id" => "nixos_authority",
+            "label" => "NixOS authority",
+            "state" => authority_ready ? "active" : "unavailable"
+          }
+        ],
+        facts: facts.merge(
+          "reachability" => "reachable",
+          "kernel" => successful?(running_kernel_result) ? output(running_kernel_result) : facts["kernel"].to_s,
+          "package_managers" => package_managers,
+          "status_adapter" => control_ready ? "nixos_flake_fixed_maintenance" : "nixos_flake_read_only",
+          "control_target_id" => "temper",
+          "control_capability" => control_ready ? "fixed_maintenance" : "inventory_only",
+          "maintenance_authority" => authority_ready ? "declarative_root_owned_fixed_operations" : "unavailable",
+          "maintenance_adapter" => control_ready ? "nixos_flake" : nil,
+          "maintenance_lifecycle" => control_ready ? "device_scoped_v1" : nil,
+          "locked_nixpkgs_revision" => locked_revision,
+          "upstream_nixpkgs_revision" => upstream_revision,
+          "mutation_supported" => control_ready
+        ),
+        control: control_ready ? "maintenance" : "inventory_only"
+      )
+    end
+
+    def temper_control_authorized?(record)
+      return false unless %w[1 true yes on].include?(@process_env["SOUL_FLEET_TEMPER_CONTROL_ENABLED"].to_s.strip.downcase)
+
+      configured_alias = @process_env.fetch("SOUL_FLEET_TEMPER_SSH_ALIAS", "temper").to_s.strip
+      configured_alias.match?(SSH_ALIAS_PATTERN) && record["ssh_alias"].to_s == configured_alias
+    end
+
+    def nixpkgs_locked_revision(result)
+      return "" unless successful?(result)
+
+      parsed = JSON.parse(result.stdout.to_s)
+      safe_text(parsed.dig("nodes", "nixpkgs", "locked", "rev")).byteslice(0, 80).to_s
+    rescue JSON::ParserError
+      ""
+    end
+
+    def nixpkgs_upstream_revision(result)
+      return "" unless successful?(result)
+
+      value = result.stdout.to_s.split(/\s+/, 2).first.to_s
+      value.match?(/\A[0-9a-f]{40}\z/) ? value : ""
+    end
+
+    def nixos_authority_ready?(result)
+      return false unless successful?(result)
+
+      parsed = JSON.parse(result.stdout.to_s)
+      parsed.is_a?(Hash) &&
+        parsed["version"] == "soul-nixos-maintenance-a1-v1" &&
+        parsed["arbitrary_command_forwarding"] == false &&
+        parsed["password_storage"] == false &&
+        parsed["flake"] == "/etc/nixos#temper"
+    rescue JSON::ParserError
+      false
     end
 
     def collect_fedora_inventory_device(record, facts, package_managers)
