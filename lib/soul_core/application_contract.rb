@@ -170,6 +170,15 @@ module SoulCore
       "music.projects.restore" => %w[project_id],
       "music.projects.delete.preview" => %w[project_id],
       "music.projects.delete.execute" => %w[project_id confirmation expected_digest],
+      "mix.sources.list" => %w[limit],
+      "mix.projects.list" => %w[limit],
+      "mix.projects.get" => %w[mix_id],
+      "mix.projects.create" => %w[plan],
+      "mix.handoff.preview" => %w[mix_id],
+      "mix.handoff.execute" => %w[mix_id confirmation expected_digest],
+      "mix.render.status" => %w[mix_id],
+      "mix.render.preview" => %w[mix_id],
+      "mix.render.execute" => %w[mix_id confirmation expected_digest],
       "music.references.list" => %w[limit],
       "music.references.get" => %w[reference_id],
       "music.references.delete.preview" => %w[reference_id],
@@ -373,7 +382,7 @@ module SoulCore
           return "limit must be an integer" unless value.is_a?(Integer)
         elsif key == "start_seconds" || key == "end_seconds"
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
-        elsif key == "filters" || key == "item" || key == "project" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
+        elsif key == "filters" || key == "item" || key == "project" || key == "plan" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "expected_revision"
           return "expected_revision must be a positive integer" unless value.is_a?(Integer) && value.positive?

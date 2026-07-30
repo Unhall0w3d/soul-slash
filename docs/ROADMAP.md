@@ -16,6 +16,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Self Augmentation isolated experiment and external integration-review lane
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
+- [~] review Mix Studio immutable stereo-source sequencing, portable editor
+  handoff, and bounded A1 listening render; final acceptance/export remains
+  human-gated
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
 - [~] review exact-channel NOC Thoughts description-link synchronization; live OAuth and one reviewed batch remain open
 - [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
@@ -61,7 +64,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
-- [ ] assemble reviewed variable-duration songs and short visual loops into an editable longer-form mix timeline with transition, overlap, trim, loop, and export controls
+- [~] review A0 assembly of finished variable-duration songs into an immutable
+  timeline with trim, crossfade, transition, cues, and editor handoff; visual
+  loop sequencing and final mix rendering remain open
 - [~] review the A0 foreground authenticated YouTube upload candidate; private
   remains the default and publication remains human-controlled
 - [x] bounded voice input and speech output through the same conversation and skill core, including visible wake-word presence and natural follow-up

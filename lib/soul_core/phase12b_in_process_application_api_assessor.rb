@@ -112,7 +112,7 @@ module SoulCore
           bootstrap.dig("data", "system_status", "collected") == false &&
           bootstrap.dig("data", "product_tabs") == ["Chat", "Self Improvement", "Creative Studios", "Administration"] &&
           bootstrap.dig("data", "administration_surfaces") == ["Project Timeline", "Backup & Recovery", "Guided Maintenance"] &&
-          bootstrap.dig("data", "creative_surfaces") == ["Music Studio", "Visual Studio"] &&
+          bootstrap.dig("data", "creative_surfaces") == ["Music Studio", "Visual Studio", "Mix Studio"] &&
           bootstrap.dig("data", "self_improvement_surfaces") == ["Skill Studio", "Self Assessment", "Self Augmentation"] &&
           status.calls.zero? && runtime.calls.empty? &&
           !JSON.generate(bootstrap).include?("phase12b-secret-sentinel")

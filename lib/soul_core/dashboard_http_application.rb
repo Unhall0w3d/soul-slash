@@ -135,6 +135,10 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_audio(normalized_headers, *match.captures)
       end
+      if (match = target.match(%r{\A/api/v1/mix/audio/(mix_[a-f0-9]{16})/(mp3|flac)\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return mix_audio(normalized_headers, *match.captures)
+      end
       if (match = target.match(%r{\A/api/v1/music/visual/(music_[a-f0-9]{16})/(candidate_[a-f0-9]{16})/(visual_[a-f0-9]{16})/(base|loop|preview)\z}))
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return music_visual(normalized_headers, *match.captures)
@@ -469,6 +473,26 @@ module SoulCore
       extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
       response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
     rescue MusicProjectStore::ValidationError, MusicProjectStore::IntegrityError
+      response(404, "Not Found")
+    end
+
+    def mix_audio(headers, mix_id, artifact)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.mix_artifact_path(mix_id: mix_id, artifact: artifact)
+      raise LongFormMixRenderService::ValidationError, "mix artifact path is unavailable" if path.to_s.empty?
+      content_type = artifact == "mp3" ? "audio/mpeg" : "audio/flac"
+      size = File.size(path)
+      range = audio_range(headers["range"], size)
+      return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
+      offset, length = range || [0, size]
+      extra = { "Content-Type" => content_type, "Content-Length" => length.to_s, "Content-Disposition" => "inline; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store", "Accept-Ranges" => "bytes" }
+      extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
+      response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
+    rescue LongFormMixRenderService::ValidationError, LongFormMixRenderService::IntegrityError, ArgumentError
+      response(404, "Not Found")
+    rescue Errno::ENOENT
       response(404, "Not Found")
     end
 
