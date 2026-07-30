@@ -2625,10 +2625,14 @@ function formatMaintenanceUpdates(device, inventoryOnly, readOnlyStatus) {
     if (updates.freshness === "unavailable") return "unavailable";
     return "not queried";
   }
-  return updates.channels.map((channel) => {
+  const channelSummary = updates.channels.map((channel) => {
     const label = channel.label || canonicalMaintenanceManagerLabel(channel.manager);
     return channel.status === "complete" ? `${label} ${channel.count ?? 0}` : `${label} unavailable`;
   }).join(" · ");
+  const freshness = String(updates.freshness || "");
+  if (freshness.startsWith("fresh_") || freshness.startsWith("live_")) return `${channelSummary} · fresh`;
+  if (freshness.startsWith("cached_")) return `${channelSummary} · cached metadata`;
+  return channelSummary;
 }
 
 function canonicalMaintenancePackageManagers(managers) {

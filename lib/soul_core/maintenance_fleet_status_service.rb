@@ -15,6 +15,7 @@ module SoulCore
     SCHEMA_VERSION = "soul.maintenance.fleet_status.v1"
     COMMAND_TIMEOUT_SECONDS = 20
     DNF5_STATUS_TIMEOUT_SECONDS = 120
+    CHECKUPDATES_TIMEOUT_SECONDS = 90
     MAX_OUTPUT_BYTES = 256 * 1024
     SSH_PATH = "/usr/bin/ssh"
     PING_PATH = "/usr/bin/ping"
@@ -271,7 +272,17 @@ module SoulCore
 
     def collect_workstation
       kernel = local_run("workstation.kernel", "/usr/bin/uname", "-r")
-      native = local_run("workstation.native_updates", "/usr/bin/pacman", "-Qu", accepted_exit_statuses: [0, 1])
+      native = local_run(
+        "workstation.native_updates_fresh",
+        "/usr/bin/checkupdates", "--nocolor",
+        timeout: CHECKUPDATES_TIMEOUT_SECONDS,
+        accepted_exit_statuses: [0, 2]
+      )
+      native_freshness = "fresh_pacman_metadata"
+      if native.status == "unavailable"
+        native = local_run("workstation.native_updates_cached", "/usr/bin/pacman", "-Qu", accepted_exit_statuses: [0, 1])
+        native_freshness = "cached_pacman_metadata"
+      end
       aur = local_run("workstation.aur_updates", "/usr/bin/yay", "-Qua", timeout: 30, accepted_exit_statuses: [0, 1])
       flatpak_user = local_run(
         "workstation.flatpak_user_updates",
@@ -314,7 +325,7 @@ module SoulCore
         aur: aur_count,
         flatpak: flatpak_count,
         channels: update_channels,
-        freshness: "cached_pacman_metadata"
+        freshness: native_freshness
       )
 
       device(
