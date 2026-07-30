@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+
+ROOT = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(ROOT, "lib"))
+
+require "soul_core/noctalia_device_registry"
+require "soul_core/noctalia_status_service"
+require "soul_core/voice_presence_launch_service"
+
+def usage!
+  warn "Usage: soul-noctalia status | voice-launch | connect --device DEVICE_ID"
+  exit 2
+end
+
+command = ARGV.shift || "status"
+case command
+when "status"
+  usage! unless ARGV.empty?
+  result = SoulCore::NoctaliaStatusService.new(root: ROOT).status
+  puts JSON.generate(result)
+  exit(result.fetch("ok", false) ? 0 : 1)
+when "voice-launch"
+  usage! unless ARGV.empty?
+  result = SoulCore::VoicePresenceLaunchService.new(root: ROOT).launch
+  puts JSON.generate(result)
+  exit(result.fetch("ok", false) ? 0 : 1)
+when "connect"
+  device_id = nil
+  parser = OptionParser.new do |options|
+    options.on("--device DEVICE_ID") { |value| device_id = value }
+  end
+  begin
+    parser.parse!(ARGV)
+    usage! unless ARGV.empty? && device_id
+    argv = SoulCore::NoctaliaDeviceRegistry.new(root: ROOT).ssh_argv(device_id)
+    exec(*argv)
+  rescue OptionParser::ParseError, ArgumentError => error
+    puts JSON.generate({"ok" => false, "lifecycle_state" => "failed", "message" => error.message})
+    exit 2
+  end
+else
+  usage!
+end

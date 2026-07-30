@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soul.local/schemas/noctalia_status.schema.json",
+  "title": "Soul Noctalia companion status",
+  "type": "object",
+  "required": ["schema_version", "collected_at", "ok", "soul", "core", "voice_presence", "fleet"],
+  "properties": {
+    "schema_version": {"const": "soul.noctalia.status.v2"},
+    "collected_at": {"type": "string"},
+    "ok": {"type": "boolean"},
+    "soul": {"type": "object"},
+    "core": {"type": "object"},
+    "voice_presence": {"type": "object"},
+    "fleet": {
+      "type": "object",
+      "required": ["available", "device_count", "healthy_count", "devices"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "device_count": {"type": "integer", "minimum": 0},
+        "healthy_count": {"type": "integer", "minimum": 0},
+        "devices": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "required": ["id", "display_name", "subtitle", "health", "reachable", "summary_rows", "detail_rows", "actions"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+              "display_name": {"type": "string"},
+              "subtitle": {"type": "string"},
+              "health": {"enum": ["healthy", "degraded", "unhealthy", "unavailable"]},
+              "reachable": {"type": "boolean"},
+              "summary_rows": {"$ref": "#/$defs/rows"},
+              "detail_rows": {"$ref": "#/$defs/rows"},
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "label", "kind", "enabled"],
+                  "properties": {
+                    "id": {"const": "connect"},
+                    "label": {"type": "string"},
+                    "kind": {"const": "terminal"},
+                    "enabled": {"type": "boolean"}
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "error": {"type": "string"}
+  },
+  "$defs": {
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "value"],
+        "properties": {
+          "label": {"type": "string", "maxLength": 48},
+          "value": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

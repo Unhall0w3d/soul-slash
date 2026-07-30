@@ -1,0 +1,126 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "json"
+require "tmpdir"
+
+ROOT = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(ROOT, "lib"))
+
+require "soul_core/noctalia_device_registry"
+require "soul_core/noctalia_status_service"
+
+EnvelopeStub = Struct.new(:value) { def status = value }
+FleetStub = Struct.new(:value) { def snapshot = value }
+
+checks = 0
+assert = lambda do |condition, message|
+  raise message unless condition
+  checks += 1
+end
+
+Dir.mktmpdir("soul-noctalia-v2-") do |root|
+  File.write(File.join(root, "VERSION"), "0.1.0-dev\n")
+  fleet_dir = File.join(root, "Soul", "private", "host_maintenance")
+  action_dir = File.join(root, "Soul", "private", "noctalia")
+  FileUtils.mkdir_p(fleet_dir)
+  FileUtils.mkdir_p(action_dir)
+  File.write(File.join(fleet_dir, "discovered_devices.json"), JSON.generate({
+    "schema_version" => "soul.maintenance.fleet_registry.v1",
+    "devices" => [
+      {"id" => "node_beta", "connection_mode" => "ssh", "ssh_alias" => "node-beta-automation"},
+      {"id" => "speaker", "connection_mode" => "status_only", "ssh_alias" => ""}
+    ]
+  }))
+  File.write(File.join(action_dir, "device_actions.json"), JSON.generate({
+    "schema_version" => "soul.noctalia.device_actions.v1",
+    "devices" => [
+      {"id" => "node_alpha", "interactive_ssh_alias" => "node-alpha-interactive"},
+      {"id" => "node_beta", "interactive_ssh_alias" => "node-beta-interactive"}
+    ]
+  }))
+
+  core = EnvelopeStub.new({
+    "ok" => true, "lifecycle_state" => "complete",
+    "data" => {"active_core_id" => "daily", "active_core_label" => "Daily Core", "core_mode" => "daily"}
+  })
+  voice = EnvelopeStub.new({
+    "ok" => true, "message" => "Voice Presence is closed",
+    "data" => {"running" => false, "checked_at" => "2026-07-30T12:00:00Z"}
+  })
+  fleet = FleetStub.new({
+    "ok" => true,
+    "data" => {
+      "collected_at" => "2026-07-30T11:59:00Z",
+      "devices" => [
+        {
+          "id" => "node_alpha", "label" => "Node Alpha", "address" => "192.0.2.6",
+          "status" => "healthy", "reachable" => true, "role" => "Hypervisor",
+          "os" => "Proxmox VE", "version" => "9.2.5", "observed_at" => "2026-07-30T11:59:00Z",
+          "updates" => {"total" => 0, "freshness" => "fresh", "channels" => [
+            {"label" => "APT", "status" => "complete", "count" => 0}
+          ]},
+          "kernel" => {"running" => "7.0.14", "available" => "7.0.14", "update_required" => false},
+          "reboot" => {"required" => false},
+          "services" => [{"id" => "ssh", "label" => "SSH", "state" => "active"}],
+          "facts" => {"hostname" => "node-alpha", "management_channel" => "ssh"}
+        },
+        {
+          "id" => "node_beta", "label" => "Node Beta", "address" => "192.0.2.7",
+          "status" => "healthy", "reachable" => true,
+          "facts" => {"hostname" => "node-beta", "management_channel" => "ssh_inventory"}
+        },
+        {
+          "id" => "speaker", "label" => "Speaker", "address" => "192.0.2.8",
+          "status" => "reachable", "reachable" => true,
+          "facts" => {"hostname" => "speaker", "management_channel" => "icmp_status"}
+        }
+      ]
+    }
+  })
+
+  registry = SoulCore::NoctaliaDeviceRegistry.new(root:)
+  result = SoulCore::NoctaliaStatusService.new(
+    root:, clock: -> { Time.utc(2026, 7, 30, 12, 0, 0) },
+    core_service: core, fleet_service: fleet, voice_presence_service: voice,
+    device_registry: registry
+  ).status
+
+  devices = result.dig("fleet", "devices")
+  serialized = JSON.generate(result)
+  assert.call(result["schema_version"] == "soul.noctalia.status.v2", "schema differs")
+  assert.call(result.dig("core", "label") == "Daily Core", "Core projection differs")
+  assert.call(devices.map { |device| device["id"] } == %w[node_alpha node_beta], "SSH filtering differs")
+  assert.call(devices.first["summary_rows"].any? { |row| row == {"label" => "Hostname", "value" => "node-alpha"} }, "generic summary is missing")
+  assert.call(devices.first["detail_rows"].any? { |row| row["label"] == "Updates" && row["value"].include?("APT 0") }, "generic details are missing")
+  assert.call(devices.all? { |device| device["actions"] == [{"id" => "connect", "label" => "Connect", "kind" => "terminal", "enabled" => true}] }, "connect action differs")
+  assert.call(!serialized.include?("node-alpha-interactive") && !serialized.include?("node-beta-interactive"), "private SSH target leaked into status")
+  assert.call(!serialized.include?("ssh_target"), "legacy target field leaked into status")
+  assert.call(registry.ssh_argv("node_alpha") == ["/usr/bin/ssh", "node-alpha-interactive"], "private override was not resolved")
+  assert.call(registry.ssh_argv("node_beta") == ["/usr/bin/ssh", "node-beta-interactive"], "enrolled override was not resolved")
+  assert.call(!registry.connectable?("speaker"), "status-only device became connectable")
+  assert.call(!registry.connectable?("../forge"), "unsafe device id was accepted")
+  begin
+    registry.ssh_argv("missing")
+    raise "unknown device was accepted"
+  rescue ArgumentError
+    checks += 1
+  end
+
+  fleet.value["data"]["devices"][0]["reachable"] = false
+  fleet.value["data"]["devices"][0]["status"] = "offline"
+  degraded = SoulCore::NoctaliaStatusService.new(
+    root:, clock: -> { Time.utc(2026, 7, 30, 12, 1, 0) },
+    core_service: core, fleet_service: fleet, voice_presence_service: voice,
+    device_registry: registry
+  ).status
+  assert.call(degraded.dig("soul", "health") == "degraded", "offline device did not degrade health")
+end
+
+puts JSON.pretty_generate(
+  "lifecycle_state" => "complete",
+  "deterministic_tests" => checks,
+  "schema_version" => SoulCore::NoctaliaStatusService::SCHEMA_VERSION,
+  "resolved_targets_exposed" => false
+)
