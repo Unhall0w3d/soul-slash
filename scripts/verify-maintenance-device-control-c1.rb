@@ -29,7 +29,21 @@ class C1FleetStub
   end
 
   def snapshot
-    {"ok" => true, "lifecycle_state" => "complete", "mutation" => "none", "data" => {"schema_version" => "soul.maintenance.fleet_status.v1", "devices" => []}}
+    {
+      "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
+      "data" => {
+        "schema_version" => "soul.maintenance.fleet_status.v1",
+        "devices" => [{
+          "id" => "managed_foundry_fixture",
+          "control" => "maintenance",
+          "facts" => {
+            "control_target_id" => "foundry",
+            "mutation_supported" => true,
+            "status_adapter" => "proxmox_fixed_maintenance"
+          }
+        }]
+      }
+    }
   end
 end
 
@@ -47,7 +61,7 @@ class C1Runner
   def run(*command, **options)
     argv = command.flatten.map(&:to_s)
     @calls << {"argv" => argv, "options" => options}
-    remote = argv.drop_while { |part| !%w[proxmox-maintenance pihole-maintenance].include?(part) }.drop(1)
+    remote = argv.drop_while { |part| !%w[proxmox-maintenance pihole-maintenance foundry].include?(part) }.drop(1)
     if remote == ["/usr/bin/cat", "/proc/sys/kernel/random/boot_id"]
       @boot_reads += 1
       return ok(@boot_reads == 1 || !@reconnect ? "boot-old\n" : "boot-new\n")
@@ -59,6 +73,7 @@ class C1Runner
     end
     return ok("status: running\n") if remote == ["/usr/sbin/pct", "status", "100"]
     return ok("active\nactive\n") if remote == ["/usr/bin/systemctl", "is-active", "pihole-FTL", "unbound"]
+    return ok("active\nactive\nactive\n") if remote == ["/usr/bin/systemctl", "is-active", "pveproxy", "pvedaemon", "pvestatd"]
     return ok("Core version is v6.4.3\nWeb version is v6.6\nFTL version is v6.7\n") if remote == ["/usr/local/bin/pihole", "-v"]
     return ok("FTL is listening on port 53\nPi-hole blocking is enabled\n") if remote == ["/usr/local/bin/pihole", "status"]
     ok("")
@@ -112,6 +127,98 @@ Dir.mktmpdir("soul-device-control-") do |root|
   end
   check.call("remote service cannot target the local workstation, its legacy alias, or a request-supplied host",
              rejected_workstation_ids)
+  foundry_disabled = disabled.preview(device_id: "foundry", action: "maintenance")
+  check.call("Foundry is unavailable to the controller until its separate authority switch is enabled",
+             foundry_disabled["lifecycle_state"] == "awaiting_input")
+
+  foundry_runner = C1Runner.new
+  foundry_fleet = C1FleetStub.new
+  foundry = SoulCore::MaintenanceDeviceControlService.new(
+    root: File.join(root, "foundry"), fleet_status_service: foundry_fleet, runner: foundry_runner,
+    clock: -> { Time.utc(2026, 7, 27, 22, 1, 0) }, sleeper: ->(_seconds) {}, live_execution_enabled: true,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry",
+      "SOUL_FLEET_FOUNDRY_ADDRESS" => "192.0.2.7",
+      "SOUL_FLEET_FOUNDRY_LABEL" => "Foundry"
+    },
+    id_generator: -> { "foundryfixture" }
+  )
+  foundry_preview = foundry.preview(device_id: "foundry", action: "maintenance")
+  foundry_plan = foundry_preview.dig("data", "plan")
+  check.call("Foundry preview binds the configured literal alias to two fixed APT vectors",
+             foundry_preview["lifecycle_state"] == "complete" &&
+               foundry_plan["ssh_alias"] == "foundry" &&
+               foundry_plan["address"] == "192.0.2.7" &&
+               foundry_plan["device_label"] == "Foundry" &&
+               foundry_plan["commands"].map { |entry| entry["argv"] } ==
+                 SoulCore::MaintenanceDeviceControlService::FOUNDRY_MAINTENANCE &&
+               foundry_plan["confirmation"] == "MAINTAIN_FOUNDRY")
+  foundry_wrong = foundry.execute(
+    device_id: "foundry", action: "maintenance",
+    confirmation: "MAINTAIN_FORGE",
+    expected_digest: foundry_preview.dig("data", "expected_digest")
+  )
+  check.call("Foundry rejects a different device confirmation before running SSH",
+             foundry_wrong["lifecycle_state"] == "blocked_for_human_review" && foundry_runner.calls.empty?)
+  foundry_done = foundry.execute(
+    device_id: "foundry", action: "maintenance",
+    confirmation: foundry_preview.dig("data", "confirmation"),
+    expected_digest: foundry_preview.dig("data", "expected_digest")
+  )
+  check.call("Foundry maintenance executes only its two fixed shell-free commands",
+             foundry_done["lifecycle_state"] == "complete" &&
+               foundry_runner.calls.length == 2 &&
+               foundry_runner.calls.all? { |call| call["argv"].include?("foundry") } &&
+               foundry_runner.calls.none? { |call| call["argv"].any? { |part| %w[sh bash zsh -c].include?(part) } })
+
+  foundry_reboot_runner = C1Runner.new(reconnect: true)
+  foundry_reboot = SoulCore::MaintenanceDeviceControlService.new(
+    root: File.join(root, "foundry-reboot"), fleet_status_service: C1FleetStub.new, runner: foundry_reboot_runner,
+    clock: -> { Time.utc(2026, 7, 27, 22, 1, 30) }, sleeper: ->(_seconds) {}, live_execution_enabled: true,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry"
+    },
+    id_generator: -> { "foundryrebootfixture" }
+  )
+  foundry_reboot_preview = foundry_reboot.preview(device_id: "foundry", action: "reboot")
+  foundry_reboot_result = foundry_reboot.execute(
+    device_id: "foundry", action: "reboot",
+    confirmation: foundry_reboot_preview.dig("data", "confirmation"),
+    expected_digest: foundry_reboot_preview.dig("data", "expected_digest")
+  )
+  foundry_reboot_requests = foundry_reboot_runner.calls.count { |call| call["argv"].last(2) == ["/usr/bin/systemctl", "reboot"] }
+  check.call("Foundry reboot sends one request and requires a new boot identity plus fixed PVE readiness",
+             foundry_reboot_preview.dig("data", "plan", "impact").join.include?("All Foundry guests") &&
+               foundry_reboot_preview.dig("data", "plan", "readiness").length == 2 &&
+               foundry_reboot_requests == 1 &&
+               foundry_reboot_result["lifecycle_state"] == "complete")
+
+  invalid_foundry = SoulCore::MaintenanceDeviceControlService.new(
+    root: File.join(root, "invalid-foundry"), fleet_status_service: C1FleetStub.new, runner: C1Runner.new,
+    live_execution_enabled: true,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry; reboot"
+    }
+  )
+  check.call("Foundry rejects non-literal SSH aliases",
+             invalid_foundry.preview(device_id: "foundry", action: "reboot")["lifecycle_state"] == "awaiting_input")
+  unenrolled_fleet = C1FleetStub.new
+  def unenrolled_fleet.snapshot
+    {"ok" => true, "lifecycle_state" => "complete", "mutation" => "none", "data" => {"devices" => []}}
+  end
+  unenrolled_foundry = SoulCore::MaintenanceDeviceControlService.new(
+    root: File.join(root, "unenrolled-foundry"), fleet_status_service: unenrolled_fleet, runner: C1Runner.new,
+    live_execution_enabled: true,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry"
+    }
+  )
+  check.call("Foundry environment enablement cannot bypass missing enrolled control evidence",
+             unenrolled_foundry.preview(device_id: "foundry", action: "maintenance")["lifecycle_state"] == "awaiting_input")
 
   lock_clock = Time.utc(2026, 7, 27, 22, 2, 0)
   lock_case = lambda do |name, process_alive:|

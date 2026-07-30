@@ -24,6 +24,23 @@ module SoulCore
     MAX_LOCK_BYTES = 4096
     CRUCIBLE_HELPER_PATH = "/usr/local/libexec/soul-crucible-maintenance"
     CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
+    SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
+    FOUNDRY_MAINTENANCE = [
+      ["/usr/bin/apt-get", "update"],
+      ["/usr/bin/apt-get", "-y", "-o", "Dpkg::Options::=--force-confold", "dist-upgrade"]
+    ].freeze
+    FOUNDRY_REBOOT_READINESS = [
+      {
+        "label" => "Proxmox VE management",
+        "argv" => ["/usr/bin/pveversion"],
+        "stdout_includes" => ["pve-manager/"]
+      },
+      {
+        "label" => "Proxmox VE management services",
+        "argv" => ["/usr/bin/systemctl", "is-active", "pveproxy", "pvedaemon", "pvestatd"],
+        "stdout_includes" => ["active\nactive\nactive"]
+      }
+    ].freeze
 
     TARGETS = {
       "forge" => {
@@ -531,7 +548,39 @@ module SoulCore
     end
 
     def target!(device_id)
+      return foundry_target! if device_id.to_s == "foundry"
+
       TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
+    end
+
+    def foundry_target!
+      raise ArgumentError, "Foundry control is not enabled" unless truthy?(@process_env["SOUL_FLEET_FOUNDRY_CONTROL_ENABLED"])
+
+      ssh_alias = @process_env.fetch("SOUL_FLEET_FOUNDRY_SSH_ALIAS", "foundry").to_s.strip
+      raise ArgumentError, "Foundry SSH alias is invalid" unless ssh_alias.match?(SSH_ALIAS_PATTERN)
+      raise ArgumentError, "Foundry enrolled control evidence is unavailable; refresh fleet status" unless foundry_control_evidence?
+
+      {
+        "label" => "Foundry",
+        "ssh_alias" => ssh_alias,
+        "impact" => ["All Foundry guests are interrupted while Foundry reboots"],
+        "maintenance" => FOUNDRY_MAINTENANCE,
+        "reboot_readiness" => FOUNDRY_REBOOT_READINESS
+      }
+    end
+
+    def foundry_control_evidence?
+      snapshot = @fleet_status_service.snapshot
+      return false unless snapshot["ok"] == true && snapshot["lifecycle_state"] == "complete"
+
+      Array(snapshot.dig("data", "devices")).any? do |device|
+        device["control"] == "maintenance" &&
+          device.dig("facts", "control_target_id") == "foundry" &&
+          device.dig("facts", "mutation_supported") == true &&
+          device.dig("facts", "status_adapter") == "proxmox_fixed_maintenance"
+      end
+    rescue StandardError
+      false
     end
 
     def target_display_address(device_id)
@@ -539,6 +588,7 @@ module SoulCore
                       when "forge" then ["SOUL_FLEET_FORGE_ADDRESS", "proxmox-maintenance"]
                       when "pihole" then ["SOUL_FLEET_PIHOLE_ADDRESS", "pihole-maintenance"]
                       when "crucible" then ["SOUL_FLEET_CRUCIBLE_ADDRESS", "crucible-maintenance"]
+                      when "foundry" then ["SOUL_FLEET_FOUNDRY_ADDRESS", "foundry"]
                       else raise ArgumentError, "device is not available for remote maintenance"
                       end
       value = @process_env[key].to_s.strip
@@ -550,6 +600,7 @@ module SoulCore
             when "pihole" then "SOUL_FLEET_PIHOLE_LABEL"
             when "crucible" then "SOUL_FLEET_CRUCIBLE_LABEL"
             when "forge" then nil
+            when "foundry" then "SOUL_FLEET_FOUNDRY_LABEL"
             else raise ArgumentError, "device is not available for remote maintenance"
             end
       value = key && @process_env[key].to_s.strip
@@ -560,6 +611,10 @@ module SoulCore
       value = action.to_s
       raise ArgumentError, "device action must be maintenance or reboot" unless %w[maintenance reboot].include?(value)
       value
+    end
+
+    def truthy?(value)
+      %w[1 true yes on].include?(value.to_s.strip.downcase)
     end
 
     def digest(value)

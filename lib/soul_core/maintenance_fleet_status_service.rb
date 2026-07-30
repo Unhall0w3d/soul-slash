@@ -27,6 +27,7 @@ module SoulCore
     MAX_ROUTE_BYTES = 64 * 1024
     REGISTRY_SCHEMA = "soul.maintenance.fleet_registry.v1"
     MAX_ENROLLED_DEVICES = 64
+    SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
     WORKSTATION_ID = "workstation"
     LEGACY_WORKSTATION_ID = "maven"
     SUPPORTED_PACKAGE_MANAGERS = %w[pacman yay paru apt apt-get dnf zypper apk flatpak snap nix].freeze
@@ -608,19 +609,22 @@ module SoulCore
           "uptime_seconds" => integer(guest["uptime"])
         }
       end
+      foundry_control = foundry_control_authorized?(record)
       enriched_facts = facts.merge(
         "platform" => "proxmox",
         "management_channel" => "ssh_inventory",
-        "control_capability" => "inventory_only",
-        "mutation_supported" => false,
-        "status_adapter" => "proxmox_read_only",
+        "control_target_id" => foundry_control ? "foundry" : nil,
+        "control_capability" => foundry_control ? "fixed_maintenance" : "inventory_only",
+        "maintenance_authority" => foundry_control ? "reviewed_root_ssh_fixed_operations" : "unavailable",
+        "mutation_supported" => foundry_control,
+        "status_adapter" => foundry_control ? "proxmox_fixed_maintenance" : "proxmox_read_only",
         "package_managers" => package_managers,
         "guests" => guests
       )
       device(
         id: record.fetch("id"),
         label: record.fetch("label"),
-        role: "Proxmox VE hypervisor · inventory only",
+        role: foundry_control ? "Proxmox VE hypervisor" : "Proxmox VE hypervisor · inventory only",
         address: record.fetch("address"),
         reachable: true,
         os: "Proxmox VE on Debian",
@@ -633,8 +637,15 @@ module SoulCore
         },
         services: [{"id" => "ssh_inventory", "label" => "SSH inventory", "state" => "active"}],
         facts: enriched_facts,
-        control: "inventory_only"
+        control: foundry_control ? "maintenance" : "inventory_only"
       )
+    end
+
+    def foundry_control_authorized?(record)
+      return false unless %w[1 true yes on].include?(@process_env["SOUL_FLEET_FOUNDRY_CONTROL_ENABLED"].to_s.strip.downcase)
+
+      configured_alias = @process_env.fetch("SOUL_FLEET_FOUNDRY_SSH_ALIAS", "foundry").to_s.strip
+      configured_alias.match?(SSH_ALIAS_PATTERN) && record["ssh_alias"].to_s == configured_alias
     end
 
     def collect_fedora_inventory_device(record, facts, package_managers)

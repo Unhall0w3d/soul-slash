@@ -384,6 +384,40 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                foundry.dig("facts", "status_adapter") == "proxmox_read_only" &&
                foundry.dig("facts", "mutation_supported") == false &&
                foundry.dig("facts", "guests", 0, "type") == "qemu")
+  controlled_foundry = SoulCore::MaintenanceFleetStatusService.new(
+    runner: FleetFakeRunner.new,
+    clock: -> { Time.utc(2026, 7, 27, 21, 6, 5) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "atelier" },
+    root: private_root,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "foundry"
+    }
+  ).collect.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
+  check.call("explicit Foundry authority promotes only the exactly matching enrolled PVE alias",
+             controlled_foundry["control"] == "maintenance" &&
+               controlled_foundry["role"] == "Proxmox VE hypervisor" &&
+               controlled_foundry.dig("facts", "control_target_id") == "foundry" &&
+               controlled_foundry.dig("facts", "control_capability") == "fixed_maintenance" &&
+               controlled_foundry.dig("facts", "status_adapter") == "proxmox_fixed_maintenance" &&
+               controlled_foundry.dig("facts", "mutation_supported") == true)
+  mismatched_foundry = SoulCore::MaintenanceFleetStatusService.new(
+    runner: FleetFakeRunner.new,
+    clock: -> { Time.utc(2026, 7, 27, 21, 6, 10) },
+    ssh_config: File.join(root, "ssh_config"),
+    os_release_path: os_release,
+    hostname_reader: -> { "atelier" },
+    root: private_root,
+    process_env: {
+      "SOUL_FLEET_FOUNDRY_CONTROL_ENABLED" => "true",
+      "SOUL_FLEET_FOUNDRY_SSH_ALIAS" => "different-reviewed-alias"
+    }
+  ).collect.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
+  check.call("platform recognition and a mismatched alias never grant Foundry mutation authority",
+             mismatched_foundry["control"] == "inventory_only" &&
+               mismatched_foundry.dig("facts", "mutation_supported") == false)
   calls_before_foundry_refresh = refresh_runner.calls.length
   foundry_refresh = refresh_service.refresh(device_id: "managed_1111111111111111")
   refreshed_foundry = foundry_refresh.dig("data", "devices").find { |device| device["id"] == "managed_1111111111111111" }
