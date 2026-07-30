@@ -112,7 +112,7 @@ http_source = File.read(File.expand_path("../lib/soul_core/dashboard_http_applic
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
-check.call("dashboard concurrency is capped with bounded burst absorption and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 48") && server_source.include?("REQUEST_SLOT_WAIT_SECONDS = 2.0") && server_source.include?("@request_available.wait") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
+check.call("dashboard concurrency is capped with bounded burst absorption and joined", server_source.include?("MAX_CONCURRENT_REQUESTS = 64") && server_source.include?("REQUEST_SLOT_WAIT_SECONDS = 2.0") && server_source.include?("@request_available.wait") && server_source.include?("close_and_join_requests") && server_source.include?("429"))
 check.call("music stream and authenticated audio routes are explicit", http_source.include?("/api/v1/music-stream") && http_source.include?("/api/v1/music/audio/"))
 check.call("Music Studio exposes preview progress cancel playback and review", %w[music-panel preview-music-generation music-progress cancel-music-generation music-candidates].all? { |id| html.include?(id) } && js.include?("music.candidates.review"))
 check.call("initial and revision generation share one live status treatment", html.include?("class=\"generation-progress\"") && css.include?(".generation-progress") && js.include?("createGenerationProgress") && js.include?("showGenerationProgress(progress, event)"))

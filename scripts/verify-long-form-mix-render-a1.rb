@@ -318,6 +318,8 @@ Dir.mktmpdir("soul-long-form-mix-a1-") do |root|
   check.call("dashboard UI includes mix listening route text", File.read(File.expand_path("../assets/dashboard/index.html", __dir__)).include?("Listening renders remain review evidence"))
   check.call("dashboard JS wires mix render operations", File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__)).include?("mix.render.status"))
   check.call("dashboard JS invokes mix/audio URLs", File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__)).include?("/api/v1/mix/audio/"))
+  check.call("inactive mix audio does not reserve a request slot", File.read(File.expand_path("../assets/dashboard/index.html", __dir__)).include?('id="mix-render-audio" controls preload="none"'))
+  check.call("plain-text overload degrades without JSON parse leakage", File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__)).include?("Dashboard is busy serving active media"))
 
   facade_fixture = RenderFacadeFixture.new
   facade = SoulCore::ApplicationFacade.new(root: root, long_form_mix_render_service: facade_fixture)

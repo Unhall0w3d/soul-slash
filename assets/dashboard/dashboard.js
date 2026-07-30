@@ -207,9 +207,17 @@ async function callSoul(operation, parameters = {}, context = {}, requestOptions
     signal: requestOptions.signal,
     cache: "no-store"
   });
-  const envelope = await response.json();
+  const responseText = await response.text();
+  let envelope = {};
+  try {
+    envelope = responseText ? JSON.parse(responseText) : {};
+  } catch (_error) {
+    if (response.status === 429) throw new Error("Dashboard is busy serving active media. Wait a moment, then try again.");
+    throw new Error(response.ok ? "Dashboard returned an invalid response" : `Dashboard transport failed (${response.status})`);
+  }
   if (response.status === 401 || envelope.error?.code === "password_change_required") { window.location.reload(); throw new Error("Dashboard session expired"); }
   if (response.status === 403 && envelope.error?.code === "csrf") { window.location.reload(); throw new Error("Dashboard security token refreshed"); }
+  if (response.status === 429) throw new Error(envelope.error?.reason || "Dashboard is busy serving active media. Wait a moment, then try again.");
   if (!response.ok) throw new Error(envelope.error?.reason || "Dashboard transport failed");
   return envelope;
 }

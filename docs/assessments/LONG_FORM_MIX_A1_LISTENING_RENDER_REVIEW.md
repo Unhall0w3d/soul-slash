@@ -83,6 +83,10 @@ exports.
 - All manifest checks passed.
 - No silence was detected around either transition window at the bounded
   threshold used for inspection.
+- Live review exposed a plain-text `429` during handoff preview. The inactive
+  mix player now uses `preload="none"`, overload responses are presented as a
+  readable retry message instead of a JSON parser exception, and the still
+  bounded request ceiling is 64 with a two-second slot wait.
 
 ## Local LLM eval results
 

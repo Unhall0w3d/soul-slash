@@ -17,7 +17,7 @@ module SoulCore
     # API, asset, and foreground render-stream traffic. Keep a hard ceiling while
     # allowing the Studios to expose reviewed media without starving an Operator
     # action or its terminal render result.
-    MAX_CONCURRENT_REQUESTS = 48
+    MAX_CONCURRENT_REQUESTS = 64
     REQUEST_SLOT_WAIT_SECONDS = 2.0
 
     STATUS_TEXT = {
@@ -260,7 +260,8 @@ module SoulCore
 
     def write_plain_error(client, status, message)
       body = "#{message}\n"
-      client.write("HTTP/1.1 #{status} #{STATUS_TEXT.fetch(status)}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: #{body.bytesize}\r\nConnection: close\r\n\r\n#{body}")
+      retry_header = status == 429 ? "Retry-After: 2\r\n" : ""
+      client.write("HTTP/1.1 #{status} #{STATUS_TEXT.fetch(status)}\r\n#{retry_header}Content-Type: text/plain; charset=utf-8\r\nContent-Length: #{body.bytesize}\r\nConnection: close\r\n\r\n#{body}")
     rescue IOError, Errno::EPIPE
       nil
     end
