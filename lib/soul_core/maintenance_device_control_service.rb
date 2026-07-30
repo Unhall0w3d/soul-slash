@@ -26,6 +26,8 @@ module SoulCore
     LIFECYCLE_CONTRACT = "device_scoped_v1"
     CRUCIBLE_HELPER_PATH = "/usr/local/libexec/soul-crucible-maintenance"
     CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
+    NIXOS_HELPER_PATH = "/run/current-system/sw/bin/soul-nixos-maintenance"
+    NIXOS_AUTHORITY_VERSION = "soul-nixos-maintenance-a1-v1"
     SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
     FOUNDRY_MAINTENANCE = [
       ["/usr/bin/apt-get", "update"],
@@ -146,6 +148,38 @@ module SoulCore
             "stdout_includes" => [CRUCIBLE_AUTHORITY_VERSION]
           }
         ]
+      },
+      "temper" => {
+        "label" => "Temper",
+        "maintenance_adapter" => "nixos_flake",
+        "ssh_alias" => "temper",
+        "impact" => [],
+        "maintenance" => [
+          ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "upgrade"]
+        ],
+        "reboot" => [
+          "/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "reboot"
+        ],
+        "boot_identity" => [
+          "/run/current-system/sw/bin/cat", "/proc/sys/kernel/random/boot_id"
+        ],
+        "reboot_readiness" => [
+          {
+            "label" => "SSH and QEMU guest agent",
+            "argv" => ["/run/current-system/sw/bin/systemctl", "is-active", "sshd", "qemu-guest-agent"],
+            "stdout_includes" => ["active\nactive"]
+          },
+          {
+            "label" => "Fixed NixOS authority",
+            "argv" => ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "self-check"],
+            "stdout_includes" => [NIXOS_AUTHORITY_VERSION]
+          },
+          {
+            "label" => "Active and booted NixOS generations",
+            "argv" => ["/run/current-system/sw/bin/sudo", "-n", NIXOS_HELPER_PATH, "generation-match"],
+            "stdout_includes" => ["matched"]
+          }
+        ]
       }
     }.freeze
 
@@ -195,6 +229,11 @@ module SoulCore
         "automatic_retry" => false,
         "fleet_wide" => false
       }
+      if action == "reboot"
+        basis["boot_identity"] = {
+          "argv" => target.fetch("boot_identity", ["/usr/bin/cat", "/proc/sys/kernel/random/boot_id"])
+        }
+      end
       expected_digest = digest(basis)
       confirmation = "#{action == "maintenance" ? "MAINTAIN" : "REBOOT"}_#{device_id.upcase}"
       outcome("complete", true, "Device-scoped #{action} preview ready", {
@@ -286,7 +325,8 @@ module SoulCore
     def reboot(plan, progress)
       started = @clock.call
       evidence = []
-      before = remote_run(plan.fetch("ssh_alias"), "/usr/bin/cat", "/proc/sys/kernel/random/boot_id")
+      boot_identity = plan.fetch("boot_identity").fetch("argv")
+      before = remote_run(plan.fetch("ssh_alias"), *boot_identity)
       evidence << command_evidence("reboot.boot_id_before", before)
       return receipt(plan, started, "failed", "Target boot identity could not be collected.", evidence) unless before.status == "ok"
 
@@ -304,7 +344,7 @@ module SoulCore
       new_boot_seen = false
       RECONNECT_ATTEMPTS.times do |attempt|
         progress&.call({"stage" => "reconnecting", "message" => "Reconnect check #{attempt + 1} of #{RECONNECT_ATTEMPTS} for #{plan.fetch('device_label')}."})
-        current = remote_run(plan.fetch("ssh_alias"), "/usr/bin/cat", "/proc/sys/kernel/random/boot_id", timeout: 7)
+        current = remote_run(plan.fetch("ssh_alias"), *boot_identity, timeout: 7)
         evidence << command_evidence("reboot.reconnect.#{attempt + 1}", current)
         if current.status == "ok" && !output(current).empty? && output(current) != output(before)
           new_boot_seen = true
@@ -613,7 +653,37 @@ module SoulCore
     def target!(device_id)
       return foundry_target! if device_id.to_s == "foundry"
 
-      TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
+      target = TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
+      return temper_target!(target) if device_id.to_s == "temper"
+
+      target
+    end
+
+    def temper_target!(target)
+      raise ArgumentError, "Temper control is not enabled" unless truthy?(@process_env["SOUL_FLEET_TEMPER_CONTROL_ENABLED"])
+
+      ssh_alias = @process_env.fetch("SOUL_FLEET_TEMPER_SSH_ALIAS", "temper").to_s.strip
+      raise ArgumentError, "Temper SSH alias is invalid" unless ssh_alias.match?(SSH_ALIAS_PATTERN)
+      raise ArgumentError, "Temper enrolled control evidence is unavailable; refresh fleet status" unless temper_control_evidence?
+
+      target.merge(
+        "label" => target_display_label("temper", target.fetch("label")),
+        "ssh_alias" => ssh_alias
+      )
+    end
+
+    def temper_control_evidence?
+      snapshot = @fleet_status_service.snapshot
+      return false unless snapshot["ok"] == true && snapshot["lifecycle_state"] == "complete"
+
+      Array(snapshot.dig("data", "devices")).any? do |device|
+        device["control"] == "maintenance" &&
+          device.dig("facts", "control_target_id") == "temper" &&
+          device.dig("facts", "mutation_supported") == true &&
+          device.dig("facts", "status_adapter") == "nixos_flake_fixed_maintenance"
+      end
+    rescue StandardError
+      false
     end
 
     def foundry_target!
@@ -653,6 +723,7 @@ module SoulCore
                       when "pihole" then ["SOUL_FLEET_PIHOLE_ADDRESS", "pihole-maintenance"]
                       when "crucible" then ["SOUL_FLEET_CRUCIBLE_ADDRESS", "crucible-maintenance"]
                       when "foundry" then ["SOUL_FLEET_FOUNDRY_ADDRESS", "foundry"]
+                      when "temper" then ["SOUL_FLEET_TEMPER_ADDRESS", "temper"]
                       else raise ArgumentError, "device is not available for remote maintenance"
                       end
       value = @process_env[key].to_s.strip
@@ -665,6 +736,7 @@ module SoulCore
             when "crucible" then "SOUL_FLEET_CRUCIBLE_LABEL"
             when "forge" then nil
             when "foundry" then "SOUL_FLEET_FOUNDRY_LABEL"
+            when "temper" then "SOUL_FLEET_TEMPER_LABEL"
             else raise ArgumentError, "device is not available for remote maintenance"
             end
       value = key && @process_env[key].to_s.strip

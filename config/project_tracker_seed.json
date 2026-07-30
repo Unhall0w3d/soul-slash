@@ -519,6 +519,23 @@
       "source": "Operator-authorized A4 implementation, 2026-07-28"
     },
     {
+      "item_id": "track_nixos_temper_maintenance",
+      "title": "NixOS Temper maintenance laboratory",
+      "area": "Administration + Infrastructure",
+      "horizon": "now",
+      "status": "in_progress",
+      "priority": "high",
+      "summary": "Use one reproducible NixOS VM on Foundry to prove declarative update, system-generation, and reboot behavior through the same Guided Maintenance lifecycle as the existing fleet.",
+      "implementation": "Temper is a NixOS 26.05 QEMU VM on Foundry with a pinned nixos-26.05 flake, key-only SSH, QEMU guest agent, disabled automatic upgrades/garbage collection, and one declarative root-owned helper. The fleet adapter recognizes immutable NixOS command paths, presents only the native Nix channel, compares the pinned nixpkgs revision with the live stable branch, and treats an active/booted generation mismatch as reboot evidence. Exact authority self-check evidence unlocks the shared device-scoped Maintain and Reboot controls. Upgrade performs one flake-lock update plus nixos-rebuild switch and restores the prior lock on failure; reboot remains separate. Invalid helper operations and broad sudo are rejected.",
+      "technologies": "NixOS 26.05; Nix flakes; nixos-rebuild; QEMU/KVM and QEMU guest agent on Proxmox VE; OpenSSH Ed25519; declarative sudo rules; Ruby fleet discovery, status, and device-control adapters; Dashboard shared maintenance card.",
+      "interfaces": "Administration → Guided Maintenance → enrolled Temper card; native Nix update evidence; exact Maintenance and Reboot previews; Makefile deterministic verifier; public deploy/nixos/temper module and helper.",
+      "commands": "make verify-nixos-maintenance\nmake verify-maintenance-fleet-discovery\nmake verify-maintenance-fleet-status\nmake verify-maintenance-device-control",
+      "references": "docs/soul/NIXOS_TEMPER_MAINTENANCE_A1_BRIEF.md\ndocs/assessments/NIXOS_TEMPER_MAINTENANCE_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndeploy/nixos/temper/soul-maintenance.nix",
+      "acceptance": "Deterministic verification and live VM install, final DHCP reservation, host-key verification, digest-bound SSH alias and fleet enrollment, authority rejection checks, fixed helper self-check, bounded reboot, QEMU agent readiness, and generation-match checks pass. One live card refresh and one human-reviewed maintenance preview remain after merge before validation.",
+      "source": "Operator-approved NixOS maintenance laboratory deployment, 2026-07-30",
+      "notes": "VM 200 is local deployment state and is not stored in the public repository. Private LAN addressing, SSH keys, host-key evidence, fleet registry, and receipts remain local."
+    },
+    {
       "item_id": "track_post_login_application_restoration",
       "title": "Post-login application restoration refinement",
       "area": "Administration",

@@ -599,9 +599,9 @@ module SoulCore
       resolved_address = resolved_ssh_hostname(alias_name)
       raise ArgumentError, "SSH alias must resolve to the selected candidate address" unless resolved_address == address
 
-      hostname = first_ssh_output(alias_name, [%w[/usr/bin/hostname], %w[/bin/hostname]])
-      kernel = first_ssh_output(alias_name, [%w[/usr/bin/uname -r], %w[/bin/uname -r]])
-      os_release = first_ssh_output(alias_name, [%w[/usr/bin/cat /etc/os-release], %w[/bin/cat /etc/os-release]])
+      hostname = first_ssh_output(alias_name, [%w[/usr/bin/hostname], %w[/bin/hostname], %w[/run/current-system/sw/bin/hostname]])
+      kernel = first_ssh_output(alias_name, [%w[/usr/bin/uname -r], %w[/bin/uname -r], %w[/run/current-system/sw/bin/uname -r]])
+      os_release = first_ssh_output(alias_name, [%w[/usr/bin/cat /etc/os-release], %w[/bin/cat /etc/os-release], %w[/run/current-system/sw/bin/cat /etc/os-release]])
       raise ArgumentError, "SSH fingerprint could not collect fixed hostname, kernel, and OS evidence" if hostname.empty? || kernel.empty? || os_release.empty?
 
       values = parse_os_release(os_release)
@@ -652,7 +652,7 @@ module SoulCore
     end
 
     def remote_test_path(alias_name)
-      %w[/usr/bin/test /bin/test].find { |path| ssh_success?(alias_name, path, "-x", path) }.to_s
+      %w[/usr/bin/test /bin/test /run/current-system/sw/bin/test].find { |path| ssh_success?(alias_name, path, "-x", path) }.to_s
     end
 
     def ssh_success?(alias_name, *argv)

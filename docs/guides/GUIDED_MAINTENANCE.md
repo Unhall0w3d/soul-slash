@@ -199,6 +199,49 @@ Every action still requires a fresh Dashboard preview and its exact
 device-specific gate; there is no guest mutation, automatic reboot, or retry.
 See `docs/soul/FOUNDRY_PROXMOX_CONTROL_A6_BRIEF.md`.
 
+### NixOS laboratory target
+
+Temper is the reproducible NixOS maintenance laboratory on Foundry. It is a
+full VM rather than a container so system generations, kernel activation,
+guest-agent readiness, and reboot semantics are exercised honestly. Its
+public deployment material lives in `deploy/nixos/temper/`; private addresses,
+SSH keys, host keys, and fleet records remain local.
+
+The deployment module installs one immutable
+`soul-nixos-maintenance` helper and grants the dedicated
+`soul-maintenance` account passwordless access to exactly four complete
+helper invocations:
+
+- `self-check`;
+- `generation-match`;
+- `upgrade`; and
+- `reboot`.
+
+`upgrade` updates `/etc/nixos/flake.lock` and performs one
+`nixos-rebuild switch --flake /etc/nixos#temper`. If the update or rebuild
+fails, the reviewed lock file is restored before the operation terminates.
+NixOS still retains its prior system generations for ordinary rollback.
+There is no arbitrary command forwarding, unattended timer, automatic
+garbage collection, automatic upgrade, or automatic reboot.
+
+After enrolling the exact literal `temper` SSH alias, local deployment may
+enable the adapter with ignored environment settings:
+
+```text
+SOUL_FLEET_TEMPER_CONTROL_ENABLED=true
+SOUL_FLEET_TEMPER_SSH_ALIAS=temper
+SOUL_FLEET_TEMPER_ADDRESS=192.168.1.80
+SOUL_FLEET_TEMPER_LABEL=Temper
+```
+
+The card compares the pinned `nixpkgs` revision with the live
+`nixos-26.05` branch and reports one native **Nix** source update when they
+differ. This is intentionally not a fabricated package count: NixOS applies
+one declarative system generation. A reboot is recommended only when
+`/run/current-system` differs from `/run/booted-system`. Exact authority
+self-check evidence is required before Maintain or Reboot becomes available.
+See `docs/soul/NIXOS_TEMPER_MAINTENANCE_A1_BRIEF.md`.
+
 An unsubscribed, non-production Proxmox VE node must use Proxmox's
 `pve-no-subscription` repository rather than the authenticated enterprise PVE
 or Ceph repositories. For Proxmox VE 9 on Debian 13, the reviewed deb822 source
@@ -284,7 +327,7 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one mutable workstation, Forge, Pi-hole, qualified Crucible, or qualified Foundry card
+choose exactly one mutable workstation, Forge, Pi-hole, qualified Crucible, qualified Foundry, or qualified Temper card
 → choose Maintenance or Reboot
 → inspect the exact device, platform adapter, commands, confirmation, and dependency impact
 → authorize only that digest
@@ -303,7 +346,8 @@ and impact evidence:
 - `arch_pacman` for the configured workstation;
 - `proxmox_apt` for Forge and qualified Foundry nodes;
 - `debian_apt_pihole` for the Pi-hole appliance; and
-- `fedora_dnf5` for qualified Crucible hosts.
+- `fedora_dnf5` for qualified Crucible hosts; and
+- `nixos_flake` for qualified Temper hosts.
 
 Adapter recognition never grants authority. Enrollment and monitoring remain
 read-only until the adapter's separately reviewed mutation prerequisites are
@@ -326,6 +370,11 @@ or `reboot` operation. The Fedora update never requests a reboot. Crucible
 reboot readiness additionally requires SSH, the QEMU guest agent, DNF5,
 `/srv/soul-backup`, and the helper self-check. See
 [`CRUCIBLE_FEDORA.md`](CRUCIBLE_FEDORA.md).
+
+Temper likewise remains inventory-only until its declarative authority
+self-check succeeds. Its update is one fixed flake-and-switch transaction.
+Reboot readiness requires SSH, the QEMU guest agent, the exact helper
+self-check, and matching active/booted generations.
 
 Remote maintenance never reboots automatically. A remote reboot records the
 old boot identity, sends one reboot request, holds off, performs bounded
