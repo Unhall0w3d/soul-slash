@@ -531,7 +531,7 @@
       "interfaces": "Administration → Guided Maintenance → enrolled Temper card; native Nix update evidence; exact Maintenance and Reboot previews; Makefile deterministic verifier; public deploy/nixos/temper module and helper.",
       "commands": "make verify-nixos-maintenance\nmake verify-maintenance-fleet-discovery\nmake verify-maintenance-fleet-status\nmake verify-maintenance-device-control",
       "references": "docs/soul/NIXOS_TEMPER_MAINTENANCE_A1_BRIEF.md\ndocs/assessments/NIXOS_TEMPER_MAINTENANCE_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndeploy/nixos/temper/soul-maintenance.nix",
-      "acceptance": "Deterministic verification and live VM install, host-key verification, authority rejection checks, fixed helper self-check, bounded reboot, QEMU agent readiness, and generation-match checks pass. Final stable DHCP reservation, Dashboard enrollment, one live card refresh, and one human-reviewed maintenance preview remain before validation.",
+      "acceptance": "Deterministic verification and live VM install, final DHCP reservation, host-key verification, digest-bound SSH alias and fleet enrollment, authority rejection checks, fixed helper self-check, bounded reboot, QEMU agent readiness, and generation-match checks pass. One live card refresh and one human-reviewed maintenance preview remain after merge before validation.",
       "source": "Operator-approved NixOS maintenance laboratory deployment, 2026-07-30",
       "notes": "VM 200 is local deployment state and is not stored in the public repository. Private LAN addressing, SSH keys, host-key evidence, fleet registry, and receipts remain local."
     },

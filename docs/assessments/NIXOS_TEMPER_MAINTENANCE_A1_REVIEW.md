@@ -44,6 +44,9 @@ make verify-maintenance-device-control
 - Fixed helper self-check succeeds.
 - A bounded helper reboot returned with matching current and booted
   generations.
+- The reviewed MAC acquired its reserved final address, its SSH fingerprint
+  remained unchanged, and the ordinary digest-bound alias and fleet-enrollment
+  gates created the owner-private Temper record.
 
 ## Local LLM eval
 
@@ -54,8 +57,8 @@ operation routing; model output cannot validate its safety.
 
 - The native update count represents whether the pinned NixOS source revision
   differs, not a package-by-package count.
-- A stable LAN reservation and final Dashboard enrollment are local deployment
-  steps and are not committed.
+- The final LAN reservation, SSH alias, and enrolled record are intentionally
+  owner-private local deployment state and are not committed.
 - Rollback remains an explicit operator action using retained NixOS
   generations; it is not exposed in A1.
 
