@@ -25,10 +25,12 @@ module SoulCore
     ).freeze
     CALLBACK_TIMEOUT = 180
     MAX_CREDENTIAL_BYTES = 64 * 1024
+    MAX_DISCOVERY_FILES = 64
+    CLIENT_FILENAME_PATTERN = /\Aclient_secret_[A-Za-z0-9._-]+\.apps\.googleusercontent\.com\.json\z/
 
     class CredentialError < StandardError; end
 
-    def initialize(root: Dir.pwd, api: YouTubeApiClient.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, random: SecureRandom, callback_timeout: CALLBACK_TIMEOUT, scopes: SCOPES, credential_name: "oauth.json", confirmation: CONFIRMATION, operation: "authorize_youtube")
+    def initialize(root: Dir.pwd, api: YouTubeApiClient.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, random: SecureRandom, callback_timeout: CALLBACK_TIMEOUT, scopes: SCOPES, credential_name: "oauth.json", confirmation: CONFIRMATION, operation: "authorize_youtube", discovery_directories: nil)
       @root = File.expand_path(root)
       @api = api
       @runner = runner
@@ -39,6 +41,7 @@ module SoulCore
       @credential_name = credential_name.to_s
       @confirmation = confirmation.to_s
       @operation = operation.to_s
+      @discovery_directories = Array(discovery_directories || [File.join(Dir.home, "Downloads")]).map { |path| operator_path(path) }.uniq.freeze
       raise ArgumentError, "OAuth scopes are required" if @scopes.empty? || @scopes.any?(&:empty?)
       raise ArgumentError, "OAuth scopes include an unapproved value" unless (@scopes - ALLOWED_SCOPES).empty?
       raise ArgumentError, "OAuth credential name is invalid" unless @credential_name.match?(/\A[a-z0-9][a-z0-9._-]*\.json\z/)
@@ -159,11 +162,40 @@ module SoulCore
         "configured" => false,
         "project_id" => PROJECT_ID,
         "expected_channel_id" => EXPECTED_CHANNEL_ID,
-        "credential_path" => credential_path
+        "credential_path" => credential_path,
+        "client_candidates" => discover_client_candidates
       })
     end
 
     private
+
+    def discover_client_candidates
+      remaining = MAX_DISCOVERY_FILES
+      @discovery_directories.each_with_object([]) do |directory, candidates|
+        next unless remaining.positive? && File.directory?(directory) && !File.symlink?(directory)
+
+        entries = Dir.children(directory).sort.first(remaining)
+        remaining -= entries.length
+        entries.each do |name|
+          next unless name.match?(CLIENT_FILENAME_PATTERN)
+
+          path = File.join(directory, name)
+          begin
+            client = read_client(path)
+            candidates << {
+              "path" => path,
+              "filename" => name,
+              "project_id" => client.fetch("project_id"),
+              "application_type" => "desktop"
+            }
+          rescue CredentialError, Errno::ENOENT, Errno::EACCES
+            next
+          end
+        end
+      rescue Errno::ENOENT, Errno::EACCES
+        next
+      end
+    end
 
     def read_client(path)
       raise CredentialError, "OAuth client JSON is required" if path.to_s.empty?

@@ -1401,7 +1401,7 @@ async function renderYouTubeAuthenticatedUpload(identity, container, parentStatu
     const envelope = await callSoul("youtube.oauth.status"); lifecycle(envelope);
     const oauth = dataOf(envelope);
     if (!oauth.configured) {
-      renderYouTubeAuthorization(identity, panel, status, parentStatus);
+      renderYouTubeAuthorization(identity, panel, status, parentStatus, oauth);
       return;
     }
     renderYouTubeUploadGate(identity, panel, status, oauth);
@@ -1410,10 +1410,27 @@ async function renderYouTubeAuthenticatedUpload(identity, container, parentStatu
   }
 }
 
-function renderYouTubeAuthorization(identity, panel, status, parentStatus) {
-  status.textContent = "YouTube authorization is not configured. Select the owner-only Desktop OAuth JSON for soul-slash-local-publisher.";
+function renderYouTubeAuthorization(identity, panel, status, parentStatus, oauth = {}) {
+  const candidates = Array.isArray(oauth.client_candidates) ? oauth.client_candidates : [];
+  status.textContent = candidates.length
+    ? `${candidates.length} validated owner-only Desktop OAuth client${candidates.length === 1 ? "" : "s"} detected for soul-slash-local-publisher.`
+    : "YouTube authorization is not configured. Select the owner-only Desktop OAuth JSON for soul-slash-local-publisher.";
   const label = document.createElement("label"); label.textContent = "Desktop OAuth client JSON path";
   const path = document.createElement("input"); path.type = "text"; path.placeholder = "~/Downloads/client_secret_….json"; path.autocomplete = "off"; path.spellcheck = false; label.append(path);
+  if (candidates.length) {
+    const detectedLabel = document.createElement("label"); detectedLabel.textContent = "Detected valid Desktop OAuth client";
+    const detected = document.createElement("select");
+    candidates.forEach((candidate) => {
+      const option = document.createElement("option");
+      option.value = candidate.path;
+      option.textContent = candidate.filename;
+      detected.append(option);
+    });
+    detected.addEventListener("change", () => { path.value = detected.value; });
+    detectedLabel.append(detected);
+    path.value = detected.value;
+    panel.append(detectedLabel);
+  }
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview YouTube authorization";
   preview.addEventListener("click", async () => {
     preview.disabled = true; status.textContent = "Validating the exact Desktop OAuth client…";

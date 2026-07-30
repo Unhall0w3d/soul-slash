@@ -4,6 +4,7 @@
 require "json"
 require "open3"
 require "tmpdir"
+require "fileutils"
 
 require_relative "../lib/soul_core/application_contract"
 require_relative "../lib/soul_core/application_facade"
@@ -121,6 +122,65 @@ end
 
 failures = []
 
+Dir.mktmpdir("soul-youtube-client-discovery") do |root|
+  downloads = File.join(root, "Downloads")
+  FileUtils.mkdir_p(downloads)
+  client_document = lambda do |project_id: SoulCore::YouTubeOAuthService::PROJECT_ID|
+    {
+      "installed" => {
+        "client_id" => "fixture-client.apps.googleusercontent.com",
+        "client_secret" => "fixture-client-secret-must-not-leak",
+        "auth_uri" => "https://accounts.google.com/o/oauth2/auth",
+        "token_uri" => "https://oauth2.googleapis.com/token",
+        "project_id" => project_id
+      }
+    }
+  end
+  write_client = lambda do |name, document, mode|
+    path = File.join(downloads, name)
+    File.write(path, JSON.generate(document))
+    File.chmod(mode, path)
+    path
+  end
+
+  valid_path = write_client.call(
+    "client_secret_valid.apps.googleusercontent.com.json",
+    client_document.call,
+    0o600
+  )
+  write_client.call(
+    "client_secret_wrong-project.apps.googleusercontent.com.json",
+    client_document.call(project_id: "some-other-project"),
+    0o600
+  )
+  unsafe_path = write_client.call(
+    "client_secret_unsafe.apps.googleusercontent.com.json",
+    client_document.call,
+    0o644
+  )
+  symlink_path = File.join(downloads, "client_secret_symlink.apps.googleusercontent.com.json")
+  File.symlink(valid_path, symlink_path)
+
+  discovery = SoulCore::YouTubeOAuthService.new(
+    root: root,
+    discovery_directories: [downloads]
+  ).status
+  candidates = discovery.dig("data", "client_candidates")
+  serialized = JSON.generate(discovery)
+  check("OAuth status discovers only the exact valid owner-only Desktop client",
+    candidates == [{
+      "path" => valid_path,
+      "filename" => File.basename(valid_path),
+      "project_id" => SoulCore::YouTubeOAuthService::PROJECT_ID,
+      "application_type" => "desktop"
+    }], failures)
+  check("OAuth discovery rejects unsafe permissions and symlinks",
+    candidates.none? { |candidate| [unsafe_path, symlink_path].include?(candidate["path"]) }, failures)
+  check("OAuth discovery returns no client secret or client identifier",
+    !serialized.include?("fixture-client-secret") &&
+      !serialized.include?("fixture-client.apps.googleusercontent.com"), failures)
+end
+
 operations = SoulCore::ApplicationContract::OPERATIONS
 youtube_operations = operations.select { |operation, _| operation.start_with?("youtube.") }
 
@@ -218,6 +278,10 @@ end, failures)
 
 check("YouTube dashboard UI renders OAuth/status/upload after exact package is ready", javascript.include?('if (envelope.lifecycle_state === "complete" && data.package)') && javascript.include?("renderYouTubeAuthenticatedUpload"), failures)
 check("YouTube OAuth status + preview + execute flows are present", javascript.include?('callSoul("youtube.oauth.status"') && javascript.include?('callSoul("youtube.oauth.authorization.preview"') && javascript.include?('callSoul("youtube.oauth.authorization.execute"'), failures)
+check("YouTube OAuth UI prefills a validated detected client while retaining manual entry",
+  javascript.include?("Detected valid Desktop OAuth client") &&
+    javascript.include?("oauth.client_candidates") &&
+    javascript.include?("path.value = detected.value"), failures)
 check("YouTube upload preview + bounded stream execute are present", javascript.include?('callSoul("youtube.upload.preview"') && javascript.include?('callNdjson("/api/v1/music-stream", "youtube.upload.execute"'), failures)
 check("upload visibility gate is explicit with private default and all three choices", javascript.include?('visibility.value = "private"') &&
   javascript.include?('["private","Private · recommended draft"]') &&

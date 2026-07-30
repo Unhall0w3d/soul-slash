@@ -124,7 +124,13 @@ module SoulCore
           chunk = io.read([UPLOAD_CHUNK_BYTES, size - offset].min)
           raise ApiError, "local upload source ended before its recorded size" if chunk.nil? || chunk.empty?
           ending = offset + chunk.bytesize - 1
-          progress&.call("upload_chunk", { "offset" => offset, "ending" => ending, "total" => size })
+          progress&.call({
+            "stage" => "upload_chunk",
+            "message" => "Uploading bytes #{offset + 1}–#{ending + 1} of #{size}.",
+            "offset" => offset,
+            "ending" => ending,
+            "total" => size
+          })
           response, headers = request(
             :put,
             upload_url,
