@@ -648,7 +648,7 @@
     <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>
       <header class="studio-header">
         <div><p class="eyebrow">Continuity administration</p><h1>Backup &amp; Recovery</h1><p>Create verified encrypted snapshots, preserve deletion recovery holds, and stage exact restores without overwriting the live system.</p></div>
-        <div class="studio-boundary"><strong>Manual authority only</strong><span>Inspect → preview → authorize → verify</span><small>No schedule, password retention, automatic pruning, or live-tree replacement.</small></div>
+        <div class="studio-boundary"><strong>Bounded recovery authority</strong><span>Inspect → preview → authorize → verify</span><small>Nightly DRS may be explicitly deployed; pruning and live-tree replacement remain manual.</small></div>
       </header>
       <div class="backup-unlock">
         <label for="backup-password">Repository password <input id="backup-password" type="password" maxlength="1024" autocomplete="off" placeholder="Held only for this page session"></label>
@@ -675,7 +675,7 @@
             <button id="preview-backup-drs" class="gate-button" type="button">Preview DRS transaction</button>
             <div id="backup-drs-confirm" hidden><pre id="backup-drs-scope" class="clear-preview-list"></pre><button id="execute-backup-drs" class="gate-button gate-button--gold" type="button">Create &amp; reconcile</button></div>
             <div id="backup-drs-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing supervised DRS transaction…</span></div>
-            <p id="backup-drs-status" class="dialog-status" role="status">Supervised only · no stored credential, schedule, automatic retry, or pruning.</p>
+            <p id="backup-drs-status" class="dialog-status" role="status">Manual gate remains available. Installed nightly DRS uses one host-encrypted credential, no retry, and no pruning.</p>
           </section>
           <section class="gate-card">
             <div><p class="eyebrow">Owner manifest policy</p><h3>Reconcile backup scope</h3><p>Adds only missing paths from the current portable policy. Existing sources, exclusions, comments, and encrypted history remain untouched.</p></div>

@@ -1,9 +1,11 @@
 # Backup and Recovery
 
 Soul exposes encrypted local recovery under **Administration → Backup &
-Recovery**. Every operation is bounded, foreground, manually initiated, and
-ends in a visible lifecycle state. Soul installs no backup timer, scheduler,
-watcher, daemon, automatic retry, or unattended restore.
+Recovery**. Dashboard mutations are bounded, foreground, manually initiated,
+and end in a visible lifecycle state. An optional separately reviewed
+deployment may invoke the exact accepted DRS transaction nightly through one
+hardened systemd `oneshot`. There is no watcher, resident backup process,
+automatic retry, automatic pruning, remote deletion, or unattended restore.
 
 ## What the dashboard does
 
@@ -160,14 +162,77 @@ the source has been captured.
 7. Keep the page open while its request-bound progress stream runs. The
    operation does not detach into a background process.
 
-The supervised DRS gate is the transaction foundation for later reviewed
-nightly execution. In A1 it still uses the page-session password and remains
-manual. It records a terminal parent receipt showing local and Crucible state,
-while the component capture and replica receipts retain their exact evidence.
-No credential, service, timer, or schedule is installed.
+The supervised DRS gate is also the transaction foundation for reviewed
+nightly execution. The manual A1 gate continues to use the page-session
+password. The optional A2/A3 deployment uses a host-encrypted systemd
+credential and invokes that same preview-bound implementation. Both paths
+record a terminal parent receipt showing local and Crucible state, while the
+component capture and replica receipts retain their exact evidence.
 
 If the target is read-only, on the wrong filesystem, missing, or if configured
 sources are unavailable, backup creation fails before restic capture.
+
+## Optional nightly DRS deployment
+
+Nightly deployment is intentionally separate from portable setup. It requires
+systemd 256 or newer with user-scoped encrypted credentials, a functioning
+user manager, the configured recovery mount, Restic, and the already reviewed
+key-only Crucible SSH alias.
+
+First preview and enroll the repository password in a local terminal:
+
+```sh
+make drs-credential-plan
+make drs-credential-enroll CONFIRM=ENROLL_SOUL_DRS_CREDENTIAL
+```
+
+The enrollment prompt disables terminal echo and confirms the password
+locally. Soul first proves that it opens both the local and Crucible
+repositories; a rejected password creates or replaces nothing. The verified
+value then passes directly to
+`systemd-creds encrypt --user --with-key=host`. Plaintext is never written to
+disk. The resulting ignored credential is bound to the current user and host
+installation.
+
+Qualification requires one exact run scheduled 60 to 300 seconds ahead:
+
+```sh
+make drs-test-plan RUN_AT=ISO8601_TIME
+make drs-test-install \
+  RUN_AT=THE_SAME_ISO8601_TIME \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=INSTALL_SOUL_DRS_QUALIFICATION_TIMER
+make drs-automation-status
+```
+
+Permanent activation remains blocked until the timed run records a complete
+DRS parent receipt with verified local and Crucible state:
+
+```sh
+make drs-permanent-plan
+make drs-permanent-install \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=ACTIVATE_SOUL_DRS_3AM_TIMER
+```
+
+The permanent calendar is fixed at **3:00 AM in the host's local timezone**.
+`Persistent=true` permits one missed activation after the user manager
+returns. Existing active-work and backup locks still fail closed, and there is
+no retry. The Dashboard reports the encrypted credential state, timer mode,
+next activation, last run, and last successful complete transaction.
+Restic receives one owner-private systemd-managed cache directory while the
+rest of the home directory remains read-only to the service.
+
+The service and timer can be removed without deleting the encrypted
+credential. Credential removal is a separate exact confirmation so an
+accidental service rollback cannot also destroy recovery access.
+
+The current Operator deployment was qualified live on 2026-07-29. Its timed
+run completed in 26 seconds, created and verified local snapshot
+`7b5c625e…c54ba1`, proved that lineage on Crucible, and then unlocked the
+permanent 3:00 AM timer. This machine-local evidence is not a portable setup
+default; another installation must perform its own credential enrollment and
+qualification.
 
 ## Deletion-aware retention
 
@@ -240,14 +305,14 @@ backup scope.
 
 This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
-and location. The manual Crucible gate provides an independently hosted
-encrypted second copy. The manual initialize/copy/check path and exact
+and location. Crucible provides an independently hosted encrypted second copy.
+The manual initialize/copy/check path and exact
 cross-repository lineage reconciliation were live-accepted on 2026-07-29. The
-supervised DRS A1 candidate composes capture and replication without storing
-its password or enabling a schedule. It intentionally does not delete remote
-snapshots or run nightly; noninteractive credential handling, timer
-activation, remote retention policy, and a complete disaster rehearsal remain
-later work.
+supervised DRS A1 transaction composes capture and replication without storing
+its page-session password. A2/A3 adds the separately reviewed host-encrypted
+credential and qualification-before-permanent systemd timer. Neither path
+deletes remote snapshots. Remote retention policy and a complete disaster
+rehearsal remain separate work.
 
 ### Rotating both repository passwords
 
@@ -279,6 +344,8 @@ Run the deterministic fixture:
 make verify-backup-administration
 make verify-backup-manifest-reconciliation
 make verify-storage-retention-census
+make verify-nightly-drs-transaction
+make verify-nightly-drs-automation
 ```
 
 It exercises locked status, exact capture authority, repository verification,

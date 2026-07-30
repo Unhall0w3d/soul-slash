@@ -631,7 +631,12 @@ module SoulCore
         "scheduled" => false,
         "password_retained" => false
       })
-      {"receipt_id" => receipt.fetch("receipt_id"), "state" => state}
+      {
+        "receipt_id" => receipt.fetch("receipt_id"),
+        "state" => state,
+        "local" => {"state" => local["state"]},
+        "replica" => {"state" => replica["state"]}
+      }
     rescue StandardError
       nil
     end
