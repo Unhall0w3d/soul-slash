@@ -454,8 +454,12 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                unavailable_phone.dig("facts", "reachability") == "unreachable")
 
   source = File.read(File.join(__dir__, "../lib/soul_core/maintenance_fleet_status_service.rb"))
+  collector = File.read(File.join(__dir__, "soul-maintenance-fleet-status"))
   dashboard = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
   stylesheet = File.read(File.join(__dir__, "../assets/dashboard/dashboard.css"))
+  check.call("scheduled collector loads private typed configuration before fleet collection",
+             collector.include?('require "soul_core/env_loader"') &&
+               collector.include?('SoulCore::EnvLoader.load(File.join(root, ".env"))'))
   check.call("public service defaults contain no operator-specific RFC1918 addresses",
              !source.match?(/\b192\.168\.\d{1,3}\.\d{1,3}\b/))
   check.call("dashboard suppresses mutation controls for status-only and inventory-only devices",

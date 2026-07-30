@@ -15,6 +15,8 @@ changing the shared human gates.
 - `deploy/nixos/temper/soul-maintenance.nix`
 - `deploy/nixos/temper/soul-nixos-maintenance`
 - `scripts/verify-nixos-maintenance-a1.rb`
+- `scripts/soul-maintenance-fleet-status`
+- `scripts/verify-maintenance-fleet-status-b1.rb`
 - `Makefile`
 - `docs/guides/GUIDED_MAINTENANCE.md`
 - `docs/soul/NIXOS_TEMPER_MAINTENANCE_A1_BRIEF.md`
@@ -61,6 +63,11 @@ make verify-maintenance-device-control
   `MAINTAIN_TEMPER` execution completed as private receipt
   `device_receipt_180795accefb5a6b` with one fixed upgrade call, no reboot,
   and no automatic retry.
+- The Operator confirmed Temper renders in the running Dashboard's
+  SSH-integrated fleet section. The final inspection also exposed that the
+  timer-driven collector did not load the private typed environment; the
+  collector now loads `.env` before collection so Temper retains its explicit
+  maintenance opt-in during scheduled refreshes.
 
 ## Local LLM eval
 
@@ -88,10 +95,11 @@ Class 5: remote privileged package/system generation mutation and reboot.
 
 ## Human review checklist
 
-- [ ] Confirm public deployment material contains no private addressing or
+- [x] Confirm public deployment material contains no private addressing or
   key material.
-- [ ] Inspect the four fixed helper operations.
-- [ ] Confirm stale digest and wrong confirmation execute nothing.
-- [ ] Review deterministic verifier output.
-- [ ] Review live Dashboard Temper card.
-- [ ] Approve or reject merge.
+- [x] Inspect the four fixed helper operations.
+- [x] Confirm stale digest and wrong confirmation execute nothing.
+- [x] Review deterministic verifier output.
+- [x] Review live Dashboard Temper card.
+- [x] Approve the feature merge; retain the scheduled-collector correction as
+  a separate reviewable durability patch.
