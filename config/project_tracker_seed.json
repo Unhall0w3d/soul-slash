@@ -208,14 +208,20 @@
     },
     {
       "item_id": "track_structured_creative_exports",
-      "title": "Evaluate Blender and DAW-compatible structured creative construction",
-      "area": "Creative Tooling",
+      "title": "Track-aware AI and FL Studio production for new songs",
+      "area": "Music Studio + Creative Tooling",
       "horizon": "later",
       "status": "planned",
-      "priority": "medium",
-      "summary": "Prototype practical scene interchange and multitrack/stem-oriented music handoff where it adds real editability.",
-      "acceptance": "A bounded prototype produces an inspectable editable artifact faster than manual reconstruction and fits local hardware.",
-      "source": "Alternate creative construction research"
+      "priority": "high",
+      "summary": "Design a new-song production lane where Soul and a human share track-aware arrangements instead of regenerating an entire flattened composition for localized changes.",
+      "acceptance": "A newly generated song preserves editable tracks or stems, clips, tempo and markers, MIDI where applicable, automation, effects intent, and source lineage; opens in FL Studio through a stable supported interchange or adapter; accepts bounded track or time-range edits from Soul without GUI automation; preserves unaffected material; and renders reviewable A/B candidates. Existing flattened songs are explicitly out of scope.",
+      "source": "Operator-defined structured music direction, 2026-07-30",
+      "notes": "Paused for a dedicated research and architecture slice. This is prospective only: do not retrofit existing stereo songs through inferred stems. Investigate generation-time track separation, localized alternate takes, deterministic automation such as simultaneous pitch and gain curves, human edits returning from FL Studio, and safe project reconciliation. Blender or 3D scene construction is no longer part of this item.",
+      "implementation": "Planned. Define a DAW-independent production graph first, then qualify a maintainable FL Studio adapter or supported interchange. Soul edits structured musical operations and artifacts, not screen coordinates, menu navigation, or arbitrary application automation.",
+      "technologies": "Research candidates: WAV/FLAC stems, MIDI, tempo and marker maps, automation curves, effect and bus metadata, generation-time track lineage, FL Studio-supported interchange or scripting surfaces, and bounded preview rendering.",
+      "interfaces": "Future Music Studio Editable Production mode; human FL Studio handoff and reconciliation; bounded Soul skills for track, clip, automation, and localized replacement operations.",
+      "commands": "",
+      "references": "docs/guides/MIX_STUDIO.md; docs/assessments/LONG_FORM_MIX_A1_LISTENING_RENDER_REVIEW.md"
     },
     {
       "item_id": "track_cloud_core",
