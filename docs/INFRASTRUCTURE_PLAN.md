@@ -121,7 +121,7 @@ PostgreSQL
 Redis or another job queue
 Qdrant or pgvector
 object/artifact storage
-multi-user auth
+single-Operator authentication hardening
 backup/restore orchestration
 remote sync
 ```
