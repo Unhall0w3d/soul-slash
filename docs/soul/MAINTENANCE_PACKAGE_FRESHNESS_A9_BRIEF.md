@@ -14,6 +14,12 @@ metadata instead of merely rereading the host's existing sync database. Keep
 the result truthful when a platform cannot safely refresh metadata through its
 read-only status channel.
 
+> Implementation note: A10 preserves this outcome but replaces the stock
+> `checkupdates` wrapper with a fixed equivalent temporary-database adapter
+> because `checkupdates` is incompatible with the Dashboard's user-service
+> `PrivateTmp` namespace. See
+> `docs/soul/MAINTENANCE_PACMAN_RUNTIME_A10_BRIEF.md`.
+
 ## Contract
 
 - Atelier's pacman channel uses `/usr/bin/checkupdates --nocolor`.

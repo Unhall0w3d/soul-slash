@@ -5,6 +5,7 @@ require "fileutils"
 require "ipaddr"
 require "rbconfig"
 require "socket"
+require "tmpdir"
 require "time"
 
 require_relative "bounded_command_runner"
@@ -23,6 +24,9 @@ module SoulCore
     ARP_PATH = "/proc/net/arp"
     ROUTE_PATH = "/proc/net/route"
     SYSTEMD_RUN_PATH = "/usr/bin/systemd-run"
+    FAKEROOT_PATH = "/usr/bin/fakeroot"
+    PACMAN_PATH = "/usr/bin/pacman"
+    PACMAN_LOCAL_DATABASE_PATH = "/var/lib/pacman/local"
     MAX_DHCP_RECOVERY_SCANS = 4
     MAX_SNAPSHOT_BYTES = 512 * 1024
     MAX_ROUTE_BYTES = 64 * 1024
@@ -272,15 +276,10 @@ module SoulCore
 
     def collect_workstation
       kernel = local_run("workstation.kernel", "/usr/bin/uname", "-r")
-      native = local_run(
-        "workstation.native_updates_fresh",
-        "/usr/bin/checkupdates", "--nocolor",
-        timeout: CHECKUPDATES_TIMEOUT_SECONDS,
-        accepted_exit_statuses: [0, 2]
-      )
+      native = collect_fresh_pacman_updates
       native_freshness = "fresh_pacman_metadata"
       if native.status == "unavailable"
-        native = local_run("workstation.native_updates_cached", "/usr/bin/pacman", "-Qu", accepted_exit_statuses: [0, 1])
+        native = local_run("workstation.native_updates_cached", PACMAN_PATH, "-Qu", accepted_exit_statuses: [0, 1])
         native_freshness = "cached_pacman_metadata"
       end
       aur = local_run("workstation.aur_updates", "/usr/bin/yay", "-Qua", timeout: 30, accepted_exit_statuses: [0, 1])
@@ -349,6 +348,63 @@ module SoulCore
           "flatpak_applicable" => flatpak_user.status != "unavailable" || flatpak_system.status != "unavailable"
         }
       )
+    end
+
+    def collect_fresh_pacman_updates
+      Dir.mktmpdir("soul-pacman-status-") do |database_path|
+        File.symlink(PACMAN_LOCAL_DATABASE_PATH, File.join(database_path, "local"))
+        sync = local_run(
+          "workstation.native_updates_fresh_sync",
+          FAKEROOT_PATH,
+          PACMAN_PATH, "-Sy",
+          pacman_download_sandbox_option,
+          "--dbpath", database_path,
+          "--logfile", "/dev/null",
+          timeout: CHECKUPDATES_TIMEOUT_SECONDS
+        )
+        return sync unless sync.status == "ok"
+
+        local_run(
+          "workstation.native_updates_fresh_query",
+          PACMAN_PATH, "-Qu",
+          "--dbpath", database_path,
+          accepted_exit_statuses: [0, 1]
+        )
+      end
+    rescue Errno::ENOENT => error
+      result = BoundedCommandRunner::Result.new(
+        stdout: "",
+        stderr: safe_text(error.message),
+        exit_status: nil,
+        status: "unavailable",
+        truncated: false
+      )
+      @evidence << {
+        "adapter" => "workstation.native_updates_fresh_prepare",
+        "status" => result.status,
+        "exit_status" => result.exit_status,
+        "truncated" => false
+      }
+      result
+    rescue SystemCallError => error
+      result = BoundedCommandRunner::Result.new(
+        stdout: "",
+        stderr: safe_text(error.message),
+        exit_status: nil,
+        status: "failed",
+        truncated: false
+      )
+      @evidence << {
+        "adapter" => "workstation.native_updates_fresh_prepare",
+        "status" => result.status,
+        "exit_status" => result.exit_status,
+        "truncated" => false
+      }
+      result
+    end
+
+    def pacman_download_sandbox_option
+      @process_env["INVOCATION_ID"].to_s.empty? ? "--disable-sandbox-filesystem" : "--disable-sandbox"
     end
 
     def collect_proxmox

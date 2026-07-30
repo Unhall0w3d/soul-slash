@@ -268,15 +268,18 @@ neighbor and vendor hints are insufficient.
 The snapshot is private, atomic, and survives Dashboard reloads. When separately
 installed, the owner-level oneshot timer collects it at local noon and
 midnight. The timer cannot maintain or reboot anything and has no persistent
-worker or polling loop. Atelier uses `checkupdates --nocolor` so a per-device
-refresh downloads current pacman metadata into an isolated temporary database
-without changing pacman's live sync database or requiring sudo. If
-`checkupdates` from `pacman-contrib` is unavailable, Atelier falls back to
-explicitly cached `pacman -Qu` evidence. Remote APT counts remain cached because
-refreshing APT metadata is a privileged maintenance mutation; DNF5, AUR, and
-Flatpak retain their existing on-demand queries. The Dashboard labels fresh
-and cached evidence. An offline device remains visible without hiding evidence
-from the other devices.
+worker or polling loop. Atelier refreshes official pacman metadata into an
+isolated temporary database, queries that database, and deletes it before
+returning. The fixed adapter uses `fakeroot`, an alternate `--dbpath`, and
+pacman's documented `--disable-sandbox` option because Soul already supplies a
+stricter outer systemd sandbox. It never synchronizes pacman's live database or
+requires sudo. `yay -Qua` supplies a separate AUR-only count; Flatpak remains a
+third independently assessed channel. If the isolated-sync tooling is missing,
+Atelier falls back to explicitly cached `pacman -Qu` evidence. Remote APT
+counts remain cached because refreshing APT metadata is a privileged
+maintenance mutation; DNF5 retains its existing on-demand query. The Dashboard
+labels fresh and cached evidence. An offline device remains visible without
+hiding evidence from the other devices.
 
 ## Device-scoped flow
 
