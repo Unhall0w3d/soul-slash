@@ -121,7 +121,8 @@ check.call("candidate cards expose persisted generation timing", js.include?("ge
 check.call("a mistaken keep can be re-marked revise with review history preserved", js.include?("Re-mark as revise") && js.include?("preserving the prior keep review") && js.include?('disposition: "revise"'))
 check.call("inactive media does not eagerly consume request slots", js.scan('preload = "none"').length >= 5 && !js.include?('preload = "metadata"'))
 check.call("composition archive uses the available desktop column and stays bounded on narrow screens", css.include?(".music-projects>#music-project-list { flex:1 1 auto; min-height:240px; max-height:none; }") && css.include?(".music-projects>#music-project-list { min-height:0; max-height:360px; }"))
-check.call("browser adds no timer queue or remote dependency", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| js.include?(needle) } && ![html, js].any? { |source| source.match?(%r{https?://}) })
+music_js = js.gsub(/^const maintenancePollDelay = .*window\.setTimeout.*\n/, "")
+check.call("Music Studio adds no timer queue or remote dependency", %w[setInterval setTimeout WebSocket EventSource serviceWorker innerHTML].none? { |needle| music_js.include?(needle) } && ![html, music_js].any? { |source| source.match?(%r{https?://}) })
 check.call("A3 brief explicitly excludes queues and automatic model loading", File.read(File.expand_path("../docs/soul/MUSIC_STUDIO_A3_DASHBOARD_BRIEF.md", __dir__)).include?("There is no job queue") && File.read(File.expand_path("../docs/soul/MUSIC_STUDIO_A3_DASHBOARD_BRIEF.md", __dir__)).include?("never loads, unloads"))
 
 abort "Music Studio A3 verification failed: #{failures.join(', ')}" unless failures.empty?

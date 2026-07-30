@@ -1374,13 +1374,117 @@ async function previewMusicPublicationPackage(identity, textarea, editor, button
   button.disabled = true; status.textContent = "Binding the exact video, thumbnail, and edited description…";
   try {
     const description = textarea.value; const envelope = await callSoul("music.publication.preview", { ...identity, description }); lifecycle(envelope); const data = dataOf(envelope);
-    if (envelope.lifecycle_state === "complete" && data.package) { status.textContent = `Upload package already exists at ${data.package.destination}`; return; }
+    if (envelope.lifecycle_state === "complete" && data.package) {
+      textarea.disabled = true; button.remove();
+      status.textContent = `Upload package ready at ${data.package.destination}.`;
+      await renderYouTubeAuthenticatedUpload(identity, editor, status);
+      return;
+    }
     if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "YouTube package preview is unavailable");
     const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
     const approval = document.createElement("input"); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Export exact upload package"; prefillApprovalGate(approval, execute, data.confirmation_phrase);
-    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Copying the exact reviewed package into the finished-song library…"; try { const result = await callSoul("music.publication.execute", { ...identity, description, confirmation: approval.value, expected_digest: data.expected_digest }); lifecycle(result); const published = dataOf(result).package; if (result.lifecycle_state !== "complete" || !published) throw new Error(result.errors?.[0]?.message || result.lifecycle_state); status.textContent = `YouTube upload package ready at ${published.destination}. Nothing was uploaded or published.`; } catch (error) { status.textContent = error.message; execute.disabled = false; } });
+    execute.addEventListener("click", async () => { execute.disabled = true; status.textContent = "Copying the exact reviewed package into the finished-song library…"; try { const result = await callSoul("music.publication.execute", { ...identity, description, confirmation: approval.value, expected_digest: data.expected_digest }); lifecycle(result); const published = dataOf(result).package; if (result.lifecycle_state !== "complete" || !published) throw new Error(result.errors?.[0]?.message || result.lifecycle_state); status.textContent = `YouTube upload package ready at ${published.destination}. Nothing was uploaded or published.`; await renderYouTubeAuthenticatedUpload(identity, editor, status); } catch (error) { status.textContent = error.message; execute.disabled = false; } });
     const label = document.createElement("label"); label.textContent = `Approval phrase · ${data.confirmation_phrase}`; label.append(approval); editor.append(scope, label, execute); textarea.disabled = true; button.remove(); status.textContent = "One click exports local upload materials only; YouTube upload and publication remain separate.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
+}
+
+async function renderYouTubeAuthenticatedUpload(identity, container, parentStatus) {
+  container.querySelector(".youtube-upload-control")?.remove();
+  const panel = document.createElement("section"); panel.className = "youtube-upload-control";
+  const heading = document.createElement("div"); heading.className = "card-heading";
+  const title = document.createElement("strong"); title.textContent = "Authenticated YouTube draft";
+  const boundary = document.createElement("small"); boundary.textContent = "foreground · exact package only";
+  heading.append(title, boundary);
+  const status = document.createElement("p"); status.className = "dialog-status"; status.textContent = "Checking owner-only YouTube authorization…";
+  panel.append(heading, status); container.append(panel);
+  try {
+    const envelope = await callSoul("youtube.oauth.status"); lifecycle(envelope);
+    const oauth = dataOf(envelope);
+    if (!oauth.configured) {
+      renderYouTubeAuthorization(identity, panel, status, parentStatus);
+      return;
+    }
+    renderYouTubeUploadGate(identity, panel, status, oauth);
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+function renderYouTubeAuthorization(identity, panel, status, parentStatus) {
+  status.textContent = "YouTube authorization is not configured. Select the owner-only Desktop OAuth JSON for soul-slash-local-publisher.";
+  const label = document.createElement("label"); label.textContent = "Desktop OAuth client JSON path";
+  const path = document.createElement("input"); path.type = "text"; path.placeholder = "~/Downloads/client_secret_….json"; path.autocomplete = "off"; path.spellcheck = false; label.append(path);
+  const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview YouTube authorization";
+  preview.addEventListener("click", async () => {
+    preview.disabled = true; status.textContent = "Validating the exact Desktop OAuth client…";
+    try {
+      const envelope = await callSoul("youtube.oauth.authorization.preview", { client_path: path.value }); lifecycle(envelope); const data = dataOf(envelope);
+      if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "YouTube authorization preview is unavailable");
+      const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
+      const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Authorize Soul Slash Synthesis";
+      const progress = createGenerationProgress();
+      execute.addEventListener("click", async () => {
+        execute.disabled = true; showGenerationProgress(progress, { stage: "consent", message: "Waiting up to three minutes for the exact Google Desktop OAuth consent." });
+        try {
+          const result = await callSoul("youtube.oauth.authorization.execute", { client_path: path.value, confirmation: data.confirmation_phrase, expected_digest: data.expected_digest }); lifecycle(result);
+          if (result.lifecycle_state !== "complete") throw new Error(result.errors?.[0]?.message || "YouTube authorization did not complete");
+          parentStatus.textContent = "Expected Soul Slash Synthesis channel authorized. No upload was performed.";
+          await renderYouTubeAuthenticatedUpload(identity, panel.parentElement, parentStatus);
+        } catch (error) { status.textContent = error.message; execute.disabled = false; }
+        finally { hideGenerationProgress(progress); }
+      });
+      panel.append(scope, execute, progress); path.disabled = true; preview.remove();
+      status.textContent = `Review the exact scope. Clicking Authorize supplies ${data.confirmation_phrase} and opens one bounded consent path.`;
+    } catch (error) { status.textContent = error.message; preview.disabled = false; }
+  });
+  panel.append(label, preview);
+}
+
+function renderYouTubeUploadGate(identity, panel, status, oauth) {
+  const channel = document.createElement("p"); channel.className = "card-note"; channel.textContent = `${oauth.channel_title} · ${oauth.channel_id}`;
+  const visibilityLabel = document.createElement("label"); visibilityLabel.textContent = "Upload visibility";
+  const visibility = document.createElement("select");
+  [["private","Private · recommended draft"],["unlisted","Unlisted · explicit publication choice"],["public","Public · explicit publication choice"]].forEach(([value, text]) => { const option = document.createElement("option"); option.value = value; option.textContent = text; visibility.append(option); });
+  visibility.value = "private"; visibilityLabel.append(visibility);
+  const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact YouTube upload";
+  preview.addEventListener("click", async () => {
+    preview.disabled = true; status.textContent = "Revalidating the channel, package receipt, metadata, and every file digest…";
+    try {
+      const selectedVisibility = visibility.value;
+      const envelope = await callSoul("youtube.upload.preview", { ...identity, visibility: selectedVisibility }); lifecycle(envelope); const data = dataOf(envelope);
+      if (envelope.lifecycle_state === "complete" && data.upload) { renderYouTubeUploadReceipt(panel, status, data.upload, true); visibility.disabled = true; preview.remove(); return; }
+      if (!data.expected_digest) throw new Error(envelope.errors?.[0]?.message || "YouTube upload preview is unavailable");
+      const scope = document.createElement("pre"); scope.className = "diagnostic-output"; scope.textContent = JSON.stringify(data.preview_scope, null, 2);
+      const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = selectedVisibility === "private" ? "Upload private draft" : `Upload as ${selectedVisibility}`;
+      const progress = createGenerationProgress();
+      execute.addEventListener("click", async () => {
+        execute.disabled = true; showGenerationProgress(progress, { stage: "uploading", message: "Uploading the exact reviewed package through YouTube's bounded resumable path." });
+        try {
+          const result = await callNdjson("/api/v1/music-stream", "youtube.upload.execute", { ...identity, visibility: selectedVisibility, confirmation: data.confirmation_phrase, expected_digest: data.expected_digest }, {}, (event) => showGenerationProgress(progress, event)); lifecycle(result);
+          const upload = dataOf(result).upload;
+          if (!upload) throw new Error(result.errors?.[0]?.message || "YouTube upload ended without a review receipt");
+          renderYouTubeUploadReceipt(panel, status, upload, false);
+          if (!["complete", "blocked_for_human_review"].includes(result.lifecycle_state)) throw new Error(result.errors?.[0]?.message || result.lifecycle_state);
+          scope.remove(); execute.remove();
+        } catch (error) { status.textContent = error.message; execute.disabled = false; }
+        finally { hideGenerationProgress(progress); }
+      });
+      panel.append(scope, execute, progress); visibility.disabled = true; preview.remove();
+      status.textContent = `Review the exact ${selectedVisibility} scope. Clicking Upload supplies ${data.confirmation_phrase}; Soul will not change visibility later.`;
+    } catch (error) { status.textContent = error.message; preview.disabled = false; }
+  });
+  panel.append(channel, visibilityLabel, preview);
+  status.textContent = "Authorization matches Soul Slash Synthesis. Private is selected; preview one exact package before upload.";
+}
+
+function renderYouTubeUploadReceipt(panel, status, upload, replay) {
+  panel.querySelector(".youtube-upload-receipt")?.remove();
+  const receipt = document.createElement("div"); receipt.className = "youtube-upload-receipt";
+  const summary = document.createElement("strong"); summary.textContent = `${upload.state || "complete"} · ${upload.actual_privacy || upload.requested_privacy || "unknown visibility"}`;
+  const details = document.createElement("small"); details.textContent = `${upload.video_id} · thumbnail ${upload.thumbnail_applied ? "applied" : "requires review"}`;
+  const studio = document.createElement("a"); studio.href = upload.studio_url; studio.target = "_blank"; studio.rel = "noopener noreferrer"; studio.textContent = "Open exact video in YouTube Studio";
+  receipt.append(summary, details, studio); panel.append(receipt);
+  status.textContent = replay ? "This exact package already has an upload receipt; no duplicate upload occurred." : "Upload reached a terminal receipt. Review the exact video in YouTube Studio before publishing.";
 }
 
 function musicVisualPresentationSettings(visual) {

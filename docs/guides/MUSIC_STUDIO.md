@@ -86,10 +86,11 @@ A kept candidate can:
 - generate an editable, exact YouTube upload package containing the MP4, thumbnail, description sidecar, and private-upload metadata.
 
 The package operation itself does not contact YouTube. The separate
-[YouTube Publication](YOUTUBE_PUBLICATION.md) A0 candidate can upload one exact
-package through foreground OAuth, expected-channel verification, and another
-digest-bound confirmation. Private remains the default; final visibility and
-publication remain the Operator's responsibility.
+[YouTube Publication](YOUTUBE_PUBLICATION.md) workflow can upload one exact
+package through Music Studio or the foreground CLI after OAuth,
+expected-channel verification, and another digest-bound confirmation. Private
+remains the default; final visibility and publication remain the Operator's
+responsibility.
 
 ## Deletion boundary
 

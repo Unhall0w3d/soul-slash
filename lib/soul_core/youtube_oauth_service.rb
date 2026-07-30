@@ -166,8 +166,8 @@ module SoulCore
     private
 
     def read_client(path)
-      expanded = File.expand_path(path.to_s)
       raise CredentialError, "OAuth client JSON is required" if path.to_s.empty?
+      expanded = operator_path(path)
       raise CredentialError, "OAuth client JSON must be a regular non-symlink file" unless File.file?(expanded) && !File.symlink?(expanded)
       raise CredentialError, "OAuth client JSON permissions must be owner-only" unless (File.stat(expanded).mode & 0o077).zero?
       raise CredentialError, "OAuth client JSON exceeds size limit" unless File.size(expanded).between?(1, MAX_CREDENTIAL_BYTES)
@@ -183,6 +183,13 @@ module SoulCore
       client
     rescue JSON::ParserError
       raise CredentialError, "OAuth client JSON is invalid"
+    end
+
+    def operator_path(path)
+      value = path.to_s
+      value = File.join(Dir.home, value.delete_prefix("~/")) if value.start_with?("~/")
+      value = Dir.home if value == "~"
+      File.expand_path(value)
     end
 
     def receive_authorization(client)
