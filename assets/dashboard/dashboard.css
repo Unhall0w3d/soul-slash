@@ -196,6 +196,13 @@ button:disabled { cursor:not-allowed; opacity:.4; }
 .mix-boundary dd { margin:5px 0 0; color:var(--copy); font-size:12px; }
 .mix-boundary>p:last-child { color:var(--muted); line-height:1.6; }
 .mix-detail-card { margin:0; }
+.mix-title-revision { display:grid; grid-template-columns:minmax(240px,1fr) minmax(220px,.7fr) auto; gap:12px; align-items:end; margin-top:16px; padding:14px; border:1px solid rgba(196,161,98,.24); border-radius:3px 16px 3px 16px; background:linear-gradient(135deg,rgba(167,123,91,.045),rgba(6,18,28,.7)); }
+.mix-title-revision h3 { margin:3px 0 5px; color:var(--copy-strong); font:400 20px var(--serif); }
+.mix-title-revision p { margin:0; color:var(--muted); font-size:11px; line-height:1.5; }
+.mix-title-revision label { display:grid; gap:6px; color:var(--gold-light); font:var(--type-micro) var(--mono); text-transform:uppercase; }
+.mix-title-revision input { width:100%; }
+.mix-title-revision .gate-button { margin:0; white-space:nowrap; }
+.mix-title-revision .dialog-status { grid-column:1/-1; }
 .mix-cue { display:grid; grid-template-columns:minmax(170px,1fr) auto; gap:12px; }
 .mix-cue code { color:var(--gold-light); }
 .mix-render-card { display:grid; gap:12px; margin-top:18px; padding:16px; border:1px solid rgba(58,174,223,.28); border-radius:3px 18px 3px 18px; background:linear-gradient(145deg,rgba(8,27,37,.88),rgba(5,13,19,.94)); }
@@ -403,6 +410,7 @@ button:disabled { cursor:not-allowed; opacity:.4; }
   .mix-layout { display:block; }
   .mix-plans { border-right:0; border-bottom:1px solid var(--line); }
   .mix-form-grid,.mix-source-workspace { grid-template-columns:1fr; }
+  .mix-title-revision { grid-template-columns:1fr; }
   .mix-sequence-fields { grid-template-columns:1fr; }
   .mix-boundary { border-left:0; }
 }

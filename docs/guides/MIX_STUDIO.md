@@ -57,6 +57,18 @@ The first source starts at zero and cannot have an incoming crossfade. Later
 crossfades are limited to 10 seconds and must be shorter than both adjacent
 usable source ranges.
 
+## Title revisions
+
+Once sealed, a mix plan is immutable—including its title. The detail view can
+save a revised title as a new plan revision. Soul copies the exact intent,
+source lineage, trims, crossfades, and transition notes, records the prior
+`mix_id` as its parent, and derives a new immutable identity.
+
+The prior plan, handoff, and listening evidence remain preserved. Because the
+title participates in the exact render and handoff scope, the revised plan must
+be reviewed and rendered independently rather than relabeling existing
+artifacts.
+
 ## Handoff package
 
 The exact package is written beneath:

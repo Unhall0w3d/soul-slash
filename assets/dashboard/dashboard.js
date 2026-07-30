@@ -4714,6 +4714,8 @@ function resetMixComposer() {
   byId("mix-render-player").hidden = true;
   byId("mix-render-audio").removeAttribute("src");
   byId("mix-render-audio").load();
+  byId("mix-revised-title").value = "";
+  byId("mix-title-revision-status").textContent = "";
   byId("mix-form-status").textContent = "";
   renderMixSequence();
 }
@@ -4820,6 +4822,8 @@ function renderMixPlanDetail(plan) {
   byId("mix-render-audio").removeAttribute("src"); byId("mix-render-audio").load();
   byId("mix-render-status").textContent = "Inspecting listening-render evidence…";
   byId("mix-detail-title").textContent = plan.title;
+  byId("mix-revised-title").value = plan.title;
+  byId("mix-title-revision-status").textContent = plan.parent_mix_id ? `Revision of ${plan.parent_mix_id}.` : "Original immutable plan.";
   byId("mix-detail-summary").textContent = `${plan.intent} · ${plan.sequence.length} verified sources · ${formatMixTime(plan.total_duration_seconds)}`;
   const cues = byId("mix-cue-list"); cues.replaceChildren();
   plan.timeline_seconds.forEach((cue, index) => {
@@ -4905,6 +4909,48 @@ async function createMixPlan(event) {
     byId("mix-form-status").textContent = "Immutable mix plan sealed. Changes require a new plan.";
   } catch (error) { byId("mix-form-status").textContent = error.message; showError(error); }
   finally { button.disabled = false; }
+}
+
+async function reviseMixTitle() {
+  if (!state.selectedMixPlan) return;
+  const title = byId("mix-revised-title").value.trim();
+  const status = byId("mix-title-revision-status");
+  if (!title) { status.textContent = "A revised title is required."; return; }
+  if (title === state.selectedMixPlan.title) { status.textContent = "Enter a different title to create a new revision."; return; }
+
+  const button = byId("save-mix-title-revision"); button.disabled = true;
+  status.textContent = "Preserving the exact timeline while deriving a new immutable plan identity…";
+  try {
+    const sequence = state.selectedMixPlan.sequence.map((item, index) => ({
+      project_id: item.project_id,
+      candidate_id: item.candidate_id,
+      source_id: item.source_id,
+      trim_start_seconds: Number(item.trim_start_seconds),
+      trim_end_seconds: Number(item.trim_end_seconds),
+      crossfade_seconds: index === 0 ? 0 : Number(item.crossfade_seconds),
+      transition_note: item.transition_note || ""
+    }));
+    const envelope = await callSoul("mix.projects.create", {
+      plan: {
+        title,
+        intent: state.selectedMixPlan.intent,
+        parent_mix_id: state.selectedMixPlan.mix_id,
+        sequence
+      }
+    });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Title revision was not created"));
+    const plan = dataOf(envelope).mix;
+    state.mixPlans = [plan, ...state.mixPlans.filter((entry) => entry.mix_id !== plan.mix_id)];
+    renderMixPlans();
+    await selectMixPlan(plan.mix_id);
+    byId("mix-title-revision-status").textContent = "New immutable title revision created. Prior plan and listening evidence remain preserved.";
+  } catch (error) {
+    status.textContent = error.message;
+    showError(error);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function previewMixHandoff() {
@@ -5008,6 +5054,7 @@ byId("new-mix-plan").addEventListener("click", resetMixComposer);
 byId("mix-plan-form").addEventListener("submit", createMixPlan);
 byId("preview-mix-render").addEventListener("click", previewMixRender);
 byId("execute-mix-render").addEventListener("click", executeMixRender);
+byId("save-mix-title-revision").addEventListener("click", reviseMixTitle);
 byId("preview-mix-handoff").addEventListener("click", previewMixHandoff);
 byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));

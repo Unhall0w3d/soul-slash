@@ -284,6 +284,7 @@ check(failures, "dashboard exposes Mix Studio navigation and panel", dashboard_h
 check(failures, "dashboard states stereo-source limitations", dashboard_html.include?("No inferred stems") && dashboard_html.include?("No destructive source edits"))
 check(failures, "dashboard wires all mix operations", %w[mix.sources.list mix.projects.list mix.projects.get mix.projects.create mix.handoff.preview mix.handoff.execute].all? { |operation| dashboard_js.include?(operation) })
 check(failures, "dashboard includes responsive mix styling", dashboard_css.include?(".mix-layout") && dashboard_css.include?(".mix-sequence-fields"))
+check(failures, "dashboard title revision preserves immutable lineage", dashboard_html.include?('id="mix-revised-title"') && dashboard_js.include?("parent_mix_id: state.selectedMixPlan.mix_id") && dashboard_js.include?("Prior plan and listening evidence remain preserved"))
 check(failures, "brief preserves exact export gate", brief.include?("EXPORT_MIX_HANDOFF"))
 
 if failures.empty?

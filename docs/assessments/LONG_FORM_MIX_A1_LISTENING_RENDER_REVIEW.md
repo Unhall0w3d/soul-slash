@@ -14,6 +14,11 @@ FFmpeg, writes a 48 kHz stereo FLAC and 320 kbps MP3, verifies both with
 FFprobe, records checksums and a receipt, and exposes authenticated ranged audio
 playback in the dashboard. It does not accept, publish, or final-export the mix.
 
+The plan detail also supports title correction without rewriting history. A
+revised title creates a child immutable plan with identical intent, sources,
+trims, crossfades, and transition notes; the original plan and its evidence
+remain intact.
+
 ## Files changed
 
 - `lib/soul_core/long_form_mix_render_service.rb` (new)
@@ -24,12 +29,12 @@ playback in the dashboard. It does not accept, publish, or final-export the mix.
 - `assets/dashboard/index.html`
 - `assets/dashboard/dashboard.js`
 - `assets/dashboard/dashboard.css`
+- `docs/guides/MIX_STUDIO.md`
 - `scripts/verify-long-form-mix-a0.rb`
 - `Makefile`
 - `README.md`
 - `docs/CURRENT_STATE.md`
 - `docs/ROADMAP.md`
-- `docs/guides/MIX_STUDIO.md`
 - `docs/soul/LONG_FORM_MIX_A1_LISTENING_RENDER_BRIEF.md` (new)
 - `docs/assessments/LONG_FORM_MIX_A0_REVIEW.md`
 

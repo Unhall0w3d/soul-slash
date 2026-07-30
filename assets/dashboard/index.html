@@ -288,6 +288,12 @@
           </form>
           <section id="mix-detail-card" class="gate-card mix-detail-card" hidden>
             <div><p class="eyebrow">Exact timeline</p><h3 id="mix-detail-title">Mix plan</h3><p id="mix-detail-summary"></p></div>
+            <section class="mix-title-revision">
+              <div><p class="eyebrow">Plan identity</p><h3>Revise title</h3><p>A title change creates a new immutable plan revision. The current plan and its listening evidence remain preserved.</p></div>
+              <label>Revised title<input id="mix-revised-title" maxlength="120"></label>
+              <button id="save-mix-title-revision" class="gate-button" type="button">Save title as new revision</button>
+              <p id="mix-title-revision-status" class="dialog-status" role="status"></p>
+            </section>
             <div id="mix-cue-list" class="mix-cue-list"></div>
             <section class="mix-render-card">
               <div><p class="eyebrow">Listening candidate</p><h3>Hear the sealed timeline</h3><p>Render the exact trims and crossfades in the foreground. This is review evidence—not a final export or automatic approval.</p></div>
