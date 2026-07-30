@@ -110,7 +110,7 @@ Lifecycle states: complete / failed
 - The current device override registry is private and intentionally contains
   local device IDs and aliases. It must never be copied into the plugin repo.
 - Luau behavior has live loader/render coverage but no standalone unit harness.
-- Voice Presence launch remains a separate manual acceptance item.
+- Voice Presence launch was confirmed from the Git-source plugin after cutover.
 
 ## Local LLM eval
 
@@ -123,7 +123,7 @@ adapter behavior rather than conversational routing.
 [x] Panel renders the expected five dynamic devices without clipping
 [x] Right-click still opens and closes each generic detail face
 [x] Left-click opens the correct reviewed interactive SSH session
-[ ] Voice Presence launch remains functional
+[x] Voice Presence launch remains functional
 [x] No private alias is visible in the panel or status JSON
 [x] Candidate may proceed to public-repository extraction and exposure audit
 [x] Public source exposure audit passes
