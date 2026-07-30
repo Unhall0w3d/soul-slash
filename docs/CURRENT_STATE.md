@@ -174,15 +174,17 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - Crucible provides a reboot-qualified, independently mounted 100 GiB XFS
   target at `/srv/soul-backup`, reachable through key-only SSH/SFTP. Backup &
   Recovery's manual gate initialized the independently encrypted repository,
-  copied all three accepted snapshots, verified metadata, and proved exact
+  copied the accepted snapshots, verified metadata, and proved exact
   coverage through original-snapshot lineage. Both repository passwords were
   subsequently rotated through a local echo-disabled gate. Remote deletion
-  and nightly execution remain disabled.
-- Nightly DRS Transaction A1 is candidate-complete as a supervised manual
-  transaction: one exact gate creates and verifies a local snapshot, advances
-  deletion evidence, reconciles missing lineage to Crucible, and records a
-  terminal parent result. Credential persistence and the 3:00 AM timer remain
-  unimplemented and unauthorized in A1.
+  remains disabled.
+- Nightly DRS A2/A3 is live-qualified on the Operator workstation. One
+  host-encrypted user credential feeds a hardened, no-restart systemd
+  `oneshot` that reuses the accepted A1 transaction. The 2026-07-29
+  qualification created local snapshot `7b5c625e…c54ba1`, verified its exact
+  lineage among six Crucible snapshots, and completed in 26 seconds. The
+  permanent timer is enabled for 3:00 AM local time with no retry, pruning,
+  remote deletion, or unattended restore authority.
 
 ## Runtime topology
 
@@ -200,12 +202,13 @@ Core changes are click-authorized and lease-revalidated. Before a conversational
 
 Hosting Soul itself on Proxmox, Internet exposure, and multi-user accounts
 remain separate future tracks. Forge currently hosts the Warden Pi-hole
-appliance and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now
-has an accepted encrypted local foundation, verified live captures, and an
-accepted encrypted second copy on Crucible. The supervised DRS transaction is
-candidate-complete, while encrypted unattended credentials, timer activation,
-remote retention, live-tree promotion, and full disaster-recovery
-qualification remain separate review gates.
+appliance
+and the Crucible Fedora backup/DNF5 laboratory. Backup & Recovery now has an
+accepted encrypted local foundation, verified live captures, and an accepted
+encrypted second copy on Crucible. The supervised DRS transaction,
+host-encrypted unattended credential, and nightly 3:00 AM activation are
+live-qualified. Remote retention, live-tree promotion, and full isolated
+disaster-recovery rehearsal remain separate review gates.
 
 ## Memory, artifacts, and deletion
 

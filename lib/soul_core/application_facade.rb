@@ -22,6 +22,7 @@ require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
 require_relative "backup_administration_service"
+require_relative "nightly_drs_deployment"
 require_relative "project_tracker_service"
 require_relative "project_release_service"
 require_relative "model_runtime_control_service"
@@ -75,6 +76,7 @@ module SoulCore
       workspace_service: nil,
       status_collector: nil,
       backup_administration_service: nil,
+      nightly_drs_deployment: nil,
       project_tracker_service: nil,
       project_release_service: nil,
       model_runtime_control_service: nil,
@@ -124,6 +126,7 @@ module SoulCore
       @workspace_service = workspace_service
       @status_collector = status_collector
       @backup_administration_service = backup_administration_service
+      @nightly_drs_deployment = nightly_drs_deployment
       @project_tracker_service = project_tracker_service
       @project_release_service = project_release_service
       @model_runtime_control_service = model_runtime_control_service
@@ -230,7 +233,7 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
-      when "backup.status" then domain(backup_administration.status(password: parameters["password"]))
+      when "backup.status" then domain(backup_status(password: parameters["password"]))
       when "backup.manifests.reconcile.preview" then domain(backup_administration.manifest_reconciliation_preview)
       when "backup.manifests.reconcile.execute" then domain(backup_administration.manifest_reconciliation_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "backup.create.preview" then domain(backup_administration.backup_preview(password: required(parameters, "password")))
@@ -898,6 +901,26 @@ module SoulCore
       @backup_administration_service ||= BackupAdministrationService.new(
         root: @root, process_env: @process_env, clock: @clock
       )
+    end
+
+    def nightly_drs_deployment
+      @nightly_drs_deployment ||= NightlyDrsDeployment.new(
+        root: @root, process_env: @process_env, clock: @clock
+      )
+    end
+
+    def backup_status(password:)
+      result = backup_administration.status(password: password)
+      return result unless result["ok"] && result["data"].is_a?(Hash)
+      result["data"]["automation"] = nightly_drs_deployment.status.fetch("data", {})
+      result
+    rescue StandardError
+      result["data"]["automation"] = {
+        "ready" => false,
+        "mode" => "unavailable",
+        "credential_ready" => false
+      } if result && result["data"].is_a?(Hash)
+      result
     end
 
     def conversation_creative_workflow

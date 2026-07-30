@@ -77,17 +77,16 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] review the bounded cleanup A3 candidate for allowlisted old temporary
   residue, old regular project logs, and failed partial Music quarantine only;
   broader lifecycle-owned or capacity-bounded cleanup remains unavailable
-- [~] review the supervised Nightly DRS A1 transaction for one verified local
-  capture, deletion-ledger observation, exact Crucible reconciliation, and
-  terminal partial-failure evidence; encrypted credential enrollment and the
-  3:00 AM timer remain separately gated
+- [x] live-qualified Nightly DRS A2/A3 reuses the supervised A1 transaction
+  through a host-encrypted credential and hardened no-restart user oneshot;
+  the fixed 3:00 AM timer reports exact local and Crucible lineage with no
+  retry, pruning, or remote deletion
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation and Crucible's bounded
-  manual encrypted second copy are accepted; the supervised DRS transaction is
-  candidate-complete, while unattended credential/timer deployment and full
-  recovery remain
+- [~] backup and disaster-recovery local foundation, Crucible's encrypted
+  second copy, supervised DRS, and the live-qualified nightly credential/timer
+  are accepted; remote retention and full isolated recovery rehearsal remain
 - [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
 - [ ] multi-user/LAN family access only after a new identity and authorization model
 - [ ] Internet exposure only after a dedicated threat model and deployment review

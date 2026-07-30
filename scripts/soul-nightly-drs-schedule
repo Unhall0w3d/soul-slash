@@ -1,0 +1,69 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "io/console"
+require "json"
+require "optparse"
+
+root = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(root, "lib"))
+require "soul_core/env_loader"
+require "soul_core/nightly_drs_deployment"
+
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+options = {}
+OptionParser.new do |parser|
+  parser.on("--run-at ISO8601") { |value| options["run_at"] = value }
+  parser.on("--confirmation VALUE") { |value| options["confirmation"] = value }
+  parser.on("--expected-digest VALUE") { |value| options["expected_digest"] = value }
+end.parse!
+
+action = ARGV.shift.to_s
+abort "unexpected arguments" unless ARGV.empty?
+deployment = SoulCore::NightlyDrsDeployment.new(root: root)
+
+result = case action
+when "credential-plan"
+  deployment.credential_plan
+when "credential-enroll"
+  abort "credential enrollment requires an interactive terminal" unless $stdin.tty?
+  print "Restic repository password: "
+  first = $stdin.noecho(&:gets).to_s.chomp
+  puts
+  print "Confirm Restic repository password: "
+  second = $stdin.noecho(&:gets).to_s.chomp
+  puts
+  abort "passwords did not match" unless first == second
+  begin
+    deployment.enroll_credential(password: first, confirmation: options["confirmation"])
+  ensure
+    first.replace("\0" * first.bytesize)
+    second.replace("\0" * second.bytesize)
+  end
+when "test-plan"
+  deployment.test_plan(run_at: options["run_at"])
+when "test-install"
+  deployment.install_test(
+    run_at: options["run_at"],
+    confirmation: options["confirmation"],
+    expected_digest: options["expected_digest"]
+  )
+when "permanent-plan"
+  deployment.permanent_plan
+when "permanent-install"
+  deployment.install_permanent(
+    confirmation: options["confirmation"],
+    expected_digest: options["expected_digest"]
+  )
+when "status"
+  deployment.status
+when "uninstall"
+  deployment.uninstall(confirmation: options["confirmation"])
+when "credential-remove"
+  deployment.remove_credential(confirmation: options["confirmation"])
+else
+  abort "Usage: soul-nightly-drs-schedule credential-plan|credential-enroll|test-plan|test-install|permanent-plan|permanent-install|status|uninstall|credential-remove [options]"
+end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

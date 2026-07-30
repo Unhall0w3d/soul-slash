@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+
+options = {"trigger" => "systemd_timer", "schedule_mode" => "installed"}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options["root"] = value }
+  parser.on("--trigger VALUE") { |value| options["trigger"] = value }
+  parser.on("--schedule-mode VALUE") { |value| options["schedule_mode"] = value }
+end.parse!
+
+abort "root is required" if options["root"].to_s.empty? || !ARGV.empty?
+abort "trigger is invalid" unless options["trigger"].match?(/\A[a-z][a-z0-9_]{0,31}\z/)
+abort "schedule mode is invalid" unless options["schedule_mode"].match?(/\A[a-z][a-z0-9_]{0,31}\z/)
+
+root = File.expand_path(options.fetch("root"))
+$LOAD_PATH.unshift(File.join(root, "lib"))
+require "soul_core/env_loader"
+require "soul_core/nightly_drs_runner"
+
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+result = SoulCore::NightlyDrsRunner.new(root: root).run(
+  trigger: options.fetch("trigger"),
+  schedule_mode: options.fetch("schedule_mode")
+)
+puts result.fetch("reason")
+exit(result["ok"] ? 0 : 1)

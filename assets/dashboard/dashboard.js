@@ -4354,14 +4354,17 @@ function renderBackupStatus(payload) {
     "Remote deletion": "Disabled"
   });
   const drs = payload.drs || {};
-  byId("backup-drs-state").textContent = drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
+  const automation = payload.automation || {};
+  const lastAutomated = automation.last_run || {};
+  byId("backup-drs-state").textContent = automation.ready ? "NIGHTLY" : automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
   renderBackupFacts(byId("backup-drs-details"), {
-    "Last result": drs.state || "not run",
-    "Local": drs.local_state || "not run",
-    "Crucible": drs.replica_state || "not run",
-    "Completed": drs.completed_at || "not yet",
-    "Schedule": "Disabled",
-    "Credential": "Never retained"
+    "Last result": lastAutomated.state || drs.state || "not run",
+    "Local": lastAutomated.local_state || drs.local_state || "not run",
+    "Crucible": lastAutomated.replica_state || drs.replica_state || "not run",
+    "Completed": lastAutomated.completed_at || drs.completed_at || "not yet",
+    "Schedule": automation.ready ? "Nightly · 3:00 AM" : automation.mode === "qualification" ? "Qualification armed" : "Disabled",
+    "Next run": automation.next_run || "not scheduled",
+    "Credential": automation.credential_ready ? "Host-encrypted" : "Not enrolled"
   });
   renderBackupSnapshots(payload.snapshots);
   const status = !payload.available ? "Restic is unavailable."
