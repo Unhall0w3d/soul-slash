@@ -380,9 +380,11 @@ Dir.mktmpdir("soul-youtube-chunks-") do |root|
       chunk_responses.shift
     end
   )
+  progress_events = []
   chunk_video = chunk_client.upload_video(
     access_token: "ya29.chunk-fixture", upload_url: "https://upload.youtube.test/session",
-    path: video_path, mime_type: "video/mp4"
+    path: video_path, mime_type: "video/mp4",
+    progress: ->(event) { progress_events << event }
   )
   check.call("resumable upload sends bounded acknowledged chunks",
              chunk_video["id"] == "SoulA0chunks" &&
@@ -390,6 +392,11 @@ Dir.mktmpdir("soul-youtube-chunks-") do |root|
                ["bytes 0-#{SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES - 1}/#{SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES + 3}", SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES],
                ["bytes #{SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES}-#{SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES + 2}/#{SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES + 3}", 3]
              ])
+  check.call("resumable upload emits one dashboard-compatible event per chunk",
+             progress_events.length == 2 &&
+             progress_events.all? { |event| event.is_a?(Hash) && event["stage"] == "upload_chunk" && event["message"].to_s.include?("Uploading bytes") } &&
+             progress_events.map { |event| event["offset"] } == [0, SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES] &&
+             progress_events.all? { |event| event["total"] == SoulCore::YouTubeApiClient::UPLOAD_CHUNK_BYTES + 3 })
 end
 
 source = File.binread(File.expand_path("../lib/soul_core/youtube_api_client.rb", __dir__))

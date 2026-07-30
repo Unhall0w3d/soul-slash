@@ -86,7 +86,7 @@ begin
                visibility: options.fetch(:visibility),
                confirmation: required(options, :confirmation, "--confirmation"),
                expected_digest: required(options, :expected_digest, "--expected-digest"),
-               progress: ->(event, data) { warn(JSON.generate({ "event" => event, "data" => data })) }
+               progress: ->(event) { warn(JSON.generate({ "event" => event })) }
              )
            else
              raise OptionParser::InvalidArgument, "command must be status, authorize-preview, authorize-execute, description-status, description-authorize-preview, description-authorize-execute, description-preview, description-execute, upload-preview, or upload-execute"

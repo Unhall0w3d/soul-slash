@@ -9,6 +9,9 @@ Status: candidate-complete; awaiting human review
   application type, endpoint, file type, size, and owner-only permission checks.
 - The selected detected path is copied into the existing manual path field.
   Manual entry remains available.
+- The authenticated resumable uploader now emits the repository-wide
+  single-object progress event shape. This repairs the live dashboard failure
+  that occurred before the first video chunk was sent.
 - Discovery is non-recursive, follows no symlinks, and examines at most 64
   direct children of the Operator's Downloads directory.
 - Dashboard responses include only the validated path, filename, project ID,
@@ -18,7 +21,9 @@ Status: candidate-complete; awaiting human review
 ## Files changed
 
 - `lib/soul_core/youtube_oauth_service.rb`
+- `lib/soul_core/youtube_api_client.rb`
 - `assets/dashboard/dashboard.js`
+- `scripts/soul-youtube-publisher`
 - `scripts/verify-youtube-dashboard-upload-a1.rb`
 - `docs/soul/YOUTUBE_DASHBOARD_UPLOAD_A1_BRIEF.md`
 - `docs/soul/YOUTUBE_OAUTH_CLIENT_DISCOVERY_A1_REVIEW.md`
@@ -37,6 +42,8 @@ Status: candidate-complete; awaiting human review
   discovery and unsafe-permission, wrong-project, symlink, and secret-leak
   rejection.
 - Existing authenticated YouTube upload A0 verifier passed.
+- The A0 verifier now exercises the real chunked client with a unary Dashboard
+  callback and verifies one structured progress event per chunk.
 - `git diff --check` passed.
 
 ## Local LLM evals
