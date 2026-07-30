@@ -1,6 +1,6 @@
 # YouTube OAuth Client Discovery A1 Review
 
-Status: candidate-complete; awaiting human review
+Status: live-accepted; awaiting merge
 
 ## What was implemented
 
@@ -76,8 +76,25 @@ read-only and does not authorize or upload anything.
 
 ## Human review checklist
 
-- [ ] Detected file is shown without exposing client contents.
-- [ ] Manual path entry remains available.
-- [ ] Authorization still requires the exact preview and explicit button gate.
-- [ ] Authorization binds to the exact Soul Slash Synthesis channel.
-- [ ] No upload occurs during authorization or deterministic verification.
+- [x] Detected file is shown without exposing client contents.
+- [x] Manual path entry remains available.
+- [x] Authorization still requires the exact preview and explicit button gate.
+- [x] Authorization binds to the exact Soul Slash Synthesis channel.
+- [x] No upload occurs during authorization or deterministic verification.
+
+## Live acceptance
+
+On 2026-07-30, the Operator:
+
+1. authorized the exact `soul-slash-local-publisher` Desktop OAuth client;
+2. verified the expected Soul Slash Synthesis channel;
+3. previewed and explicitly approved one exact private upload;
+4. received a complete local upload receipt for video `un7jfZsbDRE`, with the
+   requested and returned privacy both `private` and the thumbnail applied; and
+5. separately reviewed and published the video through YouTube's human-owned
+   surface.
+
+Soul performed no automatic publication. The live run exposed a progress
+callback arity defect before the first attempted video chunk; the repaired
+single-object event contract was deterministically verified, deployed, and the
+subsequent supervised upload completed successfully.
