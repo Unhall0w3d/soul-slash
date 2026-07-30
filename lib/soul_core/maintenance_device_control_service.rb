@@ -22,6 +22,8 @@ module SoulCore
     LOCK_SCHEMA = "soul.maintenance.operation_lock.v1"
     LOCK_RECOVERY_GRACE_SECONDS = 30
     MAX_LOCK_BYTES = 4096
+    MAX_DIAGNOSTIC_EXCERPT_BYTES = 480
+    LIFECYCLE_CONTRACT = "device_scoped_v1"
     CRUCIBLE_HELPER_PATH = "/usr/local/libexec/soul-crucible-maintenance"
     CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
     SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
@@ -45,6 +47,7 @@ module SoulCore
     TARGETS = {
       "forge" => {
         "label" => "Forge",
+        "maintenance_adapter" => "proxmox_apt",
         "ssh_alias" => "proxmox-maintenance",
         "impact" => ["Pi-hole LXC 100 is interrupted while Forge reboots"],
         "maintenance" => [
@@ -84,6 +87,7 @@ module SoulCore
       },
       "pihole" => {
         "label" => "Pi-hole",
+        "maintenance_adapter" => "debian_apt_pihole",
         "ssh_alias" => "pihole-maintenance",
         "impact" => [],
         "maintenance" => [
@@ -111,6 +115,7 @@ module SoulCore
       },
       "crucible" => {
         "label" => "Crucible",
+        "maintenance_adapter" => "fedora_dnf5",
         "ssh_alias" => "crucible-maintenance",
         "impact" => ["Crucible backup storage is unavailable while the guest reboots"],
         "maintenance" => [
@@ -181,6 +186,8 @@ module SoulCore
         "device_label" => target_display_label(device_id, target.fetch("label")),
         "address" => target_display_address(device_id),
         "action" => action,
+        "maintenance_adapter" => target.fetch("maintenance_adapter"),
+        "lifecycle_contract" => LIFECYCLE_CONTRACT,
         "ssh_alias" => target.fetch("ssh_alias"),
         "commands" => commands.map { |argv| {"argv" => argv} },
         "readiness" => action == "reboot" ? target.fetch("reboot_readiness") : [],
@@ -264,7 +271,14 @@ module SoulCore
         evidence << command_evidence("maintenance.#{index + 1}", result)
         next if result.status == "ok"
 
-        return receipt(plan, started, "failed", "Maintenance stopped at fixed step #{index + 1}.", evidence)
+        diagnostic = evidence.last.fetch("diagnostic")
+        return receipt(
+          plan,
+          started,
+          "failed",
+          "Maintenance stopped at fixed step #{index + 1}: #{diagnostic.fetch('summary')}",
+          evidence
+        )
       end
       receipt(plan, started, "complete", "#{plan.fetch('device_label')} maintenance completed.", evidence)
     end
@@ -352,6 +366,8 @@ module SoulCore
         "receipt_id" => "device_receipt_#{@id_generator.call}",
         "device_id" => plan.fetch("device_id"),
         "action" => plan.fetch("action"),
+        "maintenance_adapter" => plan.fetch("maintenance_adapter"),
+        "lifecycle_contract" => plan.fetch("lifecycle_contract"),
         "expected_digest" => plan.fetch("expected_digest"),
         "lifecycle_state" => lifecycle,
         "summary" => summary,
@@ -364,12 +380,59 @@ module SoulCore
     end
 
     def command_evidence(adapter, result)
-      {
+      evidence = {
         "adapter" => adapter,
         "status" => result.status,
         "exit_status" => result.exit_status,
         "truncated" => result.truncated == true
       }
+      evidence["diagnostic"] = maintenance_diagnostic(result) unless result.status == "ok"
+      evidence
+    end
+
+    def maintenance_diagnostic(result)
+      source = [result.stderr, result.stdout].map(&:to_s).reject(&:empty?).join("\n")
+      code, summary = diagnostic_classification(result, source)
+      diagnostic = {"code" => code, "summary" => summary}
+      excerpt = sanitize_diagnostic_excerpt(source)
+      diagnostic["excerpt"] = excerpt unless excerpt.empty?
+      diagnostic
+    end
+
+    def diagnostic_classification(result, source)
+      return ["command_timeout", "The fixed command exceeded its bounded runtime."] if result.status == "timeout"
+
+      case source
+      when /401\s+Unauthorized|enterprise repository.*subscription|requires (?:a )?(?:valid )?subscription|authentication failed/i
+        ["repository_authorization", "A configured package repository rejected this device's authorization."]
+      when /could not get lock|unable to acquire (?:the )?(?:dpkg|apt|rpm|dnf|package manager).*lock|another app is currently holding the (?:yum|dnf) lock/i
+        ["package_manager_lock", "Another package-manager transaction holds the required lock."]
+      when /temporary failure resolving|could not resolve|name or service not known|failed to resolve/i
+        ["name_resolution", "The device could not resolve a package repository name."]
+      when /no space left on device|insufficient disk space|not enough (?:free )?disk space/i
+        ["storage_exhausted", "The device does not have enough storage for package maintenance."]
+      when /dpkg was interrupted|run ['"]?dpkg --configure -a|rpmdb.*(?:corrupt|damaged)|transaction.*(?:interrupted|incomplete)/i
+        ["package_state_interrupted", "The package manager has an interrupted or inconsistent transaction state."]
+      when /network is unreachable|connection (?:timed out|refused)|failed to connect|could not connect/i
+        ["network_unavailable", "The device could not reach a configured package repository."]
+      else
+        ["nonzero_exit", "The fixed maintenance command returned a nonzero exit status."]
+      end
+    end
+
+    def sanitize_diagnostic_excerpt(source)
+      value = source.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+      value = value.gsub(/\e\[[0-?]*[ -\/]*[@-~]/, "")
+      value = value.gsub(%r{([a-z][a-z0-9+.-]*://)[^/\s@]+@}i, '\1[REDACTED]@')
+      value = value.gsub(/([?&](?:token|access_?token|api_?key|auth|key|password|secret|signature)=)[^&#\s]+/i, '\1[REDACTED]')
+      value = value.gsub(/[[:cntrl:]]+/, " ").gsub(/\s+/, " ").strip
+      bounded_utf8(value, MAX_DIAGNOSTIC_EXCERPT_BYTES)
+    end
+
+    def bounded_utf8(value, maximum_bytes)
+      return value if value.bytesize <= maximum_bytes
+
+      value.byteslice(0, maximum_bytes).to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "").sub(/\s+\S*\z/, "").rstrip
     end
 
     def acquire_lock
@@ -562,6 +625,7 @@ module SoulCore
 
       {
         "label" => "Foundry",
+        "maintenance_adapter" => "proxmox_apt",
         "ssh_alias" => ssh_alias,
         "impact" => ["All Foundry guests are interrupted while Foundry reboots"],
         "maintenance" => FOUNDRY_MAINTENANCE,

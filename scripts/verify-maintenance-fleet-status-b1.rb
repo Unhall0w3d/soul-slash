@@ -161,6 +161,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("workstation", "address") == "atelier.example.test" &&
                devices.dig("workstation", "updates", "total") == 4 &&
                devices.dig("workstation", "updates", "freshness") == "cached_pacman_metadata" &&
+               devices.dig("workstation", "facts", "maintenance_adapter") == "arch_pacman" &&
+               devices.dig("workstation", "facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                devices.dig("workstation", "kernel", "running") == "7.1.4-1-cachyos-eevdf-lto" &&
                devices.dig("workstation", "kernel", "available") == "7.1.5-1" &&
                devices.dig("workstation", "kernel", "update_required") == true)
@@ -169,6 +171,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("forge", "updates", "native") == 1 &&
                devices.dig("forge", "kernel", "available") == "7.0.14-6-pve" &&
                devices.dig("forge", "kernel", "update_required") == true &&
+               devices.dig("forge", "facts", "maintenance_adapter") == "proxmox_apt" &&
+               devices.dig("forge", "facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                devices.dig("forge", "facts", "pihole_container", "id") == 100 &&
                devices.dig("forge", "facts", "pihole_container", "status") == "running")
   check.call("Pi-hole exposes versions, DNS health, services, and package evidence",
@@ -176,6 +180,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                devices.dig("pihole", "role").include?("Pi-hole DNS filtering") &&
                devices.dig("pihole", "version").include?("Core v6.4.3") &&
                devices.dig("pihole", "updates", "native") == 2 &&
+               devices.dig("pihole", "facts", "maintenance_adapter") == "debian_apt_pihole" &&
+               devices.dig("pihole", "facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                devices.dig("pihole", "facts", "blocking_enabled") == true &&
                devices.dig("pihole", "services").all? { |service_record| service_record["state"] == "active" })
   check.call("summary and network-map topology derive from the same device and route evidence",
@@ -401,6 +407,8 @@ Dir.mktmpdir("soul-fleet-status-") do |root|
                controlled_foundry["role"] == "Proxmox VE hypervisor" &&
                controlled_foundry.dig("facts", "control_target_id") == "foundry" &&
                controlled_foundry.dig("facts", "control_capability") == "fixed_maintenance" &&
+               controlled_foundry.dig("facts", "maintenance_adapter") == "proxmox_apt" &&
+               controlled_foundry.dig("facts", "maintenance_lifecycle") == "device_scoped_v1" &&
                controlled_foundry.dig("facts", "status_adapter") == "proxmox_fixed_maintenance" &&
                controlled_foundry.dig("facts", "mutation_supported") == true)
   mismatched_foundry = SoulCore::MaintenanceFleetStatusService.new(
