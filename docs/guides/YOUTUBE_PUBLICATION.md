@@ -1,15 +1,16 @@
 # YouTube Publication
 
 Soul can turn one reviewed Music Studio upload package into one
-operator-authorized YouTube upload. This is an optional foreground workflow;
-it does not run from the Dashboard, at startup, on a schedule, or after package
-export.
+operator-authorized YouTube upload. The foreground CLI remains available, and
+Music Studio now exposes the same OAuth, exact preview, and upload gates after
+an upload package exists. It does not run at startup, on a schedule, or
+automatically after package export.
 
-The commands below are merged and executable, but authenticated upload and
-description synchronization remain owner-authorized A0 candidates with live
-acceptance still open. Command availability and deterministic tests do not
-count as live acceptance; every remote mutation retains its exact foreground
-preview and human gate.
+The commands below are merged and executable. Authenticated upload has a
+Dashboard A1 candidate; description synchronization remains an A0 CLI
+candidate. Live acceptance is still open. Command or Dashboard availability
+and deterministic tests do not count as live acceptance; every remote mutation
+retains its exact foreground preview and human gate.
 
 ## Boundaries
 
@@ -25,6 +26,25 @@ preview and human gate.
 - Google may force uploads from an unaudited API project to remain private.
 - A successful upload receipt blocks accidental duplicate upload of the same
   exact package.
+
+## Use Music Studio
+
+1. Keep and export the reviewed song.
+2. Bind and render its reviewed full-duration visual.
+3. Prepare the exact local YouTube package and review its description.
+4. In **Authenticated YouTube draft**, inspect OAuth status.
+5. If needed, enter the local path to the owner-only Desktop OAuth JSON and
+   preview the exact authorization. Clicking **Authorize Soul Slash Synthesis**
+   opens one bounded consent flow.
+6. Leave visibility on **Private** unless you deliberately intend another
+   state.
+7. Preview the exact upload scope, then click **Upload private draft**.
+8. Follow the returned link to YouTube Studio for final human review and any
+   later publication.
+
+The Dashboard displays all three visibility choices because YouTube requires
+them, but never selects `unlisted` or `public`. The upload button is unavailable
+until a package exists and the exact preview succeeds.
 
 ## Authorize the Desktop OAuth client
 
@@ -111,6 +131,7 @@ never contacts Google:
 
 ```bash
 make verify-youtube-authenticated-upload
+make verify-youtube-dashboard-upload
 ```
 
 Engineering scope and owner authority are recorded in

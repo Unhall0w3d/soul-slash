@@ -45,6 +45,8 @@ require_relative "music_candidate_disposition_service"
 require_relative "music_candidate_trim_service"
 require_relative "music_visual_companion_service"
 require_relative "music_publication_package_service"
+require_relative "youtube_oauth_service"
+require_relative "youtube_authenticated_upload_service"
 require_relative "music_project_deletion_service"
 require_relative "music_reference_library_service"
 require_relative "music_reference_analysis_service"
@@ -99,6 +101,8 @@ module SoulCore
       music_candidate_trim_service: nil,
       music_visual_companion_service: nil,
       music_publication_package_service: nil,
+      youtube_oauth_service: nil,
+      youtube_authenticated_upload_service: nil,
       music_project_deletion_service: nil,
       music_reference_library_service: nil,
       music_reference_analysis_service: nil,
@@ -146,6 +150,8 @@ module SoulCore
       @music_candidate_trim_service = music_candidate_trim_service
       @music_visual_companion_service = music_visual_companion_service
       @music_publication_package_service = music_publication_package_service
+      @youtube_oauth_service = youtube_oauth_service
+      @youtube_authenticated_upload_service = youtube_authenticated_upload_service
       @music_project_deletion_service = music_project_deletion_service
       @music_reference_library_service = music_reference_library_service
       @music_reference_analysis_service = music_reference_analysis_service
@@ -409,6 +415,11 @@ module SoulCore
       when "music.publication.draft" then domain(music_publication_package.draft(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id")))
       when "music.publication.preview" then domain(music_publication_package.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description")))
       when "music.publication.execute" then domain(music_publication_package.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), description: required(parameters, "description"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "youtube.oauth.status" then domain(youtube_oauth.status)
+      when "youtube.oauth.authorization.preview" then domain(youtube_oauth.preview(client_path: required(parameters, "client_path")))
+      when "youtube.oauth.authorization.execute" then domain(youtube_oauth.execute(client_path: required(parameters, "client_path"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "youtube.upload.preview" then domain(youtube_authenticated_upload.preview(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), visibility: parameters.fetch("visibility", "private")))
+      when "youtube.upload.execute" then domain(youtube_authenticated_upload.execute(project_id: required(parameters, "project_id"), candidate_id: required(parameters, "candidate_id"), visual_id: required(parameters, "visual_id"), visibility: parameters.fetch("visibility", "private"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "visual.resources.status" then domain(visual_studio.resources)
       when "visual.motion.qualification" then domain(visual_motion_qualification.snapshot)
       when "visual.projects.list" then domain(project_release.decorate_outcome(visual_studio.list(limit: bounded_limit(parameters["limit"], 200)), kind: "visual"))
@@ -924,6 +935,14 @@ module SoulCore
 
     def music_publication_package
       @music_publication_package_service ||= MusicPublicationPackageService.new(root: @root, visual_service: music_visual_companion)
+    end
+
+    def youtube_oauth
+      @youtube_oauth_service ||= YouTubeOAuthService.new(root: @root)
+    end
+
+    def youtube_authenticated_upload
+      @youtube_authenticated_upload_service ||= YouTubeAuthenticatedUploadService.new(root: @root, oauth: youtube_oauth)
     end
 
     def music_project_deletion

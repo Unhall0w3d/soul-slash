@@ -238,12 +238,12 @@
       "summary": "Upload reviewed packages as unpublished drafts while preserving manual metadata review and publication.",
       "acceptance": "OAuth and upload are explicitly authorized; publication remains human-controlled.",
       "source": "Qualified expansion",
-      "notes": "A0 owner-authorized candidate adds a foreground Desktop OAuth flow, exact Soul Slash Synthesis channel gate, digest-bound upload preview, resumable upload, exact thumbnail application, partial-outcome handling, and owner-private receipts. Private is the default; YouTube-required visibility selection remains an explicit human decision. Deterministic fake-transport verification passes; live OAuth and one selected private upload remain human acceptance gates.",
-      "implementation": "YouTubeOAuthService, YouTubeApiClient, YouTubeAuthenticatedUploadService, and scripts/soul-youtube-publisher. No Dashboard secret surface, background worker, schedule, automatic upload, or later visibility mutation.",
+      "notes": "A0 provides the foreground Desktop OAuth transport, exact Soul Slash Synthesis channel gate, digest-bound resumable upload, thumbnail application, partial outcomes, and owner-private receipts. Dashboard A1 exposes those same gates only after an exact Music Studio package exists. Private is the default; YouTube-required visibility selection remains an explicit human decision. Deterministic fake-transport verification passes; live OAuth and one selected private upload remain human acceptance gates.",
+      "implementation": "YouTubeOAuthService, YouTubeApiClient, YouTubeAuthenticatedUploadService, ApplicationFacade operations, Music Studio controls, and scripts/soul-youtube-publisher. No Dashboard secret value, background worker, schedule, automatic upload, or later visibility mutation.",
       "technologies": "Ruby stdlib, OAuth 2.0 installed-app flow with PKCE/state, YouTube Data API v3 resumable upload, SHA-256 digest binding, owner-only atomic JSON.",
-      "interfaces": "Foreground CLI only in A0: status, authorize-preview/execute, upload-preview/execute.",
-      "commands": "make verify-youtube-authenticated-upload; scripts/soul-youtube-publisher status",
-      "references": "docs/soul/YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md; docs/guides/YOUTUBE_PUBLICATION.md; docs/assessments/YOUTUBE_AUTHENTICATED_UPLOAD_A0_REVIEW.md"
+      "interfaces": "Music Studio exact-package OAuth and upload gates; foreground CLI status, authorize-preview/execute, and upload-preview/execute.",
+      "commands": "make verify-youtube-authenticated-upload; make verify-youtube-dashboard-upload; scripts/soul-youtube-publisher status",
+      "references": "docs/soul/YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md; docs/soul/YOUTUBE_DASHBOARD_UPLOAD_A1_BRIEF.md; docs/guides/YOUTUBE_PUBLICATION.md; docs/assessments/YOUTUBE_AUTHENTICATED_UPLOAD_A0_REVIEW.md; docs/assessments/YOUTUBE_DASHBOARD_UPLOAD_A1_REVIEW.md"
     },
     {
       "item_id": "track_youtube_description_sync",
