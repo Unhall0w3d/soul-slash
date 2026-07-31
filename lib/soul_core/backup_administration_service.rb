@@ -32,6 +32,7 @@ module SoulCore
     MAX_RETENTION_SELECTION = 50
     MAX_RESTORE_PATHS = 20
     MAX_INVENTORY_PATHS = BackupRetentionLedger::MAX_PATHS
+    OPERATOR_MAX_SOURCE_ROOTS = 256
     BACKUP_TIMEOUT = 3600
     CHECK_TIMEOUT = 1200
     RETENTION_TIMEOUT = 3600
@@ -92,7 +93,11 @@ module SoulCore
           manifests: MANIFEST_RECONCILIATION_CONFIRMATION
         }
       end
-      @ledger = BackupRetentionLedger.new(ledger_path: @ledger_path, clock: @clock)
+      @ledger = BackupRetentionLedger.new(
+        ledger_path: @ledger_path,
+        clock: @clock,
+        max_roots: operator ? OPERATOR_MAX_SOURCE_ROOTS : BackupRetentionLedger::MAX_ROOTS
+      )
       raise ArgumentError, "backup state must remain inside the project root" unless within?(@state_root, @root)
       validate_private_state_root!
     end

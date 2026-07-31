@@ -40,6 +40,20 @@ Dir.mktmpdir("soul-backup-retention-") do |sandbox|
   current_time = Time.utc(2026, 7, 1, 12, 0, 0)
   service = SoulCore::BackupRetentionLedger.new(ledger_path: ledger_path, clock: -> { current_time })
 
+  operator_roots = 117.times.map { |index| format("/home/operator/source-%03d", index) }
+  operator_manifest = manifest.call(id: "f", at: current_time, entries: operator_roots, roots: operator_roots)
+  default_root_limit = service.observe_preview(manifest: operator_manifest)
+  operator_service = SoulCore::BackupRetentionLedger.new(
+    ledger_path: File.join(sandbox, "operator-retention.json"),
+    clock: -> { current_time },
+    max_roots: SoulCore::BackupRetentionLedger::MAX_CONFIGURABLE_ROOTS
+  )
+  configured_root_limit = operator_service.observe_preview(manifest: operator_manifest)
+  check.call("the default Soul root ceiling remains 64 while a bounded Operator ledger accepts 117 roots",
+    default_root_limit["lifecycle_state"] == "awaiting_input" &&
+      default_root_limit["reason"].include?("source roots exceed 64") &&
+      configured_root_limit["lifecycle_state"] == "complete")
+
   initial = manifest.call(id: "a", at: current_time, entries: paths.values)
   preview = service.observe_preview(manifest: initial)
   check.call("first verified manifest prepares an exact approval gate",
