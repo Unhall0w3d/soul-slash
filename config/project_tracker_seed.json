@@ -83,7 +83,7 @@
       "summary": "Present what Soul can invoke, required inputs, conversational triggers, Core requirements, and approval behavior without dumping the raw skill registry.",
       "acceptance": "The Operator can inspect available invocations; Soul can explain when each is appropriate; examples do not accidentally execute capabilities.",
       "source": "Operator-requested invocation list",
-      "notes": "The curated guide exposes 12 current human-facing invocations without executing them. Operator completed live acceptance on 2026-07-27.",
+      "notes": "The curated guide exposes 13 current human-facing invocations without executing them. Operator completed the original live acceptance on 2026-07-27; Capability and Skill Foundation A1 adds device maintenance as a candidate pending review.",
       "implementation": "Curated YAML catalog, registry-backed Ruby read service, allowlisted application operation, deterministic Chat discoverability route, and a filterable read-only Chat context-rail dialog.",
       "technologies": "Ruby, YAML, vanilla JavaScript, semantic HTML, handwritten responsive CSS.",
       "interfaces": "Authenticated Dashboard Chat context rail; deterministic Chat; soul.application.v1 invocations.list.",
@@ -94,12 +94,18 @@
       "item_id": "track_dashboard_skill_coverage",
       "title": "Complete appropriate Dashboard capability coverage through Chat",
       "area": "Chat + Dashboard",
-      "horizon": "next",
+      "horizon": "now",
       "status": "in_progress",
       "priority": "high",
-      "summary": "Continue mapping appropriate Music, Visual, Core, project, and administrative Dashboard actions into bounded conversational workflows.",
+      "summary": "Use one machine-readable capability contract to map appropriate Music, Visual, Core, project, and administrative Dashboard actions into bounded conversational workflows. A1 adds the first administrative vertical slice for exact device maintenance.",
       "acceptance": "Soul gathers required fields, proposes optional values, reaches the correct human gate, and returns resulting artifacts without bypassing Studio lineage.",
-      "source": "Conversational creative and administration roadmap"
+      "source": "Conversational creative and administration roadmap",
+      "notes": "Capability and Skill Foundation A1 is candidate-complete pending Operator review. It makes Dashboard self-recognition catalog-driven, adds maintenance.device, and preserves Operator-only gestures for reboot, workstation maintenance, deletion, credentials, and publication.",
+      "implementation": "A normalized YAML catalog declares surfaces, targets, underlying operations, Chat/Voice/Dashboard coverage, authority, progress, and receipts. The first new workflow shares Chat and Voice Presence, resolves one exact fleet target, previews the existing fixed adapter, retains a digest-bound ten-minute confirmation, and returns refreshed fleet evidence.",
+      "technologies": "Ruby deterministic routing and bounded action state; YAML capability, invocation, and skill registries; existing fixed MaintenanceDeviceControlService.",
+      "interfaces": "Authenticated Dashboard Chat, Voice Presence, Administration → Guided Maintenance, terminal, and Noctalia protected handoff.",
+      "commands": "make verify-operator-capability-catalog\nmake verify-conversation-maintenance-workflow\nruby scripts/verify-dashboard-capability-guide-a1.rb\nruby scripts/verify-invocation-catalog-a1.rb",
+      "references": "docs/soul/CAPABILITY_SKILL_FOUNDATION_A1_BRIEF.md\ndocs/assessments/CAPABILITY_SKILL_FOUNDATION_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md"
     },
     {
       "item_id": "track_persona_fidelity",
@@ -545,8 +551,8 @@
       "item_id": "track_long_form_mix_editor",
       "title": "Editable long-form music and visual mix assembly",
       "area": "Creative Studios",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Assemble reviewed songs and reviewed short visual loops into one cohesive longer-form program without destructively altering source candidates.",
       "implementation": "A0 seals immutable stereo-source edit decision lists and exports checksum-verified editor handoffs. A1 renders bounded private FLAC/MP3 listening candidates from the exact trims and crossfades. A2 records replaceable human listening decisions with preserved history and permits only the latest exact keep review to export the verified A1 audio with metadata and checksums. Visual-loop sequencing, release mastering, and publication remain separate future work.",
@@ -554,9 +560,9 @@
       "interfaces": "Creative Studios → Mix Studio; immutable sequence composer; listening player; human review form; exact accepted-audio export gate; portable editor handoff.",
       "commands": "make verify-long-form-mix\nmake verify-long-form-mix-render\nmake verify-long-form-mix-finalization",
       "references": "docs/guides/MIX_STUDIO.md\ndocs/soul/LONG_FORM_MIX_A0_BRIEF.md\ndocs/soul/LONG_FORM_MIX_A1_LISTENING_RENDER_BRIEF.md\ndocs/soul/LONG_FORM_MIX_A2_ACCEPTED_EXPORT_BRIEF.md\ndocs/assessments/LONG_FORM_MIX_A2_ACCEPTED_EXPORT_REVIEW.md",
-      "acceptance": "The Operator can seal an exact non-destructive sequence, hear the rendered transitions, preserve corrected listening decisions, and export only an exact latest keep review as checksum-verified accepted audio. Complete listening review of the current candidate remains human-gated. Visual-loop sequencing and a later combined audio/video contract remain open.",
+      "acceptance": "The Operator sealed an exact non-destructive sequence, heard the complete 423.6-second render, recorded review mixreview_68ea17f07e94511a, and exported only that latest keep review as checksum-verified accepted audio. The review rated Biome Change 3/5, passed transition quality, and marked sequence cohesion partial because the songs' general sound is too dissimilar. Visual-loop sequencing and a later combined audio/video contract remain open.",
       "source": "Operator-approved long-form Mix Studio direction and A2 continuation, 2026-07-30",
-      "notes": "Accepted audio is not a mastered release, visual program, native DAW project, or publication."
+      "notes": "Live A2 acceptance completed 2026-07-31. Immutable export scope digest: 6cd87b8398efceccb47262d8087a0142940c22edc648f3bbb6e821cc99f2b937. All package checksums passed; FLAC and MP3 are stereo 48 kHz and exactly 423.6 seconds. Accepted audio is not a mastered release, visual program, native DAW project, or publication."
     },
     {
       "item_id": "track_nixos_temper_maintenance",

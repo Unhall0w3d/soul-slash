@@ -16,6 +16,7 @@ require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
 require_relative "conversation_creative_workflow_service"
+require_relative "conversation_maintenance_workflow_service"
 require_relative "conversation_core_workflow_service"
 require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
@@ -756,6 +757,7 @@ module SoulCore
       @conversation_runtime ||= ConversationRuntime.new(root: @root, store: chat_store, env: resolver.effective_environment,
         creative_workflow_service: conversation_creative_workflow,
         core_workflow_service: conversation_core_workflow,
+        maintenance_workflow_service: conversation_maintenance_workflow,
         identity_compact_resolver: -> { %w[amd-free music].include?(core_orchestration.status.dig("data", "active_core_id")) })
     end
 
@@ -1007,6 +1009,14 @@ module SoulCore
 
     def conversation_core_workflow
       @conversation_core_workflow ||= ConversationCoreWorkflowService.new(core_orchestration: core_orchestration)
+    end
+
+    def conversation_maintenance_workflow
+      @conversation_maintenance_workflow ||= ConversationMaintenanceWorkflowService.new(
+        root: @root,
+        fleet_status_service: maintenance_fleet_status,
+        device_control_service: maintenance_device_control
+      )
     end
 
     def music_candidate_analysis

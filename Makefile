@@ -958,6 +958,14 @@ crucible-maintenance-authority-install:
 verify-maintenance-device-control:
 > @ruby scripts/verify-maintenance-device-control-c1.rb
 
+.PHONY: verify-conversation-maintenance-workflow verify-operator-capability-catalog
+
+verify-conversation-maintenance-workflow:
+> @ruby scripts/verify-conversation-maintenance-workflow-a1.rb
+
+verify-operator-capability-catalog:
+> @ruby scripts/verify-operator-capability-catalog-a1.rb
+
 verify-maintenance-fleet-discovery:
 > @ruby scripts/verify-maintenance-fleet-discovery-a1.rb
 

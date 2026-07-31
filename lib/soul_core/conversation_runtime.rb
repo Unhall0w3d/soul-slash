@@ -16,6 +16,7 @@ require_relative "conversation_evidence_followup_router"
 require_relative "conversation_evidence_store"
 require_relative "conversation_grounding_policy"
 require_relative "conversation_knowledge_reflection_service"
+require_relative "conversation_maintenance_workflow_service"
 require_relative "conversation_orchestrator"
 require_relative "conversation_provider_client"
 require_relative "conversation_provider_contract"
@@ -78,6 +79,7 @@ module SoulCore
       creative_archive_service: nil,
       creative_workflow_service: nil,
       core_workflow_service: nil,
+      maintenance_workflow_service: nil,
       identity_compact_resolver: nil
     )
       @root = File.expand_path(root)
@@ -111,6 +113,7 @@ module SoulCore
       @creative_archive_service = creative_archive_service || ConversationCreativeArchiveService.new(root: @root)
       @creative_workflow_service = creative_workflow_service
       @core_workflow_service = core_workflow_service
+      @maintenance_workflow_service = maintenance_workflow_service
       @identity_compact_resolver = identity_compact_resolver
       @weather_service = ConversationWeatherService.new(env: env)
       @response_truth_guard = ConversationResponseTruthGuard.new
@@ -137,6 +140,10 @@ module SoulCore
       if @core_workflow_service&.candidate_message?(message: text)
         core = @core_workflow_service.plan(message: text)
         return bounded_workflow_result(chat_id, text, core, provider, kind: "core_control", reason: "an explicit Core transfer uses the existing exact runtime gate")
+      end
+      if @maintenance_workflow_service&.candidate_message?(chat_id: chat_id, message: text)
+        maintenance = @maintenance_workflow_service.plan(chat_id: chat_id, message: text, progress: progress)
+        return bounded_workflow_result(chat_id, text, maintenance, provider, kind: "maintenance_workflow", reason: "an explicit device-maintenance request uses the fixed fleet controller and deterministic authority policy") if maintenance
       end
       if @creative_workflow_service&.candidate_message?(chat_id: chat_id, message: text)
         creative = @creative_workflow_service.plan(chat_id: chat_id, message: text, provider: provider, progress: progress)
