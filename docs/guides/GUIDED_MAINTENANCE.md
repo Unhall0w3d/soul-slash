@@ -6,6 +6,35 @@ and one-shot restoration of safely allowlisted Hyprland applications.
 
 Open it from **Administration → Guided Maintenance**.
 
+## Chat and Voice Presence
+
+Soul can invoke the same fixed device controller from Chat or Voice Presence
+when the Operator makes an explicit request such as:
+
+```text
+Run maintenance on Crucible.
+```
+
+Soul resolves one exact managed device from the current fleet snapshot,
+previews that device's existing fixed adapter, and repeats the device label,
+address, adapter, and no-reboot boundary. Routine package maintenance on a
+non-workstation device then accepts one short-lived conversational
+confirmation. A plain maintenance discussion, a status question, or an
+ambiguous target does not start the workflow.
+
+The retained confirmation is bound to the exact server-authored digest and
+expires after ten minutes. A confirming reply runs only that plan. Completion
+returns streamed progress, the device receipt, refreshed fleet evidence,
+remaining update count, reboot state, and bounded failure evidence. There is
+no automatic retry and no background continuation after the request returns.
+
+Reboot and workstation maintenance are protected actions. Soul may explain
+and prepare them, but typed or spoken affirmation is not execution authority.
+The Operator must use the Dashboard, a reviewed terminal command, or Noctalia
+for the final gesture. Permanent deletion, backup-snapshot deletion,
+credential or permission changes, and external publication follow the same
+protected-action principle in their owning workflows.
+
 ## Infrastructure control plane
 
 The page begins with the newest persisted fleet snapshot for the workstation,

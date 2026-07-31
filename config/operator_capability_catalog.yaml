@@ -1,0 +1,272 @@
+---
+schema_version: soul.operator_capability_catalog.v1
+surfaces:
+  - id: chat
+    label: Chat
+    aliases: [chat, conversation, transmission]
+    summary: Conversation, bounded research, local search, weather, system status, reviewed knowledge, and explicitly mapped operator workflows.
+    inputs: Ask naturally; action wording and required targets must be explicit before Soul invokes a capability.
+    boundary: A topical mention remains conversation and grants no execution authority.
+    skills: [system.status, weather.report, web.lookup, web.research, knowledge.vault.search, local.search]
+    invocations: [system-status, weather, web-research, knowledge-vault, local-search]
+    operations: [chats.send]
+    targets: [active conversation]
+    interfaces: [dashboard, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: read_only
+      conversational_confirmation: []
+      operator_gesture_required: [protected actions]
+    completion: {progress: streamed, receipt: conversation metadata}
+
+  - id: music_studio
+    label: Music Studio
+    aliases: [music studio, music, song, composition]
+    summary: Gather a brief, draft optional choices, generate, review, revise, bind, and export reviewed music.
+    inputs: Required for generation are intent, duration, mode, and rights status; optional musical choices may be proposed.
+    boundary: Generation and revision use reviewed gates; deletion and publication remain protected actions.
+    skills: [creative.music_production, creative.companion_production]
+    invocations: [music-production, companion-production]
+    operations: [music.projects.create, music.generation.preview, music.generation.execute, music.candidates.revision.preview, music.candidates.revision.execute, music.publication.preview, music.publication.execute]
+    targets: [music project, music candidate]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: reviewed_generation
+      conversational_confirmation: []
+      operator_gesture_required: [generation, revision, disposition, deletion, export, publication]
+    completion: {progress: streamed, receipt: candidate and generation receipts}
+
+  - id: visual_studio
+    label: Visual Studio
+    aliases: [visual studio, visual, image, artwork, motion]
+    summary: Gather visual briefs and create, review, revise, bind, and render still or native-motion candidates.
+    inputs: A clear visual intent; motion additionally needs reviewed context, supported duration, and chronological direction.
+    boundary: Destructive actions, binding, and external publication retain their owning human gates.
+    skills: [creative.visual_production, creative.companion_production]
+    invocations: [visual-production, companion-production]
+    operations: [visual.projects.create, visual.generation.preview, visual.generation.execute, visual.native_motion.preview, visual.native_motion.execute, visual.native_motion.revision.preview, visual.native_motion.revision.execute]
+    targets: [visual project, still candidate, motion candidate]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: reviewed_generation
+      conversational_confirmation: []
+      operator_gesture_required: [generation, revision, binding, deletion, export]
+    completion: {progress: streamed, receipt: visual candidate receipts}
+
+  - id: mix_studio
+    label: Mix Studio
+    aliases: [mix studio, long form mix, editor handoff]
+    summary: Arrange reviewed songs, render a listening candidate, prepare an editor handoff, reconcile it, and finalize a reviewed mix.
+    inputs: Exact reviewed source candidates, order, title, and any transition notes.
+    boundary: Human DAW editing and finalization remain explicit; source songs are never silently replaced.
+    skills: []
+    invocations: []
+    operations: [mix.projects.create, mix.render.preview, mix.render.execute, mix.handoff.preview, mix.handoff.execute]
+    targets: [mix project, listening candidate, editor handoff]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: reviewed_generation
+      conversational_confirmation: []
+      operator_gesture_required: [render, handoff, finalization]
+    completion: {progress: polled, receipt: mix render and finalization receipts}
+
+  - id: youtube_publication
+    label: YouTube publication
+    aliases: [youtube upload, youtube publication, publish video]
+    summary: Authorize the owner-local uploader and create an exact private YouTube draft from a reviewed package.
+    inputs: Exact reviewed upload package, configured Desktop OAuth identity, channel, and visibility.
+    boundary: Upload remains a protected external action; Soul never publishes a video publicly from conversational affirmation.
+    skills: []
+    invocations: []
+    operations: [youtube.oauth.authorization.preview, youtube.oauth.authorization.execute, youtube.upload.preview, youtube.upload.execute]
+    targets: [reviewed upload package, configured YouTube channel]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: protected_action
+      conversational_confirmation: []
+      operator_gesture_required: [OAuth authorization, upload, publication]
+    completion: {progress: streamed, receipt: OAuth and upload receipts}
+
+  - id: project_timeline
+    label: Project Timeline
+    aliases: [project timeline, timeline, project tracker, tracker]
+    summary: Read the implementation ledger, inspect one item, or make one explicit bounded edit.
+    inputs: Name the item and exact field or state to change.
+    boundary: Timeline state is planning evidence and never merge, release, or execution authority.
+    skills: [project.timeline.inspect, project.timeline.update]
+    invocations: [project-timeline]
+    operations: [project_tracker.snapshot, project_tracker.items.create, project_tracker.items.update]
+    targets: [timeline item]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: local_state
+      conversational_confirmation: [explicit item edit]
+      operator_gesture_required: []
+    completion: {progress: immediate, receipt: optimistic revision}
+
+  - id: core_control
+    label: Core control
+    aliases: [core, cores, core control, runtime mode]
+    summary: Inspect and transition among configured Cores without rebooting.
+    inputs: Name the exact target Core.
+    boundary: Active work is rechecked and only the server-authored action click authorizes a transition.
+    skills: [cores.activate]
+    invocations: [core-control]
+    operations: [core.status, core.activate.preview, core.activate.execute]
+    targets: [configured Core]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: partial}
+    authority:
+      default: runtime_mutation
+      conversational_confirmation: []
+      operator_gesture_required: [Core transition]
+    completion: {progress: immediate, receipt: runtime state}
+
+  - id: guided_maintenance
+    label: Guided Maintenance
+    aliases: [guided maintenance, maintenance, maintain device, update device]
+    summary: Inspect fleet evidence and run one fixed package-maintenance workflow on an exact managed device.
+    inputs: Name one exact managed device and distinguish maintenance from reboot.
+    boundary: Routine device maintenance accepts one short-lived conversational confirmation; reboot and workstation maintenance remain protected Operator actions.
+    skills: [maintenance.device]
+    invocations: [device-maintenance]
+    operations: [maintenance.fleet.snapshot, maintenance.fleet.device.refresh, maintenance.device.preview, maintenance.device.execute, maintenance.device.receipts]
+    targets: [managed host, VM, container, Proxmox node]
+    interfaces: [dashboard, chat, voice_presence, noctalia, terminal]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: routine_mutation
+      conversational_confirmation: [device package maintenance]
+      operator_gesture_required: [reboot, workstation maintenance]
+    completion: {progress: streamed, receipt: device maintenance receipt and refreshed fleet evidence}
+
+  - id: fleet_and_topology
+    label: Fleet and Operations Topology
+    aliases: [fleet, operations topology, device discovery, network map]
+    summary: Inspect, refresh, discover, enroll, ignore, and map local managed or status-only devices.
+    inputs: Exact device for refresh or enrollment; explicit subnet for discovery.
+    boundary: Discovery grants no mutation authority; enrollment and ignored-device changes retain exact gates.
+    skills: []
+    invocations: []
+    operations: [maintenance.fleet.status, maintenance.fleet.device.refresh, maintenance.discovery.scan, maintenance.discovery.enroll.preview, maintenance.discovery.enroll.execute]
+    targets: [LAN device, managed host, status-only device]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: mixed
+      conversational_confirmation: []
+      operator_gesture_required: [enrollment, ignore, removal, SSH alias change]
+    completion: {progress: immediate, receipt: fleet snapshot and discovery registry}
+
+  - id: backup_and_recovery
+    label: Backup and Recovery
+    aliases: [backup, backup and recovery, restore, replication, drs]
+    summary: Inspect backup health, create and replicate snapshots, validate recovery, and manage reviewed retention.
+    inputs: Exact operation, snapshot or path scope, and owner-local repository credential when required.
+    boundary: Snapshot deletion, retention removal, and restore remain protected Operator actions.
+    skills: []
+    invocations: []
+    operations: [backup.status, backup.create.preview, backup.create.execute, backup.replica.preview, backup.replica.execute, backup.restore.preview, backup.restore.execute, backup.retention.preview, backup.retention.execute]
+    targets: [local backup repository, off-device replica, reviewed snapshot]
+    interfaces: [dashboard, terminal]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: mixed
+      conversational_confirmation: [create backup, copy off-device]
+      operator_gesture_required: [restore, retention deletion, snapshot deletion]
+    completion: {progress: streamed, receipt: backup and replication receipts}
+
+  - id: skill_studio
+    label: Skill Studio
+    aliases: [skill studio, skills studio, capability workshop]
+    summary: Review proposals, Beta candidates, test evidence, upstream candidates, and production promotion.
+    inputs: Exact proposal, candidate, revision, source, or test result.
+    boundary: Proposal approval, implementation, promotion, and production replacement retain two human gates.
+    skills: []
+    invocations: []
+    operations: [skill_studio.proposals.list, skill_studio.proposals.approval.preview, skill_studio.betas.promotion.preview]
+    targets: [proposal, Beta skill, upstream skill candidate]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: protected_action
+      conversational_confirmation: []
+      operator_gesture_required: [proposal approval, Beta build, promotion, deletion]
+    completion: {progress: immediate, receipt: proposal and promotion records}
+
+  - id: self_assessment
+    label: Self Assessment
+    aliases: [self assessment, assessment, system assessment]
+    summary: Collect bounded host, runtime, dependency, capability, model, and storage evidence.
+    inputs: Name the requested assessment scope.
+    boundary: Assessment gathers evidence and never authorizes mutation.
+    skills: [system.status]
+    invocations: [system-status]
+    operations: [system_status.refresh, self_improvement.snapshot, self_improvement.refresh]
+    targets: [Soul runtime, local host]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: partial, voice: partial}
+    authority:
+      default: read_only
+      conversational_confirmation: []
+      operator_gesture_required: [host mutation]
+    completion: {progress: immediate, receipt: dated assessment evidence}
+
+  - id: self_augmentation
+    label: Self Augmentation
+    aliases: [self augmentation, augmentation]
+    summary: Inspect Soul's architecture and prepare review-only augmentation experiments.
+    inputs: Exact architecture question or reviewed experiment.
+    boundary: Inspection and proposals never authorize code application, deployment, or host mutation.
+    skills: []
+    invocations: []
+    operations: [self_augmentation.experiments.list]
+    targets: [Soul architecture, augmentation experiment]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: protected_action
+      conversational_confirmation: []
+      operator_gesture_required: [experiment approval, implementation, promotion]
+    completion: {progress: immediate, receipt: experiment record}
+
+  - id: perception
+    label: Picture and screen understanding
+    aliases: [picture understanding, screen understanding, current window, monitor]
+    summary: Inspect one supplied picture, explicit fresh capture, or existing Studio candidate.
+    inputs: One picture or explicit capture target plus a question.
+    boundary: No background watching, periodic capture, screen control, or authority from pixels.
+    skills: []
+    invocations: [picture-and-screen]
+    operations: []
+    targets: [attached image, focused window, monitor, region, Studio candidate]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: read_only
+      conversational_confirmation: [one-shot capture request]
+      operator_gesture_required: []
+    completion: {progress: streamed, receipt: ephemeral capture metadata}
+
+  - id: review_center
+    label: Review Center
+    aliases: [review center, reviews]
+    summary: Aggregate pending human-review gates without replacing the owning workflow.
+    inputs: Select one exact originating record.
+    boundary: Review Center presentation never changes lineage, authority, or confirmation requirements.
+    skills: []
+    invocations: []
+    operations: []
+    targets: [pending review record]
+    interfaces: [dashboard]
+    coverage: {dashboard: available, chat: missing, voice: missing}
+    authority:
+      default: read_only
+      conversational_confirmation: []
+      operator_gesture_required: [owning protected action]
+    completion: {progress: immediate, receipt: owning workflow receipt}
