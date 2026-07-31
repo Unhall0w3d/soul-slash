@@ -10,6 +10,7 @@ require "time"
 require_relative "backup_manifest_policy"
 require_relative "backup_retention_ledger"
 require_relative "bounded_command_runner"
+require_relative "operator_backup_manifest_policy"
 
 module SoulCore
   class BackupAdministrationService
@@ -19,12 +20,19 @@ module SoulCore
     REPLICA_CONFIRMATION = "COPY_VERIFIED_BACKUP_TO_CRUCIBLE"
     DRS_CONFIRMATION = "CREATE_AND_REPLICATE_VERIFIED_DRS_BACKUP"
     MANIFEST_RECONCILIATION_CONFIRMATION = "RECONCILE_BACKUP_MANIFESTS"
+    OPERATOR_BACKUP_CONFIRMATION = "CREATE_VERIFIED_OPERATOR_BACKUP"
+    OPERATOR_RETENTION_CONFIRMATION = "FORGET_SELECTED_OPERATOR_BACKUP_SNAPSHOTS"
+    OPERATOR_RESTORE_CONFIRMATION = "STAGE_OPERATOR_BACKUP_RESTORE"
+    OPERATOR_REPLICA_CONFIRMATION = "COPY_VERIFIED_OPERATOR_BACKUP_TO_CRUCIBLE"
+    OPERATOR_DRS_CONFIRMATION = "CREATE_AND_REPLICATE_VERIFIED_OPERATOR_DRS_BACKUP"
+    OPERATOR_MANIFEST_RECONCILIATION_CONFIRMATION = "RECONCILE_OPERATOR_BACKUP_MANIFESTS"
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     MAX_PASSWORD_BYTES = 1024
     MAX_SNAPSHOTS = 100
     MAX_RETENTION_SELECTION = 50
     MAX_RESTORE_PATHS = 20
     MAX_INVENTORY_PATHS = BackupRetentionLedger::MAX_PATHS
+    OPERATOR_MAX_SOURCE_ROOTS = 256
     BACKUP_TIMEOUT = 3600
     CHECK_TIMEOUT = 1200
     RETENTION_TIMEOUT = 3600
@@ -32,30 +40,64 @@ module SoulCore
     REPLICA_TIMEOUT = 3600
     REPLICA_CHECK_TIMEOUT = 1800
 
-    def initialize(root: Dir.pwd, home: Dir.home, process_env: ENV, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) })
+    def initialize(root: Dir.pwd, home: Dir.home, process_env: ENV, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, profile_id: "soul")
       @root = File.expand_path(root)
       @home = File.expand_path(home)
       @env = process_env.to_h
       @runner = runner
       @clock = clock
       @id_generator = id_generator
-      @repository = File.expand_path(@env.fetch("SOUL_BACKUP_REPOSITORY", "/mnt/soul-backup/restic"))
-      @mount = File.expand_path(@env.fetch("SOUL_BACKUP_MOUNT", File.dirname(@repository)))
-      @state_root = File.join(@root, "Soul", "private", "backup")
+      @profile_id = profile_id.to_s
+      raise ArgumentError, "backup profile must be soul or operator" unless %w[soul operator].include?(@profile_id)
+
+      operator = @profile_id == "operator"
+      @profile_label = operator ? "Operator" : "Soul"
+      @snapshot_tag = operator ? OperatorBackupManifestPolicy::SNAPSHOT_TAG : "soul-state"
+      @environment_prefix = operator ? "OPERATOR_BACKUP" : "SOUL_BACKUP"
+      @repository = File.expand_path(profile_environment("REPOSITORY", "/mnt/soul-backup/restic"))
+      @mount = File.expand_path(profile_environment("MOUNT", File.dirname(@repository)))
+      @state_root = File.join(@root, "Soul", "private", operator ? "operator_backup" : "backup")
       @sources_path = File.join(@state_root, "sources.txt")
       @excludes_path = File.join(@state_root, "excludes.txt")
       @ledger_path = File.join(@state_root, "retention-ledger.json")
       @manifest_root = File.join(@state_root, "manifests")
       @receipt_root = File.join(@state_root, "receipts")
       @restore_root = File.join(@state_root, "restores")
-      @operation_lock_path = File.join(@state_root, "operation.lock")
-      @replica_repository = @env.fetch("SOUL_BACKUP_REPLICA_REPOSITORY", "sftp:crucible-maintenance:/srv/soul-backup/restic").to_s
-      @replica_ssh_alias = @env.fetch("SOUL_BACKUP_REPLICA_SSH_ALIAS", "crucible-maintenance").to_s
-      @replica_target_path = @env.fetch("SOUL_BACKUP_REPLICA_TARGET_PATH", "/srv/soul-backup/restic").to_s
-      @replica_owner = @env.fetch("SOUL_BACKUP_REPLICA_OWNER", "souladmin").to_s
-      @replica_ssh_config = File.expand_path(@env.fetch("SOUL_BACKUP_REPLICA_SSH_CONFIG", File.join(@home, ".ssh", "config")).to_s)
-      @manifest_policy = BackupManifestPolicy.new(root: @root, home: @home)
-      @ledger = BackupRetentionLedger.new(ledger_path: @ledger_path, clock: @clock)
+      @operation_lock_path = File.join(@root, "Soul", "private", "backup", "operation.lock")
+      @replica_repository = profile_environment("REPLICA_REPOSITORY", "sftp:crucible-maintenance:/srv/soul-backup/restic").to_s
+      @replica_ssh_alias = profile_environment("REPLICA_SSH_ALIAS", "crucible-maintenance").to_s
+      @replica_target_path = profile_environment("REPLICA_TARGET_PATH", "/srv/soul-backup/restic").to_s
+      @replica_owner = profile_environment("REPLICA_OWNER", "souladmin").to_s
+      @replica_ssh_config = File.expand_path(profile_environment("REPLICA_SSH_CONFIG", File.join(@home, ".ssh", "config")).to_s)
+      @manifest_policy = if operator
+        OperatorBackupManifestPolicy.new(root: @root, home: @home)
+      else
+        BackupManifestPolicy.new(root: @root, home: @home)
+      end
+      @confirmations = if operator
+        {
+          backup: OPERATOR_BACKUP_CONFIRMATION,
+          retention: OPERATOR_RETENTION_CONFIRMATION,
+          restore: OPERATOR_RESTORE_CONFIRMATION,
+          replica: OPERATOR_REPLICA_CONFIRMATION,
+          drs: OPERATOR_DRS_CONFIRMATION,
+          manifests: OPERATOR_MANIFEST_RECONCILIATION_CONFIRMATION
+        }
+      else
+        {
+          backup: BACKUP_CONFIRMATION,
+          retention: RETENTION_CONFIRMATION,
+          restore: RESTORE_CONFIRMATION,
+          replica: REPLICA_CONFIRMATION,
+          drs: DRS_CONFIRMATION,
+          manifests: MANIFEST_RECONCILIATION_CONFIRMATION
+        }
+      end
+      @ledger = BackupRetentionLedger.new(
+        ledger_path: @ledger_path,
+        clock: @clock,
+        max_roots: operator ? OPERATOR_MAX_SOURCE_ROOTS : BackupRetentionLedger::MAX_ROOTS
+      )
       raise ArgumentError, "backup state must remain inside the project root" unless within?(@state_root, @root)
       validate_private_state_root!
     end
@@ -68,6 +110,9 @@ module SoulCore
       {
         "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
         "data" => {
+          "profile_id" => @profile_id,
+          "profile_label" => @profile_label,
+          "snapshot_tag" => @snapshot_tag,
           "available" => !@runner.which("restic").nil?,
           "repository" => display_path(@repository),
           "mount" => mount,
@@ -80,6 +125,7 @@ module SoulCore
           "restore_count" => regular_directory_count(@restore_root),
           "drs" => latest_drs_status,
           "manifest_reconciliation" => manifest_reconciliation_summary,
+          "policy" => @manifest_policy.respond_to?(:summary) ? @manifest_policy.summary : {},
           "replica" => replica_status(validated_password),
           "manual_only" => true,
           "password_retained" => false
@@ -97,7 +143,7 @@ module SoulCore
       scope = manifest_reconciliation_scope
       complete("exact add-only backup manifest reconciliation prepared", manifest_reconciliation_view(scope).merge(
         "expected_digest" => digest(scope),
-        "confirmation_phrase" => MANIFEST_RECONCILIATION_CONFIRMATION
+        "confirmation_phrase" => @confirmations.fetch(:manifests)
       ))
     rescue ArgumentError => error
       awaiting(error.message)
@@ -106,7 +152,7 @@ module SoulCore
     end
 
     def manifest_reconciliation_execute(confirmation:, expected_digest:)
-      return awaiting("exact backup manifest reconciliation confirmation is required") unless confirmation.to_s == MANIFEST_RECONCILIATION_CONFIRMATION
+      return awaiting("exact backup manifest reconciliation confirmation is required") unless confirmation.to_s == @confirmations.fetch(:manifests)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
 
@@ -146,6 +192,8 @@ module SoulCore
       preflight = replica_preflight(password)
       scope = {
         "operation" => "backup_replica_copy",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "source_repository_fingerprint" => repository_fingerprint,
         "target_repository" => @replica_repository,
         "target_state" => preflight.fetch("target_state"),
@@ -161,7 +209,7 @@ module SoulCore
         "password_retained" => false
       }
       complete("exact Crucible second-copy transaction prepared", scope.merge(
-        "expected_digest" => digest(scope), "confirmation_phrase" => REPLICA_CONFIRMATION
+        "expected_digest" => digest(scope), "confirmation_phrase" => @confirmations.fetch(:replica)
       ))
     rescue ArgumentError => error
       awaiting(error.message)
@@ -173,7 +221,7 @@ module SoulCore
 
     def replica_execute(password:, confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
-      return awaiting("exact Crucible copy confirmation is required") unless confirmation.to_s == REPLICA_CONFIRMATION
+      return awaiting("exact Crucible copy confirmation is required") unless confirmation.to_s == @confirmations.fetch(:replica)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
       preview = replica_preview(password: password)
@@ -188,9 +236,9 @@ module SoulCore
         initialized = replica_restic(password, "init", timeout: 120)
         raise "Crucible repository initialization failed#{restic_failure_suffix(initialized)}" unless initialized.success?
       end
-      progress&.call("stage" => "copy", "message" => "Copying missing Soul snapshots to Crucible…")
+      progress&.call("stage" => "copy", "message" => "Copying missing #{@profile_label} snapshots to Crucible…")
       copied = replica_restic(
-        password, "copy", "--from-repo", @repository, "--tag", "soul-state",
+        password, "copy", "--from-repo", @repository, "--tag", @snapshot_tag,
         timeout: REPLICA_TIMEOUT, output: 2 * 1024 * 1024,
         extra_env: { "RESTIC_FROM_PASSWORD" => password }
       )
@@ -229,6 +277,8 @@ module SoulCore
       preflight = backup_preflight(password)
       scope = {
         "operation" => "backup_create",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "repository_fingerprint" => repository_fingerprint,
         "source_manifest_digest" => Digest::SHA256.file(@sources_path).hexdigest,
         "exclusion_manifest_digest" => Digest::SHA256.file(@excludes_path).hexdigest,
@@ -241,7 +291,7 @@ module SoulCore
         "automatic_retry" => false
       }
       complete("exact backup transaction prepared", scope.merge(
-        "expected_digest" => digest(scope), "confirmation_phrase" => BACKUP_CONFIRMATION,
+        "expected_digest" => digest(scope), "confirmation_phrase" => @confirmations.fetch(:backup),
         "password_retained" => false
       ))
     rescue ArgumentError => error
@@ -254,15 +304,15 @@ module SoulCore
 
     def backup_execute(password:, confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
-      return awaiting("exact backup confirmation is required") unless confirmation.to_s == BACKUP_CONFIRMATION
+      return awaiting("exact backup confirmation is required") unless confirmation.to_s == @confirmations.fetch(:backup)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
       preview = backup_preview(password: password)
       return preview unless preview["ok"]
       return blocked("backup preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
 
-      progress&.call("stage" => "capture", "message" => "Capturing the approved owner-state sources…")
-      result = restic(password, "backup", "--json", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", "soul-state", "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024)
+      progress&.call("stage" => "capture", "message" => "Capturing the approved #{@profile_label} sources…")
+      result = restic(password, "backup", "--json", "--quiet", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024)
       raise "restic backup failed#{restic_failure_suffix(result)}" unless result.success?
       summary = json_lines(result.stdout).reverse.find { |item| item["message_type"] == "summary" }
       snapshot_id = summary.to_h["snapshot_id"].to_s
@@ -308,6 +358,8 @@ module SoulCore
       replica = replica_preview(password: password)
       scope = {
         "operation" => "backup_drs_transaction",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "local_capture" => component_scope(local),
         "replica_preflight" => component_scope(replica),
         "stage_order" => %w[local_capture local_verify deletion_ledger replica_copy replica_verify],
@@ -321,7 +373,7 @@ module SoulCore
       }
       complete("exact supervised DRS transaction prepared", scope.merge(
         "expected_digest" => digest(scope),
-        "confirmation_phrase" => DRS_CONFIRMATION
+        "confirmation_phrase" => @confirmations.fetch(:drs)
       ))
     rescue ArgumentError => error
       awaiting(error.message)
@@ -333,7 +385,7 @@ module SoulCore
 
     def drs_execute(password:, confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
-      return awaiting("exact DRS confirmation is required") unless confirmation.to_s == DRS_CONFIRMATION
+      return awaiting("exact DRS confirmation is required") unless confirmation.to_s == @confirmations.fetch(:drs)
 
       reviewed = drs_preview(password: password)
       return reviewed unless reviewed["ok"]
@@ -455,6 +507,8 @@ module SoulCore
       raise "restic retention dry-run failed#{restic_failure_suffix(dry_run)}" unless dry_run.success?
       scope = {
         "operation" => "backup_retention",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "repository_fingerprint" => repository_fingerprint,
         "ledger_digest" => holds.dig("data", "ledger_digest"),
         "snapshot_inventory_digest" => digest(snapshots),
@@ -465,7 +519,7 @@ module SoulCore
         "automatic_retry" => false
       }
       complete("exact forget and bounded prune transaction prepared", scope.merge(
-        "expected_digest" => digest(scope), "confirmation_phrase" => RETENTION_CONFIRMATION,
+        "expected_digest" => digest(scope), "confirmation_phrase" => @confirmations.fetch(:retention),
         "password_retained" => false
       ))
     rescue ArgumentError => error
@@ -478,7 +532,7 @@ module SoulCore
 
     def retention_execute(password:, snapshot_ids:, confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
-      return awaiting("exact retention confirmation is required") unless confirmation.to_s == RETENTION_CONFIRMATION
+      return awaiting("exact retention confirmation is required") unless confirmation.to_s == @confirmations.fetch(:retention)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
       preview = retention_preview(password: password, snapshot_ids: snapshot_ids)
@@ -517,6 +571,8 @@ module SoulCore
       raise ArgumentError, "restore path is absent from the snapshot" unless missing.empty?
       scope = {
         "operation" => "backup_staged_restore",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "repository_fingerprint" => repository_fingerprint,
         "snapshot_id" => id,
         "includes" => includes,
@@ -527,7 +583,7 @@ module SoulCore
         "automatic_retry" => false
       }
       complete("exact staged restore prepared", scope.merge(
-        "expected_digest" => digest(scope), "confirmation_phrase" => RESTORE_CONFIRMATION,
+        "expected_digest" => digest(scope), "confirmation_phrase" => @confirmations.fetch(:restore),
         "password_retained" => false
       ))
     rescue ArgumentError => error
@@ -540,7 +596,7 @@ module SoulCore
 
     def restore_execute(password:, snapshot_id:, paths: [], confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
-      return awaiting("exact staged-restore confirmation is required") unless confirmation.to_s == RESTORE_CONFIRMATION
+      return awaiting("exact staged-restore confirmation is required") unless confirmation.to_s == @confirmations.fetch(:restore)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
       preview = restore_preview(password: password, snapshot_id: snapshot_id, paths: paths)
@@ -556,7 +612,10 @@ module SoulCore
       preview.dig("data", "includes").each { |path| args.concat(["--include", path]) }
       progress&.call("stage" => "restore", "message" => "Restoring the approved snapshot into isolated staging…")
       result = restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
-      raise "restic restore failed#{restic_failure_suffix(result)}" unless result.success?
+      ownership_normalized = !result.success? && restic_ancestor_ownership_only_failure?(
+        result, target: target, includes: preview.dig("data", "includes")
+      )
+      raise "restic restore failed#{restic_failure_suffix(result)}" unless result.success? || ownership_normalized
       evidence = staged_inventory(target)
       receipt = write_receipt("restore", {
         "restore_id" => restore_id,
@@ -566,6 +625,8 @@ module SoulCore
         "file_count" => evidence.fetch("file_count"),
         "total_bytes" => evidence.fetch("total_bytes"),
         "inventory_digest" => evidence.fetch("inventory_digest"),
+        "content_verification" => "passed",
+        "ownership" => ownership_normalized ? "normalized_to_current_user_for_unprivileged_staging" : "restored_without_error",
         "live_tree_mutation" => false
       })
       {
@@ -648,6 +709,8 @@ module SoulCore
 
       receipt = JSON.parse(File.binread(path, 128 * 1024))
       raise "DRS receipt schema is invalid" unless receipt["schema_version"] == "soul.backup_receipt.v1" && receipt["operation"] == "drs"
+      receipt_profile = receipt.fetch("profile_id", "soul")
+      raise "DRS receipt profile is invalid" unless receipt_profile == @profile_id
       {
         "state" => receipt.fetch("state", "unknown"),
         "completed_at" => receipt["completed_at"],
@@ -680,6 +743,8 @@ module SoulCore
       policy_exclusions = @manifest_policy.exclusions
       {
         "operation" => "backup_manifest_reconciliation",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "source_manifest_digest" => Digest::SHA256.file(@sources_path).hexdigest,
         "exclusion_manifest_digest" => Digest::SHA256.file(@excludes_path).hexdigest,
         "source_additions" => policy_sources - current_sources,
@@ -697,6 +762,8 @@ module SoulCore
     def manifest_reconciliation_view(scope)
       {
         "operation" => scope.fetch("operation"),
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "source_additions" => scope.fetch("source_additions").map { |path| display_path(path) },
         "exclusion_additions" => scope.fetch("exclusion_additions").map { |pattern| display_pattern(pattern) },
         "source_removals" => [],
@@ -755,6 +822,8 @@ module SoulCore
         "schema_version" => "soul.backup_manifest_reconciliation_receipt.v1",
         "receipt_id" => "manifest_reconciliation_#{timestamp.strftime('%Y%m%dT%H%M%SZ')}_#{@id_generator.call}",
         "operation" => "manifest_reconciliation",
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "completed_at" => timestamp.iso8601,
         "source_addition_count" => scope.fetch("source_additions").length,
         "exclusion_addition_count" => scope.fetch("exclusion_additions").length,
@@ -803,7 +872,7 @@ module SoulCore
       target = replica_target_status
       raise ArgumentError, "Crucible backup target identity is invalid" unless target["ready"]
       source = snapshot_inventory(password)
-      raise ArgumentError, "local backup repository contains no Soul snapshots" if source.empty?
+      raise ArgumentError, "local backup repository contains no #{@profile_label} snapshots" if source.empty?
       remote = replica_inventory(password)
       target_lineage_ids = remote.fetch("lineage_ids")
       {
@@ -839,7 +908,7 @@ module SoulCore
     end
 
     def replica_inventory(password)
-      result = replica_restic(password, "snapshots", "--json", "--tag", "soul-state", timeout: 60, output: 1024 * 1024)
+      result = replica_restic(password, "snapshots", "--json", "--tag", @snapshot_tag, timeout: 60, output: 1024 * 1024)
       return { "state" => "uninitialized", "ids" => [], "lineage_ids" => [], "repository_id" => nil } if result.exit_status == 10
       raise ArgumentError, "Crucible repository password was rejected" if result.exit_status == 12
       raise "Crucible snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
@@ -891,7 +960,7 @@ module SoulCore
     end
 
     def snapshot_inventory(password)
-      result = restic(password, "snapshots", "--json", "--tag", "soul-state", timeout: 30, output: 1024 * 1024)
+      result = restic(password, "snapshots", "--json", "--tag", @snapshot_tag, timeout: 30, output: 1024 * 1024)
       raise ArgumentError, "repository password was rejected" if result.exit_status == 12
       raise "snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
       parsed = JSON.parse(result.stdout)
@@ -1031,6 +1100,30 @@ module SoulCore
       { "file_count" => files.length, "total_bytes" => files.sum { |item| item[1] }, "inventory_digest" => digest(files) }
     end
 
+    def restic_ancestor_ownership_only_failure?(result, target:, includes:)
+      return false unless result.exit_status == 1 && !result.truncated
+      selected = Array(includes)
+      return false if selected.empty? || selected.any? { |path| !within?(path, @home) }
+
+      lines = result.stderr.to_s.lines.map(&:strip).reject(&:empty?)
+      fatal = lines.last.to_s.match(/\AFatal: There (?:was|were) (\d+) errors?\z/i)
+      return false unless fatal
+      ownership_errors = lines[0...-1]
+      return false unless ownership_errors.length == Integer(fatal[1]) && !ownership_errors.empty?
+
+      ownership_errors.all? do |line|
+        match = line.match(/\Aignoring error for (.+): lchown (.+): invalid argument\z/)
+        next false unless match
+        ancestor = File.expand_path(match[1])
+        staged = File.expand_path(match[2])
+        expected_staged = File.join(target, ancestor.delete_prefix("/"))
+        ancestor.start_with?("/") && staged == expected_staged &&
+          selected.any? { |path| path.start_with?("#{ancestor}/") }
+      end
+    rescue ArgumentError
+      false
+    end
+
     def disk_usage(path)
       result = @runner.run("du", "-s", "-B1", "--", path, timeout_seconds: 30, max_output_bytes: 4096)
       result.success? ? Integer(result.stdout.split.first) : 0
@@ -1055,6 +1148,8 @@ module SoulCore
       receipt = {
         "schema_version" => "soul.backup_receipt.v1", "receipt_id" => id,
         "operation" => kind, "completed_at" => timestamp.iso8601,
+        "profile_id" => @profile_id,
+        "snapshot_tag" => @snapshot_tag,
         "repository_fingerprint" => repository_fingerprint
       }.merge(data)
       path = File.join(@receipt_root, "#{id}.json")
@@ -1088,13 +1183,14 @@ module SoulCore
     end
 
     def max_repack_size
-      value = @env.fetch("SOUL_BACKUP_MAX_REPACK_SIZE", "4G").to_s
+      value = profile_environment("MAX_REPACK_SIZE", "4G").to_s
       raise ArgumentError, "backup max repack size is invalid" unless value.match?(/\A(?:[1-9]\d{0,3})(?:M|G)\z/)
       value
     end
 
     def acquire_operation_lock
       FileUtils.mkdir_p(@state_root, mode: 0o700)
+      FileUtils.mkdir_p(File.dirname(@operation_lock_path), mode: 0o700)
       lock = File.open(@operation_lock_path, File::RDWR | File::CREAT, 0o600)
       return lock if lock.flock(File::LOCK_EX | File::LOCK_NB)
       lock.close
@@ -1102,12 +1198,25 @@ module SoulCore
     end
 
     def validate_private_state_root!
-      [File.join(@root, "Soul"), File.join(@root, "Soul", "private"), @state_root].each do |path|
+      [
+        File.join(@root, "Soul"),
+        File.join(@root, "Soul", "private"),
+        @state_root,
+        File.dirname(@operation_lock_path)
+      ].uniq.each do |path|
         raise ArgumentError, "backup state path must not traverse a symlink" if File.symlink?(path)
       end
       return unless File.exist?(@state_root)
       raise ArgumentError, "backup state root must be a directory" unless File.directory?(@state_root)
       raise ArgumentError, "backup state root must be owner-only" unless (File.stat(@state_root).mode & 0o077).zero?
+    end
+
+    def profile_environment(suffix, default)
+      profile_key = "#{@environment_prefix}_#{suffix}"
+      return @env.fetch(profile_key).to_s if @env.key?(profile_key)
+      return @env.fetch("SOUL_BACKUP_#{suffix}").to_s if @profile_id == "operator" && @env.key?("SOUL_BACKUP_#{suffix}")
+
+      default.to_s
     end
 
     def release_operation_lock(lock)
@@ -1135,7 +1244,14 @@ module SoulCore
       return " (password rejected)" if result.exit_status == 12
       return " (repository locked)" if result.exit_status == 11
       return " (timed out)" if result.status == "timeout"
-      " (exit #{result.exit_status || 'unavailable'})"
+      lines = result.stderr.to_s.lines.map(&:strip).reject(&:empty?)
+      terminal = lines.last.to_s
+      diagnostic = lines.reverse.find { |line| line != terminal && !line.match?(/\AFatal: There (?:was|were) \d+ errors?\z/i) }.to_s
+      detail = [diagnostic, terminal].reject(&:empty?).uniq.join(" | ")
+      detail = safe_error(StandardError.new(detail)) unless detail.empty?
+      suffix = " (exit #{result.exit_status || 'unavailable'}"
+      suffix += ": #{detail}" unless detail.empty?
+      "#{suffix})"
     end
 
     def safe_error(error)

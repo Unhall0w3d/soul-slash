@@ -17,12 +17,15 @@ module SoulCore
     MAX_PATHS = 100_000
     MAX_HOLDS = 100_000
     MAX_ROOTS = 64
+    MAX_CONFIGURABLE_ROOTS = 256
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     DIGEST = /\A[a-f0-9]{64}\z/
 
-    def initialize(ledger_path:, clock: -> { Time.now.utc })
+    def initialize(ledger_path:, clock: -> { Time.now.utc }, max_roots: MAX_ROOTS)
       @ledger_path = File.expand_path(ledger_path)
       @clock = clock
+      @max_roots = Integer(max_roots)
+      raise ArgumentError, "source root limit is invalid" unless @max_roots.between?(1, MAX_CONFIGURABLE_ROOTS)
     end
 
     def observe_preview(manifest:)
@@ -232,7 +235,7 @@ module SoulCore
         raise ArgumentError, "snapshot verification must record a passed metadata or full-data check"
       end
 
-      roots = normalize_paths(manifest["source_roots"], maximum: MAX_ROOTS, label: "source roots")
+      roots = normalize_paths(manifest["source_roots"], maximum: @max_roots, label: "source roots")
       raise ArgumentError, "at least one verified source root is required" if roots.empty?
       paths = normalize_paths(manifest["paths"], maximum: MAX_PATHS, label: "snapshot paths")
       raise ArgumentError, "snapshot inventory does not contain every verified source root" unless (roots - paths).empty?
@@ -271,7 +274,7 @@ module SoulCore
       snapshot = ledger.fetch("last_verified_snapshot")
       raise unless snapshot.is_a?(Hash) && snapshot.keys.sort == %w[manifest_digest paths repository_id snapshot_id source_roots verified_at].sort
       raise unless snapshot["snapshot_id"].to_s.match?(SNAPSHOT_ID) && snapshot["repository_id"].to_s.match?(DIGEST) && snapshot["manifest_digest"].to_s.match?(DIGEST)
-      roots = normalize_paths(snapshot["source_roots"], maximum: MAX_ROOTS, label: "source roots")
+      roots = normalize_paths(snapshot["source_roots"], maximum: @max_roots, label: "source roots")
       paths = normalize_paths(snapshot["paths"], maximum: MAX_PATHS, label: "snapshot paths")
       raise unless (roots - paths).empty?
       raise if paths.any? { |path| roots.none? { |root| within?(path, root) } }

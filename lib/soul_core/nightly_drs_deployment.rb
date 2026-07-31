@@ -21,6 +21,37 @@ module SoulCore
     CONFIRM_UNINSTALL = "REMOVE_SOUL_DRS_AUTOMATION"
     CONFIRM_REMOVE_CREDENTIAL = "REMOVE_SOUL_DRS_CREDENTIAL"
     PERMANENT_CALENDAR = "*-*-* 03:00:00"
+    OPERATOR_SERVICE = "soul-operator-nightly-drs.service"
+    OPERATOR_TIMER = "soul-operator-nightly-drs.timer"
+    OPERATOR_CREDENTIAL_NAME = "operator-backup-repository-password"
+    OPERATOR_CONFIRM_CREDENTIAL = "ENROLL_OPERATOR_DRS_CREDENTIAL"
+    OPERATOR_CONFIRM_TEST = "INSTALL_OPERATOR_DRS_QUALIFICATION_TIMER"
+    OPERATOR_CONFIRM_PERMANENT = "ACTIVATE_OPERATOR_DRS_2AM_TIMER"
+    OPERATOR_CONFIRM_UNINSTALL = "REMOVE_OPERATOR_DRS_AUTOMATION"
+    OPERATOR_CONFIRM_REMOVE_CREDENTIAL = "REMOVE_OPERATOR_DRS_CREDENTIAL"
+    OPERATOR_PERMANENT_CALENDAR = "*-*-* 02:00:00"
+    PROFILES = {
+      "soul" => {
+        label: "Soul", service: SERVICE, timer: TIMER,
+        credential_name: CREDENTIAL_NAME,
+        confirmations: {
+          credential: CONFIRM_CREDENTIAL, test: CONFIRM_TEST,
+          permanent: CONFIRM_PERMANENT, uninstall: CONFIRM_UNINSTALL,
+          remove_credential: CONFIRM_REMOVE_CREDENTIAL
+        },
+        calendar: PERMANENT_CALENDAR, state_directory: "backup"
+      },
+      "operator" => {
+        label: "Operator", service: OPERATOR_SERVICE, timer: OPERATOR_TIMER,
+        credential_name: OPERATOR_CREDENTIAL_NAME,
+        confirmations: {
+          credential: OPERATOR_CONFIRM_CREDENTIAL, test: OPERATOR_CONFIRM_TEST,
+          permanent: OPERATOR_CONFIRM_PERMANENT, uninstall: OPERATOR_CONFIRM_UNINSTALL,
+          remove_credential: OPERATOR_CONFIRM_REMOVE_CREDENTIAL
+        },
+        calendar: OPERATOR_PERMANENT_CALENDAR, state_directory: "operator_backup"
+      }
+    }.freeze
     MIN_TEST_DELAY = 60
     MAX_TEST_DELAY = 300
 
@@ -33,7 +64,8 @@ module SoulCore
       systemctl_path: "/usr/bin/systemctl",
       systemd_creds_path: "/usr/bin/systemd-creds",
       backup_service: nil,
-      runner: nil
+      runner: nil,
+      profile_id: "soul"
     )
       @root = File.expand_path(root)
       @home = File.expand_path(home)
@@ -43,15 +75,27 @@ module SoulCore
       @systemctl_path = File.expand_path(systemctl_path)
       @systemd_creds_path = File.expand_path(systemd_creds_path)
       @runner = runner || method(:capture)
+      @profile_id = profile_id.to_s
+      profile = PROFILES[@profile_id]
+      raise ArgumentError, "DRS profile must be soul or operator" unless profile
+      @profile_label = profile.fetch(:label)
+      @service_name = profile.fetch(:service)
+      @timer_name = profile.fetch(:timer)
+      @credential_name = profile.fetch(:credential_name)
+      @confirmations = profile.fetch(:confirmations)
+      @permanent_calendar = profile.fetch(:calendar)
       @backup_service = backup_service || BackupAdministrationService.new(
-        root: @root, home: @home, process_env: @env, clock: @clock
+        root: @root, home: @home, process_env: @env, clock: @clock,
+        profile_id: @profile_id
       )
       @unit_root = File.join(@home, ".config", "systemd", "user")
       @credential_root = File.join(@home, ".config", "credstore.encrypted")
-      @credential_path = File.join(@credential_root, "#{CREDENTIAL_NAME}.cred")
-      @state_path = File.join(@root, "Soul", "private", "backup", "nightly-drs-state.json")
-      @receipt_root = File.join(@root, "Soul", "private", "backup", "receipts")
-      @backup_mount = File.expand_path(@env.fetch("SOUL_BACKUP_MOUNT", "/mnt/soul-backup"))
+      @credential_path = File.join(@credential_root, "#{@credential_name}.cred")
+      state_root = File.join(@root, "Soul", "private", profile.fetch(:state_directory))
+      @state_path = File.join(state_root, "nightly-drs-state.json")
+      @receipt_root = File.join(state_root, "receipts")
+      mount_key = @profile_id == "operator" ? "OPERATOR_BACKUP_MOUNT" : "SOUL_BACKUP_MOUNT"
+      @backup_mount = File.expand_path(@env.fetch(mount_key, @env.fetch("SOUL_BACKUP_MOUNT", "/mnt/soul-backup")))
     end
 
     def credential_plan
@@ -59,17 +103,18 @@ module SoulCore
       return result(false, "failed", errors.first, {"errors" => errors}) unless errors.empty?
 
       result(true, "blocked_for_human_review", "Review host-bound encrypted DRS credential enrollment.", {
-        "credential_name" => CREDENTIAL_NAME,
+        "profile_id" => @profile_id,
+        "credential_name" => @credential_name,
         "encryption_scope" => "current user and this host installation",
         "plaintext_file_created" => false,
-        "confirmation_phrase" => CONFIRM_CREDENTIAL
+        "confirmation_phrase" => @confirmations.fetch(:credential)
       })
     end
 
     def enroll_credential(password:, confirmation:)
       planned = credential_plan
       return planned unless planned["ok"]
-      return result(false, "awaiting_input", "Exact DRS credential enrollment confirmation is required.", planned["data"]) unless confirmation == CONFIRM_CREDENTIAL
+      return result(false, "awaiting_input", "Exact #{@profile_label} DRS credential enrollment confirmation is required.", planned["data"]) unless confirmation == @confirmations.fetch(:credential)
 
       secret = validate_password(password)
       validation = validate_repository_access(secret)
@@ -78,12 +123,12 @@ module SoulCore
       temporary = "#{@credential_path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
       command = [
         @systemd_creds_path, "encrypt", "--user", "--with-key=host", "--newline=no",
-        "--name=#{CREDENTIAL_NAME}", "-", temporary
+        "--name=#{@credential_name}", "-", temporary
       ]
       execution = run(command, stdin_data: secret)
       unless execution["success"] && File.file?(temporary) && !File.symlink?(temporary) && File.size(temporary).between?(1, 128 * 1024)
         return result(false, "failed", "Encrypted DRS credential enrollment failed safely.", {
-          "credential_name" => CREDENTIAL_NAME,
+          "credential_name" => @credential_name,
           "stderr" => bounded(execution["stderr"])
         })
       end
@@ -91,7 +136,7 @@ module SoulCore
       File.rename(temporary, @credential_path)
       File.chmod(0o600, @credential_path)
       result(true, "complete", "Host-bound encrypted DRS credential enrolled.", {
-        "credential_name" => CREDENTIAL_NAME,
+        "credential_name" => @credential_name,
         "credential_ready" => credential_ready?,
         "plaintext_file_created" => false
       }, "local_encrypted_credential")
@@ -106,7 +151,7 @@ module SoulCore
 
     def test_plan(run_at:)
       instant = validate_test_time(run_at)
-      plan_for(mode: "qualification", calendar: calendar_for(instant), confirmation: CONFIRM_TEST)
+      plan_for(mode: "qualification", calendar: calendar_for(instant), confirmation: @confirmations.fetch(:test))
     rescue ArgumentError => error
       result(false, "awaiting_input", error.message, {})
     end
@@ -114,7 +159,7 @@ module SoulCore
     def install_test(run_at:, confirmation:, expected_digest:)
       planned = test_plan(run_at: run_at)
       return planned unless planned["ok"]
-      return result(false, "awaiting_input", "Exact DRS qualification timer confirmation is required.", planned["data"]) unless confirmation == CONFIRM_TEST
+      return result(false, "awaiting_input", "Exact #{@profile_label} DRS qualification timer confirmation is required.", planned["data"]) unless confirmation == @confirmations.fetch(:test)
       return result(false, "blocked_for_human_review", "DRS qualification timer preview digest is stale or invalid.", {}) unless secure_equal?(expected_digest, planned.dig("data", "expected_digest"))
       return result(false, "blocked_for_human_review", "Encrypted DRS credential must be enrolled before timer installation.", {}) unless credential_ready?
 
@@ -124,24 +169,25 @@ module SoulCore
 
     def permanent_plan
       return result(false, "blocked_for_human_review", "A complete timed DRS qualification is required before permanent activation.", qualification_evidence) unless qualification_verified?
-      plan_for(mode: "permanent", calendar: PERMANENT_CALENDAR, confirmation: CONFIRM_PERMANENT)
+      plan_for(mode: "permanent", calendar: @permanent_calendar, confirmation: @confirmations.fetch(:permanent))
     end
 
     def install_permanent(confirmation:, expected_digest:)
       planned = permanent_plan
       return planned unless planned["ok"]
-      return result(false, "awaiting_input", "Exact permanent 3:00 AM DRS timer confirmation is required.", planned["data"]) unless confirmation == CONFIRM_PERMANENT
+      schedule = @permanent_calendar[/\d{2}:\d{2}/]
+      return result(false, "awaiting_input", "Exact permanent #{schedule} #{@profile_label} DRS timer confirmation is required.", planned["data"]) unless confirmation == @confirmations.fetch(:permanent)
       return result(false, "blocked_for_human_review", "Permanent DRS timer preview digest is stale or invalid.", {}) unless secure_equal?(expected_digest, planned.dig("data", "expected_digest"))
       return result(false, "blocked_for_human_review", "Timed DRS qualification evidence is no longer valid.", qualification_evidence) unless qualification_verified?
 
       install_units(planned.dig("data", "units"))
-      result(true, "complete", "Nightly 3:00 AM DRS timer installed and armed.", status["data"], "local_timer_configuration")
+      result(true, "complete", "Nightly #{schedule} #{@profile_label} DRS timer installed and armed.", status["data"], "local_timer_configuration")
     end
 
     def status
       unit_mode, unit_calendar = installed_mode_and_calendar
-      timer = show_unit(TIMER, "ActiveState,SubState,UnitFileState,NextElapseUSecRealtime,LastTriggerUSec")
-      service = show_unit(SERVICE, "ActiveState,SubState,Result,ExecMainStatus")
+      timer = show_unit(@timer_name, "ActiveState,SubState,UnitFileState,NextElapseUSecRealtime,LastTriggerUSec")
+      service = show_unit(@service_name, "ActiveState,SubState,Result,ExecMainStatus")
       run_state = read_run_state
       visible_run_state = public_run_state(run_state)
       receipt = qualification_receipt(visible_run_state["drs_receipt_id"])
@@ -152,7 +198,7 @@ module SoulCore
         visible_run_state["reason"] = "the prior run did not record a terminal result"
       end
       exact = if unit_mode == "permanent"
-        installed_exact?(rendered(mode: "permanent", calendar: PERMANENT_CALENDAR))
+        installed_exact?(rendered(mode: "permanent", calendar: @permanent_calendar))
       elsif unit_mode == "qualification" && unit_calendar
         installed_exact?(rendered(mode: "qualification", calendar: unit_calendar))
       else
@@ -161,6 +207,8 @@ module SoulCore
       armed = credential_ready? && exact && timer["ActiveState"] == "active" && timer["UnitFileState"] == "enabled"
       ready = armed && unit_mode == "permanent"
       result(true, "complete", "Nightly DRS automation status collected.", {
+        "profile_id" => @profile_id,
+        "profile_label" => @profile_label,
         "credential_ready" => credential_ready?,
         "units_installed_exact" => exact,
         "mode" => unit_mode || "not_installed",
@@ -182,8 +230,8 @@ module SoulCore
     end
 
     def uninstall(confirmation:)
-      return result(false, "awaiting_input", "Exact DRS automation removal confirmation is required.", {"confirmation_phrase" => CONFIRM_UNINSTALL}) unless confirmation == CONFIRM_UNINSTALL
-      run([@systemctl_path, "--user", "disable", "--now", TIMER])
+      return result(false, "awaiting_input", "Exact #{@profile_label} DRS automation removal confirmation is required.", {"confirmation_phrase" => @confirmations.fetch(:uninstall)}) unless confirmation == @confirmations.fetch(:uninstall)
+      run([@systemctl_path, "--user", "disable", "--now", @timer_name])
       unit_paths.each_value { |path| FileUtils.rm_f(path) if safe_file?(path) }
       run([@systemctl_path, "--user", "daemon-reload"])
       result(true, "complete", "Nightly DRS service and timer removed; encrypted credential preserved.", {
@@ -192,7 +240,7 @@ module SoulCore
     end
 
     def remove_credential(confirmation:)
-      return result(false, "awaiting_input", "Exact DRS credential removal confirmation is required.", {"confirmation_phrase" => CONFIRM_REMOVE_CREDENTIAL}) unless confirmation == CONFIRM_REMOVE_CREDENTIAL
+      return result(false, "awaiting_input", "Exact #{@profile_label} DRS credential removal confirmation is required.", {"confirmation_phrase" => @confirmations.fetch(:remove_credential)}) unless confirmation == @confirmations.fetch(:remove_credential)
       return result(false, "blocked_for_human_review", "Remove the DRS timer before removing its credential.", status["data"]) if status.dig("data", "timer_active")
       FileUtils.rm_f(@credential_path) if credential_ready?
       result(true, "complete", "Encrypted DRS credential removed.", {"credential_ready" => credential_ready?}, "local_encrypted_credential")
@@ -203,9 +251,9 @@ module SoulCore
       raise ArgumentError, "DRS schedule mode is invalid" unless %w[qualification permanent].include?(mode)
       calendar = validate_calendar(calendar, mode: mode)
       {
-        SERVICE => <<~UNIT,
+        @service_name => <<~UNIT,
           [Unit]
-          Description=Soul bounded encrypted DRS backup
+          Description=#{@profile_label} bounded encrypted DRS backup
           Wants=network-online.target
           After=network-online.target
           ConditionPathIsMountPoint=#{unit_path(@backup_mount)}
@@ -213,14 +261,14 @@ module SoulCore
           [Service]
           Type=oneshot
           WorkingDirectory=#{unit_path(@root)}
-          LoadCredentialEncrypted=#{CREDENTIAL_NAME}:#{unit_path(@credential_path)}
-          ExecStart=#{unit_quote(@ruby_path)} #{unit_quote(runner_script)} --root #{unit_quote(@root)} --trigger systemd_timer --schedule-mode #{mode}
+          LoadCredentialEncrypted=#{@credential_name}:#{unit_path(@credential_path)}
+          ExecStart=#{unit_quote(@ruby_path)} #{unit_quote(runner_script)} --root #{unit_quote(@root)}#{runner_profile_argument} --trigger systemd_timer --schedule-mode #{mode}
           TimeoutStartSec=4h
           Restart=no
           UMask=0077
-          CacheDirectory=soul-drs
+          CacheDirectory=#{cache_directory_name}
           CacheDirectoryMode=0700
-          Environment=XDG_CACHE_HOME=%C/soul-drs
+          Environment=XDG_CACHE_HOME=%C/#{cache_directory_name}
           Nice=10
           IOSchedulingClass=best-effort
           IOSchedulingPriority=6
@@ -228,7 +276,7 @@ module SoulCore
           PrivateTmp=true
           ProtectSystem=strict
           ProtectHome=read-only
-          ReadWritePaths=#{unit_path(File.join(@root, "Soul", "private", "backup"))} #{unit_path(@backup_mount)}
+          ReadWritePaths=#{writable_paths}
           ProtectControlGroups=true
           ProtectKernelModules=true
           ProtectKernelTunables=true
@@ -236,15 +284,15 @@ module SoulCore
           LockPersonality=true
           RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
         UNIT
-        TIMER => <<~UNIT
+        @timer_name => <<~UNIT
           [Unit]
-          Description=Schedule Soul encrypted DRS backup (#{mode})
+          Description=Schedule #{@profile_label} encrypted DRS backup (#{mode})
 
           [Timer]
           OnCalendar=#{calendar}
           AccuracySec=1s
           Persistent=true
-          Unit=#{SERVICE}
+          Unit=#{@service_name}
 
           [Install]
           WantedBy=timers.target
@@ -268,7 +316,8 @@ module SoulCore
         "automatic_retry" => false,
         "automatic_retention" => false,
         "remote_deletion" => false,
-        "credential_name" => CREDENTIAL_NAME,
+        "profile_id" => @profile_id,
+        "credential_name" => @credential_name,
         "units" => units
       }
       result(true, "blocked_for_human_review", "Review the exact #{mode} DRS timer.", scope.merge(
@@ -282,8 +331,8 @@ module SoulCore
       units.each { |name, content| atomic_write(File.join(@unit_root, name), content, 0o600) }
       [
         [@systemctl_path, "--user", "daemon-reload"],
-        [@systemctl_path, "--user", "enable", "--now", TIMER],
-        [@systemctl_path, "--user", "restart", TIMER]
+        [@systemctl_path, "--user", "enable", "--now", @timer_name],
+        [@systemctl_path, "--user", "restart", @timer_name]
       ].each do |command|
         execution = run(command)
         raise IOError, "systemd user timer installation failed" unless execution["success"]
@@ -305,7 +354,7 @@ module SoulCore
 
     def validate_calendar(value, mode:)
       calendar = value.to_s
-      return calendar if mode == "permanent" && calendar == PERMANENT_CALENDAR
+      return calendar if mode == "permanent" && calendar == @permanent_calendar
       return calendar if mode == "qualification" && calendar.match?(/\A20\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\z/)
       raise ArgumentError, "DRS timer calendar is invalid"
     end
@@ -374,7 +423,8 @@ module SoulCore
       receipt = JSON.parse(File.read(path))
       return {} unless receipt["schema_version"] == "soul.backup_receipt.v1" &&
         receipt["operation"] == "drs" &&
-        receipt["receipt_id"] == receipt_id
+        receipt["receipt_id"] == receipt_id &&
+        receipt.fetch("profile_id", "soul") == @profile_id
       receipt
     rescue JSON::ParserError, SystemCallError
       {}
@@ -398,8 +448,8 @@ module SoulCore
     end
 
     def installed_mode_and_calendar
-      service = unit_paths.fetch(SERVICE)
-      timer = unit_paths.fetch(TIMER)
+      service = unit_paths.fetch(@service_name)
+      timer = unit_paths.fetch(@timer_name)
       return [nil, nil] unless safe_file?(service) && safe_file?(timer)
       service_body = File.binread(service, 128 * 1024)
       timer_body = File.binread(timer, 128 * 1024)
@@ -439,7 +489,19 @@ module SoulCore
     end
 
     def runner_script = File.join(@root, "scripts", "soul-nightly-drs-run")
-    def unit_paths = {SERVICE => File.join(@unit_root, SERVICE), TIMER => File.join(@unit_root, TIMER)}
+    def runner_profile_argument = @profile_id == "soul" ? "" : " --profile operator"
+    def cache_directory_name = @profile_id == "soul" ? "soul-drs" : "soul-operator-drs"
+    def writable_paths
+      paths = [File.join(@root, "Soul", "private", "backup")]
+      paths.unshift(File.dirname(@state_path)) if @profile_id == "operator"
+      (paths + [@backup_mount]).map { |path| unit_path(path) }.join(" ")
+    end
+    def unit_paths
+      {
+        @service_name => File.join(@unit_root, @service_name),
+        @timer_name => File.join(@unit_root, @timer_name)
+      }
+    end
 
     def validate_password(value)
       password = value.to_s.dup

@@ -11,8 +11,9 @@ require "soul_core/env_loader"
 require "soul_core/nightly_drs_deployment"
 
 SoulCore::EnvLoader.load(File.join(root, ".env"))
-options = {}
+options = {"profile" => "soul"}
 OptionParser.new do |parser|
+  parser.on("--profile PROFILE") { |value| options["profile"] = value }
   parser.on("--run-at ISO8601") { |value| options["run_at"] = value }
   parser.on("--confirmation VALUE") { |value| options["confirmation"] = value }
   parser.on("--expected-digest VALUE") { |value| options["expected_digest"] = value }
@@ -20,7 +21,8 @@ end.parse!
 
 action = ARGV.shift.to_s
 abort "unexpected arguments" unless ARGV.empty?
-deployment = SoulCore::NightlyDrsDeployment.new(root: root)
+abort "profile is invalid" unless %w[soul operator].include?(options["profile"])
+deployment = SoulCore::NightlyDrsDeployment.new(root: root, profile_id: options.fetch("profile"))
 
 result = case action
 when "credential-plan"

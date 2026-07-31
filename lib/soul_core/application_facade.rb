@@ -80,7 +80,9 @@ module SoulCore
       workspace_service: nil,
       status_collector: nil,
       backup_administration_service: nil,
+      operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
+      operator_nightly_drs_deployment: nil,
       project_tracker_service: nil,
       project_release_service: nil,
       model_runtime_control_service: nil,
@@ -133,7 +135,9 @@ module SoulCore
       @workspace_service = workspace_service
       @status_collector = status_collector
       @backup_administration_service = backup_administration_service
+      @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
+      @operator_nightly_drs_deployment = operator_nightly_drs_deployment
       @project_tracker_service = project_tracker_service
       @project_release_service = project_release_service
       @model_runtime_control_service = model_runtime_control_service
@@ -260,6 +264,19 @@ module SoulCore
       when "backup.replica.execute" then domain(backup_administration.replica_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "backup.drs.preview" then domain(backup_administration.drs_preview(password: required(parameters, "password")))
       when "backup.drs.execute" then domain(backup_administration.drs_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "operator_backup.status" then domain(operator_backup_status(password: parameters["password"]))
+      when "operator_backup.manifests.reconcile.preview" then domain(operator_backup_administration.manifest_reconciliation_preview)
+      when "operator_backup.manifests.reconcile.execute" then domain(operator_backup_administration.manifest_reconciliation_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "operator_backup.create.preview" then domain(operator_backup_administration.backup_preview(password: required(parameters, "password")))
+      when "operator_backup.create.execute" then domain(operator_backup_administration.backup_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "operator_backup.retention.preview" then domain(operator_backup_administration.retention_preview(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids")))
+      when "operator_backup.retention.execute" then domain(operator_backup_administration.retention_execute(password: required(parameters, "password"), snapshot_ids: required(parameters, "snapshot_ids"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "operator_backup.restore.preview" then domain(operator_backup_administration.restore_preview(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", [])))
+      when "operator_backup.restore.execute" then domain(operator_backup_administration.restore_execute(password: required(parameters, "password"), snapshot_id: required(parameters, "snapshot_id"), paths: parameters.fetch("paths", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "operator_backup.replica.preview" then domain(operator_backup_administration.replica_preview(password: required(parameters, "password")))
+      when "operator_backup.replica.execute" then domain(operator_backup_administration.replica_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "operator_backup.drs.preview" then domain(operator_backup_administration.drs_preview(password: required(parameters, "password")))
+      when "operator_backup.drs.execute" then domain(operator_backup_administration.drs_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "project_tracker.snapshot" then domain(project_tracker.snapshot)
       when "project_tracker.items.create" then domain(project_tracker.create(attributes: required(parameters, "item")))
       when "project_tracker.items.update" then domain(project_tracker.update(item_id: required(parameters, "item_id"), attributes: required(parameters, "item"), expected_revision: required(parameters, "expected_revision")))
@@ -931,9 +948,21 @@ module SoulCore
       )
     end
 
+    def operator_backup_administration
+      @operator_backup_administration_service ||= BackupAdministrationService.new(
+        root: @root, process_env: @process_env, clock: @clock, profile_id: "operator"
+      )
+    end
+
     def nightly_drs_deployment
       @nightly_drs_deployment ||= NightlyDrsDeployment.new(
         root: @root, process_env: @process_env, clock: @clock
+      )
+    end
+
+    def operator_nightly_drs_deployment
+      @operator_nightly_drs_deployment ||= NightlyDrsDeployment.new(
+        root: @root, process_env: @process_env, clock: @clock, profile_id: "operator"
       )
     end
 
@@ -941,6 +970,20 @@ module SoulCore
       result = backup_administration.status(password: password)
       return result unless result["ok"] && result["data"].is_a?(Hash)
       result["data"]["automation"] = nightly_drs_deployment.status.fetch("data", {})
+      result
+    rescue StandardError
+      result["data"]["automation"] = {
+        "ready" => false,
+        "mode" => "unavailable",
+        "credential_ready" => false
+      } if result && result["data"].is_a?(Hash)
+      result
+    end
+
+    def operator_backup_status(password:)
+      result = operator_backup_administration.status(password: password)
+      return result unless result["ok"] && result["data"].is_a?(Hash)
+      result["data"]["automation"] = operator_nightly_drs_deployment.status.fetch("data", {})
       result
     rescue StandardError
       result["data"]["automation"] = {

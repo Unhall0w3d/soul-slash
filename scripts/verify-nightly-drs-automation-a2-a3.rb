@@ -298,7 +298,7 @@ dashboard = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir
 check.call("automation source contains no retention, pruning, remote deletion, or restart authority",
            !deployment_source.match?(/\\b(?:forget|prune)\\b/) &&
              deployment_source.include?("Restart=no") &&
-             dashboard.include?('"Schedule": automation.ready ? "Nightly · 3:00 AM"'))
+             dashboard.include?('automation.ready ? `Nightly · ${scheduleLabel}`'))
 check.call("runner has one terminal state file and no retry loop",
            runner_source.include?("nightly-drs-state.json") &&
              !runner_source.match?(/\b(?:sleep|retry)\b/) &&

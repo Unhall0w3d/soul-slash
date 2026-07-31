@@ -96,6 +96,31 @@ end
 
 puts "Backup Administration A2 verification:"
 
+restore_contract = {
+  "schema_version" => SoulCore::ApplicationContract::SCHEMA_VERSION,
+  "request_id" => "verify-backup-restore-0001",
+  "operation" => "operator_backup.restore.preview",
+  "parameters" => {
+    "password" => "fixture-secret-never-persist",
+    "snapshot_id" => "d" * 64,
+    "paths" => ["/home/operator/.ssh/config", "/home/operator/.zshrc"]
+  },
+  "context" => { "interface" => "dashboard" }
+}
+retention_contract = Marshal.load(Marshal.dump(restore_contract))
+retention_contract["request_id"] = "verify-backup-retention-0001"
+retention_contract["operation"] = "operator_backup.retention.preview"
+retention_contract["parameters"] = {
+  "password" => "fixture-secret-never-persist",
+  "snapshot_ids" => ["d" * 64]
+}
+invalid_restore_contract = Marshal.load(Marshal.dump(restore_contract))
+invalid_restore_contract["parameters"]["paths"] = ["/home/operator/.ssh/config", 7]
+check.call("typed transport accepts bounded restore and retention string arrays while rejecting mixed values",
+           SoulCore::ApplicationContract.validate(restore_contract)["ok"] == true &&
+             SoulCore::ApplicationContract.validate(retention_contract)["ok"] == true &&
+             SoulCore::ApplicationContract.validate(invalid_restore_contract)["ok"] == false)
+
 Dir.mktmpdir("soul-backup-administration-") do |root|
   mount = File.join(root, "recovery")
   repository = File.join(mount, "restic")
@@ -122,6 +147,36 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
       "SOUL_BACKUP_MAX_REPACK_SIZE" => "1G"
     }, runner: runner, clock: clock, id_generator: -> { "0123456789abcdef" }
   )
+
+  restore_failure = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "restoring files\nerror: open #{File.join(root, 'private-item')}: permission denied\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  failure_suffix = service.send(:restic_failure_suffix, restore_failure)
+  check.call("bounded Restic failures retain the actionable line and sanitize private roots",
+             failure_suffix.include?("permission denied") &&
+               failure_suffix.include?("Fatal: There were 1 errors") &&
+               failure_suffix.include?("[PROJECT_ROOT]") &&
+               !failure_suffix.include?(root))
+
+  ownership_target = File.join(state_root, "restores", "restore_0123456789abcdef")
+  ownership_failure = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "Summary: Restored 2 / 1 files/dirs\n",
+    stderr: "ignoring error for #{root}: lchown #{ownership_target}#{root}: invalid argument\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  accepted_ownership = service.send(
+    :restic_ancestor_ownership_only_failure?, ownership_failure,
+    target: ownership_target, includes: [File.join(root, "owner-state", "state.json")]
+  )
+  rejected_content = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "error: damaged restored file\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  check.call("only exact untruncated ancestor ownership failures under the owner home are accepted",
+             accepted_ownership &&
+               !service.send(:restic_ancestor_ownership_only_failure?, rejected_content,
+                             target: ownership_target, includes: [File.join(root, "owner-state", "state.json")]))
 
   locked = service.status
   check.call("status inspects configuration without requesting or retaining the repository password",
@@ -167,7 +222,11 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
              captured["ok"] && snapshot_id == "d" * 64 &&
                File.file?(manifest_path) && File.file?(ledger_path) &&
                JSON.parse(File.read(manifest_path)).fetch("paths").include?(File.join(source_root, "state.json")) &&
-               (File.stat(manifest_path).mode & 0o777) == 0o600)
+               (File.stat(manifest_path).mode & 0o777) == 0o600 &&
+               runner.calls.any? do |call|
+                 argv = call["argv"]
+                 argv.include?("backup") && argv.include?("--json") && argv.include?("--quiet")
+               end)
 
   newest_blocked = service.retention_preview(password: password, snapshot_ids: ["d" * 64])
   minimum_blocked = service.retention_preview(password: password, snapshot_ids: ["a" * 64, "b" * 64, "c" * 64])
@@ -274,10 +333,14 @@ end
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 http = File.read(File.expand_path("../lib/soul_core/dashboard_http_application.rb", __dir__))
 check.call("dashboard exposes Administration navigation, repository unlock, exact gates, snapshots, and staged restore",
            %w[administration-tab administration-menu backup-panel backup-password backup-snapshot-list preview-backup-create execute-backup-create preview-backup-retention execute-backup-retention preview-backup-restore execute-backup-restore].all? { |id| html.include?("id=\"#{id}\"") } &&
-             javascript.include?('"backup.create.preview"') &&
+             javascript.include?('retainText.textContent = "Forget"') &&
+             javascript.include?('restoreText.textContent = "Restore"') &&
+             css.include?(".backup-snapshot-control") &&
+             javascript.include?('backupOperation("create.preview")') &&
              javascript.include?('"/api/v1/administration-stream"') &&
              javascript.include?('["blocked_for_human_review"]'))
 check.call("administration stream is request-bound and allow-lists only mutating backup operations",

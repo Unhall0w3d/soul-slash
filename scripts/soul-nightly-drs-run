@@ -3,14 +3,16 @@
 
 require "optparse"
 
-options = {"trigger" => "systemd_timer", "schedule_mode" => "installed"}
+options = {"trigger" => "systemd_timer", "schedule_mode" => "installed", "profile" => "soul"}
 OptionParser.new do |parser|
   parser.on("--root PATH") { |value| options["root"] = value }
+  parser.on("--profile PROFILE") { |value| options["profile"] = value }
   parser.on("--trigger VALUE") { |value| options["trigger"] = value }
   parser.on("--schedule-mode VALUE") { |value| options["schedule_mode"] = value }
 end.parse!
 
 abort "root is required" if options["root"].to_s.empty? || !ARGV.empty?
+abort "profile is invalid" unless %w[soul operator].include?(options["profile"])
 abort "trigger is invalid" unless options["trigger"].match?(/\A[a-z][a-z0-9_]{0,31}\z/)
 abort "schedule mode is invalid" unless options["schedule_mode"].match?(/\A[a-z][a-z0-9_]{0,31}\z/)
 
@@ -20,7 +22,7 @@ require "soul_core/env_loader"
 require "soul_core/nightly_drs_runner"
 
 SoulCore::EnvLoader.load(File.join(root, ".env"))
-result = SoulCore::NightlyDrsRunner.new(root: root).run(
+result = SoulCore::NightlyDrsRunner.new(root: root, profile_id: options.fetch("profile")).run(
   trigger: options.fetch("trigger"),
   schedule_mode: options.fetch("schedule_mode")
 )

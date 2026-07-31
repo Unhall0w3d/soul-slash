@@ -10,6 +10,11 @@ require_relative "backup_administration_service"
 module SoulCore
   class NightlyDrsRunner
     CREDENTIAL_NAME = "soul-backup-repository-password"
+    OPERATOR_CREDENTIAL_NAME = "operator-backup-repository-password"
+    PROFILES = {
+      "soul" => {credential_name: CREDENTIAL_NAME, state_directory: "backup"},
+      "operator" => {credential_name: OPERATOR_CREDENTIAL_NAME, state_directory: "operator_backup"}
+    }.freeze
     MAX_CREDENTIAL_BYTES = BackupAdministrationService::MAX_PASSWORD_BYTES
 
     def initialize(
@@ -18,18 +23,24 @@ module SoulCore
       process_env: ENV,
       clock: -> { Time.now.utc },
       id_generator: -> { SecureRandom.hex(8) },
-      backup_service: nil
+      backup_service: nil,
+      profile_id: "soul"
     )
       @root = File.expand_path(root)
       @home = File.expand_path(home)
       @env = process_env.to_h
       @clock = clock
       @id_generator = id_generator
-      @state_root = File.join(@root, "Soul", "private", "backup")
+      @profile_id = profile_id.to_s
+      profile = PROFILES[@profile_id]
+      raise ArgumentError, "DRS profile must be soul or operator" unless profile
+      @credential_name = profile.fetch(:credential_name)
+      @state_root = File.join(@root, "Soul", "private", profile.fetch(:state_directory))
       @state_path = File.join(@state_root, "nightly-drs-state.json")
       @lock_path = File.join(@state_root, "nightly-drs-run.lock")
       @backup_service = backup_service || BackupAdministrationService.new(
-        root: @root, home: @home, process_env: @env, clock: @clock
+        root: @root, home: @home, process_env: @env, clock: @clock,
+        profile_id: @profile_id
       )
       validate_state_root!
     end
@@ -43,6 +54,7 @@ module SoulCore
       previous = read_state
       running = {
         "schema_version" => "soul.nightly_drs_state.v1",
+        "profile_id" => @profile_id,
         "run_id" => run_id,
         "state" => "running",
         "trigger" => bounded(trigger),
@@ -87,6 +99,7 @@ module SoulCore
     rescue StandardError => error
       failed = (defined?(running) && running ? running : {
         "schema_version" => "soul.nightly_drs_state.v1",
+        "profile_id" => @profile_id,
         "state" => "failed",
         "started_at" => @clock.call.utc.iso8601,
         "last_success_at" => read_state["last_success_at"]
@@ -113,7 +126,7 @@ module SoulCore
       raise "systemd credential directory is unavailable" if directory.empty?
       expanded = File.expand_path(directory)
       raise "systemd credential directory is invalid" unless File.directory?(expanded) && !File.symlink?(expanded)
-      File.join(expanded, CREDENTIAL_NAME)
+      File.join(expanded, @credential_name)
     end
 
     def read_credential

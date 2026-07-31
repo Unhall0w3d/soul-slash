@@ -725,12 +725,14 @@
         <div class="studio-boundary"><strong>Bounded recovery authority</strong><span>Inspect → preview → authorize → verify</span><small>Nightly DRS may be explicitly deployed; pruning and live-tree replacement remain manual.</small></div>
       </header>
       <div class="backup-unlock">
+        <label for="backup-profile">Continuity profile <select id="backup-profile"><option value="soul">Soul continuity</option><option value="operator">Operator continuity</option></select></label>
         <label for="backup-password">Repository password <input id="backup-password" type="password" maxlength="1024" autocomplete="off" placeholder="Held only for this page session"></label>
         <button id="refresh-backup" class="refresh-button" type="button">Unlock &amp; refresh</button>
         <button id="forget-backup-password" class="quiet-button" type="button">Forget password</button>
         <p id="backup-status" role="status" aria-live="polite">Open this page to inspect the local recovery target.</p>
       </div>
       <div class="backup-summary">
+        <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Selected continuity profile</p><h2 id="backup-profile-heading">Soul continuity</h2></div><span id="backup-profile-state" class="count-badge">SOUL</span></div><dl id="backup-profile-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery target</p><h2>Repository</h2></div><span id="backup-repository-state" class="count-badge">—</span></div><dl id="backup-repository-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Deletion safety</p><h2>Retention ledger</h2></div><span id="backup-ledger-state" class="count-badge">—</span></div><dl id="backup-ledger-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
         <section class="improvement-card"><div class="card-heading"><div><p class="eyebrow">Recovery evidence</p><h2>Receipts &amp; staging</h2></div><span id="backup-receipt-count" class="count-badge">0</span></div><dl id="backup-evidence-details" class="improvement-details"><div><dt>State</dt><dd>Not inspected</dd></div></dl></section>
@@ -749,7 +751,7 @@
             <button id="preview-backup-drs" class="gate-button" type="button">Preview DRS transaction</button>
             <div id="backup-drs-confirm" hidden><pre id="backup-drs-scope" class="clear-preview-list"></pre><button id="execute-backup-drs" class="gate-button gate-button--gold" type="button">Create &amp; reconcile</button></div>
             <div id="backup-drs-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing supervised DRS transaction…</span></div>
-            <p id="backup-drs-status" class="dialog-status" role="status">Manual gate remains available. Installed nightly DRS uses one host-encrypted credential, no retry, and no pruning.</p>
+            <p id="backup-drs-status" class="dialog-status" role="status">Manual gate remains available. Each separately qualified profile schedule uses its own host-encrypted credential, with no retry and no pruning.</p>
           </section>
           <section class="gate-card">
             <div><p class="eyebrow">Owner manifest policy</p><h3>Reconcile backup scope</h3><p>Adds only missing paths from the current portable policy. Existing sources, exclusions, comments, and encrypted history remain untouched.</p></div>
@@ -765,7 +767,7 @@
             <p id="backup-create-status" class="dialog-status" role="status"></p>
           </section>
           <section class="gate-card">
-            <div><p class="eyebrow">Verified second copy</p><h3>Copy to Crucible</h3><p>Initializes the exact remote repository when absent, copies only missing Soul snapshots, then verifies repository metadata and exact snapshot coverage. It never deletes remote snapshots.</p></div>
+            <div><p class="eyebrow">Verified second copy</p><h3>Copy to Crucible</h3><p>Initializes the exact remote repository when absent, copies only missing snapshots from the selected continuity profile, then verifies repository metadata and exact snapshot coverage. It never deletes remote snapshots.</p></div>
             <button id="preview-backup-replica" class="gate-button" type="button">Preview Crucible copy</button>
             <div id="backup-replica-confirm" hidden><pre id="backup-replica-scope" class="clear-preview-list"></pre><button id="execute-backup-replica" class="gate-button gate-button--gold" type="button">Initialize/copy &amp; verify</button></div>
             <div id="backup-replica-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing Crucible copy…</span></div>

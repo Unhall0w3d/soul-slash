@@ -23,7 +23,7 @@ Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectVie
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
-Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
+Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
 state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
@@ -4320,6 +4320,10 @@ function backupPassword() {
   return password;
 }
 
+function backupOperation(suffix) {
+  return `${state.backupProfile === "operator" ? "operator_backup" : "backup"}.${suffix}`;
+}
+
 function backupResult(envelope, accepted = ["complete"]) {
   const lifecycleState = envelope.lifecycle_state || "failed";
   if (!accepted.includes(lifecycleState)) throw new Error(envelope.errors?.[0]?.message || "Backup administration stopped safely.");
@@ -4342,17 +4346,23 @@ function renderBackupSnapshots(snapshots) {
   byId("backup-snapshot-count").textContent = String(state.backupSnapshots.length);
   if (!state.backupSnapshots.length) {
     const empty = document.createElement("p"); empty.className = "muted";
-    empty.textContent = byId("backup-password").value ? "No Soul state snapshots were found." : "Enter the repository password to inspect encrypted history.";
+    empty.textContent = byId("backup-password").value ? `No ${state.backupProfileLabel} snapshots were found.` : "Enter the repository password to inspect encrypted history.";
     list.append(empty); return;
   }
   state.backupSnapshots.forEach((snapshot, index) => {
     const row = document.createElement("div"); row.className = `backup-snapshot${index === 0 ? " is-newest" : ""}`;
     const controls = document.createElement("div"); controls.className = "backup-snapshot-controls";
+    const retainLabel = document.createElement("label"); retainLabel.className = "backup-snapshot-control";
     const retain = document.createElement("input"); retain.type = "checkbox"; retain.className = "backup-retention-select"; retain.value = snapshot.id;
     retain.disabled = index === 0; retain.title = index === 0 ? "The newest snapshot cannot be forgotten" : "Select for retention";
+    retain.setAttribute("aria-label", index === 0 ? "Newest snapshot cannot be forgotten" : `Forget snapshot ${snapshot.short_id || snapshot.id.slice(0, 8)}`);
+    const retainText = document.createElement("span"); retainText.textContent = "Forget"; retainLabel.append(retain, retainText);
+    const restoreLabel = document.createElement("label"); restoreLabel.className = "backup-snapshot-control";
     const restore = document.createElement("input"); restore.type = "radio"; restore.name = "backup-restore-snapshot"; restore.value = snapshot.id;
     restore.title = "Select for staged restore";
-    controls.append(retain, restore);
+    restore.setAttribute("aria-label", `Restore snapshot ${snapshot.short_id || snapshot.id.slice(0, 8)}`);
+    const restoreText = document.createElement("span"); restoreText.textContent = "Restore"; restoreLabel.append(restore, restoreText);
+    controls.append(retainLabel, restoreLabel);
     const copy = document.createElement("div");
     const heading = document.createElement("strong"); heading.textContent = `${snapshot.short_id || snapshot.id.slice(0, 8)}${index === 0 ? " · newest" : ""}`;
     const time = document.createElement("span"); time.textContent = snapshot.time || "time unavailable";
@@ -4364,6 +4374,20 @@ function renderBackupSnapshots(snapshots) {
 function renderBackupStatus(payload) {
   const mount = payload.mount || {};
   const manifests = payload.manifest_reconciliation || {};
+  const policy = payload.policy || {};
+  state.backupProfile = payload.profile_id === "operator" ? "operator" : "soul";
+  state.backupProfileLabel = payload.profile_label || (state.backupProfile === "operator" ? "Operator" : "Soul");
+  byId("backup-profile").value = state.backupProfile;
+  byId("backup-profile-heading").textContent = `${state.backupProfileLabel} continuity`;
+  byId("backup-profile-state").textContent = state.backupProfile.toUpperCase();
+  renderBackupFacts(byId("backup-profile-details"), {
+    "Snapshot tag": payload.snapshot_tag || "unavailable",
+    "Execution": state.backupProfile === "operator" ? "Manual plus separately qualified 2:00 AM DRS" : "Manual plus approved 3:00 AM DRS",
+    "Raw AI weights": policy.raw_model_weights_included === false ? "Excluded · reproducible" : "Profile policy",
+    "Tracked model assets": policy.reproducible_asset_count ?? "not applicable",
+    "Outbound recovery": Array.isArray(policy.outbound_recovery_coverage) ? `${policy.outbound_recovery_coverage.filter((item) => item.selected).length}/${policy.outbound_recovery_coverage.length} selected` : "not applicable",
+    "Manual review gaps": Array.isArray(policy.explicit_manual_review_gaps) ? policy.explicit_manual_review_gaps.length : 0
+  });
   const ready = payload.available && payload.configured && mount.mounted && mount.writable && mount.expected_target;
   byId("backup-repository-state").textContent = ready ? "READY" : "ATTENTION";
   renderBackupFacts(byId("backup-repository-details"), {
@@ -4402,13 +4426,17 @@ function renderBackupStatus(payload) {
   const drs = payload.drs || {};
   const automation = payload.automation || {};
   const lastAutomated = automation.last_run || {};
+  const calendarTime = String(automation.calendar || "").match(/(\d{2}):(\d{2})/);
+  const scheduleLabel = calendarTime
+    ? `${Number(calendarTime[1])}:${calendarTime[2]} ${Number(calendarTime[1]) >= 12 ? "PM" : "AM"}`
+    : (state.backupProfile === "operator" ? "2:00 AM" : "3:00 AM");
   byId("backup-drs-state").textContent = automation.ready ? "NIGHTLY" : automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
   renderBackupFacts(byId("backup-drs-details"), {
     "Last result": lastAutomated.state || drs.state || "not run",
     "Local": lastAutomated.local_state || drs.local_state || "not run",
     "Crucible": lastAutomated.replica_state || drs.replica_state || "not run",
     "Completed": lastAutomated.completed_at || drs.completed_at || "not yet",
-    "Schedule": automation.ready ? "Nightly · 3:00 AM" : automation.mode === "qualification" ? "Qualification armed" : "Disabled",
+    "Schedule": automation.ready ? `Nightly · ${scheduleLabel}` : automation.mode === "qualification" ? "Qualification armed" : "Disabled",
     "Next run": automation.next_run || "not scheduled",
     "Credential": automation.credential_ready ? "Host-encrypted" : "Not enrolled"
   });
@@ -4427,7 +4455,7 @@ async function loadBackupAdministration({ unlock = false } = {}) {
   try {
     const parameters = {};
     if (unlock) parameters.password = backupPassword();
-    const envelope = await callSoul("backup.status", parameters);
+    const envelope = await callSoul(backupOperation("status"), parameters);
     renderBackupStatus(backupResult(envelope));
     state.backupLoaded = true;
   } catch (error) { byId("backup-status").textContent = error.message; }
@@ -4454,7 +4482,7 @@ function backupRestorePaths() {
 async function previewBackupManifestReconciliation() {
   byId("preview-backup-manifests").disabled = true;
   try {
-    const envelope = await callSoul("backup.manifests.reconcile.preview");
+    const envelope = await callSoul(backupOperation("manifests.reconcile.preview"));
     state.backupManifestPreview = backupResult(envelope);
     byId("backup-manifest-scope").textContent = JSON.stringify({
       source_additions: state.backupManifestPreview.source_additions,
@@ -4477,7 +4505,7 @@ async function executeBackupManifestReconciliation() {
   if (!state.backupManifestPreview || !state.backupManifestPreview.changes_required || state.backupBusy) return;
   state.backupBusy = true; byId("execute-backup-manifests").disabled = true;
   try {
-    const envelope = await callSoul("backup.manifests.reconcile.execute", {
+    const envelope = await callSoul(backupOperation("manifests.reconcile.execute"), {
       confirmation: state.backupManifestPreview.confirmation_phrase,
       expected_digest: state.backupManifestPreview.expected_digest
     });
@@ -4491,7 +4519,7 @@ async function executeBackupManifestReconciliation() {
 async function previewBackupCreate() {
   byId("preview-backup-create").disabled = true;
   try {
-    const envelope = await callSoul("backup.create.preview", { password: backupPassword() });
+    const envelope = await callSoul(backupOperation("create.preview"), { password: backupPassword() });
     state.backupCreatePreview = backupResult(envelope);
     byId("backup-create-scope").textContent = JSON.stringify({
       sources: state.backupCreatePreview.sources,
@@ -4508,7 +4536,7 @@ async function previewBackupCreate() {
 async function previewBackupDrs() {
   byId("preview-backup-drs").disabled = true;
   try {
-    const envelope = await callSoul("backup.drs.preview", { password: backupPassword() });
+    const envelope = await callSoul(backupOperation("drs.preview"), { password: backupPassword() });
     state.backupDrsPreview = backupResult(envelope);
     const local = state.backupDrsPreview.local_capture?.data || {};
     const replica = state.backupDrsPreview.replica_preflight || {};
@@ -4537,7 +4565,7 @@ async function executeBackupDrs() {
   const progress = byId("backup-drs-progress");
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact supervised DRS transaction." });
-    const envelope = await callNdjson("/api/v1/administration-stream", "backup.drs.execute", {
+    const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("drs.execute"), {
       password: backupPassword(),
       confirmation: state.backupDrsPreview.confirmation_phrase,
       expected_digest: state.backupDrsPreview.expected_digest
@@ -4555,7 +4583,7 @@ async function executeBackupCreate() {
   const progress = byId("backup-create-progress");
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact capture scope." });
-    const envelope = await callNdjson("/api/v1/administration-stream", "backup.create.execute", {
+    const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("create.execute"), {
       password: backupPassword(), confirmation: state.backupCreatePreview.confirmation_phrase,
       expected_digest: state.backupCreatePreview.expected_digest
     }, {}, (event) => showGenerationProgress(progress, event));
@@ -4569,7 +4597,7 @@ async function executeBackupCreate() {
 async function previewBackupReplica() {
   byId("preview-backup-replica").disabled = true;
   try {
-    const envelope = await callSoul("backup.replica.preview", { password: backupPassword() });
+    const envelope = await callSoul(backupOperation("replica.preview"), { password: backupPassword() });
     state.backupReplicaPreview = backupResult(envelope);
     byId("backup-replica-scope").textContent = JSON.stringify({
       target_repository: state.backupReplicaPreview.target_repository,
@@ -4593,12 +4621,12 @@ async function executeBackupReplica() {
   const progress = byId("backup-replica-progress");
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating local and Crucible repository identities." });
-    const envelope = await callNdjson("/api/v1/administration-stream", "backup.replica.execute", {
+    const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("replica.execute"), {
       password: backupPassword(), confirmation: state.backupReplicaPreview.confirmation_phrase,
       expected_digest: state.backupReplicaPreview.expected_digest
     }, {}, (event) => showGenerationProgress(progress, event));
     const result = backupResult(envelope);
-    byId("backup-replica-status").textContent = `Crucible verified with ${result.target_snapshot_count || 0} Soul snapshots.`;
+    byId("backup-replica-status").textContent = `Crucible verified with ${result.target_snapshot_count || 0} ${state.backupProfileLabel} snapshots.`;
     resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
   } catch (error) { byId("backup-replica-status").textContent = error.message; }
   finally { state.backupBusy = false; byId("execute-backup-replica").disabled = false; hideGenerationProgress(progress); }
@@ -4608,7 +4636,7 @@ async function previewBackupRetention() {
   byId("preview-backup-retention").disabled = true;
   try {
     const snapshotIds = selectedBackupSnapshotIds();
-    const envelope = await callSoul("backup.retention.preview", { password: backupPassword(), snapshot_ids: snapshotIds });
+    const envelope = await callSoul(backupOperation("retention.preview"), { password: backupPassword(), snapshot_ids: snapshotIds });
     state.backupRetentionPreview = backupResult(envelope);
     byId("backup-retention-scope").textContent = JSON.stringify({
       selected_snapshot_ids: state.backupRetentionPreview.selected_snapshot_ids,
@@ -4628,7 +4656,7 @@ async function executeBackupRetention() {
   const progress = byId("backup-retention-progress");
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating snapshot holds and inventory." });
-    const envelope = await callNdjson("/api/v1/administration-stream", "backup.retention.execute", {
+    const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("retention.execute"), {
       password: backupPassword(), snapshot_ids: state.backupRetentionPreview.selected_snapshot_ids,
       confirmation: state.backupRetentionPreview.confirmation_phrase, expected_digest: state.backupRetentionPreview.expected_digest
     }, {}, (event) => showGenerationProgress(progress, event));
@@ -4642,7 +4670,7 @@ async function executeBackupRetention() {
 async function previewBackupRestore() {
   byId("preview-backup-restore").disabled = true;
   try {
-    const envelope = await callSoul("backup.restore.preview", {
+    const envelope = await callSoul(backupOperation("restore.preview"), {
       password: backupPassword(), snapshot_id: selectedBackupRestoreId(), paths: backupRestorePaths()
     });
     state.backupRestorePreview = backupResult(envelope);
@@ -4665,7 +4693,7 @@ async function executeBackupRestore() {
   const progress = byId("backup-restore-progress");
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact isolated restore." });
-    const envelope = await callNdjson("/api/v1/administration-stream", "backup.restore.execute", {
+    const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("restore.execute"), {
       password: backupPassword(), snapshot_id: state.backupRestorePreview.snapshot_id,
       paths: state.backupRestorePreview.includes, confirmation: state.backupRestorePreview.confirmation_phrase,
       expected_digest: state.backupRestorePreview.expected_digest
@@ -5224,6 +5252,15 @@ byId("preview-maintenance-reboot").addEventListener("click", previewMaintenanceR
 byId("execute-maintenance-reboot").addEventListener("click", executeMaintenanceReboot);
 byId("refresh-maintenance-reboot-status").addEventListener("click", loadMaintenanceRebootStatus);
 byId("refresh-backup").addEventListener("click", () => loadBackupAdministration({ unlock: true }));
+byId("backup-profile").addEventListener("change", async (event) => {
+  state.backupProfile = event.target.value === "operator" ? "operator" : "soul";
+  state.backupProfileLabel = state.backupProfile === "operator" ? "Operator" : "Soul";
+  state.backupLoaded = false;
+  resetBackupPreviews();
+  renderBackupSnapshots([]);
+  byId("backup-status").textContent = `Inspecting ${state.backupProfileLabel} continuity without unlocking encrypted history…`;
+  await loadBackupAdministration();
+});
 byId("forget-backup-password").addEventListener("click", () => {
   byId("backup-password").value = ""; resetBackupPreviews(); renderBackupSnapshots([]);
   byId("backup-status").textContent = "Repository password forgotten; encrypted history is locked.";

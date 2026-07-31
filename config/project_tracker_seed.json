@@ -292,6 +292,23 @@
       "references": "docs/soul/BACKUP_ADMINISTRATION_A2_BRIEF.md; docs/soul/BACKUP_ADMINISTRATION_A2_REVIEW.md; docs/soul/CRUCIBLE_BACKUP_REPLICATION_A2_BRIEF.md; docs/assessments/CRUCIBLE_BACKUP_REPLICATION_A2_REVIEW.md; docs/soul/BACKUP_CREDENTIAL_ROTATION_A0_BRIEF.md; docs/assessments/BACKUP_CREDENTIAL_ROTATION_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md; docs/guides/CRUCIBLE_FEDORA.md"
     },
     {
+      "item_id": "track_operator_backup",
+      "title": "Qualify Operator workstation backup coverage",
+      "area": "Backup & Recovery",
+      "horizon": "archive",
+      "status": "validated",
+      "priority": "high",
+      "summary": "Protect selected personal data, dotfiles, application state, local game saves, private recovery credentials, and host-rebuild evidence through a separately tagged continuity profile scheduled at 2:00 AM.",
+      "acceptance": "The exact workstation manifest is human-reviewed; one encrypted Operator snapshot verifies locally and on Crucible; a representative dotfile and personal-data restore verify in isolated staging; raw AI weights remain reproducible from pinned upstream revisions and exact SHA-256 evidence; disclosed manual gaps are either accepted or resolved.",
+      "source": "Operator-defined workstation recovery scope, 2026-07-31",
+      "implementation": "Operator Backup A0 reuses the bounded BackupAdministrationService with the operator-state tag, separate manifests/ledger/receipts/restores, profile-specific confirmations, and the shared cross-profile mutation lock. The Dashboard selects Soul or Operator continuity before deriving any operation. A separately qualified hardened systemd oneshot uses distinct Operator unit names, credential, state, and receipts at 2:00 AM local time while preserving Soul's accepted 3:00 AM deployment.",
+      "technologies": "Ruby, Restic, OpenSSH/SFTP, JSON, SHA-256 asset records, vanilla Dashboard JavaScript, owner-only atomic state, flock.",
+      "interfaces": "Administration → Backup & Recovery profile selector; Operator manifest and DRS Makefile gates; separate soul-operator-nightly-drs.service/timer; deterministic verification.",
+      "commands": "make operator-backup-config-plan; make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS; make operator-drs-automation-status; make verify-operator-backup",
+      "references": "docs/soul/OPERATOR_BACKUP_A0_BRIEF.md; docs/assessments/OPERATOR_BACKUP_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md",
+      "notes": "Live qualification completed 2026-07-31. The 117-root Atelier manifest is active; supervised and systemd-triggered Operator DRS runs verified locally and on Crucible; the separately encrypted permanent 2:00 AM timer is enabled; Crucible's XFS backup disk is 200 GiB; and restore receipt restore_20260731T212748Z_369e5596cb475fa0 proves isolated recovery of SSH config, a maintenance private key, .zshrc, and personal document data with matching hashes/modes and no live mutation. Raw ai_models weights remain excluded in favor of exact pinned recovery evidence. Automatic retry, retention, remote deletion, and live restore promotion remain disabled."
+    },
+    {
       "item_id": "track_project_search",
       "title": "Project-aware and local-document search",
       "area": "Knowledge",

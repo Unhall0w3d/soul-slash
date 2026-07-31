@@ -64,6 +64,19 @@ module SoulCore
       "backup.replica.execute" => %w[password confirmation expected_digest],
       "backup.drs.preview" => %w[password],
       "backup.drs.execute" => %w[password confirmation expected_digest],
+      "operator_backup.status" => %w[password],
+      "operator_backup.manifests.reconcile.preview" => [],
+      "operator_backup.manifests.reconcile.execute" => %w[confirmation expected_digest],
+      "operator_backup.create.preview" => %w[password],
+      "operator_backup.create.execute" => %w[password confirmation expected_digest],
+      "operator_backup.retention.preview" => %w[password snapshot_ids],
+      "operator_backup.retention.execute" => %w[password snapshot_ids confirmation expected_digest],
+      "operator_backup.restore.preview" => %w[password snapshot_id paths],
+      "operator_backup.restore.execute" => %w[password snapshot_id paths confirmation expected_digest],
+      "operator_backup.replica.preview" => %w[password],
+      "operator_backup.replica.execute" => %w[password confirmation expected_digest],
+      "operator_backup.drs.preview" => %w[password],
+      "operator_backup.drs.execute" => %w[password confirmation expected_digest],
       "project_tracker.snapshot" => [],
       "project_tracker.items.create" => %w[item],
       "project_tracker.items.update" => %w[item_id item expected_revision],
@@ -390,7 +403,7 @@ module SoulCore
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "expected_revision"
           return "expected_revision must be a positive integer" unless value.is_a?(Integer) && value.positive?
-        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources"
+        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources" || key == "paths" || key == "snapshot_ids"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)
