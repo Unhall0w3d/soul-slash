@@ -17,8 +17,8 @@
       "item_id": "track_notification_cues",
       "title": "Validate unified notification cues and spoken notices",
       "area": "Voice + Dashboard",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Review wake, submit, completion, attention, and idle-Presence spoken notices.",
       "acceptance": "Cues are distinct and unobtrusive; speech never overlaps active Presence; Voice/Cues/Muted persists.",
@@ -300,7 +300,7 @@
       "interfaces": "Administration → Backup & Recovery profile selector; Operator manifest and DRS Makefile gates; separate soul-operator-nightly-drs.service/timer; deterministic verification.",
       "commands": "make operator-backup-config-plan; make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS; make operator-drs-automation-status; make verify-operator-backup",
       "references": "docs/soul/OPERATOR_BACKUP_A0_BRIEF.md; docs/assessments/OPERATOR_BACKUP_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md",
-      "notes": "Candidate policy currently resolves 117 existing readable source roots and 31 exclusions on Atelier. Personal media and outbound SSH recovery material are in scope. Raw ai_models weights total 22,269,129,472 bytes and are excluded in favor of exact filename, byte count, SHA-256, repository, and pinned revision evidence. Live manifest configuration, separate credential enrollment, timed qualification, permanent 2:00 AM activation, first Crucible reconciliation, and staged recovery rehearsal remain human gates."
+      "notes": "Live qualification completed 2026-07-31. The 117-root Atelier manifest is active; supervised and systemd-triggered Operator DRS runs verified locally and on Crucible; the separately encrypted permanent 2:00 AM timer is enabled; Crucible's XFS backup disk is 200 GiB; and restore receipt restore_20260731T212748Z_369e5596cb475fa0 proves isolated recovery of SSH config, a maintenance private key, .zshrc, and personal document data with matching hashes/modes and no live mutation. Raw ai_models weights remain excluded in favor of exact pinned recovery evidence. Automatic retry, retention, remote deletion, and live restore promotion remain disabled."
     },
     {
       "item_id": "track_project_search",

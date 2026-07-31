@@ -4352,11 +4352,17 @@ function renderBackupSnapshots(snapshots) {
   state.backupSnapshots.forEach((snapshot, index) => {
     const row = document.createElement("div"); row.className = `backup-snapshot${index === 0 ? " is-newest" : ""}`;
     const controls = document.createElement("div"); controls.className = "backup-snapshot-controls";
+    const retainLabel = document.createElement("label"); retainLabel.className = "backup-snapshot-control";
     const retain = document.createElement("input"); retain.type = "checkbox"; retain.className = "backup-retention-select"; retain.value = snapshot.id;
     retain.disabled = index === 0; retain.title = index === 0 ? "The newest snapshot cannot be forgotten" : "Select for retention";
+    retain.setAttribute("aria-label", index === 0 ? "Newest snapshot cannot be forgotten" : `Forget snapshot ${snapshot.short_id || snapshot.id.slice(0, 8)}`);
+    const retainText = document.createElement("span"); retainText.textContent = "Forget"; retainLabel.append(retain, retainText);
+    const restoreLabel = document.createElement("label"); restoreLabel.className = "backup-snapshot-control";
     const restore = document.createElement("input"); restore.type = "radio"; restore.name = "backup-restore-snapshot"; restore.value = snapshot.id;
     restore.title = "Select for staged restore";
-    controls.append(retain, restore);
+    restore.setAttribute("aria-label", `Restore snapshot ${snapshot.short_id || snapshot.id.slice(0, 8)}`);
+    const restoreText = document.createElement("span"); restoreText.textContent = "Restore"; restoreLabel.append(restore, restoreText);
+    controls.append(retainLabel, restoreLabel);
     const copy = document.createElement("div");
     const heading = document.createElement("strong"); heading.textContent = `${snapshot.short_id || snapshot.id.slice(0, 8)}${index === 0 ? " · newest" : ""}`;
     const time = document.createElement("span"); time.textContent = snapshot.time || "time unavailable";

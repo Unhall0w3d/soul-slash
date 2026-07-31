@@ -333,9 +333,13 @@ end
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 http = File.read(File.expand_path("../lib/soul_core/dashboard_http_application.rb", __dir__))
 check.call("dashboard exposes Administration navigation, repository unlock, exact gates, snapshots, and staged restore",
            %w[administration-tab administration-menu backup-panel backup-password backup-snapshot-list preview-backup-create execute-backup-create preview-backup-retention execute-backup-retention preview-backup-restore execute-backup-restore].all? { |id| html.include?("id=\"#{id}\"") } &&
+             javascript.include?('retainText.textContent = "Forget"') &&
+             javascript.include?('restoreText.textContent = "Restore"') &&
+             css.include?(".backup-snapshot-control") &&
              javascript.include?('backupOperation("create.preview")') &&
              javascript.include?('"/api/v1/administration-stream"') &&
              javascript.include?('["blocked_for_human_review"]'))

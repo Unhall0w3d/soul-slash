@@ -23,15 +23,28 @@ application state, private recovery credentials, and host-rebuild evidence.
   including config, known hosts, and key material. GnuPG, keyrings, GitHub CLI
   configuration, and encrypted credential stores are also selected.
 
-## Outstanding live qualification
+## Live qualification
 
-1. Review `make operator-backup-config-plan` against the actual workstation.
-2. Configure the manifests with the exact reviewed digest.
-3. Enroll the separate Operator credential and qualify one timed run.
-4. Install and inspect the fixed 2:00 AM timer.
-5. Reconcile that exact lineage to Crucible and verify it.
-6. Stage a representative SSH configuration/key set, dotfile, and personal-data restore, inspect it, and
-   remove staging only through the normal reviewed procedure.
+Qualification completed on 2026-07-31:
 
-Until those steps pass, this is a candidate implementation, not qualified
-recovery coverage.
+- The reviewed Atelier policy resolved 117 owner-selected source roots. Raw
+  model weights remain excluded in favor of pinned revision and SHA-256
+  recovery evidence.
+- A supervised Operator DRS transaction verified snapshot
+  `11d0b549…e294c` locally and reconciled exact lineage to Crucible.
+- A systemd-triggered qualification run completed in 34.7 seconds with local
+  snapshot `b081a699…c7839d` and exact Crucible lineage verification. The
+  permanent `soul-operator-nightly-drs.timer` is enabled for 2:00 AM local
+  time with no retry, retention, or deletion authority.
+- Crucible's dedicated XFS backup disk was expanded online from 100 GiB to
+  200 GiB before permanent qualification.
+- Restore receipt `restore_20260731T212748Z_369e5596cb475fa0` verifies an
+  isolated four-file recovery from `b081a699…c7839d`: SSH configuration, a
+  maintenance private key, `.zshrc`, and personal document data. Restored
+  SHA-256 hashes and modes match live state; the key derives the same public
+  identity and the restored SSH configuration resolves `forge` identically.
+  Unprivileged staging ownership is explicitly normalized to the current
+  operator, and live state remains unchanged.
+
+Operator Backup A0 is qualified recovery coverage. Staged recovery promotion,
+retention execution, and deletion remain separate human-reviewed procedures.
