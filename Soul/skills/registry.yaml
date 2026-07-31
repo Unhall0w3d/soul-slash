@@ -49,6 +49,23 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: invocation_catalog_a1
+  maintenance.device:
+    internal_handler: conversation_maintenance_workflow
+    instruction_path: Soul/skills/maintenance/maintain-device/SKILL.md
+    category: administration
+    status: available
+    description: Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+    risk: routine_mutation
+    requires_approval: true
+    confirmation_mode: short_lived_conversational
+    protected_actions:
+      - reboot
+      - deletion
+      - credential_change
+      - external_publication
+    writes_files: true
+    expected_output: conversation_result
+    verifier: conversation_maintenance_workflow_a1
   chats.clear:
     path: Soul/skills/chats/clear.rb
     language: ruby

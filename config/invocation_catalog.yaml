@@ -172,16 +172,16 @@ entries:
     boundary: Files are never permanently deleted by this workflow.
     examples:
       - Inspect my Downloads folder and prepare a cleanup plan.
-  - id: guided-maintenance
-    label: Guided Maintenance
+  - id: device-maintenance
+    label: Device maintenance
     category: Administration
-    summary: Preview the reviewed maintenance transaction, refresh native package evidence through a single-use desktop handoff, and open its visible no-mutation A2 terminal rehearsal.
-    handler_id: maintenance_rehearsal
-    required_inputs: [An explicit maintenance preview or terminal-rehearsal request]
-    optional_inputs: [Normal yay -Syu mode or forced-refresh yay -Syyu mode]
-    core: Any Core; routing is deterministic and model-independent.
-    approval: A1 preview is read-only. Native evidence and A2 rehearsal use one exact digest and Dashboard click. Live A2 remains disabled pending supervised authorization; A3 remains separate.
-    output: Fresh package, disk, active-work, and restore evidence; exact argv; a bounded terminal rehearsal; and a redacted local receipt.
-    boundary: Chat may explain the plan but cannot authorize execution. Rehearsal never authenticates or updates, and no A2 path can reboot.
+    summary: Preview and run one fixed package-maintenance adapter against one exact managed device.
+    skill_ids: [maintenance.device]
+    required_inputs: [An explicit maintenance request and exact managed device]
+    optional_inputs: []
+    core: Any Core; routing and authority are deterministic and model-independent.
+    approval: One short-lived conversational confirmation may authorize routine package maintenance on a non-workstation device.
+    output: Live progress, a device-scoped maintenance receipt, refreshed fleet evidence, remaining updates, reboot state, and any bounded failure.
+    boundary: Reboot, workstation maintenance, deletion, credentials, and other protected actions require an Operator-controlled Dashboard, terminal, or Noctalia gesture; model output and spoken or typed affirmation are not authority.
     examples:
-      - Explain the guided maintenance rehearsal.
+      - Run maintenance on Crucible.
