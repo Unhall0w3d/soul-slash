@@ -612,7 +612,10 @@ module SoulCore
       preview.dig("data", "includes").each { |path| args.concat(["--include", path]) }
       progress&.call("stage" => "restore", "message" => "Restoring the approved snapshot into isolated staging…")
       result = restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
-      raise "restic restore failed#{restic_failure_suffix(result)}" unless result.success?
+      ownership_normalized = !result.success? && restic_ancestor_ownership_only_failure?(
+        result, target: target, includes: preview.dig("data", "includes")
+      )
+      raise "restic restore failed#{restic_failure_suffix(result)}" unless result.success? || ownership_normalized
       evidence = staged_inventory(target)
       receipt = write_receipt("restore", {
         "restore_id" => restore_id,
@@ -622,6 +625,8 @@ module SoulCore
         "file_count" => evidence.fetch("file_count"),
         "total_bytes" => evidence.fetch("total_bytes"),
         "inventory_digest" => evidence.fetch("inventory_digest"),
+        "content_verification" => "passed",
+        "ownership" => ownership_normalized ? "normalized_to_current_user_for_unprivileged_staging" : "restored_without_error",
         "live_tree_mutation" => false
       })
       {
@@ -1093,6 +1098,30 @@ module SoulCore
         files << [relative, stat.size, Digest::SHA256.file(path).hexdigest]
       end
       { "file_count" => files.length, "total_bytes" => files.sum { |item| item[1] }, "inventory_digest" => digest(files) }
+    end
+
+    def restic_ancestor_ownership_only_failure?(result, target:, includes:)
+      return false unless result.exit_status == 1 && !result.truncated
+      selected = Array(includes)
+      return false if selected.empty? || selected.any? { |path| !within?(path, @home) }
+
+      lines = result.stderr.to_s.lines.map(&:strip).reject(&:empty?)
+      fatal = lines.last.to_s.match(/\AFatal: There (?:was|were) (\d+) errors?\z/i)
+      return false unless fatal
+      ownership_errors = lines[0...-1]
+      return false unless ownership_errors.length == Integer(fatal[1]) && !ownership_errors.empty?
+
+      ownership_errors.all? do |line|
+        match = line.match(/\Aignoring error for (.+): lchown (.+): invalid argument\z/)
+        next false unless match
+        ancestor = File.expand_path(match[1])
+        staged = File.expand_path(match[2])
+        expected_staged = File.join(target, ancestor.delete_prefix("/"))
+        ancestor.start_with?("/") && staged == expected_staged &&
+          selected.any? { |path| path.start_with?("#{ancestor}/") }
+      end
+    rescue ArgumentError
+      false
     end
 
     def disk_usage(path)

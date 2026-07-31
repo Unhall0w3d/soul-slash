@@ -159,6 +159,25 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
                failure_suffix.include?("[PROJECT_ROOT]") &&
                !failure_suffix.include?(root))
 
+  ownership_target = File.join(state_root, "restores", "restore_0123456789abcdef")
+  ownership_failure = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "Summary: Restored 2 / 1 files/dirs\n",
+    stderr: "ignoring error for #{root}: lchown #{ownership_target}#{root}: invalid argument\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  accepted_ownership = service.send(
+    :restic_ancestor_ownership_only_failure?, ownership_failure,
+    target: ownership_target, includes: [File.join(root, "owner-state", "state.json")]
+  )
+  rejected_content = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "error: damaged restored file\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  check.call("only exact untruncated ancestor ownership failures under the owner home are accepted",
+             accepted_ownership &&
+               !service.send(:restic_ancestor_ownership_only_failure?, rejected_content,
+                             target: ownership_target, includes: [File.join(root, "owner-state", "state.json")]))
+
   locked = service.status
   check.call("status inspects configuration without requesting or retaining the repository password",
              locked["ok"] && locked.dig("data", "snapshot_access") == "locked" &&
