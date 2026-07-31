@@ -123,7 +123,8 @@ module SoulCore
         File.join(@home, ".local", "state", "noctalia", "screen_recorder", "**"),
         File.join(@home, ".winboat", "*.log"),
         File.join(@home, ".winboat", "oem", "*.exe"),
-        File.join(@home, ".winboat", "oem", "*.zip")
+        File.join(@home, ".winboat", "oem", "*.zip"),
+        File.join(@home, ".config", "qBittorrent", "ipc-socket")
       ].sort
     end
 

@@ -204,6 +204,7 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                summary["outbound_recovery_coverage"].any? { |entry| entry["label"].include?("known hosts") })
   check.call("generated project trees and separately protected Soul state are excluded",
              exclusions.include?("**/target/**") &&
+               exclusions.include?(File.join(home, ".config", "qBittorrent", "ipc-socket")) &&
                exclusions.include?(File.join(home, "Projects", "soul", "**")) &&
                exclusions.include?(File.join(home, "Knowledge", "soul-vault", "**")))
   check.call("ambiguous and privileged gaps remain explicit",
