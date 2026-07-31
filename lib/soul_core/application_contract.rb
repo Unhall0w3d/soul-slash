@@ -403,7 +403,7 @@ module SoulCore
           return "#{key} must be an object" unless value.is_a?(Hash) && string_keys?(value)
         elsif key == "expected_revision"
           return "expected_revision must be a positive integer" unless value.is_a?(Integer) && value.positive?
-        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources"
+        elsif key == "args" || key == "chat_ids" || key == "allowed_files" || key == "tags" || key == "sources" || key == "paths" || key == "snapshot_ids"
           return "#{key} must be an array of strings" unless value.is_a?(Array) && value.all? { |item| item.is_a?(String) }
         else
           return "#{key} must be a string" unless value.is_a?(String)

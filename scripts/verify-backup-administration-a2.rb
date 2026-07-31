@@ -96,6 +96,31 @@ end
 
 puts "Backup Administration A2 verification:"
 
+restore_contract = {
+  "schema_version" => SoulCore::ApplicationContract::SCHEMA_VERSION,
+  "request_id" => "verify-backup-restore-0001",
+  "operation" => "operator_backup.restore.preview",
+  "parameters" => {
+    "password" => "fixture-secret-never-persist",
+    "snapshot_id" => "d" * 64,
+    "paths" => ["/home/operator/.ssh/config", "/home/operator/.zshrc"]
+  },
+  "context" => { "interface" => "dashboard" }
+}
+retention_contract = Marshal.load(Marshal.dump(restore_contract))
+retention_contract["request_id"] = "verify-backup-retention-0001"
+retention_contract["operation"] = "operator_backup.retention.preview"
+retention_contract["parameters"] = {
+  "password" => "fixture-secret-never-persist",
+  "snapshot_ids" => ["d" * 64]
+}
+invalid_restore_contract = Marshal.load(Marshal.dump(restore_contract))
+invalid_restore_contract["parameters"]["paths"] = ["/home/operator/.ssh/config", 7]
+check.call("typed transport accepts bounded restore and retention string arrays while rejecting mixed values",
+           SoulCore::ApplicationContract.validate(restore_contract)["ok"] == true &&
+             SoulCore::ApplicationContract.validate(retention_contract)["ok"] == true &&
+             SoulCore::ApplicationContract.validate(invalid_restore_contract)["ok"] == false)
+
 Dir.mktmpdir("soul-backup-administration-") do |root|
   mount = File.join(root, "recovery")
   repository = File.join(mount, "restic")
