@@ -166,7 +166,8 @@ http = File.read(File.expand_path("../lib/soul_core/dashboard_http_application.r
 service_source = File.read(File.expand_path("../lib/soul_core/backup_administration_service.rb", __dir__))
 check.call("Dashboard exposes one request-bound initialize/copy/verify gate",
            %w[backup-replica-state preview-backup-replica execute-backup-replica backup-replica-progress].all? { |id| html.include?("id=\"#{id}\"") } &&
-             javascript.include?('"backup.replica.preview"') && javascript.include?('"backup.replica.execute"') &&
+             javascript.include?('backupOperation("replica.preview")') &&
+             javascript.include?('backupOperation("replica.execute")') &&
              http.include?("backup.replica.execute"))
 check.call("replica flow contains no forget, prune, scheduler, or background retry",
            !service_source[/def replica_preview.*?def retention_preview/m].to_s.match?(/forget|prune|cron|timer|sleep/i))

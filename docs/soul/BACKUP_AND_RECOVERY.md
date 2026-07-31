@@ -7,6 +7,14 @@ deployment may invoke the exact accepted DRS transaction nightly through one
 hardened systemd `oneshot`. There is no watcher, resident backup process,
 automatic retry, automatic pruning, remote deletion, or unattended restore.
 
+The page has two explicitly separated profiles. **Soul continuity** preserves
+Soul's private runtime and retains the separately approved nightly DRS option.
+**Operator continuity** preserves the human-owned workstation data, dotfiles,
+selected application state, and host-rebuild evidence described below. The
+Operator profile is manual foreground only. The profiles use distinct Restic
+tags, manifests, ledgers, receipts, and restore staging; by default they share
+the same encrypted local repository and Crucible destination.
+
 ## What the dashboard does
 
 The page has five exact-gated operations:
@@ -84,6 +92,57 @@ in:
 Soul/private/backup/sources.txt
 Soul/private/backup/excludes.txt
 ```
+
+Generate the separate Operator manifests after reviewing the machine-local
+inventory:
+
+```sh
+make operator-backup-config-plan
+make operator-backup-configure \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS
+```
+
+Operator manifests live under `Soul/private/operator_backup/`. Select
+**Operator continuity** in the Dashboard before previewing capture, replica,
+retention, or staged restore operations. A shared operation lock prevents Soul
+and Operator mutations from running concurrently.
+
+### Operator continuity scope
+
+The portable Operator policy includes existing readable personal-data folders
+such as Documents, Music, Pictures, Videos, Servers, Tools, Projects, and the
+other named home folders; selected application configuration under
+`~/.config`; shell, Git, terminal, SSH, GnuPG, keyring, Codex, Noctalia,
+desktop/theming, gaming-overlay, and WinBoat state needed to recreate this
+workstation; selected local game-save/userdata and qBittorrent resume state;
+and readable host-rebuild evidence such as package inventory, boot
+configuration, systemd units, udev rules, and the LACT fan curve. Large
+reproducible build trees, caches, virtual environments, `node_modules`, Rust
+`target` trees, Steam game installations, Soul's separately protected
+project/private state, and WinBoat container disks are excluded.
+
+`~/ai_models` raw GGUF weights are deliberately excluded. The tracked
+`config/operator_recovery_assets.json` records the exact filename, byte count,
+SHA-256 digest, upstream repository, and revision needed to reacquire each
+model. This avoids spending roughly 21 GiB in every local and Crucible lineage
+on reproducible artifacts while retaining integrity evidence. If an upstream
+artifact disappears, the reviewed policy may be changed later to protect that
+specific model as irreplaceable data.
+
+The encrypted profile may include private keys and credential stores because
+those are essential recovery material, but encryption does not make every
+credential portable. In particular, systemd-creds material encrypted to the
+current host is useful for same-host disk recovery and cannot by itself restore
+an unattended credential on replacement hardware. A bare-metal recovery still
+requires separately held repository credentials, password-vault recovery, and
+re-enrollment or rotation of host-bound secrets.
+
+The following remain explicit manual-review gaps rather than silent coverage:
+browser profiles/session stores, Downloads and recovered-file holding areas,
+WinBoat disk images, root-only NetworkManager profiles, and cloud-synchronized
+password-vault contents. The plan lists only paths that exist, are readable,
+and are not symlinks; review it before configuration.
 
 The source file is an allow-list, not a whole-home backup. The default
 exclusions omit session state, approval tokens, temporary files, and staged

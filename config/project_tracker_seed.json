@@ -286,6 +286,23 @@
       "references": "docs/soul/BACKUP_ADMINISTRATION_A2_BRIEF.md; docs/soul/BACKUP_ADMINISTRATION_A2_REVIEW.md; docs/soul/CRUCIBLE_BACKUP_REPLICATION_A2_BRIEF.md; docs/assessments/CRUCIBLE_BACKUP_REPLICATION_A2_REVIEW.md; docs/soul/BACKUP_CREDENTIAL_ROTATION_A0_BRIEF.md; docs/assessments/BACKUP_CREDENTIAL_ROTATION_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md; docs/guides/CRUCIBLE_FEDORA.md"
     },
     {
+      "item_id": "track_operator_backup",
+      "title": "Qualify Operator workstation backup coverage",
+      "area": "Backup & Recovery",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Protect selected personal data, dotfiles, application state, local game saves, private recovery credentials, and host-rebuild evidence through a separately tagged manual continuity profile.",
+      "acceptance": "The exact workstation manifest is human-reviewed; one encrypted Operator snapshot verifies locally and on Crucible; a representative dotfile and personal-data restore verify in isolated staging; raw AI weights remain reproducible from pinned upstream revisions and exact SHA-256 evidence; disclosed manual gaps are either accepted or resolved.",
+      "source": "Operator-defined workstation recovery scope, 2026-07-31",
+      "implementation": "Operator Backup A0 reuses the bounded BackupAdministrationService with the operator-state tag, separate manifests/ledger/receipts/restores, profile-specific confirmations, and the shared cross-profile mutation lock. The Dashboard selects Soul or Operator continuity before deriving any operation. Operator A0 is foreground-only and defaults to the existing encrypted local and Crucible repositories.",
+      "technologies": "Ruby, Restic, OpenSSH/SFTP, JSON, SHA-256 asset records, vanilla Dashboard JavaScript, owner-only atomic state, flock.",
+      "interfaces": "Administration → Backup & Recovery profile selector; make operator-backup-config-plan; make operator-backup-configure; make verify-operator-backup.",
+      "commands": "make operator-backup-config-plan; make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS; make verify-operator-backup",
+      "references": "docs/soul/OPERATOR_BACKUP_A0_BRIEF.md; docs/assessments/OPERATOR_BACKUP_A0_REVIEW.md; docs/soul/BACKUP_AND_RECOVERY.md",
+      "notes": "Candidate policy currently resolves 117 existing readable source roots and 31 exclusions on Atelier. Personal media is in scope. Raw ai_models weights total 22,269,129,472 bytes and are excluded in favor of exact filename, byte count, SHA-256, repository, and pinned revision evidence. Live manifest configuration, first capture, Crucible reconciliation, and staged recovery rehearsal remain human gates."
+    },
+    {
       "item_id": "track_project_search",
       "title": "Project-aware and local-document search",
       "area": "Knowledge",

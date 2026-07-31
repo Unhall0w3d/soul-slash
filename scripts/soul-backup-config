@@ -9,29 +9,48 @@ require "pathname"
 require "securerandom"
 
 require_relative "../lib/soul_core/backup_manifest_policy"
+require_relative "../lib/soul_core/operator_backup_manifest_policy"
 
-CONFIRMATION = "CONFIGURE_SOUL_BACKUP_MANIFESTS"
+PROFILES = {
+  "soul" => {
+    policy: SoulCore::BackupManifestPolicy,
+    state_directory: "backup",
+    confirmation: "CONFIGURE_SOUL_BACKUP_MANIFESTS",
+    mutation: "backup_manifests_configured"
+  },
+  "operator" => {
+    policy: SoulCore::OperatorBackupManifestPolicy,
+    state_directory: "operator_backup",
+    confirmation: "CONFIGURE_OPERATOR_BACKUP_MANIFESTS",
+    mutation: "operator_backup_manifests_configured"
+  }
+}.freeze
 
-options = { root: Dir.pwd, home: Dir.home }
+options = { root: Dir.pwd, home: Dir.home, profile: "soul" }
 command = ARGV.shift
 OptionParser.new do |parser|
   parser.on("--root PATH") { |value| options[:root] = value }
   parser.on("--home PATH") { |value| options[:home] = value }
+  parser.on("--profile PROFILE") { |value| options[:profile] = value }
   parser.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
   parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
 end.parse!(ARGV)
 
-abort("Usage: soul-backup-config plan|execute [--root PATH] [--home PATH]") unless %w[plan execute].include?(command)
+abort("Usage: soul-backup-config plan|execute [--profile soul|operator] [--root PATH] [--home PATH]") unless %w[plan execute].include?(command)
 
 root = File.expand_path(options.fetch(:root))
 home = File.expand_path(options.fetch(:home))
-state_root = File.join(root, "Soul", "private", "backup")
+profile_id = options.fetch(:profile).to_s
+profile = PROFILES[profile_id]
+abort("Backup profile must be soul or operator.") unless profile
+
+state_root = File.join(root, "Soul", "private", profile.fetch(:state_directory))
 sources_path = File.join(state_root, "sources.txt")
 excludes_path = File.join(state_root, "excludes.txt")
 
-policy = SoulCore::BackupManifestPolicy.new(root: root, home: home)
+policy = profile.fetch(:policy).new(root: root, home: home)
 sources = policy.sources
-abort("No default backup sources exist; initialize Soul before configuring backup manifests.") if sources.empty?
+abort("No default #{profile_id} backup sources exist.") if sources.empty?
 
 excludes = policy.exclusions
 
@@ -44,6 +63,7 @@ canonical = lambda do |value|
 end
 scope = {
   "operation" => "backup_manifest_configuration",
+  "profile_id" => profile_id,
   "root" => root,
   "home" => home,
   "sources_path" => sources_path,
@@ -59,13 +79,13 @@ digest = Digest::SHA256.hexdigest(JSON.generate(canonical.call(scope)))
 if command == "plan"
   puts JSON.pretty_generate(
     "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
-    "data" => scope.merge("confirmation_phrase" => CONFIRMATION, "expected_digest" => digest),
+    "data" => scope.merge("confirmation_phrase" => profile.fetch(:confirmation), "expected_digest" => digest),
     "next" => "Review every source and exclusion. Execute only on a new clone with no differing owner manifests."
   )
   exit 0
 end
 
-abort("Exact confirmation #{CONFIRMATION} is required.") unless options[:confirmation] == CONFIRMATION
+abort("Exact confirmation #{profile.fetch(:confirmation)} is required.") unless options[:confirmation] == profile.fetch(:confirmation)
 abort("Expected digest is stale or invalid; run plan again.") unless options[:expected_digest] == digest
 
 source_body = sources.join("\n") + "\n"
@@ -90,6 +110,12 @@ end
 
 puts JSON.pretty_generate(
   "ok" => true, "lifecycle_state" => "complete",
-  "mutation" => "backup_manifests_configured",
-  "data" => { "source_count" => sources.length, "exclusion_count" => excludes.length, "sources_path" => sources_path, "excludes_path" => excludes_path }
+  "mutation" => profile.fetch(:mutation),
+  "data" => {
+    "profile_id" => profile_id,
+    "source_count" => sources.length,
+    "exclusion_count" => excludes.length,
+    "sources_path" => sources_path,
+    "excludes_path" => excludes_path
+  }
 )

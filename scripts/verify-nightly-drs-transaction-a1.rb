@@ -267,8 +267,8 @@ drs_source = service_source[/def drs_preview.*?def retention_preview/m].to_s
 
 check.call("Dashboard separates supervised preview from one exact execution gate",
            %w[backup-drs-state preview-backup-drs backup-drs-confirm execute-backup-drs backup-drs-progress backup-drs-status].all? { |id| html.include?("id=\"#{id}\"") } &&
-             javascript.include?('"backup.drs.preview"') &&
-             javascript.include?('"backup.drs.execute"') &&
+             javascript.include?('backupOperation("drs.preview")') &&
+             javascript.include?('backupOperation("drs.execute")') &&
              http.include?("backup.drs.execute"))
 check.call("A1 uses the reviewed SSH config and adds no persistence or automatic retention primitive",
            service_source.include?("sftp.command=ssh -F") &&

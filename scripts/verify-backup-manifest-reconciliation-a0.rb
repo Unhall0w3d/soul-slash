@@ -198,7 +198,8 @@ config_script = File.read(File.expand_path("soul-backup-config", __dir__))
 check.call("Dashboard exposes preview then exact add-only execution",
            html.include?('id="preview-backup-manifests"') &&
              html.include?('id="execute-backup-manifests"') &&
-             javascript.index('"backup.manifests.reconcile.preview"') < javascript.index('"backup.manifests.reconcile.execute"') &&
+             javascript.index('backupOperation("manifests.reconcile.preview")') <
+               javascript.index('backupOperation("manifests.reconcile.execute")') &&
              html.include?("A fresh verified backup remains a separate gate"))
 check.call("initial setup and reconciliation share one portable policy",
            config_script.include?('require_relative "../lib/soul_core/backup_manifest_policy"') &&

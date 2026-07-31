@@ -72,6 +72,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-maintenance-reboot-restore verify-maintenance-passwordless-authority maintenance-authority-plan maintenance-authority-status maintenance-authority-install maintenance-authority-uninstall verify-maintenance-fleet-status verify-maintenance-device-control verify-maintenance-fleet-discovery verify-maintenance-fleet-dhcp-identity verify-apple-mobile-fleet-inventory apple-mobile-inventory-check verify-crucible-fedora-status verify-crucible-maintenance-control verify-nixos-maintenance crucible-maintenance-authority-plan crucible-maintenance-authority-status crucible-maintenance-authority-install fleet-discovery-check fleet-discovery-scan maintenance-resume-plan maintenance-resume-install maintenance-resume-status maintenance-resume-uninstall fleet-status-schedule-plan fleet-status-schedule-install fleet-status-schedule-status fleet-status-schedule-uninstall
 .PHONY: verify-storage-cleanup
 .PHONY: verify-long-form-mix verify-long-form-mix-render verify-long-form-mix-finalization
+.PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -127,6 +128,9 @@ help:
 > @echo "  make backup-config-plan  Preview portable owner backup manifests"
 > @echo "  make backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_SOUL_BACKUP_MANIFESTS"
 > @echo "  make verify-backup-administration  Verify capture, retention, and staged restore gates"
+> @echo "  make operator-backup-config-plan  Preview Operator home, dotfile, and host-rebuild manifests"
+> @echo "  make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS"
+> @echo "  make verify-operator-backup  Verify separated Operator scope, policy, and gates"
 > @echo "  make verify-nightly-drs-transaction  Verify supervised local + Crucible DRS orchestration"
 > @echo "  make verify-nightly-drs-automation  Verify encrypted credential, oneshot, and qualification/permanent timer gates"
 > @echo "  make drs-credential-plan / drs-credential-enroll CONFIRM=ENROLL_SOUL_DRS_CREDENTIAL"
@@ -518,6 +522,17 @@ backup-configure:
 > @test -n "$(EXPECTED_DIGEST)" || { echo "Run backup-config-plan first, then provide EXPECTED_DIGEST."; exit 2; }
 > @test "$(CONFIRM)" = "CONFIGURE_SOUL_BACKUP_MANIFESTS" || { echo "Exact confirmation CONFIGURE_SOUL_BACKUP_MANIFESTS is required."; exit 2; }
 > @ruby scripts/soul-backup-config execute --root "$(PROJECT_ROOT)" --home "$(BACKUP_HOME)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+operator-backup-config-plan:
+> @ruby scripts/soul-backup-config plan --profile operator --root "$(PROJECT_ROOT)" --home "$(BACKUP_HOME)"
+
+operator-backup-configure:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run operator-backup-config-plan first, then provide EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "CONFIGURE_OPERATOR_BACKUP_MANIFESTS" || { echo "Exact confirmation CONFIGURE_OPERATOR_BACKUP_MANIFESTS is required."; exit 2; }
+> @ruby scripts/soul-backup-config execute --profile operator --root "$(PROJECT_ROOT)" --home "$(BACKUP_HOME)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+verify-operator-backup:
+> @ruby scripts/verify-operator-backup-a0.rb
 
 verify-backup-administration:
 > @ruby scripts/verify-backup-administration-a2.rb

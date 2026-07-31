@@ -1,0 +1,30 @@
+{
+  "schema_version": "soul.operator_recovery_assets.v1",
+  "policy": {
+    "raw_model_weights_in_backup": false,
+    "reason": "Model weights are reproducible and would consume 22269069472 bytes before retention. Preserve exact provenance and hashes instead."
+  },
+  "assets": [
+    {
+      "filename": "Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
+      "bytes": 8239593024,
+      "sha256": "824e0f3373e69b84f2cae46fdcb9bd1ebc6ab3bfc7acc125d818b7b8178cc613",
+      "repository": "mistralai/Ministral-3-14B-Instruct-2512-GGUF",
+      "revision": "74fac473c43357d7fb2671713608183cc72496d0"
+    },
+    {
+      "filename": "Qwen3-14B-Q4_K_M.gguf",
+      "bytes": 9001752960,
+      "sha256": "500a8806e85ee9c83f3ae08420295592451379b4f8cf2d0f41c15dffeb6b81f0",
+      "repository": "Qwen/Qwen3-14B-GGUF",
+      "revision": "530227a7d994db8eca5ab5ced2fb692b614357fd"
+    },
+    {
+      "filename": "Qwen3-8B-Q4_K_M.gguf",
+      "bytes": 5027783488,
+      "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "repository": "Qwen/Qwen3-8B-GGUF",
+      "revision": "7c41481f57cb95916b40956ab2f0b139b296d974"
+    }
+  ]
+}
