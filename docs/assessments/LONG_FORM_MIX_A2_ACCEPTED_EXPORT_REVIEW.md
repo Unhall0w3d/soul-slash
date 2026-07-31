@@ -1,6 +1,6 @@
 # Long-form Mix Studio A2 Accepted Export Review
 
-Status: candidate-complete; Operator listening and Dashboard review required
+Status: live accepted; Operator listening review and immutable export complete
 
 ## Implementation summary
 
@@ -64,11 +64,28 @@ LLM output cannot supply human listening acceptance.
 
 ## Known weaknesses
 
-- The Operator has not yet completed the A2 listening review in the live
-  Dashboard.
+- The Operator rated the live `Biome Change` sequence 3/5 and kept it, with
+  transition quality passed but sequence cohesion only partial because the
+  general sound of each song is too dissimilar. This is accepted evidence for
+  A2's review/export contract, not a claim that the sequence is release-ready.
 - Accepted audio is the verified A1 render; it is not release mastering or
   loudness normalization.
 - Visual-loop sequencing and combined audio/video export remain a later slice.
+
+## Live acceptance
+
+On 2026-07-31 the Operator listened to the complete 423.6-second `Biome Change`
+render and recorded review `mixreview_68ea17f07e94511a`: sequence cohesion
+`partial`, transition quality `passed`, rating `3`, disposition `keep`, with the
+note that the general sound of each song is too dissimilar.
+
+The review produced one immutable accepted export whose scope digest is
+`6cd87b8398efceccb47262d8087a0142940c22edc648f3bbb6e821cc99f2b937`.
+Independent closeout verification passed every manifest checksum and confirmed
+that both the FLAC master and MP3 listening copy are stereo 48 kHz audio with an
+exact duration of 423.6 seconds. The accepted package preserves the exact review,
+render hashes, metadata, summary, and checksum manifest without changing live
+source state.
 
 ## Memory keys
 
@@ -94,7 +111,7 @@ source mutation.
 - [x] Exact review/render digest gate is preserved
 - [x] Source drift and destination collision fail closed
 - [x] Accepted package checksums are deterministic
-- [ ] Listen through the selected candidate
-- [ ] Record the live disposition and notes
-- [ ] Preview and, if kept, inspect one real accepted-audio package
-- [ ] Decide whether the audio foundation is validated before visual sequencing
+- [x] Listen through the selected candidate
+- [x] Record the live disposition and notes
+- [x] Preview and, if kept, inspect one real accepted-audio package
+- [x] Decide whether the audio foundation is validated before visual sequencing
