@@ -167,7 +167,11 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
              captured["ok"] && snapshot_id == "d" * 64 &&
                File.file?(manifest_path) && File.file?(ledger_path) &&
                JSON.parse(File.read(manifest_path)).fetch("paths").include?(File.join(source_root, "state.json")) &&
-               (File.stat(manifest_path).mode & 0o777) == 0o600)
+               (File.stat(manifest_path).mode & 0o777) == 0o600 &&
+               runner.calls.any? do |call|
+                 argv = call["argv"]
+                 argv.include?("backup") && argv.include?("--json") && argv.include?("--quiet")
+               end)
 
   newest_blocked = service.retention_preview(password: password, snapshot_ids: ["d" * 64])
   minimum_blocked = service.retention_preview(password: password, snapshot_ids: ["a" * 64, "b" * 64, "c" * 64])

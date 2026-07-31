@@ -307,7 +307,7 @@ module SoulCore
       return blocked("backup preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
 
       progress&.call("stage" => "capture", "message" => "Capturing the approved #{@profile_label} sources…")
-      result = restic(password, "backup", "--json", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024)
+      result = restic(password, "backup", "--json", "--quiet", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024)
       raise "restic backup failed#{restic_failure_suffix(result)}" unless result.success?
       summary = json_lines(result.stdout).reverse.find { |item| item["message_type"] == "summary" }
       snapshot_id = summary.to_h["snapshot_id"].to_s
