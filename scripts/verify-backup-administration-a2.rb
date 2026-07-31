@@ -148,6 +148,17 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
     }, runner: runner, clock: clock, id_generator: -> { "0123456789abcdef" }
   )
 
+  restore_failure = SoulCore::BoundedCommandRunner::Result.new(
+    stdout: "", stderr: "restoring files\nerror: open #{File.join(root, 'private-item')}: permission denied\nFatal: There were 1 errors\n",
+    exit_status: 1, status: "failed", truncated: false
+  )
+  failure_suffix = service.send(:restic_failure_suffix, restore_failure)
+  check.call("bounded Restic failures retain the actionable line and sanitize private roots",
+             failure_suffix.include?("permission denied") &&
+               failure_suffix.include?("Fatal: There were 1 errors") &&
+               failure_suffix.include?("[PROJECT_ROOT]") &&
+               !failure_suffix.include?(root))
+
   locked = service.status
   check.call("status inspects configuration without requesting or retaining the repository password",
              locked["ok"] && locked.dig("data", "snapshot_access") == "locked" &&

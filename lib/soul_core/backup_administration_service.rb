@@ -1215,7 +1215,10 @@ module SoulCore
       return " (password rejected)" if result.exit_status == 12
       return " (repository locked)" if result.exit_status == 11
       return " (timed out)" if result.status == "timeout"
-      detail = result.stderr.to_s.lines.map(&:strip).reject(&:empty?).last.to_s
+      lines = result.stderr.to_s.lines.map(&:strip).reject(&:empty?)
+      terminal = lines.last.to_s
+      diagnostic = lines.reverse.find { |line| line != terminal && !line.match?(/\AFatal: There (?:was|were) \d+ errors?\z/i) }.to_s
+      detail = [diagnostic, terminal].reject(&:empty?).uniq.join(" | ")
       detail = safe_error(StandardError.new(detail)) unless detail.empty?
       suffix = " (exit #{result.exit_status || 'unavailable'}"
       suffix += ": #{detail}" unless detail.empty?
