@@ -20,7 +20,7 @@ state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
-Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null });
+Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
@@ -4712,6 +4712,7 @@ function resetMixComposer() {
   state.mixSequence = [];
   state.mixHandoffPreview = null;
   state.mixRenderPreview = null;
+  state.mixFinalPreview = null;
   byId("mix-title").value = "";
   byId("mix-intent").value = "";
   byId("mix-workbench-title").textContent = "New mix plan";
@@ -4720,6 +4721,9 @@ function resetMixComposer() {
   byId("mix-handoff-confirm").hidden = true;
   byId("mix-render-confirm").hidden = true;
   byId("mix-render-player").hidden = true;
+  byId("mix-final-card").hidden = true;
+  byId("mix-final-export-card").hidden = true;
+  byId("mix-final-export-confirm").hidden = true;
   byId("mix-render-audio").removeAttribute("src");
   byId("mix-render-audio").load();
   byId("mix-revised-title").value = "";
@@ -4824,9 +4828,10 @@ function renderMixPlans() {
 }
 
 function renderMixPlanDetail(plan) {
-  state.selectedMixPlan = plan; state.mixHandoffPreview = null; state.mixRenderPreview = null;
+  state.selectedMixPlan = plan; state.mixHandoffPreview = null; state.mixRenderPreview = null; state.mixFinalPreview = null;
   byId("mix-detail-card").hidden = false; byId("mix-handoff-confirm").hidden = true;
   byId("mix-render-confirm").hidden = true; byId("mix-render-player").hidden = true;
+  byId("mix-final-card").hidden = true; byId("mix-final-export-card").hidden = true; byId("mix-final-export-confirm").hidden = true;
   byId("mix-render-audio").removeAttribute("src"); byId("mix-render-audio").load();
   byId("mix-render-status").textContent = "Inspecting listening-render evidence…";
   byId("mix-detail-title").textContent = plan.title;
@@ -4854,6 +4859,43 @@ function renderMixListeningCandidate(render) {
   byId("mix-render-player").hidden = false;
   byId("mix-render-confirm").hidden = true;
   byId("mix-render-status").textContent = "Listening candidate ready. Review the transitions before deciding whether this mix deserves final export.";
+  byId("mix-final-card").hidden = false;
+}
+
+function renderMixFinalStatus(data) {
+  const review = data.review;
+  const exportCard = byId("mix-final-export-card");
+  byId("mix-final-export-confirm").hidden = true;
+  state.mixFinalPreview = null;
+  if (!review) {
+    byId("mix-final-review-status").textContent = "No listening decision recorded for this exact plan.";
+    exportCard.hidden = true;
+    return;
+  }
+  byId("mix-sequence-cohesion").value = review.sequence_cohesion;
+  byId("mix-transition-quality").value = review.transition_quality;
+  byId("mix-final-rating").value = String(review.rating);
+  byId("mix-final-disposition").value = review.disposition;
+  byId("mix-final-notes").value = review.notes || "";
+  byId("mix-final-review-status").textContent = `${review.disposition} · ${review.rating}/5 · revision ${review.revision} · ${data.review_history_count} prior review${data.review_history_count === 1 ? "" : "s"} preserved.`;
+  exportCard.hidden = review.disposition !== "keep";
+  if (data.accepted_export) {
+    byId("mix-final-export-status").textContent = `Accepted audio package ready at ${data.accepted_export.destination}.`;
+    byId("preview-mix-final-export").disabled = true;
+  } else {
+    byId("mix-final-export-status").textContent = review.disposition === "keep" ? "Latest keep review is eligible for an exact accepted-audio export." : "";
+    byId("preview-mix-final-export").disabled = false;
+  }
+}
+
+async function loadMixFinalStatus(mixId) {
+  try {
+    const envelope = await callSoul("mix.final.status", { mix_id: mixId }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Mix review status is unavailable"));
+    renderMixFinalStatus(dataOf(envelope));
+  } catch (error) {
+    byId("mix-final-review-status").textContent = error.message;
+  }
 }
 
 async function loadMixRenderStatus(mixId) {
@@ -4861,7 +4903,7 @@ async function loadMixRenderStatus(mixId) {
     const envelope = await callSoul("mix.render.status", { mix_id: mixId }); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Listening-render status is unavailable"));
     const render = dataOf(envelope).render;
-    if (render) renderMixListeningCandidate(render);
+    if (render) { renderMixListeningCandidate(render); await loadMixFinalStatus(mixId); }
     else byId("mix-render-status").textContent = "No listening candidate has been rendered for this exact plan.";
   } catch (error) {
     byId("mix-render-status").textContent = error.message;
@@ -5035,11 +5077,75 @@ async function executeMixRender() {
     if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Listening render failed safely"));
     state.mixRenderPreview = null;
     renderMixListeningCandidate(dataOf(envelope).render);
+    await loadMixFinalStatus(state.selectedMixPlan.mix_id);
     emitSoulNotification("music_ready", `mix:${state.selectedMixPlan.mix_id}`);
   } catch (error) {
     byId("mix-render-status").textContent = error.message; showError(error); emitSoulNotification("attention");
   } finally {
     hideGenerationProgress(byId("mix-render-progress")); button.disabled = false;
+  }
+}
+
+async function recordMixFinalReview(event) {
+  event.preventDefault();
+  if (!state.selectedMixPlan) return;
+  const button = byId("record-mix-final-review"); button.disabled = true;
+  byId("mix-final-review-status").textContent = "Binding the listening decision to this exact render…";
+  try {
+    const review = {
+      sequence_cohesion: byId("mix-sequence-cohesion").value,
+      transition_quality: byId("mix-transition-quality").value,
+      rating: Number(byId("mix-final-rating").value),
+      disposition: byId("mix-final-disposition").value,
+      notes: byId("mix-final-notes").value
+    };
+    const envelope = await callSoul("mix.final.review", { mix_id: state.selectedMixPlan.mix_id, review }); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Mix review was not recorded"));
+    await loadMixFinalStatus(state.selectedMixPlan.mix_id);
+  } catch (error) {
+    byId("mix-final-review-status").textContent = error.message; showError(error);
+  } finally { button.disabled = false; }
+}
+
+async function previewMixFinalExport() {
+  if (!state.selectedMixPlan) return;
+  const button = byId("preview-mix-final-export"); button.disabled = true;
+  byId("mix-final-export-status").textContent = "Binding accepted audio to the latest keep review and render hashes…";
+  try {
+    const envelope = await callSoul("mix.final.export.preview", { mix_id: state.selectedMixPlan.mix_id }); lifecycle(envelope);
+    if (!["blocked_for_human_review", "complete"].includes(envelope.lifecycle_state)) throw new Error(mixFailure(envelope, "Accepted mix preview failed safely"));
+    const data = dataOf(envelope);
+    if (data.accepted_export) {
+      renderMixFinalStatus({ review: data.accepted_export.metadata.review, review_history_count: 0, accepted_export: data.accepted_export });
+      return;
+    }
+    state.mixFinalPreview = data;
+    byId("mix-final-export-scope").textContent = JSON.stringify(data.preview_scope, null, 2);
+    byId("mix-final-export-confirm").hidden = false;
+    byId("mix-final-export-status").textContent = "Review the exact package. Clicking export authorizes this digest only.";
+  } catch (error) {
+    byId("mix-final-export-status").textContent = error.message; showError(error); button.disabled = false;
+  }
+}
+
+async function executeMixFinalExport() {
+  if (!state.selectedMixPlan || !state.mixFinalPreview) return;
+  const button = byId("execute-mix-final-export"); button.disabled = true;
+  byId("mix-final-export-status").textContent = "Copying and checksum-verifying the accepted audio package…";
+  try {
+    const envelope = await callSoul("mix.final.export.execute", {
+      mix_id: state.selectedMixPlan.mix_id,
+      confirmation: state.mixFinalPreview.confirmation_phrase,
+      expected_digest: state.mixFinalPreview.expected_digest
+    });
+    lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(mixFailure(envelope, "Accepted mix export failed safely"));
+    state.mixFinalPreview = null;
+    byId("mix-final-export-confirm").hidden = true;
+    byId("mix-final-export-status").textContent = `Accepted audio package ready at ${dataOf(envelope).accepted_export.destination}.`;
+    byId("preview-mix-final-export").disabled = true;
+  } catch (error) {
+    byId("mix-final-export-status").textContent = error.message; showError(error); button.disabled = false;
   }
 }
 
@@ -5062,6 +5168,9 @@ byId("new-mix-plan").addEventListener("click", resetMixComposer);
 byId("mix-plan-form").addEventListener("submit", createMixPlan);
 byId("preview-mix-render").addEventListener("click", previewMixRender);
 byId("execute-mix-render").addEventListener("click", executeMixRender);
+byId("mix-final-review-form").addEventListener("submit", recordMixFinalReview);
+byId("preview-mix-final-export").addEventListener("click", previewMixFinalExport);
+byId("execute-mix-final-export").addEventListener("click", executeMixFinalExport);
 byId("save-mix-title-revision").addEventListener("click", reviseMixTitle);
 byId("preview-mix-handoff").addEventListener("click", previewMixHandoff);
 byId("export-mix-handoff").addEventListener("click", exportMixHandoff);

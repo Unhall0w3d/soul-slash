@@ -306,15 +306,33 @@
               </div>
               <p id="mix-render-status" class="dialog-status" role="status"></p>
             </section>
+            <section id="mix-final-card" class="mix-final-card" hidden>
+              <div><p class="eyebrow">Human listening gate</p><h3>Decide the sequence</h3><p>Record what you heard. A corrected review preserves the prior decision; only the latest <strong>keep</strong> can enter exact audio export.</p></div>
+              <form id="mix-final-review-form" class="music-review">
+                <label>Sequence cohesion<select id="mix-sequence-cohesion" name="sequence_cohesion"><option value="passed">passed</option><option value="partial">partial</option><option value="failed">failed</option></select></label>
+                <label>Transitions<select id="mix-transition-quality" name="transition_quality"><option value="passed">passed</option><option value="partial">partial</option><option value="failed">failed</option></select></label>
+                <label>Overall rating<select id="mix-final-rating" name="rating"><option value="1">1 · unusable</option><option value="2">2 · poor</option><option value="3" selected>3 · workable</option><option value="4">4 · strong</option><option value="5">5 · excellent</option></select></label>
+                <label>Disposition<select id="mix-final-disposition" name="disposition"><option value="keep">keep</option><option value="revise">revise</option><option value="reject">reject</option></select></label>
+                <textarea id="mix-final-notes" name="notes" maxlength="8000" placeholder="What worked, where transitions drifted, and what should change?"></textarea>
+                <button id="record-mix-final-review" class="gate-button" type="submit">Record listening review</button>
+              </form>
+              <p id="mix-final-review-status" class="dialog-status" role="status"></p>
+              <div id="mix-final-export-card" hidden>
+                <p>This copies the accepted A1 FLAC and MP3 with exact metadata and checksums. It does not master, publish, or assemble visuals.</p>
+                <button id="preview-mix-final-export" class="gate-button" type="button">Preview accepted audio export</button>
+                <div id="mix-final-export-confirm" hidden><pre id="mix-final-export-scope" class="diagnostic-output"></pre><button id="execute-mix-final-export" class="gate-button gate-button--gold" type="button">Export exact accepted mix</button></div>
+                <p id="mix-final-export-status" class="dialog-status" role="status"></p>
+              </div>
+            </section>
             <button id="preview-mix-handoff" class="gate-button" type="button">Preview editor handoff</button>
             <div id="mix-handoff-confirm" hidden><pre id="mix-handoff-scope" class="diagnostic-output"></pre><button id="export-mix-handoff" class="gate-button gate-button--gold" type="button">Export exact handoff</button></div>
             <p id="mix-handoff-status" class="dialog-status" role="status"></p>
           </section>
         </section>
         <aside class="mix-boundary">
-          <p class="eyebrow">A1 boundary</p><h2>Truthful continuity</h2>
-          <dl><div><dt>Inputs</dt><dd>Checksum-verified stereo masters</dd></div><div><dt>Plan</dt><dd>Immutable JSON EDL</dd></div><div><dt>Review</dt><dd>Bounded FLAC and MP3 listening candidate</dd></div><div><dt>Handoff</dt><dd>Sources, cues, metadata, checksums</dd></div></dl>
-          <p>No inferred stems. No destructive source edits. No automatic acceptance or publication.</p>
+          <p class="eyebrow">A2 boundary</p><h2>Truthful continuity</h2>
+          <dl><div><dt>Inputs</dt><dd>Checksum-verified stereo masters</dd></div><div><dt>Plan</dt><dd>Immutable JSON EDL</dd></div><div><dt>Review</dt><dd>Operator disposition with preserved history</dd></div><div><dt>Accepted audio</dt><dd>FLAC, MP3, metadata, checksums</dd></div><div><dt>Handoff</dt><dd>Sources, cues, metadata, checksums</dd></div></dl>
+          <p>No inferred stems. No destructive source edits. No mastering, visual assembly, automatic acceptance, or publication.</p>
         </aside>
       </div>
     </section>

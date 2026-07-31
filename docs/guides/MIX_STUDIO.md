@@ -23,6 +23,11 @@ songs and prepares a portable package for a conventional audio editor or DAW.
     review artifacts.
 12. Listen in the dashboard and decide whether the plan should be revised or
     considered for a later final export.
+13. Record sequence cohesion, transition quality, rating, disposition, and
+    listening notes.
+14. When the latest disposition is `keep`, preview the exact accepted-audio
+    export.
+15. Select **Export exact accepted mix** to authorize that review-bound digest.
 
 Changing a sealed plan means creating another plan. The original remains as
 lineage evidence.
@@ -104,6 +109,32 @@ The MP3 is available only through the authenticated Dashboard ranged-media
 route. Rendering does not mark the mix accepted and does not create a release
 master.
 
+## Listening review and accepted audio
+
+The A2 gate records `keep`, `revise`, or `reject` against the exact A1 render.
+Correcting a review preserves the prior review in bounded history. Only the
+latest `keep` review can reach accepted export.
+
+The exact accepted package is written beneath:
+
+```text
+~/Music/soul-music/mixes/finished/
+```
+
+It contains:
+
+```text
+master.flac         accepted lossless A1 audio
+listening.mp3       accepted 320 kbps proxy
+mix.json            exact plan, render hashes, and review
+mix-info.md         human-readable intent and review summary
+checksums.sha256    sha256sum-compatible integrity manifest
+```
+
+Each corrected keep review receives its own review-bound destination. Existing
+packages are never overwritten. This is accepted audio, not release mastering,
+visual assembly, or publication.
+
 ## Limitations
 
 Mix Studio does not separate stems, reconstruct instrument tracks, or create a
@@ -118,4 +149,6 @@ finished source exports.
 - [Long-form Mix Studio A0 Brief](../soul/LONG_FORM_MIX_A0_BRIEF.md)
 - [Long-form Mix Studio A0 Review](../assessments/LONG_FORM_MIX_A0_REVIEW.md)
 - [Long-form Mix Studio A1 Listening Render Brief](../soul/LONG_FORM_MIX_A1_LISTENING_RENDER_BRIEF.md)
+- [Long-form Mix Studio A2 Accepted Export Brief](../soul/LONG_FORM_MIX_A2_ACCEPTED_EXPORT_BRIEF.md)
+- [Long-form Mix Studio A2 Review](../assessments/LONG_FORM_MIX_A2_ACCEPTED_EXPORT_REVIEW.md)
 - [Music Studio](MUSIC_STUDIO.md)
