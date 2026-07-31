@@ -17,8 +17,8 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
 - [~] review Mix Studio immutable stereo-source sequencing, portable editor
-  handoff, and bounded A1 listening render; final acceptance/export remains
-  human-gated
+  handoff, bounded A1 listening render, and A2 review-bound accepted-audio
+  export; Operator listening and later visual sequencing remain open
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
 - [~] review exact-channel NOC Thoughts description-link synchronization; live OAuth and one reviewed batch remain open
 - [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
