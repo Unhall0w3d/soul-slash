@@ -16,8 +16,9 @@ without changing the approved Soul nightly DRS schedule.
   allow explicit non-secret Operator location overrides.
 - Require preview, exact digest, profile-specific confirmation, foreground
   execution, verification, and visible lifecycle results.
-- Keep Operator execution manual only in A0. Add no timer, scheduler, daemon,
-  watcher, automatic retry, pruning, remote deletion, or live-tree restore.
+- Permit one separately qualified hardened Operator systemd oneshot at 2:00 AM
+  local time. It must use its own host-encrypted credential, timer, state, and
+  receipts. Add no retry, pruning, remote deletion, or live-tree restore.
 - Include existing readable personal folders and a reviewed, selective set of
   dotfiles, application configuration, private recovery credentials, and
   host-rebuild evidence.
@@ -25,6 +26,9 @@ without changing the approved Soul nightly DRS schedule.
   metadata and checksums in a tracked manifest.
 - Disclose ambiguous and privileged recovery gaps instead of implying they are
   covered.
+- Preserve outbound recovery material including SSH configuration, known-host
+  evidence, private/public client keys, GnuPG, keyrings, GitHub CLI state, and
+  encrypted credential stores inside the encrypted snapshot.
 
 ## Human review boundary
 

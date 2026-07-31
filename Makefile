@@ -73,6 +73,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-storage-cleanup
 .PHONY: verify-long-form-mix verify-long-form-mix-render verify-long-form-mix-finalization
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
+.PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -131,6 +132,8 @@ help:
 > @echo "  make operator-backup-config-plan  Preview Operator home, dotfile, and host-rebuild manifests"
 > @echo "  make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS"
 > @echo "  make verify-operator-backup  Verify separated Operator scope, policy, and gates"
+> @echo "  make operator-drs-credential-plan  Preview separate host-encrypted Operator credential enrollment"
+> @echo "  make operator-drs-automation-status  Inspect the separately qualified 2:00 AM Operator timer"
 > @echo "  make verify-nightly-drs-transaction  Verify supervised local + Crucible DRS orchestration"
 > @echo "  make verify-nightly-drs-automation  Verify encrypted credential, oneshot, and qualification/permanent timer gates"
 > @echo "  make drs-credential-plan / drs-credential-enroll CONFIRM=ENROLL_SOUL_DRS_CREDENTIAL"
@@ -563,6 +566,27 @@ drs-permanent-plan:
 
 drs-permanent-install:
 > @ruby scripts/soul-nightly-drs-schedule permanent-install --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+operator-drs-credential-plan:
+> @ruby scripts/soul-nightly-drs-schedule credential-plan --profile operator
+
+operator-drs-credential-enroll:
+> @ruby scripts/soul-nightly-drs-schedule credential-enroll --profile operator --confirmation "$(CONFIRM)"
+
+operator-drs-test-plan:
+> @ruby scripts/soul-nightly-drs-schedule test-plan --profile operator --run-at "$(RUN_AT)"
+
+operator-drs-test-install:
+> @ruby scripts/soul-nightly-drs-schedule test-install --profile operator --run-at "$(RUN_AT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+operator-drs-automation-status:
+> @ruby scripts/soul-nightly-drs-schedule status --profile operator
+
+operator-drs-permanent-plan:
+> @ruby scripts/soul-nightly-drs-schedule permanent-plan --profile operator
+
+operator-drs-permanent-install:
+> @ruby scripts/soul-nightly-drs-schedule permanent-install --profile operator --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
 
 .PHONY: verify-crucible-backup-replication
 verify-crucible-backup-replication:

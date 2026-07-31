@@ -138,6 +138,9 @@ module SoulCore
         "reproducible_assets" => assets.map do |asset|
           asset.slice("filename", "bytes", "sha256", "repository", "revision")
         end,
+        "outbound_recovery_coverage" => outbound_recovery_paths.map do |label, path|
+          {"label" => label, "path" => path, "selected" => sources.include?(path)}
+        end,
         "explicit_manual_review_gaps" => [
           "browser profiles and session stores",
           "Downloads and recovered-file holding areas",
@@ -149,6 +152,18 @@ module SoulCore
     end
 
     private
+
+    def outbound_recovery_paths
+      {
+        "SSH configuration, known hosts, and client keys" => File.join(@home, ".ssh"),
+        "GnuPG key material" => File.join(@home, ".gnupg"),
+        "desktop keyrings" => File.join(@home, ".local", "share", "keyrings"),
+        "GitHub CLI authentication and configuration" => File.join(@home, ".config", "gh"),
+        "Codex authentication state" => File.join(@home, ".codex", "auth.json"),
+        "PKI state" => File.join(@home, ".pki"),
+        "host-encrypted systemd credentials" => File.join(@home, ".config", "credstore.encrypted")
+      }
+    end
 
     def source_candidates
       candidates = USER_DATA_DIRECTORIES.map { |name| File.join(@home, name) }

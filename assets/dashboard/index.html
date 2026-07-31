@@ -751,7 +751,7 @@
             <button id="preview-backup-drs" class="gate-button" type="button">Preview DRS transaction</button>
             <div id="backup-drs-confirm" hidden><pre id="backup-drs-scope" class="clear-preview-list"></pre><button id="execute-backup-drs" class="gate-button gate-button--gold" type="button">Create &amp; reconcile</button></div>
             <div id="backup-drs-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong data-generation-stage>Preparing</strong><span data-generation-message>Preparing supervised DRS transaction…</span></div>
-            <p id="backup-drs-status" class="dialog-status" role="status">Manual gate remains available. Installed nightly DRS uses one host-encrypted credential, no retry, and no pruning.</p>
+            <p id="backup-drs-status" class="dialog-status" role="status">Manual gate remains available. Each separately qualified profile schedule uses its own host-encrypted credential, with no retry and no pruning.</p>
           </section>
           <section class="gate-card">
             <div><p class="eyebrow">Owner manifest policy</p><h3>Reconcile backup scope</h3><p>Adds only missing paths from the current portable policy. Existing sources, exclusions, comments, and encrypted history remain untouched.</p></div>

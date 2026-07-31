@@ -10,8 +10,8 @@ automatic retry, automatic pruning, remote deletion, or unattended restore.
 The page has two explicitly separated profiles. **Soul continuity** preserves
 Soul's private runtime and retains the separately approved nightly DRS option.
 **Operator continuity** preserves the human-owned workstation data, dotfiles,
-selected application state, and host-rebuild evidence described below. The
-Operator profile is manual foreground only. The profiles use distinct Restic
+selected application state, and host-rebuild evidence described below. It may
+run through a separately qualified fixed 2:00 AM oneshot. The profiles use distinct Restic
 tags, manifests, ledgers, receipts, and restore staging; by default they share
 the same encrypted local repository and Crucible destination.
 
@@ -137,6 +137,18 @@ current host is useful for same-host disk recovery and cannot by itself restore
 an unattended credential on replacement hardware. A bare-metal recovery still
 requires separately held repository credentials, password-vault recovery, and
 re-enrollment or rotation of host-bound secrets.
+
+Outbound-access recovery explicitly includes `~/.ssh` as one encrypted source:
+SSH client configuration, aliases, known-host evidence, and private/public key
+material are captured together. The policy also selects GnuPG state, desktop
+keyrings, GitHub CLI configuration, Codex authentication state, PKI state, and
+the encrypted systemd credential store. Temporary SSH control sockets are
+excluded. These copies can restore Atelier's ability to connect outward, but
+they do not replace revocation and rotation after a suspected compromise.
+Because the repository password is needed before any of these files can be
+restored, that password must remain available through an independent offline
+or password-vault recovery path; storing it only inside its own encrypted
+backup would be circular and unusable.
 
 The following remain explicit manual-review gaps rather than silent coverage:
 browser profiles/session stores, Downloads and recovered-file holding areas,
@@ -274,7 +286,7 @@ make drs-permanent-install \
   CONFIRM=ACTIVATE_SOUL_DRS_3AM_TIMER
 ```
 
-The permanent calendar is fixed at **3:00 AM in the host's local timezone**.
+Soul's permanent calendar is fixed at **3:00 AM in the host's local timezone**.
 `Persistent=true` permits one missed activation after the user manager
 returns. Existing active-work and backup locks still fail closed, and there is
 no retry. The Dashboard reports the encrypted credential state, timer mode,
@@ -292,6 +304,33 @@ run completed in 26 seconds, created and verified local snapshot
 permanent 3:00 AM timer. This machine-local evidence is not a portable setup
 default; another installation must perform its own credential enrollment and
 qualification.
+
+### Operator 2:00 AM automation
+
+Operator continuity follows the same qualification-before-permanent sequence
+with distinct state and authority:
+
+```sh
+make operator-drs-credential-plan
+make operator-drs-credential-enroll CONFIRM=ENROLL_OPERATOR_DRS_CREDENTIAL
+make operator-drs-test-plan RUN_AT=ISO8601_TIME_60_TO_300_SECONDS_AHEAD
+make operator-drs-test-install \
+  RUN_AT=THE_SAME_ISO8601_TIME \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=INSTALL_OPERATOR_DRS_QUALIFICATION_TIMER
+make operator-drs-automation-status
+make operator-drs-permanent-plan
+make operator-drs-permanent-install \
+  EXPECTED_DIGEST=DIGEST_FROM_PLAN \
+  CONFIRM=ACTIVATE_OPERATOR_DRS_2AM_TIMER
+```
+
+The permanent Operator calendar is fixed at **2:00 AM local time**. It uses
+`soul-operator-nightly-drs.service` and `.timer`, the separately encrypted
+`operator-backup-repository-password` credential, Operator receipts/state, and
+the shared cross-profile mutation lock. It cannot modify or replace Soul's
+3:00 AM units or credential. Qualification must prove a fresh local Operator
+snapshot and its exact Crucible lineage before permanent activation.
 
 ## Deletion-aware retention
 

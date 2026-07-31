@@ -81,6 +81,7 @@ module SoulCore
       backup_administration_service: nil,
       operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
+      operator_nightly_drs_deployment: nil,
       project_tracker_service: nil,
       project_release_service: nil,
       model_runtime_control_service: nil,
@@ -135,6 +136,7 @@ module SoulCore
       @backup_administration_service = backup_administration_service
       @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
+      @operator_nightly_drs_deployment = operator_nightly_drs_deployment
       @project_tracker_service = project_tracker_service
       @project_release_service = project_release_service
       @model_runtime_control_service = model_runtime_control_service
@@ -261,7 +263,7 @@ module SoulCore
       when "backup.replica.execute" then domain(backup_administration.replica_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "backup.drs.preview" then domain(backup_administration.drs_preview(password: required(parameters, "password")))
       when "backup.drs.execute" then domain(backup_administration.drs_execute(password: required(parameters, "password"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
-      when "operator_backup.status" then domain(operator_backup_administration.status(password: parameters["password"]))
+      when "operator_backup.status" then domain(operator_backup_status(password: parameters["password"]))
       when "operator_backup.manifests.reconcile.preview" then domain(operator_backup_administration.manifest_reconciliation_preview)
       when "operator_backup.manifests.reconcile.execute" then domain(operator_backup_administration.manifest_reconciliation_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "operator_backup.create.preview" then domain(operator_backup_administration.backup_preview(password: required(parameters, "password")))
@@ -956,10 +958,30 @@ module SoulCore
       )
     end
 
+    def operator_nightly_drs_deployment
+      @operator_nightly_drs_deployment ||= NightlyDrsDeployment.new(
+        root: @root, process_env: @process_env, clock: @clock, profile_id: "operator"
+      )
+    end
+
     def backup_status(password:)
       result = backup_administration.status(password: password)
       return result unless result["ok"] && result["data"].is_a?(Hash)
       result["data"]["automation"] = nightly_drs_deployment.status.fetch("data", {})
+      result
+    rescue StandardError
+      result["data"]["automation"] = {
+        "ready" => false,
+        "mode" => "unavailable",
+        "credential_ready" => false
+      } if result && result["data"].is_a?(Hash)
+      result
+    end
+
+    def operator_backup_status(password:)
+      result = operator_backup_administration.status(password: password)
+      return result unless result["ok"] && result["data"].is_a?(Hash)
+      result["data"]["automation"] = operator_nightly_drs_deployment.status.fetch("data", {})
       result
     rescue StandardError
       result["data"]["automation"] = {

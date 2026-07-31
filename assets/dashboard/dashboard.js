@@ -4376,9 +4376,10 @@ function renderBackupStatus(payload) {
   byId("backup-profile-state").textContent = state.backupProfile.toUpperCase();
   renderBackupFacts(byId("backup-profile-details"), {
     "Snapshot tag": payload.snapshot_tag || "unavailable",
-    "Execution": state.backupProfile === "operator" ? "Manual foreground only" : "Manual plus approved nightly DRS",
+    "Execution": state.backupProfile === "operator" ? "Manual plus separately qualified 2:00 AM DRS" : "Manual plus approved 3:00 AM DRS",
     "Raw AI weights": policy.raw_model_weights_included === false ? "Excluded · reproducible" : "Profile policy",
     "Tracked model assets": policy.reproducible_asset_count ?? "not applicable",
+    "Outbound recovery": Array.isArray(policy.outbound_recovery_coverage) ? `${policy.outbound_recovery_coverage.filter((item) => item.selected).length}/${policy.outbound_recovery_coverage.length} selected` : "not applicable",
     "Manual review gaps": Array.isArray(policy.explicit_manual_review_gaps) ? policy.explicit_manual_review_gaps.length : 0
   });
   const ready = payload.available && payload.configured && mount.mounted && mount.writable && mount.expected_target;
@@ -4419,16 +4420,19 @@ function renderBackupStatus(payload) {
   const drs = payload.drs || {};
   const automation = payload.automation || {};
   const lastAutomated = automation.last_run || {};
-  const operatorProfile = state.backupProfile === "operator";
-  byId("backup-drs-state").textContent = !operatorProfile && automation.ready ? "NIGHTLY" : !operatorProfile && automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
+  const calendarTime = String(automation.calendar || "").match(/(\d{2}):(\d{2})/);
+  const scheduleLabel = calendarTime
+    ? `${Number(calendarTime[1])}:${calendarTime[2]} ${Number(calendarTime[1]) >= 12 ? "PM" : "AM"}`
+    : (state.backupProfile === "operator" ? "2:00 AM" : "3:00 AM");
+  byId("backup-drs-state").textContent = automation.ready ? "NIGHTLY" : automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
   renderBackupFacts(byId("backup-drs-details"), {
     "Last result": lastAutomated.state || drs.state || "not run",
     "Local": lastAutomated.local_state || drs.local_state || "not run",
     "Crucible": lastAutomated.replica_state || drs.replica_state || "not run",
     "Completed": lastAutomated.completed_at || drs.completed_at || "not yet",
-    "Schedule": operatorProfile ? "Manual only" : automation.ready ? "Nightly · 3:00 AM" : automation.mode === "qualification" ? "Qualification armed" : "Disabled",
-    "Next run": operatorProfile ? "not scheduled" : automation.next_run || "not scheduled",
-    "Credential": operatorProfile ? "Entered per operation" : automation.credential_ready ? "Host-encrypted" : "Not enrolled"
+    "Schedule": automation.ready ? `Nightly · ${scheduleLabel}` : automation.mode === "qualification" ? "Qualification armed" : "Disabled",
+    "Next run": automation.next_run || "not scheduled",
+    "Credential": automation.credential_ready ? "Host-encrypted" : "Not enrolled"
   });
   renderBackupSnapshots(payload.snapshots);
   const status = !payload.available ? "Restic is unavailable."

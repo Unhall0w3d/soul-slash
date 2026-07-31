@@ -10,6 +10,8 @@ require "tmpdir"
 require_relative "../lib/soul_core/application_facade"
 require_relative "../lib/soul_core/backup_administration_service"
 require_relative "../lib/soul_core/bounded_command_runner"
+require_relative "../lib/soul_core/nightly_drs_deployment"
+require_relative "../lib/soul_core/nightly_drs_runner"
 require_relative "../lib/soul_core/operator_backup_manifest_policy"
 
 errors = []
@@ -35,6 +37,61 @@ class OperatorBackupNoResticRunner
       stdout: "", stderr: "not mounted", exit_status: 1,
       status: "failed", truncated: false
     )
+  end
+end
+
+class OperatorDrsBackupStub
+  def status(password:)
+    return {"ok" => false, "data" => {}, "reason" => "rejected"} unless password == "operator fixture secret"
+    {
+      "ok" => true,
+      "data" => {
+        "snapshot_access" => "unlocked",
+        "snapshots" => [{"id" => "a" * 64}],
+        "replica" => {"configured" => true, "state" => "ready", "target_ready" => true, "snapshot_count" => 1}
+      }
+    }
+  end
+
+  def drs_preview(password:)
+    raise "credential mismatch" unless password == "operator fixture secret"
+    {
+      "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
+      "data" => {
+        "confirmation_phrase" => SoulCore::BackupAdministrationService::OPERATOR_DRS_CONFIRMATION,
+        "expected_digest" => "d" * 64
+      }
+    }
+  end
+
+  def drs_execute(password:, confirmation:, expected_digest:)
+    raise "operator gate mismatch" unless password == "operator fixture secret" &&
+      confirmation == SoulCore::BackupAdministrationService::OPERATOR_DRS_CONFIRMATION &&
+      expected_digest == "d" * 64
+    {
+      "ok" => true, "lifecycle_state" => "complete", "reason" => "verified",
+      "mutation" => "backup_drs_verified",
+      "data" => {
+        "snapshot_id" => "e" * 64,
+        "drs_receipt" => {
+          "receipt_id" => "drs_operator_fixture",
+          "local" => {"state" => "complete"},
+          "replica" => {"state" => "complete"}
+        }
+      }
+    }
+  end
+end
+
+class OperatorAutomationStatusStub
+  def status
+    {
+      "ok" => true,
+      "data" => {
+        "profile_id" => "operator", "ready" => true,
+        "calendar" => "*-*-* 02:00:00", "credential_ready" => true
+      }
+    }
   end
 end
 
@@ -72,7 +129,10 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
     File.join(home, ".ssh", "id_ed25519_operator"),
     File.join(home, ".gnupg", "private-keys-v1.d", "fixture.key"),
     File.join(home, ".local", "share", "keyrings", "login.keyring"),
+    File.join(home, ".config", "gh", "hosts.yml"),
+    File.join(home, ".config", "credstore.encrypted", "fixture.cred"),
     File.join(home, ".codex", "auth.json"),
+    File.join(home, ".pki", "fixture.pem"),
     File.join(home, ".zshrc")
   ].each do |path|
     FileUtils.mkdir_p(File.dirname(path))
@@ -138,6 +198,10 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                summary["reproducible_asset_count"] == 3 &&
                summary["reproducible_asset_bytes"] == 22_269_129_472 &&
                summary["reproducible_assets"].all? { |asset| asset["sha256"].match?(/\A[a-f0-9]{64}\z/) })
+  check.call("outbound SSH and credential recovery coverage is explicit and selected",
+             summary["outbound_recovery_coverage"].length == 7 &&
+               summary["outbound_recovery_coverage"].all? { |entry| entry["selected"] == true } &&
+               summary["outbound_recovery_coverage"].any? { |entry| entry["label"].include?("known hosts") })
   check.call("generated project trees and separately protected Soul state are excluded",
              exclusions.include?("**/target/**") &&
                exclusions.include?(File.join(home, "Projects", "soul", "**")) &&
@@ -207,7 +271,9 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                preview.dig("data", "profile_id") == "operator")
 
   facade = SoulCore::ApplicationFacade.new(
-    root: root, operator_backup_administration_service: service
+    root: root,
+    operator_backup_administration_service: service,
+    operator_nightly_drs_deployment: OperatorAutomationStatusStub.new
   )
   envelope = facade.call({
     "schema_version" => "soul.application.v1",
@@ -217,7 +283,112 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
     "context" => { "interface" => "dashboard_test" }
   })
   check.call("application contract exposes the Operator profile",
-             envelope["ok"] && envelope.dig("data", "profile_id") == "operator")
+             envelope["ok"] && envelope.dig("data", "profile_id") == "operator" &&
+               envelope.dig("data", "automation", "calendar") == "*-*-* 02:00:00")
+
+  now = Time.new(2026, 7, 31, 21, 0, 0, "-04:00")
+  system_commands = []
+  unit_state = {
+    "ActiveState" => "active", "SubState" => "waiting", "UnitFileState" => "enabled",
+    "NextElapseUSecRealtime" => "Sat 2026-08-01 02:00:00 EDT", "LastTriggerUSec" => "n/a",
+    "Result" => "success", "ExecMainStatus" => "0"
+  }
+  system_runner = lambda do |argv, stdin_data: nil|
+    system_commands << argv
+    if argv.include?("encrypt")
+      File.write(argv.last, "operator-encrypted-fixture")
+      {"success" => true, "stdout" => "", "stderr" => ""}
+    elsif argv.include?("show")
+      properties = argv.find { |item| item.start_with?("--property=") }.delete_prefix("--property=").split(",")
+      {"success" => true, "stdout" => properties.map { |key| "#{key}=#{unit_state[key]}" }.join("\n") + "\n", "stderr" => ""}
+    else
+      {"success" => true, "stdout" => "", "stderr" => ""}
+    end
+  end
+  FileUtils.mkdir_p(File.join(root, "scripts"), mode: 0o700)
+  File.write(File.join(root, "scripts", "soul-nightly-drs-run"), "# fixture\n")
+  File.chmod(0o700, File.join(root, "scripts", "soul-nightly-drs-run"))
+  operator_backup_stub = OperatorDrsBackupStub.new
+  deployment = SoulCore::NightlyDrsDeployment.new(
+    root: root, home: home, profile_id: "operator", clock: -> { now },
+    ruby_path: RbConfig.ruby, systemctl_path: "/usr/bin/true",
+    systemd_creds_path: "/usr/bin/true", backup_service: operator_backup_stub,
+    runner: system_runner
+  )
+  enrolled = deployment.enroll_credential(
+    password: "operator fixture secret",
+    confirmation: SoulCore::NightlyDrsDeployment::OPERATOR_CONFIRM_CREDENTIAL
+  )
+  operator_credential = File.join(
+    home, ".config", "credstore.encrypted",
+    "#{SoulCore::NightlyDrsDeployment::OPERATOR_CREDENTIAL_NAME}.cred"
+  )
+  check.call("Operator automation has a separately encrypted credential",
+             enrolled["ok"] && File.file?(operator_credential) &&
+               !File.exist?(File.join(home, ".config", "credstore.encrypted", "#{SoulCore::NightlyDrsDeployment::CREDENTIAL_NAME}.cred")))
+
+  qualification_at = (now + 120).iso8601
+  qualification = deployment.test_plan(run_at: qualification_at)
+  operator_units = qualification.dig("data", "units") || {}
+  operator_service = operator_units[SoulCore::NightlyDrsDeployment::OPERATOR_SERVICE].to_s
+  check.call("Operator qualification binds distinct units state profile and authority",
+             qualification["ok"] &&
+               qualification.dig("data", "confirmation_phrase") == SoulCore::NightlyDrsDeployment::OPERATOR_CONFIRM_TEST &&
+               operator_units.key?(SoulCore::NightlyDrsDeployment::OPERATOR_TIMER) &&
+               operator_service.include?("--profile operator") &&
+               operator_service.include?("CacheDirectory=soul-operator-drs") &&
+               operator_service.include?("Soul/private/operator_backup"))
+  installed_qualification = deployment.install_test(
+    run_at: qualification_at,
+    confirmation: SoulCore::NightlyDrsDeployment::OPERATOR_CONFIRM_TEST,
+    expected_digest: qualification.dig("data", "expected_digest")
+  )
+  check.call("Operator qualification installs without touching Soul units",
+             installed_qualification["ok"] &&
+               File.file?(File.join(home, ".config", "systemd", "user", SoulCore::NightlyDrsDeployment::OPERATOR_TIMER)) &&
+               !File.exist?(File.join(home, ".config", "systemd", "user", SoulCore::NightlyDrsDeployment::TIMER)))
+
+  credential_delivery = File.join(root, "credential-delivery")
+  FileUtils.mkdir_p(credential_delivery, mode: 0o700)
+  File.write(
+    File.join(credential_delivery, SoulCore::NightlyDrsRunner::OPERATOR_CREDENTIAL_NAME),
+    "operator fixture secret"
+  )
+  timed = SoulCore::NightlyDrsRunner.new(
+    root: root, home: home, profile_id: "operator",
+    process_env: {"CREDENTIALS_DIRECTORY" => credential_delivery},
+    clock: -> { now }, id_generator: -> { "fixture" },
+    backup_service: operator_backup_stub
+  ).run(trigger: "systemd_timer", schedule_mode: "qualification")
+  operator_state_root = File.join(root, "Soul", "private", "operator_backup")
+  timed_state = JSON.parse(File.read(File.join(operator_state_root, "nightly-drs-state.json")))
+  check.call("timed Operator execution records separated profile state",
+             timed["ok"] && timed_state["profile_id"] == "operator" &&
+               timed_state["snapshot_id"] == "e" * 64 &&
+               !File.read(File.join(operator_state_root, "nightly-drs-state.json")).include?("operator fixture secret"))
+
+  receipt_root = File.join(operator_state_root, "receipts")
+  FileUtils.mkdir_p(receipt_root, mode: 0o700)
+  File.write(
+    File.join(receipt_root, "drs_operator_fixture.json"),
+    JSON.pretty_generate({
+      "schema_version" => "soul.backup_receipt.v1", "profile_id" => "operator",
+      "receipt_id" => "drs_operator_fixture", "operation" => "drs", "state" => "complete",
+      "local" => {"state" => "complete", "verification" => "passed", "snapshot_id" => "e" * 64},
+      "replica" => {"state" => "complete", "destination_snapshot_lineage_ids" => ["e" * 64]}
+    }) + "\n"
+  )
+  permanent = deployment.permanent_plan
+  installed_permanent = deployment.install_permanent(
+    confirmation: SoulCore::NightlyDrsDeployment::OPERATOR_CONFIRM_PERMANENT,
+    expected_digest: permanent.dig("data", "expected_digest")
+  )
+  timer_body = File.read(File.join(home, ".config", "systemd", "user", SoulCore::NightlyDrsDeployment::OPERATOR_TIMER))
+  check.call("qualified Operator automation is fixed at 2:00 AM with no retry or pruning",
+             permanent["ok"] && installed_permanent["ok"] &&
+               permanent.dig("data", "calendar") == "*-*-* 02:00:00" &&
+               timer_body.include?("OnCalendar=*-*-* 02:00:00") &&
+               system_commands.none? { |argv| argv.any? { |item| item.match?(/forget|prune|retry/) } })
 end
 
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
@@ -229,9 +400,9 @@ check.call("Dashboard selects the profile before deriving every operation",
              javascript.include?('function backupOperation(suffix)') &&
              !javascript.match?(/callSoul\("backup\.(?:status|create|retention|restore|replica|drs)/) &&
              !javascript.match?(/callNdjson\([^\\n]+, "backup\.(?:create|retention|restore|replica|drs)/))
-check.call("Operator scope remains manual and models are documented as reproducible",
-           brief.include?("manual only") &&
-             brief.include?("Add no timer, scheduler, daemon") &&
+check.call("Operator scope remains bounded and models are documented as reproducible",
+           brief.include?("2:00 AM") &&
+             brief.include?("Add no retry, pruning, remote deletion") &&
              documentation.include?("raw GGUF weights are deliberately excluded") &&
              documentation.include?("systemd-creds"))
 
