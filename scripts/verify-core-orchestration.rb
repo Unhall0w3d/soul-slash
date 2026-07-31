@@ -186,9 +186,14 @@ end
 js = File.read(File.join(__dir__, "../assets/dashboard/dashboard.js"))
 html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 brief = File.read(File.join(__dir__, "../docs/soul/CORE_ORCHESTRATION_A0_A1_BRIEF.md"))
+core_interface = js[/\nfunction setCoreMenu\b.*?(?=\nasync function refreshStatus\b)/m]
 check.call("top bar exposes an explicit Core selector beside Local", html.include?('id="connection-label"') && html.include?('id="core-selector"') && html.index('id="connection-label"') < html.index('id="core-selector"'))
 check.call("dashboard uses the Core application gate rather than direct service control", js.include?('core.activate.preview') && js.include?('core.activate.execute') && js.include?('prefillApprovalGate("model-runtime-confirmation"'))
-check.call("Core interface remains event-driven without polling", !js.match?(/setInterval|setTimeout|requestAnimationFrame/))
+check.call("Core interface remains event-driven without timer primitives",
+           core_interface && !core_interface.match?(/setInterval|setTimeout|requestAnimationFrame/))
+check.call("no Dashboard timer drives Core refresh",
+           !js.match?(/setInterval/) &&
+             !js.match?(/(?:setTimeout|requestAnimationFrame)\s*\([^;]*\brefreshCores\b/m))
 check.call("brief preserves Qwen and ACE-Step mutual exclusion", brief.include?("Qwen fallback and\nACE-Step share the NVIDIA lane") && brief.include?("No attempt is made to run Qwen and ACE-Step concurrently"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?
