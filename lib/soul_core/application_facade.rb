@@ -32,7 +32,6 @@ require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "self_assessment_dev_synthesis_service"
-require_relative "host_improvement_plan_service"
 require_relative "maintenance_fleet_status_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
@@ -96,7 +95,6 @@ module SoulCore
       skill_studio_service: nil,
       self_improvement_service: nil,
       self_assessment_dev_synthesis_service: nil,
-      host_improvement_plan_service: nil,
       maintenance_fleet_status_service: nil,
       maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
@@ -154,7 +152,6 @@ module SoulCore
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
       @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
-      @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
@@ -367,10 +364,6 @@ module SoulCore
       when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "storage_retention.cleanup.preview" then domain(self_improvement.storage_cleanup_preview(category: required(parameters, "category")))
       when "storage_retention.cleanup.execute" then domain(self_improvement.storage_cleanup_execute(category: required(parameters, "category"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "host_improvement.plans.list" then domain(host_improvement.list(limit: bounded_limit(parameters["limit"], HostImprovementPlanService::MAX_RECORDS)))
-      when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
-      when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
       when "maintenance.fleet.device.refresh" then domain(maintenance_fleet_status.refresh(device_id: required(parameters, "device_id")))
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
@@ -882,10 +875,6 @@ module SoulCore
         clock: @clock,
         assessment_source: self_improvement
       )
-    end
-
-    def host_improvement
-      @host_improvement_plan_service ||= HostImprovementPlanService.new(root: @root, clock: @clock)
     end
 
     def maintenance_rehearsal

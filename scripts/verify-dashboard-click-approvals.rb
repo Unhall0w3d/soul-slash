@@ -18,7 +18,7 @@ affirmative_inputs = %w[
   model-runtime-confirmation proposal-confirmation beta-build-confirmation
   beta-run-confirmation beta-promotion-confirmation
   production-promotion-confirmation improvement-proposal-confirmation
-  host-plan-confirmation augmentation-confirmation
+  augmentation-confirmation
   augmentation-experiment-confirmation augmentation-gate-a2-confirmation
   augmentation-model-confirmation
 ]

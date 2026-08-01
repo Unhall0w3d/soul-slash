@@ -10,6 +10,9 @@ Candidate-complete; human review required before merge and production use.
 - Operation-specific subject validation and owner-private persisted receipts.
 - Safe provider/runtime failure messages retained through the application
   envelope instead of becoming an empty Dashboard error.
+- Retired the overlapping Arch improvement-plan card, application operations,
+  service, and schema; Guided Maintenance is now the sole active host-update
+  execution and verification surface.
 - Progress propagation for Self Assessment synthesis, proposal critique, and
   post-Gate A1 implementation handoff.
 - Dashboard stream/reconnect behavior without polling or automatic retry.
@@ -61,6 +64,13 @@ starting/restored Core: Soul-Lite
 post-run Qwen service: active
 post-run Dev service: inactive
 ```
+
+The Operator's later completed environment synthesis also exposed a useful
+quality defect: several bullets cited one scalar while asserting additional
+facts from sibling fields (package-manager capabilities, Git branch, automatic
+collection, and system architecture). This is suitable Self Augmentation
+evidence for an atomic citation contract: every factual clause must cite its
+exact evidence scalar or be explicitly labeled as inference.
 
 An initial standalone attempt correctly failed closed because model runtime
 control was not present in that process environment. Repeating with the normal

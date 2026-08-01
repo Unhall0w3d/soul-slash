@@ -564,15 +564,6 @@
         </section>
       </div>
 
-      <section class="improvement-card host-plan-card" aria-labelledby="host-plan-heading">
-        <div class="card-heading"><div><p class="eyebrow">Terminal-only host boundary</p><h2 id="host-plan-heading">Arch improvement plan</h2></div><span id="host-plan-count" class="count-badge">0</span></div>
-        <p class="card-note">Prepare a fresh, digest-bound <code>pacman -Syu</code> handoff. Soul will never run the command or collect your password.</p>
-        <div class="host-plan-actions"><button id="preview-host-plan" class="gate-button" type="button">Preview full-upgrade handoff</button><button id="verify-host-plan" class="gate-button" type="button" disabled>Verify selected plan</button></div>
-        <div id="host-plan-preview" class="gate-card" hidden><div id="host-plan-preview-details" class="recommendation-list"></div><label for="host-plan-confirmation">Approval phrase <code>CREATE_ARCH_FULL_UPGRADE_HANDOFF</code></label><input id="host-plan-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-host-plan" class="gate-button gate-button--gold" type="button" disabled>Create terminal handoff packet</button></div>
-        <div id="host-plan-list" class="recommendation-list"><p class="muted">No host handoff packets loaded.</p></div>
-        <p id="host-plan-status" class="dialog-status" role="status"></p>
-      </section>
-
       <aside class="unavailable-boundary" aria-labelledby="unavailable-actions-heading">
         <div><p class="eyebrow">Assessment boundary</p><h2 id="unavailable-actions-heading">Host changes require separate approval</h2></div>
         <p>Self Assessment only inspects and prepares evidence. Guided Maintenance is exposed separately under Administration; authentication, update execution, reboot, and post-login restoration still require their reviewed A2 and A3 gates.</p>

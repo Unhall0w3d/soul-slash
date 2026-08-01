@@ -2733,7 +2733,7 @@ function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[da
 
 async function loadSelfImprovement() {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
-  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await Promise.all([loadHostPlans(), loadAssessmentDevReviews()]); await resumeBoundedDevJobs(["self_improvement.dev_synthesis.execute"]); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await loadAssessmentDevReviews(); await resumeBoundedDevJobs(["self_improvement.dev_synthesis.execute"]); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
   catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
   finally { setAssessmentButtonsDisabled(false); }
 }
@@ -3751,44 +3751,6 @@ async function executeMaintenanceDeviceAction() {
   } finally {
     hideGenerationProgress(progress);
   }
-}
-
-function renderHostPlans(records) {
-  const list = byId("host-plan-list"); list.replaceChildren(); byId("host-plan-count").textContent = String(records.length);
-  records.forEach((plan) => { const button = labeledRecord(plan.plan_id, `${plan.pending_update_count} pending · ${plan.risk_class} · terminal handoff`); button.tabIndex = 0; button.addEventListener("click", () => { state.selectedHostPlan = plan.plan_id; byId("verify-host-plan").disabled = false; byId("host-plan-status").textContent = `${plan.plan_id} selected for a foreground postcondition check.`; }); list.append(button); });
-  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No host handoff packets created."; list.append(empty); }
-}
-
-async function loadHostPlans() {
-  const envelope = await callSoul("host_improvement.plans.list", { limit: 100 });
-  if (envelope.lifecycle_state === "complete") renderHostPlans(dataOf(envelope).records || []);
-}
-
-async function previewHostPlan() {
-  const status = byId("host-plan-status"); status.textContent = "Running fresh Arch update discovery…"; byId("preview-host-plan").disabled = true;
-  try {
-    const envelope = await callSoul("host_improvement.arch_upgrade.preview"); const data = dataOf(envelope);
-    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "A fresh Arch plan could not be prepared.");
-    state.hostPlanPreview = data; const plan = data.plan; const list = byId("host-plan-preview-details"); list.replaceChildren();
-    list.append(labeledRecord(`${plan.pending_update_count} pending package records`, "Class 5 · interactive terminal only"), labeledRecord("Exact command", "sudo pacman -Syu · never executed by Soul"));
-    byId("host-plan-preview").hidden = false; prefillApprovalGate("host-plan-confirmation", "create-host-plan", data.confirmation_phrase || "CREATE_ARCH_FULL_UPGRADE_HANDOFF"); status.textContent = "Review the exact handoff boundary; clicking Create writes the terminal packet and runs no host command.";
-  } catch (error) { status.textContent = error.message; }
-  finally { byId("preview-host-plan").disabled = false; }
-}
-
-async function createHostPlan() {
-  if (!state.hostPlanPreview) return; const status = byId("host-plan-status"); status.textContent = "Revalidating fresh package evidence…";
-  const envelope = await callSoul("host_improvement.arch_upgrade.handoff", { confirmation: byId("host-plan-confirmation").value, expected_digest: state.hostPlanPreview.expected_digest });
-  const data = dataOf(envelope); lifecycle(envelope);
-  if (envelope.lifecycle_state !== "blocked_for_human_review" || !data.packet) { status.textContent = envelope.errors?.[0]?.message || "Handoff creation was blocked safely."; return; }
-  state.selectedHostPlan = data.plan.plan_id; state.hostPlanPreview = null; byId("host-plan-preview").hidden = true; byId("verify-host-plan").disabled = false; status.textContent = `Terminal handoff created at ${data.packet}. Soul executed no host command.`; await loadHostPlans();
-}
-
-async function verifyHostPlan() {
-  if (!state.selectedHostPlan) return; const status = byId("host-plan-status"); status.textContent = "Checking current postconditions…"; byId("verify-host-plan").disabled = true;
-  try { const envelope = await callSoul("host_improvement.plans.verify", { plan_id: state.selectedHostPlan }); const receipt = dataOf(envelope).receipt; if (!receipt) throw new Error(envelope.errors?.[0]?.message || "Verification failed safely."); status.textContent = receipt.postcondition === "satisfied" ? "Postcondition satisfied: fresh discovery reports no remaining repository updates." : `Postcondition not satisfied: ${receipt.remaining_update_count} update records remain.`; }
-  catch (error) { status.textContent = error.message; }
-  finally { byId("verify-host-plan").disabled = !state.selectedHostPlan; }
 }
 
 function renderMaintenancePreview(plan) {
@@ -5660,10 +5622,6 @@ byId("improvement-proposal-confirmation").addEventListener("input", () => { byId
 byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);
 byId("preview-storage-cleanup").addEventListener("click", previewStorageCleanup);
 byId("execute-storage-cleanup").addEventListener("click", executeStorageCleanup);
-byId("preview-host-plan").addEventListener("click", previewHostPlan);
-byId("host-plan-confirmation").addEventListener("input", () => { byId("create-host-plan").disabled = !state.hostPlanPreview || byId("host-plan-confirmation").value !== state.hostPlanPreview.confirmation_phrase; });
-byId("create-host-plan").addEventListener("click", createHostPlan);
-byId("verify-host-plan").addEventListener("click", verifyHostPlan);
 byId("preview-maintenance").addEventListener("click", previewMaintenance);
 byId("rehearse-maintenance").addEventListener("click", rehearseMaintenance);
 byId("maintenance-force-refresh").addEventListener("change", () => {
