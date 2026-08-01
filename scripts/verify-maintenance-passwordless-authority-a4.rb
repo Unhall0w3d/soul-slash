@@ -66,12 +66,15 @@ check.call(
     !helper.include?("--nodeps") && !helper.include?("--overwrite")
 )
 check.call(
-  "pacman bridge is limited to active yay ancestry and rejects dangerous database or path controls",
+  "pacman bridge is limited to active yay ancestry and accepts only yay's exact install-reason bookkeeping shape",
   helper.include?("active_arch_update") &&
     helper.include?("yay_start_ticks") &&
     helper.include?("MAX_SUDO_ANCESTRY_DEPTH = 3") &&
     helper.include?("ancestor[\"exe\"] == File.realpath(PATHS.fetch(\"sudo\"))") &&
     helper.include?("ancestor[\"start_ticks\"] == yay[\"start_ticks\"]") &&
+    helper.include?('explicit_prefix = ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"]') &&
+    helper.include?("explicit_targets.length.between?(1, 128)") &&
+    helper.include?('operation == "mark_explicit"') &&
     %w[--remove --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir].all? { |flag| helper.include?(flag) } &&
     helper.include?("pacman bridge configuration changed")
 )
@@ -84,6 +87,39 @@ check.call(
 
 syntax_out, syntax_err, syntax_status = Open3.capture3("/usr/bin/ruby", "-c", stdin_data: helper)
 check.call("generated root helper is valid Ruby", syntax_status.success? && syntax_out.include?("Syntax OK") && syntax_err.empty?)
+
+helper_definitions = helper.split("\nverify_caller!\n", 2).first
+bridge_probe = <<~RUBY
+  #{helper_definitions}
+  require "json"
+  cases = {
+    "exact" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "webex-bin"],
+    "multiple" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "one", "two-bin"],
+    "no_target" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"],
+    "path_target" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "../../root"],
+    "asdeps" => ["-D", "--asdeps", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "webex-bin"],
+    "changed_config" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/tmp/pacman.conf", "--", "webex-bin"],
+    "sync" => ["-Syu"],
+    "archive" => ["-U", "--noconfirm", "--", "/home/operator/.cache/yay/example/example.pkg.tar.zst"]
+  }
+  puts JSON.generate(cases.transform_values { |arguments| pacman_bridge_operation(arguments) })
+RUBY
+probe_out, probe_err, probe_status = Open3.capture3("/usr/bin/ruby", stdin_data: bridge_probe)
+probe = probe_status.success? ? JSON.parse(probe_out) : {}
+check.call(
+  "generated helper classifies only the exact install-reason vector as bounded bookkeeping",
+  probe_err.empty? &&
+    probe == {
+      "exact" => "mark_explicit",
+      "multiple" => "mark_explicit",
+      "no_target" => nil,
+      "path_target" => nil,
+      "asdeps" => nil,
+      "changed_config" => nil,
+      "sync" => "package_mutation",
+      "archive" => "package_mutation"
+    }
+)
 
 begin
   authority.command_for("arch-update", "maintenance_tx_0123456789abcdef")

@@ -1,7 +1,8 @@
 # Maintenance Passwordless Authority A4 Review
 
-Status: A2 maintenance and separate reboot-only A3 live-accepted on 2026-07-29
-with A4 v3; individual application restoration remains non-blocking refinement
+Status: A2 maintenance and separate reboot-only A3 live-accepted on 2026-07-29;
+A4 v4 installed exactly on 2026-08-01 after repairing yay install-reason
+bookkeeping exposed by a successful upgrade
 
 ## What was implemented
 
@@ -16,11 +17,15 @@ with A4 v3; individual application restoration remains non-blocking refinement
 - Added yay 13.0.1 native unattended policy flags: decline clean rebuilds,
   diffs, PKGBUILD edits, and make-dependency removal; select the reviewed
   upgrade set; proceed without routine input.
+- A4 v4 admits only yay 13.0.1's exact post-install
+  `pacman -D --asexplicit -q --noconfirm --config /etc/pacman.conf -- <name>`
+  bookkeeping vector while the exact active yay process remains transaction
+  bound. Every other package-database operation remains rejected.
 - A4 v3 runs yay under the qualified desktop UID/GID instead of root. Its
   privileged pacman calls return through a transaction-scoped helper bridge
   that is accepted only through a bounded chain of exact sudo processes
   descended from the exact active yay PID/start identity.
-  The bridge rejects removals, pacman database operations, alternate roots,
+  The bridge rejects removals, other pacman database operations, alternate roots,
   alternate database/cache/hook/log/keyring paths, changed configuration,
   non-package-manager executables, and calls outside the active reviewed
   transaction.
@@ -108,6 +113,18 @@ git diff --check
 - The supervised 2026-07-29 A2 run completed the Arch/AUR full upgrade and
   system Flatpak update with zero password prompts, no reboot request, a
   closed sudo lifecycle, and one redacted terminal receipt.
+- The 2026-08-01 retained failure was a false-negative terminal state after 47
+  native upgrades and the `webex-bin` AUR upgrade completed. The v3 bridge
+  rejected yay's final `--asexplicit` bookkeeping call, so yay returned 1 and
+  the separate Flatpak phase did not run. A4 v4 adds deterministic coverage for
+  that exact vector without permitting arbitrary pacman database mutation.
+- The Operator approved deployment digest
+  `044448c8010277b9e66a2dab50dd24eab23f84b38e4b7a4e2a83b1733022d2ac`.
+  The installed root-owned helper reports `soul-maintenance-authority-a4-v4`,
+  matches SHA-256
+  `1394aa18dff9f8c5c469b5a59a93ce94126b73dd802a811543a62ea56ce34951`,
+  and passed the native passwordless self-check. Installation did not run a
+  package transaction or reboot.
 
 ## Local LLM eval results
 
@@ -139,6 +156,9 @@ model.
   root-owned AUR builds, a handoff/canonical transaction-path mismatch, and
   sudo's additional monitor ancestry. A4 v3 repairs all three without
   broadening the fixed-operation surface.
+- A4 v3 also rejected yay's bounded post-install `--asexplicit` call. A4 v4
+  narrows the exception to one exact flag order, the fixed pacman configuration,
+  one to 128 package-name tokens, and the already-bound active yay ancestry.
 - The zero-prompt A3 authority and reboot boundary are accepted. The first
   successful reboot-only receipt retained two bounded application failures
   (Webex and Opera); these do not broaden or invalidate A4 and remain
@@ -175,6 +195,7 @@ no password and exposes no general command runner.
 - [x] Confirm A4 v1 exact self-check and arbitrary-operation rejection.
 - [x] Enable the ignored local A4 flag.
 - [x] Inspect and install the corrected A4 v3 helper and sudoers plan.
+- [x] Inspect and install the A4 v4 install-reason repair.
 - [x] Run one supervised A2 transaction with zero
   prompts.
 - [ ] Run one later A3 reboot/restore transaction with zero prompts and no

@@ -13,7 +13,7 @@ module SoulCore
     CONFIRM_REMOVE = "REMOVE_SOUL_MAINTENANCE_AUTHORITY"
     HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
     SUDOERS_PATH = "/etc/sudoers.d/90-soul-maintenance-authority"
-    HELPER_VERSION = "soul-maintenance-authority-a4-v3"
+    HELPER_VERSION = "soul-maintenance-authority-a4-v4"
     TRANSACTION_PATTERN = "maintenance_tx_[a-f0-9]{16}"
     SUPPORTED_YAY_VERSION = "13.0.1"
     FIXED_PATHS = {
