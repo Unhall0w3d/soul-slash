@@ -33,6 +33,12 @@ evidence timestamp and SHA-256. Confirming the pre-filled gate permits one
 bounded local GPT-OSS review; normal Core restoration remains the Dev runtime's
 responsibility.
 
+The confirmed review runs through the Dashboard's persisted bounded-job lane.
+Navigating away does not cancel it, and reopening or refreshing Self Assessment
+reconnects to the active job. A Dashboard-process restart fails an interrupted
+job visibly and never retries it automatically; collect fresh evidence and
+preview again before a deliberate retry.
+
 The result is an owner-private, immutable review containing only a summary,
 evidence-linked observations, explicit unknowns, and navigation hints. It does
 not replace deterministic collection, classify safety, alter findings or

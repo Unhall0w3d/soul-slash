@@ -51,14 +51,15 @@ module SoulCore
       failed("Self Augmentation Dev critique preview failed safely: #{error.class}: #{error.message}"[0, 1_000])
     end
 
-    def execute(proposal_id:, confirmation:, expected_digest:)
+    def execute(proposal_id:, confirmation:, expected_digest:, on_progress: nil)
       prepared = prepared_request(proposal_id)
       return prepared if envelope?(prepared)
 
       worker_result = @dev_worker.execute(
         request: prepared.fetch("request"),
         confirmation: confirmation,
-        expected_digest: expected_digest
+        expected_digest: expected_digest,
+        on_progress: on_progress
       )
       return worker_result unless worker_result["ok"]
 

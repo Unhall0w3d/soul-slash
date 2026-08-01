@@ -63,7 +63,7 @@ module SoulCore
       })
     end
 
-    def execute(request:, confirmation:, expected_digest:)
+    def execute(request:, confirmation:, expected_digest:, on_progress: nil)
       normalized = validate_request(request)
       return normalized if envelope?(normalized)
 
@@ -81,7 +81,8 @@ module SoulCore
         # switch. Keep this foreground worker at the documented low level so
         # it retains enough budget to emit the schema-constrained final answer.
         reasoning: "low",
-        request_id: normalized.fetch("request_id")
+        request_id: normalized.fetch("request_id"),
+        on_progress: on_progress
       )
       return provider_failure(response) unless response.ok? && response.structured.is_a?(Hash)
       return failed("Soul Dev Worker result exceeds #{MAX_RESULT_BYTES} bytes") if JSON.generate(response.structured).bytesize > MAX_RESULT_BYTES

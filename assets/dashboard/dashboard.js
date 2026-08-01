@@ -24,6 +24,8 @@ const CORE_ACTIVATABLE_IDS = new Set(["daily", "amd-free", "music", "free", "dev
 const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationDevCritiquePreview: null, augmentationDevHandoffPreview: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
+state.boundedJobId = null;
+state.followedBoundedJobIds = new Set();
 state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
@@ -250,10 +252,10 @@ async function callNdjson(endpoint, operation, parameters = {}, context = {}, on
   while (true) {
     const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
     const lines = buffer.split("\n"); buffer = lines.pop() || "";
-    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.record?.job_id) state.musicJobId = event.record.job_id; if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; });
+    lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.record?.job_id) { state.boundedJobId = event.record.job_id; if (endpoint.includes("music-job")) state.musicJobId = event.record.job_id; } if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; });
     if (done) break;
   }
-  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.record?.job_id) state.musicJobId = event.record.job_id; if (event.type === "result") finalEnvelope = event.envelope; }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.record?.job_id) { state.boundedJobId = event.record.job_id; if (endpoint.includes("music-job")) state.musicJobId = event.record.job_id; } if (event.type === "result") finalEnvelope = event.envelope; }
   if (!finalEnvelope) throw new Error("Foreground stream ended without a terminal result");
   return finalEnvelope;
 }
@@ -271,6 +273,43 @@ async function followMusicJob(jobId, onProgress = () => {}) {
 async function activeMusicJobs(projectId) {
   const response = await fetch("/api/v1/music-job-status", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf }, body: JSON.stringify({ project_id: projectId }), cache: "no-store" });
   const result = await response.json(); if (!response.ok) throw new Error(result.error?.reason || "Music job status failed safely"); return result.jobs || [];
+}
+
+async function followBoundedJob(jobId, onProgress = () => {}) {
+  const response = await fetch("/api/v1/bounded-job-follow", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf }, body: JSON.stringify({ job_id: jobId }), cache: "no-store" });
+  if (!response.ok || !response.body) { const failure = await response.json().catch(() => ({})); throw new Error(failure.error?.reason || "Bounded job follow failed safely"); }
+  const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ""; let finalEnvelope = null;
+  while (true) { const { value, done } = await reader.read(); buffer += decoder.decode(value || new Uint8Array(), { stream: !done }); const lines = buffer.split("\n"); buffer = lines.pop() || ""; lines.filter(Boolean).forEach((line) => { const event = JSON.parse(line); if (event.type === "progress") onProgress(event.event || {}); if (event.type === "result") finalEnvelope = event.envelope; }); if (done) break; }
+  if (buffer.trim()) { const event = JSON.parse(buffer); if (event.type === "result") finalEnvelope = event.envelope; }
+  if (!finalEnvelope) throw new Error("Bounded job follow ended without a terminal result");
+  return finalEnvelope;
+}
+
+async function activeBoundedJobs(operations) {
+  const response = await fetch("/api/v1/bounded-job-status", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf }, body: JSON.stringify({ operations }), cache: "no-store" });
+  const result = await response.json(); if (!response.ok) throw new Error(result.error?.reason || "Bounded job status failed safely"); return result.jobs || [];
+}
+
+function boundedDevSurface(operation) {
+  return {
+    "self_improvement.dev_synthesis.execute": { status: "assessment-dev-status", progress: "assessment-dev-progress", reload: loadAssessmentDevReviews, complete: "Advisory review recorded. Source evidence remains authoritative; no follow-on action was invoked." },
+    "self_augmentation.dev_critique.execute": { status: "augmentation-dev-critique-status", progress: "augmentation-dev-critique-progress", reload: loadAugmentationDevCritiques, complete: "Advisory critique recorded. Gate A1 and worktree creation remain unchanged." },
+    "self_augmentation.dev_handoff.execute": { status: "augmentation-dev-handoff-status", progress: "augmentation-dev-handoff-progress", reload: loadAugmentationDevHandoffs, complete: "Advisory handoff recorded. No code, worktree, gate, or integration state changed." }
+  }[operation];
+}
+
+async function resumeBoundedDevJobs(operations) {
+  const jobs = await activeBoundedJobs(operations);
+  jobs.forEach((job) => {
+    if (state.followedBoundedJobIds.has(job.job_id)) return;
+    const surface = boundedDevSurface(job.operation); if (!surface) return;
+    state.followedBoundedJobIds.add(job.job_id); const status = byId(surface.status); const progress = byId(surface.progress);
+    progress.hidden = false; status.textContent = job.latest_progress?.message || "Reconnected to bounded Dev work…";
+    followBoundedJob(job.job_id, (event) => { status.textContent = event.message || "Bounded Dev work in progress…"; })
+      .then(async (envelope) => { if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Bounded Dev work failed safely"); await surface.reload(); status.textContent = surface.complete; })
+      .catch((error) => { status.textContent = error.message; })
+      .finally(() => { progress.hidden = true; state.followedBoundedJobIds.delete(job.job_id); });
+  });
 }
 
 const callSoulStream = (operation, parameters = {}, context = {}, onProgress = () => {}, requestOptions = {}) => callNdjson("/api/v1/chat-stream", operation, parameters, context, onProgress, requestOptions);
@@ -2694,7 +2733,7 @@ function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[da
 
 async function loadSelfImprovement() {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
-  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await Promise.all([loadHostPlans(), loadAssessmentDevReviews()]); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await Promise.all([loadHostPlans(), loadAssessmentDevReviews()]); await resumeBoundedDevJobs(["self_improvement.dev_synthesis.execute"]); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
   catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
   finally { setAssessmentButtonsDisabled(false); }
 }
@@ -2739,8 +2778,7 @@ async function executeAssessmentDevSynthesis() {
   const status = byId("assessment-dev-status"); const progress = byId("assessment-dev-progress"); const button = byId("execute-assessment-dev");
   button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is reviewing the exact evidence in the foreground…";
   try {
-    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
-    const envelope = await callSoul("self_improvement.dev_synthesis.execute", { scope: preview.scope, confirmation: byId("assessment-dev-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_improvement.dev_synthesis.execute", { scope: preview.scope, confirmation: byId("assessment-dev-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev synthesis in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev synthesis failed safely");
     state.assessmentDevPreview = null; byId("assessment-dev-confirm").hidden = true; await loadAssessmentDevReviews(); status.textContent = "Advisory review recorded. Source evidence remains authoritative; no follow-on action was invoked."; announce("Self Assessment Dev synthesis review ready");
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev synthesis exceeded its foreground time limit." : error.message; }
@@ -4015,7 +4053,7 @@ function renderAugmentationCensus(report) {
 
 async function loadSelfAugmentation() {
   byId("augmentation-status").textContent = "Loading local proposal inventory…";
-  try { const [proposals, experiments, critiques, handoffs] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 }), callSoul("self_augmentation.dev_critique.list", { limit: 50 }), callSoul("self_augmentation.dev_handoff.list", { limit: 50 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); renderAugmentationDevCritiques(dataOf(critiques).records || []); renderAugmentationDevHandoffs(dataOf(handoffs).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
+  try { const [proposals, experiments, critiques, handoffs] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 }), callSoul("self_augmentation.dev_critique.list", { limit: 50 }), callSoul("self_augmentation.dev_handoff.list", { limit: 50 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); renderAugmentationDevCritiques(dataOf(critiques).records || []); renderAugmentationDevHandoffs(dataOf(handoffs).records || []); await resumeBoundedDevJobs(["self_augmentation.dev_critique.execute", "self_augmentation.dev_handoff.execute"]); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
   catch (error) { byId("augmentation-status").textContent = error.message; }
 }
 
@@ -4072,8 +4110,7 @@ async function executeAugmentationDevHandoff() {
   const status = byId("augmentation-dev-handoff-status"); const progress = byId("augmentation-dev-handoff-progress"); const button = byId("execute-augmentation-dev-handoff");
   button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is drafting against the exact Gate A1 evidence in the foreground…";
   try {
-    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
-    const envelope = await callSoul("self_augmentation.dev_handoff.execute", { experiment_id: preview.experiment_id, confirmation: byId("augmentation-dev-handoff-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_augmentation.dev_handoff.execute", { experiment_id: preview.experiment_id, confirmation: byId("augmentation-dev-handoff-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev handoff in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev implementation handoff failed safely");
     state.augmentationDevHandoffPreview = null; byId("augmentation-dev-handoff-confirm").hidden = true; await loadAugmentationDevHandoffs(); status.textContent = "Advisory handoff recorded. No code, worktree, gate, or integration state changed."; announce("Self Augmentation Dev handoff ready");
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev handoff exceeded its foreground time limit." : error.message; }
@@ -4096,8 +4133,7 @@ async function executeAugmentationDevCritique() {
   const status = byId("augmentation-dev-critique-status"); const progress = byId("augmentation-dev-critique-progress"); const button = byId("execute-augmentation-dev-critique");
   button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is critiquing the exact proposal in the foreground…";
   try {
-    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
-    const envelope = await callSoul("self_augmentation.dev_critique.execute", { proposal_id: preview.proposal_id, confirmation: byId("augmentation-dev-critique-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_augmentation.dev_critique.execute", { proposal_id: preview.proposal_id, confirmation: byId("augmentation-dev-critique-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev critique in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev critique failed safely");
     state.augmentationDevCritiquePreview = null; byId("augmentation-dev-critique-confirm").hidden = true; await loadAugmentationDevCritiques(); status.textContent = "Advisory critique recorded. Gate A1 and worktree creation remain unchanged."; announce("Self Augmentation Dev critique ready");
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev critique exceeded its foreground time limit." : error.message; }

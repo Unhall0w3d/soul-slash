@@ -62,6 +62,12 @@ repository excerpts or worktree contents and cannot emit code, patches,
 commands, additional paths, Gate A2 approval, or follow-on execution. The
 original handoff and detached worktree remain unchanged.
 
+Proposal critique and post-Gate A1 handoff generation use the same persisted,
+single-lane bounded-job transport as other long-running creative and
+development work. Navigation or a browser refresh reconnects to active work.
+If the Dashboard process itself restarts, the interrupted request terminates as
+failed and must be previewed and invoked again; it is never silently replayed.
+
 ## 4. Candidate dossier
 
 After an implementation is committed in the experiment worktree, **Generate dossier** records the base and candidate commits, changed files, deterministic verification, and blockers. Passing checks make the candidate reviewable; they do not approve it.
