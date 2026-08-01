@@ -184,15 +184,15 @@ surfaces:
   - id: skill_studio
     label: Skill Studio
     aliases: [skill studio, skills studio, capability workshop]
-    summary: Review proposals, Beta candidates, test evidence, upstream candidates, and production promotion.
+    summary: Inspect proposals, Beta candidates, test evidence, upstream candidates, and production skills through Chat or Voice; perform protected gates in Skill Studio.
     inputs: Exact proposal, candidate, revision, source, or test result.
     boundary: Proposal approval, implementation, promotion, and production replacement retain two human gates.
-    skills: []
-    invocations: []
-    operations: [skill_studio.proposals.list, skill_studio.proposals.approval.preview, skill_studio.betas.promotion.preview]
+    skills: [skill_studio.inspect]
+    invocations: [skill-studio-inspection]
+    operations: [skills.list, skill_studio.proposals.list, skill_studio.proposals.get, skill_studio.proposals.approval.preview, skill_studio.betas.list, skill_studio.betas.get, skill_studio.betas.promotion.preview]
     targets: [proposal, Beta skill, upstream skill candidate]
-    interfaces: [dashboard]
-    coverage: {dashboard: available, chat: missing, voice: missing}
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
     authority:
       default: protected_action
       conversational_confirmation: []

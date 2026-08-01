@@ -29,11 +29,12 @@ project.timeline.inspect
 project.timeline.update
 dashboard.capabilities.inspect
 dashboard.invocations.inspect
+skill_studio.inspect
 ```
 
 These identifiers cover the bounded implementation ledger and the read-only
-Dashboard capability and invocation guides. Timeline updates remain limited to
-one explicitly named item.
+Dashboard capability and invocation guides plus the read-only Skill Studio
+inventory. Timeline updates remain limited to one explicitly named item.
 
 ### Core control
 
@@ -231,7 +232,10 @@ ruby bin/soul skill skill.brief.review -- \
 
 ### Skill Studio lifecycle
 
-Skill Studio is a dashboard application workflow over proposal packets, isolated Beta candidates, and the production skill registry; it is not itself a production skill.
+Skill Studio is a dashboard application workflow over proposal packets,
+isolated Beta candidates, and the production skill registry. The read-only
+`skill_studio.inspect` skill exposes its current inventory through Chat and
+Voice Presence; all lifecycle mutations remain Dashboard-controlled.
 
 ```text
 proposal intake or draft

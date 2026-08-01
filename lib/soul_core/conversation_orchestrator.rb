@@ -13,6 +13,7 @@ require_relative "dashboard_capability_guide"
 require_relative "intent_router"
 require_relative "invocation_catalog_service"
 require_relative "local_search_chat_controls"
+require_relative "skill_studio_chat_controls"
 
 module SoulCore
   class ConversationOrchestrator
@@ -144,6 +145,7 @@ module SoulCore
 
     DASHBOARD_CAPABILITY_GUIDE_PATTERNS = DashboardCapabilityGuide::REQUEST_PATTERNS
     INVOCATION_CATALOG_PATTERNS = InvocationCatalogService::REQUEST_PATTERNS
+    SKILL_STUDIO_CONTROL_PATTERNS = SkillStudioChatControls::REQUEST_PATTERNS
 
     MEMORY_PATTERNS = [
       /\b(remember|earlier|last time|previously|we discussed|we talked about|you should know)\b/i
@@ -337,6 +339,15 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "explicit Project Timeline reads and edits use one bounded owner-local ledger",
           flags: flags.merge("project_tracker_control" => true)
+        )
+      end
+
+      skill_studio_control = SKILL_STUDIO_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+      if skill_studio_control && (request_shape.request? || text.match?(SkillStudioChatControls::MUTATION_PATTERN))
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "an explicit Skill Studio inventory question uses the bounded read-only Studio projection",
+          flags: flags.merge("skill_studio_control" => true)
         )
       end
 

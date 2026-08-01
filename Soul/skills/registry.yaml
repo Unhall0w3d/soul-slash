@@ -49,6 +49,17 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: invocation_catalog_a1
+  skill_studio.inspect:
+    internal_handler: skill_studio_chat_controls
+    instruction_path: Soul/skills/studio/inspect-skill-studio/SKILL.md
+    category: project_coordination
+    status: available
+    description: Inspect current Skill Studio proposals, Beta evidence, stages, and production registry entries without authorizing or executing a Studio gate.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: conversation_result
+    verifier: skill_studio_conversation_a2
   maintenance.device:
     internal_handler: conversation_maintenance_workflow
     instruction_path: Soul/skills/maintenance/maintain-device/SKILL.md

@@ -33,7 +33,7 @@ overview = guide.respond(overview_request)
 checks["overview_distinguishes_chat_mappings_from_dashboard_only_surfaces"] =
   overview.include?("Music Studio — available") &&
   overview.include?("Guided Maintenance — available") &&
-  overview.include?("Skill Studio — not yet mapped to Chat") &&
+  overview.include?("Skill Studio — available") &&
   overview.include?("Self Augmentation — not yet mapped to Chat") &&
   overview.include?("It does not invoke any capability") &&
   overview.include?("Lifecycle: complete. Mutation: none.")
@@ -66,6 +66,13 @@ checks["maintenance_guide_exposes_routine_and_protected_authority"] =
   maintenance.include?("conversational confirmation for device package maintenance") &&
   maintenance.include?("Operator gesture required for reboot, workstation maintenance") &&
   maintenance.include?("device maintenance receipt and refreshed fleet evidence")
+
+studio = guide.respond("What can I ask you to do in Skill Studio?")
+checks["skill_studio_guide_exposes_read_only_inventory_and_protected_gates"] =
+  studio.include?("Availability: available") &&
+  studio.include?("`skill_studio.inspect` (available)") &&
+  studio.include?("Operator gesture required for proposal approval") &&
+  studio.include?("proposal and promotion records")
 
 guide_source = File.read(File.expand_path("../lib/soul_core/dashboard_capability_guide.rb", __dir__))
 checks["guide_consumes_machine_readable_catalog"] =

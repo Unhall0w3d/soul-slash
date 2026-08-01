@@ -15,6 +15,7 @@ require_relative "local_search_chat_controls"
 require_relative "project_tracker_chat_controls"
 require_relative "dashboard_capability_guide"
 require_relative "invocation_catalog_service"
+require_relative "skill_studio_chat_controls"
 require_relative "conversation_tool_catalog"
 require_relative "intent_router"
 require_relative "skill_invocation_planner"
@@ -43,6 +44,7 @@ module SoulCore
       @project_tracker_controls = ProjectTrackerChatControls.new(root: @root)
       @invocation_catalog = InvocationCatalogService.new(root: @root)
       @dashboard_capability_guide = DashboardCapabilityGuide.new(root: @root)
+      @skill_studio_controls = SkillStudioChatControls.new(root: @root)
       @router = IntentRouter.new
       @planner = SkillInvocationPlanner.new(router: @router)
       @history = ChatExecutionHistory.new(root: @root)
@@ -71,6 +73,7 @@ module SoulCore
       return @knowledge_vault_controls.respond(text, chat_id: chat_id) if @knowledge_vault_controls.match?(text)
       return @local_search_controls.respond(text, chat_id: chat_id) if @local_search_controls.match?(text)
       return @project_tracker_controls.respond(text, chat_id: chat_id) if @project_tracker_controls.match?(text)
+      return @skill_studio_controls.respond(text) if @skill_studio_controls.match?(text)
       return @invocation_catalog.respond(text) if @invocation_catalog.match?(text)
       return @dashboard_capability_guide.respond(text) if @dashboard_capability_guide.match?(text)
       return approve_downloads_cleanup if lower.match?(/\b(approve downloads cleanup preview|approve cleanup preview)\b/)
