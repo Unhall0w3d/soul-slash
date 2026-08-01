@@ -30,6 +30,7 @@ Ask:
 Show the invocation catalog.
 List Creative invocations.
 How can I invoke music production?
+Show the Skill Studio inventory.
 ```
 
 These requests resolve deterministically and perform no mutation. Ordinary

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Skill Studio"
+  short_description: "Inspect proposals, Beta evidence, and production skills"
+  default_prompt: "Use $inspect-skill-studio to show the current Skill Studio inventory and explain its stages."

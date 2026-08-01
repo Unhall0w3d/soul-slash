@@ -146,6 +146,19 @@ entries:
     boundary: Tracker state is planning evidence, not merge, release, or execution authority.
     examples:
       - Show the project timeline.
+  - id: skill-studio-inspection
+    label: Skill Studio inspection
+    category: Project
+    summary: Inspect current proposal stages, Beta evidence, and production skill inventory without crossing either human gate.
+    skill_ids: [skill_studio.inspect]
+    required_inputs: []
+    optional_inputs: [Proposal ID or exact title, Beta skill ID, or proposal/Beta/production inventory filter]
+    core: Any Core; the projection is deterministic and local.
+    approval: No approval for inspection; every build, trial, approval, promotion, closeout, and deletion remains an exact Skill Studio action.
+    output: Current proposal, Beta, stage, and production registry evidence.
+    boundary: Conversational inspection never prepares or executes a Skill Studio mutation and never treats model output as authority.
+    examples:
+      - Show the Skill Studio inventory.
   - id: conversation-management
     label: Conversation management
     category: Administration

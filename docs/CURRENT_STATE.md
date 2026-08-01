@@ -42,6 +42,13 @@ be queried deterministically in Chat. Catalog inspection and its example
 wording are inert: neither can execute a skill, change a Core, or authorize a
 gate.
 
+Explicit Skill Studio inventory questions now use a deterministic read-only
+projection shared by Chat and Voice Presence. Soul can report current proposal
+stages, Beta run and test state, and production registry entries. Proposal
+approval, Beta creation or execution, promotion, closeout, rejection, and
+deletion remain exact Skill Studio actions and cannot be authorized by the
+conversation response.
+
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the
 same identity; neither changes authority or routing. Explicit Chat commands can

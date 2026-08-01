@@ -4,6 +4,23 @@ Skill Studio is Soul's controlled path for turning a missing capability into a r
 
 Open it from **Self Improvement → Skill Studio**.
 
+## Chat and Voice inspection
+
+Soul can inspect current Skill Studio state through Chat or the same Chat path
+used by Voice Presence. For example:
+
+```text
+Show the Skill Studio inventory.
+List Skill Studio proposals.
+List Skill Studio Beta skills.
+List Skill Studio production skills.
+Inspect Skill Studio proposal <exact ID or title>.
+```
+
+These requests read current proposal, Beta, test, stage, and registry
+projections. They cannot approve, build, run, promote, close, reject, or delete
+anything. Use the exact reviewed action in Skill Studio for those gates.
+
 ## The three inventories
 
 - **Proposals** describe a capability, its scope, risks, tests, and review requirements. A proposal is not code and cannot run.
@@ -80,3 +97,4 @@ test, and promotion state remains in Skill Studio's existing stores.
 - [`docs/SKILLS.md`](../SKILLS.md)
 - [`docs/soul/HUMAN_REVIEW_GATE.md`](../soul/HUMAN_REVIEW_GATE.md)
 - [`docs/soul/PHASE12D5_GATED_BETA_BUILD_AND_PRODUCTION_PROMOTION_BRIEF.md`](../soul/PHASE12D5_GATED_BETA_BUILD_AND_PRODUCTION_PROMOTION_BRIEF.md)
+- [`docs/soul/CAPABILITY_SKILL_FOUNDATION_A2_BRIEF.md`](../soul/CAPABILITY_SKILL_FOUNDATION_A2_BRIEF.md)
