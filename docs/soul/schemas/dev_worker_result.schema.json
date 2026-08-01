@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soul.local/schemas/dev_worker_result.schema.json",
+  "title": "Soul Dev Worker Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "ok", "lifecycle_state", "message", "data", "mutation"],
+  "properties": {
+    "schema_version": { "const": "soul.dev_worker.result.v1" },
+    "ok": { "type": "boolean" },
+    "lifecycle_state": {
+      "enum": ["complete", "failed", "awaiting_input", "canceled", "blocked_for_human_review"]
+    },
+    "message": { "type": "string" },
+    "data": { "type": "object" },
+    "mutation": { "const": "none" }
+  }
+}

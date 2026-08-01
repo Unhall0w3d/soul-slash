@@ -2,10 +2,11 @@
 
 ## Status
 
-Candidate-complete for deterministic and human review. No live Core transition,
-GPU model load, service installation, or runtime request was performed during
-this implementation pass because the Operator retained Soul-Lite Core for
-unrelated AMD use.
+Candidate-complete for deterministic and human review. The Operator adopted the
+brief, installed the exact inactive user unit, and reviewed live Soul-Lite → Dev
+→ Soul-Lite behavior. GPT-OSS remained resident for two selected Dev requests;
+one later scoped Soul Dev Worker request borrowed the runtime and returned to
+Soul-Lite without disturbing Qwen.
 
 ## What was implemented
 
@@ -75,8 +76,10 @@ one real Beta draft remain human acceptance items.
 
 ## Known weaknesses
 
-- Dashboard visual behavior for Free and Dev Core is not yet owner-reviewed.
-- The inactive Dev unit is not installed by repository mutation alone.
+- Dashboard and Noctalia visual behavior for the Core choices remains subject
+  to ordinary ongoing usability refinement.
+- The inactive Dev unit is installed only through the separately reviewed
+  owner action; repository mutation alone still cannot install it.
 - Self Assessment and Self Augmentation have documented review-only Dev roles,
   but no new model-backed button was added; their deterministic evidence and
   established human gates remain unchanged.
@@ -103,10 +106,10 @@ and networklessly tested; all successful output remains candidate material.
 ## Human review checklist
 
 - [ ] Visually review the five Core choices and Free Core lock.
-- [ ] Install and inspect the inactive Dev unit using the Makefile preview.
+- [x] Install and inspect the inactive Dev unit using the Makefile preview.
 - [ ] Confirm Soul Core → scoped Dev → Soul Core restores Gemma.
-- [ ] Confirm Soul-Lite scoped Dev work leaves Qwen running and unloads GPT-OSS.
-- [ ] Confirm selected Dev Core keeps GPT-OSS resident across two requests.
+- [x] Confirm Soul-Lite scoped Dev work leaves Qwen running and unloads GPT-OSS.
+- [x] Confirm selected Dev Core keeps GPT-OSS resident across two requests.
 - [ ] Build one approved proposal and inspect the generated Beta and `REVIEW.md`.
 - [ ] Run one deliberately invalid candidate and confirm useful terminal failure.
 - [ ] Confirm Mistral is used only after explicit fallback selection.

@@ -42,3 +42,12 @@ Dev Core or accepting a scoped Dev action is what starts it.
 
 Mistral configuration is retained only as an explicit fallback for the brief
 draft/review commands. It is never selected silently after a local failure.
+
+## Codex delegation
+
+The optional repository-local `$soul-dev-worker` Codex skill can borrow this
+runtime for one tool-less structured analysis, critique, or candidate-patch
+request. It does not register GPT-OSS as a native Codex model or give it Codex
+tools. See [Soul Dev Worker](DEV_WORKER.md) for the exact request and review
+flow; use native Spark agents when repository exploration or tool-using changes
+are required.

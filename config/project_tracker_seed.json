@@ -110,6 +110,22 @@
       "references": "docs/soul/CAPABILITY_SKILL_FOUNDATION_A1_BRIEF.md\ndocs/assessments/CAPABILITY_SKILL_FOUNDATION_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md"
     },
     {
+      "item_id": "track_codex_soul_dev_worker",
+      "title": "Review bounded Codex–Soul Dev Worker delegation",
+      "area": "Development + Cores",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "medium",
+      "summary": "Review the foreground GPT-OSS worker contract that accepts one Codex-selected evidence packet and returns structured analysis, critique, or candidate patch text.",
+      "acceptance": "Soul remains tool-less and context-bounded; Spark remains the repository-aware native worker; scoped runtime use restores the starting Core; candidate output never bypasses primary Codex validation, tests, Git, or human merge review.",
+      "source": "Codex–Soul Dev Worker A0",
+      "implementation": "A repository-local Codex skill prepares digest-bound JSON requests for a foreground Ruby adapter. The adapter validates non-secret context, safe metadata, task class, closed output schema, timeout, exact preview digest, and confirmation before one GPT-OSS request through the existing Dev lease. Returned candidate material is independently schema-validated and mutation-free.",
+      "technologies": "Ruby; JSON Schema; SHA-256; Ollama/Vulkan GPT-OSS 20B; repository-local Codex skill metadata.",
+      "interfaces": "Codex $soul-dev-worker skill; bin/soul dev-worker preview|execute; existing Dev Core runtime receipts.",
+      "commands": "make verify-codex-soul-dev-worker\nbin/soul dev-worker preview --request-file /tmp/soul-dev-worker-request.json\nbin/soul dev-worker execute --request-file /tmp/soul-dev-worker-request.json --confirmation <exact-phrase> --expected-digest <digest>",
+      "references": "docs/guides/DEV_WORKER.md\ndocs/soul/CODEX_SOUL_DEV_WORKER_A0_BRIEF.md\ndocs/assessments/CODEX_SOUL_DEV_WORKER_A0_REVIEW.md"
+    },
+    {
       "item_id": "track_persona_fidelity",
       "title": "Refine persona fidelity across Daily and fallback chat models",
       "area": "Chat + Persona",
