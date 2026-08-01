@@ -282,6 +282,19 @@ def command_for(operation, transaction)
   end
 end
 
+def pacman_bridge_operation(arguments)
+  explicit_prefix = ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"]
+  explicit_targets = arguments.drop(explicit_prefix.length)
+  mark_explicit =
+    arguments.first(explicit_prefix.length) == explicit_prefix &&
+    explicit_targets.length.between?(1, 128) &&
+    explicit_targets.all? { |target| target.match?(/\A[a-z0-9@._+:-]+\z/) }
+  return "mark_explicit" if mark_explicit
+  return "package_mutation" if arguments.any? { |part| part == "-S" || part.start_with?("-S") || part == "-U" || part.start_with?("-U") }
+
+  nil
+end
+
 def validate_pacman_bridge!(state, transaction, operations, argv)
   index = validate_phase!(state, transaction, operations, "arch-update")
   fail_closed("pacman bridge is outside the active Arch/AUR operation") unless index == state["next_index"]
@@ -311,9 +324,13 @@ def validate_pacman_bridge!(state, transaction, operations, argv)
   fail_closed("pacman bridge command is empty") unless argv.is_a?(Array) && argv.length.between?(2, 256)
   fail_closed("pacman bridge executable changed") unless argv.first == PATHS.fetch("pacman")
   fail_closed("pacman bridge argument is too large") unless argv.all? { |part| part.is_a?(String) && part.bytesize.between?(1, 4096) && !part.include?("\0") }
-  fail_closed("pacman bridge operation is not mutation-bounded") unless argv.any? { |part| part == "-S" || part.start_with?("-S") || part == "-U" || part.start_with?("-U") }
+  arguments = argv.drop(1)
+  operation = pacman_bridge_operation(arguments)
+  fail_closed("pacman bridge operation is not mutation-bounded") unless operation
   forbidden = %w[-R --remove -D --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir]
-  fail_closed("pacman bridge contains a forbidden operation") if argv.drop(1).any? { |part| forbidden.include?(part) || forbidden.any? { |token| part.start_with?("#{token}=") } }
+  unless operation == "mark_explicit"
+    fail_closed("pacman bridge contains a forbidden operation") if arguments.any? { |part| forbidden.include?(part) || forbidden.any? { |token| part.start_with?("#{token}=") } }
+  end
   argv.each_with_index do |part, offset|
     next unless part == "--config"
     fail_closed("pacman bridge configuration changed") unless argv[offset + 1] == "/etc/pacman.conf"

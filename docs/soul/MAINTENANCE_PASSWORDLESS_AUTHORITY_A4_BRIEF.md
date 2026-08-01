@@ -161,6 +161,20 @@ unexpected future yay version fails closed before the operation begins.
 `--noconfirm` is permitted only inside the immutable, target-free,
 version-qualified full-upgrade vector; it is never accepted from a caller.
 
+After a successful AUR archive installation, qualified yay may invoke exactly
+this bounded package-database bookkeeping shape to preserve the reviewed
+package as explicitly installed:
+
+```text
+/usr/bin/pacman -D --asexplicit -q --noconfirm --config /etc/pacman.conf -- <package-name>...
+```
+
+This exception accepts one to 128 syntactically valid package names only while
+the exact active yay PID remains bound to the reviewed transaction. It accepts
+no other `-D`/`--database` operation, alternate path, install-reason action, or
+caller-selected vector. The bookkeeping call cannot install, remove, upgrade,
+or downgrade package contents.
+
 ### System Flatpak update
 
 Only this exact operation is permitted:
