@@ -38,6 +38,12 @@ Describe the architectural objective and explain why it cannot be a bounded skil
 
 This is intentionally a human-authored gate. Soul may help analyze the architecture, but the objective and the reason for crossing the skill boundary must remain reviewable.
 
+The reviewed GPT-OSS Dev lane may later critique an existing proposal or draft
+a bounded implementation handoff after Gate A1. Such output remains candidate
+material: it cannot classify its own safety, create a worktree, integrate a
+candidate, or approve either augmentation gate. The current experiment and
+integration controls remain authoritative.
+
 ## 3. Gate A1: isolated experiment
 
 Select a proposal and list the exact files the experiment may change. Gate A1 may create one detached worktree plus an implementation handoff. It does not invoke Codex, create a production branch, merge, push, deploy, or modify the main worktree.

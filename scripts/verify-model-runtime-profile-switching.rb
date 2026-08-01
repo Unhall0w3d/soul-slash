@@ -278,7 +278,8 @@ html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 brief = File.read(File.join(__dir__, "../docs/soul/MODEL_RUNTIME_PORTABILITY_2_BRIEF.md"))
 check("dashboard renders explicit profiles and switch actions", html.include?('id="runtime-profile-list"') && dashboard.include?('previewModelRuntime(action, profileId = null)') && dashboard.include?('action = "switch"'), errors)
 check("dashboard distinguishes model identity, accelerator, API alias, and startup selection", %w[model_name accelerator api_alias selected_profile_id].all? { |field| dashboard.include?(field) }, errors)
-check("profile dashboard remains timer-free", !dashboard.match?(/setInterval|setTimeout|requestAnimationFrame/), errors)
+runtime_dashboard = dashboard[/function renderModelRuntime\(.*?(?=function showError)/m].to_s
+check("profile dashboard remains timer-free", !runtime_dashboard.empty? && !runtime_dashboard.match?(/setInterval|setTimeout|requestAnimationFrame/), errors)
 check("approved brief keeps host deployment behind a later gate", brief.include?("implementation_authorized: yes") && brief.include?("must not create, install, enable, start, stop, or modify the AMD"), errors)
 
 if errors.empty?

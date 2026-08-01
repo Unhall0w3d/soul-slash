@@ -18,6 +18,7 @@ end
 require "soul_core/cloud_provider_config"
 require "soul_core/cloud_assist_artifact"
 require "soul_core/cloud_llm_client"
+require "soul_core/local_development_model_client"
 
 module SoulSkills
   module SkillBrief
@@ -48,14 +49,13 @@ module SoulSkills
         end
 
         config = SoulCore::CloudProviderConfig.load(path: option_value("--config"))
-        result =
-          if @argv.include?("--dry-run")
-            dry_run_result(config, idea)
-          elsif !config.valid?
-            config_error_result(config)
-          else
-            draft_with_provider(config, idea)
-          end
+        result = if @argv.include?("--dry-run")
+                   dry_run_result(config, idea)
+                 elsif option_value("--provider")
+                   config.valid? ? draft_with_provider(config, idea) : config_error_result(config)
+                 else
+                   draft_with_local(idea)
+                 end
 
         log_path = write_log(result)
         result["task_log"] = log_path if log_path
@@ -81,6 +81,33 @@ module SoulSkills
       end
 
       private
+
+      def draft_with_local(idea)
+        prompt = build_prompt(idea)
+        response = SoulCore::LocalDevelopmentModelClient.new(root: ROOT).chat(
+          messages: prompt_messages(prompt), purpose: ROLE, temperature: 0.2,
+          max_tokens: 2_200, reasoning: true
+        )
+        provider = LocalProvider.new
+        unless response.ok?
+          return {
+            "skill" => "skill.brief.draft", "generated_at" => Time.now.iso8601,
+            "status" => "error", "outcome" => response.status,
+            "idea" => idea, "provider" => provider_summary(provider), "response" => response.to_h,
+            "recommendation" => "Local Dev Core drafting failed safely. Use --provider mistral only as an explicit fallback.",
+            "verification" => verification(false, network_used: false)
+          }
+        end
+        artifact = write_proposal_artifact(idea:, provider:, response:, prompt:, dry_run: false)
+        {
+          "skill" => "skill.brief.draft", "generated_at" => Time.now.iso8601,
+          "status" => "ok", "outcome" => "complete", "idea" => idea,
+          "provider" => provider_summary(provider), "response" => response.to_h,
+          "proposal_path" => artifact.relative_path,
+          "recommendation" => "Local GPT-OSS proposal drafted as candidate material. Human Gate 1 remains required.",
+          "verification" => verification(true, network_used: false)
+        }
+      end
 
       def draft_with_provider(config, idea)
         provider = selected_provider(config)
@@ -201,6 +228,15 @@ end
 
         candidates = config.providers_for_role(ROLE)
         candidates.find { |provider| provider.name == "mistral" } || candidates.first
+      end
+
+      class LocalProvider
+        def name = "local.dev"
+        def default_model = SoulCore::LocalDevelopmentModelClient::MODEL
+        def api_key_env = nil
+        def auth_mode = "local_loopback"
+        def api_key_present? = false
+        def roles = [ROLE]
       end
 
       def provider_summary(provider)
@@ -476,7 +512,8 @@ end
 
           Notes:
             - Uses provider role: #{ROLE}
-            - Mistral is the first supported provider.
+            - Local GPT-OSS Dev Core is preferred.
+            - Mistral remains available only through explicit --provider mistral fallback.
             - Writes review artifacts only.
             - Does not implement the skill.
             - Does not send secrets, user memory, or private repo content.

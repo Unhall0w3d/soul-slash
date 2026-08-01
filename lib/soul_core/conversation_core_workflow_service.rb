@@ -2,7 +2,8 @@
 
 module SoulCore
   class ConversationCoreWorkflowService
-    REQUEST = /\A\s*(?:please\s+)?(?:switch|change|move|activate|use)\s+(?:over\s+)?(?:to\s+)?(?:(daily|amd[- ]?free|music)\s+core|core\s+(daily|amd[- ]?free|music))\s*[.!]*\s*\z/i
+    CORE_NAME = /(?:soul(?:[- ]lite)?|creative|free|dev|daily|amd[- ]?free|music)/i
+    REQUEST = /\A\s*(?:please\s+)?(?:switch|change|move|activate|use)\s+(?:over\s+)?(?:to\s+)?(?:the\s+)?(?:(#{CORE_NAME})\s+core|core\s+(#{CORE_NAME}))\s*[.!]*\s*\z/i
 
     def initialize(core_orchestration:) = (@core_orchestration = core_orchestration)
 
@@ -36,9 +37,11 @@ module SoulCore
 
     def normalize(value)
       case value.to_s.downcase.tr(" ", "-")
-      when "daily" then "daily"
-      when "amd-free" then "amd-free"
-      when "music" then "music"
+      when "soul", "daily" then "daily"
+      when "soul-lite", "amd-free" then "amd-free"
+      when "creative", "music" then "music"
+      when "free" then "free"
+      when "dev" then "dev"
       else raise ArgumentError, "known Core is required"
       end
     end

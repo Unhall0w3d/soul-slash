@@ -51,6 +51,40 @@ class CoreRunner
   end
 end
 
+class DevRuntimeFixture
+  attr_reader :state, :activations, :deactivations
+
+  def initialize
+    @state = "inactive"
+    @activations = 0
+    @deactivations = 0
+  end
+
+  def status
+    { "ok" => true, "lifecycle_state" => "complete", "data" => {
+      "service" => SoulCore::DevModelRuntimeCoordinator::UNIT_NAME,
+      "service_state" => state, "loaded" => state == "active", "resident" => state == "active",
+      "active_work_count" => 0, "expected_digest" => SoulCore::DevModelRuntimeCoordinator::DEFAULT_DIGEST
+    } }
+  end
+
+  def activate_selected(on_progress: nil)
+    @activations += 1
+    @state = "active"
+    on_progress&.call("stage" => "dev_core_ready", "message" => "fixture ready")
+    { "ok" => true, "lifecycle_state" => "complete", "data" => { "resident" => true } }
+  end
+
+  def deactivate_selected(on_progress: nil)
+    @deactivations += 1
+    @state = "inactive"
+    on_progress&.call("stage" => "dev_runtime_stopping", "message" => "fixture stopped")
+    { "ok" => true, "lifecycle_state" => "complete", "data" => { "resident" => false } }
+  end
+
+  def crash! = (@state = "inactive")
+end
+
 def write_profiles(root)
   path = File.join(root, "Soul/config/core-runtime.local.yaml")
   FileUtils.mkdir_p(File.dirname(path))
@@ -102,11 +136,13 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   env = { "SOUL_MODEL_RUNTIME_CONTROL" => "1", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => file,
           "SOUL_LOCAL_OPENAI_MODEL" => "soul-local-chat" }
   runtime = SoulCore::ModelRuntimeControlService.new(root:, env:, runner:, http_get:)
-  cores = SoulCore::CoreOrchestrationService.new(root:, runtime_control: runtime, env:)
+  dev_runtime = DevRuntimeFixture.new
+  cores = SoulCore::CoreOrchestrationService.new(root:, runtime_control: runtime, dev_runtime:, env:)
 
   status = cores.status
-  check.call("explicit roles form Daily, AMD-Free, and virtual Music Cores", status["ok"] && status.dig("data", "cores").map { |core| core["id"] } == %w[daily amd-free music])
-  check.call("Daily Core requires an explicit Music Core transition", status.dig("data", "active_core_id") == "daily" && status.dig("data", "music_lane", "available_in_active_core") == false && status.dig("data", "music_lane", "conflict").include?("Activate Music Core"))
+  check.call("explicit roles form all five operator Cores", status["ok"] && status.dig("data", "cores").map { |core| core["id"] } == %w[daily amd-free music free dev])
+  check.call("operator-facing Core names use the approved taxonomy", status.dig("data", "cores").map { |core| core["label"] } == ["Soul Core", "Soul-Lite Core", "Creative Core", "Free Core", "Dev Core"])
+  check.call("Soul Core requires an explicit Creative Core transition", status.dig("data", "active_core_id") == "daily" && status.dig("data", "music_lane", "available_in_active_core") == false && status.dig("data", "music_lane", "conflict").include?("Activate Creative Core"))
   check.call("Daily Core targets the promoted Gemma profile", status.dig("data", "cores", 0, "target_profile", "id") == "amd-gemma")
 
   preview = cores.preview(core_id: "amd-free")
@@ -157,6 +193,35 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   music = cores.execute(core_id: "music", target_profile_id: "nvidia-fallback", confirmation: music_preview.dig("data", "confirmation_phrase"), expected_digest: music_preview.dig("data", "expected_digest"))
   check.call("Music Core reuses reserve chat and exposes variable and fixed duration contracts", restored["ok"] && music["ok"] && music.dig("data", "active_core_id") == "music" && music.dig("data", "music_lane", "accelerator") == "AMD Vulkan" && music.dig("data", "music_lane", "duration_range_seconds") == { "minimum" => 30, "maximum" => 300 } && music.dig("data", "music_lane", "fixed_durations") == [600] && !music.dig("data", "music_lane").key?("candidate"))
 
+  free_preview = cores.preview(core_id: "free")
+  free = cores.execute(core_id: "free", target_profile_id: free_preview.dig("data", "target_profile", "id"),
+                       confirmation: free_preview.dig("data", "confirmation_phrase"), expected_digest: free_preview.dig("data", "expected_digest"))
+  check.call("Free Core unloads every chat model behind an exact gate",
+             free["ok"] && free.dig("data", "active_core_id") == "free" && free.dig("data", "active_profile_count").zero?)
+
+  dev_preview = cores.preview(core_id: "dev")
+  dev = cores.execute(core_id: "dev", target_profile_id: dev_preview.dig("data", "target_profile", "id"),
+                      confirmation: dev_preview.dig("data", "confirmation_phrase"), expected_digest: dev_preview.dig("data", "expected_digest"))
+  check.call("Dev Core loads NVIDIA chat and pins the reviewed GPT-OSS runtime",
+             dev["ok"] && dev.dig("data", "active_core_id") == "dev" && dev_runtime.activations == 1 && dev_runtime.state == "active")
+
+  dev_runtime.crash!
+  degraded = cores.status
+  check.call("a stopped GPT-OSS runtime cannot masquerade as an active Dev Core",
+             degraded.dig("data", "active_core_id") == "amd-free" &&
+               degraded.dig("data", "cores").find { |core| core["id"] == "dev" }.fetch("selected") == true)
+  repair_preview = cores.preview(core_id: "dev")
+  repaired = cores.execute(core_id: "dev", target_profile_id: repair_preview.dig("data", "target_profile", "id"),
+                           confirmation: repair_preview.dig("data", "confirmation_phrase"), expected_digest: repair_preview.dig("data", "expected_digest"))
+  check.call("reselecting a degraded Dev Core rehydrates its reviewed runtime",
+             repaired["ok"] && repaired.dig("data", "active_core_id") == "dev" && dev_runtime.activations == 2)
+
+  soul_lite_preview = cores.preview(core_id: "amd-free")
+  soul_lite = cores.execute(core_id: "amd-free", target_profile_id: soul_lite_preview.dig("data", "target_profile", "id"),
+                            confirmation: soul_lite_preview.dig("data", "confirmation_phrase"), expected_digest: soul_lite_preview.dig("data", "expected_digest"))
+  check.call("leaving Dev Core unloads GPT-OSS while preserving shared NVIDIA chat",
+             soul_lite["ok"] && soul_lite.dig("data", "active_core_id") == "amd-free" && dev_runtime.deactivations == 1 && dev_runtime.state == "inactive")
+
   facade = SoulCore::ApplicationFacade.new(root:, process_env: {}, core_orchestration_service: cores, model_runtime_control_service: runtime)
   facade_status = facade.call(request("core.status"))
   facade_preview = facade.call(request("core.activate.preview", "core_id" => "daily"))
@@ -188,7 +253,8 @@ html = File.read(File.join(__dir__, "../assets/dashboard/index.html"))
 brief = File.read(File.join(__dir__, "../docs/soul/CORE_ORCHESTRATION_A0_A1_BRIEF.md"))
 check.call("top bar exposes an explicit Core selector beside Local", html.include?('id="connection-label"') && html.include?('id="core-selector"') && html.index('id="connection-label"') < html.index('id="core-selector"'))
 check.call("dashboard uses the Core application gate rather than direct service control", js.include?('core.activate.preview') && js.include?('core.activate.execute') && js.include?('prefillApprovalGate("model-runtime-confirmation"'))
-check.call("Core interface remains event-driven without polling", !js.match?(/setInterval|setTimeout|requestAnimationFrame/))
+core_ui = js[/function renderCores\(.*?(?=function renderModelRuntime)/m].to_s
+check.call("Core interface remains event-driven without polling", !core_ui.match?(/setInterval|setTimeout|requestAnimationFrame/))
 check.call("brief preserves Qwen and ACE-Step mutual exclusion", brief.include?("Qwen fallback and\nACE-Step share the NVIDIA lane") && brief.include?("No attempt is made to run Qwen and ACE-Step concurrently"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?

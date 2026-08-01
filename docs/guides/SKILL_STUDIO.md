@@ -40,13 +40,17 @@ Select the proposal and review:
 
 **Approve for Beta implementation** records approval of one exact proposal revision. It does not generate code, invoke Codex, change the production registry, or run a skill.
 
-After Gate 1, **Prepare isolated Beta implementation** creates an intentionally incomplete proposal-local workspace and a bounded implementation handoff. The human or an explicitly invoked development tool performs the implementation separately.
+After Gate 1, **Prepare isolated Beta implementation** creates an intentionally incomplete proposal-local workspace and a bounded implementation handoff. **Build with Dev Core** may then ask the reviewed local GPT-OSS worker for one proposal-bound, read-only Ruby candidate. Soul runs syntax and model-declared behavior checks in a networkless, read-only bubblewrap sandbox and stops at human review. There is no automatic repair retry.
+
+The default brief-drafting and review commands are also local-first. Mistral is
+available only when the Operator explicitly passes `--provider mistral`; local
+failure never falls through to cloud use.
 
 ### 3. Review and try the Beta
 
 A Beta remains separate from production. Inspect its description, risk classification, current-revision test evidence, known weaknesses, and required promotion tests.
 
-**Try this Beta** performs one previewed, foreground run with bounded arguments and writes diagnostic evidence. Beta failures should terminate visibly; they must not become silent background work.
+**Try this Beta** performs one previewed, foreground run with bounded arguments and writes diagnostic evidence. GPT-OSS-generated read-only Betas retain the same networkless, read-only sandbox during human trials. Beta failures should terminate visibly; they must not become silent background work.
 
 Changing candidate files changes the revision. Tests and approvals for an older digest do not carry forward automatically.
 
@@ -67,6 +71,9 @@ Use Skill Studio when the new behavior can be expressed as one bounded capabilit
 ## Authority boundary
 
 Model output, passing tests, and successful Beta trials are evidence—not authorization. Proposal approval, Beta approval, production promotion, and closeout are distinct human decisions.
+
+Dev jobs do not read or write the Knowledge Vault. Canonical proposal, Beta,
+test, and promotion state remains in Skill Studio's existing stores.
 
 ## Related engineering references
 

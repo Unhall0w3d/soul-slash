@@ -242,7 +242,7 @@ module SoulCore
              when /creative\.companion_production/
                ["make a song and image, then prepare the video", "use this kept image with that kept song"]
              when /cores\.activate/
-               ["switch to Music Core", "activate AMD-Free Core"]
+               ["switch to Creative Core", "activate Soul-Lite Core"]
              when /project\.timeline\.inspect/
                ["show project timeline", "what is next on the project timeline"]
              when /project\.timeline\.update/

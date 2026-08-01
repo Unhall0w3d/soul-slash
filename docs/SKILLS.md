@@ -242,7 +242,7 @@ proposal intake or draft
 → separate preview/digest/exact-confirmation production promotion
 ```
 
-Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. After Gate 1, Skill Studio can prepare an incomplete proposal-local Beta workspace and bounded Codex handoff, but does not invoke Codex or Mistral. After separate implementation, current passing tests, and Gate 2 approval, production promotion remains a distinct preview/digest/exact-confirmation operation that never replaces an existing skill.
+Soul may create or reuse a local proposal intake when a task-shaped request is genuinely unsupported and no production or runnable Beta skill covers it. After Gate 1, Skill Studio can prepare an incomplete proposal-local Beta workspace and bounded handoff. The Operator may explicitly invoke the local GPT-OSS Dev lane to draft one read-only Ruby candidate; syntax and declared behavior run in a networkless, read-only sandbox, and successful machine evidence still stops at human Beta review. Mistral is an explicit fallback for brief drafting/review, never a silent failover. After current passing tests and Gate 2 approval, production promotion remains a distinct preview/digest/exact-confirmation operation that never replaces an existing skill.
 
 ### Self Assessment workflows
 

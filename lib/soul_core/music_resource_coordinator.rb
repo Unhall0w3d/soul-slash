@@ -255,7 +255,7 @@ module SoulCore
 
     def amd_blockers(hardware, lease)
       items = []
-      items << "Music Core is not active" unless hardware["active_core_id"] == "music"
+      items << "Creative Core is not active" unless hardware["active_core_id"] == "music"
       items << "NVIDIA reserve chat service is not active" unless hardware["fallback_state"] == "active"
       items << "Gemma AMD chat service is still active" if hardware["gemma_state"] == "active"
       items << "Gemma AMD chat service state is uncertain" unless %w[inactive failed].include?(hardware["gemma_state"])

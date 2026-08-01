@@ -116,6 +116,8 @@ module SoulCore
       "skill_studio.proposals.close.execute" => %w[proposal_id confirmation expected_digest],
       "skill_studio.betas.list" => %w[limit],
       "skill_studio.betas.get" => %w[beta_id],
+      "skill_studio.betas.dev_build.preview" => %w[beta_id],
+      "skill_studio.betas.dev_build.execute" => %w[beta_id confirmation expected_digest],
       "skill_studio.betas.run.preview" => %w[beta_id args],
       "skill_studio.betas.run.execute" => %w[beta_id args confirmation expected_digest],
       "skill_studio.betas.promotion.preview" => %w[beta_id],

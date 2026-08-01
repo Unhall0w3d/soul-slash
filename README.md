@@ -22,9 +22,13 @@ The authenticated dashboard provides:
 
 The supported local runtime topology currently includes:
 
-- **Daily Core** — Gemma 4 12B Instruct Q4_K_M through Ollama/Vulkan on AMD;
-- **AMD-Free Core** — Qwen3 8B Q4_K_M through llama.cpp/CUDA on NVIDIA, leaving AMD available;
-- **Music Core** — Qwen handles chat on NVIDIA while the bounded ACE-Step Vulkan music runtime uses AMD on demand.
+- **Soul Core** — Gemma 4 12B Instruct Q4_K_M through Ollama/Vulkan on AMD;
+- **Soul-Lite Core** — Qwen3 8B Q4_K_M through llama.cpp/CUDA on NVIDIA, leaving AMD available;
+- **Creative Core** — Qwen handles chat on NVIDIA while bounded music and visual runtimes use AMD on demand;
+- **Free Core** — no chat or development model is loaded, and the Dashboard remains locked to Core selection;
+- **Dev Core** — Qwen carries chat on NVIDIA while the reviewed GPT-OSS 20B development worker remains resident on AMD.
+
+The internal IDs `daily`, `amd-free`, and `music` remain stable for local-state compatibility. GPT-OSS is local-first for Skill Studio implementation drafting and bounded development review; Mistral remains an explicit, disclosed fallback rather than a silent dependency.
 
 The dashboard can run in the foreground for development or as an explicitly installed local user service. Optional Caddy-based HTTPS exposes one reviewed LAN endpoint while Soul itself remains loopback-bound.
 
@@ -51,6 +55,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Crucible Fedora Guest | Add an optional off-device backup target and read-only DNF5 maintenance laboratory on Proxmox | [Crucible Fedora](docs/guides/CRUCIBLE_FEDORA.md) |
 | Temper NixOS Guest | Prove declarative Nix flake updates, system generations, and bounded reboot behavior on Proxmox | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md#nixos-laboratory-target) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
+| Cores | Understand Soul, Soul-Lite, Creative, Free, and Dev runtime arrangements and the optional Dev setup | [Soul Cores](docs/guides/CORES.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |

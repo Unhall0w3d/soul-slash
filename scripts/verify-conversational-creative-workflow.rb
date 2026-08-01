@@ -243,9 +243,9 @@ checks["unsupported_background_activity_and_unprompted_emoji_are_removed"] = !gu
 
 core_control = FakeCore.new
 core_workflow = SoulCore::ConversationCoreWorkflowService.new(core_orchestration: core_control)
-checks["explicit_core_request_is_recognized"] = core_workflow.candidate_message?(message: "Switch to Music Core")
-checks["core_discussion_is_not_an_invocation"] = !core_workflow.candidate_message?(message: "I was thinking about Music Core earlier")
-core_ready = core_workflow.plan(message: "Switch to Music Core")
+checks["explicit_core_request_is_recognized"] = core_workflow.candidate_message?(message: "Switch to Creative Core")
+checks["core_discussion_is_not_an_invocation"] = !core_workflow.candidate_message?(message: "I was thinking about Creative Core earlier")
+core_ready = core_workflow.plan(message: "Switch to Creative Core")
 checks["core_chat_action_reuses_exact_runtime_gate"] = core_ready["mode"] == "core_activation_ready" && core_ready.dig("metadata", "actions", 0, "operation") == "core.activate.execute" && core_control.executions.zero?
 
 provider = SoulCore::ConversationProviderContract::ProviderDefinition.new(id: "local.fixture", label: "fixture", transport: "openai_compatible",
@@ -277,7 +277,7 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
     action.dig("core_requirement", "active_core_id") == "daily" &&
     action.dig("core_requirement", "required_core_id") == "music" &&
     action.dig("core_requirement", "transition_required") == true &&
-    ready["content"].include?("Daily Core → Music Core after your click")
+    ready["content"].include?("Soul Core → Creative Core after your click")
 
   stale = service.execute(chat_id: chat.fetch("id"), flow_id: action.fetch("flow_id"), confirmation: "START_CREATIVE_WORKFLOW", expected_digest: "0" * 64)
   checks["stale_action_is_blocked"] = !stale["ok"] && stale["reason"].include?("changed") && core.executions.zero?
@@ -396,10 +396,10 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   planner.plan = plan(kind: "visual", supplied: %w[visual_intent])
   visual_ready = service.plan(chat_id: visual_chat.fetch("id"), message: "Create an image", provider: Object.new)
   visual_action = visual_ready.dig("metadata", "actions", 0)
-  checks["visual_request_discloses_amd_free_requirement"] =
+  checks["visual_request_discloses_soul_lite_requirement"] =
     visual_action.dig("core_requirement", "required_core_id") == "amd-free" &&
     visual_action.dig("core_requirement", "transition_required") == true &&
-    visual_ready["content"].include?("Required: AMD-Free Core")
+    visual_ready["content"].include?("Required: Soul-Lite Core")
   visual_result = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_action.fetch("flow_id"), action_id: visual_action.fetch("action_id"),
     confirmation: visual_action.fetch("confirmation_phrase"), expected_digest: visual_action.fetch("expected_digest"))
   checks["visual_only_uses_amd_free_core"] = visual_result["ok"] && core.active == "amd-free"
@@ -420,7 +420,7 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
     visual_revision_action.dig("core_requirement", "active_core_id") == "amd-free" &&
     visual_revision_action.dig("core_requirement", "required_core_id") == "amd-free" &&
     visual_revision_action.dig("core_requirement", "transition_required") == false &&
-    visual_proposed["content"].include?("Already in AMD-Free Core; no transfer needed")
+    visual_proposed["content"].include?("Already in Soul-Lite Core; no transfer needed")
   stale_visual_revision = service.execute(chat_id: visual_chat.fetch("id"), flow_id: visual_revision_action.fetch("flow_id"), action_id: visual_revision_action.fetch("action_id"),
     confirmation: visual_revision_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
   checks["stale_visual_revision_mutates_nothing"] = !stale_visual_revision["ok"] && visual.edits.empty?
@@ -452,9 +452,9 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   revision_action = proposed.dig("metadata", "actions", 0)
   revision_scope = proposed.dig("metadata", "creative_workflow", "revision_draft", "revision")
   checks["explicit_revision_request_returns_exact_action"] = proposed["mode"] == "creative_music_revision_ready" && revision_action["action_id"] == "creative_music_revision" && revision_scope["lyrics"] == ""
-  checks["music_revision_discloses_music_core_requirement"] =
+  checks["music_revision_discloses_creative_core_requirement"] =
     revision_action.dig("core_requirement", "required_core_id") == "music" &&
-    proposed["content"].include?("Required: Music Core")
+    proposed["content"].include?("Required: Creative Core")
   stale_revision = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
     confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
   checks["stale_revision_action_mutates_nothing"] = !stale_revision["ok"] && music.revisions.empty?
