@@ -41,6 +41,7 @@ require_relative "maintenance_foreground_execution_service"
 require_relative "maintenance_reboot_restore_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
+require_relative "self_augmentation_dev_critique_service"
 require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
@@ -103,6 +104,7 @@ module SoulCore
       maintenance_reboot_restore_service: nil,
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
+      self_augmentation_dev_critique_service: nil,
       music_generation_service: nil,
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
@@ -159,6 +161,7 @@ module SoulCore
       @maintenance_reboot_restore_service = maintenance_reboot_restore_service
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
+      @self_augmentation_dev_critique_service = self_augmentation_dev_critique_service
       @music_generation_service = music_generation_service
       @music_candidate_analysis_service = music_candidate_analysis_service
       @music_revision_draft_service = music_revision_draft_service
@@ -399,6 +402,9 @@ module SoulCore
       when "self_augmentation.proposals.list" then domain(self_augmentation.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationService::MAX_RECORDS)))
       when "self_augmentation.proposals.preview" then domain(self_augmentation.preview(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill")))
       when "self_augmentation.proposals.execute" then domain(self_augmentation.create_proposal(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.dev_critique.list" then domain(self_augmentation_dev_critique.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationDevCritiqueService::MAX_RECORDS)))
+      when "self_augmentation.dev_critique.preview" then domain(self_augmentation_dev_critique.preview(proposal_id: required(parameters, "proposal_id")))
+      when "self_augmentation.dev_critique.execute" then domain(self_augmentation_dev_critique.execute(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.experiments.list" then domain(self_augmentation_experiments.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationExperimentService::MAX_RECORDS)))
       when "self_augmentation.experiments.gate_a1.preview" then domain(self_augmentation_experiments.gate_a1_preview(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files")))
       when "self_augmentation.experiments.gate_a1.execute" then domain(self_augmentation_experiments.prepare_experiment(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -940,6 +946,14 @@ module SoulCore
 
     def self_augmentation_experiments
       @self_augmentation_experiment_service ||= SelfAugmentationExperimentService.new(root: @root, clock: @clock)
+    end
+
+    def self_augmentation_dev_critique
+      @self_augmentation_dev_critique_service ||= SelfAugmentationDevCritiqueService.new(
+        root: @root,
+        clock: @clock,
+        proposal_source: self_augmentation
+      )
     end
 
     def music_generation

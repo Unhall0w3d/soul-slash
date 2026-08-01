@@ -248,6 +248,8 @@ Soul may create or reuse a local proposal intake when a task-shaped request is g
 
 Self Assessment is an application workflow rather than a production skill. The dashboard can run bounded read-only environment, update, model-runtime, capability, and storage assessments. Its optional Dev synthesis gate binds the latest successful scope evidence to one local GPT-OSS review and stores only an immutable advisory packet of evidence-linked observations and unknowns. The model cannot alter evidence or invoke follow-on work. Generating advisory improvement proposals requires a separate preview and exact confirmation; host/package mutation is unavailable. The application API retains the historical `self_improvement.*` namespace.
 
+Self Augmentation is also an application workflow rather than a production skill. Its optional Dev critique gate binds one existing immutable proposal to a local GPT-OSS review and stores only proposal-cited strengths, concerns, unknowns, and human revision questions. It cannot classify safety, decide Gate A1, select allowed files, draft code or commands, create a worktree, or invoke follow-on work.
+
 ## Documentation rule
 
 When adding or changing a skill:

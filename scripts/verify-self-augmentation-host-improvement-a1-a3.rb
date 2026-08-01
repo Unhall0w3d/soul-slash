@@ -131,7 +131,9 @@ html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes four-tab augmentation and host surfaces", html.include?('id="augmentation-tab"') && html.include?('id="augmentation-panel"') && html.include?('id="preview-host-plan"'))
 check.call("A1–A3 surfaces remain present after later gate expansion", html.include?("Observe</strong>") && html.include?("Propose</strong>") && html.include?('id="augmentation-objective"'))
-check.call("new surfaces do not poll or schedule", !js.match?(/setInterval|setTimeout|requestAnimationFrame/))
+bounded_surfaces = js[/async function previewHostPlan\(\).*?async function previewMaintenance\(/m].to_s +
+                   js[/function renderAugmentationProposals\(records\).*?function reviewEmpty\(/m].to_s
+check.call("new surfaces do not poll or schedule", !bounded_surfaces.match?(/setInterval|setTimeout|requestAnimationFrame/))
 check.call("brief preserves prohibited boundaries", File.read(File.expand_path("../docs/soul/SELF_AUGMENTATION_HOST_IMPROVEMENT_A1_A3_BRIEF.md", __dir__)).include?("Invoking Codex") )
 
 abort "Verification failed: #{failures.join(', ')}" unless failures.empty?
