@@ -79,7 +79,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
-.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique
+.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -231,6 +231,7 @@ help:
 > @echo "  make verify-codex-soul-dev-worker"
 > @echo "  make verify-self-assessment-dev-synthesis"
 > @echo "  make verify-self-augmentation-dev-critique"
+> @echo "  make verify-self-augmentation-dev-handoff"
 > @echo "  make model-runtime-startup-plan"
 > @echo "  make model-runtime-startup-install CONFIRM=INSTALL_SELECTED_MODEL_STARTUP"
 > @echo "  make model-runtime-startup-status"
@@ -863,6 +864,9 @@ verify-self-assessment-dev-synthesis:
 
 verify-self-augmentation-dev-critique:
 > @ruby scripts/verify-self-augmentation-dev-critique-a1.rb
+
+verify-self-augmentation-dev-handoff:
+> @ruby scripts/verify-self-augmentation-dev-handoff-a2.rb
 
 model-runtime-startup-plan:
 > @ruby scripts/soul-model-runtime-startup plan

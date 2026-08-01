@@ -42,6 +42,7 @@ require_relative "maintenance_reboot_restore_service"
 require_relative "self_augmentation_service"
 require_relative "self_augmentation_experiment_service"
 require_relative "self_augmentation_dev_critique_service"
+require_relative "self_augmentation_dev_handoff_service"
 require_relative "music_generation_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
@@ -105,6 +106,7 @@ module SoulCore
       self_augmentation_service: nil,
       self_augmentation_experiment_service: nil,
       self_augmentation_dev_critique_service: nil,
+      self_augmentation_dev_handoff_service: nil,
       music_generation_service: nil,
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
@@ -162,6 +164,7 @@ module SoulCore
       @self_augmentation_service = self_augmentation_service
       @self_augmentation_experiment_service = self_augmentation_experiment_service
       @self_augmentation_dev_critique_service = self_augmentation_dev_critique_service
+      @self_augmentation_dev_handoff_service = self_augmentation_dev_handoff_service
       @music_generation_service = music_generation_service
       @music_candidate_analysis_service = music_candidate_analysis_service
       @music_revision_draft_service = music_revision_draft_service
@@ -408,6 +411,9 @@ module SoulCore
       when "self_augmentation.experiments.list" then domain(self_augmentation_experiments.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationExperimentService::MAX_RECORDS)))
       when "self_augmentation.experiments.gate_a1.preview" then domain(self_augmentation_experiments.gate_a1_preview(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files")))
       when "self_augmentation.experiments.gate_a1.execute" then domain(self_augmentation_experiments.prepare_experiment(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.dev_handoff.list" then domain(self_augmentation_dev_handoff.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationDevHandoffService::MAX_RECORDS)))
+      when "self_augmentation.dev_handoff.preview" then domain(self_augmentation_dev_handoff.preview(experiment_id: required(parameters,"experiment_id")))
+      when "self_augmentation.dev_handoff.execute" then domain(self_augmentation_dev_handoff.execute(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.reviews.generate" then domain(self_augmentation_experiments.generate_dossier(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.reviews.gate_a2.preview" then domain(self_augmentation_experiments.gate_a2_preview(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.reviews.gate_a2.execute" then domain(self_augmentation_experiments.approve_for_integration(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -953,6 +959,14 @@ module SoulCore
         root: @root,
         clock: @clock,
         proposal_source: self_augmentation
+      )
+    end
+
+    def self_augmentation_dev_handoff
+      @self_augmentation_dev_handoff_service ||= SelfAugmentationDevHandoffService.new(
+        root: @root,
+        clock: @clock,
+        experiment_source: self_augmentation_experiments
       )
     end
 
