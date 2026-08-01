@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soul.local/schemas/noctalia_core_control.schema.json",
+  "title": "Soul Noctalia Core control",
+  "type": "object",
+  "required": ["schema_version", "ok", "lifecycle_state", "message", "data"],
+  "properties": {
+    "schema_version": {"const": "soul.noctalia.core_control.v1"},
+    "ok": {"type": "boolean"},
+    "lifecycle_state": {"enum": ["complete", "failed", "awaiting_input", "blocked_for_human_review"]},
+    "message": {"type": "string", "maxLength": 240},
+    "data": {
+      "type": "object",
+      "properties": {
+        "source_core": {"$ref": "#/$defs/coreIdentity"},
+        "target_core": {"$ref": "#/$defs/coreIdentity"},
+        "target_profile_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,39}$"},
+        "confirmation_phrase": {"type": "string", "pattern": "^[A-Z][A-Z0-9_-]{1,95}$"},
+        "expected_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "service_mutation_required": {"type": "boolean"},
+        "executable": {"type": "boolean"},
+        "active_core_id": {"enum": ["daily", "amd-free", "music", "free", "dev"]},
+        "active_core_label": {"type": "string", "maxLength": 80},
+        "core_mode": {"type": "string", "maxLength": 40},
+        "mutation": {"type": "string", "maxLength": 80}
+      },
+      "additionalProperties": false
+    },
+    "error": {"type": "string"}
+  },
+  "$defs": {
+    "coreIdentity": {
+      "type": "object",
+      "required": ["id", "label", "purpose"],
+      "properties": {
+        "id": {"enum": ["daily", "amd-free", "music", "free", "dev"]},
+        "label": {"type": "string", "maxLength": 80},
+        "purpose": {"type": "string", "maxLength": 240}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

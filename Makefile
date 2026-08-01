@@ -78,7 +78,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-long-form-mix verify-long-form-mix-render verify-long-form-mix-finalization
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
-.PHONY: verify-dev-core-model-bakeoff
+.PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build
 
 help:
@@ -1041,3 +1041,6 @@ maintenance-resume-status:
 maintenance-resume-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_SOUL_MAINTENANCE_RESUME" || { echo "Set CONFIRM=REMOVE_SOUL_MAINTENANCE_RESUME to remove the one-shot unit."; exit 2; }
 > @ruby scripts/soul-maintenance-resume-service uninstall --confirmation "$(CONFIRM)"
+
+verify-noctalia-companion:
+> @ruby scripts/verify-noctalia-companion-a0.rb

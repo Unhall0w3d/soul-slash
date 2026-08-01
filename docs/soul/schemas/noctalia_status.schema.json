@@ -9,7 +9,24 @@
     "collected_at": {"type": "string"},
     "ok": {"type": "boolean"},
     "soul": {"type": "object"},
-    "core": {"type": "object"},
+    "core": {
+      "type": "object",
+      "required": ["available", "choices"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "id": {"enum": ["daily", "amd-free", "music", "free", "dev"]},
+        "label": {"type": "string"},
+        "mode": {"type": "string"},
+        "runtime_status": {"type": "string"},
+        "reason": {"type": "string"},
+        "choices": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/coreChoice"}
+        }
+      },
+      "additionalProperties": false
+    },
     "voice_presence": {"type": "object"},
     "fleet": {
       "type": "object",
@@ -55,6 +72,18 @@
     "error": {"type": "string"}
   },
   "$defs": {
+    "coreChoice": {
+      "type": "object",
+      "required": ["id", "label", "purpose", "active", "can_activate"],
+      "properties": {
+        "id": {"enum": ["daily", "amd-free", "music", "free", "dev"]},
+        "label": {"type": "string", "maxLength": 80},
+        "purpose": {"type": "string", "maxLength": 240},
+        "active": {"type": "boolean"},
+        "can_activate": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
     "rows": {
       "type": "array",
       "items": {

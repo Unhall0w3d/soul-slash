@@ -54,7 +54,7 @@ module SoulCore
         "collected_at" => @clock.call.utc.iso8601,
         "ok" => false,
         "soul" => {"version" => safe_version, "health" => "unavailable"},
-        "core" => {"available" => false},
+        "core" => {"available" => false, "choices" => []},
         "voice_presence" => {"available" => false, "running" => false},
         "fleet" => {"available" => false, "devices" => [], "device_count" => 0, "healthy_count" => 0},
         "error" => error.class.name
@@ -81,8 +81,24 @@ module SoulCore
         "label" => safe_text(data["active_core_label"]),
         "mode" => safe_text(data["core_mode"] || "unavailable"),
         "runtime_status" => safe_text(envelope.fetch("lifecycle_state", "unknown")),
-        "reason" => safe_text(envelope["reason"] || envelope["message"])
+        "reason" => safe_text(envelope["reason"] || envelope["message"]),
+        "choices" => Array(data["cores"]).first(8).filter_map { |core| project_core_choice(core) }
       }.reject { |_key, value| value == "" }
+    end
+
+    def project_core_choice(core)
+      return nil unless core.is_a?(Hash)
+
+      id = safe_text(core["id"], 40)
+      return nil unless id.match?(CoreOrchestrationService::CORE_ID)
+
+      {
+        "id" => id,
+        "label" => safe_text(core["label"], 80),
+        "purpose" => safe_text(core["purpose"]),
+        "active" => core["active"] == true,
+        "can_activate" => core["can_activate"] == true
+      }
     end
 
     def project_voice(envelope)

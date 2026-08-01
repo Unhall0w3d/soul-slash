@@ -60,7 +60,9 @@
       "priority": "high",
       "summary": "Exercise requests that require another Core and confirm Soul explains, requests authority, transitions, and resumes the intended bounded workflow.",
       "acceptance": "No skill fails opaquely because the wrong Core is active; no Core changes from ordinary conversation; active-work checks and exact transition authority remain intact.",
-      "source": "Conversational capability orchestration"
+      "source": "Conversational capability orchestration",
+      "notes": "Noctalia Core Control A1 adds a candidate two-click desktop surface over the same exact Core preview/digest gate. Deterministic and live Operator review remain required before validation.",
+      "references": "docs/soul/NOCTALIA_CORE_CONTROL_A1_BRIEF.md\ndocs/assessments/NOCTALIA_CORE_CONTROL_A1_REVIEW.md"
     },
     {
       "item_id": "track_voice_conversation_refinement",

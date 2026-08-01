@@ -1,5 +1,9 @@
 # Noctalia Companion Contract — A0 Brief
 
+> A1 extension: `NOCTALIA_CORE_CONTROL_A1_BRIEF.md` adds a separately reviewed,
+> two-click Core preview/activation flow. All A0 device and privacy boundaries
+> remain in force.
+
 ## Human-approved objective
 
 Replace the owner-local Soul Overview plugin's embedded fleet topology and SSH
