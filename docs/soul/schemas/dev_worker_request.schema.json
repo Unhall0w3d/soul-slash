@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soul.local/schemas/dev_worker_request.schema.json",
+  "title": "Soul Dev Worker Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "purpose",
+    "task_kind",
+    "repository_relative_paths",
+    "parent_supplied_context",
+    "expected_context_sha256",
+    "output_schema",
+    "timeout_seconds"
+  ],
+  "properties": {
+    "schema_version": { "const": "soul.dev_worker.request.v1" },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$" },
+    "purpose": { "type": "string", "minLength": 3, "maxLength": 256 },
+    "task_kind": { "enum": ["analyze", "critique", "draft_patch"] },
+    "repository_relative_paths": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "parent_supplied_context": { "type": "string", "minLength": 1, "maxLength": 262144 },
+    "expected_context_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "output_schema": { "type": "object" },
+    "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 300 }
+  }
+}

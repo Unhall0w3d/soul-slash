@@ -92,6 +92,7 @@ require_relative "alpha_review"
 require_relative "alpha_promotion_gate"
 require_relative "repo_curation_assessor"
 require_relative "feature_direction_assessor"
+require_relative "dev_worker_command"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -111,9 +112,11 @@ module SoulCore
         run_chat
       when "dashboard"
         DashboardCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
-    when "config", "configuration"
-      ConfigurationCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
-    when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
+      when "dev-worker"
+        DevWorkerCommand.new(argv: @argv, root: Dir.pwd, env: ENV).run
+      when "config", "configuration"
+        ConfigurationCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
+      when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
       when "skill" then run_skill
       when "intent" then run_intent
       when "do" then run_do

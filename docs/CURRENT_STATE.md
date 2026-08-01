@@ -104,6 +104,13 @@ selection. Dev Core pairs Qwen chat on NVIDIA with digest-pinned GPT-OSS 20B on
 AMD. Scoped Dev work restores the prior eligible Core and never preempts
 Creative work. Mistral remains an explicit fallback only.
 
+Primary Codex can also invoke GPT-OSS through the repository-local Soul Dev
+Worker skill. Codex supplies one exact non-secret context packet; Soul returns
+schema-validated analysis, critique, or candidate unified-diff text without
+repository, shell, network, test, Git, approval, or merge authority. Native
+Spark agents remain the tool-using choice for repository mapping and bounded
+implementation. See `docs/guides/DEV_WORKER.md`.
+
 ### Creative Studios
 
 - **Music Studio** stores immutable project briefs and candidate lineage; supports exact whole-second AMD Vulkan ACE-Step generation from 30 seconds through 5 minutes plus a fixed 10-minute option; preserves exact `[Instrumental]` no-vocal conditioning while allowing bounded instrumental movement timing in Sound and Structure; creates FLAC masters and MP3 proxies; follows durable jobs across page navigation; records generation timing, CPU vocal evidence, human review, revision drafts, lawful reference profiles and fusions, rejection, export, and one-generation source-preserving trim copies. A short/long variable-duration qualification passed technically at 43 and 248 seconds; musical acceptance remains human review.

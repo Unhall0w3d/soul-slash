@@ -79,7 +79,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
-.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build
+.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -228,6 +228,7 @@ help:
 > @echo "  make model-runtime-dev-install ... CONFIRM=INSTALL_INACTIVE_DEV_OLLAMA_UNIT"
 > @echo "  make model-runtime-dev-status"
 > @echo "  make model-runtime-dev-uninstall CONFIRM=REMOVE_INACTIVE_DEV_OLLAMA_UNIT"
+> @echo "  make verify-codex-soul-dev-worker"
 > @echo "  make model-runtime-startup-plan"
 > @echo "  make model-runtime-startup-install CONFIRM=INSTALL_SELECTED_MODEL_STARTUP"
 > @echo "  make model-runtime-startup-status"
@@ -851,6 +852,9 @@ model-runtime-dev-status:
 model-runtime-dev-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_INACTIVE_DEV_OLLAMA_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_DEV_OLLAMA_UNIT; active units are never stopped implicitly."; exit 2; }
 > @ruby scripts/soul-model-runtime-dev uninstall --confirmation "$(CONFIRM)"
+
+verify-codex-soul-dev-worker:
+> @ruby scripts/verify-codex-soul-dev-worker.rb
 
 model-runtime-startup-plan:
 > @ruby scripts/soul-model-runtime-startup plan

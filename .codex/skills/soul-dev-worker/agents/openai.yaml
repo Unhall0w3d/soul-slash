@@ -1,0 +1,4 @@
+interface:
+  display_name: "Soul Dev Worker"
+  short_description: "Delegate bounded reasoning to local Soul"
+  default_prompt: "Use $soul-dev-worker to delegate a bounded analysis or critique to Soul Dev Core."

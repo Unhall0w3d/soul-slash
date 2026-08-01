@@ -31,10 +31,12 @@ module SoulCore
       end
     end
 
-    def initialize(root: Dir.pwd, env: ENV, task_orchestrator: nil, http_post: nil)
+    def initialize(root: Dir.pwd, env: ENV, task_orchestrator: nil, http_post: nil,
+                   timeout_seconds: DEFAULT_TIMEOUT_SECONDS)
       @root = File.expand_path(root)
       @task_orchestrator = task_orchestrator || DevCoreTaskOrchestrator.new(root: @root, env: env)
       @http_post = http_post || method(:bounded_http_post)
+      @timeout_seconds = Integer(timeout_seconds).clamp(1, DEFAULT_TIMEOUT_SECONDS)
     end
 
     def chat(messages:, purpose:, response_schema: nil, temperature: 0.1,
@@ -48,7 +50,7 @@ module SoulCore
           "model" => runtime.fetch("model"),
           "messages" => normalize_messages(messages),
           "stream" => false,
-          "think" => reasoning,
+          "think" => normalize_reasoning(reasoning),
           "keep_alive" => active_core_id == "dev" ? -1 : "30m",
           "options" => {
             "temperature" => Float(temperature).clamp(0.0, 1.0),
@@ -61,8 +63,16 @@ module SoulCore
       end
 
       parsed = JSON.parse(result.fetch(:body).to_s)
+      unless result.fetch(:status).to_i.between?(200, 299)
+        return Response.new(
+          provider: "local.dev", model: MODEL, status: "error",
+          http_status: result.fetch(:status).to_i, content: "", structured: nil,
+          error_message: provider_error(parsed, result), duration_seconds: elapsed(started),
+          runtime_receipt: runtime_receipt
+        )
+      end
       content = parsed.dig("message", "content").to_s.strip
-      structured = response_schema ? JSON.parse(content) : nil
+      structured = response_schema ? parse_structured_content(content) : nil
       ok = result.fetch(:status).to_i.between?(200, 299) && !content.empty? && (!response_schema || structured.is_a?(Hash))
       Response.new(
         provider: "local.dev", model: MODEL, status: ok ? "ok" : "error",
@@ -73,12 +83,17 @@ module SoulCore
     rescue DevCoreTaskOrchestrator::Unavailable => error
       failure(error.message, started, lifecycle: error.lifecycle_state, runtime_receipt: error.receipt)
     rescue JSON::ParserError => error
-      failure("Dev model returned invalid structured output: #{error.class}", started)
+      failure("Dev model returned invalid structured output: #{error.class}", started, runtime_receipt: defined?(runtime_receipt) ? runtime_receipt : nil)
     rescue StandardError => error
-      failure("Dev model request failed safely: #{error.class}: #{error.message}", started)
+      failure("Dev model request failed safely: #{error.class}: #{error.message}", started, runtime_receipt: defined?(runtime_receipt) ? runtime_receipt : nil)
     end
 
     private
+
+    def normalize_reasoning(value)
+      return value if %w[low medium high].include?(value.to_s)
+      value == true
+    end
 
     def normalize_messages(messages)
       values = Array(messages).first(32).map do |message|
@@ -91,6 +106,14 @@ module SoulCore
       end
       raise ArgumentError, "Dev request requires at least one message" if values.empty?
       values
+    end
+
+    def parse_structured_content(content)
+      JSON.parse(content)
+    rescue JSON::ParserError
+      fenced = content.match(/\A```(?:json)?[ \t]*\r?\n(?<json>.+)\r?\n```[ \t]*\z/m)
+      raise unless fenced
+      JSON.parse(fenced[:json])
     end
 
     def active_core_id
@@ -106,7 +129,7 @@ module SoulCore
       request["Content-Type"] = "application/json"
       request["Accept"] = "application/json"
       request.body = JSON.generate(payload)
-      response = Net::HTTP.start(uri.host, uri.port, open_timeout: 5, read_timeout: DEFAULT_TIMEOUT_SECONDS) { |http| http.request(request) }
+      response = Net::HTTP.start(uri.host, uri.port, open_timeout: 5, read_timeout: @timeout_seconds) { |http| http.request(request) }
       { status: response.code.to_i, body: response.body.to_s.byteslice(0, MAX_RESPONSE_BYTES) }
     end
 
