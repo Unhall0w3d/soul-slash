@@ -74,6 +74,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-long-form-mix verify-long-form-mix-render verify-long-form-mix-finalization
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
+.PHONY: verify-dev-core-model-bakeoff
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -209,6 +210,7 @@ help:
 > @echo "  make fleet-status-schedule-status"
 > @echo "  make verify-web-knowledge  Test bounded lookup, SearXNG research, reflection, and chat streaming"
 > @echo "  make verify-model-runtime-controls  Test leases and preview-gated model controls"
+> @echo "  make verify-dev-core-model-bakeoff  Verify the bounded local Dev Core evaluation harness"
 > @echo "  make verify-character-identity  Test character assets, palette, contrast, and unchanged mark geometry"
 > @echo "  make model-runtime-amd-plan AMD_SERVER=... AMD_MODEL=... AMD_SERVER_SHA256=... AMD_MODEL_SHA256=... AMD_MODEL_ALIAS=..."
 > @echo "  make model-runtime-amd-install ... CONFIRM=INSTALL_INACTIVE_AMD_MODEL_UNIT"
@@ -781,6 +783,9 @@ verify-model-runtime-controls:
 > @ruby scripts/verify-ollama-model-runtime-deployment.rb
 > @ruby scripts/verify-model-runtime-selected-startup.rb
 > @ruby scripts/verify-model-runtime-identity-2e.rb
+
+verify-dev-core-model-bakeoff:
+> @ruby scripts/verify-dev-core-model-bakeoff.rb
 
 verify-character-identity:
 > @ruby scripts/verify-character-identity-palette.rb
