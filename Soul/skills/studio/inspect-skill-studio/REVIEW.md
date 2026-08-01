@@ -70,11 +70,21 @@ Skill-private durable memory added: no
 ## Human review checklist
 
 ```text
-[ ] Ordinary skill conversation does not trigger Studio inspection
-[ ] Overview counts reflect current local state
-[ ] Proposal and Beta detail require exact current identifiers
-[ ] Production listing invokes no skill
-[ ] Approval, build, trial, promotion, closeout, and deletion remain protected
-[ ] Voice phrasing is acceptably discoverable
-[ ] Candidate is approved for merge
+[x] Ordinary skill conversation does not trigger Studio inspection
+[x] Overview counts reflect current local state
+[x] Proposal and Beta detail require exact current identifiers
+[x] Production listing invokes no skill
+[x] Approval, build, trial, promotion, closeout, and deletion remain protected
+[x] Voice phrasing is acceptably discoverable for the reviewed contract
+[x] Candidate is approved for merge
+```
+
+## Human review outcome
+
+```text
+Outcome: approved
+Reviewer: human owner
+Date: 2026-08-01
+Decision summary: Read-only Skill Studio inventory and retained human-gate boundary accepted.
+Required changes: none
 ```
