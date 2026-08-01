@@ -8,11 +8,12 @@ ROOT = File.expand_path("..", __dir__)
 $LOAD_PATH.unshift(File.join(ROOT, "lib"))
 
 require "soul_core/noctalia_device_registry"
+require "soul_core/noctalia_core_control_service"
 require "soul_core/noctalia_status_service"
 require "soul_core/voice_presence_launch_service"
 
 def usage!
-  warn "Usage: soul-noctalia status | voice-launch | connect --device DEVICE_ID"
+  warn "Usage: soul-noctalia status | voice-launch | connect --device DEVICE_ID | core-preview --core CORE_ID | core-activate --core CORE_ID --target-profile PROFILE_ID --confirmation PHRASE --expected-digest SHA256"
   exit 2
 end
 
@@ -28,6 +29,37 @@ when "voice-launch"
   result = SoulCore::VoicePresenceLaunchService.new(root: ROOT).launch
   puts JSON.generate(result)
   exit(result.fetch("ok", false) ? 0 : 1)
+when "core-preview"
+  core_id = nil
+  parser = OptionParser.new { |options| options.on("--core CORE_ID") { |value| core_id = value } }
+  begin
+    parser.parse!(ARGV)
+    usage! unless ARGV.empty? && core_id
+    result = SoulCore::NoctaliaCoreControlService.new(root: ROOT).preview(core_id: core_id)
+    puts JSON.generate(result)
+    exit(result.fetch("ok", false) ? 0 : 1)
+  rescue OptionParser::ParseError => error
+    puts JSON.generate({"ok" => false, "lifecycle_state" => "awaiting_input", "message" => error.message})
+    exit 2
+  end
+when "core-activate"
+  options = {}
+  parser = OptionParser.new do |flags|
+    flags.on("--core CORE_ID") { |value| options[:core_id] = value }
+    flags.on("--target-profile PROFILE_ID") { |value| options[:target_profile_id] = value }
+    flags.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+    flags.on("--expected-digest SHA256") { |value| options[:expected_digest] = value }
+  end
+  begin
+    parser.parse!(ARGV)
+    usage! unless ARGV.empty? && %i[core_id target_profile_id confirmation expected_digest].all? { |key| options[key] }
+    result = SoulCore::NoctaliaCoreControlService.new(root: ROOT).execute(**options)
+    puts JSON.generate(result)
+    exit(result.fetch("ok", false) ? 0 : 1)
+  rescue OptionParser::ParseError => error
+    puts JSON.generate({"ok" => false, "lifecycle_state" => "awaiting_input", "message" => error.message})
+    exit 2
+  end
 when "connect"
   device_id = nil
   parser = OptionParser.new do |options|
