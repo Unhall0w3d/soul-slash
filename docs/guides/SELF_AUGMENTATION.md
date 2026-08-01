@@ -21,6 +21,7 @@ Do not use it when:
 Observe tracked code
 → propose a core change
 → Gate A1: authorize one isolated experiment
+→ optional Dev implementation handoff for human/Codex review
 → external implementation in an exact worktree/file scope
 → deterministic dossier and optional model qualification
 → Gate A2: approve one exact candidate for integration review
@@ -52,6 +53,15 @@ Select a proposal and list the exact files the experiment may change. Gate A1 ma
 
 Implementation happens externally against that allowed-file boundary.
 
+After Gate A1, **Dev implementation handoff** can bind the exact experiment,
+source proposal, original `CODEX_HANDOFF.md`, and allowed-file list to one local
+GPT-OSS advisory draft. The result assigns bounded responsibilities and
+verification expectations to every approved file, then records compatibility
+checks, rollback considerations, and explicit unknowns. It receives no
+repository excerpts or worktree contents and cannot emit code, patches,
+commands, additional paths, Gate A2 approval, or follow-on execution. The
+original handoff and detached worktree remain unchanged.
+
 ## 4. Candidate dossier
 
 After an implementation is committed in the experiment worktree, **Generate dossier** records the base and candidate commits, changed files, deterministic verification, and blockers. Passing checks make the candidate reviewable; they do not approve it.
@@ -77,3 +87,5 @@ A separate cleanup gate may remove only a clean experiment worktree. Soul refuse
 - [`docs/soul/SELF_AUGMENTATION_AND_HOST_IMPROVEMENT_ARCHITECTURE.md`](../soul/SELF_AUGMENTATION_AND_HOST_IMPROVEMENT_ARCHITECTURE.md)
 - [`docs/assessments/SELF_AUGMENTATION_HOST_IMPROVEMENT_A1_A3_REVIEW.md`](../assessments/SELF_AUGMENTATION_HOST_IMPROVEMENT_A1_A3_REVIEW.md)
 - [`docs/assessments/SELF_AUGMENTATION_A4_A5_REVIEW.md`](../assessments/SELF_AUGMENTATION_A4_A5_REVIEW.md)
+- [`docs/soul/SELF_AUGMENTATION_DEV_HANDOFF_A2_BRIEF.md`](../soul/SELF_AUGMENTATION_DEV_HANDOFF_A2_BRIEF.md)
+- [`docs/assessments/SELF_AUGMENTATION_DEV_HANDOFF_A2_REVIEW.md`](../assessments/SELF_AUGMENTATION_DEV_HANDOFF_A2_REVIEW.md)

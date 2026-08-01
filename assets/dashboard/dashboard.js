@@ -21,7 +21,7 @@ const CORE_LABELS = Object.freeze({
   dev: "Dev Core"
 });
 const CORE_ACTIVATABLE_IDS = new Set(["daily", "amd-free", "music", "free", "dev"]);
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationDevCritiquePreview: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationDevCritiquePreview: null, augmentationDevHandoffPreview: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
 state.voiceRoundTripPending = false;
@@ -4015,7 +4015,7 @@ function renderAugmentationCensus(report) {
 
 async function loadSelfAugmentation() {
   byId("augmentation-status").textContent = "Loading local proposal inventory…";
-  try { const [proposals, experiments, critiques] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 }), callSoul("self_augmentation.dev_critique.list", { limit: 50 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); renderAugmentationDevCritiques(dataOf(critiques).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
+  try { const [proposals, experiments, critiques, handoffs] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 }), callSoul("self_augmentation.dev_critique.list", { limit: 50 }), callSoul("self_augmentation.dev_handoff.list", { limit: 50 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); renderAugmentationDevCritiques(dataOf(critiques).records || []); renderAugmentationDevHandoffs(dataOf(handoffs).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
   catch (error) { byId("augmentation-status").textContent = error.message; }
 }
 
@@ -4035,6 +4035,49 @@ function renderAugmentationDevCritiques(records) {
 async function loadAugmentationDevCritiques() {
   try { const envelope = await callSoul("self_augmentation.dev_critique.list", { limit: 50 }); renderAugmentationDevCritiques(dataOf(envelope).records || []); }
   catch (error) { byId("augmentation-dev-critique-status").textContent = error.message; }
+}
+
+function renderAugmentationDevHandoffs(records) {
+  const list = byId("augmentation-dev-handoffs"); list.replaceChildren(); byId("augmentation-dev-handoff-count").textContent = String(records.length);
+  records.forEach((record) => {
+    const candidate = record.candidate || {}; const card = labeledRecord(`${record.experiment_id} · ${formatTime(record.created_at)}`, candidate.summary || "Bound implementation handoff");
+    (candidate.implementation_objectives || []).forEach((item, index) => card.append(labeledRecord(`Objective ${index + 1}`, typeof item === "string" ? item : (item.objective || item.statement || "Review required"))));
+    (candidate.file_guidance || []).forEach((item) => card.append(labeledRecord(item.path || "Approved file", [item.responsibility, item.verification_expectation].filter(Boolean).join(" · "))));
+    (candidate.compatibility_checks || []).forEach((item) => card.append(labeledRecord("Compatibility check", typeof item === "string" ? item : (item.check || item.statement || "Review required"))));
+    (candidate.rollback_considerations || []).forEach((item) => card.append(labeledRecord("Rollback consideration", typeof item === "string" ? item : (item.consideration || item.statement || "Review required"), "is-warning")));
+    (candidate.unknowns || []).forEach((item) => card.append(labeledRecord("Unknown", typeof item === "string" ? item : [item.question, item.reason].filter(Boolean).join(" · "), "is-warning")));
+    list.append(card);
+  });
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No owner-private Dev implementation handoffs yet."; list.append(empty); }
+}
+
+async function loadAugmentationDevHandoffs() {
+  try { const envelope = await callSoul("self_augmentation.dev_handoff.list", { limit: 50 }); renderAugmentationDevHandoffs(dataOf(envelope).records || []); }
+  catch (error) { byId("augmentation-dev-handoff-status").textContent = error.message; }
+}
+
+async function previewAugmentationDevHandoff() {
+  const experiment = state.selectedAugmentationExperiment; const status = byId("augmentation-dev-handoff-status");
+  if (!experiment) { status.textContent = "Select an isolated experiment first."; return; }
+  status.textContent = "Binding the exact Gate A1 experiment and original handoff…";
+  const envelope = await callSoul("self_augmentation.dev_handoff.preview", { experiment_id: experiment.experiment_id }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete" || !data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || "Dev handoff preview failed safely."; return; }
+  state.augmentationDevHandoffPreview = data; const details = byId("augmentation-dev-handoff-preview-details"); details.replaceChildren();
+  [["Experiment", data.experiment_id], ["Proposal SHA-256", data.proposal_sha256], ["Experiment SHA-256", data.experiment_sha256], ["Original handoff SHA-256", data.original_handoff_sha256], ["Allowed files", `${(data.allowed_files || []).length} exact path(s)`], ["Model", data.model], ["Authority", "advisory only · no code or Gate A2 authority"]].forEach(([term, value]) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = term; dd.textContent = value || "—"; row.append(dt, dd); details.append(row); });
+  byId("augmentation-dev-handoff-confirm").hidden = false; prefillApprovalGate("augmentation-dev-handoff-confirmation", "execute-augmentation-dev-handoff", data.confirmation_phrase); status.textContent = "Clicking Draft authorizes one bounded advisory packet. The detached worktree remains untouched.";
+}
+
+async function executeAugmentationDevHandoff() {
+  const preview = state.augmentationDevHandoffPreview; if (!preview) return;
+  const status = byId("augmentation-dev-handoff-status"); const progress = byId("augmentation-dev-handoff-progress"); const button = byId("execute-augmentation-dev-handoff");
+  button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is drafting against the exact Gate A1 evidence in the foreground…";
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
+    const envelope = await callSoul("self_augmentation.dev_handoff.execute", { experiment_id: preview.experiment_id, confirmation: byId("augmentation-dev-handoff-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev implementation handoff failed safely");
+    state.augmentationDevHandoffPreview = null; byId("augmentation-dev-handoff-confirm").hidden = true; await loadAugmentationDevHandoffs(); status.textContent = "Advisory handoff recorded. No code, worktree, gate, or integration state changed."; announce("Self Augmentation Dev handoff ready");
+  } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev handoff exceeded its foreground time limit." : error.message; }
+  finally { progress.hidden = true; button.disabled = !state.augmentationDevHandoffPreview; }
 }
 
 async function previewAugmentationDevCritique() {
@@ -4086,10 +4129,14 @@ async function createAugmentationProposal() {
 function selectedAllowedFiles() { return byId("augmentation-allowed-files").value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean); }
 
 function selectAugmentationExperiment(record) {
-  state.selectedAugmentationExperiment = record; state.augmentationGateA2Preview = null; state.augmentationCleanupPreview = null;
+  state.selectedAugmentationExperiment = record; state.augmentationGateA2Preview = null; state.augmentationCleanupPreview = null; state.augmentationDevHandoffPreview = null;
   byId("augmentation-selected-experiment").textContent = `${record.experiment_id} · ${record.stage} · base ${record.base_commit.slice(0, 12)}`;
+  byId("augmentation-dev-handoff-selected").textContent = `${record.experiment_id} · ${record.stage} · ${(record.allowed_files || []).length} exact file(s)`;
+  byId("augmentation-dev-handoff-confirm").hidden = true;
+  byId("preview-augmentation-dev-handoff").disabled = false;
   ["generate-augmentation-dossier", "preview-augmentation-gate-a2", "preview-augmentation-cleanup"].forEach((id) => { byId(id).disabled = false; });
   byId("augmentation-review-status").textContent = "Candidate actions run only when explicitly requested.";
+  byId("augmentation-dev-handoff-status").textContent = "Selected experiment is eligible for one bounded advisory handoff.";
 }
 
 function renderAugmentationExperiments(records) {
@@ -5600,6 +5647,9 @@ byId("preview-augmentation-experiment").addEventListener("click", previewAugment
 byId("augmentation-allowed-files").addEventListener("input", () => { state.augmentationExperimentPreview = null; byId("augmentation-experiment-preview").hidden = true; });
 byId("augmentation-experiment-confirmation").addEventListener("input", () => { byId("create-augmentation-experiment").disabled = !state.augmentationExperimentPreview || byId("augmentation-experiment-confirmation").value !== state.augmentationExperimentPreview.confirmation_phrase; });
 byId("create-augmentation-experiment").addEventListener("click", createAugmentationExperiment);
+byId("preview-augmentation-dev-handoff").addEventListener("click", previewAugmentationDevHandoff);
+byId("augmentation-dev-handoff-confirmation").addEventListener("input", () => { byId("execute-augmentation-dev-handoff").disabled = !state.augmentationDevHandoffPreview || byId("augmentation-dev-handoff-confirmation").value !== state.augmentationDevHandoffPreview.confirmation_phrase; });
+byId("execute-augmentation-dev-handoff").addEventListener("click", executeAugmentationDevHandoff);
 byId("generate-augmentation-dossier").addEventListener("click", generateAugmentationDossier);
 byId("preview-augmentation-gate-a2").addEventListener("click", previewAugmentationGateA2);
 byId("augmentation-gate-a2-confirmation").addEventListener("input", () => { byId("execute-augmentation-gate-a2").disabled = !state.augmentationGateA2Preview || byId("augmentation-gate-a2-confirmation").value !== state.augmentationGateA2Preview.confirmation_phrase; });

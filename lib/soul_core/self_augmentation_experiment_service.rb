@@ -90,6 +90,29 @@ module SoulCore
       success({"records"=>records,"count"=>records.length,"limit"=>maximum,"read_only"=>true})
     end
 
+    def dev_handoff_source(experiment_id:)
+      record = experiment_record(experiment_id)
+      return awaiting("unknown augmentation experiment") unless record
+      proposal = proposal_record(record.fetch("proposal_id"))
+      return blocked("augmentation experiment proposal evidence is unavailable") unless proposal
+      return blocked("augmentation experiment proposal revision does not match its exact base") unless proposal.fetch("head") == record.fetch("base_commit")
+
+      path = File.join(experiment_path(record.fetch("experiment_id")), "CODEX_HANDOFF.md")
+      return blocked("original augmentation handoff is unavailable or unsafe") unless File.file?(path) && !File.symlink?(path) && File.size(path) <= MAX_FILE_BYTES
+      content = File.binread(path, MAX_FILE_BYTES)
+      return blocked("original augmentation handoff evidence changed") unless content == handoff(record, proposal)
+
+      success({
+        "experiment" => JSON.parse(JSON.generate(record)),
+        "proposal" => JSON.parse(JSON.generate(proposal)),
+        "original_handoff" => content,
+        "original_handoff_path" => relative(path),
+        "read_only" => true
+      })
+    rescue JSON::GeneratorError, KeyError => error
+      failed("augmentation experiment source failed safely: #{error.class}: #{error.message}"[0, 1_000])
+    end
+
     def generate_dossier(experiment_id:)
       record = experiment_record(experiment_id)
       return awaiting("unknown augmentation experiment") unless record
@@ -220,10 +243,10 @@ module SoulCore
     def run_sandbox(record, command)
       return {"command"=>command,"status"=>"blocked","exit_status"=>nil,"output"=>"Bubblewrap is unavailable"} unless @bubblewrap_path
       worktree=absolute_worktree(record); ruby_root=File.expand_path("../..",RbConfig.ruby)
-      argv=[@bubblewrap_path,"--unshare-all","--die-with-parent","--new-session","--ro-bind","/usr","/usr"]
+      argv=[@bubblewrap_path,"--unshare-all","--die-with-parent","--new-session","--ro-bind","/usr","/usr","--tmpfs","/tmp"]
       cursor="";@root.split(File::SEPARATOR).reject(&:empty?).each{|part|cursor+=File::SEPARATOR+part;argv.concat(["--dir",cursor])}
       [["/lib","/lib"],["/lib64","/lib64"],[ruby_root,ruby_root]].each{|source,target|argv.concat(["--ro-bind",source,target]) if File.exist?(source)}
-      argv.concat(["--ro-bind",File.join(@root,".git"),File.join(@root,".git"),"--ro-bind",worktree,"/workspace","--proc","/proc","--dev","/dev","--tmpfs","/tmp","--setenv","HOME","/tmp","--chdir","/workspace","--"]+command)
+      argv.concat(["--ro-bind",File.join(@root,".git"),File.join(@root,".git"),"--ro-bind",worktree,"/workspace","--proc","/proc","--dev","/dev","--setenv","HOME","/tmp","--chdir","/workspace","--"]+command)
       result=@runner.run(*argv,timeout_seconds:30,max_output_bytes:256*1024)
       {"command"=>command,"status"=>result.success? ? "passed" : "failed","exit_status"=>result.exit_status,"output"=>(result.stdout.to_s+result.stderr.to_s).byteslice(0,4096),"sandboxed"=>true,"network"=>false}
     end
