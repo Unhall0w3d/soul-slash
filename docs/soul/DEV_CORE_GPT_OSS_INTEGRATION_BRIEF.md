@@ -124,13 +124,18 @@ digests without storing secrets.
 GPT-OSS may:
 
 - summarize already-collected, bounded Self Assessment evidence;
-- draft candidate recommendations that remain review-only;
+- identify evidence-linked observations and explicit unknowns in the dedicated
+  Self Assessment A1 action;
 - critique a Self Augmentation proposal or experiment dossier;
 - draft a bounded implementation handoff after the existing human gate.
 
 GPT-OSS may not classify its own safety, approve host mutation, create an
 augmentation worktree without Gate A1, integrate an experiment, commit, push,
 merge, install packages, or mutate the host.
+
+The accepted Self Assessment A1 action is narrower than this general model
+capability: it does not draft recommendations or plans. It emits only a summary,
+evidence-cited observations, unknowns, and non-authorizing navigation hints.
 
 ## Knowledge Vault
 

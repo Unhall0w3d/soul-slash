@@ -29,12 +29,13 @@ module SoulCore
       @proposal_generator = proposal_generator
       @storage_assessor = storage_assessor
       @assessment_timeout_seconds = Float(assessment_timeout_seconds)
+      @latest_assessments = {}
       raise ArgumentError, "assessment timeout must be positive" unless @assessment_timeout_seconds.positive?
     end
 
     def snapshot
       assessment = bounded_assessment { environment_assessor.assess(include_updates: false) }
-      success({
+      data = {
         "schema_version" => "soul.self_improvement.v1",
         "generated_at" => @clock.call.iso8601,
         "assessment_scope" => "environment",
@@ -45,7 +46,9 @@ module SoulCore
         "proposals" => proposal_inventory,
         "available_scopes" => SCOPES,
         "mutation_boundary" => mutation_boundary
-      })
+      }
+      remember_assessment(data)
+      success(data)
     rescue Timeout::Error
       failed("environment assessment exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
     end
@@ -63,7 +66,7 @@ module SoulCore
         when "storage" then storage_assessor.inventory
         end
       end
-      success({
+      data = {
         "schema_version" => "soul.self_improvement.v1",
         "generated_at" => @clock.call.iso8601,
         "assessment_scope" => scope,
@@ -72,9 +75,20 @@ module SoulCore
         "assessment" => assessment,
         "proposals" => proposal_inventory,
         "mutation_boundary" => mutation_boundary
-      })
+      }
+      remember_assessment(data)
+      success(data)
     rescue Timeout::Error
       failed("#{scope} assessment exceeded the #{@assessment_timeout_seconds.to_i}-second foreground limit")
+    end
+
+    def latest_assessment(scope:)
+      scope = scope.to_s
+      return awaiting("assessment scope must be one of: #{SCOPES.join(', ')}") unless SCOPES.include?(scope)
+      record = @latest_assessments[scope]
+      return awaiting("run the #{scope} assessment before requesting Dev synthesis") unless record
+
+      success(deep_copy(record))
     end
 
     def storage_cleanup_preview(category:)
@@ -138,6 +152,16 @@ module SoulCore
     end
 
     private
+
+    def remember_assessment(data)
+      @latest_assessments[data.fetch("assessment_scope")] = deep_copy(
+        data.slice("schema_version", "generated_at", "assessment_scope", "automatic", "read_only", "assessment")
+      )
+    end
+
+    def deep_copy(value)
+      JSON.parse(JSON.generate(value))
+    end
 
     def bounded_assessment
       Timeout.timeout(@assessment_timeout_seconds) { yield }
