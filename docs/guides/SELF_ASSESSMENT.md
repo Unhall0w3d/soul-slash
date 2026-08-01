@@ -27,12 +27,19 @@ A lightweight environment snapshot loads once when the page opens. Deeper checks
 
 Results are snapshots, not continuous monitoring. Refresh or run the relevant scope again after the machine changes.
 
-Dev Core is suitable for a separately invoked, review-only synthesis of
-already-collected bounded evidence. It does not replace deterministic
-collection, classify safety, authorize host mutation, or turn a recommendation
-into an action. This integration slice establishes that local development lane;
-the existing Self Assessment controls remain deterministic until a dedicated
-review action is separately exposed and accepted.
+**Dev synthesis** is a separately invoked, review-only pass over the latest
+successful evidence for the currently selected scope. Preview shows the exact
+evidence timestamp and SHA-256. Confirming the pre-filled gate permits one
+bounded local GPT-OSS review; normal Core restoration remains the Dev runtime's
+responsibility.
+
+The result is an owner-private, immutable review containing only a summary,
+evidence-linked observations, explicit unknowns, and navigation hints. It does
+not replace deterministic collection, classify safety, alter findings or
+severity, generate a plan, authorize host mutation, or invoke the suggested
+surface. Re-run the assessment when evidence changes, then preview again. A
+Dashboard restart intentionally clears eligible evidence, so the source scope
+must be collected again before another synthesis.
 
 ## Recommendations and proposals
 
@@ -119,6 +126,7 @@ It cannot:
 - delete protected project data or memory;
 - implement or promote skills;
 - apply a recommendation merely because an assessment found it useful.
+- let a Dev synthesis review invoke its own navigation hint or follow-on work.
 
 ## Choosing the next surface
 

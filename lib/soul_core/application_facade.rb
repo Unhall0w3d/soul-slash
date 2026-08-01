@@ -31,6 +31,7 @@ require_relative "core_orchestration_service"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
+require_relative "self_assessment_dev_synthesis_service"
 require_relative "host_improvement_plan_service"
 require_relative "maintenance_fleet_status_service"
 require_relative "maintenance_fleet_discovery_service"
@@ -92,6 +93,7 @@ module SoulCore
       skill_registry: nil,
       skill_studio_service: nil,
       self_improvement_service: nil,
+      self_assessment_dev_synthesis_service: nil,
       host_improvement_plan_service: nil,
       maintenance_fleet_status_service: nil,
       maintenance_fleet_discovery_service: nil,
@@ -147,6 +149,7 @@ module SoulCore
       @skill_registry = skill_registry
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
+      @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
       @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
@@ -351,6 +354,9 @@ module SoulCore
       when "skill_studio.betas.production.execute" then domain(skill_studio.promote_beta_to_production(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_improvement.snapshot" then domain(self_improvement.snapshot)
       when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
+      when "self_improvement.dev_synthesis.preview" then domain(self_assessment_dev_synthesis.preview(scope: required(parameters, "scope")))
+      when "self_improvement.dev_synthesis.execute" then domain(self_assessment_dev_synthesis.execute(scope: required(parameters, "scope"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_improvement.dev_synthesis.list" then domain(self_assessment_dev_synthesis.inventory(limit: bounded_limit(parameters["limit"], SelfAssessmentDevSynthesisService::MAX_RECORDS)))
       when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
       when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "storage_retention.cleanup.preview" then domain(self_improvement.storage_cleanup_preview(category: required(parameters, "category")))
@@ -856,6 +862,14 @@ module SoulCore
 
     def self_improvement
       @self_improvement_service ||= SelfImprovementService.new(root: @root, clock: @clock)
+    end
+
+    def self_assessment_dev_synthesis
+      @self_assessment_dev_synthesis_service ||= SelfAssessmentDevSynthesisService.new(
+        root: @root,
+        clock: @clock,
+        assessment_source: self_improvement
+      )
     end
 
     def host_improvement

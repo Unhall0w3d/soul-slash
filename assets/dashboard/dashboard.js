@@ -21,7 +21,7 @@ const CORE_LABELS = Object.freeze({
   dev: "Dev Core"
 });
 const CORE_ACTIVATABLE_IDS = new Set(["daily", "amd-free", "music", "free", "dev"]);
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementProposalPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
 state.voiceRoundTripPending = false;
@@ -2679,6 +2679,7 @@ function renderImprovementProposals(inventory) {
 
 function renderSelfImprovement(data) {
   const scope = data.assessment_scope || "environment"; const report = data.assessment || {};
+  state.improvementScope = scope; byId("preview-assessment-dev").disabled = false;
   byId("improvement-scope").textContent = `${scope}${data.automatic ? " · automatic" : ""}`;
   byId("storage-retention-card").hidden = scope !== "storage";
   if (scope === "environment" || scope === "updates") renderImprovementEnvironment(report);
@@ -2693,9 +2694,57 @@ function setAssessmentButtonsDisabled(disabled) { document.querySelectorAll("[da
 
 async function loadSelfImprovement() {
   setAssessmentButtonsDisabled(true); byId("improvement-scope").textContent = "assessing"; announce("Collecting lightweight read-only environment assessment");
-  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await loadHostPlans(); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
+  try { const envelope = await callSoul("self_improvement.snapshot"); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Assessment failed safely"); renderSelfImprovement(dataOf(envelope)); await Promise.all([loadHostPlans(), loadAssessmentDevReviews()]); state.improvementLoaded = true; announce("Self Assessment snapshot ready"); }
   catch (error) { byId("improvement-scope").textContent = "failed"; showError(error); }
   finally { setAssessmentButtonsDisabled(false); }
+}
+
+function renderAssessmentDevReviews(records) {
+  const list = byId("assessment-dev-reviews"); list.replaceChildren(); byId("assessment-dev-state").textContent = records.length ? `${records.length} review${records.length === 1 ? "" : "s"}` : "no review";
+  records.forEach((record) => {
+    const candidate = record.candidate || {};
+    const card = labeledRecord(`${record.scope || "assessment"} · ${formatTime(record.created_at)}`, candidate.summary || "Bound Dev synthesis review");
+    (candidate.observations || []).forEach((observation) => card.append(labeledRecord("Observation", `${observation.statement || ""} · source: ${observation.evidence_ref || "not cited"} = ${observation.evidence_value ?? "unavailable"}`)));
+    (candidate.unknowns || []).forEach((unknown) => card.append(labeledRecord("Unknown", `${unknown.question || ""} · ${unknown.reason || ""}`, "is-warning")));
+    if (candidate.suggested_next_surfaces?.length) card.append(labeledRecord("Navigation hints only", candidate.suggested_next_surfaces.join(" · ")));
+    list.append(card);
+  });
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No owner-private Dev synthesis reviews yet."; list.append(empty); }
+}
+
+async function loadAssessmentDevReviews() {
+  const status = byId("assessment-dev-status");
+  try {
+    const envelope = await callSoul("self_improvement.dev_synthesis.list", { limit: 20 });
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Review inventory failed safely");
+    renderAssessmentDevReviews(dataOf(envelope).records || []);
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function previewAssessmentDevSynthesis() {
+  const status = byId("assessment-dev-status"); const scope = state.improvementScope;
+  if (!scope) { status.textContent = "Run an assessment before requesting Dev synthesis."; return; }
+  status.textContent = `Binding the latest ${scope} evidence…`;
+  const envelope = await callSoul("self_improvement.dev_synthesis.preview", { scope }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete" || !data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || "Dev synthesis preview failed safely."; return; }
+  state.assessmentDevPreview = data;
+  const details = byId("assessment-dev-preview-details"); details.replaceChildren();
+  [["Scope", data.scope], ["Evidence", formatTime(data.evidence_generated_at)], ["SHA-256", data.evidence_sha256], ["Model", data.model], ["Authority", "advisory only · no follow-on execution"]].forEach(([term, value]) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = term; dd.textContent = value || "—"; row.append(dt, dd); details.append(row); });
+  byId("assessment-dev-confirm").hidden = false; prefillApprovalGate("assessment-dev-confirmation", "execute-assessment-dev", data.confirmation_phrase);
+  status.textContent = "Review the exact evidence identity. Clicking Run authorizes one bounded local synthesis only.";
+}
+
+async function executeAssessmentDevSynthesis() {
+  const preview = state.assessmentDevPreview; if (!preview) return;
+  const status = byId("assessment-dev-status"); const progress = byId("assessment-dev-progress"); const button = byId("execute-assessment-dev");
+  button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is reviewing the exact evidence in the foreground…";
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
+    const envelope = await callSoul("self_improvement.dev_synthesis.execute", { scope: preview.scope, confirmation: byId("assessment-dev-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev synthesis failed safely");
+    state.assessmentDevPreview = null; byId("assessment-dev-confirm").hidden = true; await loadAssessmentDevReviews(); status.textContent = "Advisory review recorded. Source evidence remains authoritative; no follow-on action was invoked."; announce("Self Assessment Dev synthesis review ready");
+  } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev synthesis exceeded its foreground time limit." : error.message; }
+  finally { progress.hidden = true; button.disabled = !state.assessmentDevPreview; }
 }
 
 async function refreshSelfImprovement(scope) {
@@ -5477,6 +5526,10 @@ byId("music-generation-confirmation").addEventListener("input", () => { byId("st
 byId("start-music-generation").addEventListener("click", startMusicGeneration);
 byId("cancel-music-generation").addEventListener("click", cancelMusicGeneration);
 document.querySelectorAll("[data-assessment-scope]").forEach((button) => button.addEventListener("click", () => refreshSelfImprovement(button.dataset.assessmentScope)));
+byId("preview-assessment-dev").addEventListener("click", previewAssessmentDevSynthesis);
+byId("refresh-assessment-dev-reviews").addEventListener("click", loadAssessmentDevReviews);
+byId("assessment-dev-confirmation").addEventListener("input", () => { byId("execute-assessment-dev").disabled = !state.assessmentDevPreview || byId("assessment-dev-confirmation").value !== state.assessmentDevPreview.confirmation_phrase; });
+byId("execute-assessment-dev").addEventListener("click", executeAssessmentDevSynthesis);
 byId("preview-improvement-proposals").addEventListener("click", previewImprovementProposals);
 byId("improvement-proposal-confirmation").addEventListener("input", () => { byId("execute-improvement-proposals").disabled = !state.improvementProposalPreview || byId("improvement-proposal-confirmation").value !== state.improvementProposalPreview.confirmation_phrase; });
 byId("execute-improvement-proposals").addEventListener("click", executeImprovementProposals);

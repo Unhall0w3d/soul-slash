@@ -526,6 +526,21 @@
         </section>
       </section>
 
+      <section class="improvement-card assessment-dev-card" aria-labelledby="assessment-dev-heading">
+        <div class="card-heading"><div><p class="eyebrow">Bound evidence review</p><h2 id="assessment-dev-heading">Dev synthesis</h2></div><span id="assessment-dev-state" class="count-badge">no review</span></div>
+        <p class="card-note">Ask the local GPT-OSS Dev worker to summarize only the latest assessment scope shown above. Its observations and unknowns are advisory; they cannot change evidence, severity, recommendations, plans, or host state.</p>
+        <div class="host-plan-actions"><button id="preview-assessment-dev" class="gate-button" type="button" disabled>Preview exact evidence review</button><button id="refresh-assessment-dev-reviews" class="quiet-button" type="button">Refresh reviews</button></div>
+        <div id="assessment-dev-confirm" class="gate-card" hidden>
+          <dl id="assessment-dev-preview-details" class="improvement-details"></dl>
+          <label for="assessment-dev-confirmation">Exact confirmation</label>
+          <input id="assessment-dev-confirmation" type="text" autocomplete="off" spellcheck="false">
+          <button id="execute-assessment-dev" class="gate-button gate-button--gold" type="button" disabled>Run bounded Dev synthesis</button>
+        </div>
+        <div id="assessment-dev-progress" class="generation-progress" role="status" aria-live="polite" hidden><i aria-hidden="true"></i><strong>Dev synthesis running</strong><span>Core orchestration and one bounded local review are in progress.</span></div>
+        <div id="assessment-dev-reviews" class="recommendation-list"><p class="muted">No owner-reviewed synthesis has been recorded.</p></div>
+        <p id="assessment-dev-status" class="dialog-status" role="status" aria-live="polite">Run an assessment scope above to make its latest evidence eligible.</p>
+      </section>
+
       <div class="improvement-lower-grid">
         <section class="improvement-card recommendations-card" aria-labelledby="recommendations-heading">
           <div class="card-heading"><div><p class="eyebrow">Assessed opportunities</p><h2 id="recommendations-heading">Recommendations</h2></div><span id="recommendation-count" class="count-badge">0</span></div>
