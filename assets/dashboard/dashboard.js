@@ -21,7 +21,7 @@ const CORE_LABELS = Object.freeze({
   dev: "Dev Core"
 });
 const CORE_ACTIVATABLE_IDS = new Set(["daily", "amd-free", "music", "free", "dev"]);
-const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
+const state = { authenticated: false, bootstrapped: false, chats: [], activeChat: null, busy: false, voiceRecorder: null, voiceStream: null, voiceChunks: [], voiceStartedAt: 0, voiceDiscard: false, voiceTranscribing: false, voicePlayback: null, voicePlaybackUrl: null, voiceSynthesisController: null, voiceSynthesisButton: null, clearPreview: null, forgetPreview: null, coreStatus: null, modelRuntime: null, modelRuntimePreview: null, studioLoaded: false, proposals: [], betas: [], productionSkills: [], linkedProductionSkill: null, selectedProposal: null, selectedBeta: null, proposalApproval: null, betaBuildPreview: null, proposalClosePreview: null, betaRunPreview: null, betaPromotionPreview: null, productionPromotionPreview: null, improvementLoaded: false, improvementScope: null, improvementProposalPreview: null, assessmentDevPreview: null, hostPlanPreview: null, selectedHostPlan: null, augmentationLoaded: false, augmentationPreview: null, augmentationProposals: [], selectedAugmentationProposal: null, augmentationDevCritiquePreview: null, augmentationExperiments: [], selectedAugmentationExperiment: null, augmentationExperimentPreview: null, augmentationGateA2Preview: null, augmentationCleanupPreview: null, augmentationModelPreview: null, musicLoaded: false, musicProjects: [], musicProjectView: "active", musicReferences: { artists: [], tracks: [], fusions: [] }, musicReferencePreview: null, musicReferenceAnalyzing: false, selectedMusicReference: null, musicReferenceDelete: null, musicReferenceReanalysis: null, musicSynthesisApproval: null, musicSynthesisRejection: null, musicSynthesisBusy: false, musicFusionSources: new Set(), selectedMusicProject: null, musicProjectDeletePreview: null, musicPreview: null, musicGenerating: false, musicCandidateId: null, reviewLoaded: false, approvals: [], activities: [], activitySummary: [], activityFilter: "all", selectedApproval: null, selectedActivity: null, reviewOpener: null };
 const byId = (id) => document.getElementById(id);
 state.musicJobId = null;
 state.voiceRoundTripPending = false;
@@ -4004,7 +4004,7 @@ async function loadMaintenanceRebootStatus() {
 
 function renderAugmentationProposals(records) {
   state.augmentationProposals = records; const list = byId("augmentation-proposal-list"); list.replaceChildren(); byId("augmentation-proposal-count").textContent = String(records.length);
-  records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for Gate A1`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
+  records.forEach((proposal) => { const item = labeledRecord(proposal.objective || proposal.proposal_id, `${proposal.stage} · ${proposal.risk_class} · select for review`); item.tabIndex = 0; item.setAttribute("role", "button"); const select = () => { state.selectedAugmentationProposal = proposal; state.augmentationDevCritiquePreview = null; byId("augmentation-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("augmentation-dev-selected-proposal").textContent = `${proposal.proposal_id} · ${proposal.objective}`; byId("preview-augmentation-experiment").disabled = false; byId("preview-augmentation-dev-critique").disabled = false; byId("augmentation-dev-critique-confirm").hidden = true; byId("augmentation-experiment-status").textContent = "Define the exact file scope, then preview Gate A1."; byId("augmentation-dev-critique-status").textContent = "Selected proposal is eligible for one advisory critique."; }; item.addEventListener("click", select); item.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } }); list.append(item); });
   if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No augmentation proposal packets."; list.append(empty); }
 }
 
@@ -4015,8 +4015,50 @@ function renderAugmentationCensus(report) {
 
 async function loadSelfAugmentation() {
   byId("augmentation-status").textContent = "Loading local proposal inventory…";
-  try { const [proposals, experiments] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
+  try { const [proposals, experiments, critiques] = await Promise.all([callSoul("self_augmentation.proposals.list", { limit: 100 }), callSoul("self_augmentation.experiments.list", { limit: 100 }), callSoul("self_augmentation.dev_critique.list", { limit: 50 })]); renderAugmentationProposals(dataOf(proposals).records || []); renderAugmentationExperiments(dataOf(experiments).records || []); renderAugmentationDevCritiques(dataOf(critiques).records || []); state.augmentationLoaded = true; byId("augmentation-status").textContent = "Observation runs only when requested."; }
   catch (error) { byId("augmentation-status").textContent = error.message; }
+}
+
+function renderAugmentationDevCritiques(records) {
+  const list = byId("augmentation-dev-critiques"); list.replaceChildren(); byId("augmentation-dev-critique-count").textContent = String(records.length);
+  records.forEach((record) => {
+    const candidate = record.candidate || {}; const card = labeledRecord(`${record.proposal_id} · ${formatTime(record.created_at)}`, candidate.summary || "Bound proposal critique");
+    (candidate.strengths || []).forEach((item) => card.append(labeledRecord("Supported strength", `${item.statement || ""} · source: ${item.evidence_ref || "not cited"} = ${item.evidence_value ?? "unavailable"}`)));
+    (candidate.concerns || []).forEach((item) => card.append(labeledRecord(`Concern · ${item.dimension || "review"}`, `${item.statement || ""} · source: ${item.evidence_ref || "not cited"} = ${item.evidence_value ?? "unavailable"}`, "is-warning")));
+    (candidate.unknowns || []).forEach((item) => card.append(labeledRecord("Unknown", `${item.question || ""} · ${item.reason || ""}`, "is-warning")));
+    (candidate.revision_questions || []).forEach((question) => card.append(labeledRecord("Revision question", question)));
+    list.append(card);
+  });
+  if (!records.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No owner-private Dev critique reviews yet."; list.append(empty); }
+}
+
+async function loadAugmentationDevCritiques() {
+  try { const envelope = await callSoul("self_augmentation.dev_critique.list", { limit: 50 }); renderAugmentationDevCritiques(dataOf(envelope).records || []); }
+  catch (error) { byId("augmentation-dev-critique-status").textContent = error.message; }
+}
+
+async function previewAugmentationDevCritique() {
+  const proposal = state.selectedAugmentationProposal; const status = byId("augmentation-dev-critique-status");
+  if (!proposal) { status.textContent = "Select an existing proposal first."; return; }
+  status.textContent = "Binding the exact proposal packet to one Dev critique…";
+  const envelope = await callSoul("self_augmentation.dev_critique.preview", { proposal_id: proposal.proposal_id }); const data = dataOf(envelope);
+  if (envelope.lifecycle_state !== "complete" || !data.expected_digest) { status.textContent = envelope.errors?.[0]?.message || "Dev critique preview failed safely."; return; }
+  state.augmentationDevCritiquePreview = data; const details = byId("augmentation-dev-critique-preview-details"); details.replaceChildren();
+  [["Proposal", data.proposal_id], ["Proposal SHA-256", data.proposal_sha256], ["Source revision", data.source_head], ["Model", data.model], ["Authority", "advisory only · Gate A1 remains human"]].forEach(([term, value]) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = term; dd.textContent = value || "—"; row.append(dt, dd); details.append(row); });
+  byId("augmentation-dev-critique-confirm").hidden = false; prefillApprovalGate("augmentation-dev-critique-confirmation", "execute-augmentation-dev-critique", data.confirmation_phrase); status.textContent = "Clicking Run authorizes one bounded critique. It cannot create an experiment or choose Gate A1.";
+}
+
+async function executeAugmentationDevCritique() {
+  const preview = state.augmentationDevCritiquePreview; if (!preview) return;
+  const status = byId("augmentation-dev-critique-status"); const progress = byId("augmentation-dev-critique-progress"); const button = byId("execute-augmentation-dev-critique");
+  button.disabled = true; progress.hidden = false; status.textContent = "The Dev worker is critiquing the exact proposal in the foreground…";
+  try {
+    const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(310_000) : undefined;
+    const envelope = await callSoul("self_augmentation.dev_critique.execute", { proposal_id: preview.proposal_id, confirmation: byId("augmentation-dev-critique-confirmation").value, expected_digest: preview.expected_digest }, {}, { signal });
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev critique failed safely");
+    state.augmentationDevCritiquePreview = null; byId("augmentation-dev-critique-confirm").hidden = true; await loadAugmentationDevCritiques(); status.textContent = "Advisory critique recorded. Gate A1 and worktree creation remain unchanged."; announce("Self Augmentation Dev critique ready");
+  } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev critique exceeded its foreground time limit." : error.message; }
+  finally { progress.hidden = true; button.disabled = !state.augmentationDevCritiquePreview; }
 }
 
 async function runAugmentationCensus() {
@@ -5551,6 +5593,9 @@ byId("run-augmentation-census").addEventListener("click", runAugmentationCensus)
 byId("preview-augmentation-proposal").addEventListener("click", previewAugmentationProposal);
 byId("augmentation-confirmation").addEventListener("input", () => { byId("create-augmentation-proposal").disabled = !state.augmentationPreview || byId("augmentation-confirmation").value !== state.augmentationPreview.confirmation_phrase; });
 byId("create-augmentation-proposal").addEventListener("click", createAugmentationProposal);
+byId("preview-augmentation-dev-critique").addEventListener("click", previewAugmentationDevCritique);
+byId("augmentation-dev-critique-confirmation").addEventListener("input", () => { byId("execute-augmentation-dev-critique").disabled = !state.augmentationDevCritiquePreview || byId("augmentation-dev-critique-confirmation").value !== state.augmentationDevCritiquePreview.confirmation_phrase; });
+byId("execute-augmentation-dev-critique").addEventListener("click", executeAugmentationDevCritique);
 byId("preview-augmentation-experiment").addEventListener("click", previewAugmentationExperiment);
 byId("augmentation-allowed-files").addEventListener("input", () => { state.augmentationExperimentPreview = null; byId("augmentation-experiment-preview").hidden = true; });
 byId("augmentation-experiment-confirmation").addEventListener("input", () => { byId("create-augmentation-experiment").disabled = !state.augmentationExperimentPreview || byId("augmentation-experiment-confirmation").value !== state.augmentationExperimentPreview.confirmation_phrase; });

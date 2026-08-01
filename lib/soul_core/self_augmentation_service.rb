@@ -121,6 +121,13 @@ module SoulCore
       success({"records"=>records,"count"=>records.length,"limit"=>maximum,"read_only"=>true})
     end
 
+    def proposal(proposal_id:)
+      record = read_proposal(proposal_id)
+      return awaiting("unknown augmentation proposal") unless record
+
+      success({ "proposal" => record, "read_only" => true })
+    end
+
     private
 
     def git(*args)

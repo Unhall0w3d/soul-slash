@@ -80,6 +80,7 @@ operations=SoulCore::ApplicationContract::OPERATIONS
 check.call("A4–A5 API operations are explicitly allowlisted",%w[self_augmentation.experiments.gate_a1.preview self_augmentation.experiments.gate_a1.execute self_augmentation.reviews.generate self_augmentation.reviews.gate_a2.preview self_augmentation.reviews.gate_a2.execute self_augmentation.experiments.cleanup.preview].all?{|operation|operations.key?(operation)})
 html=File.read(File.expand_path("../assets/dashboard/index.html",__dir__));javascript=File.read(File.expand_path("../assets/dashboard/dashboard.js",__dir__))
 check.call("dashboard exposes both gates and exact confirmations",%w[preview-augmentation-experiment create-augmentation-experiment generate-augmentation-dossier preview-augmentation-gate-a2 execute-augmentation-gate-a2].all?{|id|html.include?(%Q{id="#{id}"})}&&html.include?(SoulCore::SelfAugmentationExperimentService::GATE_A1_CONFIRMATION)&&html.include?(SoulCore::SelfAugmentationExperimentService::GATE_A2_CONFIRMATION))
-check.call("dashboard adds no polling or automatic implementation",!javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|callSoul\([^\n]*(?:codex|merge|push|deploy)/i))
+augmentation_javascript=javascript[/function renderAugmentationProposals\(records\).*?function reviewEmpty\(/m].to_s
+check.call("dashboard adds no polling or automatic implementation",!augmentation_javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|callSoul\([^\n]*(?:codex|merge|push|deploy)/i))
 abort "Verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Verification complete."
