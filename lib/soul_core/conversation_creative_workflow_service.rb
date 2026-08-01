@@ -14,9 +14,11 @@ module SoulCore
   class ConversationCreativeWorkflowService
     EXECUTE_CONFIRMATION = "START_CREATIVE_WORKFLOW"
     CORE_LABELS = {
-      "daily" => "Daily Core",
-      "amd-free" => "AMD-Free Core",
-      "music" => "Music Core"
+      "daily" => "Soul Core",
+      "amd-free" => "Soul-Lite Core",
+      "music" => "Creative Core",
+      "free" => "Free Core",
+      "dev" => "Dev Core"
     }.freeze
 
     def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, music_visual_companion: nil, publication_package: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
@@ -1072,14 +1074,14 @@ module SoulCore
         "Changes: #{Array(draft['changes']).join(' ')}", "",
         *render_core_requirement(flow),
         "",
-        "Review the complete input. Clicking the action revalidates Music Core and authorizes only this exact linked revision candidate."
+        "Review the complete input. Clicking the action revalidates Creative Core and authorizes only this exact linked revision candidate."
       ].join("\n")
     end
 
     def execute_music_revision(flow, progress)
       draft = flow.fetch("revision_draft")
       music = flow.dig("generated", "music")
-      progress&.call({ "stage" => "core", "message" => "Revalidating Music Core for the exact revision." })
+      progress&.call({ "stage" => "core", "message" => "Revalidating Creative Core for the exact revision." })
       core = ensure_creative_core(flow, action_id: "creative_music_revision")
       return core unless core.fetch("ok")
 

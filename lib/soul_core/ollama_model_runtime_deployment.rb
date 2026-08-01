@@ -20,12 +20,27 @@ module SoulCore
       def to_h = { "ok" => ok, "lifecycle_state" => lifecycle_state, "message" => message, "details" => details }
     end
 
-    def initialize(home: Dir.home, ollama_path: nil, systemctl_path: nil, systemd_analyze_path: nil, runner: BoundedCommandRunner.new)
+    def initialize(home: Dir.home, ollama_path: nil, systemctl_path: nil, systemd_analyze_path: nil, runner: BoundedCommandRunner.new,
+                   unit_name: UNIT_NAME, marker: MARKER, confirm_install: CONFIRM_INSTALL, confirm_uninstall: CONFIRM_UNINSTALL,
+                   display_name: "Gemma", description: "Soul Gemma AMD Vulkan Ollama runtime", keep_alive: "5m")
       @home = File.expand_path(home)
       @ollama_path = ollama_path || find_executable("ollama")
       @systemctl_path = systemctl_path || find_executable("systemctl")
       @systemd_analyze_path = systemd_analyze_path || find_executable("systemd-analyze")
       @runner = runner
+      @unit_name = unit_name.to_s
+      @marker = marker.to_s
+      @confirm_install = confirm_install.to_s
+      @confirm_uninstall = confirm_uninstall.to_s
+      @display_name = display_name.to_s
+      @description = description.to_s
+      @keep_alive = keep_alive.to_s
+      raise ArgumentError, "unit name is invalid" unless @unit_name.match?(/\Asoul-model-[a-z0-9-]+\.service\z/)
+      raise ArgumentError, "deployment marker is invalid" unless @marker.start_with?("# Managed by Soul ")
+      raise ArgumentError, "confirmation phrase is invalid" unless [@confirm_install, @confirm_uninstall].all? { |value| value.match?(/\A[A-Z0-9_]{8,80}\z/) }
+      raise ArgumentError, "display name is invalid" unless @display_name.match?(/\A[A-Za-z0-9 -]{2,40}\z/)
+      raise ArgumentError, "service description is invalid" unless @description.match?(/\A[A-Za-z0-9 .\/-]{4,100}\z/)
+      raise ArgumentError, "keep-alive is invalid" unless @keep_alive.match?(/\A(?:-1|\d+[smh])\z/)
     end
 
     def plan(expected_ollama_sha256:, source_model:, api_model:, expected_model_digest:, host: "127.0.0.1", port: 8082, device: "0")
@@ -33,11 +48,11 @@ module SoulCore
       return inputs if inputs.is_a?(Result)
 
       unit = render_unit(inputs)
-      Result.new(ok: true, lifecycle_state: "blocked_for_human_review", message: "Inactive Gemma Ollama unit plan is ready for exact review.", details: {
-        "unit_name" => UNIT_NAME, "unit_path" => unit_path, "bind" => "#{inputs.fetch('host')}:#{inputs.fetch('port')}",
+      Result.new(ok: true, lifecycle_state: "blocked_for_human_review", message: "Inactive #{@display_name} Ollama unit plan is ready for exact review.", details: {
+        "unit_name" => @unit_name, "unit_path" => unit_path, "bind" => "#{inputs.fetch('host')}:#{inputs.fetch('port')}",
         "source_model" => inputs.fetch("source_model"), "api_model" => inputs.fetch("api_model"),
         "expected_model_digest" => inputs.fetch("expected_model_digest"), "ollama_sha256" => inputs.fetch("ollama_sha256"),
-        "unit_sha256" => Digest::SHA256.hexdigest(unit), "confirmation_phrase" => CONFIRM_INSTALL,
+        "unit_sha256" => Digest::SHA256.hexdigest(unit), "confirmation_phrase" => @confirm_install,
         "will_start" => false, "will_enable" => false, "will_select" => false,
         "commands" => [["systemctl", "--user", "daemon-reload"]]
       })
@@ -47,7 +62,7 @@ module SoulCore
       options = { expected_ollama_sha256:, source_model:, api_model:, expected_model_digest:, host:, port:, device: }
       planned = plan(**options)
       return planned unless planned.ok
-      return awaiting("Exact inactive-unit installation confirmation is required.", planned.details) unless confirmation == CONFIRM_INSTALL
+      return awaiting("Exact inactive-unit installation confirmation is required.", planned.details) unless confirmation == @confirm_install
 
       inputs = validate_inputs(**options)
       return inputs if inputs.is_a?(Result)
@@ -67,25 +82,25 @@ module SoulCore
       observed = status
       return observed unless observed.ok
       unless observed.details["load_state"] == "loaded" && observed.details["active_state"] == "inactive" && !observed.details["enabled"]
-        return blocked("Gemma Ollama unit did not remain loaded, inactive, and unenabled.", observed.details)
+        return blocked("#{@display_name} Ollama unit did not remain loaded, inactive, and unenabled.", observed.details)
       end
 
-      Result.new(ok: true, lifecycle_state: "complete", message: "Gemma Ollama unit installed inactive and unenabled.", details: planned.details.merge(observed.details).merge("written" => wrote))
+      Result.new(ok: true, lifecycle_state: "complete", message: "#{@display_name} Ollama unit installed inactive and unenabled.", details: planned.details.merge(observed.details).merge("written" => wrote))
     rescue SystemCallError, IOError => error
-      failed("Gemma Ollama unit installation failed safely: #{error.class}")
+      failed("#{@display_name} Ollama unit installation failed safely: #{error.class}")
     end
 
     def status
       return failed("systemctl is unavailable") unless executable?(@systemctl_path)
-      return Result.new(ok: true, lifecycle_state: "complete", message: "Gemma Ollama unit is not installed.", details: { "installed" => false, "unit_path" => unit_path, "load_state" => "not-found", "active_state" => "inactive", "enabled" => false }) unless File.exist?(unit_path) || File.symlink?(unit_path)
-      return failed("Gemma Ollama unit path is not a regular managed file") unless safe_managed_unit?
+      return Result.new(ok: true, lifecycle_state: "complete", message: "#{@display_name} Ollama unit is not installed.", details: { "installed" => false, "unit_path" => unit_path, "load_state" => "not-found", "active_state" => "inactive", "enabled" => false }) unless File.exist?(unit_path) || File.symlink?(unit_path)
+      return failed("#{@display_name} Ollama unit path is not a regular managed file") unless safe_managed_unit?
 
       load_state = property("LoadState")
       active_state = property("ActiveState")
       unit_file_state = property("UnitFileState")
-      return failed("Gemma Ollama unit state could not be read") if [load_state, active_state, unit_file_state].any?(&:nil?)
+      return failed("#{@display_name} Ollama unit state could not be read") if [load_state, active_state, unit_file_state].any?(&:nil?)
 
-      Result.new(ok: true, lifecycle_state: "complete", message: "Gemma Ollama unit status collected.", details: {
+      Result.new(ok: true, lifecycle_state: "complete", message: "#{@display_name} Ollama unit status collected.", details: {
         "installed" => true, "unit_path" => unit_path, "load_state" => load_state, "active_state" => active_state,
         "unit_file_state" => unit_file_state, "enabled" => %w[enabled enabled-runtime linked linked-runtime alias].include?(unit_file_state),
         "unit_sha256" => Digest::SHA256.file(unit_path).hexdigest
@@ -93,18 +108,18 @@ module SoulCore
     end
 
     def uninstall(confirmation: nil)
-      return awaiting("Exact inactive-unit removal confirmation is required.", "confirmation_phrase" => CONFIRM_UNINSTALL, "unit_path" => unit_path) unless confirmation == CONFIRM_UNINSTALL
+      return awaiting("Exact inactive-unit removal confirmation is required.", "confirmation_phrase" => @confirm_uninstall, "unit_path" => unit_path) unless confirmation == @confirm_uninstall
       current = status
       return current unless current.ok && current.details.fetch("installed")
-      return blocked("Gemma Ollama unit must be explicitly unloaded before removal.", current.details) unless current.details.fetch("active_state") == "inactive"
+      return blocked("#{@display_name} Ollama unit must be explicitly unloaded before removal.", current.details) unless current.details.fetch("active_state") == "inactive"
 
       File.unlink(unit_path)
       reload = run_systemctl("daemon-reload")
       return failed("systemd user-manager reload failed after removal", "stderr" => bounded(reload.stderr)) unless reload.success?
 
-      Result.new(ok: true, lifecycle_state: "complete", message: "Inactive Gemma Ollama unit removed.", details: { "removed" => unit_path, "service_stopped" => false })
+      Result.new(ok: true, lifecycle_state: "complete", message: "Inactive #{@display_name} Ollama unit removed.", details: { "removed" => unit_path, "service_stopped" => false })
     rescue SystemCallError, IOError => error
-      failed("Gemma Ollama unit removal failed safely: #{error.class}")
+      failed("#{@display_name} Ollama unit removal failed safely: #{error.class}")
     end
 
     private
@@ -120,8 +135,8 @@ module SoulCore
       errors << "Source model tag is invalid." unless source_model.to_s.match?(MODEL)
       errors << "API model alias is invalid." unless api_model.to_s.match?(MODEL)
       errors << "Expected model digest must be lowercase hexadecimal." unless expected_model_digest.to_s.match?(SHA256)
-      errors << "Gemma Ollama service must bind exact loopback host 127.0.0.1." unless host.to_s == "127.0.0.1"
-      errors << "Gemma Ollama service port must be unprivileged." unless numeric_port&.between?(1024, 65_535)
+      errors << "#{@display_name} Ollama service must bind exact loopback host 127.0.0.1." unless host.to_s == "127.0.0.1"
+      errors << "#{@display_name} Ollama service port must be unprivileged." unless numeric_port&.between?(1024, 65_535)
       errors << "Vulkan device must be one decimal identifier." unless device.to_s.match?(/\A\d\z/)
       errors << "systemctl is unavailable." unless executable?(@systemctl_path)
       errors << "systemd-analyze is unavailable." unless executable?(@systemd_analyze_path)
@@ -137,16 +152,16 @@ module SoulCore
         "OLLAMA_HOST" => "#{inputs.fetch('host')}:#{inputs.fetch('port')}", "OLLAMA_VULKAN" => "1",
         "GGML_VK_VISIBLE_DEVICES" => inputs.fetch("device"), "OLLAMA_NO_CLOUD" => "1", "OLLAMA_NOHISTORY" => "1",
         "OLLAMA_MAX_LOADED_MODELS" => "1", "OLLAMA_NUM_PARALLEL" => "1", "OLLAMA_CONTEXT_LENGTH" => "16384",
-        "OLLAMA_KEEP_ALIVE" => "5m"
+        "OLLAMA_KEEP_ALIVE" => @keep_alive
       }
       <<~UNIT
-        #{MARKER}
+        #{@marker}
         # ollama-sha256=#{inputs.fetch("ollama_sha256")}
         # source-model=#{inputs.fetch("source_model")}
         # api-model=#{inputs.fetch("api_model")}
         # expected-model-digest=#{inputs.fetch("expected_model_digest")}
         [Unit]
-        Description=Soul Gemma AMD Vulkan Ollama runtime
+        Description=#{@description}
         After=network.target
         StartLimitIntervalSec=60
         StartLimitBurst=3
@@ -174,20 +189,20 @@ module SoulCore
     end
 
     def validate_rendered_unit(content)
-      Tempfile.create(["soul-model-gemma", ".service"]) do |file|
+      Tempfile.create([@unit_name.delete_suffix(".service"), ".service"]) do |file|
         file.write(content); file.flush
         result = @runner.run(@systemd_analyze_path, "--user", "verify", file.path, timeout_seconds: COMMAND_TIMEOUT_SECONDS, max_output_bytes: MAX_OUTPUT_BYTES)
-        return failed("systemd rejected the rendered Gemma Ollama unit", "stderr" => bounded(result.stderr)) unless result.success?
+        return failed("systemd rejected the rendered #{@display_name} Ollama unit", "stderr" => bounded(result.stderr)) unless result.success?
       end
       Result.new(ok: true, lifecycle_state: "complete", message: "Rendered unit is valid.", details: {})
     end
 
     def existing_unit(rendered)
       return :missing unless File.exist?(unit_path) || File.symlink?(unit_path)
-      return failed("refusing symlink or non-regular Gemma Ollama unit destination") unless safe_managed_unit?
+      return failed("refusing symlink or non-regular #{@display_name} Ollama unit destination") unless safe_managed_unit?
       return :matching if File.binread(unit_path, 128 * 1024) == rendered
 
-      failed("existing Gemma Ollama unit differs from the reviewed deployment")
+      failed("existing #{@display_name} Ollama unit differs from the reviewed deployment")
     end
 
     def write_unit(content)
@@ -204,7 +219,7 @@ module SoulCore
 
     def safe_managed_unit?
       stat = File.lstat(unit_path)
-      stat.file? && !stat.symlink? && File.binread(unit_path, 128 * 1024).start_with?(MARKER)
+      stat.file? && !stat.symlink? && File.binread(unit_path, 128 * 1024).start_with?(@marker)
     rescue Errno::ENOENT, Errno::EACCES
       false
     end
@@ -217,9 +232,9 @@ module SoulCore
     end
 
     def executable?(path) = !path.to_s.empty? && File.file?(path) && File.executable?(path)
-    def unit_path = File.join(@home, ".config/systemd/user", UNIT_NAME)
+    def unit_path = File.join(@home, ".config/systemd/user", @unit_name)
     def property(name)
-      result = @runner.run(@systemctl_path, "--user", "show", UNIT_NAME, "--property=#{name}", "--value", "--no-pager", timeout_seconds: COMMAND_TIMEOUT_SECONDS, max_output_bytes: MAX_OUTPUT_BYTES)
+      result = @runner.run(@systemctl_path, "--user", "show", @unit_name, "--property=#{name}", "--value", "--no-pager", timeout_seconds: COMMAND_TIMEOUT_SECONDS, max_output_bytes: MAX_OUTPUT_BYTES)
       result.success? ? result.stdout.to_s.strip : nil
     end
     def run_systemctl(*args) = @runner.run(@systemctl_path, "--user", *args, timeout_seconds: COMMAND_TIMEOUT_SECONDS, max_output_bytes: MAX_OUTPUT_BYTES)

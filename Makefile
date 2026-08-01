@@ -20,6 +20,10 @@ OLLAMA_MODEL ?= gemma4:12b-it-q4_K_M
 GEMMA_SOURCE_MODEL ?= $(OLLAMA_MODEL)
 GEMMA_API_MODEL ?= soul-local-chat
 GEMMA_PORT ?= 8082
+DEV_SOURCE_MODEL ?= gpt-oss:20b
+DEV_API_MODEL ?= $(DEV_SOURCE_MODEL)
+DEV_MODEL_DIGEST ?= 17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7
+DEV_PORT ?= 18083
 AMD_SERVER ?=
 AMD_MODEL ?=
 AMD_SERVER_SHA256 ?=
@@ -75,6 +79,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff
+.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -219,6 +224,10 @@ help:
 > @echo "  make model-runtime-gemma-plan OLLAMA_SHA256=... GEMMA_MODEL_DIGEST=..."
 > @echo "  make model-runtime-gemma-install ... CONFIRM=INSTALL_INACTIVE_GEMMA_OLLAMA_UNIT"
 > @echo "  make model-runtime-gemma-status"
+> @echo "  make model-runtime-dev-plan OLLAMA_SHA256=... [DEV_SOURCE_MODEL=gpt-oss:20b]"
+> @echo "  make model-runtime-dev-install ... CONFIRM=INSTALL_INACTIVE_DEV_OLLAMA_UNIT"
+> @echo "  make model-runtime-dev-status"
+> @echo "  make model-runtime-dev-uninstall CONFIRM=REMOVE_INACTIVE_DEV_OLLAMA_UNIT"
 > @echo "  make model-runtime-startup-plan"
 > @echo "  make model-runtime-startup-install CONFIRM=INSTALL_SELECTED_MODEL_STARTUP"
 > @echo "  make model-runtime-startup-status"
@@ -781,11 +790,19 @@ verify-model-runtime-controls:
 > @ruby scripts/verify-core-orchestration.rb
 > @ruby scripts/verify-model-runtime-profile-deployment.rb
 > @ruby scripts/verify-ollama-model-runtime-deployment.rb
+> @ruby scripts/verify-dev-core-runtime.rb
+> @ruby scripts/verify-dev-core-skill-build.rb
 > @ruby scripts/verify-model-runtime-selected-startup.rb
 > @ruby scripts/verify-model-runtime-identity-2e.rb
 
 verify-dev-core-model-bakeoff:
 > @ruby scripts/verify-dev-core-model-bakeoff.rb
+
+verify-dev-core-runtime:
+> @ruby scripts/verify-dev-core-runtime.rb
+
+verify-dev-core-skill-build:
+> @ruby scripts/verify-dev-core-skill-build.rb
 
 verify-character-identity:
 > @ruby scripts/verify-character-identity-palette.rb
@@ -819,6 +836,21 @@ model-runtime-gemma-status:
 model-runtime-gemma-uninstall:
 > @test "$(CONFIRM)" = "REMOVE_INACTIVE_GEMMA_OLLAMA_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_GEMMA_OLLAMA_UNIT; active units are never stopped implicitly."; exit 2; }
 > @ruby scripts/soul-model-runtime-gemma uninstall --confirmation "$(CONFIRM)"
+
+model-runtime-dev-plan:
+> @test -n "$(OLLAMA_SHA256)" -a -n "$(DEV_MODEL_DIGEST)" || { echo "OLLAMA_SHA256 and DEV_MODEL_DIGEST are required."; exit 2; }
+> @ruby scripts/soul-model-runtime-dev plan --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(DEV_SOURCE_MODEL)" --api-model "$(DEV_API_MODEL)" --model-digest "$(DEV_MODEL_DIGEST)" --port "$(DEV_PORT)"
+
+model-runtime-dev-install:
+> @test "$(CONFIRM)" = "INSTALL_INACTIVE_DEV_OLLAMA_UNIT" || { echo "Run model-runtime-dev-plan first, then set CONFIRM=INSTALL_INACTIVE_DEV_OLLAMA_UNIT."; exit 2; }
+> @ruby scripts/soul-model-runtime-dev install --ollama-sha256 "$(OLLAMA_SHA256)" --source-model "$(DEV_SOURCE_MODEL)" --api-model "$(DEV_API_MODEL)" --model-digest "$(DEV_MODEL_DIGEST)" --port "$(DEV_PORT)" --confirmation "$(CONFIRM)"
+
+model-runtime-dev-status:
+> @ruby scripts/soul-model-runtime-dev status
+
+model-runtime-dev-uninstall:
+> @test "$(CONFIRM)" = "REMOVE_INACTIVE_DEV_OLLAMA_UNIT" || { echo "Set CONFIRM=REMOVE_INACTIVE_DEV_OLLAMA_UNIT; active units are never stopped implicitly."; exit 2; }
+> @ruby scripts/soul-model-runtime-dev uninstall --confirmation "$(CONFIRM)"
 
 model-runtime-startup-plan:
 > @ruby scripts/soul-model-runtime-startup plan

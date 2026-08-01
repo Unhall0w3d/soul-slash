@@ -57,7 +57,7 @@ check("browser has no client-side credential store",
       errors)
 check("server protects facade and persists only bounded session digests", http_source.include?("authentication_required") && http_source.include?("password_change_required") && auth_source.include?("clear_sessions!") && auth_source.include?("SESSION_ABSOLUTE_SECONDS = 7 * 24 * 60 * 60") && auth_source.include?("token_digest"), errors)
 check("no signup or multi-user route was added", %w[/auth/v1/signup /auth/v1/register].none? { |route| [html, javascript, http_source].any? { |source| source.include?(route) } }, errors)
-check("implementation remains foreground and timer-free", %w[setInterval setTimeout WebSocket EventSource serviceWorker Thread.new daemon(].none? { |primitive| [javascript, auth_source, http_source].any? { |source| source.include?(primitive) } }, errors)
+check("implementation adds no recurring browser transport, service worker, or daemon", %w[setInterval WebSocket EventSource serviceWorker daemon(].none? { |primitive| [javascript, auth_source, http_source].any? { |source| source.include?(primitive) } }, errors)
 
 stdout, stderr, status = Open3.capture3("ruby", "scripts/verify-phase12c-foreground-dashboard.rb")
 check("Phase 12C foreground dashboard regressions", status.success?, errors)

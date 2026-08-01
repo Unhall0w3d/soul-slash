@@ -27,6 +27,13 @@ A lightweight environment snapshot loads once when the page opens. Deeper checks
 
 Results are snapshots, not continuous monitoring. Refresh or run the relevant scope again after the machine changes.
 
+Dev Core is suitable for a separately invoked, review-only synthesis of
+already-collected bounded evidence. It does not replace deterministic
+collection, classify safety, authorize host mutation, or turn a recommendation
+into an action. This integration slice establishes that local development lane;
+the existing Self Assessment controls remain deterministic until a dedicated
+review action is separately exposed and accepted.
+
 ## Recommendations and proposals
 
 Assessment findings may produce recommendations. **Generate proposal packets** previews the exact current capability-derived set, binds it to a digest, and writes advisory packets only after confirmation.

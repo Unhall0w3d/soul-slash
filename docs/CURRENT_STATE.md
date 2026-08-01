@@ -93,9 +93,16 @@ The dashboard has one personal administrator boundary. First-run `admin` / `soul
 
 ### Self Improvement
 
-- **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations.
+- **Skill Studio** separates Proposals, Operator-invoked Beta candidates, and Production skills. Gate 1 approves exact scope; the reviewed local GPT-OSS Dev lane can draft one proposal-local read-only candidate and run it through networkless deterministic checks; Gate 2 approves an exact tested revision; production promotion and completed-proposal closeout remain separate mutations. GPT-OSS-generated Betas remain sandboxed during human trials.
 - **Self Assessment** collects bounded host, update, runtime, capability, and storage evidence. It can prepare advisory proposals and terminal handoffs but cannot mutate the host.
 - **Self Augmentation** creates human-authored architecture proposals, exact allowed-file experiments in isolated worktrees, deterministic candidate dossiers, and external integration handoffs. It cannot invoke Codex, merge, push, or deploy.
+
+The current Core taxonomy is Soul Core (`daily`), Soul-Lite Core (`amd-free`),
+Creative Core (`music`), Free Core (`free`), and Dev Core (`dev`). Free Core
+unloads all chat and development models and locks the Dashboard to Core
+selection. Dev Core pairs Qwen chat on NVIDIA with digest-pinned GPT-OSS 20B on
+AMD. Scoped Dev work restores the prior eligible Core and never preempts
+Creative work. Mistral remains an explicit fallback only.
 
 ### Creative Studios
 

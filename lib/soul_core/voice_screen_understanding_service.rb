@@ -108,7 +108,7 @@ module SoulCore
       unless ready["ready"]
         return terminal_exchange(
           chat_id: chat_id, transcript: transcript, state: ready.fetch("lifecycle_state", "awaiting_input"),
-          reason: ready.fetch("reason", "Daily Core is required for screen understanding"),
+          reason: ready.fetch("reason", "Soul Core is required for screen understanding"),
           mode: parsed.fetch("mode")
         )
       end

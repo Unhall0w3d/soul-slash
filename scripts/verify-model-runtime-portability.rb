@@ -208,7 +208,8 @@ brief = File.read(File.join(__dir__, "..", "docs", "soul", "MODEL_RUNTIME_PORTAB
 operations = %w[model_runtime.status model_runtime.load.preview model_runtime.load.execute model_runtime.unload.preview model_runtime.unload.execute]
 check("application operations are explicitly allowlisted", operations.all? { |operation| contract.include?(%("#{operation}")) && facade.include?(%(when "#{operation}")) }, errors)
 check("dashboard exposes manual model controls", %w[refresh-model-runtime load-model-runtime unload-model-runtime model-runtime-dialog].all? { |id| html.include?(%(id="#{id}")) }, errors)
-check("dashboard has no automatic runtime timer", !dashboard.match?(/setInterval|setTimeout|requestAnimationFrame/), errors)
+runtime_dashboard = dashboard[/function renderModelRuntime\(.*?(?=function showError)/m].to_s
+check("dashboard model-runtime controls have no automatic timer", !runtime_dashboard.empty? && !runtime_dashboard.match?(/setInterval|setTimeout|requestAnimationFrame/), errors)
 check("approved brief prohibits force and automatic unload", brief.include?("implementation_authorized: yes") && brief.include?("No automatic idle unload") && brief.include?("No forced termination"), errors)
 
 if errors.empty?

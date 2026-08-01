@@ -42,10 +42,10 @@ module SoulCore
 
     def status
       core = read_json(File.join(@root, "Soul/runtime/model_runtime/core_selection.json"))
-      return { "ready" => false, "lifecycle_state" => "awaiting_input", "reason" => "Daily Core is required for picture understanding", "active_core_id" => core["active_core_id"] } unless core["active_core_id"] == "daily"
+      return { "ready" => false, "lifecycle_state" => "awaiting_input", "reason" => "Soul Core is required for picture understanding", "active_core_id" => core["active_core_id"] } unless core["active_core_id"] == "daily"
 
       profile = daily_profile
-      return { "ready" => false, "lifecycle_state" => "blocked_for_human_review", "reason" => "Daily Core does not resolve to the reviewed Ollama profile" } unless profile && profile["runtime"] == "ollama_openai"
+      return { "ready" => false, "lifecycle_state" => "blocked_for_human_review", "reason" => "Soul Core does not resolve to the reviewed Ollama profile" } unless profile && profile["runtime"] == "ollama_openai"
 
       { "ready" => true, "profile" => profile }
     end

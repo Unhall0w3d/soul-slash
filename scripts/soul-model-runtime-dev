@@ -1,0 +1,48 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/dev_model_runtime_coordinator"
+require_relative "../lib/soul_core/ollama_model_runtime_deployment"
+
+options = {
+  host: "127.0.0.1",
+  port: 18_083,
+  device: "0",
+  source_model: SoulCore::DevModelRuntimeCoordinator::DEFAULT_MODEL,
+  api_model: SoulCore::DevModelRuntimeCoordinator::DEFAULT_MODEL,
+  expected_model_digest: SoulCore::DevModelRuntimeCoordinator::DEFAULT_DIGEST
+}
+parser = OptionParser.new do |value|
+  value.banner = "Usage: scripts/soul-model-runtime-dev COMMAND [options]"
+  value.on("--ollama-sha256 SHA") { |item| options[:expected_ollama_sha256] = item }
+  value.on("--source-model TAG") { |item| options[:source_model] = item }
+  value.on("--api-model ALIAS") { |item| options[:api_model] = item }
+  value.on("--model-digest SHA") { |item| options[:expected_model_digest] = item }
+  value.on("--host HOST") { |item| options[:host] = item }
+  value.on("--port PORT", Integer) { |item| options[:port] = item }
+  value.on("--device ID") { |item| options[:device] = item }
+  value.on("--confirmation PHRASE") { |item| options[:confirmation] = item }
+end
+
+command = ARGV.shift
+parser.parse!(ARGV)
+deployment = SoulCore::OllamaModelRuntimeDeployment.new(
+  unit_name: SoulCore::DevModelRuntimeCoordinator::UNIT_NAME,
+  marker: "# Managed by Soul Dev Core Ollama Runtime Deployment",
+  confirm_install: "INSTALL_INACTIVE_DEV_OLLAMA_UNIT",
+  confirm_uninstall: "REMOVE_INACTIVE_DEV_OLLAMA_UNIT",
+  display_name: "GPT-OSS Dev Core",
+  description: "Soul GPT-OSS Dev Core AMD Vulkan Ollama runtime",
+  keep_alive: "30m"
+)
+result = case command
+         when "plan" then deployment.plan(**options.except(:confirmation))
+         when "install" then deployment.install(**options)
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else warn(parser); exit(1)
+         end
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (%w[awaiting_input blocked_for_human_review].include?(result.lifecycle_state) ? 2 : 1))

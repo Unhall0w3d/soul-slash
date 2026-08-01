@@ -492,7 +492,7 @@ module SoulCore
       data = envelope.fetch("data", {})
       core_id = data["active_core_id"] || data["selected_core_id"]
       allowed = %w[amd-free music].include?(core_id) && data["active_profile_id"] != "amd-gemma"
-      { "allowed" => allowed, "core_id" => core_id, "reason" => allowed ? "AMD is assigned to foreground creative work" : "Activate AMD-Free Core or Music Core before visual generation" }
+      { "allowed" => allowed, "core_id" => core_id, "reason" => allowed ? "AMD is assigned to foreground creative work" : "Activate Soul-Lite Core or Creative Core before visual generation" }
     rescue StandardError
       { "allowed" => false, "core_id" => "unknown", "reason" => "Core state could not be verified safely" }
     end

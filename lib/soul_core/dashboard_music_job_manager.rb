@@ -10,7 +10,7 @@ module SoulCore
   class DashboardMusicJobManager
     JOB_ID = /\Ajob_[a-f0-9]{16}\z/
     ACTIVE_STATES = %w[accepted running].freeze
-    OPERATIONS = %w[music.generation.execute music.candidates.revision.execute chats.creative.execute].freeze
+    OPERATIONS = %w[music.generation.execute music.candidates.revision.execute chats.creative.execute skill_studio.betas.dev_build.execute].freeze
     MAX_RECORDS = 100
 
     def initialize(root:, facade:, clock: -> { Time.now }, id_generator: -> { SecureRandom.hex(8) })
@@ -34,9 +34,12 @@ module SoulCore
       candidate_id = parameters["candidate_id"].to_s
       chat_id = parameters["chat_id"].to_s
       flow_id = parameters["flow_id"].to_s
+      beta_id = parameters["beta_id"].to_s
       if operation == "chats.creative.execute"
         raise ArgumentError, "creative job chat_id is invalid" unless chat_id.match?(/\Achat_[A-Za-z0-9_.-]+\z/)
         raise ArgumentError, "creative job flow_id is invalid" unless flow_id.match?(/\Acreative_[a-f0-9]{16}\z/)
+      elsif operation == "skill_studio.betas.dev_build.execute"
+        raise ArgumentError, "development job beta_id is invalid" unless beta_id.match?(/\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/)
       else
         raise ArgumentError, "music job project_id is invalid" unless project_id.match?(/\Amusic_[a-f0-9]{16}\z/)
         raise ArgumentError, "music job candidate_id is invalid" unless candidate_id.match?(/\Acandidate_[a-f0-9]{16}\z/)
@@ -55,8 +58,9 @@ module SoulCore
           "schema_version" => "soul.dashboard.music_job.v1", "job_id" => "job_#{@id_generator.call}",
           "operation" => operation, "project_id" => project_id.empty? ? nil : project_id, "candidate_id" => candidate_id.empty? ? nil : candidate_id,
           "chat_id" => chat_id.empty? ? nil : chat_id, "flow_id" => flow_id.empty? ? nil : flow_id,
+          "beta_id" => beta_id.empty? ? nil : beta_id,
           "request_digest" => digest, "status" => "accepted", "lifecycle_state" => "awaiting_input",
-          "latest_progress" => { "stage" => "accepted", "message" => "Generation accepted by the bounded dashboard worker" },
+          "latest_progress" => { "stage" => "accepted", "message" => "Bounded creative or development work accepted by the dashboard worker" },
           "created_at" => now, "updated_at" => now, "result" => nil
         }
         raise ArgumentError, "music job id is invalid" unless record["job_id"].match?(JOB_ID)
@@ -192,7 +196,7 @@ module SoulCore
     end
 
     def public_record(record)
-      record.slice("job_id", "operation", "project_id", "candidate_id", "chat_id", "flow_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
+      record.slice("job_id", "operation", "project_id", "candidate_id", "chat_id", "flow_id", "beta_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
     end
 
     def safe_progress(event)

@@ -341,6 +341,8 @@ module SoulCore
       when "skill_studio.proposals.close.execute" then domain(skill_studio.close_production_proposal(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.list" then domain(skill_studio.betas(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
       when "skill_studio.betas.get" then domain(skill_studio.beta(beta_id: required(parameters, "beta_id")))
+      when "skill_studio.betas.dev_build.preview" then domain(skill_studio.dev_build_preview(beta_id: required(parameters, "beta_id")))
+      when "skill_studio.betas.dev_build.execute" then domain(skill_studio.build_beta_with_dev_core(beta_id: required(parameters, "beta_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], on_progress: progress))
       when "skill_studio.betas.run.preview" then domain(skill_studio.beta_run_preview(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", [])))
       when "skill_studio.betas.run.execute" then domain(skill_studio.run_beta(beta_id: required(parameters, "beta_id"), args: parameters.fetch("args", []), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "skill_studio.betas.promotion.preview" then domain(skill_studio.promotion_preview(beta_id: required(parameters, "beta_id")))

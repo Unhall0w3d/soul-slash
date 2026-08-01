@@ -5,10 +5,13 @@ require "fileutils"
 require "json"
 require "open3"
 require "pathname"
+require "securerandom"
 require "time"
 require "timeout"
 require "yaml"
 require_relative "skill_registry"
+require_relative "bounded_command_runner"
+require_relative "local_development_model_client"
 
 module SoulCore
   class SkillStudioService
@@ -26,6 +29,10 @@ module SoulCore
     MAX_ARG_BYTES = 4 * 1024
     MAX_OUTPUT_BYTES = 32 * 1024
     MAX_TIMEOUT_SECONDS = 60
+    DEV_BUILD_CONFIRMATION_PREFIX = "BUILD_BETA_WITH_DEV_CORE"
+    DEV_MODEL_MAX_TOKENS = 8_192
+    DEV_TEST_LIMIT = 12
+    DEV_SOURCE_DENY = /(?:\bsystem\s*\(|\bexec\s*\(|\bspawn\s*\(|IO\.popen|Open3|File\.(?:write|open|delete|unlink|rename)|Net::|TCPSocket|UDPSocket|Socket\.|Process\.(?:spawn|fork)|Thread\.new|`)/
 
     CLOSE_CONFIRMATION = "CLOSE_PRODUCTION_PROPOSAL"
     BETA_BUILD_CONFIRMATION_PREFIX = "PREPARE_BETA_BUILD"
@@ -35,10 +42,16 @@ module SoulCore
     PRODUCTION_RECEIPT = "PROMOTION.json"
     SKILL_ID = /\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/
 
-    def initialize(root: Dir.pwd, clock: -> { Time.now }, production_registry: nil)
+    def initialize(root: Dir.pwd, clock: -> { Time.now }, production_registry: nil,
+                   development_model_client: nil, runner: BoundedCommandRunner.new,
+                   ruby_path: "/usr/bin/ruby", bwrap_path: "/usr/bin/bwrap")
       @root = File.expand_path(root)
       @clock = clock
       @production_registry = production_registry
+      @development_model_client = development_model_client
+      @runner = runner
+      @ruby_path = ruby_path
+      @bwrap_path = bwrap_path
     end
 
     def proposals(limit: MAX_RECORDS)
@@ -180,6 +193,70 @@ module SoulCore
       success({ "record" => beta_projection(*located, detail: true), "read_only" => true })
     end
 
+    def dev_build_preview(beta_id:)
+      located = locate_beta(beta_id)
+      return awaiting("unknown Beta skill ID") unless located
+      directory, manifest, proposal_directory = located
+      return blocked("legacy alpha scaffold cannot use Dev Core") if manifest["schema_version"] != "soul.beta.v1"
+      return blocked("proposal Gate 1 approval is required") unless read_state(proposal_directory).dig("proposal_gate", "status") == "approved"
+      return blocked("Beta implementation is already complete") if manifest["implementation_complete"] == true
+      return blocked("Beta package path must not be a symlink") if File.symlink?(directory)
+
+      scope = dev_build_scope(directory, manifest, proposal_directory)
+      success({
+        "beta_id" => beta_id,
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => "#{DEV_BUILD_CONFIRMATION_PREFIX} #{beta_id}",
+        "effect" => "run one local GPT-OSS draft, isolated syntax and behavior tests, then return a Beta candidate for human review",
+        "model" => LocalDevelopmentModelClient::MODEL,
+        "automatic_repair_attempts" => 0,
+        "production_modified" => false,
+        "vault_access" => false,
+        "scope" => scope
+      }, lifecycle: "blocked_for_human_review")
+    end
+
+    def build_beta_with_dev_core(beta_id:, expected_digest:, confirmation:, on_progress: nil)
+      located = locate_beta(beta_id)
+      return awaiting("unknown Beta skill ID") unless located
+      directory, manifest, proposal_directory = located
+      return awaiting("exact Dev Core Beta build confirmation is required") unless confirmation == "#{DEV_BUILD_CONFIRMATION_PREFIX} #{beta_id}"
+      return blocked("proposal Gate 1 approval is required") unless read_state(proposal_directory).dig("proposal_gate", "status") == "approved"
+      return blocked("Beta implementation is already complete") if manifest["implementation_complete"] == true
+      scope = dev_build_scope(directory, manifest, proposal_directory)
+      return blocked("Beta or proposal changed after preview; review the current revision") unless secure_equal?(expected_digest, digest(scope))
+
+      progress(on_progress, "dev_build_drafting", "GPT-OSS is drafting one proposal-bound Beta candidate.")
+      response = development_model_client.chat(
+        messages: dev_build_messages(directory, manifest, proposal_directory),
+        purpose: "Skill Studio Beta build #{beta_id}",
+        response_schema: dev_build_schema,
+        temperature: 0.1,
+        max_tokens: DEV_MODEL_MAX_TOKENS,
+        reasoning: true,
+        on_progress: on_progress,
+        request_id: "skill_dev_#{SecureRandom.hex(10)}"
+      )
+      return failed("Dev Core draft failed safely: #{response.error_message}") unless response.ok? && response.structured.is_a?(Hash)
+
+      candidate = validate_dev_candidate(response.structured, beta_id)
+      return candidate if candidate.is_a?(Hash) && candidate["lifecycle_state"]
+      progress(on_progress, "dev_build_testing", "Running isolated syntax and model-declared behavior checks.")
+      result = materialize_and_test_dev_candidate(directory, manifest, candidate, response)
+      lifecycle = result.fetch("implementation_complete") ? "blocked_for_human_review" : "failed"
+      success(result.merge(
+        "beta_id" => beta_id,
+        "provider" => response.to_h,
+        "production_modified" => false,
+        "vault_access" => false,
+        "human_review_required" => true
+      ), lifecycle:, mutation: "dev_core_beta_candidate_built_and_tested")
+    rescue StandardError => error
+      failed("Dev Core Beta build failed safely: #{error.class}: #{error.message}"[0, 1_000])
+    ensure
+      FileUtils.remove_entry_secure(staging) if defined?(staging) && staging && File.directory?(staging) && File.dirname(staging) == directory
+    end
+
     def beta_run_preview(beta_id:, args: [])
       located = locate_beta(beta_id)
       return awaiting("unknown Beta skill ID") unless located
@@ -200,6 +277,7 @@ module SoulCore
           "confirmation_phrase" => "RUN_BETA_SKILL #{beta_id}",
           "argument_count" => validated_args.length,
           "timeout_seconds" => execution_timeout(manifest),
+          "execution_isolation" => manifest["development_provider"] == "local.dev" ? "networkless_read_only_bubblewrap" : "bounded_local_process",
           "diagnostic_logging" => "bounded local JSONL; output may contain skill-produced content",
           "production_skill" => false
         },
@@ -519,6 +597,269 @@ module SoulCore
       MARKDOWN
     end
 
+    def dev_build_scope(directory, manifest, proposal_directory)
+      {
+        "operation" => "skill_studio_dev_beta_build",
+        "beta_id" => manifest.fetch("skill_id"),
+        "proposal_id" => File.basename(proposal_directory),
+        "proposal_digest" => proposal_digest(proposal_directory),
+        "beta_digest" => beta_digest(directory, manifest),
+        "gate_1_digest" => read_state(proposal_directory).dig("proposal_gate", "proposal_digest"),
+        "implementation_complete" => manifest["implementation_complete"] == true,
+        "allowed_root" => relative(directory),
+        "model" => LocalDevelopmentModelClient::MODEL,
+        "model_digest" => DevModelRuntimeCoordinator::DEFAULT_DIGEST,
+        "test_limit" => DEV_TEST_LIMIT,
+        "network_access" => false,
+        "production_mutation" => false,
+        "vault_access" => false
+      }
+    end
+
+    def dev_build_messages(directory, manifest, proposal_directory)
+      proposal = read_text(File.join(proposal_directory, "proposal.md"))
+      implementation = read_text(File.join(directory, "IMPLEMENTATION.md"))
+      [{
+        "role" => "system",
+        "content" => <<~PROMPT
+          You are Soul's local Dev Core drafting one candidate Beta skill after human Gate 1 approval.
+          Return only the requested JSON object. Produce a self-contained Ruby CLI that reads bounded argv and prints exactly one JSON object.
+          Allowed runtime libraries: json, time, digest, uri. No shell commands, subprocesses, network, sockets, filesystem writes,
+          persistent processes, threads, dynamic loading, eval, secrets, credentials, private memory, or production mutation.
+          Every path remains inside the proposal-local Beta workspace. The candidate is not production and must end at human review.
+          Declare 1..#{DEV_TEST_LIMIT} deterministic tests. Each test must use argv only and expect ok plus a lifecycle state.
+        PROMPT
+      }, {
+        "role" => "user",
+        "content" => <<~PROMPT
+          Skill ID: #{manifest.fetch("skill_id")}
+
+          Approved proposal:
+          #{proposal}
+
+          Existing bounded implementation task pack:
+          #{implementation}
+
+          Draft the smallest complete read-only Beta candidate. If the proposal cannot be safely implemented within these bounds,
+          return a candidate whose default behavior clearly ends blocked_for_human_review and name the missing authority as a weakness.
+        PROMPT
+      }]
+    end
+
+    def dev_build_schema
+      {
+        "type" => "object",
+        "additionalProperties" => false,
+        "required" => %w[description risk requires_approval confirmation_phrase expected_output timeout_seconds inputs known_weaknesses failure_behavior skill_rb test_cases],
+        "properties" => {
+          "description" => { "type" => "string", "maxLength" => 500 },
+          "risk" => { "type" => "string", "enum" => ["read_only"] },
+          "requires_approval" => { "type" => "boolean" },
+          "confirmation_phrase" => { "type" => "string", "maxLength" => 80 },
+          "expected_output" => { "type" => "string", "enum" => ["json"] },
+          "timeout_seconds" => { "type" => "integer", "minimum" => 1, "maximum" => MAX_TIMEOUT_SECONDS },
+          "inputs" => { "type" => "array", "maxItems" => 20, "items" => { "type" => "string", "maxLength" => 200 } },
+          "known_weaknesses" => { "type" => "array", "maxItems" => 20, "items" => { "type" => "string", "maxLength" => 500 } },
+          "failure_behavior" => { "type" => "array", "minItems" => 1, "maxItems" => 20, "items" => { "type" => "string", "maxLength" => 500 } },
+          "skill_rb" => { "type" => "string", "maxLength" => MAX_TEXT_BYTES },
+          "test_cases" => {
+            "type" => "array", "minItems" => 1, "maxItems" => DEV_TEST_LIMIT,
+            "items" => {
+              "type" => "object", "additionalProperties" => false,
+              "required" => %w[id description args expected_ok expected_lifecycle],
+              "properties" => {
+                "id" => { "type" => "string", "pattern" => "^[a-z][a-z0-9_-]{1,63}$" },
+                "description" => { "type" => "string", "maxLength" => 300 },
+                "args" => { "type" => "array", "maxItems" => MAX_ARGS, "items" => { "type" => "string", "maxLength" => MAX_ARG_BYTES } },
+                "expected_ok" => { "type" => "boolean" },
+                "expected_lifecycle" => { "type" => "string", "enum" => %w[complete failed awaiting_input canceled blocked_for_human_review] }
+              }
+            }
+          }
+        }
+      }
+    end
+
+    def validate_dev_candidate(value, beta_id)
+      source = value["skill_rb"].to_s
+      tests = value["test_cases"]
+      return failed("Dev candidate source is empty or exceeds the Beta text limit") if source.empty? || source.bytesize > MAX_TEXT_BYTES
+      return failed("Dev candidate uses an operation outside the read-only Beta boundary") if source.match?(DEV_SOURCE_DENY)
+      return failed("Dev candidate tests are invalid") unless tests.is_a?(Array) && tests.length.between?(1, DEV_TEST_LIMIT)
+      return failed("Dev candidate test IDs must be unique and bounded") unless tests.all? { |item| item.is_a?(Hash) && item["id"].to_s.match?(/\A[a-z][a-z0-9_-]{1,63}\z/) } && tests.map { |item| item["id"] }.uniq.length == tests.length
+      return failed("Dev candidate test arguments are invalid") unless tests.all? { |item| validate_args(item["args"]).is_a?(Array) }
+      return failed("Dev candidate risk must remain read-only") unless value["risk"] == "read_only"
+      phrase = value["confirmation_phrase"].to_s
+      return failed("Dev candidate confirmation phrase is invalid") if value["requires_approval"] == true && !phrase.match?(/\A[A-Z][A-Z0-9_ ]{7,79}\z/)
+
+      {
+        "skill_id" => beta_id,
+        "description" => value["description"].to_s[0, 500],
+        "risk" => "read_only",
+        "requires_approval" => value["requires_approval"] == true,
+        "confirmation_phrase" => phrase,
+        "expected_output" => "json",
+        "timeout_seconds" => value["timeout_seconds"].to_i.clamp(1, MAX_TIMEOUT_SECONDS),
+        "inputs" => Array(value["inputs"]).map { |item| item.to_s[0, 200] }.first(20),
+        "known_weaknesses" => Array(value["known_weaknesses"]).map { |item| item.to_s[0, 500] }.first(20),
+        "failure_behavior" => Array(value["failure_behavior"]).map { |item| item.to_s[0, 500] }.first(20),
+        "skill_rb" => source,
+        "test_cases" => tests.first(DEV_TEST_LIMIT)
+      }
+    end
+
+    def materialize_and_test_dev_candidate(directory, previous_manifest, candidate, response)
+      staging = File.join(directory, ".dev-build-#{SecureRandom.hex(6)}")
+      Dir.mkdir(staging, 0o700)
+      source_path = File.join(staging, "skill.rb")
+      File.write(source_path, candidate.fetch("skill_rb"), mode: "w", perm: 0o600)
+      required_tests = [{ "id" => "ruby-syntax", "description" => "Ruby parser accepts the exact candidate", "kind" => "deterministic" }] +
+                       candidate.fetch("test_cases").map { |item| item.slice("id", "description").merge("kind" => "deterministic") }
+      manifest = previous_manifest.merge(
+        "description" => candidate.fetch("description"), "risk" => candidate.fetch("risk"),
+        "entrypoint" => "skill.rb", "implementation_complete" => true,
+        "timeout_seconds" => candidate.fetch("timeout_seconds"),
+        "requires_approval" => candidate.fetch("requires_approval"),
+        "confirmation_phrase" => candidate.fetch("confirmation_phrase"),
+        "writes_files" => false, "expected_output" => "json", "verifier" => "schema_basic",
+        "lifecycle_states" => %w[complete failed awaiting_input canceled blocked_for_human_review],
+        "inputs" => candidate.fetch("inputs"), "required_tests" => required_tests,
+        "known_weaknesses" => candidate.fetch("known_weaknesses"),
+        "failure_behavior" => candidate.fetch("failure_behavior"),
+        "development_provider" => "local.dev", "development_model" => LocalDevelopmentModelClient::MODEL,
+        "development_model_digest" => DevModelRuntimeCoordinator::DEFAULT_DIGEST
+      )
+      write_json(File.join(staging, BETA_MANIFEST), manifest)
+      results = []
+      syntax = @runner.run(@ruby_path, "--disable-gems", "-c", source_path, timeout_seconds: 10, max_output_bytes: MAX_OUTPUT_BYTES)
+      results << { "id" => "ruby-syntax", "passed" => syntax.success?, "stdout" => truncate(syntax.stdout), "stderr" => truncate(syntax.stderr) }
+      candidate.fetch("test_cases").each do |test|
+        execution = run_isolated_dev_test(staging, test, manifest.fetch("timeout_seconds"))
+        results << execution.merge("id" => test.fetch("id"))
+      end
+      passed = results.all? { |item| item["passed"] == true }
+      manifest["implementation_complete"] = passed
+      write_json(File.join(staging, BETA_MANIFEST), manifest)
+      candidate_digest = beta_digest(staging, manifest)
+      test_results = {
+        "schema_version" => "soul.beta_tests.v1", "tested_at" => now,
+        "beta_digest" => candidate_digest, "passed" => passed, "results" => results
+      }
+      write_json(File.join(staging, TEST_RESULTS), test_results)
+      File.write(File.join(staging, "REVIEW.md"), dev_candidate_review(candidate, response, results, passed), mode: "w", perm: 0o600)
+      %w[skill.rb beta_manifest.json test_results.json REVIEW.md].each do |name|
+        File.rename(File.join(staging, name), File.join(directory, name))
+      end
+      FileUtils.remove_entry_secure(staging)
+      {
+        "implementation_complete" => passed,
+        "test_summary" => { "declared" => results.length, "passed" => results.count { |item| item["passed"] }, "failed" => results.count { |item| !item["passed"] } },
+        "beta_digest" => candidate_digest,
+        "package_path" => relative(directory),
+        "review_artifact" => relative(File.join(directory, "REVIEW.md")),
+        "lifecycle_state" => passed ? "blocked_for_human_review" : "failed"
+      }
+    ensure
+      FileUtils.remove_entry_secure(staging) if staging && File.directory?(staging) && File.dirname(staging) == directory
+    end
+
+    def run_isolated_dev_test(staging, test, timeout_seconds)
+      return { "passed" => false, "reason" => "bubblewrap is unavailable" } unless safe_test_executable?(@bwrap_path) && safe_test_executable?(@ruby_path)
+      command = [@bwrap_path, "--unshare-all", "--die-with-parent", "--new-session", "--ro-bind", "/usr", "/usr"]
+      command.concat(["--ro-bind", "/lib", "/lib"]) if File.directory?("/lib")
+      command.concat(["--ro-bind", "/lib64", "/lib64"]) if File.directory?("/lib64")
+      command.concat(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--ro-bind", staging, "/work", "--chdir", "/work", @ruby_path, "--disable-gems", "skill.rb"])
+      command.concat(test.fetch("args"))
+      result = @runner.run(*command, timeout_seconds: timeout_seconds, max_output_bytes: MAX_OUTPUT_BYTES)
+      parsed = JSON.parse(result.stdout.to_s.lines.last.to_s)
+      passed = result.success? && parsed["ok"] == test.fetch("expected_ok") && parsed["lifecycle_state"] == test.fetch("expected_lifecycle")
+      { "passed" => passed, "exit_status" => result.exit_status, "stdout" => truncate(result.stdout), "stderr" => truncate(result.stderr) }
+    rescue JSON::ParserError, KeyError => error
+      { "passed" => false, "reason" => "isolated output was invalid: #{error.class}", "stdout" => truncate(result&.stdout), "stderr" => truncate(result&.stderr) }
+    end
+
+    def safe_test_executable?(path)
+      stat = File.lstat(path)
+      stat.file? && !stat.symlink? && File.executable?(path)
+    rescue Errno::ENOENT, Errno::EACCES
+      false
+    end
+
+    def dev_candidate_review(candidate, response, results, passed)
+      <<~MARKDOWN
+        # Beta Skill Candidate Review: #{candidate.fetch("skill_id")}
+
+        ## Implementation summary
+
+        Locally drafted by GPT-OSS and #{passed ? "accepted by" : "stopped at"} the isolated deterministic machine-test gate.
+
+        ## Files changed
+
+        - `skill.rb`
+        - `beta_manifest.json`
+        - `test_results.json`
+        - `REVIEW.md`
+
+        ## Commands run
+
+        - Ruby syntax check with gems disabled
+        - #{candidate.fetch("test_cases").length} networkless bubblewrap behavior test(s)
+
+        ## Deterministic test results
+
+        #{results.map { |item| "- #{item.fetch('id')}: #{item['passed'] ? 'passed' : 'failed'}" }.join("\n")}
+
+        ## Local LLM eval results
+
+        Provider `local.dev`; model `#{LocalDevelopmentModelClient::MODEL}`; request duration #{response.duration_seconds}s. LLM output did not decide safety or promotion.
+
+        ## Known weaknesses
+
+        #{candidate.fetch("known_weaknesses").map { |item| "- #{item}" }.join("\n")}
+
+        ## Memory keys
+
+        None. Soul Vault was not read or written.
+
+        ## Lifecycle states touched
+
+        `#{passed ? 'blocked_for_human_review' : 'failed'}`
+
+        ## Risk classification
+
+        `read_only`; generated candidates are denied shell, subprocess, network, persistence, and file-write APIs.
+
+        ## Human review checklist
+
+        - [ ] Read the complete generated entrypoint.
+        - [ ] Confirm declared inputs, outputs, failure behavior, and weaknesses match the approved proposal.
+        - [ ] Invoke the Beta manually with representative arguments.
+        - [ ] Approve Gate 2 only after reviewing current-revision test and diagnostic evidence.
+      MARKDOWN
+    end
+
+    def development_model_client
+      @development_model_client ||= LocalDevelopmentModelClient.new(root: @root)
+    end
+
+    def progress(callback, stage, message)
+      callback&.call("stage" => stage, "message" => message)
+    rescue StandardError
+      nil
+    end
+
+    def digest(value)
+      Digest::SHA256.hexdigest(JSON.generate(canonicalize(value)))
+    end
+
+    def canonicalize(value)
+      case value
+      when Hash then value.keys.map(&:to_s).sort.to_h { |key| [key, canonicalize(value.fetch(key))] }
+      when Array then value.map { |item| canonicalize(item) }
+      else value
+      end
+    end
+
     def production_promotion_context(beta_id)
       located = locate_beta(beta_id)
       return awaiting("unknown Beta skill ID") unless located
@@ -816,42 +1157,33 @@ module SoulCore
     def execute_beta(directory, manifest, args)
       entrypoint = File.expand_path(manifest.fetch("entrypoint"), directory)
       timeout_seconds = execution_timeout(manifest)
-      stdout = stderr = ""
-      status = nil
-      timed_out = false
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      Open3.popen3("ruby", entrypoint, *args, chdir: directory) do |stdin, out, err, wait_thread|
-        stdin.close
-        out_reader = Thread.new { out.read(MAX_OUTPUT_BYTES + 1) }
-        err_reader = Thread.new { err.read(MAX_OUTPUT_BYTES + 1) }
-        begin
-          Timeout.timeout(timeout_seconds) { status = wait_thread.value }
-        rescue Timeout::Error
-          timed_out = true
-          Process.kill("TERM", wait_thread.pid) rescue nil
-          begin
-            Timeout.timeout(2) { wait_thread.join }
-          rescue Timeout::Error
-            Process.kill("KILL", wait_thread.pid) rescue nil
-            wait_thread.join
-          end
-        ensure
-          stdout = out_reader.value.to_s
-          stderr = err_reader.value.to_s
-        end
+      isolated = manifest["development_provider"] == "local.dev"
+      if isolated && (!safe_test_executable?(@bwrap_path) || !safe_test_executable?(@ruby_path))
+        return { "ok" => false, "exit_status" => nil, "timed_out" => false, "duration_ms" => 0, "stdout" => "", "stderr" => "networkless Beta sandbox is unavailable", "output_truncated" => false }
       end
+      command = isolated ? isolated_beta_command(directory, args) : [@ruby_path, entrypoint, *args]
+      result = @runner.run(*command, timeout_seconds: timeout_seconds, max_output_bytes: MAX_OUTPUT_BYTES, chdir: isolated ? nil : directory)
       duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
       {
-        "ok" => !timed_out && status&.success? == true,
-        "exit_status" => status&.exitstatus,
-        "timed_out" => timed_out,
+        "ok" => result.success?,
+        "exit_status" => result.exit_status,
+        "timed_out" => result.status == "timeout",
         "duration_ms" => duration_ms,
-        "stdout" => truncate(stdout),
-        "stderr" => truncate(stderr),
-        "output_truncated" => stdout.bytesize > MAX_OUTPUT_BYTES || stderr.bytesize > MAX_OUTPUT_BYTES
+        "stdout" => truncate(result.stdout),
+        "stderr" => truncate(result.stderr),
+        "output_truncated" => result.truncated == true
       }
     rescue StandardError => error
       { "ok" => false, "exit_status" => nil, "timed_out" => false, "duration_ms" => 0, "stdout" => "", "stderr" => "#{error.class}: #{error.message}"[0, 1000], "output_truncated" => false }
+    end
+
+    def isolated_beta_command(directory, args)
+      command = [@bwrap_path, "--unshare-all", "--die-with-parent", "--new-session", "--ro-bind", "/usr", "/usr"]
+      command.concat(["--ro-bind", "/lib", "/lib"]) if File.directory?("/lib")
+      command.concat(["--ro-bind", "/lib64", "/lib64"]) if File.directory?("/lib64")
+      command.concat(["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--ro-bind", directory, "/work", "--chdir", "/work", @ruby_path, "--disable-gems", "skill.rb"])
+      command.concat(args)
     end
 
     def append_beta_log(beta_id, digest, argument_count, result)

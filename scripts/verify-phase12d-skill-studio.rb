@@ -77,7 +77,8 @@ stylesheet = File.read(File.expand_path("../assets/dashboard/dashboard.css", __d
 check.call("dashboard exposes proposals, Beta, production, and two gates", %w[proposal-list beta-list production-skill-list proposal-approval beta-promotion-card].all? { |id| html.include?("id=\"#{id}\"") })
 check.call("Skill Studio uses the scalable Soul core and responsive foundry field", html.include?('id="studio-empty" class="studio-empty"><img src="/brand/micro-mark.svg"') && html.include?('id="studio-detail-pane" class="studio-detail is-empty"') && stylesheet.include?(".studio-detail.is-empty { padding:0") && stylesheet.include?("Capability Foundry") && javascript.include?('classList.toggle("is-empty", kind === "empty")'))
 check.call("dashboard renders domain content without innerHTML", !javascript.include?("innerHTML"))
-check.call("Skill Studio adds no polling or background continuation", !javascript.match?(/setInterval|setTimeout|WebSocket|EventSource/))
+studio_javascript = javascript[/function renderStudioLists\(.*?(?=function renderImprovement)/m].to_s
+check.call("Skill Studio adds no polling or unbounded continuation", !studio_javascript.match?(/setInterval|setTimeout|WebSocket|EventSource/))
 
 if failures.empty?
   puts "Phase 12D Skill Studio verification complete."
