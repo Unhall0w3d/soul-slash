@@ -1,8 +1,8 @@
 # Maintenance Passwordless Authority A4 Review
 
 Status: A2 maintenance and separate reboot-only A3 live-accepted on 2026-07-29;
-A4 v4 candidate repairs exact yay install-reason bookkeeping after a successful
-2026-08-01 upgrade
+A4 v4 installed exactly on 2026-08-01 after repairing yay install-reason
+bookkeeping exposed by a successful upgrade
 
 ## What was implemented
 
@@ -118,6 +118,13 @@ git diff --check
   rejected yay's final `--asexplicit` bookkeeping call, so yay returned 1 and
   the separate Flatpak phase did not run. A4 v4 adds deterministic coverage for
   that exact vector without permitting arbitrary pacman database mutation.
+- The Operator approved deployment digest
+  `044448c8010277b9e66a2dab50dd24eab23f84b38e4b7a4e2a83b1733022d2ac`.
+  The installed root-owned helper reports `soul-maintenance-authority-a4-v4`,
+  matches SHA-256
+  `1394aa18dff9f8c5c469b5a59a93ce94126b73dd802a811543a62ea56ce34951`,
+  and passed the native passwordless self-check. Installation did not run a
+  package transaction or reboot.
 
 ## Local LLM eval results
 
@@ -188,7 +195,7 @@ no password and exposes no general command runner.
 - [x] Confirm A4 v1 exact self-check and arbitrary-operation rejection.
 - [x] Enable the ignored local A4 flag.
 - [x] Inspect and install the corrected A4 v3 helper and sudoers plan.
-- [ ] Inspect and install the A4 v4 install-reason repair.
+- [x] Inspect and install the A4 v4 install-reason repair.
 - [x] Run one supervised A2 transaction with zero
   prompts.
 - [ ] Run one later A3 reboot/restore transaction with zero prompts and no
