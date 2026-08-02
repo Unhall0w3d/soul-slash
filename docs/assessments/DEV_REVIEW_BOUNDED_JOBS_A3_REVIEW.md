@@ -74,12 +74,16 @@ exact evidence scalar or be explicitly labeled as inference.
 
 An initial standalone attempt correctly failed closed because model runtime
 control was not present in that process environment. Repeating with the normal
-reviewed local configuration completed and restored the Core. No eligible
-local augmentation proposal or Gate A1 experiment currently exists, so live
-critique and handoff transport remain explicit production acceptance items
-rather than fabricated fixtures. Their model behavior already has focused live
-evidence in the A1/A2 review artifacts; this slice's shared persistence and
-transport behavior is covered deterministically.
+reviewed local configuration completed and restored the Core.
+
+The human-gate acceptance session then used that synthesis defect as a real
+augmentation proposal (`aug_fa3752f59e227938`). Its bounded GPT-OSS critique
+completed after navigating away from Self Augmentation. Gate A1 created
+`exp_e1e6434f4fccdf00` with six exact allowed paths and did not invoke Codex.
+The implementation handoff survived a full page refresh, reattached to the
+same running job, and completed once. The untouched worktree produced a
+blocked dossier with zero changed files; both dossier and Gate A2 reported
+`candidate must contain a committed change`.
 
 ## Lifecycle, memory, and risk
 
@@ -99,10 +103,10 @@ Core, file, gate, Git, host, memory, or follow-on authority.
 
 ## Human checklist
 
-- [ ] Start each Dev review action and navigate to another Dashboard page.
-- [ ] Refresh during a test job and confirm current/terminal state is retained.
+- [x] Start each Dev review action and navigate to another Dashboard page.
+- [x] Refresh during a test job and confirm current/terminal state is retained.
 - [x] Complete one real scoped GPT-OSS job and confirm prior Core restoration.
 - [ ] Confirm Creative Core blocks scoped Dev work rather than being preempted.
 - [ ] Confirm Soul Core and Soul-Lite restore their prior runtime state.
 - [ ] Confirm selected Dev Core retains GPT-OSS between two requests.
-- [ ] Confirm no review result changes evidence or approves a gate.
+- [x] Confirm no review result changes evidence or approves a gate.
