@@ -111,7 +111,7 @@ module SoulCore
           terminal_envelope?(bootstrap, "complete") &&
           bootstrap.dig("data", "system_status", "collected") == false &&
           bootstrap.dig("data", "product_tabs") == ["Chat", "Self Improvement", "Creative Studios", "Administration"] &&
-          bootstrap.dig("data", "administration_surfaces") == ["Project Timeline", "Backup & Recovery", "Guided Maintenance"] &&
+          bootstrap.dig("data", "administration_surfaces") == ["Project Timeline", "Local Topology", "Backup & Recovery", "Guided Maintenance"] &&
           bootstrap.dig("data", "creative_surfaces") == ["Music Studio", "Visual Studio", "Mix Studio"] &&
           bootstrap.dig("data", "self_improvement_surfaces") == ["Skill Studio", "Self Assessment", "Self Augmentation"] &&
           status.calls.zero? && runtime.calls.empty? &&

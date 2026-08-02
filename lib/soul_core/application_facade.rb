@@ -34,6 +34,7 @@ require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "self_assessment_dev_synthesis_service"
 require_relative "maintenance_fleet_status_service"
+require_relative "wazuh_security_status_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
 require_relative "maintenance_rehearsal_service"
@@ -97,6 +98,7 @@ module SoulCore
       self_improvement_service: nil,
       self_assessment_dev_synthesis_service: nil,
       maintenance_fleet_status_service: nil,
+      wazuh_security_status_service: nil,
       maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
       maintenance_rehearsal_service: nil,
@@ -155,6 +157,7 @@ module SoulCore
       @self_improvement_service = self_improvement_service
       @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
+      @wazuh_security_status_service = wazuh_security_status_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
@@ -374,6 +377,8 @@ module SoulCore
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
       when "maintenance.fleet.device.refresh" then domain(maintenance_fleet_status.refresh(device_id: required(parameters, "device_id")))
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
+      when "security.wazuh.status" then domain(wazuh_security_status.collect)
+      when "security.wazuh.snapshot" then domain(wazuh_security_status.snapshot)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
       when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
@@ -532,7 +537,7 @@ module SoulCore
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
         "product_tabs" => ["Chat", "Self Improvement", "Creative Studios", "Administration"],
-        "administration_surfaces" => ["Project Timeline", "Backup & Recovery", "Guided Maintenance"],
+        "administration_surfaces" => ["Project Timeline", "Local Topology", "Backup & Recovery", "Guided Maintenance"],
         "creative_surfaces" => ["Music Studio", "Visual Studio", "Mix Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
@@ -895,6 +900,14 @@ module SoulCore
 
     def maintenance_fleet_status
       @maintenance_fleet_status_service ||= MaintenanceFleetStatusService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env
+      )
+    end
+
+    def wazuh_security_status
+      @wazuh_security_status_service ||= WazuhSecurityStatusService.new(
         root: @root,
         clock: @clock,
         process_env: @process_env

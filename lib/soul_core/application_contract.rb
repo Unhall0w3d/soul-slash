@@ -140,6 +140,8 @@ module SoulCore
       "maintenance.fleet.status" => [],
       "maintenance.fleet.device.refresh" => %w[device_id],
       "maintenance.fleet.snapshot" => [],
+      "security.wazuh.status" => [],
+      "security.wazuh.snapshot" => [],
       "maintenance.discovery.status" => [],
       "maintenance.discovery.scan" => %w[subnet],
       "maintenance.discovery.registry" => [],
