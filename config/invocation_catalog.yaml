@@ -83,6 +83,22 @@ entries:
       - Show approved file roots.
       - List files in root project at docs.
       - Read file from root project at README.md.
+  - id: network-diagnose
+    label: Bounded network diagnosis
+    category: Knowledge
+    summary: Inspect local network evidence or run one exact-target DNS, reachability, or TCP socket check.
+    skill_ids: [network.diagnose]
+    required_inputs: [Explicit diagnostic operation]
+    optional_inputs: [One exact hostname or IP literal; one exact TCP port for socket checks]
+    core: Any Core; diagnosis is deterministic and foreground.
+    approval: No approval for these bounded reads.
+    output: Point-in-time local address and route evidence, DNS addresses, one reachability result, or one zero-payload TCP connection result.
+    boundary: No subnet or port scan, range, wildcard, multiple targets, URL fetch, traceroute, packet capture, retry, monitoring, privilege, or configuration mutation.
+    examples:
+      - Diagnose local network.
+      - Resolve example.com.
+      - Check reachability to 192.0.2.10.
+      - Check socket example.com port 443.
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

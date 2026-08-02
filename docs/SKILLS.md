@@ -69,6 +69,7 @@ knowledge.vault.reflect
 knowledge.vault.conversation_reflect
 local.search
 files.inspect
+network.diagnose
 ```
 
 Knowledge Vault writes and memory exchange retain their explicit confirmation
@@ -78,6 +79,10 @@ treat retrieved note content as untrusted context.
 `files.inspect` is the narrower exact-path companion to `local.search`. It may
 list one directory level, stat one path, or read one bounded text file beneath
 a root approved in local configuration. See `docs/skills/FILES_INSPECT.md`.
+
+`network.diagnose` inspects bounded local address and route evidence or runs one
+exact-target DNS, reachability, or zero-payload TCP connection check. It does
+not scan or mutate network state. See `docs/skills/NETWORK_DIAGNOSE.md`.
 
 ### Downloads cleanup skills
 
@@ -101,6 +106,18 @@ ruby bin/soul do "cleanup files in my downloads folder older than 30 days"
 ruby bin/soul respond "move all"
 ruby bin/soul respond "yeah, do it"
 ```
+
+### Device maintenance
+
+```text
+maintenance.device
+```
+
+This deterministic conversation workflow resolves one exact managed device and
+uses its existing fixed maintenance controller. Routine mutation requires its
+short-lived confirmation; reboot, workstation maintenance, deletion,
+credentials, and other protected actions remain outside conversational
+authority. See `docs/guides/GUIDED_MAINTENANCE.md`.
 
 ### Conversation lifecycle skills
 

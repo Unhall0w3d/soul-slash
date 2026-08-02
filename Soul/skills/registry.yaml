@@ -177,6 +177,18 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: fundamental_files_inspect_a1
+  network.diagnose:
+    internal_handler: network_diagnostic
+    instruction_path: Soul/skills/network/diagnose-network/SKILL.md
+    category: knowledge
+    status: available
+    description: Inspect bounded local address and route evidence, resolve one target, send one reachability probe, or test one TCP socket without scanning or mutation.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: application_envelope
+    verifier: fundamental_network_diagnose_a1
   knowledge.vault.initialize:
     internal_handler: knowledge_vault
     category: knowledge

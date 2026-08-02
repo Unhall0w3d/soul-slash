@@ -64,3 +64,8 @@ The application operation `invocations.list` accepts optional bounded
 The `files-inspect` entry is intentionally exact. `.env` configuration defines
 approved roots; invocation wording can select a configured root but cannot add
 one. See `docs/skills/FILES_INSPECT.md`.
+
+The `network-diagnose` entry selects one foreground read at a time. A target in
+conversation does not authorize a subnet scan, port range, traceroute, content
+fetch, retry loop, monitoring, or mutation. See
+`docs/skills/NETWORK_DIAGNOSE.md`.
