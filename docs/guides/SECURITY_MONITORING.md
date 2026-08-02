@@ -13,7 +13,10 @@ vulnerabilities, system inventory, and security analytics.
 read-only operational projection. A4a shows manager and endpoint-agent health
 on the associated system cards and deep-links into Wazuh. It does not duplicate
 the investigation console or give the model administrative credentials.
-Alert evidence is a separate A4b gate because the indexer remains loopback-only.
+Alert evidence uses the separately qualified A4b lane: a restricted SSH tunnel
+preserves the indexer's loopback-only bind, and a dedicated indexer role can
+search only `wazuh-alerts-*`. Soul stores bounded normalized evidence, not raw
+events, and still cannot acknowledge, suppress, write, or remediate alerts.
 
 **ClamAV** will scan only approved ingress and staging paths. It will not scan
 model stores, generated media libraries, VM disks, or encrypted backup blobs by
@@ -30,7 +33,8 @@ on-access scanner. Official signatures update once daily through the packaged
 3. Agent A2 — one passive endpoint pilot, then measured expansion.
 4. ClamAV A3 — bounded manual ingress scan and Wazuh log collection.
 5. Soul A4a — least-privilege server-API health on Maintenance cards and Local Topology.
-6. Soul A4b/A4c — separately review indexer alerts, then durable notifications.
+6. Soul A4b — bounded read-only indexer alert evidence through a restricted tunnel.
+7. Soul A4c — durable high-priority cursor and optional static voice notification.
 
 Each stage has a separate review. Installing the central platform does not
 authorize agent enrollment, scanning, quarantine, or remediation.
@@ -121,9 +125,11 @@ the Operator's password manager. A browser warning is expected for the initial
 self-signed certificate. Do not copy credentials into Soul, Chat, project
 state, or Git.
 
-No Soul Chat or Voice security invocation exists yet. Do not paste Wazuh
-credentials or alert payloads into Chat. A4a uses a separate read-only API
-identity and bounded response projection; it does not yet query alerts.
+No Soul Chat security invocation exists. Do not paste Wazuh credentials or raw
+alert payloads into Chat. A4a uses a separate read-only server-API identity;
+A4b uses a separate read-only indexer identity. A4c may speak one generic static
+high-priority cue while Voice Presence is idle, but it never speaks event
+details or performs response work.
 
 ## Safe interpretation
 

@@ -40,8 +40,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
   A4a server-API health projection and Local Topology extraction are live with
   an exact custom read-only role, private CA validation, accepted manager health,
   exact active Atelier/Crucible mappings, and accepted Dashboard presentation.
-  Wazuh receipt/detection ingestion, indexer alert access, and durable
-  notification delivery remain separately review-gated
+  A4b read-only alert search is live-qualified through a restricted loopback
+  tunnel and exact index-only role; its Dashboard presentation remains a human
+  gate. A4c is live-accepted with a silently seeded historical baseline, an
+  exact installed one-minute timer, durable private cursor, cooldown batching,
+  and one Operator-heard privacy-safe controlled cue
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
 - [x] refine persona fidelity across supported chat models without corrupting structured tool output
 - [x] review durable event-derived Chat progress summaries; automatic stream

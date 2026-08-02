@@ -11,6 +11,7 @@ $LOAD_PATH.unshift(File.join(ROOT, "lib"))
 require "soul_core/noctalia_device_registry"
 require "soul_core/noctalia_core_control_service"
 require "soul_core/noctalia_status_service"
+require "soul_core/configuration_schema"
 
 EnvelopeStub = Struct.new(:value) { def status = value }
 FleetStub = Struct.new(:value) { def snapshot = value }
@@ -20,6 +21,11 @@ assert = lambda do |condition, message|
   raise message unless condition
   checks += 1
 end
+
+assert.call(
+  SoulCore::ConfigurationSchema.definitions.length <= SoulCore::ConfigurationSchema::MAX_SETTINGS,
+  "typed configuration growth exceeds the Noctalia companion's runtime schema bound"
+)
 
 Dir.mktmpdir("soul-noctalia-v2-") do |root|
   File.write(File.join(root, "VERSION"), "0.1.0-dev\n")

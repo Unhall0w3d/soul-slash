@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/wazuh_alert_notification_deployment"
+
+options = {root: File.expand_path("..", __dir__), home: Dir.home}
+command = ARGV.shift.to_s
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = File.expand_path(value) }
+  parser.on("--home PATH") { |value| options[:home] = File.expand_path(value) }
+  parser.on("--integration-file PATH") { |value| options[:integration_file] = File.expand_path(value) }
+  parser.on("--confirmation VALUE") { |value| options[:confirmation] = value }
+end.parse!
+
+abort "--integration-file is required" if options[:integration_file].to_s.empty?
+deployment = SoulCore::WazuhAlertNotificationDeployment.new(root: options.fetch(:root), home: options.fetch(:home), integration_file: options.fetch(:integration_file))
+result = case command
+         when "plan" then deployment.plan
+         when "install" then deployment.install(confirmation: options[:confirmation])
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else abort "usage: soul-wazuh-alert-notifications plan|install|status|uninstall --integration-file PATH [--confirmation VALUE]"
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

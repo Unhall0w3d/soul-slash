@@ -35,6 +35,8 @@ require_relative "self_improvement_service"
 require_relative "self_assessment_dev_synthesis_service"
 require_relative "maintenance_fleet_status_service"
 require_relative "wazuh_security_status_service"
+require_relative "wazuh_alert_evidence_service"
+require_relative "wazuh_alert_notification_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
 require_relative "maintenance_rehearsal_service"
@@ -99,6 +101,8 @@ module SoulCore
       self_assessment_dev_synthesis_service: nil,
       maintenance_fleet_status_service: nil,
       wazuh_security_status_service: nil,
+      wazuh_alert_evidence_service: nil,
+      wazuh_alert_notification_service: nil,
       maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
       maintenance_rehearsal_service: nil,
@@ -158,6 +162,8 @@ module SoulCore
       @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
       @wazuh_security_status_service = wazuh_security_status_service
+      @wazuh_alert_evidence_service = wazuh_alert_evidence_service
+      @wazuh_alert_notification_service = wazuh_alert_notification_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
@@ -379,6 +385,9 @@ module SoulCore
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
       when "security.wazuh.status" then domain(wazuh_security_status.collect)
       when "security.wazuh.snapshot" then domain(wazuh_security_status.snapshot)
+      when "security.wazuh.alerts.status" then domain(wazuh_alert_evidence.collect)
+      when "security.wazuh.alerts.snapshot" then domain(wazuh_alert_evidence.snapshot)
+      when "security.wazuh.notifications.status" then domain(wazuh_alert_notifications.status)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
       when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
@@ -911,6 +920,23 @@ module SoulCore
         root: @root,
         clock: @clock,
         process_env: @process_env
+      )
+    end
+
+    def wazuh_alert_evidence
+      @wazuh_alert_evidence_service ||= WazuhAlertEvidenceService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env
+      )
+    end
+
+    def wazuh_alert_notifications
+      @wazuh_alert_notification_service ||= WazuhAlertNotificationService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env,
+        alert_service: wazuh_alert_evidence
       )
     end
 

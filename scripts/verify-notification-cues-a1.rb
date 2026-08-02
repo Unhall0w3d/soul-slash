@@ -17,6 +17,7 @@ assets = %w[
   f3-chat-ready m3-chat-ready f3-music-ready m3-music-ready
   f3-visual-ready m3-visual-ready f3-lyrics-ready m3-lyrics-ready
   f3-attention m3-attention
+  f3-security-alert m3-security-alert
 ]
 assets.each do |name|
   path = File.join(ROOT, "assets", "notifications", "#{name}.wav")

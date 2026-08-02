@@ -37,7 +37,9 @@ module SoulCore
       "/notifications/f3-lyrics-ready.wav" => ["assets/notifications/f3-lyrics-ready.wav", "audio/wav"],
       "/notifications/m3-lyrics-ready.wav" => ["assets/notifications/m3-lyrics-ready.wav", "audio/wav"],
       "/notifications/f3-attention.wav" => ["assets/notifications/f3-attention.wav", "audio/wav"],
-      "/notifications/m3-attention.wav" => ["assets/notifications/m3-attention.wav", "audio/wav"]
+      "/notifications/m3-attention.wav" => ["assets/notifications/m3-attention.wav", "audio/wav"],
+      "/notifications/f3-security-alert.wav" => ["assets/notifications/f3-security-alert.wav", "audio/wav"],
+      "/notifications/m3-security-alert.wav" => ["assets/notifications/m3-security-alert.wav", "audio/wav"]
     }.freeze
 
     SECURITY_HEADERS = {

@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "optparse"
+
+options = {root: File.expand_path("..", __dir__)}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = File.expand_path(value) }
+  parser.on("--integration-file PATH") { |value| options[:integration_file] = File.expand_path(value) }
+end.parse!
+
+abort "--integration-file is required" if options[:integration_file].to_s.empty?
+ENV["SOUL_WAZUH_ALERTS_INTEGRATION_FILE"] = options.fetch(:integration_file)
+require File.join(options.fetch(:root), "lib", "soul_core", "wazuh_alert_notification_service")
+
+result = SoulCore::WazuhAlertNotificationService.new(root: options.fetch(:root), process_env: ENV).poll
+puts result.fetch("message", result.fetch("lifecycle_state"))
+exit(result.fetch("ok") ? 0 : 1)

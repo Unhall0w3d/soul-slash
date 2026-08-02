@@ -42,6 +42,8 @@ state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
 state.wazuhSecurity = null;
+state.wazuhAlerts = null;
+state.wazuhNotifications = null;
 state.maintenanceDevicePreview = null;
 state.maintenanceDeviceFlowToken = 0;
 state.maintenanceDiscoveryCandidates = [];
@@ -2900,6 +2902,10 @@ function wazuhDeviceAssociation(deviceId) {
   return (state.wazuhSecurity?.devices || []).find((record) => record.device_id === deviceId) || null;
 }
 
+function wazuhAlertsForAgent(agentId) {
+  return (state.wazuhAlerts?.alerts || []).filter((alert) => alert.agent_id === agentId);
+}
+
 function renderWazuhDeviceSecurity(deviceId) {
   const association = wazuhDeviceAssociation(deviceId); if (!association) return null;
   const block = document.createElement("section"); block.className = "maintenance-device-security"; block.dataset.state = association.state || "unavailable";
@@ -2912,8 +2918,19 @@ function renderWazuhDeviceSecurity(deviceId) {
   heading.append(label, badge);
   const detail = document.createElement("p");
   detail.textContent = `Agent ${association.agent_id || "—"} · ${String(association.agent_status || "unknown").replaceAll("_", " ")} · last seen ${association.last_seen_at || "unavailable"}`;
-  const boundary = document.createElement("small"); boundary.textContent = "Health only · alert evidence not integrated · no remediation authority";
-  block.append(heading, detail, boundary);
+  const alerts = wazuhAlertsForAgent(association.agent_id);
+  if (state.wazuhAlerts?.available === true) {
+    const high = alerts.filter((alert) => ["high", "critical"].includes(alert.severity)).length;
+    const alertDetail = document.createElement("p"); alertDetail.className = "maintenance-security-alerts";
+    alertDetail.textContent = alerts.length
+      ? `${alerts.length} bounded alert${alerts.length === 1 ? "" : "s"} in the review window · ${high} high/critical · latest: ${alerts[0].description || "description unavailable"}`
+      : "No alert evidence in the bounded review window.";
+    block.append(heading, detail, alertDetail);
+  } else {
+    block.append(heading, detail);
+  }
+  const boundary = document.createElement("small"); boundary.textContent = "Read-only normalized evidence · no acknowledgement, suppression, or remediation authority";
+  block.append(boundary);
   const dashboardUrl = reviewedWazuhDashboardUrl(association.dashboard_url);
   if (dashboardUrl) {
     const link = document.createElement("a"); link.href = dashboardUrl; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Investigate in Wazuh";
@@ -2924,19 +2941,65 @@ function renderWazuhDeviceSecurity(deviceId) {
 
 function renderWazuhSecurity(data) {
   state.wazuhSecurity = data;
+  updateWazuhSummary();
+  if (state.maintenanceFleet) renderMaintenanceFleet(state.maintenanceFleet);
+}
+
+function renderWazuhAlerts(data) {
+  state.wazuhAlerts = data;
+  updateWazuhSummary();
+  if (state.maintenanceFleet) renderMaintenanceFleet(state.maintenanceFleet);
+}
+
+function renderWazuhNotificationStatus(data) {
+  state.wazuhNotifications = data;
+  updateWazuhSummary();
+}
+
+function updateWazuhSummary() {
+  const data = state.wazuhSecurity || {};
   const summary = data.summary || {};
   const available = data.available === true;
   const dashboardUrl = reviewedWazuhDashboardUrl(data.dashboard_url);
+  const alertData = state.wazuhAlerts || {};
+  const alertSummary = alertData.summary || {};
+  const alertCopy = alertData.available === true
+    ? `${alertSummary.alert_count ?? 0} bounded alerts · ${(alertSummary.high ?? 0) + (alertSummary.critical ?? 0)} high/critical${alertData.query?.truncated ? " · result limit reached" : ""}`
+    : (alertData.reason || "alert evidence unavailable");
+  const notification = state.wazuhNotifications || {};
+  const receipt = notification.last_receipt?.data || {};
+  const notificationCopy = notification.initialized
+    ? `voice ${receipt.voice_enabled === true ? "enabled" : "disabled"} · ${notification.pending_alerts ?? 0} pending`
+    : "voice cursor not initialized";
   const copy = available
-    ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · alerts deferred to A4b`
+    ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · ${alertCopy} · ${notificationCopy}`
     : (data.reason || "Wazuh health is unavailable.");
+  const securityState = available && alertData.available === true && alertData.state === "attention" ? "attention" : data.state;
   ["maintenance", "topology"].forEach((surface) => {
     const summaryElement = byId(`${surface}-wazuh-summary`); const badge = byId(`${surface}-wazuh-state`); const link = byId(`open-${surface}-wazuh`);
     if (summaryElement) summaryElement.textContent = copy;
-    if (badge) { badge.textContent = available ? (data.state === "healthy" ? "Healthy" : "Attention") : "Unavailable"; badge.dataset.state = available ? data.state : "unavailable"; }
+    if (badge) { badge.textContent = available ? (securityState === "healthy" ? "Healthy" : "Attention") : "Unavailable"; badge.dataset.state = available ? securityState : "unavailable"; }
     if (link) { link.hidden = !dashboardUrl; if (dashboardUrl) link.href = dashboardUrl; else link.removeAttribute("href"); }
   });
-  if (state.maintenanceFleet) renderMaintenanceFleet(state.maintenanceFleet);
+}
+
+async function loadWazuhAlerts(operation) {
+  try {
+    const envelope = await callSoul(operation); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Wazuh alerts failed safely.");
+    renderWazuhAlerts(dataOf(envelope));
+  } catch (error) {
+    renderWazuhAlerts({ available: false, state: "unavailable", reason: error.message, alerts: [], summary: {} });
+  }
+}
+
+async function loadWazuhNotificationStatus() {
+  try {
+    const envelope = await callSoul("security.wazuh.notifications.status"); lifecycle(envelope);
+    renderWazuhNotificationStatus(dataOf(envelope));
+  } catch (error) {
+    renderWazuhNotificationStatus({ initialized: false, reason: error.message });
+  }
 }
 
 async function loadWazuhSecurity(operation, button = null) {
@@ -2946,6 +3009,8 @@ async function loadWazuhSecurity(operation, button = null) {
     const envelope = await callSoul(operation); lifecycle(envelope);
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Wazuh health failed safely.");
     renderWazuhSecurity(dataOf(envelope));
+    await loadWazuhAlerts(operation === "security.wazuh.status" ? "security.wazuh.alerts.status" : "security.wazuh.alerts.snapshot");
+    await loadWazuhNotificationStatus();
   } catch (error) {
     renderWazuhSecurity({ available: false, state: "unavailable", reason: error.message, devices: [], summary: {} });
   } finally {
