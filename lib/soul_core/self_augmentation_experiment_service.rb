@@ -246,7 +246,7 @@ module SoulCore
       argv=[@bubblewrap_path,"--unshare-all","--die-with-parent","--new-session","--ro-bind","/usr","/usr","--tmpfs","/tmp"]
       cursor="";@root.split(File::SEPARATOR).reject(&:empty?).each{|part|cursor+=File::SEPARATOR+part;argv.concat(["--dir",cursor])}
       [["/lib","/lib"],["/lib64","/lib64"],[ruby_root,ruby_root]].each{|source,target|argv.concat(["--ro-bind",source,target]) if File.exist?(source)}
-      argv.concat(["--ro-bind",File.join(@root,".git"),File.join(@root,".git"),"--ro-bind",worktree,"/workspace","--proc","/proc","--dev","/dev","--setenv","HOME","/tmp","--chdir","/workspace","--"]+command)
+      argv.concat(["--ro-bind",File.join(@root,".git"),File.join(@root,".git"),"--ro-bind",worktree,"/workspace","--dir","/proc","--dev","/dev","--setenv","HOME","/tmp","--chdir","/workspace","--"]+command)
       result=@runner.run(*argv,timeout_seconds:30,max_output_bytes:256*1024)
       {"command"=>command,"status"=>result.success? ? "passed" : "failed","exit_status"=>result.exit_status,"output"=>(result.stdout.to_s+result.stderr.to_s).byteslice(0,4096),"sandboxed"=>true,"network"=>false}
     end

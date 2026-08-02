@@ -75,7 +75,7 @@ end
 source=File.read(File.expand_path("../lib/soul_core/self_augmentation_experiment_service.rb",__dir__))
 integration_calls=%w[merge push branch commit tag].any?{|name|source.include?(%Q{git("#{name}"})||source.include?(%Q{git_in(record,"#{name}"})}
 check.call("service contains no Codex invocation or Git integration command",!source.match?(/(?:system|spawn|exec|run)\s*\([^\n]*["']codex/i)&&!integration_calls&&source.include?('"worktree","remove"')&&!source.include?("--force"))
-check.call("candidate execution requires no-network Bubblewrap",source.include?("--unshare-all")&&source.include?("--ro-bind")&&source.include?('"network"=>false'))
+check.call("candidate execution requires no-network Bubblewrap with an empty proc directory",source.include?("--unshare-all")&&source.include?("--ro-bind")&&source.include?('"--dir","/proc"')&&!source.include?('"--proc","/proc"')&&source.include?('"network"=>false'))
 operations=SoulCore::ApplicationContract::OPERATIONS
 check.call("A4–A5 API operations are explicitly allowlisted",%w[self_augmentation.experiments.gate_a1.preview self_augmentation.experiments.gate_a1.execute self_augmentation.reviews.generate self_augmentation.reviews.gate_a2.preview self_augmentation.reviews.gate_a2.execute self_augmentation.experiments.cleanup.preview].all?{|operation|operations.key?(operation)})
 html=File.read(File.expand_path("../assets/dashboard/index.html",__dir__));javascript=File.read(File.expand_path("../assets/dashboard/dashboard.js",__dir__))
