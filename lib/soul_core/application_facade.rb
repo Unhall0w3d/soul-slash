@@ -32,7 +32,6 @@ require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "self_assessment_dev_synthesis_service"
-require_relative "host_improvement_plan_service"
 require_relative "maintenance_fleet_status_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
@@ -96,7 +95,6 @@ module SoulCore
       skill_studio_service: nil,
       self_improvement_service: nil,
       self_assessment_dev_synthesis_service: nil,
-      host_improvement_plan_service: nil,
       maintenance_fleet_status_service: nil,
       maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
@@ -154,7 +152,6 @@ module SoulCore
       @skill_studio_service = skill_studio_service
       @self_improvement_service = self_improvement_service
       @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
-      @host_improvement_plan_service = host_improvement_plan_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
@@ -361,16 +358,12 @@ module SoulCore
       when "self_improvement.snapshot" then domain(self_improvement.snapshot)
       when "self_improvement.refresh" then domain(self_improvement.refresh(scope: required(parameters, "scope")))
       when "self_improvement.dev_synthesis.preview" then domain(self_assessment_dev_synthesis.preview(scope: required(parameters, "scope")))
-      when "self_improvement.dev_synthesis.execute" then domain(self_assessment_dev_synthesis.execute(scope: required(parameters, "scope"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_improvement.dev_synthesis.execute" then domain(self_assessment_dev_synthesis.execute(scope: required(parameters, "scope"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], on_progress: progress))
       when "self_improvement.dev_synthesis.list" then domain(self_assessment_dev_synthesis.inventory(limit: bounded_limit(parameters["limit"], SelfAssessmentDevSynthesisService::MAX_RECORDS)))
       when "self_improvement.proposals.preview" then domain(self_improvement.proposal_preview)
       when "self_improvement.proposals.execute" then domain(self_improvement.generate_proposals(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "storage_retention.cleanup.preview" then domain(self_improvement.storage_cleanup_preview(category: required(parameters, "category")))
       when "storage_retention.cleanup.execute" then domain(self_improvement.storage_cleanup_execute(category: required(parameters, "category"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "host_improvement.plans.list" then domain(host_improvement.list(limit: bounded_limit(parameters["limit"], HostImprovementPlanService::MAX_RECORDS)))
-      when "host_improvement.arch_upgrade.preview" then domain(host_improvement.preview_arch_upgrade)
-      when "host_improvement.arch_upgrade.handoff" then domain(host_improvement.create_arch_handoff(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
-      when "host_improvement.plans.verify" then domain(host_improvement.verify(plan_id: required(parameters, "plan_id")))
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
       when "maintenance.fleet.device.refresh" then domain(maintenance_fleet_status.refresh(device_id: required(parameters, "device_id")))
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
@@ -407,13 +400,13 @@ module SoulCore
       when "self_augmentation.proposals.execute" then domain(self_augmentation.create_proposal(objective: required(parameters, "objective"), why_not_skill: required(parameters, "why_not_skill"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.dev_critique.list" then domain(self_augmentation_dev_critique.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationDevCritiqueService::MAX_RECORDS)))
       when "self_augmentation.dev_critique.preview" then domain(self_augmentation_dev_critique.preview(proposal_id: required(parameters, "proposal_id")))
-      when "self_augmentation.dev_critique.execute" then domain(self_augmentation_dev_critique.execute(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.dev_critique.execute" then domain(self_augmentation_dev_critique.execute(proposal_id: required(parameters, "proposal_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], on_progress: progress))
       when "self_augmentation.experiments.list" then domain(self_augmentation_experiments.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationExperimentService::MAX_RECORDS)))
       when "self_augmentation.experiments.gate_a1.preview" then domain(self_augmentation_experiments.gate_a1_preview(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files")))
       when "self_augmentation.experiments.gate_a1.execute" then domain(self_augmentation_experiments.prepare_experiment(proposal_id: required(parameters,"proposal_id"), allowed_files: required(parameters,"allowed_files"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "self_augmentation.dev_handoff.list" then domain(self_augmentation_dev_handoff.inventory(limit: bounded_limit(parameters["limit"], SelfAugmentationDevHandoffService::MAX_RECORDS)))
       when "self_augmentation.dev_handoff.preview" then domain(self_augmentation_dev_handoff.preview(experiment_id: required(parameters,"experiment_id")))
-      when "self_augmentation.dev_handoff.execute" then domain(self_augmentation_dev_handoff.execute(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "self_augmentation.dev_handoff.execute" then domain(self_augmentation_dev_handoff.execute(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], on_progress: progress))
       when "self_augmentation.reviews.generate" then domain(self_augmentation_experiments.generate_dossier(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.reviews.gate_a2.preview" then domain(self_augmentation_experiments.gate_a2_preview(experiment_id: required(parameters,"experiment_id")))
       when "self_augmentation.reviews.gate_a2.execute" then domain(self_augmentation_experiments.approve_for_integration(experiment_id: required(parameters,"experiment_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -884,10 +877,6 @@ module SoulCore
       )
     end
 
-    def host_improvement
-      @host_improvement_plan_service ||= HostImprovementPlanService.new(root: @root, clock: @clock)
-    end
-
     def maintenance_rehearsal
       @maintenance_rehearsal_service ||= MaintenanceRehearsalService.new(root: @root, clock: @clock)
     end
@@ -1245,11 +1234,11 @@ module SoulCore
 
     def envelope(request, lifecycle:, data:, errors: [], mutation: "none", idempotent_replay: false)
       if data.is_a?(Hash) && data.key?("data") && data.key?("lifecycle_state")
-        errors = [{ "code" => "domain_failure", "message" => safe_message(data["reason"]) }] unless data.fetch("ok", false)
+        errors = [{ "code" => "domain_failure", "message" => safe_message(data["reason"] || data["message"]) }] unless data.fetch("ok", false)
         mutation = data.fetch("mutation", mutation)
         data = data.fetch("data")
       elsif data.is_a?(Hash) && data.key?("lifecycle_state")
-        errors = [{ "code" => "domain_failure", "message" => safe_message(data["reason"]) }] unless data.fetch("ok", false)
+        errors = [{ "code" => "domain_failure", "message" => safe_message(data["reason"] || data["message"]) }] unless data.fetch("ok", false)
       end
       {
         "schema_version" => Contract::SCHEMA_VERSION,

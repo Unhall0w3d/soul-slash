@@ -7,7 +7,6 @@ require "open3"
 require "tmpdir"
 require "time"
 require_relative "../lib/soul_core/package_manager_assessor"
-require_relative "../lib/soul_core/host_improvement_plan_service"
 require_relative "../lib/soul_core/self_augmentation_service"
 require_relative "../lib/soul_core/application_contract"
 require_relative "../lib/soul_core/application_facade"
@@ -75,22 +74,6 @@ check.call("failed update discovery remains failed", report.dig("managers","pacm
 check.call("failed update discovery carries bounded diagnostics", report.dig("managers","pacman","updates","error") == "network failed")
 
 Dir.mktmpdir("soul-a1-a3-") do |root|
-  FileUtils.mkdir_p(File.join(root, "Soul", "host_improvement", "plans"))
-  assessor = FakePackageAssessor.new(["linux 6.0 -> 6.1"])
-  pacman_log = File.join(root, "pacman.log")
-  File.write(pacman_log, "[2026-07-16T11:00:00-0400] [ALPM] upgraded linux (6.0 -> 6.1)\n")
-  host = SoulCore::HostImprovementPlanService.new(root: root, clock: -> { Time.utc(2026,7,16,12,0,0) }, package_assessor: assessor, pacman_log_path: pacman_log)
-  preview = host.preview_arch_upgrade
-  check.call("host preview is read-only", preview["ok"] && Dir.children(File.join(root,"Soul","host_improvement","plans")).empty?)
-  wrong = host.create_arch_handoff(confirmation: "WRONG", expected_digest: preview.dig("data","expected_digest"))
-  check.call("wrong host confirmation writes nothing", wrong["lifecycle_state"] == "blocked_for_human_review" && Dir.children(File.join(root,"Soul","host_improvement","plans")).empty?)
-  created = host.create_arch_handoff(confirmation: SoulCore::HostImprovementPlanService::CONFIRMATION, expected_digest: preview.dig("data","expected_digest"))
-  packet = created.dig("data","packet")
-  handoff = packet && File.read(File.join(root, packet, "TERMINAL_HANDOFF.md"))
-  check.call("exact gate creates only a review handoff", created["lifecycle_state"] == "blocked_for_human_review" && created.dig("data","host_command_executed") == false && handoff.include?("Soul did not execute"))
-  receipt = host.verify(plan_id: created.dig("data","plan","plan_id"))
-  check.call("host verification persists bounded typed receipt evidence", receipt.dig("data","receipt","schema_version") == "soul.host_improvement.receipt.v1" && receipt.dig("data","receipt","receipt_persisted") == true && receipt.dig("data","receipt","pacman_log_evidence","entry_count") == 1 && File.file?(File.join(root, receipt.dig("data","receipt","packet"))))
-
   repo = File.join(root, "repo")
   FileUtils.mkdir_p(File.join(repo, "lib")); FileUtils.mkdir_p(File.join(repo, "scripts")); FileUtils.mkdir_p(File.join(repo, "Soul", "augmentation", "proposals"))
   File.write(File.join(repo,"lib","sample.rb"), "module Sample; end\n")
@@ -111,13 +94,12 @@ Dir.mktmpdir("soul-a1-a3-") do |root|
   proposal = service.create_proposal(objective: objective, why_not_skill: why, confirmation: SoulCore::SelfAugmentationService::CONFIRMATION, expected_digest: aug_preview.dig("data","expected_digest"))
   check.call("exact gate creates proposal but no implementation", proposal["lifecycle_state"] == "blocked_for_human_review" && proposal.dig("data","implementation_started") == false && File.file?(File.join(repo,proposal.dig("data","packet"),"REVIEW.md")))
 
-  facade = SoulCore::ApplicationFacade.new(root: repo, host_improvement_plan_service: host, self_augmentation_service: service, clock: -> { Time.utc(2026,7,16,12,0,0) })
+  facade = SoulCore::ApplicationFacade.new(root: repo, self_augmentation_service: service, clock: -> { Time.utc(2026,7,16,12,0,0) })
   request = lambda do |operation, parameters = {}|
     facade.call({"schema_version"=>"soul.application.v1","request_id"=>"a1a3:#{Digest::SHA256.hexdigest(operation + JSON.generate(parameters))[0,12]}","operation"=>operation,"parameters"=>parameters,"context"=>{"interface"=>"dashboard_test"}})
   end
   api_census = request.call("self_augmentation.census")
-  api_plans = request.call("host_improvement.plans.list", {"limit"=>10})
-  check.call("application facade exposes bounded A2 and A3 projections", api_census["lifecycle_state"] == "complete" && api_plans["lifecycle_state"] == "complete" && api_plans.dig("data","count") == 1)
+  check.call("application facade exposes bounded augmentation projections", api_census["lifecycle_state"] == "complete")
 
   File.symlink("lib/sample.rb", File.join(repo, "linked-source"))
   system("git", "-C", repo, "add", "linked-source") or raise "git add symlink failed"
@@ -125,14 +107,14 @@ Dir.mktmpdir("soul-a1-a3-") do |root|
 end
 
 operations = SoulCore::ApplicationContract::OPERATIONS
-check.call("typed API operations are allowlisted", %w[host_improvement.arch_upgrade.preview host_improvement.arch_upgrade.handoff host_improvement.plans.verify self_augmentation.census self_augmentation.proposals.preview self_augmentation.proposals.execute].all? { |operation| operations.key?(operation) })
+check.call("typed augmentation operations remain allowlisted", %w[self_augmentation.census self_augmentation.proposals.preview self_augmentation.proposals.execute].all? { |operation| operations.key?(operation) })
+check.call("retired Arch handoff operations are not callable", operations.keys.grep(/\Ahost_improvement\./).empty?)
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("dashboard exposes four-tab augmentation and host surfaces", html.include?('id="augmentation-tab"') && html.include?('id="augmentation-panel"') && html.include?('id="preview-host-plan"'))
+check.call("dashboard retains augmentation and removes the overlapping Arch handoff", html.include?('id="augmentation-tab"') && html.include?('id="augmentation-panel"') && !html.include?('id="preview-host-plan"'))
 check.call("A1–A3 surfaces remain present after later gate expansion", html.include?("Observe</strong>") && html.include?("Propose</strong>") && html.include?('id="augmentation-objective"'))
-bounded_surfaces = js[/async function previewHostPlan\(\).*?async function previewMaintenance\(/m].to_s +
-                   js[/function renderAugmentationProposals\(records\).*?function reviewEmpty\(/m].to_s
+bounded_surfaces = js[/function renderAugmentationProposals\(records\).*?function reviewEmpty\(/m].to_s
 check.call("new surfaces do not poll or schedule", !bounded_surfaces.match?(/setInterval|setTimeout|requestAnimationFrame/))
 check.call("brief preserves prohibited boundaries", File.read(File.expand_path("../docs/soul/SELF_AUGMENTATION_HOST_IMPROVEMENT_A1_A3_BRIEF.md", __dir__)).include?("Invoking Codex") )
 

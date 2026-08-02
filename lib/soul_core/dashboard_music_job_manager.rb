@@ -6,11 +6,21 @@ require "json"
 require "securerandom"
 require "time"
 
+require_relative "self_improvement_service"
+
 module SoulCore
   class DashboardMusicJobManager
     JOB_ID = /\Ajob_[a-f0-9]{16}\z/
     ACTIVE_STATES = %w[accepted running].freeze
-    OPERATIONS = %w[music.generation.execute music.candidates.revision.execute chats.creative.execute skill_studio.betas.dev_build.execute].freeze
+    OPERATIONS = %w[
+      music.generation.execute
+      music.candidates.revision.execute
+      chats.creative.execute
+      skill_studio.betas.dev_build.execute
+      self_improvement.dev_synthesis.execute
+      self_augmentation.dev_critique.execute
+      self_augmentation.dev_handoff.execute
+    ].freeze
     MAX_RECORDS = 100
 
     def initialize(root:, facade:, clock: -> { Time.now }, id_generator: -> { SecureRandom.hex(8) })
@@ -28,18 +38,27 @@ module SoulCore
 
     def start(request)
       operation = request.is_a?(Hash) ? request["operation"].to_s : ""
-      raise ArgumentError, "music job operation is not detachable" unless OPERATIONS.include?(operation)
+      raise ArgumentError, "bounded job operation is not detachable" unless OPERATIONS.include?(operation)
       parameters = request.fetch("parameters", {})
       project_id = parameters["project_id"].to_s
       candidate_id = parameters["candidate_id"].to_s
       chat_id = parameters["chat_id"].to_s
       flow_id = parameters["flow_id"].to_s
       beta_id = parameters["beta_id"].to_s
+      scope = parameters["scope"].to_s
+      proposal_id = parameters["proposal_id"].to_s
+      experiment_id = parameters["experiment_id"].to_s
       if operation == "chats.creative.execute"
         raise ArgumentError, "creative job chat_id is invalid" unless chat_id.match?(/\Achat_[A-Za-z0-9_.-]+\z/)
         raise ArgumentError, "creative job flow_id is invalid" unless flow_id.match?(/\Acreative_[a-f0-9]{16}\z/)
       elsif operation == "skill_studio.betas.dev_build.execute"
         raise ArgumentError, "development job beta_id is invalid" unless beta_id.match?(/\A[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\z/)
+      elsif operation == "self_improvement.dev_synthesis.execute"
+        raise ArgumentError, "Dev synthesis scope is invalid" unless SoulCore::SelfImprovementService::SCOPES.include?(scope)
+      elsif operation == "self_augmentation.dev_critique.execute"
+        raise ArgumentError, "Dev critique proposal_id is invalid" unless proposal_id.match?(/\Aaug_[a-f0-9]{16}\z/)
+      elsif operation == "self_augmentation.dev_handoff.execute"
+        raise ArgumentError, "Dev handoff experiment_id is invalid" unless experiment_id.match?(/\Aexp_[a-f0-9]{16}\z/)
       else
         raise ArgumentError, "music job project_id is invalid" unless project_id.match?(/\Amusic_[a-f0-9]{16}\z/)
         raise ArgumentError, "music job candidate_id is invalid" unless candidate_id.match?(/\Acandidate_[a-f0-9]{16}\z/)
@@ -51,7 +70,7 @@ module SoulCore
         active = records_unlocked.find { |item| ACTIVE_STATES.include?(item["status"]) }
         if active
           return active if active["request_digest"] == digest
-          raise ArgumentError, "another bounded music generation job is active"
+          raise ArgumentError, "another bounded creative or development job is active"
         end
         now = @clock.call.iso8601
         record = {
@@ -59,12 +78,15 @@ module SoulCore
           "operation" => operation, "project_id" => project_id.empty? ? nil : project_id, "candidate_id" => candidate_id.empty? ? nil : candidate_id,
           "chat_id" => chat_id.empty? ? nil : chat_id, "flow_id" => flow_id.empty? ? nil : flow_id,
           "beta_id" => beta_id.empty? ? nil : beta_id,
+          "scope" => scope.empty? ? nil : scope,
+          "proposal_id" => proposal_id.empty? ? nil : proposal_id,
+          "experiment_id" => experiment_id.empty? ? nil : experiment_id,
           "request_digest" => digest, "status" => "accepted", "lifecycle_state" => "awaiting_input",
           "latest_progress" => { "stage" => "accepted", "message" => "Bounded creative or development work accepted by the dashboard worker" },
           "created_at" => now, "updated_at" => now, "result" => nil
         }
-        raise ArgumentError, "music job id is invalid" unless record["job_id"].match?(JOB_ID)
-        raise ArgumentError, "music job id already exists" if read_record_unlocked(record.fetch("job_id"))
+        raise ArgumentError, "bounded job id is invalid" unless record["job_id"].match?(JOB_ID)
+        raise ArgumentError, "bounded job id already exists" if read_record_unlocked(record.fetch("job_id"))
         write_record_unlocked(record)
         gate = Queue.new
         thread = Thread.new { gate.pop; execute(record.fetch("job_id"), request) }
@@ -75,21 +97,26 @@ module SoulCore
       record
     end
 
-    def active(project_id: nil)
+    def active(project_id: nil, operations: nil)
       @mutex.synchronize do
-        records_unlocked.select { |item| ACTIVE_STATES.include?(item["status"]) && (project_id.nil? || item["project_id"] == project_id) }
+        allowed_operations = Array(operations).map(&:to_s)
+        records_unlocked.select do |item|
+          ACTIVE_STATES.include?(item["status"]) &&
+            (project_id.nil? || item["project_id"] == project_id) &&
+            (allowed_operations.empty? || allowed_operations.include?(item["operation"]))
+        end
           .sort_by { |item| item["created_at"] }.reverse.map { |item| public_record(item) }
       end
     end
 
     def stream(job_id)
-      raise ArgumentError, "music job id is invalid" unless job_id.to_s.match?(JOB_ID)
+      raise ArgumentError, "bounded job id is invalid" unless job_id.to_s.match?(JOB_ID)
       queue = Queue.new
       Enumerator.new do |output|
         record = nil
         @mutex.synchronize do
           record = read_record_unlocked(job_id)
-          raise ArgumentError, "music job was not found" unless record
+          raise ArgumentError, "bounded job was not found" unless record
           @subscribers[job_id] << queue if ACTIVE_STATES.include?(record["status"])
         end
         emit_snapshot(output, record)
@@ -120,7 +147,7 @@ module SoulCore
       envelope = failure_envelope(request, error)
       update(job_id) do |record|
         record.merge("status" => "terminal", "lifecycle_state" => "failed", "result" => envelope,
-          "latest_progress" => { "stage" => "failed", "message" => "Music job failed safely: #{error.class}" })
+          "latest_progress" => { "stage" => "failed", "message" => "Bounded job failed safely: #{error.class}" })
       end
     ensure
       @mutex.synchronize { @threads.delete(job_id) }
@@ -196,7 +223,7 @@ module SoulCore
     end
 
     def public_record(record)
-      record.slice("job_id", "operation", "project_id", "candidate_id", "chat_id", "flow_id", "beta_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
+      record.slice("job_id", "operation", "project_id", "candidate_id", "chat_id", "flow_id", "beta_id", "scope", "proposal_id", "experiment_id", "status", "lifecycle_state", "latest_progress", "created_at", "updated_at")
     end
 
     def safe_progress(event)
@@ -204,13 +231,13 @@ module SoulCore
     end
 
     def terminal_message(envelope)
-      envelope.dig("data", "reason").to_s.empty? ? "Bounded music job reached a terminal state" : envelope.dig("data", "reason").to_s.byteslice(0, 500)
+      envelope.dig("data", "reason").to_s.empty? ? "Bounded job reached a terminal state" : envelope.dig("data", "reason").to_s.byteslice(0, 500)
     end
 
     def failure_envelope(request, error)
       { "schema_version" => "soul.application.v1", "request_id" => request["request_id"].to_s,
         "operation" => request["operation"].to_s, "ok" => false, "lifecycle_state" => "failed", "data" => {},
-        "errors" => [{ "code" => "music_job_failure", "message" => "Music job failed safely: #{error.class}" }],
+        "errors" => [{ "code" => "bounded_job_failure", "message" => "Bounded job failed safely: #{error.class}" }],
         "warnings" => [], "meta" => { "mutation" => "none" } }
     end
   end

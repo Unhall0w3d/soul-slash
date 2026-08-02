@@ -105,10 +105,16 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/administration-stream"
       return music_job_start(normalized_headers, body) if target == "/api/v1/music-job-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-stream"
+      return music_job_start(normalized_headers, body) if target == "/api/v1/bounded-job-stream" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/bounded-job-stream"
       return music_job_follow(normalized_headers, body) if target == "/api/v1/music-job-follow" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-follow"
+      return music_job_follow(normalized_headers, body) if target == "/api/v1/bounded-job-follow" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/bounded-job-follow"
       return music_job_status(normalized_headers, body) if target == "/api/v1/music-job-status" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/music-job-status"
+      return bounded_job_status(normalized_headers, body) if target == "/api/v1/bounded-job-status" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/bounded-job-status"
       return voice_status(normalized_headers) if target == "/api/v1/voice/status" && method == "GET"
       return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/voice/status"
       return voice_transcribe(normalized_headers, body) if target == "/api/v1/voice/transcribe" && method == "POST"
@@ -282,6 +288,20 @@ module SoulCore
       project_id = request["project_id"]
       return json_response(422, error_envelope("music_job_rejected", "project_id is invalid")) unless project_id.to_s.match?(/\Amusic_[a-f0-9]{16}\z/)
       json_response(200, { "jobs" => music_jobs.active(project_id: project_id) })
+    end
+
+    def bounded_job_status(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      request = JSON.parse(body)
+      operations = Array(request["operations"])
+      dev_operations = DashboardMusicJobManager::OPERATIONS.grep(/\Aself_(?:improvement|augmentation)\./)
+      return json_response(422, error_envelope("bounded_job_rejected", "operations are invalid")) if operations.empty? || (operations - dev_operations).any?
+      json_response(200, { "jobs" => music_jobs.active(operations: operations) })
+    rescue JSON::ParserError
+      json_response(422, error_envelope("bounded_job_rejected", "request is invalid"))
     end
 
     def music_job_stream_response(job_id)

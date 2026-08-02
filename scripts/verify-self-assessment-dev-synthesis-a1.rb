@@ -142,7 +142,7 @@ check.call("dashboard exposes a distinct advisory Dev synthesis gate",
              html.include?('id="assessment-dev-progress"') &&
              html.include?("cannot change evidence, severity, recommendations, plans, or host state"))
 check.call("dashboard binds preview before execute and pre-fills exact authority",
-           javascript.index('callSoul("self_improvement.dev_synthesis.preview"') < javascript.index('callSoul("self_improvement.dev_synthesis.execute"') &&
+           javascript.index('callSoul("self_improvement.dev_synthesis.preview"') < javascript.index('callNdjson("/api/v1/bounded-job-stream", "self_improvement.dev_synthesis.execute"') &&
              javascript.include?('prefillApprovalGate("assessment-dev-confirmation", "execute-assessment-dev"'))
 dev_javascript = javascript[/async function previewAssessmentDevSynthesis\(\).*?^}/m].to_s +
                  javascript[/async function executeAssessmentDevSynthesis\(\).*?^}/m].to_s +

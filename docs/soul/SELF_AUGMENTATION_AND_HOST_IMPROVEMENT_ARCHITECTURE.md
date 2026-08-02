@@ -1,5 +1,11 @@
 # Self Augmentation and Host Improvement Architecture
 
+> Historical design note: the standalone Arch improvement-plan surface and
+> `host_improvement.*` application operations were retired after Guided
+> Maintenance gained device-scoped update, reboot, receipt, and verification
+> ownership. The Self Augmentation architecture below remains active; older
+> Host Improvement sections are retained only to explain the design lineage.
+
 ```text
 document_status: approved
 implementation_authorized: A1-A3 only

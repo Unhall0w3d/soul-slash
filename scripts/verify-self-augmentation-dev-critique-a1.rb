@@ -127,7 +127,7 @@ end
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("dashboard exposes a distinct advisory proposal critique gate", html.include?('id="preview-augmentation-dev-critique"') && html.include?('id="augmentation-dev-critique-progress"') && html.include?("Critique cannot approve Gate A1 or create a worktree"))
-check.call("dashboard binds preview before execute and pre-fills click authority", javascript.index('callSoul("self_augmentation.dev_critique.preview"') < javascript.index('callSoul("self_augmentation.dev_critique.execute"') && javascript.include?('prefillApprovalGate("augmentation-dev-critique-confirmation", "execute-augmentation-dev-critique"'))
+check.call("dashboard binds preview before execute and pre-fills click authority", javascript.index('callSoul("self_augmentation.dev_critique.preview"') < javascript.index('callNdjson("/api/v1/bounded-job-stream", "self_augmentation.dev_critique.execute"') && javascript.include?('prefillApprovalGate("augmentation-dev-critique-confirmation", "execute-augmentation-dev-critique"'))
 dev_javascript = javascript[/function renderAugmentationDevCritiques\(records\).*?^}/m].to_s + javascript[/async function loadAugmentationDevCritiques\(\).*?^}/m].to_s + javascript[/async function previewAugmentationDevCritique\(\).*?^}/m].to_s + javascript[/async function executeAugmentationDevCritique\(\).*?^}/m].to_s
 check.call("dashboard uses safe rendering and adds no critique polling", !dev_javascript.match?(/setInterval|setTimeout|WebSocket|EventSource|innerHTML/))
 

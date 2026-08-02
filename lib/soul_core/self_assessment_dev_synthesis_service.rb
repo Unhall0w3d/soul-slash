@@ -54,14 +54,15 @@ module SoulCore
       failed("Self Assessment Dev synthesis preview failed safely: #{error.class}: #{error.message}"[0, 1_000])
     end
 
-    def execute(scope:, confirmation:, expected_digest:)
+    def execute(scope:, confirmation:, expected_digest:, on_progress: nil)
       prepared = prepared_request(scope)
       return prepared if envelope?(prepared)
 
       dev_result = @dev_worker.execute(
         request: prepared.fetch("request"),
         confirmation: confirmation,
-        expected_digest: expected_digest
+        expected_digest: expected_digest,
+        on_progress: on_progress
       )
       return dev_result unless dev_result["ok"]
 

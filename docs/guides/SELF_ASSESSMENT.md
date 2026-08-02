@@ -1,6 +1,6 @@
 # Self Assessment
 
-Self Assessment is Soul's read-only view of the machine and runtime it inhabits. It gathers evidence, explains gaps, and can prepare advisory proposals or terminal handoffs. It is not an autonomous package manager or host administrator.
+Self Assessment is Soul's read-only view of the machine and runtime it inhabits. It gathers evidence, explains gaps, and can prepare advisory proposals. It is not an autonomous package manager or host administrator.
 
 Open it from **Self Improvement → Self Assessment**.
 
@@ -10,7 +10,7 @@ Open it from **Self Improvement → Self Assessment**.
 inspect
 → assess evidence
 → identify a gap or maintenance need
-→ prepare a bounded recommendation, proposal, or terminal handoff
+→ prepare a bounded recommendation or proposal
 → human reviews and acts separately
 → verify the resulting state
 ```
@@ -33,6 +33,12 @@ evidence timestamp and SHA-256. Confirming the pre-filled gate permits one
 bounded local GPT-OSS review; normal Core restoration remains the Dev runtime's
 responsibility.
 
+The confirmed review runs through the Dashboard's persisted bounded-job lane.
+Navigating away does not cancel it, and reopening or refreshing Self Assessment
+reconnects to the active job. A Dashboard-process restart fails an interrupted
+job visibly and never retries it automatically; collect fresh evidence and
+preview again before a deliberate retry.
+
 The result is an owner-private, immutable review containing only a summary,
 evidence-linked observations, explicit unknowns, and navigation hints. It does
 not replace deterministic collection, classify safety, alter findings or
@@ -46,10 +52,6 @@ must be collected again before another synthesis.
 Assessment findings may produce recommendations. **Generate proposal packets** previews the exact current capability-derived set, binds it to a digest, and writes advisory packets only after confirmation.
 
 Those packets do not implement a skill, alter the host, download a model, or promote anything. Skill-shaped proposals continue through [Skill Studio](SKILL_STUDIO.md).
-
-## Arch host handoff
-
-On the supported Arch/CachyOS host path, Self Assessment can prepare a fresh, digest-bound full-upgrade handoff. Soul never runs `pacman`, invokes `sudo`, or collects a password. The Operator executes the terminal command and may return afterward to verify postconditions.
 
 ## Guided maintenance evidence
 
@@ -132,7 +134,7 @@ It cannot:
 
 - A missing bounded capability belongs in [Skill Studio](SKILL_STUDIO.md).
 - A shared architectural limitation belongs in [Self Augmentation](SELF_AUGMENTATION.md).
-- A host mutation remains a separately reviewed executor or a human-run terminal operation.
+- Host maintenance and reboot belong in [Guided Maintenance](GUIDED_MAINTENANCE.md), which owns the reviewed device-scoped execution and evidence lifecycle.
 
 ## Related engineering references
 
