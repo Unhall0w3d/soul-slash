@@ -1,0 +1,138 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "pathname"
+require "securerandom"
+require "time"
+
+ROOT = File.expand_path("..", __dir__)
+POLICY_PATH = File.join(ROOT, "config", "clamav_scan_policy.json")
+
+options = {target: "downloads"}
+OptionParser.new do |parser|
+  parser.on("--target NAME") { |value| options[:target] = value }
+  parser.on("--path PATH") { |value| options[:path] = value }
+end.parse!
+
+def fail_result(message)
+  puts JSON.pretty_generate(
+    "ok" => false,
+    "lifecycle_state" => "failed",
+    "message" => message,
+    "mutation" => "none"
+  )
+  exit 2
+end
+
+policy = JSON.parse(File.read(POLICY_PATH))
+fail_result("ClamAV scan policy is unsupported") unless policy["schema_version"] == "soul.clamav.scan-policy.v1"
+
+test_mode = ENV["SOUL_CLAMAV_TEST_MODE"] == "1"
+home = File.expand_path(test_mode ? ENV.fetch("SOUL_CLAMAV_HOME") : Dir.home)
+target_template = policy.fetch("targets")[options[:target]]
+fail_result("ClamAV target class is unavailable") unless target_template
+
+allowed_root = File.expand_path(target_template.sub(/\A~/, home))
+requested = File.expand_path(options[:path] || allowed_root)
+fail_result("ClamAV target does not exist") unless File.exist?(requested)
+
+allowed_real = File.realpath(allowed_root)
+requested_real = File.realpath(requested)
+within_allowed = requested_real == allowed_real || requested_real.start_with?("#{allowed_real}/")
+fail_result("ClamAV target escapes its approved ingress root") unless within_allowed
+
+state_root = if test_mode
+               File.expand_path(ENV.fetch("SOUL_CLAMAV_STATE_ROOT"))
+             else
+               File.join(ROOT, "Soul", "private", "security", "clamav", "scans")
+             end
+FileUtils.mkdir_p(state_root, mode: 0o700)
+FileUtils.chmod(0o700, state_root)
+
+scanner = test_mode ? File.expand_path(ENV.fetch("SOUL_CLAMSCAN_BIN")) : "/usr/bin/clamscan"
+timeout_bin = "/usr/bin/timeout"
+fail_result("ClamAV scanner is unavailable") unless File.file?(scanner) && File.executable?(scanner)
+fail_result("bounded timeout utility is unavailable") unless File.file?(timeout_bin) && File.executable?(timeout_bin)
+
+limits = policy.fetch("limits")
+timeout_seconds = test_mode && ENV["SOUL_CLAMAV_TIMEOUT_SECONDS"] ? Integer(ENV.fetch("SOUL_CLAMAV_TIMEOUT_SECONDS")) : Integer(limits.fetch("operation_timeout_seconds"))
+fail_result("ClamAV timeout is invalid") unless timeout_seconds.between?(1, 3600)
+
+argv = [
+  timeout_bin, "--signal=TERM", "--kill-after=10s", timeout_seconds.to_s,
+  scanner,
+  "--recursive=yes",
+  "--infected",
+  "--official-db-only=yes",
+  "--cross-fs=no",
+  "--max-filesize=#{limits.fetch('max_file_size')}",
+  "--max-scansize=#{limits.fetch('max_scan_size')}",
+  "--max-files=#{Integer(limits.fetch('max_files_per_container'))}",
+  "--max-recursion=#{Integer(limits.fetch('max_recursion'))}",
+  "--max-scantime=#{Integer(limits.fetch('max_scan_time_ms'))}",
+  "--", requested_real
+]
+
+started_at = Time.now.utc
+stdout, stderr, status = Open3.capture3({"LC_ALL" => "C"}, *argv)
+finished_at = Time.now.utc
+combined = [stdout, stderr].reject(&:empty?).join("\n")
+scan_id = "scan_#{started_at.strftime('%Y%m%dT%H%M%SZ')}_#{SecureRandom.hex(4)}"
+log_path = File.join(state_root, "#{scan_id}.log")
+File.open(log_path, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(combined) }
+
+exit_code = status.exitstatus
+lifecycle, ok, outcome = case exit_code
+                         when 0 then ["complete", true, "clean"]
+                         when 1 then ["blocked_for_human_review", false, "detections"]
+                         when 124, 137 then ["failed", false, "timeout"]
+                         else ["failed", false, "scanner_error"]
+                         end
+
+summary = {}
+{
+  "known_viruses" => /Known viruses:\s*(\d+)/,
+  "scanned_directories" => /Scanned directories:\s*(\d+)/,
+  "scanned_files" => /Scanned files:\s*(\d+)/,
+  "infected_files" => /Infected files:\s*(\d+)/,
+  "data_scanned" => /Data scanned:\s*([^\n]+)/,
+  "elapsed" => /Time:\s*([^\n]+)/
+}.each do |key, pattern|
+  match = combined.match(pattern)
+  summary[key] = match[1].strip if match
+end
+
+db_files = Dir.glob("/var/lib/clamav/*.{cvd,cld}")
+receipt = {
+  "schema_version" => "soul.clamav.scan-receipt.v1",
+  "scan_id" => scan_id,
+  "lifecycle_state" => lifecycle,
+  "ok" => ok,
+  "outcome" => outcome,
+  "target_class" => options[:target],
+  "target_path" => requested_real,
+  "started_at" => started_at.iso8601,
+  "finished_at" => finished_at.iso8601,
+  "duration_seconds" => (finished_at - started_at).round(3),
+  "scanner_exit_code" => exit_code,
+  "policy_sha256" => Digest::SHA256.file(POLICY_PATH).hexdigest,
+  "database_latest_mtime" => db_files.empty? ? nil : db_files.map { |path| File.mtime(path) }.max.utc.iso8601,
+  "summary" => summary,
+  "log_path" => log_path,
+  "source_files_mutated" => false,
+  "automatic_quarantine" => false,
+  "automatic_delete" => false
+}
+receipt_path = File.join(state_root, "#{scan_id}.json")
+File.open(receipt_path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+  file.write(JSON.pretty_generate(receipt))
+  file.write("\n")
+end
+
+puts JSON.pretty_generate(receipt.merge("receipt_path" => receipt_path))
+exit(ok ? 0 : (outcome == "detections" ? 1 : 2))

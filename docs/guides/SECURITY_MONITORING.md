@@ -18,6 +18,10 @@ credentials.
 model stores, generated media libraries, VM disks, or encrypted backup blobs by
 default.
 
+The current A3 design uses standalone `clamscan`, not the resident daemon or
+on-access scanner. Official signatures update once daily through the packaged
+`clamav-freshclam-once.timer`; file scans remain explicit foreground actions.
+
 ## Rollout stages
 
 1. Security A0 — architecture, trust, retention, and response boundaries.
@@ -59,6 +63,54 @@ pilot is a separate hardening blocker; it is not an accepted Wazuh dependency.
 
 See the [A2 pilot contract](../soul/WAZUH_PASSIVE_AGENT_A2_BRIEF.md) and
 [A2 review](../assessments/WAZUH_PASSIVE_AGENT_A2_REVIEW.md).
+
+An Arch-family Operator workstation is a separate A2B lane. Wazuh does not
+publish a native Arch package, so Soul does not install or automatically trust
+an AUR package. If the Operator chooses a community package, review its exact
+recipe, source checksums, install hook, configuration, service behavior, and
+version relationship before enrollment. Permit manager TCP 1514 only from the
+exact endpoint, remove temporary TCP 1515 access immediately after enrollment,
+and keep endpoint-side Active Response disabled. See the
+[A2B contract](../soul/WAZUH_ARCH_AGENT_A2B_BRIEF.md) and
+[A2B review](../assessments/WAZUH_ARCH_AGENT_A2B_REVIEW.md).
+
+## Selective ClamAV setup and use
+
+Arch/CachyOS package setup:
+
+```bash
+sudo pacman -S --needed clamav
+sudo freshclam
+sudo systemctl enable --now clamav-freshclam-once.timer
+```
+
+Fedora package setup:
+
+```bash
+sudo dnf5 install clamav clamav-freshclam
+sudo freshclam
+sudo systemctl enable --now clamav-freshclam-once.timer
+```
+
+Do not enable `clamav-daemon`, `clamav-clamonacc`, or a ClamAV network socket.
+After setup, verify and run a bounded scan:
+
+```bash
+make clamav-check
+make verify-clamav-bounded-scan
+make clamav-scan-downloads
+```
+
+The scan never removes or moves a finding. Review its owner-private receipt
+under `Soul/private/security/clamav/scans/`. See the
+[A3 contract](../soul/CLAMAV_SELECTIVE_SCAN_A3_BRIEF.md) and
+[A3 review](../assessments/CLAMAV_SELECTIVE_SCAN_A3_REVIEW.md).
+
+ClamAV placement follows ingress role, not fleet membership. Current defaults
+qualify an Operator Downloads/import boundary and a backup guest's isolated
+plaintext restore staging. Hypervisor VM storage, encrypted repositories, DNS
+appliances, and maintenance-only laboratories are excluded unless their roles
+later acquire an explicit plaintext ingress path.
 
 ## Current interaction boundary
 

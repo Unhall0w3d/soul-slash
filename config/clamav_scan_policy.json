@@ -1,0 +1,24 @@
+{
+  "schema_version": "soul.clamav.scan-policy.v1",
+  "targets": {
+    "downloads": "~/Downloads",
+    "import_staging": "~/.local/share/soul/import-staging"
+  },
+  "limits": {
+    "operation_timeout_seconds": 900,
+    "max_file_size": "128M",
+    "max_scan_size": "512M",
+    "max_files_per_container": 20000,
+    "max_recursion": 16,
+    "max_scan_time_ms": 120000
+  },
+  "behavior": {
+    "official_database_only": true,
+    "cross_filesystems": false,
+    "recursive": true,
+    "infected_only_output": true,
+    "delete": false,
+    "move": false,
+    "copy": false
+  }
+}
