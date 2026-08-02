@@ -52,6 +52,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
 | Guided Maintenance | Preview and rehearse the reviewed Arch/AUR, Flatpak, reboot, and Hyprland restoration flow from Administration | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
+| Security Monitoring | Roll out Wazuh central observability and selective ClamAV scanning through separate human-reviewed gates | [Security Monitoring](docs/guides/SECURITY_MONITORING.md) |
 | Crucible Fedora Guest | Add an optional off-device backup target and read-only DNF5 maintenance laboratory on Proxmox | [Crucible Fedora](docs/guides/CRUCIBLE_FEDORA.md) |
 | Temper NixOS Guest | Prove declarative Nix flake updates, system generations, and bounded reboot behavior on Proxmox | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md#nixos-laboratory-target) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
