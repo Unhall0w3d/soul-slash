@@ -39,7 +39,7 @@ This roadmap tracks product bodies rather than the repository's historical phase
   and Fedora plaintext restore-staging lanes with current daily signatures.
   A4a server-API health projection and Local Topology extraction are live with
   an exact custom read-only role, private CA validation, accepted manager health,
-  and exact active Atelier/Crucible mappings. Operator presentation review,
+  exact active Atelier/Crucible mappings, and accepted Dashboard presentation.
   Wazuh receipt/detection ingestion, indexer alert access, and durable
   notification delivery remain separately review-gated
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
