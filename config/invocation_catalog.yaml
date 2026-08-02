@@ -68,6 +68,21 @@ entries:
       - Search local projects and documents for backrooms visual prompts.
       - Search my music projects for liquid drum and bass.
       - Search my visual projects for backrooms.
+  - id: files-inspect
+    label: Approved local file inspection
+    category: Knowledge
+    summary: List one directory level, stat one path, or read one bounded text file beneath an explicitly configured approved root.
+    skill_ids: [files.inspect]
+    required_inputs: [Exact approved root ID, operation, and relative path]
+    optional_inputs: [List the configured root IDs before selecting one]
+    core: Any Core; inspection is deterministic and local.
+    approval: No approval for this bounded read; configuration alone defines root authority.
+    output: Bounded directory metadata, exact path metadata, or UTF-8 text with digest and untrusted-content labeling.
+    boundary: Conversation cannot add roots; absolute paths, traversal, hidden paths, secret-bearing files, symlinks, binary files, oversized files, writes, recursion, indexing, and background continuation are unavailable.
+    examples:
+      - Show approved file roots.
+      - List files in root project at docs.
+      - Read file from root project at README.md.
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

@@ -166,6 +166,17 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: local_search_a1
+  files.inspect:
+    internal_handler: file_inspection
+    instruction_path: Soul/skills/files/inspect-files/SKILL.md
+    category: knowledge
+    status: available
+    description: List one directory, stat one path, or read one bounded text file beneath an explicitly configured approved local root without mutation.
+    risk: read_only
+    requires_approval: false
+    writes_files: false
+    expected_output: application_envelope
+    verifier: fundamental_files_inspect_a1
   knowledge.vault.initialize:
     internal_handler: knowledge_vault
     category: knowledge

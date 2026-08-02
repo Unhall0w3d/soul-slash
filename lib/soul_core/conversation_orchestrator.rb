@@ -13,6 +13,7 @@ require_relative "dashboard_capability_guide"
 require_relative "intent_router"
 require_relative "invocation_catalog_service"
 require_relative "local_search_chat_controls"
+require_relative "file_inspection_chat_controls"
 require_relative "skill_studio_chat_controls"
 
 module SoulCore
@@ -134,6 +135,7 @@ module SoulCore
       /\A\s*search\s+(?:the\s+)?knowledge\s+vault\s+(?:for\s+)?.+\z/i
     ].freeze
     LOCAL_SEARCH_CONTROL_PATTERNS = LocalSearchChatControls::REQUEST_PATTERNS
+    FILE_INSPECTION_CONTROL_PATTERNS = FileInspectionChatControls::REQUEST_PATTERNS
     PROJECT_TRACKER_CONTROL_PATTERNS = [
       /\A\s*(?:show|list|open)\s+(?:the\s+)?(?:project\s+timeline|implementation\s+tracker)\s*[?.!]*\z/i,
       /\A\s*what(?:'s|\s+is)\s+(?:next|on\s+the\s+project\s+timeline)\s*[?.!]*\z/i,
@@ -331,6 +333,14 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "explicit local project and document search remains a bounded source-attributed read",
           flags: flags.merge("local_search_control" => true)
+        )
+      end
+
+      if FILE_INSPECTION_CONTROL_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "an explicit approved-root file request uses one bounded local read with no path authority from conversation",
+          flags: flags.merge("file_inspection_control" => true)
         )
       end
 

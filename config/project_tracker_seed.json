@@ -116,7 +116,7 @@
       "summary": "Present what Soul can invoke, required inputs, conversational triggers, Core requirements, and approval behavior without dumping the raw skill registry.",
       "acceptance": "The Operator can inspect available invocations; Soul can explain when each is appropriate; examples do not accidentally execute capabilities.",
       "source": "Operator-requested invocation list",
-      "notes": "The curated guide exposes 15 current human-facing invocations without executing them. Operator completed the original live acceptance on 2026-07-27, approved Capability and Skill Foundation A1 on 2026-07-31, and approved A2 read-only Skill Studio inspection on 2026-08-01.",
+      "notes": "The curated guide exposes 16 current human-facing invocations without executing them. Operator completed the original live acceptance on 2026-07-27, approved Capability and Skill Foundation A1 on 2026-07-31, and approved A2 read-only Skill Studio inspection on 2026-08-01. Fundamental Skill Cohort A1 now adds the candidate files.inspect invocation for human review.",
       "implementation": "Curated YAML catalog, registry-backed Ruby read service, allowlisted application operation, deterministic Chat discoverability route, and a filterable read-only Chat context-rail dialog.",
       "technologies": "Ruby, YAML, vanilla JavaScript, semantic HTML, handwritten responsive CSS.",
       "interfaces": "Authenticated Dashboard Chat context rail; deterministic Chat; soul.application.v1 invocations.list.",
@@ -139,6 +139,23 @@
       "interfaces": "Authenticated Dashboard Chat, Voice Presence, Administration → Guided Maintenance, terminal, and Noctalia protected handoff.",
       "commands": "make verify-operator-capability-catalog\nmake verify-conversation-maintenance-workflow\nmake verify-skill-studio-conversation\nruby scripts/verify-dashboard-capability-guide-a1.rb\nruby scripts/verify-invocation-catalog-a1.rb",
       "references": "docs/soul/CAPABILITY_SKILL_FOUNDATION_A1_BRIEF.md\ndocs/assessments/CAPABILITY_SKILL_FOUNDATION_A1_REVIEW.md\ndocs/soul/CAPABILITY_SKILL_FOUNDATION_A2_BRIEF.md\ndocs/assessments/CAPABILITY_SKILL_FOUNDATION_A2_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SKILL_STUDIO.md"
+    },
+    {
+      "item_id": "track_fundamental_skill_cohort_a1",
+      "title": "Build Fundamental Skill Cohort A1",
+      "area": "Skills + Chat + Voice",
+      "horizon": "now",
+      "status": "in_progress",
+      "priority": "high",
+      "summary": "Deliver the curated fundamental skill cohort as separate reviewed vertical slices, beginning with bounded approved-root file inspection.",
+      "acceptance": "Each candidate has one deterministic implementation path, bounded lifecycle, explicit authority boundary, modern skill package, tests, documentation, review artifact, registry and invocation coverage, and separate human acceptance.",
+      "source": "Capability and Skill Foundation A2 approved cohort",
+      "notes": "files.inspect was accepted by the Operator on 2026-08-02 as the first completed cohort slice. network.diagnose is next; repository.inspect, workspace.artifact.compose packaging, and web.research packaging remain planned and unavailable as cohort claims until their own reviewed slices complete.",
+      "implementation": "The first slice adds one approved-root FileInspectionService shared by the application API, deterministic Chat, and Voice Presence. It lists one directory level, stats one path, or reads one allowlisted bounded UTF-8 file while rejecting traversal, absolute paths, hidden paths, symlinks, secret-bearing names or content, binaries, and oversized reads.",
+      "technologies": "Ruby; deterministic request routing; YAML skill, invocation, and capability registries; dotenv-local root allowlist; SHA-256 content evidence; Codex modern skill package metadata.",
+      "interfaces": "Authenticated Dashboard Chat; Voice Presence through the shared Chat route; soul.application.v1 files.roots, files.list, files.stat, and files.read; public skill and invocation guides.",
+      "commands": "make verify-fundamental-files-inspect\npython \"${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py\" Soul/skills/files/inspect-files\nmake verify-invocation-catalog\nmake verify-operator-capability-catalog",
+      "references": "docs/soul/CAPABILITY_SKILL_FOUNDATION_A2_BRIEF.md\ndocs/soul/FUNDAMENTAL_FILES_INSPECT_A1_BRIEF.md\ndocs/skills/FILES_INSPECT.md\ndocs/assessments/FUNDAMENTAL_FILES_INSPECT_A1_REVIEW.md"
     },
     {
       "item_id": "track_codex_soul_dev_worker",

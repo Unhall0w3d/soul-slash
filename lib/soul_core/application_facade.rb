@@ -11,6 +11,7 @@ require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "knowledge_vault_service"
 require_relative "local_search_service"
+require_relative "file_inspection_service"
 require_relative "invocation_catalog_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
@@ -126,6 +127,7 @@ module SoulCore
       visual_studio_service: nil,
       knowledge_vault_service: nil,
       local_search_service: nil,
+      file_inspection_service: nil,
       invocation_catalog_service: nil
     )
       @root = File.expand_path(root)
@@ -183,6 +185,7 @@ module SoulCore
       @visual_studio_service = visual_studio_service
       @knowledge_vault_service = knowledge_vault_service
       @local_search_service = local_search_service
+      @file_inspection_service = file_inspection_service
       @invocation_catalog_service = invocation_catalog_service
     end
 
@@ -335,6 +338,10 @@ module SoulCore
           limit: parameters["limit"],
           sources: parameters["sources"]
         ))
+      when "files.roots" then domain(file_inspection.roots)
+      when "files.list" then domain(file_inspection.list(root_id: required(parameters, "root_id"), relative_path: parameters["relative_path"] || "."))
+      when "files.stat" then domain(file_inspection.stat(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path")))
+      when "files.read" then domain(file_inspection.read(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path")))
       when "invocations.list" then [invocation_catalog.list(category: parameters["category"], query: parameters["query"]), "complete", "none", false]
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
       when "skill_studio.proposals.list" then domain(skill_studio.proposals(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
@@ -720,6 +727,10 @@ module SoulCore
 
     def invocation_catalog
       @invocation_catalog_service ||= InvocationCatalogService.new(root: @root, registry: skill_registry)
+    end
+
+    def file_inspection
+      @file_inspection_service ||= FileInspectionService.new(root: @root, process_env: @process_env)
     end
 
     def approvals_pending(parameters)

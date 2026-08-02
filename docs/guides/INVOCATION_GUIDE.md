@@ -31,6 +31,8 @@ Show the invocation catalog.
 List Creative invocations.
 How can I invoke music production?
 Show the Skill Studio inventory.
+Show approved file roots.
+Read file from root project at README.md.
 ```
 
 These requests resolve deterministically and perform no mutation. Ordinary
@@ -58,3 +60,7 @@ visibly unavailable.
 The application operation `invocations.list` accepts optional bounded
 `category` and `query` filters. It always returns `read_only: true`,
 `examples_are_authority: false`, and `mutation: none`.
+
+The `files-inspect` entry is intentionally exact. `.env` configuration defines
+approved roots; invocation wording can select a configured root but cannot add
+one. See `docs/skills/FILES_INSPECT.md`.
