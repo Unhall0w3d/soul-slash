@@ -16,7 +16,8 @@ PHRASES = {
   "music-ready" => "Your music candidate is ready for review.",
   "visual-ready" => "Your visual candidate is ready for review.",
   "lyrics-ready" => "Lyric analysis is ready for review.",
-  "attention" => "A task needs your attention."
+  "attention" => "A task needs your attention.",
+  "security-alert" => "Soul detected a high-priority security alert. Review Wazuh."
 }.freeze
 CUES = {
   "submit" => [740, 0.11],

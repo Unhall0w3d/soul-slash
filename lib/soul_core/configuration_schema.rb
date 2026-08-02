@@ -2,7 +2,7 @@
 
 module SoulCore
   module ConfigurationSchema
-    MAX_SETTINGS = 64
+    MAX_SETTINGS = 96
 
     module_function
 
@@ -70,6 +70,7 @@ module SoulCore
         setting("maintenance.fleet.chancery_guest_address", "SOUL_FLEET_CHANCERY_GUEST_ADDRESS", :string, "172.30.0.2", effect: "Records the fixed private guest address inside WinBoat's isolated QEMU network; this does not modify networking."),
         setting("maintenance.fleet.chancery_container_name", "SOUL_FLEET_CHANCERY_CONTAINER_NAME", :string, "WinBoat", effect: "Selects the exact local Docker container inspected by the read-only WinBoat adapter."),
         setting("security.wazuh.integration_file", "SOUL_WAZUH_INTEGRATION_FILE", :string, "", effect: "Selects one ignored owner-private Wazuh integration manifest containing reviewed private origins, certificate and credential paths, and exact device-to-agent mappings.", risk: "The manifest must not contain credentials; it enables bounded outbound read-only Wazuh server API access when explicitly configured."),
+        setting("security.wazuh.alerts_integration_file", "SOUL_WAZUH_ALERTS_INTEGRATION_FILE", :string, "", effect: "Selects one ignored owner-private Wazuh alert manifest for a restricted SSH tunnel and exact read-only index search.", risk: "The indexer remains loopback-only; this enables bounded normalized alert evidence and contains no remediation authority."),
         setting("voice.transcription.runtime_root", "SOUL_VOICE_TRANSCRIPTION_ROOT", :string, "", effect: "Overrides the user-local root containing Soul's pinned foreground transcription runtime."),
         setting("voice.transcription.manifest", "SOUL_VOICE_TRANSCRIPTION_MANIFEST", :string, "", effect: "Overrides the repository transcription manifest used by Chat push-to-talk."),
         setting("voice.transcription.model", "SOUL_VOICE_TRANSCRIPTION_MODEL", :string, "ggml-small.en.bin", effect: "Selects one exact model filename declared by the transcription manifest."),

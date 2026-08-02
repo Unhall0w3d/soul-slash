@@ -3,6 +3,7 @@
 
 html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 js = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
+css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 errors = []
 
 check = lambda do |label, condition|
@@ -15,12 +16,15 @@ check.call("Administration exposes a dedicated Local Topology panel", html.inclu
 check.call("Guided Maintenance no longer owns the topology canvas", !html.include?('id="maintenance-topology"'))
 check.call("Local Topology has saved-snapshot and explicit collection controls", html.include?('id="refresh-local-topology-fleet"') && html.include?('id="collect-local-topology-fleet"'))
 check.call("topology reuses the bounded maintenance snapshot contract", js.include?('callSoul("maintenance.fleet.snapshot")') && js.include?('callSoul("maintenance.fleet.status"'))
+check.call("topology snapshot actions share one equal control grid", css.include?(".local-topology-toolbar { display:grid; grid-template-columns:repeat(2,minmax(220px,1fr))") && css.include?(".local-topology-toolbar .refresh-button,.local-topology-toolbar .gate-button"))
+check.call("shared Wazuh actions align buttons and links identically", css.include?(".wazuh-security-actions .quiet-button { display:inline-flex; align-items:center; justify-content:center") && css.include?("flex:0 0 180px; width:180px; min-height:36px"))
 check.call("topology navigation has a stable hash", js.include?('topology: "#local-topology-panel"'))
 check.call("shared renderer targets the dedicated topology canvas", js.include?('renderMaintenanceTopology(data.topology, { canvasId: "local-topology" })'))
 check.call("Wazuh health is projected without moving remediation authority",
            html.include?('id="maintenance-wazuh-summary"') && html.include?('id="topology-wazuh-summary"') &&
              js.include?('callSoul(operation)') && js.include?('"security.wazuh.snapshot"') && js.include?('"security.wazuh.status"') &&
-             js.include?("alert evidence not integrated · no remediation authority"))
+             js.include?("Read-only normalized evidence · no acknowledgement, suppression, or remediation authority") &&
+             js.include?("security.wazuh.alerts.snapshot") && js.include?("security.wazuh.alerts.status"))
 check.call("Wazuh investigations open only as isolated HTTPS links",
            html.scan('rel="noopener noreferrer"').length >= 2 && js.include?('url.protocol === "https:"'))
 

@@ -76,7 +76,7 @@ brief = File.read("docs/soul/PHASE12A_PORTABLE_TYPED_CONFIGURATION_BRIEF.md")
 review = File.read("docs/assessments/CONVERSATIONAL_SOUL_PHASE12A_PORTABLE_TYPED_CONFIGURATION.md")
 
 check("approved brief remains explicit", brief.include?("implementation_authorized: yes") && brief.include?("Outcome: approved"), errors)
-check("schema cap is explicit", schema.include?("MAX_SETTINGS = 64"), errors)
+check("schema cap is explicit", schema.include?("MAX_SETTINGS = 96"), errors)
 check("dotenv bounds are explicit", dotenv.include?("MAX_BYTES = 64 * 1024") && dotenv.include?("MAX_LINES = 512"), errors)
 check("override and error caps are explicit", resolver.include?("MAX_OVERRIDES = 32") && resolver.include?("MAX_ERRORS = 100"), errors)
 check("secret redaction is explicit", resolver.include?("[REDACTED]") && command.include?("[REDACTED]"), errors)
