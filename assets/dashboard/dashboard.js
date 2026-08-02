@@ -2933,6 +2933,7 @@ function renderMaintenanceDevice(device) {
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
   const readOnlyStatus = inventoryOnly && ["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter);
   const facts = [
+    ...(device.facts?.fqdn ? [["Identity", device.facts.fqdn]] : []),
     ["Platform", device.os || "unavailable"],
     ["Maintenance adapter", device.facts?.maintenance_adapter ? String(device.facts.maintenance_adapter).replaceAll("_", " ") : (inventoryOnly ? "not authorized" : "fixed platform adapter")],
     ["Version", device.version || "unavailable"],
@@ -2977,7 +2978,9 @@ function renderMaintenanceDevice(device) {
       ? "Status only · lifecycle and mutation remain provider-managed"
       : (readOnlyStatus
         ? `${device.facts?.status_adapter === "proxmox_read_only" ? "Proxmox" : "DNF5"} evidence only · maintenance and reboot authority remain disabled`
-        : "Inventory only · discovered capabilities grant no mutation authority");
+        : (device.facts?.management_channel === "host_local_inventory"
+          ? "Host-local inventory only · no guest mutation or LAN authority"
+          : "Inventory only · discovered capabilities grant no mutation authority"));
     actions.append(notice);
   } else {
     const controlDeviceId = device.facts?.control_target_id || device.id;
@@ -3075,6 +3078,20 @@ function renderMaintenanceTopology(topology) {
   lan.append(lanHeading, lanNodes);
   map.append(cloudTier, uplink, gatewayTier, lanUplink, lan);
 
+  const hostNodeIds = network.host_node_ids || [];
+  if (hostNodeIds.length) {
+    const hostTier = document.createElement("section"); hostTier.className = "maintenance-network-lan maintenance-network-host";
+    const hostHeading = document.createElement("header");
+    const hostIdentity = document.createElement("div"); const hostEyebrow = document.createElement("p"); hostEyebrow.className = "eyebrow"; hostEyebrow.textContent = "Host-local runtime";
+    const hostTitle = document.createElement("strong"); hostTitle.textContent = "Workstation-contained systems";
+    hostIdentity.append(hostEyebrow, hostTitle);
+    const hostBoundary = document.createElement("code"); hostBoundary.textContent = "not LAN-routed";
+    hostHeading.append(hostIdentity, hostBoundary);
+    const hostNodes = document.createElement("div"); hostNodes.className = "maintenance-network-lan-nodes";
+    hostNodeIds.forEach((id) => { const node = nodes.get(id); if (node) hostNodes.append(makeNode(node, "HOST")); });
+    hostTier.append(hostHeading, hostNodes); map.append(hostTier);
+  }
+
   const relationships = (topology?.edges || []).filter((edge) => !["route", "wan"].includes(edge.kind));
   const relationshipSection = document.createElement("section"); relationshipSection.className = "maintenance-topology-relationships";
   const relationshipHeading = document.createElement("div"); relationshipHeading.className = "maintenance-network-tier-heading";
@@ -3107,7 +3124,7 @@ function renderMaintenanceFleet(data) {
   statusDevices.forEach((device) => statusGrid.append(renderMaintenanceDevice(device)));
   byId("maintenance-managed-count").textContent = String(managedDevices.length);
   byId("maintenance-presence-count").textContent = String(statusDevices.length);
-  if (!managedDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No SSH-integrated systems returned."; managedGrid.append(empty); }
+  if (!managedDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No integrated systems returned."; managedGrid.append(empty); }
   if (!statusDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No status-only devices returned."; statusGrid.append(empty); }
   renderMaintenanceTopology(data.topology);
   state.maintenanceFleetLoaded = true;

@@ -10,6 +10,7 @@ require "time"
 
 require_relative "bounded_command_runner"
 require_relative "apple_mobile_inventory_adapter"
+require_relative "winboat_inventory_adapter"
 
 module SoulCore
   class MaintenanceFleetStatusService
@@ -57,7 +58,8 @@ module SoulCore
       systemd_run_path: SYSTEMD_RUN_PATH,
       ruby_path: RbConfig.ruby,
       recovery_scheduler: nil,
-      apple_mobile_inventory_adapter: nil
+      apple_mobile_inventory_adapter: nil,
+      winboat_inventory_adapter: nil
     )
       @runner = runner
       @clock = clock
@@ -73,6 +75,7 @@ module SoulCore
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
       @apple_mobile_inventory_adapter = apple_mobile_inventory_adapter || AppleMobileInventoryAdapter.new(runner: @runner)
+      @winboat_inventory_adapter = winboat_inventory_adapter || WinboatInventoryAdapter.new(runner: @runner)
       @addresses = {
         WORKSTATION_ID => configured_display_value(
           "SOUL_FLEET_WORKSTATION_ADDRESS",
@@ -108,6 +111,7 @@ module SoulCore
         collect_pihole
       ]
       devices << collect_cisco_phone if cisco_phone_enabled?
+      devices << collect_chancery if chancery_enabled?
       existing_addresses = devices.map { |device| device.fetch("address") }
       registry_records.each do |record|
         devices << collect_enrolled_device(record) unless existing_addresses.include?(record.fetch("address"))
@@ -246,6 +250,10 @@ module SoulCore
         raise "Cisco phone status is no longer configured" unless cisco_phone_enabled?
 
         collect_cisco_phone
+      when "chancery"
+        raise "Chancery WinBoat inventory is no longer configured" unless chancery_enabled?
+
+        collect_chancery
       else
         record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
         return collect_enrolled_device(record, schedule_recovery: schedule_recovery) if record
@@ -597,6 +605,65 @@ module SoulCore
         facts: cisco_phone_facts("reachable"),
         control: "status_only",
         status: "reachable"
+      )
+    end
+
+    def collect_chancery
+      label = configured_display_address("SOUL_FLEET_CHANCERY_LABEL", "Chancery")
+      fqdn = @process_env.fetch("SOUL_FLEET_CHANCERY_FQDN", "").to_s.strip
+      guest_address = @process_env.fetch("SOUL_FLEET_CHANCERY_GUEST_ADDRESS", "172.30.0.2").to_s.strip
+      container_name = @process_env.fetch("SOUL_FLEET_CHANCERY_CONTAINER_NAME", "WinBoat").to_s.strip
+      inventory = @winboat_inventory_adapter.collect(
+        container_name: container_name,
+        fqdn: fqdn,
+        guest_address: guest_address
+      )
+      Array(inventory["evidence"]).each_with_index do |entry, index|
+        @evidence << entry.merge("adapter" => "chancery.winboat_inventory.#{index + 1}")
+      end
+      role = "Windows 11 work environment · host-local WinBoat guest"
+      facts = {
+        "fqdn" => fqdn,
+        "guest_address" => guest_address,
+        "container_name" => container_name,
+        "container_address" => inventory["container_address"] || "unavailable",
+        "container_started_at" => inventory["started_at"],
+        "container_restart_count" => inventory["restart_count"],
+        "container_image" => inventory["image"],
+        "container_status" => inventory["status"] || "unavailable",
+        "management_channel" => "host_local_inventory",
+        "status_adapter" => "winboat_read_only",
+        "control_capability" => "inventory_only",
+        "mutation_supported" => false,
+        "network_scope" => "host_local",
+        "lan_exposed" => inventory["loopback_only"] == false,
+        "health" => inventory["healthy"] ? "healthy" : "attention"
+      }
+      unless inventory["available"]
+        unavailable = SoulCore::BoundedCommandRunner::Result.new(
+          stdout: "", stderr: inventory["reason"].to_s, exit_status: nil, status: "unavailable", truncated: false
+        )
+        return offline_device(
+          "chancery", label, role, guest_address, unavailable,
+          control: "inventory_only", facts: facts
+        )
+      end
+
+      device(
+        id: "chancery",
+        label: label,
+        role: role,
+        address: guest_address,
+        reachable: inventory["reachable"] == true,
+        os: "Windows 11",
+        version: "WinBoat · #{inventory["image"].to_s.empty? ? "image unavailable" : inventory["image"]}",
+        kernel: {"running" => "guest-managed", "available" => "not queried", "update_required" => false},
+        updates: update_summary(freshness: "not_queried"),
+        reboot: {"required" => false, "reason" => "not assessed · inventory only"},
+        services: Array(inventory["services"]),
+        facts: facts,
+        control: "inventory_only",
+        status: inventory["healthy"] ? "healthy" : "attention"
       )
     end
 
@@ -1363,7 +1430,7 @@ module SoulCore
       if devices.any? { |device| device.fetch("id") == "cisco-8851" }
         edges << {"from" => "cisco-8851", "to" => "webex-calling", "label" => "Webex Calling · status not asserted", "kind" => "provider"}
       end
-      devices.reject { |device| device["id"] == gateway_node["id"] }.each do |device|
+      devices.reject { |device| device["id"] == gateway_node["id"] || device.dig("facts", "network_scope") == "host_local" }.each do |device|
         edges << {
           "from" => device.fetch("id"),
           "to" => gateway_node.fetch("id"),
@@ -1372,7 +1439,11 @@ module SoulCore
         }
       end
       devices.select { |device| device.fetch("control") == "inventory_only" }.each do |device|
-        channel = device.dig("facts", "management_channel") == "ssh_inventory" ? "fixed SSH inventory" : "bounded status probe"
+        channel = case device.dig("facts", "management_channel")
+                  when "ssh_inventory" then "fixed SSH inventory"
+                  when "host_local_inventory" then "host-local inventory"
+                  else "bounded status probe"
+                  end
         edges << {"from" => WORKSTATION_ID, "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
       end
       device_nodes = devices.map do |device|
@@ -1385,7 +1456,9 @@ module SoulCore
           }
         end
       device_nodes << gateway_node unless device_nodes.any? { |node| node["id"] == gateway_node["id"] }
-      network["lan_node_ids"] = device_nodes.reject { |node| node["id"] == gateway_node["id"] }.map { |node| node.fetch("id") }
+      host_local_ids = devices.select { |device| device.dig("facts", "network_scope") == "host_local" }.map { |device| device.fetch("id") }
+      network["lan_node_ids"] = device_nodes.reject { |node| node["id"] == gateway_node["id"] || host_local_ids.include?(node["id"]) }.map { |node| node.fetch("id") }
+      network["host_node_ids"] = host_local_ids
       network["cloud_node_ids"] = external_nodes.map { |node| node.fetch("id") }
       {
         "layout" => "network_map",
@@ -1517,6 +1590,10 @@ module SoulCore
 
     def cisco_phone_enabled?
       %w[1 true yes on].include?(@process_env["SOUL_FLEET_CISCO_PHONE_ENABLED"].to_s.strip.downcase)
+    end
+
+    def chancery_enabled?
+      %w[1 true yes on].include?(@process_env["SOUL_FLEET_CHANCERY_ENABLED"].to_s.strip.downcase)
     end
 
     def registry_records
@@ -1776,6 +1853,7 @@ module SoulCore
       if network
         network["gateway_node_id"] = canonical_device_id(network["gateway_node_id"]) if network.key?("gateway_node_id")
         network["lan_node_ids"] = Array(network["lan_node_ids"]).map { |id| canonical_device_id(id) } if network.key?("lan_node_ids")
+        network["host_node_ids"] = Array(network["host_node_ids"]).map { |id| canonical_device_id(id) } if network.key?("host_node_ids")
         network["cloud_node_ids"] = Array(network["cloud_node_ids"]).map { |id| canonical_device_id(id) } if network.key?("cloud_node_ids")
       end
       canonical = parsed.merge(

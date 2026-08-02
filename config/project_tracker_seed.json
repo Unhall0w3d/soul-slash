@@ -548,6 +548,23 @@
       "notes": "Implemented in commits 2ea121c and 0c63647, with Crucible D1 live-accepted. Supervised receipts: Forge maintenance device_receipt_9192a74a3625e208; Pi-hole maintenance device_receipt_713c515392cb4f19; Pi-hole reboot device_receipt_f6b016c37f4ba527; Forge reboot device_receipt_1eb39ab94fb81dde; Crucible maintenance device_receipt_de12d9416cc87d61; Crucible reboot device_receipt_aea88b989d8df1ba. The private dashboard environment keeps remote live execution enabled, but every action still requires a fresh digest and exact device-specific confirmation. Crucible returned on kernel 7.1.5 with zero updates and passed SSH/QEMU guest agent, DNF5, backup-mount, and authority readiness. A10 repaired A9's live systemd-sandbox incompatibility; deterministic and exact-sandbox verification pass, while normal-card visual acceptance remains pending. Workstation conditional reboot and Hyprland restoration remain tracked separately."
     },
     {
+      "item_id": "track_winboat_windows_inventory",
+      "title": "Host-local WinBoat Windows fleet identity",
+      "area": "Administration + Infrastructure",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Enroll the Operator's Windows 11 work environment as its own read-only fleet identity while retaining WinBoat's fixed guest address and loopback-only host access.",
+      "implementation": "A1 adds an optional built-in Chancery inventory adapter. It uses fixed-format Docker state, isolated-network address, and port-binding projections; validates that all published bindings remain loopback-only; resolves and probes only the reviewed RDP and WinBoat guest-service ports; and projects the configured private FQDN plus fixed guest address into a rich inventory-only card. The adapter never serializes container environment data, invokes the guest, changes networking, or creates Maintenance/Reboot authority. Operations Topology represents Chancery as host-local inventory from Atelier and excludes it from the LAN default-route tier.",
+      "technologies": "Ruby bounded command runner and WinBoat inventory adapter; fixed Docker CLI templates; IPAddr, Socket, and bounded timeouts; private typed configuration; vanilla JavaScript and HTML Dashboard.",
+      "interfaces": "Administration → Guided Maintenance → Integrated inventory; Chancery per-device Refresh; Operations Topology host-local inventory relationship.",
+      "commands": "make verify-winboat-inventory\nmake verify-maintenance-fleet-status",
+      "references": "docs/soul/WINBOAT_WINDOWS_INVENTORY_A1_BRIEF.md\ndocs/assessments/WINBOAT_WINDOWS_INVENTORY_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
+      "acceptance": "Deterministic adapter and fleet regression suites pass. A live read-only adapter probe confirms the existing WinBoat container, fixed guest identity, loopback-only publication, and active RDP/guest-service bindings without mutation. Final acceptance requires the deployed Chancery card and topology relationship to be reviewed in the normal Dashboard.",
+      "source": "Operator direction, 2026-08-02",
+      "notes": "Working identity: Chancery. Deployment-local FQDN is stored only in ignored configuration. Docker, Windows, DNS, DHCP, routing, firewall, and Pi-hole configuration remain unchanged. Direct LAN access is explicitly out of scope."
+    },
+    {
       "item_id": "track_portable_fleet_discovery",
       "title": "Portable Linux fleet discovery and capability enrollment",
       "area": "Administration + Infrastructure",
