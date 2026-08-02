@@ -3,6 +3,22 @@
   "title": "Soul / Project Timeline",
   "items": [
     {
+      "item_id": "track_wazuh_clamav_security",
+      "title": "Roll out Wazuh and selective ClamAV security monitoring",
+      "area": "Administration + Security",
+      "horizon": "now",
+      "status": "in_progress",
+      "priority": "high",
+      "summary": "Deploy a private-LAN Wazuh console, qualify passive Linux agents and bounded ClamAV ingress scanning, then expose a least-privilege read-only security summary through Soul.",
+      "implementation": "A0 defines a portable dedicated-VM topology, private network and credential boundaries, passive-first agent cohort, selective ClamAV targets and exclusions, staged human gates, retention, failure behavior, and a read-only Soul integration contract. No persistent security service has been installed by A0.",
+      "technologies": "Wazuh manager, indexer, dashboard, server API and Linux agents; ClamAV, freshclam and optional later clamonacc; Ubuntu Server VM; TLS; Ruby bounded API client and vanilla Dashboard in a later slice.",
+      "interfaces": "Wazuh HTTPS dashboard as the authoritative investigation console; planned Administration → Security summary; planned read-only Chat and Voice status invocations.",
+      "references": "docs/soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md\ndocs/assessments/WAZUH_CLAMAV_SECURITY_A0_REVIEW.md",
+      "acceptance": "Central services are private and recoverable; each endpoint is explicitly enrolled; resource and false-positive costs are measured; ClamAV never scans protected high-churn stores by default; Soul cannot remediate or mutate Wazuh state; all security operations expose fresh, stale, unavailable, and terminal evidence honestly.",
+      "source": "Operator-approved security rollout direction, 2026-08-01",
+      "notes": "A0 is ready for human topology review. Proposed initial alert retention is 30 days. Active Response, quarantine, automatic deletion, unattended remediation, and raw-index backup remain excluded or separately gated."
+    },
+    {
       "item_id": "track_voice_live_validation",
       "title": "Validate Voice Presence, natural follow-up, and dashboard recognition",
       "area": "Voice + Perception",
