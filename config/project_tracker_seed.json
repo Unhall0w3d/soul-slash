@@ -10,13 +10,28 @@
       "status": "needs_review",
       "priority": "high",
       "summary": "Deploy a private-LAN Wazuh console, qualify passive Linux agents and bounded ClamAV ingress scanning, then expose a least-privilege read-only security summary through Soul.",
-      "implementation": "A0 defines the portable trust boundary and staged gates. Central A1 deploys a dedicated Ubuntu 24.04 single-node Wazuh manager, indexer, dashboard, and Filebeat with fixed resources, private firewall, loopback indexer, matched component versions, disabled update repository, 30-day ISM policy, protected VM lifecycle, stable local DNS, key-only administration, and verified reboot recovery. Agent ports remain closed and no endpoint, ClamAV, Active Response, or Soul API identity exists yet.",
+      "implementation": "A0 defines the portable trust boundary and staged gates. Central A1 deploys an Operator-accepted Ubuntu 24.04 single-node Wazuh manager, indexer, dashboard, and Filebeat with fixed resources, private firewall, loopback indexer, matched component versions, disabled update repository, 30-day ISM policy, protected VM lifecycle, stable local DNS, key-only administration, and verified reboot recovery. A2 adds one signed, version-matched Fedora pilot agent with endpoint-scoped encrypted event transport, closed post-enrollment registration, disabled package repository, and explicit endpoint-side Active Response denial.",
       "technologies": "Wazuh manager, indexer, dashboard, server API and Linux agents; ClamAV, freshclam and optional later clamonacc; Ubuntu Server VM; TLS; Ruby bounded API client and vanilla Dashboard in a later slice.",
       "interfaces": "Wazuh HTTPS dashboard as the authoritative investigation console; planned Administration → Security summary; planned read-only Chat and Voice status invocations.",
-      "references": "docs/soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md\ndocs/assessments/WAZUH_CLAMAV_SECURITY_A0_REVIEW.md\ndocs/soul/WAZUH_CENTRAL_A1_BRIEF.md\ndocs/assessments/WAZUH_CENTRAL_A1_REVIEW.md\ndocs/guides/SECURITY_MONITORING.md",
+      "references": "docs/soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md\ndocs/assessments/WAZUH_CLAMAV_SECURITY_A0_REVIEW.md\ndocs/soul/WAZUH_CENTRAL_A1_BRIEF.md\ndocs/assessments/WAZUH_CENTRAL_A1_REVIEW.md\ndocs/soul/WAZUH_PASSIVE_AGENT_A2_BRIEF.md\ndocs/assessments/WAZUH_PASSIVE_AGENT_A2_REVIEW.md\ndocs/guides/SECURITY_MONITORING.md",
       "acceptance": "Central services are private and recoverable; each endpoint is explicitly enrolled; resource and false-positive costs are measured; ClamAV never scans protected high-churn stores by default; Soul cannot remediate or mutate Wazuh state; all security operations expose fresh, stale, unavailable, and terminal evidence honestly.",
       "source": "Operator-approved security rollout direction, 2026-08-01",
-      "notes": "Central A1 is live and blocked for Operator dashboard review. Agent ports 1514/1515 remain closed. The next gate is one passive endpoint pilot with measured telemetry and resource cost. Active Response, quarantine, automatic deletion, unattended remediation, ClamAV, Soul API access, and raw-index backup remain excluded or separately gated."
+      "notes": "Central A1 is accepted. One Fedora A2 pilot is Active and machine-qualified with explicit passive enforcement; Operator dashboard evidence review remains open. A pre-existing unrestricted passwordless sudo rule on the pilot is a separately gated high-priority hardening blocker before cohort expansion. Active Response, quarantine, automatic deletion, unattended remediation, ClamAV, Soul API access, and raw-index backup remain excluded or separately gated."
+    },
+    {
+      "item_id": "track_harden_fedora_pilot_sudo",
+      "title": "Remove broad passwordless sudo drift from a Fedora pilot",
+      "area": "Administration + Security",
+      "horizon": "next",
+      "status": "planned",
+      "priority": "high",
+      "summary": "Replace the cloud-init unrestricted NOPASSWD grant with the accepted digest-bound maintenance authority while preserving ordinary password-authenticated administration.",
+      "implementation": "Prepare and review one exact root-owned sudoers change, validate with visudo, prove maintenance self-check and fixed operations still work, then verify arbitrary passwordless commands fail.",
+      "technologies": "sudoers, cloud-init residue, digest-bound maintenance helper, Fedora Linux",
+      "interfaces": "Operator terminal and Administration maintenance evidence; no model or Wazuh mutation authority.",
+      "acceptance": "The broad NOPASSWD rule is absent; password-authenticated owner sudo remains available; only reviewed digest-bound fixed maintenance commands are passwordless; sudoers validates; accepted maintenance paths still pass.",
+      "source": "Wazuh passive-agent A2 installation audit, 2026-08-02",
+      "notes": "Security defect discovered during A2. Do not silently remove it inside agent rollout because the accepted maintenance authority must be re-qualified under the exact replacement policy."
     },
     {
       "item_id": "track_voice_live_validation",

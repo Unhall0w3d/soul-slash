@@ -29,10 +29,12 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Near-term refinement
 
-- [~] Wazuh Central A1 is live-qualified behind a private firewall with matched
-  components, 30-day time-series retention, reboot recovery, and no agent or
-  response authority; Operator dashboard review and the one-endpoint passive
-  A2 pilot remain open before selective ClamAV or Soul integration
+- [~] Wazuh Central A1 is Operator-accepted behind a private firewall with
+  matched components, 30-day time-series retention, and reboot recovery. The
+  single Fedora A2 pilot is enrolled, active, explicitly passive, and
+  machine-qualified; Operator evidence review and a separately gated sudo-rule
+  hardening repair remain open before cohort expansion, selective ClamAV, or
+  Soul integration
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
 - [x] refine persona fidelity across supported chat models without corrupting structured tool output
 - [x] review durable event-derived Chat progress summaries; automatic stream

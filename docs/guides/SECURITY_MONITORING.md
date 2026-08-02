@@ -43,11 +43,29 @@ Owner-specific addresses, credentials, keys, and certificates belong in
 ignored local state. See the [A0 architecture](../soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md)
 and [A1 central contract](../soul/WAZUH_CENTRAL_A1_BRIEF.md).
 
+## A2 passive endpoint requirements
+
+- install one exact signed agent matching the central release;
+- restrict registration and event transport to the exact endpoint;
+- close registration immediately after enrollment;
+- disable the package repository after installation;
+- explicitly disable endpoint Active Response;
+- measure startup and settled resource cost before adding another endpoint;
+- retain exact endpoint evidence only in ignored owner-local receipts.
+
+The first Fedora pilot is machine-qualified and awaits Operator review in the
+Wazuh dashboard. A pre-existing broad passwordless sudo rule discovered on the
+pilot is a separate hardening blocker; it is not an accepted Wazuh dependency.
+
+See the [A2 pilot contract](../soul/WAZUH_PASSIVE_AGENT_A2_BRIEF.md) and
+[A2 review](../assessments/WAZUH_PASSIVE_AGENT_A2_REVIEW.md).
+
 ## Current interaction boundary
 
-At A1, open the private Wazuh HTTPS URL and log in using the generated
-administrator credential retained on the central guest. A browser warning is
-expected for the initial self-signed certificate.
+Open the private Wazuh HTTPS URL and retrieve the administrator credential from
+the Operator's password manager. A browser warning is expected for the initial
+self-signed certificate. Do not copy credentials into Soul, Chat, project
+state, or Git.
 
 No Soul Chat or Voice security invocation exists yet. Do not paste Wazuh
 credentials or alert payloads into Chat. The A4 integration will use a separate

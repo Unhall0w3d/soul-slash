@@ -2,8 +2,8 @@
 
 ## Status
 
-Live central deployment is candidate-complete and blocked for Operator visual
-review. No endpoint agent or ClamAV component was installed.
+Live central deployment is accepted after Operator visual review. The later A2
+pilot enrolls one endpoint; A1 itself installed no endpoint or ClamAV component.
 
 ## What was implemented
 
@@ -53,7 +53,8 @@ and credentials remain outside tracked source.
 
 - The generated dashboard certificate is self-signed and requires a private-LAN
   browser exception until later TLS hardening.
-- The Operator has not yet visually reviewed the Wazuh dashboard.
+- The Operator accepted the Wazuh dashboard and authenticated console on
+  2026-08-02.
 - No agent data exists, so alert volume, vulnerability accuracy, resource cost,
   and false positives are still unknown.
 - Agent ports intentionally remain closed.
@@ -74,7 +75,7 @@ None.
 ## Lifecycle states touched
 
 `complete` for bounded provisioning and verification steps;
-`blocked_for_human_review` for the A1 rollout as a whole.
+`complete` for the Operator-accepted A1 rollout as a whole.
 
 ## Risk classification
 
@@ -84,9 +85,9 @@ or remediation authority in A1.
 
 ## Human review checklist
 
-- [ ] Log in to the private Wazuh dashboard.
-- [ ] Confirm the central overview loads without component errors.
-- [ ] Inspect server and indexer health.
-- [ ] Confirm zero endpoint agents is expected at A1.
-- [ ] Accept the temporary self-signed certificate behavior.
-- [ ] Approve A2 opening ports 1514/1515 for one passive pilot agent.
+- [x] Log in to the private Wazuh dashboard.
+- [x] Confirm the central overview loads without component errors.
+- [x] Inspect server and indexer health.
+- [x] Confirm zero endpoint agents is expected at A1.
+- [x] Accept the temporary self-signed certificate behavior.
+- [x] Approve A2 opening ports 1514/1515 for one passive pilot agent.
