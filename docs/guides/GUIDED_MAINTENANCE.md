@@ -39,7 +39,7 @@ protected-action principle in their owning workflows.
 
 The page begins with the newest persisted fleet snapshot for the workstation,
 the dynamically discovered Proxmox node, the Pi-hole DNS appliance, Crucible
-when enrolled, and optional status-only appliances configured by the Operator. Deployment-specific
+when enrolled, optional host-local inventory, and status-only appliances configured by the Operator. Deployment-specific
 display names (for example, **Warden**) come from ignored local configuration;
 the public repository retains stable functional identities and no private
 addresses.
@@ -79,8 +79,9 @@ small evidence row retains checked time, status-probe state, and network
 reachability. Firmware, WAN health, client inventory, and vendor-cloud state
 remain unasserted unless a separately reviewed adapter provides that evidence.
 
-The card surface is split by actual integration depth. **SSH integrated**
-contains rich managed or inventory-only Linux cards. **Status only** contains
+The card surface is split by actual integration depth. **Integrated inventory**
+contains rich managed or inventory-only cards, including supported host-local
+adapters. **Status only** contains
 compact LAN-presence cards. The two grids are independent, so a short
 status-only card never stretches to the height of a managed system beside it.
 
@@ -147,6 +148,33 @@ Use a DHCP reservation if the phone should retain a stable address. Cisco
 documents richer read-only Product Information and Status pages when phone web
 access is enabled; Soul does not enable, authenticate to, or retain those pages
 in the present supported boundary.
+
+### Optional WinBoat Windows inventory
+
+One existing WinBoat Windows 11 guest can appear as a first-class host-local
+identity without becoming a LAN endpoint. Its rich inventory-only card shows
+the configured private FQDN and guest address, Docker container state, and
+bounded RDP/guest-service reachability. It never receives Maintenance or Reboot
+buttons.
+
+The adapter reads only fixed-format Docker state, isolated-network address, and
+published-port fields. It never requests the container environment, Compose
+configuration, credentials, logs, mounts, Windows content, or guest commands.
+Every declared binding must remain on `127.0.0.1`; unexpected exposure fails
+closed. No DNS, Docker, Windows, DHCP, route, or firewall setting is changed.
+
+Configure the identity in ignored `.env`:
+
+```text
+SOUL_FLEET_CHANCERY_ENABLED=true
+SOUL_FLEET_CHANCERY_LABEL=Chancery
+SOUL_FLEET_CHANCERY_FQDN=<private logical FQDN>
+SOUL_FLEET_CHANCERY_GUEST_ADDRESS=<private WinBoat guest address>
+SOUL_FLEET_CHANCERY_CONTAINER_NAME=WinBoat
+```
+
+Run `make verify-winboat-inventory` to exercise the deterministic security and
+presentation boundary.
 
 ## Portable discovery and enrollment
 
