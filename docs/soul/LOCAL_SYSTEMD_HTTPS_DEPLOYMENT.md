@@ -63,6 +63,10 @@ soul-dashboard-proxy.service
 access only to the Soul project and the exact optional
 `SOUL_BACKUP_MOUNT` recovery path. A missing recovery path is ignored; the
 exception does not widen Soul's network listener or grant access elsewhere.
+The unit permits `AF_NETLINK` so its already-approved, nested bubblewrap
+verifiers can configure an isolated network namespace. The Dashboard remains
+bound to `127.0.0.1`; candidate verification still uses `--unshare-all` and
+does not inherit host networking.
 
 If service activation fails, both services are disabled and stopped. Private data and rendered reviewable configuration are preserved for diagnosis.
 
