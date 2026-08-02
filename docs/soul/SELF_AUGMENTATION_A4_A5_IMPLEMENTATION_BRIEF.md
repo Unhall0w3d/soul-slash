@@ -25,7 +25,8 @@ architecture:
   `Soul/augmentation/experiments/<experiment-id>`.
 - Run allowlisted syntax and changed-verifier commands only inside Bubblewrap
   with no network, a read-only candidate worktree, writable `/tmp`, bounded
-  output, sequential execution, and a per-command timeout.
+  output, sequential execution, an empty `/proc` directory, and a per-command
+  timeout. The sandbox must not mount procfs or expose the host process tree.
 - Expose explicit preview/digest/confirmation operations through the existing
   authenticated local application facade and Self Augmentation tab.
 - Remove a clean experiment worktree only through a separately previewed exact
@@ -86,7 +87,9 @@ process remains alive.
   block the dossier.
 - Ruby and JavaScript syntax checks run for changed applicable files.
 - At most ten changed `scripts/verify-*.rb` files may run. Bubblewrap is
-  mandatory; absence or failure blocks Gate A2.
+  mandatory; absence or failure blocks Gate A2. Candidate verification receives
+  an empty `/proc` directory so it remains compatible with host kernel-hardening
+  policy without gaining visibility into host processes.
 - Model-facing changes are detected from explicit path categories. They require
   a separately recorded capability-specific local-model result before Gate A2;
   the model result cannot decide safety or approval.

@@ -18,7 +18,9 @@ Date: 2026-07-16
 - Changed Ruby/JavaScript syntax and at most ten changed Ruby verifier scripts
   run sequentially in foreground Bubblewrap sessions with no network, a
   read-only candidate worktree, writable temporary storage, capped output, and
-  per-command plus aggregate timeouts.
+  per-command plus aggregate timeouts. The sandbox provides an empty `/proc`
+  directory rather than mounting procfs or exposing the host process tree; this
+  remains compatible with the Dashboard service's kernel hardening.
 - Model-facing candidates require digest-bound, human-attested evidence from a
   separately run local-model qualification. That evidence authorizes nothing.
 - Gate A2 re-runs the dossier and exact-candidate validation, then writes only an
@@ -85,7 +87,9 @@ paths, sandboxing, safety, approval, or integration readiness.
   it, Gate A2 remains blocked; there is no unsafe fallback.
 - The sandbox exposes the candidate read-only plus the repository's Git metadata
   read-only so Git-aware verifiers work; private runtime and ignored user data
-  remain unmounted.
+  remain unmounted. `/proc` is intentionally empty, so candidate checks that
+  depend on process inspection must remain blocked or be reviewed outside this
+  bounded lane.
 - The sandboxed checks are intentionally narrow and cannot prove semantic
   correctness or absence of malicious behavior.
 - Model qualification evidence is externally run and human-attested. Soul
