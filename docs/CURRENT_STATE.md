@@ -59,6 +59,12 @@ background continuation remain unavailable. The first slice was accepted by
 the Operator on 2026-08-02; each remaining cohort skill retains a separate
 implementation and human-review gate.
 
+The second cohort candidate, `network.diagnose`, is a bounded foreground network
+evidence surface. It may inspect local IP addresses and Linux routes, resolve
+one target, send one fixed one-packet reachability probe, or attempt one
+zero-payload TCP connection. It rejects scans, ranges, URLs, multiple targets,
+retries, monitoring, and mutation; human review remains pending.
+
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the
 same identity; neither changes authority or routing. Explicit Chat commands can

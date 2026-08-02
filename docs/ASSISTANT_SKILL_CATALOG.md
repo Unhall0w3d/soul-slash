@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-07-26T19:47:31-04:00
+Generated: 2026-08-02T18:33:35-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-31
+35
 ```
 
 ## Skills
@@ -114,8 +114,8 @@ Preview and activate one configured Core without rebooting while preserving acti
 
 Example ways the owner might ask for this:
 
-- switch to Music Core
-- activate AMD-Free Core
+- switch to Creative Core
+- activate Soul-Lite Core
 - prepare this first and ask before changing anything
 
 ### Creative Companion Production
@@ -294,6 +294,25 @@ Example ways the owner might ask for this:
 - undo the last cleanup
 - prepare this first and ask before changing anything
 
+### Files Inspect
+
+```text
+id: files.inspect
+category: knowledge
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+List one directory, stat one path, or read one bounded text file beneath an explicitly configured approved local root without mutation.
+
+Example ways the owner might ask for this:
+
+- use files inspect
+- run files.inspect
+
 ### Knowledge Vault Conversation Reflect
 
 ```text
@@ -427,18 +446,49 @@ core_transition_authority: not_applicable
 
 Search reviewed repository documentation, Knowledge Vault notes, and canonical Music and Visual project briefs in one bounded source-attributed foreground read.
 
-Chat can select one source explicitly (`repository`, `knowledge_vault`,
-`music`, or `visual`). General searches preserve a qualifying result from each
-contributing source when the result limit permits. Follow-up model explanations
-remain reference-only, receive one bounded quality retry at most, and fail
-closed to deterministic evidence.
-
 Example ways the owner might ask for this:
 
 - use local search
 - run local.search
-- search my music projects for liquid drum and bass
-- search my visual projects for backrooms
+
+### Maintenance Device
+
+```text
+id: maintenance.device
+category: administration
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+
+Example ways the owner might ask for this:
+
+- use maintenance device
+- run maintenance.device
+- prepare this first and ask before changing anything
+
+### Network Diagnose
+
+```text
+id: network.diagnose
+category: knowledge
+status: available
+risk: network_or_provider_check
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Inspect bounded local address and route evidence, resolve one target, send one reachability probe, or test one TCP socket without scanning or mutation.
+
+Example ways the owner might ask for this:
+
+- use network diagnose
+- run network.diagnose
 
 ### Project Timeline Inspect
 
@@ -516,6 +566,25 @@ Example ways the owner might ask for this:
 - review this skill brief
 - check whether this skill proposal is safe
 - prepare this first and ask before changing anything
+
+### Skill Studio Inspect
+
+```text
+id: skill_studio.inspect
+category: project_coordination
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Inspect current Skill Studio proposals, Beta evidence, stages, and production registry entries without authorizing or executing a Studio gate.
+
+Example ways the owner might ask for this:
+
+- use skill studio inspect
+- run skill_studio.inspect
 
 ### System Status
 

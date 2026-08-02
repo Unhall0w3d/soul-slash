@@ -11,7 +11,7 @@ This document is a deterministic projection of the registered skill records. Reg
 ## Summary
 
 ```text
-skill_count: 31
+skill_count: 35
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -157,6 +157,16 @@ status: registered (availability not declared)
 
 Approval-gated restore of the latest successful Downloads cleanup from Trash.
 
+### `files.inspect`
+
+```text
+name: not declared
+category: knowledge
+status: available
+```
+
+List one directory, stat one path, or read one bounded text file beneath an explicitly configured approved local root without mutation.
+
 ### `knowledge.vault.conversation_reflect`
 
 ```text
@@ -227,6 +237,26 @@ status: available
 
 Search reviewed repository documentation, Knowledge Vault notes, and canonical Music and Visual project briefs in one bounded source-attributed foreground read.
 
+### `maintenance.device`
+
+```text
+name: not declared
+category: administration
+status: available
+```
+
+Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+
+### `network.diagnose`
+
+```text
+name: not declared
+category: knowledge
+status: available
+```
+
+Inspect bounded local address and route evidence, resolve one target, send one reachability probe, or test one TCP socket without scanning or mutation.
+
 ### `project.timeline.inspect`
 
 ```text
@@ -266,6 +296,16 @@ status: registered (availability not declared)
 ```
 
 Review a Soul/ skill proposal and write a review-only artifact.
+
+### `skill_studio.inspect`
+
+```text
+name: not declared
+category: project_coordination
+status: available
+```
+
+Inspect current Skill Studio proposals, Beta evidence, stages, and production registry entries without authorizing or executing a Studio gate.
 
 ### `system.status`
 

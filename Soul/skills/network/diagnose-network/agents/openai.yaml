@@ -1,0 +1,4 @@
+interface:
+  display_name: "Network Diagnose"
+  short_description: "Run one bounded read-only network diagnosis"
+  default_prompt: "Use $diagnose-network to inspect one explicit network condition without mutation."

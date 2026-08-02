@@ -108,6 +108,10 @@ module SoulCore
       "files.list" => %w[root_id relative_path],
       "files.stat" => %w[root_id relative_path],
       "files.read" => %w[root_id relative_path],
+      "network.snapshot" => [],
+      "network.resolve" => %w[target],
+      "network.reachability" => %w[target],
+      "network.socket" => %w[target port],
       "invocations.list" => %w[category query],
       "skills.list" => %w[limit],
       "skill_studio.proposals.list" => %w[limit],
@@ -412,8 +416,8 @@ module SoulCore
 
     def validate_parameter_types(parameters, context)
       parameters.each do |key, value|
-        if key == "limit"
-          return "limit must be an integer" unless value.is_a?(Integer)
+        if key == "limit" || key == "port"
+          return "#{key} must be an integer" unless value.is_a?(Integer)
         elsif key == "start_seconds" || key == "end_seconds"
           return "#{key} must be a finite number" unless value.is_a?(Numeric) && (!value.is_a?(Float) || value.finite?)
         elsif key == "filters" || key == "item" || key == "project" || key == "plan" || key == "visual_project" || key == "visual_review" || key == "visual_presentation" || key == "review" || key == "revision"
