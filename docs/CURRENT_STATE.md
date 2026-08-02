@@ -49,6 +49,15 @@ approval, Beta creation or execution, promotion, closeout, rejection, and
 deletion remain exact Skill Studio actions and cannot be authorized by the
 conversation response.
 
+The first Fundamental Skill Cohort A1 candidate adds `files.inspect`. An
+explicit Chat or Voice request can list one directory level, stat one path, or
+read one bounded UTF-8 text file beneath a root approved in local `.env`
+configuration. The portable default exposes only the project root. Absolute
+paths from conversation, traversal, hidden paths, symlinks, secret-bearing
+files, binaries, oversized reads, writes, recursive scans, indexes, caches, and
+background continuation remain unavailable. The candidate is deterministic
+and awaits human review.
+
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the
 same identity; neither changes authority or routing. Explicit Chat commands can

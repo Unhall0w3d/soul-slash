@@ -12,6 +12,7 @@ require_relative "conversation_memory_maintenance_controls"
 require_relative "conversation_memory_controls"
 require_relative "knowledge_vault_chat_controls"
 require_relative "local_search_chat_controls"
+require_relative "file_inspection_chat_controls"
 require_relative "project_tracker_chat_controls"
 require_relative "dashboard_capability_guide"
 require_relative "invocation_catalog_service"
@@ -41,6 +42,7 @@ module SoulCore
       @memory_maintenance_controls = ConversationMemoryMaintenanceControls.new(root: @root)
       @knowledge_vault_controls = KnowledgeVaultChatControls.new(root: @root)
       @local_search_controls = LocalSearchChatControls.new(root: @root)
+      @file_inspection_controls = FileInspectionChatControls.new(root: @root)
       @project_tracker_controls = ProjectTrackerChatControls.new(root: @root)
       @invocation_catalog = InvocationCatalogService.new(root: @root)
       @dashboard_capability_guide = DashboardCapabilityGuide.new(root: @root)
@@ -72,6 +74,7 @@ module SoulCore
       return @memory_controls.respond(text, chat_id: chat_id) if @memory_controls.match?(text)
       return @knowledge_vault_controls.respond(text, chat_id: chat_id) if @knowledge_vault_controls.match?(text)
       return @local_search_controls.respond(text, chat_id: chat_id) if @local_search_controls.match?(text)
+      return @file_inspection_controls.respond(text, chat_id: chat_id) if @file_inspection_controls.match?(text)
       return @project_tracker_controls.respond(text, chat_id: chat_id) if @project_tracker_controls.match?(text)
       return @skill_studio_controls.respond(text) if @skill_studio_controls.match?(text)
       return @invocation_catalog.respond(text) if @invocation_catalog.match?(text)

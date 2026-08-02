@@ -7,9 +7,9 @@ surfaces:
     summary: Conversation, bounded research, local search, weather, system status, reviewed knowledge, and explicitly mapped operator workflows.
     inputs: Ask naturally; action wording and required targets must be explicit before Soul invokes a capability.
     boundary: A topical mention remains conversation and grants no execution authority.
-    skills: [system.status, weather.report, web.lookup, web.research, knowledge.vault.search, local.search]
-    invocations: [system-status, weather, web-research, knowledge-vault, local-search]
-    operations: [chats.send]
+    skills: [system.status, weather.report, web.lookup, web.research, knowledge.vault.search, local.search, files.inspect]
+    invocations: [system-status, weather, web-research, knowledge-vault, local-search, files-inspect]
+    operations: [chats.send, files.roots, files.list, files.stat, files.read]
     targets: [active conversation]
     interfaces: [dashboard, voice_presence]
     coverage: {dashboard: available, chat: available, voice: available}

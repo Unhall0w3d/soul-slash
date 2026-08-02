@@ -68,11 +68,16 @@ knowledge.vault.memory_import
 knowledge.vault.reflect
 knowledge.vault.conversation_reflect
 local.search
+files.inspect
 ```
 
 Knowledge Vault writes and memory exchange retain their explicit confirmation
 and shared-memory rules. Search operations are bounded foreground reads and
 treat retrieved note content as untrusted context.
+
+`files.inspect` is the narrower exact-path companion to `local.search`. It may
+list one directory level, stat one path, or read one bounded text file beneath
+a root approved in local configuration. See `docs/skills/FILES_INSPECT.md`.
 
 ### Downloads cleanup skills
 

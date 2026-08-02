@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Files"
+  short_description: "Inspect approved local files without mutation"
+  default_prompt: "Use $inspect-files to list, stat, or read a bounded path beneath one configured approved root."
