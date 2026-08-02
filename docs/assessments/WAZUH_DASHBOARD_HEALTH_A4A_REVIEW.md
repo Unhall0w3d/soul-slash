@@ -1,8 +1,7 @@
 # Wazuh Dashboard Health A4a Review
 
-Status: live least-privilege enrollment and collection accepted; deterministic
-verification passed. Operator visual acceptance remains a separate presentation
-gate.
+Status: live least-privilege enrollment, collection, and Operator visual
+acceptance completed; deterministic verification passed.
 
 ## Implemented evidence
 
@@ -34,6 +33,12 @@ gate.
   accepted 2026-08-02 collection.
 - Expected stopped optional daemons no longer create a false manager warning,
   and the ascending agent sort is percent-encoded for Wazuh 4.14 query parsing.
+- The deployed Dashboard was restarted onto the accepted revision and reviewed
+  in its normal authenticated surface. Guided Maintenance reports a healthy
+  two-of-two endpoint summary; Atelier and Crucible show their exact active
+  agent associations separately from maintenance state; Local Topology shows
+  the same read-only monitoring plane; and a manual security refresh completed
+  without an application error or remediation authority.
 
 ## Verification
 
@@ -51,8 +56,6 @@ topology ownership; and isolated HTTPS links.
 
 ## Open review gates
 
-- Review the Local Topology and maintenance-card presentation in the running
-  Dashboard.
 - Design A4b indexer alert access without silently widening the current
   loopback-only indexer boundary.
 - Design A4c durable event cursor, deduplication, cooldown, privacy-safe voice
