@@ -7,16 +7,16 @@
       "title": "Roll out Wazuh and selective ClamAV security monitoring",
       "area": "Administration + Security",
       "horizon": "now",
-      "status": "in_progress",
+      "status": "needs_review",
       "priority": "high",
       "summary": "Deploy a private-LAN Wazuh console, qualify passive Linux agents and bounded ClamAV ingress scanning, then expose a least-privilege read-only security summary through Soul.",
-      "implementation": "A0 defines a portable dedicated-VM topology, private network and credential boundaries, passive-first agent cohort, selective ClamAV targets and exclusions, staged human gates, retention, failure behavior, and a read-only Soul integration contract. No persistent security service has been installed by A0.",
+      "implementation": "A0 defines the portable trust boundary and staged gates. Central A1 deploys a dedicated Ubuntu 24.04 single-node Wazuh manager, indexer, dashboard, and Filebeat with fixed resources, private firewall, loopback indexer, matched component versions, disabled update repository, 30-day ISM policy, protected VM lifecycle, stable local DNS, key-only administration, and verified reboot recovery. Agent ports remain closed and no endpoint, ClamAV, Active Response, or Soul API identity exists yet.",
       "technologies": "Wazuh manager, indexer, dashboard, server API and Linux agents; ClamAV, freshclam and optional later clamonacc; Ubuntu Server VM; TLS; Ruby bounded API client and vanilla Dashboard in a later slice.",
       "interfaces": "Wazuh HTTPS dashboard as the authoritative investigation console; planned Administration → Security summary; planned read-only Chat and Voice status invocations.",
-      "references": "docs/soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md\ndocs/assessments/WAZUH_CLAMAV_SECURITY_A0_REVIEW.md",
+      "references": "docs/soul/WAZUH_CLAMAV_SECURITY_A0_BRIEF.md\ndocs/assessments/WAZUH_CLAMAV_SECURITY_A0_REVIEW.md\ndocs/soul/WAZUH_CENTRAL_A1_BRIEF.md\ndocs/assessments/WAZUH_CENTRAL_A1_REVIEW.md\ndocs/guides/SECURITY_MONITORING.md",
       "acceptance": "Central services are private and recoverable; each endpoint is explicitly enrolled; resource and false-positive costs are measured; ClamAV never scans protected high-churn stores by default; Soul cannot remediate or mutate Wazuh state; all security operations expose fresh, stale, unavailable, and terminal evidence honestly.",
       "source": "Operator-approved security rollout direction, 2026-08-01",
-      "notes": "A0 is ready for human topology review. Proposed initial alert retention is 30 days. Active Response, quarantine, automatic deletion, unattended remediation, and raw-index backup remain excluded or separately gated."
+      "notes": "Central A1 is live and blocked for Operator dashboard review. Agent ports 1514/1515 remain closed. The next gate is one passive endpoint pilot with measured telemetry and resource cost. Active Response, quarantine, automatic deletion, unattended remediation, ClamAV, Soul API access, and raw-index backup remain excluded or separately gated."
     },
     {
       "item_id": "track_voice_live_validation",
