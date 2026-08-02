@@ -79,6 +79,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
+.PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
 
 help:
@@ -128,6 +129,9 @@ help:
 > @echo "  make voice-presence-launch  Open visible persistent voice (close window to stop)"
 > @echo "  make verify-notification-cues  Verify static cues and Presence-aware spoken notices"
 > @echo "  make verify-project-timeline  Verify the shared Dashboard/Chat implementation ledger"
+> @echo "  make clamav-check       Inspect the optional selective ClamAV runtime"
+> @echo "  make clamav-scan-downloads  Run one bounded foreground Downloads scan"
+> @echo "  make verify-clamav-bounded-scan  Verify limits, receipts, and fail-closed behavior"
 > @echo "  make verify-chat-progress-summaries  Verify durable bounded Chat progress summaries"
 > @echo "  make verify-storage-retention-census  Verify read-only retention and backup coverage"
 > @echo "  make verify-storage-cleanup  Verify exact review-gated disposable cleanup"
@@ -521,6 +525,17 @@ verify-notification-cues:
 
 verify-project-timeline:
 > @ruby scripts/verify-project-timeline-a1.rb
+
+clamav-check:
+> @command -v clamscan >/dev/null 2>&1 && clamscan --version || { echo "ClamAV is not installed. See docs/guides/SECURITY_MONITORING.md."; exit 1; }
+> @systemctl is-enabled clamav-freshclam-once.timer 2>/dev/null || true
+> @systemctl is-active clamav-freshclam-once.timer 2>/dev/null || true
+
+clamav-scan-downloads:
+> @ruby scripts/soul-clamav-scan --target downloads
+
+verify-clamav-bounded-scan:
+> @ruby scripts/verify-clamav-bounded-scan-a3.rb
 
 verify-chat-progress-summaries:
 > @ruby scripts/verify-chat-progress-summaries-a1.rb
