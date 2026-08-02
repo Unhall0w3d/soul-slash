@@ -37,7 +37,8 @@ class WazuhFixtureTransport
     return response(200, "aaa.bbb.ccc") if uri.path == "/security/user/authenticate"
     return response(200, JSON.generate("error" => 0, "data" => {"title" => "Wazuh API", "api_version" => "4.12.0", "hostname" => "sentinel"})) if uri.path == "/"
     if uri.path == "/manager/status"
-      return response(200, JSON.generate("error" => 0, "data" => {"affected_items" => [{"wazuh-analysisd" => "running", "wazuh-remoted" => "running"}]}))
+      required = SoulCore::WazuhSecurityStatusService::REQUIRED_MANAGER_DAEMONS.to_h { |name| [name, "running"] }
+      return response(200, JSON.generate("error" => 0, "data" => {"affected_items" => [required.merge("wazuh-maild" => "stopped", "wazuh-clusterd" => "stopped")]}))
     end
     if uri.path == "/agents"
       records = [
@@ -112,11 +113,12 @@ Dir.mktmpdir("soul-wazuh-a4a-") do |root|
   check.call("collection is bounded, read-only, and stores only a status cache",
              result["ok"] && result["mutation"] == "status_cache" && data["read_only"] && !data["remote_mutation"] && data.dig("verification", "indexer_queried") == false)
   check.call("manager and endpoint health remain distinct from alert evidence",
-             data["state"] == "attention" && data.dig("manager", "state") == "healthy" && data.dig("summary", "agent_count") == 2 && data["alert_query_available"] == false)
+             data["state"] == "attention" && data.dig("manager", "state") == "healthy" && data.dig("manager", "daemon_count") == 10 && data.dig("manager", "optional_daemons") == 2 && data.dig("summary", "agent_count") == 2 && data["alert_query_available"] == false)
   check.call("exact private device mappings drive card associations",
              devices.dig("workstation", "state") == "monitored" && devices.dig("chancery", "state") == "attention" && devices.dig("pihole", "state") == "unavailable")
   check.call("only the reviewed server API endpoints are called",
              transport.calls.map { |row| [URI(row["uri"]).path, row["method"]] } == [["/security/user/authenticate", "POST"], ["/", "GET"], ["/manager/status", "GET"], ["/agents", "GET"]] &&
+               URI(transport.calls.last.fetch("uri")).query.to_s.include?("sort=%2Bid") &&
                transport.calls.all? { |row| row["connect_address"] == "192.168.124.210" })
   serialized = JSON.generate(result)
   check.call("credentials and bearer token never enter returned or persisted status",
