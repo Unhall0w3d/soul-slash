@@ -45,9 +45,11 @@ git diff --check
   install scripts, or diffs are rejected.
 - The initial mutation adapter supports `yay` only. A detected `paru` package
   set remains read-only and cannot cross the review gate.
-- Replacing an installed older A4 helper requires a later exact digest review
-  and privileged installation. Until then, the mismatch intentionally blocks
-  workstation live maintenance rather than falling back to the retired path.
+- The exact A11 v1 helper was installed on Atelier on 2026-08-02. The native
+  passwordless self-check returned the reviewed version and helper digest.
+- Atelier had no pending AUR updates at acceptance time. The first organic
+  interactive cancel/install observation remains deferred; no fake update or
+  weakened package-set gate was introduced to force that test.
 
 ## Memory and lifecycle
 
@@ -63,10 +65,10 @@ performing live AUR maintenance.
 
 ## Human checklist
 
-- [ ] Confirm routine Maintain excludes all AUR packages.
-- [ ] Confirm pending AUR count remains visible after routine maintenance.
-- [ ] Inspect the exact generated root helper and sudoers digest.
-- [ ] Install the reviewed A11 authority through the existing exact gate.
+- [x] Confirm routine Maintain excludes all AUR packages.
+- [x] Confirm pending AUR count remains visible after routine maintenance.
+- [x] Inspect the exact generated root helper and sudoers digest.
+- [x] Install the reviewed A11 authority through the existing exact gate.
 - [ ] Open one supervised AUR review and confirm all menus remain interactive.
 - [ ] Decline or cancel once and confirm no AUR package is installed.
 - [ ] Complete a separately reviewed benign AUR update and inspect its receipt.

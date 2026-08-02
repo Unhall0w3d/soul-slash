@@ -601,8 +601,8 @@
       "item_id": "track_maintenance_passwordless_authority",
       "title": "Unattended fixed-operation workstation maintenance authority",
       "area": "Administration",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Use one digest-bound root-owned helper for trusted repository, Flatpak, and reboot operations while requiring a separate visible human gate for every AUR update set.",
       "implementation": "A11 v1 retires the historical A4 v3 unattended AUR path. The replacement SHA-256-bound root helper and sudoers rule accept only repository-update, flatpak-system-update, or reboot with an opaque transaction ID; the helper contains no yay, makepkg, AUR, pacman bridge, shell, target, or caller-selected path. Pending AUR updates remain visible and use a separate owner-private, expiring, digest-bound terminal that revalidates the package set, forces clean/diff/PKGBUILD menus, unsets predetermined answers, and always invalidates its single sudo ticket.",
@@ -610,7 +610,7 @@
       "interfaces": "Administration → Guided Maintenance device cards; Maintain automatically recovers stale native evidence, presents one prefilled exact click gate, follows the exact terminal receipt, and refreshes the card; Reboot remains a separate reviewed action. Makefile plan, status, install, uninstall, and verifier targets; ignored SOUL_MAINTENANCE_PASSWORDLESS configuration.",
       "commands": "make verify-maintenance-passwordless-authority\nmake verify-maintenance-aur-review-gate\nmake maintenance-authority-plan\nmake maintenance-authority-status",
       "references": "docs/soul/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_BRIEF.md\ndocs/soul/MAINTENANCE_AUR_REVIEW_GATE_A11_BRIEF.md\ndocs/assessments/MAINTENANCE_PASSWORDLESS_AUTHORITY_A4_REVIEW.md\ndocs/assessments/MAINTENANCE_AUR_REVIEW_GATE_A11_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
-      "acceptance": "Historical A4 v3 live acceptance passed on 2026-07-29 but its unattended AUR policy is retired. A11 deterministic verification and human code review are required, followed by exact A11 helper installation, a supervised decline/cancel check, and one supervised benign AUR review before current validation.",
+      "acceptance": "Historical A4 v3 unattended AUR behavior is retired. On 2026-08-02 the Operator approved PR #119 and the exact A11 v1 helper was installed with digest 1357aa1f5f21326eac82e6665dd947b0faf3bdd42bbef51b7233666112993b12. Native passwordless self-check passed, every deterministic maintenance/AUR boundary verifier passed, and the Dashboard returned active. Atelier had no pending AUR update, so the first organic interactive cancel/install observation remains a non-blocking operational follow-up rather than manufacturing an unsafe test input.",
       "source": "Operator-authorized A4 implementation, 2026-07-28"
     },
     {
