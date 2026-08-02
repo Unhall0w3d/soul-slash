@@ -50,9 +50,10 @@ module SoulCore
       plan_basis = {
         "schema_version" => PLAN_SCHEMA,
         "risk_class" => "class_5",
-        "adapter" => "arch_aur_flatpak_reboot_restore",
+        "adapter" => "official_repository_flatpak_reboot_restore",
         "force_database_refresh" => force_refresh,
         "commands" => commands,
+        "aur_review" => aur_review(package_evidence),
         "package_evidence" => package_evidence,
         "flatpak_installations" => flatpak_installations,
         "window_snapshot" => snapshot,
@@ -339,11 +340,11 @@ module SoulCore
     end
 
     def planned_commands(package_evidence:, flatpak_installations:, force_database_refresh:)
-      yay_path = package_evidence.dig("managers", "yay", "path")
-      raise "yay is required for the approved Arch and AUR transaction" unless yay_path.to_s.start_with?("/")
+      pacman_path = package_evidence.dig("managers", "pacman", "path")
+      raise "pacman is required for the approved repository transaction" unless pacman_path.to_s.start_with?("/")
       commands = [{
-        "adapter" => "arch_and_aur.full_upgrade",
-        "argv" => [yay_path, force_database_refresh ? "-Syyu" : "-Syu"],
+        "adapter" => "official_repository.full_upgrade",
+        "argv" => ["/usr/bin/sudo", "-n", pacman_path, force_database_refresh ? "-Syyu" : "-Syu"],
         "interactive" => true,
         "executes_in_a1" => false
       }]
@@ -361,6 +362,21 @@ module SoulCore
       commands
     end
 
+    def aur_review(package_evidence)
+      helper = package_evidence.fetch("preferred_aur_helper", nil)
+      updates = helper ? package_evidence.dig("managers", helper, "updates") : nil
+      items = Array(updates && updates["items"]).map(&:to_s).first(2_000)
+      {
+        "helper" => helper,
+        "status" => items.empty? ? "not_required" : "review_required",
+        "count" => items.length,
+        "items" => items,
+        "included_in_unattended_maintenance" => false,
+        "review_contract" => "separate_visible_interactive_terminal",
+        "required_review" => %w[package_set PKGBUILD install_script source_checksums build_diff]
+      }
+    end
+
     def rehearsal_blockers(plan)
       blockers = []
       package_evidence = plan.fetch("package_evidence")
@@ -373,7 +389,7 @@ module SoulCore
     def prohibited_effects
       [
         "request or cache sudo credentials",
-        "execute yay, pacman, or flatpak update commands",
+        "execute pacman, AUR helper, or flatpak update commands",
         "write a maintenance journal or snapshot",
         "launch, move, or close applications",
         "request or perform a reboot"

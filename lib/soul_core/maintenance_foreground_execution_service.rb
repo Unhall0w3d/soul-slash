@@ -27,7 +27,7 @@ module SoulCore
       "kitty" => "/usr/bin/kitty",
       "ruby" => "/usr/bin/ruby",
       "sudo" => "/usr/bin/sudo",
-      "yay" => "/usr/bin/yay",
+      "pacman" => "/usr/bin/pacman",
       "flatpak" => "/usr/bin/flatpak"
     }.freeze
 
@@ -124,6 +124,7 @@ module SoulCore
         "owner_uid" => Process.uid,
         "force_database_refresh" => base.fetch("force_database_refresh"),
         "commands" => commands,
+        "aur_review" => base.fetch("aur_review"),
         "package_evidence" => stable_package_evidence(base.fetch("package_evidence")),
         "native_package_evidence" => native_evidence.slice("available", "generated_at", "expires_at", "evidence_digest", "reason"),
         "desktop_handoff" => handoff_status.slice("available", "registered_desktop_id", "problems"),
@@ -191,6 +192,15 @@ module SoulCore
       outcome("failed", false, "native package evidence reservation failed safely: #{safe_error(error)}")
     end
 
+    def reserve_aur_review
+      handoff = @desktop_handoff.status
+      return outcome("blocked_for_human_review", false, "maintenance desktop handoff is unavailable", {"handoff" => handoff}) unless handoff["available"]
+      reservation = @desktop_handoff.reserve_aur_review
+      outcome("complete", true, "interactive AUR review terminal reserved", reservation, "maintenance_aur_review_reserved")
+    rescue StandardError => error
+      outcome("blocked_for_human_review", false, "AUR review reservation stopped safely: #{safe_error(error)}")
+    end
+
     def receipts(limit: MAX_RECEIPTS)
       prepare_directories
       count = [[Integer(limit), 1].max, MAX_RECEIPTS].min
@@ -198,6 +208,8 @@ module SoulCore
         .sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count)
       outcome("complete", true, "maintenance receipts loaded", {
         "receipts" => rows,
+        "aur_review_receipts" => aur_receipt_paths.filter_map { |path| read_json(path, "soul.maintenance.aur_review_receipt.v1") }
+          .sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count),
         "live_execution_enabled" => @live_execution_enabled,
         "desktop_handoff" => @desktop_handoff.status,
         "native_package_evidence" => @desktop_handoff.native_evidence.except("package_evidence")
@@ -229,7 +241,7 @@ module SoulCore
         adapter = command.fetch("adapter")
         next command.merge("argv" => [FIXED_PATHS.fetch("flatpak"), "update", "--user", "--noninteractive"]) if adapter == "flatpak.user_update"
         operation = case adapter
-        when "arch_and_aur.full_upgrade" then "arch-update"
+        when "official_repository.full_upgrade" then "repository-update"
         when "flatpak.system_update" then "flatpak-system-update"
         else raise "unsupported passwordless maintenance adapter"
         end
@@ -345,11 +357,12 @@ module SoulCore
         adapter = command.fetch("adapter")
         argv = command.fetch("argv")
         transformed = case adapter
-        when "arch_and_aur.full_upgrade"
-          raise "unexpected yay path" unless argv.first == FIXED_PATHS.fetch("yay")
+        when "official_repository.full_upgrade"
+          expected = [FIXED_PATHS.fetch("sudo"), "-n", FIXED_PATHS.fetch("pacman"), argv.fetch(3)]
+          raise "unexpected pacman vector" unless argv == expected && %w[-Syu -Syyu].include?(argv.fetch(3))
           @passwordless_authority_enabled ?
-            [MaintenancePasswordlessAuthority::HELPER_PATH, "arch-update", "<transaction_id>"] :
-            [argv.first, "--sudoflags=-n", argv.fetch(1)]
+            [MaintenancePasswordlessAuthority::HELPER_PATH, "repository-update", "<transaction_id>"] :
+            argv
         when "flatpak.user_update"
           raise "unexpected user Flatpak command" unless argv == [FIXED_PATHS.fetch("flatpak"), "update", "--user"]
           @passwordless_authority_enabled ? [*argv, "--noninteractive"] : argv
@@ -509,7 +522,7 @@ module SoulCore
     def rehearsal_commands
       [
         {"adapter" => "fixture.authenticate", "argv" => [], "interactive" => false, "requires_existing_sudo_ticket" => false, "shell" => false},
-        {"adapter" => "fixture.arch_aur_update", "argv" => [], "interactive" => false, "requires_existing_sudo_ticket" => false, "shell" => false},
+        {"adapter" => "fixture.official_repository_update", "argv" => [], "interactive" => false, "requires_existing_sudo_ticket" => false, "shell" => false},
         {"adapter" => "fixture.flatpak_update", "argv" => [], "interactive" => false, "requires_existing_sudo_ticket" => false, "shell" => false},
         {"adapter" => "fixture.verify", "argv" => [], "interactive" => false, "requires_existing_sudo_ticket" => false, "shell" => false}
       ]
@@ -580,6 +593,10 @@ module SoulCore
 
     def receipt_paths
       Dir.glob(File.join(@receipts_root, "maintenance_receipt_*.json")).first(MAX_RECEIPTS * 2)
+    end
+
+    def aur_receipt_paths
+      Dir.glob(File.join(@receipts_root, "aur_review_receipt_*.json")).first(MAX_RECEIPTS * 2)
     end
 
     def prune_receipts

@@ -1,5 +1,9 @@
 # Maintenance, Reboot, and Session Restore A0 Brief
 
+> **Current amendment:** A11 supersedes the historical combined Arch/AUR
+> package step below. Routine maintenance now excludes AUR execution, and A3
+> reboot remains a separate package-free transaction.
+
 Status: candidate human-authorization brief
 
 ## Outcome

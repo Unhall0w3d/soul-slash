@@ -243,13 +243,13 @@ module SoulCore
       commands.each do |command|
         argv = command.fetch("argv")
         allowed = case command.fetch("adapter")
-        when "arch_and_aur.full_upgrade"
+        when "official_repository.full_upgrade"
           if authority_mode == "root_owned_passwordless"
-            argv == ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "arch-update", transaction.fetch("transaction_id")]
+            argv == ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "repository-update", transaction.fetch("transaction_id")]
           else
             [
-              ["/usr/bin/yay", "--sudoflags=-n", "-Syu"],
-              ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"]
+              ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"],
+              ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syyu"]
             ].include?(argv)
           end
         when "flatpak.user_update"

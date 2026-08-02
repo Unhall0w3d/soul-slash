@@ -9,6 +9,7 @@ require "uri"
 
 require_relative "bounded_command_runner"
 require_relative "maintenance_transaction_runner"
+require_relative "maintenance_aur_review_runner"
 require_relative "package_manager_assessor"
 
 module SoulCore
@@ -18,6 +19,7 @@ module SoulCore
     TRANSACTION_SCHEMA = "soul.maintenance.transaction.v1"
     RESULT_SCHEMA = "soul.maintenance.transaction_result.v1"
     RECEIPT_SCHEMA = "soul.maintenance.receipt.v1"
+    AUR_RECEIPT_SCHEMA = "soul.maintenance.aur_review_receipt.v1"
     URI_SCHEME = "soul-maintenance"
     DESKTOP_ID = "soul-maintenance.desktop"
     RESERVATION_TTL_SECONDS = 10 * 60
@@ -37,6 +39,7 @@ module SoulCore
       runner: BoundedCommandRunner.new,
       package_assessor: nil,
       transaction_runner_factory: nil,
+      aur_review_runner_factory: nil,
       id_generator: -> { SecureRandom.hex(8) }
     )
       @root = File.expand_path(root)
@@ -45,6 +48,7 @@ module SoulCore
       @runner = runner
       @package_assessor = package_assessor || PackageManagerAssessor.new(runner: runner, clock: clock)
       @transaction_runner_factory = transaction_runner_factory || -> { MaintenanceTransactionRunner.new(root: @root, clock: @clock) }
+      @aur_review_runner_factory = aur_review_runner_factory || -> { MaintenanceAurReviewRunner.new }
       @id_generator = id_generator
       @state_root = File.join(@root, "Soul", "private", "host_maintenance")
       @reservations_root = File.join(@state_root, "handoff_reservations")
@@ -157,6 +161,42 @@ module SoulCore
       }
     end
 
+    def reserve_aur_review
+      prepare_directories
+      prune_expired_reservations
+      raise "maintenance reservation limit is reached" if reservation_paths.length >= MAX_RESERVATIONS
+      evidence = native_evidence
+      raise evidence.fetch("reason", "native package evidence is unavailable") unless evidence["available"]
+      helper = evidence.dig("package_evidence", "preferred_aur_helper")
+      raise "AUR review currently requires the reviewed yay adapter" unless helper == "yay"
+      updates = evidence.dig("package_evidence", "managers", helper, "updates")
+      items = Array(updates && updates["items"]).map(&:to_s)
+      raise "AUR review is not required" if items.empty?
+      raise "AUR update evidence is incomplete" unless updates["status"] == "complete" && updates["truncated"] != true
+      id = "maintenance_aur_review_#{@id_generator.call}"
+      raise "AUR review reservation ID is invalid" unless id.match?(/\Amaintenance_aur_review_[a-f0-9]{16}\z/)
+      basis = {
+        "schema_version" => RESERVATION_SCHEMA,
+        "reservation_id" => id,
+        "kind" => "aur_review",
+        "owner_uid" => Process.uid,
+        "helper" => "yay",
+        "package_items" => items,
+        "package_set_digest" => digest(items),
+        "created_at" => @clock.call.iso8601,
+        "expires_at" => (@clock.call + RESERVATION_TTL_SECONDS).iso8601
+      }
+      expected_digest = digest(basis)
+      atomic_json(File.join(@reservations_root, "#{id}.json"), basis.merge("expected_digest" => expected_digest), maximum: MAX_FILE_BYTES)
+      {
+        "reservation_id" => id,
+        "expected_digest" => expected_digest,
+        "launch_uri" => launch_uri("aur-review", id, expected_digest),
+        "package_items" => items,
+        "expires_at" => basis.fetch("expires_at")
+      }
+    end
+
     def native_evidence
       record = read_json(@evidence_path, EVIDENCE_SCHEMA)
       evidence_basis = record.reject { |key, _value| key == "evidence_digest" }
@@ -183,7 +223,11 @@ module SoulCore
       kind, id, digest_value = parse_uri(raw_uri)
       lock = acquire_operation_lock
       return result("blocked_for_human_review", false, "another maintenance operation is active") unless lock
-      kind == "evidence" ? handle_evidence(id, digest_value) : handle_transaction(id, digest_value)
+      case kind
+      when "evidence" then handle_evidence(id, digest_value)
+      when "aur-review" then handle_aur_review(id, digest_value)
+      else handle_transaction(id, digest_value)
+      end
     rescue ArgumentError => error
       result("blocked_for_human_review", false, error.message)
     rescue StandardError => error
@@ -252,17 +296,60 @@ module SoulCore
       result("failed", false, "live maintenance handoff failed safely: #{safe_error(error)}")
     end
 
+    def handle_aur_review(id, digest_value)
+      source = File.join(@reservations_root, "#{id}.json")
+      claimed = File.join(@reservations_root, "#{id}.claimed.json")
+      claim(source, claimed)
+      reservation = read_json(claimed, RESERVATION_SCHEMA)
+      validate_aur_review_reservation!(reservation, id, digest_value)
+      current = @package_assessor.assess(include_updates: true)
+      updates = current.dig("managers", "yay", "updates")
+      items = Array(updates && updates["items"]).map(&:to_s)
+      raise "AUR package set changed; collect fresh evidence and review again" unless
+        updates && updates["status"] == "complete" && updates["truncated"] != true &&
+        secure_equal?(digest(items), reservation.fetch("package_set_digest"))
+
+      started_at = @clock.call
+      run = @aur_review_runner_factory.call.run
+      receipt = {
+        "schema_version" => AUR_RECEIPT_SCHEMA,
+        "receipt_id" => "aur_review_receipt_#{id.delete_prefix('maintenance_aur_review_')}",
+        "reservation_id" => id,
+        "started_at" => started_at.iso8601,
+        "finished_at" => @clock.call.iso8601,
+        "lifecycle_state" => run.fetch("lifecycle_state"),
+        "package_names" => items.map { |line| line.split.first.to_s }.reject(&:empty?).first(128),
+        "package_set_digest" => reservation.fetch("package_set_digest"),
+        "interactive_review_required" => true,
+        "password_prompts" => run.fetch("password_prompts"),
+        "sudo_ticket_invalidated" => run.fetch("sudo_ticket_invalidated"),
+        "reason" => run.fetch("reason").to_s.byteslice(0, 500),
+        "redacted" => true
+      }
+      atomic_json(File.join(@receipts_root, "#{receipt.fetch('receipt_id')}.json"), receipt, maximum: 64 * 1024)
+      FileUtils.rm_f(claimed)
+      result(receipt["lifecycle_state"], receipt["lifecycle_state"] == "complete", receipt["reason"], {"aur_review_receipt" => receipt}, "aur_packages_reviewed")
+    rescue StandardError => error
+      result("failed", false, "AUR review handoff failed safely: #{safe_error(error)}")
+    ensure
+      FileUtils.rm_f(claimed) if defined?(claimed) && claimed
+    end
+
     def parse_uri(raw_uri)
       text = raw_uri.to_s
       raise ArgumentError, "maintenance handoff URI is too long" if text.empty? || text.bytesize > 256
       uri = URI.parse(text)
       raise ArgumentError, "maintenance handoff URI scheme is invalid" unless uri.scheme == URI_SCHEME
-      raise ArgumentError, "maintenance handoff URI authority is invalid" unless %w[evidence transaction].include?(uri.host)
+      raise ArgumentError, "maintenance handoff URI authority is invalid" unless %w[evidence transaction aur-review].include?(uri.host)
       raise ArgumentError, "maintenance handoff URI contains unsupported fields" if uri.userinfo || uri.port || uri.query || uri.fragment
       segments = uri.path.to_s.split("/").reject(&:empty?)
       raise ArgumentError, "maintenance handoff URI path is invalid" unless segments.length == 2
       id, digest_value = segments
-      expected_id = uri.host == "evidence" ? /\Amaintenance_evidence_[a-f0-9]{16}\z/ : /\Amaintenance_tx_[a-f0-9]{16}\z/
+      expected_id = case uri.host
+      when "evidence" then /\Amaintenance_evidence_[a-f0-9]{16}\z/
+      when "aur-review" then /\Amaintenance_aur_review_[a-f0-9]{16}\z/
+      else /\Amaintenance_tx_[a-f0-9]{16}\z/
+      end
       raise ArgumentError, "maintenance handoff reservation ID is invalid" unless id.match?(expected_id)
       raise ArgumentError, "maintenance handoff digest is invalid" unless digest_value.match?(/\A[a-f0-9]{64}\z/)
       [uri.host, id, digest_value]
@@ -278,6 +365,19 @@ module SoulCore
       basis = reservation.reject { |key, _value| key == "expected_digest" }
       raise "maintenance evidence reservation integrity mismatch" unless secure_equal?(digest(basis), digest_value)
       raise "maintenance evidence reservation expired" unless Time.iso8601(reservation.fetch("expires_at")) > @clock.call
+    end
+
+    def validate_aur_review_reservation!(reservation, id, digest_value)
+      raise "AUR review reservation kind is invalid" unless reservation["kind"] == "aur_review"
+      raise "AUR review reservation owner is invalid" unless reservation["owner_uid"] == Process.uid
+      raise "AUR review reservation ID mismatch" unless reservation["reservation_id"] == id
+      raise "AUR review helper is invalid" unless reservation["helper"] == "yay"
+      raise "AUR review package set is invalid" unless reservation["package_items"].is_a?(Array) && reservation["package_items"].length.between?(1, 2_000)
+      raise "AUR review package digest is invalid" unless secure_equal?(digest(reservation["package_items"]), reservation["package_set_digest"])
+      raise "AUR review reservation digest mismatch" unless secure_equal?(reservation["expected_digest"], digest_value)
+      basis = reservation.reject { |key, _value| key == "expected_digest" }
+      raise "AUR review reservation integrity mismatch" unless secure_equal?(digest(basis), digest_value)
+      raise "AUR review reservation expired" unless Time.iso8601(reservation.fetch("expires_at")) > @clock.call
     end
 
     def validate_transaction_reservation!(transaction)
@@ -351,11 +451,13 @@ module SoulCore
 
     def package_evidence_usable?(evidence)
       pacman = evidence.dig("managers", "pacman", "updates")
-      yay = evidence.dig("managers", "yay", "updates")
-      return false unless pacman.is_a?(Hash) && yay.is_a?(Hash)
-      %w[complete no_updates].include?(pacman["status"]) &&
-        %w[complete no_results].include?(yay["status"]) &&
-        pacman["truncated"] != true && yay["truncated"] != true
+      helper = evidence["preferred_aur_helper"]
+      aur = helper ? evidence.dig("managers", helper, "updates") : nil
+      return false unless pacman.is_a?(Hash)
+      return false unless %w[complete no_updates].include?(pacman["status"]) && pacman["truncated"] != true
+      return true unless helper
+
+      aur.is_a?(Hash) && %w[complete no_results].include?(aur["status"]) && aur["truncated"] != true
     end
 
     def registered_desktop_id
@@ -403,15 +505,16 @@ module SoulCore
     def reservation_paths
       (
         Dir.glob(File.join(@reservations_root, "maintenance_evidence_*.json")) +
+        Dir.glob(File.join(@reservations_root, "maintenance_aur_review_*.json")) +
         transaction_reservation_paths
       ).uniq
     end
 
     def prune_expired_reservations
       reservation_paths.each do |path|
-        evidence = File.basename(path).start_with?("maintenance_evidence_")
-        record = read_json(path, evidence ? RESERVATION_SCHEMA : TRANSACTION_SCHEMA)
-        expiry = evidence ? record.fetch("expires_at") : record.fetch("deadline_at")
+        reservation = File.basename(path).start_with?("maintenance_evidence_", "maintenance_aur_review_")
+        record = read_json(path, reservation ? RESERVATION_SCHEMA : TRANSACTION_SCHEMA)
+        expiry = reservation ? record.fetch("expires_at") : record.fetch("deadline_at")
         FileUtils.rm_f(path) if Time.iso8601(expiry) <= @clock.call
       rescue StandardError
         next

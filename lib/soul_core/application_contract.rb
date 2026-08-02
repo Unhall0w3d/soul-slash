@@ -157,6 +157,7 @@ module SoulCore
       "maintenance.rehearsal" => %w[force_database_refresh],
       "maintenance.execution.preview" => %w[force_database_refresh],
       "maintenance.evidence.reserve" => [],
+      "maintenance.aur_review.reserve" => [],
       "maintenance.execution.rehearsal" => %w[force_database_refresh confirmation expected_digest],
       "maintenance.execution.execute" => %w[force_database_refresh confirmation expected_digest],
       "maintenance.execution.receipts" => %w[limit],

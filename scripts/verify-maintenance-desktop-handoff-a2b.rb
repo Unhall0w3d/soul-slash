@@ -92,8 +92,8 @@ def fixture_transaction(root, now)
     "plan_digest" => "d" * 64,
     "commands" => [
       {
-        "adapter" => "arch_and_aur.full_upgrade",
-        "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"],
+        "adapter" => "official_repository.full_upgrade",
+        "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"],
         "interactive" => true,
         "requires_existing_sudo_ticket" => true,
         "shell" => false

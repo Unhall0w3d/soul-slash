@@ -37,8 +37,7 @@ check.call(
 check.call(
   "sudoers grants only the digest-bound fixed helper operations",
   sudoers.include?("sha256:#{Digest::SHA256.hexdigest(helper)}") &&
-    sudoers.include?("/usr/local/libexec/soul-maintenance-authority arch-update maintenance_tx_*") &&
-    sudoers.include?("/usr/local/libexec/soul-maintenance-authority pacman-bridge maintenance_tx_* *") &&
+    sudoers.include?("/usr/local/libexec/soul-maintenance-authority repository-update maintenance_tx_*") &&
     sudoers.include?("/usr/local/libexec/soul-maintenance-authority flatpak-system-update maintenance_tx_*") &&
     sudoers.include?("/usr/local/libexec/soul-maintenance-authority reboot maintenance_tx_*") &&
     !sudoers.match?(/NOPASSWD:\s*(?:ALL|\/usr\/bin\/(?:yay|pacman|flatpak|systemctl|ruby|sh|bash))/)
@@ -48,35 +47,24 @@ check.call(
   helper.include?("operation = ARGV.shift.to_s") &&
     helper.include?("fail_closed(\"argument count is invalid\")") &&
     helper.include?("transaction command vector is invalid") &&
-    helper.include?("pacman bridge executable changed") &&
-    helper.include?("pacman bridge is not descended through bounded sudo ancestry from active yay") &&
+    helper.include?('[PATHS.fetch("pacman"), refresh, "--noconfirm"]') &&
+    !helper.include?("pacman-bridge") &&
     !helper.include?("system(*ARGV)") &&
     !helper.include?("eval(") &&
     !helper.include?("`")
 )
 check.call(
-  "yay runs unprivileged with a transaction-scoped pacman bridge and fixed unattended policy",
-  %w[--noconfirm --answerclean --answerdiff --answeredit --answerupgrade --noremovemake --pgpfetch=false --provides=false --useask=false --sudoloop=false].all? { |flag| helper.include?(flag) } &&
-    helper.include?("\"None\"") && helper.include?("\"All\"") &&
-    helper.include?("Process::GID.change_privilege(OWNER_GID)") &&
-    helper.include?("Process::UID.change_privilege(OWNER_UID)") &&
-    helper.include?("\"--sudo\", PATHS.fetch(\"sudo\")") &&
-    helper.include?("pacman-bridge \#{transaction.fetch('transaction_id')}") &&
-    helper.include?("refresh\n    ]") &&
-    !helper.include?("--nodeps") && !helper.include?("--overwrite")
+  "zero-prompt authority updates trusted repositories only and contains no AUR machinery",
+  helper.include?('when "repository-update"') &&
+    helper.include?('refresh = transaction["force_database_refresh"] == true ? "-Syyu" : "-Syu"') &&
+    helper.include?('[PATHS.fetch("pacman"), refresh, "--noconfirm"]') &&
+    !helper.include?("yay") && !helper.include?("makepkg") &&
+    !helper.include?("--answerdiff") && !helper.include?("--answeredit")
 )
 check.call(
-  "pacman bridge is limited to active yay ancestry and accepts only yay's exact install-reason bookkeeping shape",
-  helper.include?("active_arch_update") &&
-    helper.include?("yay_start_ticks") &&
-    helper.include?("MAX_SUDO_ANCESTRY_DEPTH = 3") &&
-    helper.include?("ancestor[\"exe\"] == File.realpath(PATHS.fetch(\"sudo\"))") &&
-    helper.include?("ancestor[\"start_ticks\"] == yay[\"start_ticks\"]") &&
-    helper.include?('explicit_prefix = ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"]') &&
-    helper.include?("explicit_targets.length.between?(1, 128)") &&
-    helper.include?('operation == "mark_explicit"') &&
-    %w[--remove --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir].all? { |flag| helper.include?(flag) } &&
-    helper.include?("pacman bridge configuration changed")
+  "removed AUR bridge cannot install caller-selected packages or archives",
+  !helper.include?("active_arch_update") && !helper.include?("mark_explicit") &&
+    !helper.include?("-U") && !sudoers.include?("pacman-bridge")
 )
 check.call(
   "Flatpak and reboot remain separate fixed operations",
@@ -88,41 +76,8 @@ check.call(
 syntax_out, syntax_err, syntax_status = Open3.capture3("/usr/bin/ruby", "-c", stdin_data: helper)
 check.call("generated root helper is valid Ruby", syntax_status.success? && syntax_out.include?("Syntax OK") && syntax_err.empty?)
 
-helper_definitions = helper.split("\nverify_caller!\n", 2).first
-bridge_probe = <<~RUBY
-  #{helper_definitions}
-  require "json"
-  cases = {
-    "exact" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "webex-bin"],
-    "multiple" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "one", "two-bin"],
-    "no_target" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"],
-    "path_target" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "../../root"],
-    "asdeps" => ["-D", "--asdeps", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--", "webex-bin"],
-    "changed_config" => ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/tmp/pacman.conf", "--", "webex-bin"],
-    "sync" => ["-Syu"],
-    "archive" => ["-U", "--noconfirm", "--", "/home/operator/.cache/yay/example/example.pkg.tar.zst"]
-  }
-  puts JSON.generate(cases.transform_values { |arguments| pacman_bridge_operation(arguments) })
-RUBY
-probe_out, probe_err, probe_status = Open3.capture3("/usr/bin/ruby", stdin_data: bridge_probe)
-probe = probe_status.success? ? JSON.parse(probe_out) : {}
-check.call(
-  "generated helper classifies only the exact install-reason vector as bounded bookkeeping",
-  probe_err.empty? &&
-    probe == {
-      "exact" => "mark_explicit",
-      "multiple" => "mark_explicit",
-      "no_target" => nil,
-      "path_target" => nil,
-      "asdeps" => nil,
-      "changed_config" => nil,
-      "sync" => "package_mutation",
-      "archive" => "package_mutation"
-    }
-)
-
 begin
-  authority.command_for("arch-update", "maintenance_tx_0123456789abcdef")
+  authority.command_for("repository-update", "maintenance_tx_0123456789abcdef")
   valid_vector = true
 rescue StandardError
   valid_vector = false
@@ -130,8 +85,8 @@ end
 rejected = 0
 [
   ["shell", "maintenance_tx_0123456789abcdef"],
-  ["arch-update", "maintenance_tx_../../etc/shadow"],
-  ["arch-update", "maintenance_tx_0123456789abcdef --flag"]
+  ["repository-update", "maintenance_tx_../../etc/shadow"],
+  ["repository-update", "maintenance_tx_0123456789abcdef --flag"]
 ].each do |operation, transaction|
   begin
     authority.command_for(operation, transaction)
@@ -146,23 +101,13 @@ gated = SoulCore::MaintenancePasswordlessAuthority.new(
   root: root,
   command_runner: lambda do |argv|
     install_calls << argv
-    if argv == ["/usr/bin/yay", "--version"]
-      {"success" => true, "stdout" => "yay v13.0.1 - libalpm v15.0.0\n", "stderr" => ""}
-    else
-      {"success" => false, "stdout" => "", "stderr" => "not installed"}
-    end
+    {"success" => false, "stdout" => "", "stderr" => "not installed"}
   end
 )
 blocked_install = gated.install(expected_digest: gated.plan.dig("data", "expected_digest"), confirmation: "wrong")
-check.call("installation performs no privileged call without exact confirmation", blocked_install["lifecycle_state"] == "awaiting_input" && install_calls.all? { |argv| argv == ["/usr/bin/yay", "--version"] })
+check.call("installation performs no privileged call without exact confirmation", blocked_install["lifecycle_state"] == "awaiting_input" && install_calls.empty?)
 
-confined_runner = lambda do |argv|
-  if argv == ["/usr/bin/yay", "--version"]
-    {"success" => true, "stdout" => "yay v13.0.1 - libalpm v16.0.1\n", "stderr" => ""}
-  else
-    {"success" => false, "stdout" => "", "stderr" => "sudo: The \"no new privileges\" flag is set\n"}
-  end
-end
+confined_runner = ->(_argv) { {"success" => false, "stdout" => "", "stderr" => "sudo: The \"no new privileges\" flag is set\n"} }
 confined_authority = SoulCore::MaintenancePasswordlessAuthority.new(root: root, command_runner: confined_runner)
 confined_authority.define_singleton_method(:regular_file_exact?) { |_path, _digest, _mode| true }
 confined_status = confined_authority.status
@@ -186,14 +131,14 @@ service = SoulCore::MaintenanceForegroundExecutionService.new(
   passwordless_authority: fake_authority
 )
 materialized = service.materialize_live_commands([
-  {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/local/libexec/soul-maintenance-authority", "arch-update", "<transaction_id>"], "shell" => false},
+  {"adapter" => "official_repository.full_upgrade", "argv" => ["/usr/local/libexec/soul-maintenance-authority", "repository-update", "<transaction_id>"], "shell" => false},
   {"adapter" => "flatpak.user_update", "argv" => ["/usr/bin/flatpak", "update", "--user", "--noninteractive"], "shell" => false},
   {"adapter" => "flatpak.system_update", "argv" => ["/usr/local/libexec/soul-maintenance-authority", "flatpak-system-update", "<transaction_id>"], "shell" => false}
 ], "maintenance_tx_0123456789abcdef")
 check.call(
   "A2 materializes only fixed passwordless vectors after transaction ID allocation",
   materialized.map { |row| row.fetch("argv") } == [
-    ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "arch-update", "maintenance_tx_0123456789abcdef"],
+    ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "repository-update", "maintenance_tx_0123456789abcdef"],
     ["/usr/bin/flatpak", "update", "--user", "--noninteractive"],
     ["/usr/bin/sudo", "-n", "/usr/local/libexec/soul-maintenance-authority", "flatpak-system-update", "maintenance_tx_0123456789abcdef"]
   ] && service.privilege_fields("maintenance_tx_0123456789abcdef")["sudo_validation_argv"].empty?
