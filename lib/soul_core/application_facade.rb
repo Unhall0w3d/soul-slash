@@ -388,6 +388,7 @@ module SoulCore
       when "maintenance.rehearsal" then domain(maintenance_rehearsal.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "maintenance.execution.preview" then domain(maintenance_foreground_execution.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
       when "maintenance.evidence.reserve" then domain(maintenance_foreground_execution.reserve_native_evidence)
+      when "maintenance.aur_review.reserve" then domain(maintenance_foreground_execution.reserve_aur_review)
       when "maintenance.execution.rehearsal" then domain(maintenance_foreground_execution.rehearse(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.execution.execute" then domain(maintenance_foreground_execution.execute(force_database_refresh: parameters.fetch("force_database_refresh", false), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.execution.receipts" then domain(maintenance_foreground_execution.receipts(limit: bounded_limit(parameters["limit"], MaintenanceForegroundExecutionService::MAX_RECEIPTS)))

@@ -148,7 +148,7 @@ def transaction(root, clock, registry_digest, mode: "live_reboot")
     "deadline_at" => (clock.call + 600).iso8601,
     "plan_digest" => "a" * 64,
     "commands" => (mode == "live_reboot" ? [] : [
-      {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}
+      {"adapter" => "official_repository.full_upgrade", "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"], "shell" => false}
     ]),
     "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
     "sudo_refresh_argv" => ["/usr/bin/sudo", "-n", "-v"],
@@ -432,7 +432,7 @@ class A3ForegroundFixture
     @preview_count += 1
     plan = {
       "force_database_refresh" => force_database_refresh == true || force_database_refresh == "true",
-      "commands" => [{"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "shell" => false}],
+      "commands" => [{"adapter" => "official_repository.full_upgrade", "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"], "shell" => false}],
       "flatpak_installations" => [],
       "restore_registry_digest" => "b" * 64,
       "window_restore_summary" => {"restorable_count" => 1, "unsupported_count" => 0},

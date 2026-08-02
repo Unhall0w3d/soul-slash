@@ -64,9 +64,10 @@ transactions:
 ```text
 read-only evidence
 → separately authorized A2 package transaction:
-  yay full upgrade
+  trusted pacman repository update
 → Flatpak update
 → stop before reboot
+→ separately authorized interactive AUR review when community updates are pending
 → separately authorized A3 reboot-only transaction:
   empty package-command vectors
 → privacy-filtered Hyprland window snapshot
@@ -74,8 +75,8 @@ read-only evidence
 → one-shot workspace restoration after SDDM auto-login
 ```
 
-Choose normal `yay -Syu` behavior or explicitly request the forced
-package-database refresh used on the primary host (`yay -Syyu`). The preview
+Choose normal `pacman -Syu` behavior or explicitly request the forced trusted
+repository database refresh used on the primary host (`pacman -Syyu`). The preview
 shows exact inert argument arrays, detected Flatpak installation scopes, and
 which open application identities are safely mapped by the restore registry.
 It also checks allowlisted process names for tray-only applications that have
@@ -83,6 +84,10 @@ no compositor window. Those use `launch_if_absent`, so a later restorer must
 first honor normal desktop autostart and avoid duplicates.
 Unknown applications, games, transient dialogs, excess duplicate windows, and
 missing executables remain visible as unsupported.
+
+AUR updates never run in the unattended A2 transaction. They remain visible
+until the Operator opens the separate review terminal, inspects the current
+package set and build-file diffs, and explicitly proceeds or declines.
 
 The snapshot deliberately excludes window titles, browser URLs, raw process
 commands, terminal contents, environment values, and credentials. The

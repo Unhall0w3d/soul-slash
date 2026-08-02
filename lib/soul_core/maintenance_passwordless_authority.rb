@@ -13,20 +13,14 @@ module SoulCore
     CONFIRM_REMOVE = "REMOVE_SOUL_MAINTENANCE_AUTHORITY"
     HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
     SUDOERS_PATH = "/etc/sudoers.d/90-soul-maintenance-authority"
-    HELPER_VERSION = "soul-maintenance-authority-a4-v4"
+    HELPER_VERSION = "soul-maintenance-authority-a11-v1"
     TRANSACTION_PATTERN = "maintenance_tx_[a-f0-9]{16}"
-    SUPPORTED_YAY_VERSION = "13.0.1"
     FIXED_PATHS = {
       "sudo" => "/usr/bin/sudo",
       "ruby" => "/usr/bin/ruby",
-      "yay" => "/usr/bin/yay",
       "pacman" => "/usr/bin/pacman",
       "flatpak" => "/usr/bin/flatpak",
       "systemctl" => "/usr/bin/systemctl",
-      "makepkg" => "/usr/bin/makepkg",
-      "git" => "/usr/bin/git",
-      "gpg" => "/usr/bin/gpg",
-      "false" => "/usr/bin/false",
       "visudo" => "/usr/bin/visudo",
       "install" => "/usr/bin/install",
       "mv" => "/usr/bin/mv",
@@ -56,7 +50,6 @@ module SoulCore
 
     def plan
       problems = required_path_problems
-      problems << "yay #{SUPPORTED_YAY_VERSION} is required" unless yay_version == SUPPORTED_YAY_VERSION
       helper = helper_content
       helper_digest = Digest::SHA256.hexdigest(helper)
       sudoers = sudoers_content(helper_digest)
@@ -74,8 +67,8 @@ module SoulCore
         "sudoers_path" => SUDOERS_PATH,
         "sudoers_mode" => "0440",
         "sudoers_sha256" => Digest::SHA256.hexdigest(sudoers),
-        "allowed_operations" => %w[self-check arch-update flatpak-system-update reboot],
-        "yay_version" => yay_version,
+        "allowed_operations" => %w[self-check repository-update flatpak-system-update reboot],
+        "aur_mutation_authorized" => false,
         "password_storage" => false,
         "arbitrary_command_forwarding" => false,
         "persistent_process" => false
@@ -180,7 +173,7 @@ module SoulCore
     def command_for(operation, transaction_id)
       raise ArgumentError, "maintenance transaction ID is invalid" unless transaction_id.to_s.match?(/\A#{TRANSACTION_PATTERN}\z/)
       token = operation.to_s
-      raise ArgumentError, "maintenance authority operation is invalid" unless %w[arch-update flatpak-system-update reboot].include?(token)
+      raise ArgumentError, "maintenance authority operation is invalid" unless %w[repository-update flatpak-system-update reboot].include?(token)
       [FIXED_PATHS.fetch("sudo"), "-n", HELPER_PATH, token, transaction_id]
     end
 
@@ -194,7 +187,6 @@ module SoulCore
         "@@OWNER_NAME@@" => @owner_name,
         "@@OWNER_HOME@@" => @home,
         "@@HOSTNAME@@" => @hostname,
-        "@@YAY_VERSION@@" => SUPPORTED_YAY_VERSION
       }
       replacements.each { |token, value| template = template.gsub(token, ruby_literal(value)) }
       raise "authority helper template has unresolved tokens" if template.include?("@@")
@@ -204,8 +196,7 @@ module SoulCore
     def sudoers_content(helper_digest = Digest::SHA256.hexdigest(helper_content))
       commands = [
         "#{HELPER_PATH} self-check",
-        "#{HELPER_PATH} arch-update maintenance_tx_*",
-        "#{HELPER_PATH} pacman-bridge maintenance_tx_* *",
+        "#{HELPER_PATH} repository-update maintenance_tx_*",
         "#{HELPER_PATH} flatpak-system-update maintenance_tx_*",
         "#{HELPER_PATH} reboot maintenance_tx_*"
       ]
@@ -236,11 +227,6 @@ module SoulCore
       end + [
         ("authority helper template is unavailable" unless File.file?(File.join(@root, "scripts", "soul-maintenance-authority-root")))
       ].compact
-    end
-
-    def yay_version
-      result = run(FIXED_PATHS.fetch("yay"), "--version")
-      result["success"] ? result["stdout"].to_s[/yay v?([0-9]+\.[0-9]+\.[0-9]+)/, 1].to_s : ""
     end
 
     def regular_file_exact?(path, expected_digest, expected_mode)

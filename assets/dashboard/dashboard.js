@@ -3775,7 +3775,8 @@ function renderMaintenancePreview(plan) {
   const snapshot = plan.window_snapshot || {};
   list.append(
     labeledRecord("Authentication contract", "One password request · transaction-scoped · A1 does not authenticate"),
-    labeledRecord("Package mode", plan.force_database_refresh ? "yay -Syyu · forced database refresh" : "yay -Syu · normal full upgrade"),
+    labeledRecord("Trusted package mode", plan.force_database_refresh ? "pacman -Syyu · forced database refresh" : "pacman -Syu · normal repository upgrade"),
+    labeledRecord("AUR boundary", plan.aur_review?.count ? `${plan.aur_review.count} community update(s) excluded pending separate human review` : "no pending community updates"),
     labeledRecord("Restore map", `${snapshot.restorable_count || 0} restorable · ${snapshot.unsupported_count || 0} unsupported`),
     labeledRecord("Privacy boundary", "No titles, URLs, raw process commands, terminal contents, or environment values")
   );
@@ -3852,7 +3853,8 @@ function renderMaintenanceExecutionPlan(plan) {
   const details = byId("maintenance-execution-details"); details.replaceChildren();
   const rows = [
     ["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false ? "A4 fixed-operation authority · no password prompt" : "one native sudo -v prompt · never enters the Dashboard"],
-    ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
+    ["Trusted repositories", plan.commands?.find((item) => item.adapter === "official_repository.full_upgrade")?.argv?.join(" ") || "unavailable"],
+    ["AUR", plan.aur_review?.count ? `${plan.aur_review.count} pending · separate interactive review required` : "no pending community updates"],
     ["Flatpak scopes", (plan.flatpak_installations || []).map((item) => item.scope).join(", ") || "none"],
     ["Active work", plan.preflight?.active_work?.join(", ") || "none"],
     ["Disk evidence", (plan.preflight?.disk_free || []).map((item) => `${item.path} · ${Math.floor(Number(item.available_kib || 0) / 1024)} MiB free`).join(" · ") || "unavailable"],
@@ -3879,9 +3881,15 @@ function renderMaintenanceReceipt(receipt) {
   ].forEach(([label, value]) => container.append(labeledRecord(label, String(value ?? "—"))));
 }
 
+function renderAurReviewReceipt(receipt) {
+  const container = byId("maintenance-receipts");
+  if (!receipt) return;
+  container.append(labeledRecord("AUR review", `${receipt.lifecycle_state} · ${(receipt.package_names || []).join(", ") || "no package names retained"}`));
+}
+
 function launchMaintenanceUri(uri) {
   const exact = String(uri || "");
-  const allowed = /^soul-maintenance:\/\/(?:evidence\/maintenance_evidence_[a-f0-9]{16}|transaction\/maintenance_tx_[a-f0-9]{16})\/[a-f0-9]{64}$/;
+  const allowed = /^soul-maintenance:\/\/(?:evidence\/maintenance_evidence_[a-f0-9]{16}|transaction\/maintenance_tx_[a-f0-9]{16}|aur-review\/maintenance_aur_review_[a-f0-9]{16})\/[a-f0-9]{64}$/;
   if (!allowed.test(exact)) throw new Error("Maintenance handoff URI failed local validation.");
   window.location.href = exact;
 }
@@ -3902,7 +3910,7 @@ async function refreshNativeMaintenanceEvidence() {
 
 async function previewMaintenanceExecution() {
   const force = byId("maintenance-force-refresh").checked; const status = byId("maintenance-execution-status");
-  state.maintenanceExecutionPreview = null; byId("rehearse-maintenance-execution").disabled = true; byId("execute-maintenance").disabled = true;
+  state.maintenanceExecutionPreview = null; byId("rehearse-maintenance-execution").disabled = true; byId("execute-maintenance").disabled = true; byId("review-aur-updates").disabled = true;
   status.textContent = "Revalidating package, disk, active-work, and restore evidence…";
   try {
     const envelope = await callSoul("maintenance.execution.preview", { force_database_refresh: String(force) }); lifecycle(envelope);
@@ -3912,6 +3920,7 @@ async function previewMaintenanceExecution() {
     const liveBlocked = (plan.preflight?.live_blockers || plan.preflight?.blockers || []).length > 0;
     byId("rehearse-maintenance-execution").disabled = rehearsalBlocked;
     byId("execute-maintenance").disabled = liveBlocked || !plan.execution_available;
+    byId("review-aur-updates").disabled = !(Number(plan.aur_review?.count || 0) > 0);
     byId("execute-maintenance").textContent = plan.execution_available ? "Open maintenance terminal" : "Live update unavailable";
     byId("maintenance-execution-state").textContent = rehearsalBlocked ? "blocked" : (plan.execution_available ? "review ready" : "rehearsal ready");
     status.textContent = rehearsalBlocked
@@ -3919,6 +3928,19 @@ async function previewMaintenanceExecution() {
       : (liveBlocked
         ? "Fixture rehearsal is ready; live-update blockers remain visible and no host update is available."
         : "Exact A2 digest ready. Terminal rehearsal performs no authentication or host update.");
+  } catch (error) { status.textContent = error.message; }
+}
+
+async function reviewAurUpdates() {
+  const status = byId("maintenance-execution-status");
+  byId("review-aur-updates").disabled = true;
+  status.textContent = "Reserving a separate interactive AUR review terminal…";
+  try {
+    const envelope = await callSoul("maintenance.aur_review.reserve"); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (!data.launch_uri) throw new Error(envelope.errors?.[0]?.message || "AUR review handoff is unavailable.");
+    launchMaintenanceUri(data.launch_uri);
+    status.textContent = "AUR review terminal requested. Review every package, PKGBUILD/install-script diff, source, and checksum before accepting.";
   } catch (error) { status.textContent = error.message; }
 }
 
@@ -3951,6 +3973,7 @@ async function loadMaintenanceReceipts() {
   try {
     const envelope = await callSoul("maintenance.execution.receipts", { limit: 1 }); const data = dataOf(envelope); lifecycle(envelope);
     renderMaintenanceReceipt((data.receipts || [])[0]);
+    renderAurReviewReceipt((data.aur_review_receipts || [])[0]);
     const evidence = data.native_package_evidence || {}; const handoff = data.desktop_handoff || {};
     if (!handoff.available) byId("maintenance-execution-status").textContent = (handoff.problems || []).join(" · ") || "Maintenance desktop handoff is unavailable.";
     else if (evidence.available) byId("maintenance-execution-status").textContent = `Native package evidence ready until ${new Date(evidence.expires_at).toLocaleTimeString()}.`;
@@ -3961,7 +3984,7 @@ function renderMaintenanceRebootPlan(plan) {
   const details = byId("maintenance-reboot-details"); details.replaceChildren();
   [
     ["Authentication", plan.authority_mode === "root_owned_passwordless" && plan.one_authentication_required === false ? "A4 fixed-operation authority · no password prompt" : "one native sudo -v prompt · never enters the Dashboard"],
-    ["Arch/AUR", plan.commands?.find((item) => item.adapter === "arch_and_aur.full_upgrade")?.argv?.join(" ") || "unavailable"],
+    ["Package maintenance", "not included · reboot and restore only"],
     ["Restore map", `${plan.window_restore_summary?.restorable_count ?? 0} restorable · ${plan.window_restore_summary?.unsupported_count ?? 0} unsupported`],
     ["Resume unit", plan.resume_unit?.ready ? "exact unit installed · enabled · one-shot" : "not ready"],
     ["Source boot", plan.source_boot_id || "unavailable"],
@@ -5544,6 +5567,7 @@ byId("preview-maintenance-execution").addEventListener("click", previewMaintenan
 byId("refresh-maintenance-evidence").addEventListener("click", refreshNativeMaintenanceEvidence);
 byId("rehearse-maintenance-execution").addEventListener("click", () => runMaintenanceExecution("rehearsal"));
 byId("execute-maintenance").addEventListener("click", () => runMaintenanceExecution("live"));
+byId("review-aur-updates").addEventListener("click", reviewAurUpdates);
 byId("refresh-maintenance-receipt").addEventListener("click", loadMaintenanceReceipts);
 byId("preview-maintenance-reboot").addEventListener("click", previewMaintenanceReboot);
 byId("execute-maintenance-reboot").addEventListener("click", executeMaintenanceReboot);

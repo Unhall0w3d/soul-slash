@@ -1,5 +1,9 @@
 # Maintenance Foreground Execution A2 Brief
 
+> **Current amendment:** A11 supersedes the historical combined Arch/AUR
+> command below. Routine A2 now updates trusted pacman repositories and Flatpak
+> only; AUR updates use a separate interactive review gate.
+
 Status: human-approved for implementation and deterministic rehearsal on
 2026-07-27; live package update not authorized
 

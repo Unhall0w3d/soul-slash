@@ -1,8 +1,9 @@
 # Guided Maintenance
 
-Guided Maintenance is Soul's reviewed host-administration workflow for
-Arch/AUR and Flatpak updates and the later, separately gated conditional reboot
-and one-shot restoration of safely allowlisted Hyprland applications.
+Guided Maintenance is Soul's reviewed host-administration workflow for trusted
+pacman repository and Flatpak updates, separately reviewed AUR updates, and the
+distinct gated reboot and one-shot restoration of safely allowlisted Hyprland
+applications.
 
 Open it from **Administration → Guided Maintenance**.
 
@@ -536,37 +537,42 @@ window/workspace restoration inventory; closing the evidence terminal does not
 invalidate the reviewed update plan. A3 captures and binds its own fresh
 restore state separately before reboot.
 
-## Maintenance Passwordless Authority A4
+## Maintenance Passwordless Authority A4 + AUR Review A11
 
-A4 removes the routine password and package questions without storing a
-password and without granting passwordless access to yay, pacman, Flatpak,
-systemctl, a shell, or an interpreter. The public default remains:
+A4 removes routine trusted-repository and Flatpak questions without storing a
+password and without granting passwordless access to pacman, Flatpak,
+systemctl, a shell, or an interpreter. A11 removes AUR execution from this
+authority entirely. The public default remains:
 
 ```text
 SOUL_MAINTENANCE_PASSWORDLESS=false
 ```
 
-The root-owned helper accepts only `arch-update`, `flatpak-system-update`, or
-`reboot` plus one opaque maintenance transaction ID. Its sudoers entry binds
-the exact helper content by SHA-256 digest. Yay 13.0.1 runs as the qualified
-desktop user because AUR packages must not be built as root, and receives a
-fixed, target-free policy: no clean rebuild, no diff review, no PKGBUILD edit,
-upgrade the reviewed set, retain make dependencies, and proceed
-noninteractively. During that exact active operation, yay's pacman calls return
-through a helper bridge bound to its recorded PID/start identity. The bridge
-permits only a short bounded chain of exact sudo monitor processes before that
-recorded yay identity, and rejects removal, database operations, alternate
-roots/configuration paths, and non-pacman execution. The public surface still
-accepts no executable, package target, path, option, or free-form answer.
-Flatpak uses its native `--noninteractive` system update.
+The root-owned helper accepts only `repository-update`,
+`flatpak-system-update`, or `reboot` plus one opaque maintenance transaction
+ID. Its sudoers entry binds the exact helper content by SHA-256 digest. The
+repository operation runs target-free `pacman -Syu` (or explicitly selected
+`pacman -Syyu`) with `--noconfirm`; Flatpak uses its native `--noninteractive`
+system update. The helper contains no yay, makepkg, AUR, package target, caller
+path, arbitrary argument, shell, or interpreter surface.
+
+Pending AUR updates remain visible in the A2 plan. **Review pending AUR** opens
+a separate native terminal, authenticates at most once, confirms that the
+fresh package set still matches the reviewed digest, and runs AUR-only
+`yay -Sua`. Clean-build, diff, and PKGBUILD edit menus are forced on while all
+saved predetermined answers are unset. The Operator reviews build files,
+install scripts, sources, and checksums and may decline, cancel, or close the
+terminal. Every outcome invalidates the sudo ticket; there is no retry or
+background continuation.
 
 The visible terminal remains an audit and cancellation surface. Package-manager
 errors stop the transaction; there is no model-driven prompt answering or
 automatic retry. A3 reboot still requires its exact pending restore journal,
 but it contains no package or Flatpak command and never repeats maintenance.
-The package-only A2 path completed supervised live acceptance on 2026-07-29:
-Arch/AUR and system Flatpak both completed with zero password prompts and no
-reboot request. The distinct A3 reboot-only path then completed supervised live
+The historical combined A2 path completed supervised live acceptance on
+2026-07-29. A11 retires its unattended AUR portion; a replacement helper must
+be reviewed and installed before new workstation live maintenance. The distinct
+A3 reboot-only path then completed supervised live
 acceptance with zero password prompts, empty package-command vectors, and no
 package replay. The uniform device-card UX remains human-reviewed at each
 transaction.
@@ -575,6 +581,7 @@ Review and deployment commands:
 
 ```text
 make verify-maintenance-passwordless-authority
+make verify-maintenance-aur-review-gate
 make verify-maintenance-fleet-discovery
 make maintenance-authority-plan
 make maintenance-authority-install EXPECTED_DIGEST=<reviewed digest> CONFIRM=INSTALL_SOUL_MAINTENANCE_AUTHORITY

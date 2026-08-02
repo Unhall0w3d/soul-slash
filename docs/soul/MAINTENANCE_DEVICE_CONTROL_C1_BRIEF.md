@@ -1,5 +1,10 @@
 # Maintenance Device Control C1 Brief
 
+> **Workstation amendment:** A11 replaces the historical combined Arch/AUR
+> plan with trusted repository + Flatpak maintenance and a separate interactive
+> AUR review. Remote enrolled-device adapters retain their own reviewed package
+> semantics.
+
 ```text
 date: 2026-07-27
 human_authorization: approved in the active development conversation

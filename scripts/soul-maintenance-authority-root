@@ -17,8 +17,6 @@ OWNER_GID = Integer(@@OWNER_GID@@)
 OWNER_NAME = @@OWNER_NAME@@
 OWNER_HOME = @@OWNER_HOME@@
 QUALIFIED_HOSTNAME = @@HOSTNAME@@
-QUALIFIED_YAY_VERSION = @@YAY_VERSION@@
-MAX_SUDO_ANCESTRY_DEPTH = 3
 
 HELPER_PATH = "/usr/local/libexec/soul-maintenance-authority"
 STATE_ROOT = "/run/soul-maintenance-authority"
@@ -29,15 +27,9 @@ TRANSACTION_PATTERN = /\Amaintenance_tx_[a-f0-9]{16}\z/
 MAX_TRANSACTION_BYTES = 512 * 1024
 MAX_RUNTIME_SECONDS = 4 * 60 * 60
 PATHS = {
-  "yay" => "/usr/bin/yay",
-  "sudo" => "/usr/bin/sudo",
   "pacman" => "/usr/bin/pacman",
   "flatpak" => "/usr/bin/flatpak",
-  "systemctl" => "/usr/bin/systemctl",
-  "makepkg" => "/usr/bin/makepkg",
-  "git" => "/usr/bin/git",
-  "gpg" => "/usr/bin/gpg",
-  "false" => "/usr/bin/false"
+  "systemctl" => "/usr/bin/systemctl"
 }.freeze
 
 def fail_closed(message, code = 2)
@@ -119,7 +111,7 @@ end
 def expected_operations(transaction)
   operations = transaction.fetch("commands").filter_map do |command|
     case command["adapter"]
-    when "arch_and_aur.full_upgrade" then "arch-update"
+    when "official_repository.full_upgrade" then "repository-update"
     when "flatpak.system_update" then "flatpak-system-update"
     when "flatpak.user_update" then nil
     else fail_closed("transaction contains an unsupported adapter")
@@ -142,8 +134,8 @@ def validate_vectors!(transaction, operations, id)
     adapter = command.fetch("adapter")
     argv = command.fetch("argv")
     expected = case adapter
-    when "arch_and_aur.full_upgrade"
-      expected_vector("arch-update", id)
+    when "official_repository.full_upgrade"
+      expected_vector("repository-update", id)
     when "flatpak.system_update"
       expected_vector("flatpak-system-update", id)
     when "flatpak.user_update"
@@ -232,41 +224,11 @@ rescue KeyError
   fail_closed("sudo group identity is missing")
 end
 
-def yay_version
-  output = IO.popen([sanitized_environment, PATHS.fetch("yay"), "--version", {unsetenv_others: true}], &:read)
-  output.to_s[/yay v?([0-9]+\.[0-9]+\.[0-9]+)/, 1].to_s
-rescue SystemCallError
-  ""
-end
-
 def command_for(operation, transaction)
   case operation
-  when "arch-update"
-    fail_closed("qualified yay version changed") unless yay_version == QUALIFIED_YAY_VERSION
+  when "repository-update"
     refresh = transaction["force_database_refresh"] == true ? "-Syyu" : "-Syu"
-    [
-      PATHS.fetch("yay"),
-      "--pacman", PATHS.fetch("pacman"),
-      "--makepkg", PATHS.fetch("makepkg"),
-      "--git", PATHS.fetch("git"),
-      "--gpg", PATHS.fetch("gpg"),
-      "--sudo", PATHS.fetch("sudo"),
-      "--sudoflags", "-n #{HELPER_PATH} pacman-bridge #{transaction.fetch('transaction_id')}",
-      "--config", "/etc/pacman.conf",
-      "--builddir", File.join(OWNER_HOME, ".cache", "yay"),
-      "--editor", PATHS.fetch("false"),
-      "--noconfirm",
-      "--answerclean", "None",
-      "--answerdiff", "None",
-      "--answeredit", "None",
-      "--answerupgrade", "All",
-      "--noremovemake",
-      "--pgpfetch=false",
-      "--provides=false",
-      "--useask=false",
-      "--sudoloop=false",
-      refresh
-    ]
+    [PATHS.fetch("pacman"), refresh, "--noconfirm"]
   when "flatpak-system-update"
     [PATHS.fetch("flatpak"), "update", "--system", "--noninteractive"]
   when "reboot"
@@ -280,103 +242,6 @@ def command_for(operation, transaction)
   else
     fail_closed("operation is not allowlisted")
   end
-end
-
-def pacman_bridge_operation(arguments)
-  explicit_prefix = ["-D", "--asexplicit", "-q", "--noconfirm", "--config", "/etc/pacman.conf", "--"]
-  explicit_targets = arguments.drop(explicit_prefix.length)
-  mark_explicit =
-    arguments.first(explicit_prefix.length) == explicit_prefix &&
-    explicit_targets.length.between?(1, 128) &&
-    explicit_targets.all? { |target| target.match?(/\A[a-z0-9@._+:-]+\z/) }
-  return "mark_explicit" if mark_explicit
-  return "package_mutation" if arguments.any? { |part| part == "-S" || part.start_with?("-S") || part == "-U" || part.start_with?("-U") }
-
-  nil
-end
-
-def validate_pacman_bridge!(state, transaction, operations, argv)
-  index = validate_phase!(state, transaction, operations, "arch-update")
-  fail_closed("pacman bridge is outside the active Arch/AUR operation") unless index == state["next_index"]
-  active = state["active_arch_update"]
-  fail_closed("pacman bridge has no active yay owner") unless active.is_a?(Hash)
-
-  yay = process_identity(active.fetch("yay_pid"))
-  fail_closed("active yay process identity changed") unless
-    yay["start_ticks"] == active["yay_start_ticks"] &&
-    yay["exe"] == File.realpath(PATHS.fetch("yay"))
-
-  ancestor = process_identity(Process.ppid)
-  ancestry_matches = false
-  (MAX_SUDO_ANCESTRY_DEPTH + 1).times do
-    if ancestor["pid"] == yay["pid"]
-      ancestry_matches =
-        ancestor["start_ticks"] == yay["start_ticks"] &&
-        ancestor["exe"] == yay["exe"]
-      break
-    end
-    break unless ancestor["exe"] == File.realpath(PATHS.fetch("sudo"))
-
-    ancestor = process_identity(ancestor["ppid"])
-  end
-  fail_closed("pacman bridge is not descended through bounded sudo ancestry from active yay") unless ancestry_matches
-
-  fail_closed("pacman bridge command is empty") unless argv.is_a?(Array) && argv.length.between?(2, 256)
-  fail_closed("pacman bridge executable changed") unless argv.first == PATHS.fetch("pacman")
-  fail_closed("pacman bridge argument is too large") unless argv.all? { |part| part.is_a?(String) && part.bytesize.between?(1, 4096) && !part.include?("\0") }
-  arguments = argv.drop(1)
-  operation = pacman_bridge_operation(arguments)
-  fail_closed("pacman bridge operation is not mutation-bounded") unless operation
-  forbidden = %w[-R --remove -D --database --root --sysroot --dbpath --cachedir --hookdir --logfile --gpgdir]
-  unless operation == "mark_explicit"
-    fail_closed("pacman bridge contains a forbidden operation") if arguments.any? { |part| forbidden.include?(part) || forbidden.any? { |token| part.start_with?("#{token}=") } }
-  end
-  argv.each_with_index do |part, offset|
-    next unless part == "--config"
-    fail_closed("pacman bridge configuration changed") unless argv[offset + 1] == "/etc/pacman.conf"
-  end
-  argv
-rescue KeyError, ArgumentError
-  fail_closed("pacman bridge state is invalid")
-end
-
-def execute_yay_as_owner(argv, deadline, state, id)
-  gate_read, gate_write = IO.pipe
-  pid = fork do
-    gate_write.close
-    Process.initgroups(OWNER_NAME, OWNER_GID)
-    Process::GID.change_privilege(OWNER_GID)
-    Process::UID.change_privilege(OWNER_UID)
-    gate_read.read(1)
-    gate_read.close
-    exec(sanitized_environment, *argv, unsetenv_others: true, in: $stdin, out: $stdout, err: $stderr)
-  end
-  gate_read.close
-  identity = process_identity(pid)
-  state["active_arch_update"] = {
-    "yay_pid" => pid,
-    "yay_start_ticks" => identity.fetch("start_ticks")
-  }
-  atomic_root_json(state_path(id), state)
-  gate_write.write(".")
-  gate_write.close
-
-  remaining = deadline - Time.now.utc
-  fail_closed("transaction deadline expired") unless remaining.positive?
-  status = nil
-  Timeout.timeout([remaining, MAX_RUNTIME_SECONDS].min) { _pid, status = Process.wait2(pid) }
-  status.exitstatus || 1
-rescue Timeout::Error
-  Process.kill("TERM", pid) rescue nil
-  Process.wait(pid) rescue nil
-  124
-rescue SystemCallError
-  127
-ensure
-  gate_read&.close rescue nil
-  gate_write&.close rescue nil
-  state.delete("active_arch_update") if state
-  atomic_root_json(state_path(id), state) if state && id
 end
 
 def execute_fixed(argv, deadline)
@@ -411,18 +276,6 @@ if operation == "self-check"
 end
 
 id = ARGV.shift.to_s
-if operation == "pacman-bridge"
-  fail_closed("pacman bridge argument count is invalid") if ARGV.empty?
-  transaction = transaction_for(id)
-  operations = expected_operations(transaction)
-  validate_vectors!(transaction, operations, id)
-  state = load_or_create_state(transaction, operations)
-  deadline = Time.iso8601(transaction.fetch("deadline_at"))
-  status = execute_fixed(validate_pacman_bridge!(state, transaction, operations, ARGV), deadline)
-  fail_closed("pacman bridge failed with status #{status}", status.zero? ? 1 : status) unless status.zero?
-  exit(0)
-end
-
 fail_closed("argument count is invalid") unless ARGV.empty?
 transaction = transaction_for(id)
 operations = expected_operations(transaction)
@@ -431,11 +284,7 @@ state = load_or_create_state(transaction, operations)
 index = validate_phase!(state, transaction, operations, operation)
 deadline = Time.iso8601(transaction.fetch("deadline_at"))
 command = command_for(operation, transaction)
-status = if operation == "arch-update"
-  execute_yay_as_owner(command, deadline, state, id)
-else
-  execute_fixed(command, deadline)
-end
+status = execute_fixed(command, deadline)
 fail_closed("#{operation} failed with status #{status}", status.zero? ? 1 : status) unless status.zero?
 state["next_index"] = index + 1
 state["terminal"] = state["next_index"] >= operations.length

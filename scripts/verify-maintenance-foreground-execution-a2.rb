@@ -30,10 +30,11 @@ class A2FixtureRehearsal
       "plan_id" => "maintenance_#{"a" * 16}",
       "force_database_refresh" => mode,
       "commands" => [
-        {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", mode ? "-Syyu" : "-Syu"], "interactive" => true, "executes_in_a1" => false},
+        {"adapter" => "official_repository.full_upgrade", "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/pacman", mode ? "-Syyu" : "-Syu"], "interactive" => true, "executes_in_a1" => false},
         {"adapter" => "flatpak.user_update", "argv" => ["/usr/bin/flatpak", "update", "--user"], "interactive" => true, "executes_in_a1" => false},
         {"adapter" => "flatpak.system_update", "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"], "interactive" => true, "executes_in_a1" => false}
       ],
+      "aur_review" => {"helper" => "yay", "status" => "not_required", "count" => 0, "items" => [], "included_in_unattended_maintenance" => false},
       "package_evidence" => {
         "status" => "ok",
         "managers" => {
@@ -224,7 +225,7 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   preview = service.preview(force_database_refresh: false)
   plan = preview.dig("data", "plan")
   check.call("preview is digest-bound and keeps live execution disabled", preview["ok"] && plan["execution_available"] == false && plan["rehearsal_available"] == true && preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/))
-  check.call("yay uses the existing ticket non-interactively without yay sudoloop", plan.fetch("commands").first.fetch("argv") == ["/usr/bin/yay", "--sudoflags=-n", "-Syu"] && plan.fetch("commands").none? { |command| command.fetch("argv").include?("--sudoloop") })
+  check.call("trusted repository maintenance uses only pacman and excludes AUR", plan.fetch("commands").first.fetch("argv") == ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"] && plan.dig("aur_review", "included_in_unattended_maintenance") == false)
   check.call("Flatpak user and system scopes retain fixed vectors", plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/flatpak", "update", "--user"]) && plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"]))
   check.call("preflight observes disk, active work, package lock, and fixed tools", plan.dig("preflight", "blockers").empty? && plan.dig("preflight", "disk_free").length == 3 && plan.dig("preflight", "required_executables", "kitty") == "/usr/bin/kitty")
 
@@ -349,7 +350,7 @@ Dir.mktmpdir("soul-maintenance-a2-live") do |root|
     confirmation: SoulCore::MaintenanceForegroundExecutionService::CONFIRMATION
   )
   transaction = handoff.transactions.first
-  check.call("enabled live candidate reserves one exact desktop handoff with reviewed vectors", live["lifecycle_state"] == "complete" && live.dig("data", "handoff", "launch_uri").start_with?("soul-maintenance://transaction/") && transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"] && transaction.fetch("commands").first.fetch("argv") == ["/usr/bin/yay", "--sudoflags=-n", "-Syyu"])
+  check.call("enabled live candidate reserves one exact desktop handoff with reviewed vectors", live["lifecycle_state"] == "complete" && live.dig("data", "handoff", "launch_uri").start_with?("soul-maintenance://transaction/") && transaction["sudo_validation_argv"] == ["/usr/bin/sudo", "-v"] && transaction.fetch("commands").first.fetch("argv") == ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syyu"])
   check.call("live reservation performs no prompt, package command, or reboot inside the Dashboard", terminal.transactions.empty? && live.dig("data", "reboot_requested") == false && service.receipts.dig("data", "receipts").empty?)
   replay = service.execute(
     force_database_refresh: true, expected_digest: preview.dig("data", "expected_digest"),
@@ -369,7 +370,7 @@ Dir.mktmpdir("soul-maintenance-runner") do |root|
     "mode" => "live", "owner_uid" => Process.uid, "created_at" => clock.call.iso8601,
     "deadline_at" => (clock.call + 600).iso8601, "plan_digest" => "d" * 64,
     "commands" => [
-      {"adapter" => "arch_and_aur.full_upgrade", "argv" => ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], "interactive" => true, "requires_existing_sudo_ticket" => true, "shell" => false},
+      {"adapter" => "official_repository.full_upgrade", "argv" => ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"], "interactive" => true, "requires_existing_sudo_ticket" => true, "shell" => false},
       {"adapter" => "flatpak.user_update", "argv" => ["/usr/bin/flatpak", "update", "--user"], "interactive" => true, "requires_existing_sudo_ticket" => false, "shell" => false}
     ],
     "sudo_validation_argv" => ["/usr/bin/sudo", "-v"],
@@ -385,7 +386,7 @@ Dir.mktmpdir("soul-maintenance-runner") do |root|
   end
   output = StringIO.new
   result = SoulCore::MaintenanceTransactionRunner.new(root: root, clock: clock, command_executor: executor, output: output).run(transaction_path: transaction_path, mode: "live")
-  check.call("runner executes only sudo validate, exact updates, and sudo invalidation", result["lifecycle_state"] == "complete" && calls == [["/usr/bin/sudo", "-v"], ["/usr/bin/yay", "--sudoflags=-n", "-Syu"], ["/usr/bin/flatpak", "update", "--user"], ["/usr/bin/sudo", "-k"]])
+  check.call("runner executes only sudo validate, exact trusted updates, and sudo invalidation", result["lifecycle_state"] == "complete" && calls == [["/usr/bin/sudo", "-v"], ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"], ["/usr/bin/flatpak", "update", "--user"], ["/usr/bin/sudo", "-k"]])
   check.call("runner result is bounded and records no reboot", JSON.parse(File.read(result_path))["reboot_requested"] == false && output.string.include?("A2 never requests a reboot"))
 
   bad = transaction.merge(

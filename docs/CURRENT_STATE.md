@@ -154,15 +154,18 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - **Project Timeline** provides the shared, explicitly maintained owner-local
   implementation ledger through the Dashboard and deterministic Chat controls.
 - **Guided Maintenance** consumes fresh read-only assessment evidence and
-  previews the exact Arch/AUR and Flatpak transaction plus a privacy-filtered
+  previews the exact trusted pacman repository and Flatpak transaction plus a privacy-filtered
   Hyprland restore map. A1 remains read-only. The accepted A2 path adds a
   visible, bounded terminal executor and no-mutation rehearsal. A2B adds a
   single-use XDG desktop handoff so native package evidence and an approved
   transaction can run outside the deliberately confined Dashboard without
   weakening its systemd sandbox. Native one-password execution remains the
-  portable public default; the Operator's opt-in A4 v3 digest-bound fixed
-  authority completed supervised Arch/AUR and system Flatpak maintenance with
-  zero password prompts and no reboot on 2026-07-29. The device-card UX
+  portable public default. The Operator's historical A4 v3 authority completed
+  supervised combined maintenance on 2026-07-29; A11 now retires unattended
+  AUR execution. The A11 root helper can update only trusted repositories and
+  Flatpak. Pending AUR updates remain visible and require a separate expiring,
+  digest-bound interactive terminal with clean/diff/PKGBUILD menus and no
+  predetermined answers. The device-card UX
   collects and rechecks stale native evidence, retains the exact human-reviewed
   click gate, and refreshes the card from the exact terminal receipt. A2 always
   stops before reboot. Reboot is a distinct A3 transaction with its own

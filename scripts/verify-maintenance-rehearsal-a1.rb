@@ -138,7 +138,9 @@ Dir.mktmpdir("soul-maintenance-a1-") do |root|
                plan["risk_class"] == "class_5" &&
                plan["execution_authorized"] == false &&
                plan["force_database_refresh"] == true &&
-               plan.dig("commands", 0, "argv") == ["/usr/bin/yay", "-Syyu"])
+               plan.dig("commands", 0, "argv") == ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syyu"] &&
+               plan.dig("aur_review", "status") == "review_required" &&
+               plan.dig("aur_review", "included_in_unattended_maintenance") == false)
   check.call("system Flatpak update is planned through the one existing non-interactive sudo ticket",
              plan.fetch("commands").any? { |command| command["argv"] == ["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"] })
   check.call("Hyprland snapshot keeps safe placement hints and omits sensitive titles and command lines",
@@ -185,8 +187,8 @@ Dir.mktmpdir("soul-maintenance-a1-") do |root|
 
   normal = service.preview(force_database_refresh: false)
   invalid = service.preview(force_database_refresh: "sometimes")
-  check.call("normal mode uses one coherent yay -Syu plan and invalid boolean input fails closed",
-             normal.dig("data", "plan", "commands", 0, "argv") == ["/usr/bin/yay", "-Syu"] &&
+  check.call("normal mode uses one repository-only pacman -Syu plan and invalid boolean input fails closed",
+             normal.dig("data", "plan", "commands", 0, "argv") == ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"] &&
                invalid["lifecycle_state"] == "awaiting_input")
 
   runner.clients = [{

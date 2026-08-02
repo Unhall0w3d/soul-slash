@@ -1,5 +1,9 @@
 # Maintenance Passwordless Authority A4 Review
 
+> **Historical artifact.** A11 supersedes the unattended AUR behavior recorded
+> here. Current implementation removes AUR code from the root helper and
+> requires a separate interactive review gate.
+
 Status: A2 maintenance and separate reboot-only A3 live-accepted on 2026-07-29;
 A4 v4 installed exactly on 2026-08-01 after repairing yay install-reason
 bookkeeping exposed by a successful upgrade

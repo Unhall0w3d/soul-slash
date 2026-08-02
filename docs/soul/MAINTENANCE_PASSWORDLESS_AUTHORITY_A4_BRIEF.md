@@ -1,5 +1,10 @@
 # Maintenance Passwordless Authority A4 Brief
 
+> **Superseded for current operation by A11.** The historical A4 v3 combined
+> unattended repository and AUR behavior is retired. A11 limits the root-owned
+> helper to trusted pacman repositories, Flatpak, and separately gated reboot;
+> AUR updates require a distinct interactive human review.
+
 ```text
 date: 2026-07-28
 human_authorization: approved in the active development conversation
