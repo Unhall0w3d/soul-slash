@@ -42,7 +42,10 @@ end
 deployment = File.read("lib/soul_core/dashboard_deployment.rb")
 makefile = File.read("Makefile")
 check("exact service allowlist", deployment.include?("SERVICE_NAMES = %w[soul-dashboard.service soul-dashboard-proxy.service]") && deployment.include?("SERVICE_NAMES.length") == false, errors)
-check("dashboard retains local user-manager access without broadening its listener", deployment.include?("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6"), errors)
+check("dashboard retains local user-manager and nested no-network sandbox access without broadening its listener",
+      deployment.include?("RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK") &&
+        deployment.include?("SOUL_DASHBOARD_BIND_HOST=127.0.0.1"),
+      errors)
 check("dashboard hardening grants write access only to project state and the configured recovery mount",
       deployment.include?("ProtectSystem=strict") &&
         deployment.include?('ReadWritePaths=#{unit_path(@root)} -#{unit_quote(@backup_mount)}') &&

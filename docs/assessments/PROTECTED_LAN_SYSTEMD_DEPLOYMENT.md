@@ -13,6 +13,10 @@
 - Corrected dashboard hardening to permit `AF_UNIX` for bounded communication
   with the existing systemd user manager. IPv4/IPv6 listener policy is
   unchanged, and no additional service or socket is introduced.
+- Permitted `AF_NETLINK` for the existing Dashboard process so nested
+  bubblewrap verification can configure its isolated no-network namespace.
+  Soul's listener remains loopback-only and bubblewrap retains
+  `--unshare-all`; this does not grant candidate tests host networking.
 - Added automatic page reload when an already-open dashboard presents the stale
   CSRF token left by a dashboard-service restart.
 - Corrected reinstall behavior to enable and restart the same two approved
@@ -122,6 +126,8 @@ The deployment assessor verifies:
   leaving status cards in a generic unavailable state;
 - the dashboard unit permits Unix sockets required for `systemctl --user`
   inspection while retaining its existing loopback HTTP bind;
+- the dashboard unit permits Netlink namespace setup required by its nested
+  bubblewrap verifier while candidate tests remain in an unshared network;
 - prior configuration, authentication, dashboard, Skill Studio, Self Improvement, and privacy regressions remain green.
 
 The authentication regression now recognizes the current single- and
