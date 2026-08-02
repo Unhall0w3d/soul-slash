@@ -133,8 +133,10 @@ Wazuh includes a complete HTTPS web interface for agent management, inventory,
 vulnerabilities, alerts, dashboards, and investigation. It remains the
 authoritative security console.
 
-Soul A4 should add an Administration **Security** surface rather than embedding
-the Wazuh interface. Its read-only summary may show:
+Soul A4 should project security status onto the associated Guided Maintenance
+cards and Administration **Local Topology** rather than embedding the Wazuh
+interface or adding a redundant investigation board. Across staged gates its
+read-only summary may show:
 
 - central service reachability and last successful refresh;
 - enrolled, active, disconnected, pending, and never-connected agent counts;
@@ -191,10 +193,10 @@ remediate, or close an alert.
 - measure resource impact and tune public-safe plus owner-private exclusions;
 - consider on-access scanning only in a separate reviewed sub-gate.
 
-### A4 — Soul security surface
+### A4 — Soul security projection
 
 - implement read-only API configuration and a bounded client;
-- add Administration → Security and deep links to Wazuh;
+- add separate Wazuh health to Maintenance cards, Local Topology, and safe links to Wazuh;
 - add read-only Chat/Voice invocation metadata;
 - test stale, unreachable, malformed, unauthorized, and partial-data states;
 - add no remediation authority.

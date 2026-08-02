@@ -68,6 +68,7 @@
         <button id="administration-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="administration-menu">Administration <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="administration-menu" class="self-improvement-menu" role="menu" aria-label="Administration surfaces" hidden>
           <button id="timeline-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="timeline-panel"><strong>Project Timeline</strong><span>Implementation state, priorities, deferred work, and completed inventory</span></button>
+          <button id="local-topology-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="local-topology-panel"><strong>Local Topology</strong><span>Read-only network topology evidence and route links</span></button>
           <button id="backup-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="backup-panel"><strong>Backup &amp; Recovery</strong><span>Verified snapshots, deletion holds, retention, and staged restore</span></button>
           <button id="maintenance-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="maintenance-panel"><strong>Guided Maintenance</strong><span>Update, reboot, and workspace-restore planning</span></button>
         </div>
@@ -601,6 +602,10 @@
           <div><span>Kernel attention</span><strong id="maintenance-fleet-kernels">—</strong></div>
           <div><span>Reboots</span><strong id="maintenance-fleet-reboots">—</strong></div>
         </div>
+        <section class="wazuh-security-summary" aria-labelledby="maintenance-security-heading">
+          <div><p class="eyebrow">Read-only security posture</p><h3 id="maintenance-security-heading">Wazuh monitoring</h3><p id="maintenance-wazuh-summary">Loading the most recent Wazuh health snapshot…</p></div>
+          <div class="wazuh-security-actions"><span id="maintenance-wazuh-state" class="maintenance-state-badge">Not loaded</span><button id="refresh-maintenance-wazuh" class="quiet-button" type="button">Refresh security health</button><a id="open-maintenance-wazuh" class="quiet-button" target="_blank" rel="noopener noreferrer" hidden>Open Wazuh</a></div>
+        </section>
         <details class="maintenance-discovery-card">
           <summary><span><span class="eyebrow">Portable inventory</span><strong>Discover &amp; enroll a device</strong></span><small id="maintenance-discovery-summary">Open to inspect the bounded local discovery surface.</small></summary>
           <div class="maintenance-discovery-body">
@@ -691,12 +696,6 @@
             </div>
           </section>
         </div>
-        <section class="maintenance-topology-card" aria-labelledby="maintenance-topology-heading">
-          <div class="card-heading"><div><p class="eyebrow">Network path</p><h2 id="maintenance-topology-heading">Operations topology</h2></div><span class="count-badge">route evidence</span></div>
-          <div id="maintenance-topology" class="maintenance-topology" role="region" aria-labelledby="maintenance-topology-heading">
-            <p class="muted">Topology will appear with the first status collection.</p>
-          </div>
-        </section>
         <p id="maintenance-fleet-status" class="dialog-status" role="status">Loading the most recent fleet snapshot…</p>
       </section>
       <dialog id="maintenance-device-dialog" class="clear-dialog maintenance-device-dialog" aria-labelledby="maintenance-device-dialog-title">
@@ -741,6 +740,33 @@
       </section>
       <aside class="unavailable-boundary"><div><p class="eyebrow">Execution boundary</p><h2>A3 remains disabled by default</h2></div><p>The authenticated Dashboard click can authorize only one exact digest after local arming. Chat and Voice cannot authorize reboot. The visible terminal owns any native password prompt; the separately installed A4 fixed authority may provide the reviewed zero-prompt path. The resume unit cannot update, authenticate, or reboot.</p></aside>
       </div>
+      </section>
+
+    <section id="local-topology-panel" class="tab-panel local-topology-panel" role="tabpanel" aria-labelledby="administration-tab local-topology-tab" hidden>
+      <header class="improvement-header">
+        <div><p class="eyebrow">Infrastructure evidence</p><h1>Local Topology</h1><p>Read-only network topology evidence is rendered from the maintenance fleet snapshot. Use this surface to review route paths and management visibility without any host-side authority.</p></div>
+        <div class="improvement-boundary"><strong>Read-only operation</strong><span>Evidence only · no mutations · no discovery controls</span><small>Topology is refreshed only through maintenance fleet collection with explicit actions.</small></div>
+      </header>
+      <section class="maintenance-fleet-overview" aria-labelledby="local-topology-overview-heading">
+        <div class="maintenance-fleet-toolbar">
+          <div><p class="eyebrow">Read-only topology evidence</p><h2 id="local-topology-overview-heading">Operations topology</h2><p>Collect and render network path evidence without changing any systems. Snapshots are intentionally shared with Guided Maintenance.</p></div>
+          <div class="local-topology-toolbar">
+            <button id="refresh-local-topology-fleet" class="refresh-button" type="button">Load saved topology snapshot</button>
+            <button id="collect-local-topology-fleet" class="gate-button gate-button--gold" type="button">Collect topology snapshot</button>
+          </div>
+        </div>
+        <section class="wazuh-security-summary" aria-labelledby="topology-security-heading">
+          <div><p class="eyebrow">Security relationship</p><h3 id="topology-security-heading">Wazuh monitoring plane</h3><p id="topology-wazuh-summary">Loading the most recent Wazuh health snapshot…</p></div>
+          <div class="wazuh-security-actions"><span id="topology-wazuh-state" class="maintenance-state-badge">Not loaded</span><button id="refresh-topology-wazuh" class="quiet-button" type="button">Refresh security health</button><a id="open-topology-wazuh" class="quiet-button" target="_blank" rel="noopener noreferrer" hidden>Open Wazuh</a></div>
+        </section>
+        <section class="maintenance-topology-card" aria-labelledby="local-topology-card-heading">
+          <div class="card-heading"><div><p class="eyebrow">Network path</p><h2 id="local-topology-card-heading">Operations topology</h2></div><span class="count-badge">read-only evidence</span></div>
+          <div id="local-topology" class="maintenance-topology" role="region" aria-labelledby="local-topology-card-heading">
+            <p class="muted">Topology will appear with the first saved snapshot or new collection.</p>
+          </div>
+        </section>
+        <p id="local-topology-status" class="dialog-status" role="status">Open this panel to load the most recent topology snapshot.</p>
+      </section>
     </section>
 
     <section id="backup-panel" class="tab-panel backup-panel" role="tabpanel" aria-labelledby="administration-tab backup-tab" hidden>

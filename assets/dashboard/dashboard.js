@@ -11,6 +11,7 @@ const TAB_LOCATIONS = Object.freeze({
   visual: "#visual-panel",
   mix: "#mix-panel",
   maintenance: "#maintenance-panel",
+  topology: "#local-topology-panel",
   backup: "#backup-panel"
 });
 const CORE_LABELS = Object.freeze({
@@ -40,6 +41,7 @@ state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
+state.wazuhSecurity = null;
 state.maintenanceDevicePreview = null;
 state.maintenanceDeviceFlowToken = 0;
 state.maintenanceDiscoveryCandidates = [];
@@ -542,10 +544,11 @@ function switchTab(name, { updateLocation = true } = {}) {
   const visual = name === "visual";
   const mix = name === "mix";
   const maintenance = name === "maintenance";
+  const topology = name === "topology";
   const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual || mix;
-  const administration = timeline || maintenance || backup;
+  const administration = timeline || maintenance || topology || backup;
   byId("chat-panel").hidden = !chat;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
@@ -555,6 +558,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("visual-panel").hidden = !visual;
   byId("mix-panel").hidden = !mix;
   byId("maintenance-panel").hidden = !maintenance;
+  byId("local-topology-panel").hidden = !topology;
   byId("backup-panel").hidden = !backup;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("timeline-tab").classList.toggle("is-active", timeline);
@@ -569,6 +573,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("administration-tab").classList.toggle("is-active", administration);
   byId("maintenance-tab").classList.toggle("is-active", maintenance);
   byId("backup-tab").classList.toggle("is-active", backup);
+  byId("local-topology-tab").classList.toggle("is-active", topology);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("timeline-tab").setAttribute("aria-current", timeline ? "page" : "false");
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
@@ -584,6 +589,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("mix-tab").setAttribute("aria-current", mix ? "page" : "false");
   byId("administration-tab").setAttribute("aria-selected", String(administration));
   byId("maintenance-tab").setAttribute("aria-current", maintenance ? "page" : "false");
+  byId("local-topology-tab").setAttribute("aria-current", topology ? "page" : "false");
   byId("backup-tab").setAttribute("aria-current", backup ? "page" : "false");
   setSelfImprovementMenu(false);
   setCreativeMenu(false);
@@ -598,11 +604,16 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
   if (maintenance && state.authenticated) {
     if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
+    loadWazuhSecuritySnapshot();
     loadMaintenanceDiscovery();
     loadMaintenanceReceipts();
     loadMaintenanceRebootStatus();
   }
   if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
+  if (topology && state.authenticated && !state.maintenanceFleetLoaded) {
+    loadMaintenanceFleetSnapshot({ statusId: "local-topology-status" });
+  }
+  if (topology && state.authenticated) loadWazuhSecuritySnapshot();
 }
 
 function setSelfImprovementMenu(open) {
@@ -2878,6 +2889,78 @@ function canonicalMaintenancePackageManagers(managers) {
   return [...new Set(managers.map(canonicalMaintenanceManagerLabel))];
 }
 
+function reviewedWazuhDashboardUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && !url.username && !url.password ? url.href : null;
+  } catch (_error) { return null; }
+}
+
+function wazuhDeviceAssociation(deviceId) {
+  return (state.wazuhSecurity?.devices || []).find((record) => record.device_id === deviceId) || null;
+}
+
+function renderWazuhDeviceSecurity(deviceId) {
+  const association = wazuhDeviceAssociation(deviceId); if (!association) return null;
+  const block = document.createElement("section"); block.className = "maintenance-device-security"; block.dataset.state = association.state || "unavailable";
+  const heading = document.createElement("div"); const label = document.createElement("strong"); label.textContent = "Wazuh security";
+  const badge = document.createElement("span"); badge.className = "maintenance-state-badge"; badge.textContent = {
+    monitored: "Monitored",
+    attention: "Agent attention",
+    unavailable: "Unavailable"
+  }[association.state] || "Unknown";
+  heading.append(label, badge);
+  const detail = document.createElement("p");
+  detail.textContent = `Agent ${association.agent_id || "—"} · ${String(association.agent_status || "unknown").replaceAll("_", " ")} · last seen ${association.last_seen_at || "unavailable"}`;
+  const boundary = document.createElement("small"); boundary.textContent = "Health only · alert evidence not integrated · no remediation authority";
+  block.append(heading, detail, boundary);
+  const dashboardUrl = reviewedWazuhDashboardUrl(association.dashboard_url);
+  if (dashboardUrl) {
+    const link = document.createElement("a"); link.href = dashboardUrl; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Investigate in Wazuh";
+    block.append(link);
+  }
+  return block;
+}
+
+function renderWazuhSecurity(data) {
+  state.wazuhSecurity = data;
+  const summary = data.summary || {};
+  const available = data.available === true;
+  const dashboardUrl = reviewedWazuhDashboardUrl(data.dashboard_url);
+  const copy = available
+    ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · alerts deferred to A4b`
+    : (data.reason || "Wazuh health is unavailable.");
+  ["maintenance", "topology"].forEach((surface) => {
+    const summaryElement = byId(`${surface}-wazuh-summary`); const badge = byId(`${surface}-wazuh-state`); const link = byId(`open-${surface}-wazuh`);
+    if (summaryElement) summaryElement.textContent = copy;
+    if (badge) { badge.textContent = available ? (data.state === "healthy" ? "Healthy" : "Attention") : "Unavailable"; badge.dataset.state = available ? data.state : "unavailable"; }
+    if (link) { link.hidden = !dashboardUrl; if (dashboardUrl) link.href = dashboardUrl; else link.removeAttribute("href"); }
+  });
+  if (state.maintenanceFleet) renderMaintenanceFleet(state.maintenanceFleet);
+}
+
+async function loadWazuhSecurity(operation, button = null) {
+  const original = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = "Refreshing…"; }
+  try {
+    const envelope = await callSoul(operation); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Wazuh health failed safely.");
+    renderWazuhSecurity(dataOf(envelope));
+  } catch (error) {
+    renderWazuhSecurity({ available: false, state: "unavailable", reason: error.message, devices: [], summary: {} });
+  } finally {
+    if (button) { button.disabled = false; button.textContent = original; }
+  }
+}
+
+function loadWazuhSecuritySnapshot() {
+  return loadWazuhSecurity("security.wazuh.snapshot");
+}
+
+function refreshWazuhSecurity(button) {
+  return loadWazuhSecurity("security.wazuh.status", button);
+}
+
 function renderMaintenanceDevice(device) {
   const rebootRequired = device.reboot?.required === true;
   const card = document.createElement("article"); card.className = "maintenance-device-card"; card.dataset.state = rebootRequired ? "reboot_required" : (device.status || "unknown");
@@ -2925,7 +3008,9 @@ function renderMaintenanceDevice(device) {
       const strong = document.createElement("strong"); strong.textContent = label;
       item.append(strong, document.createTextNode(` · ${value}`)); evidence.append(item);
     });
+    const security = renderWazuhDeviceSecurity(device.id);
     card.append(heading, evidence);
+    if (security) card.append(security);
     return card;
   }
 
@@ -2992,7 +3077,10 @@ function renderMaintenanceDevice(device) {
       actions.append(button);
     });
   }
-  card.append(heading, metrics, services, actions);
+  const security = renderWazuhDeviceSecurity(device.id);
+  card.append(heading, metrics, services);
+  if (security) card.append(security);
+  card.append(actions);
   return card;
 }
 
@@ -3016,8 +3104,9 @@ async function refreshMaintenanceDevice(deviceId, button) {
   }
 }
 
-function renderMaintenanceTopology(topology) {
-  const canvas = byId("maintenance-topology"); canvas.replaceChildren();
+function renderMaintenanceTopology(topology, { canvasId = "maintenance-topology" } = {}) {
+  const canvas = byId(canvasId); if (!canvas) return;
+  canvas.replaceChildren();
   const nodes = new Map((topology?.nodes || []).map((node) => [node.id, node]));
   const network = topology?.network || {};
   const makeNode = (node, markerText) => {
@@ -3126,12 +3215,13 @@ function renderMaintenanceFleet(data) {
   byId("maintenance-presence-count").textContent = String(statusDevices.length);
   if (!managedDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No integrated systems returned."; managedGrid.append(empty); }
   if (!statusDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No status-only devices returned."; statusGrid.append(empty); }
-  renderMaintenanceTopology(data.topology);
+  renderMaintenanceTopology(data.topology, { canvasId: "maintenance-topology" });
+  renderMaintenanceTopology(data.topology, { canvasId: "local-topology" });
   state.maintenanceFleetLoaded = true;
 }
 
-async function loadMaintenanceFleetSnapshot() {
-  const status = byId("maintenance-fleet-status");
+async function loadMaintenanceFleetSnapshot({ statusId = "maintenance-fleet-status" } = {}) {
+  const status = byId(statusId);
   try {
     const envelope = await callSoul("maintenance.fleet.snapshot"); lifecycle(envelope);
     const data = dataOf(envelope);
@@ -3146,8 +3236,8 @@ async function loadMaintenanceFleetSnapshot() {
   }
 }
 
-async function loadMaintenanceFleet() {
-  const button = byId("refresh-maintenance-fleet"); const status = byId("maintenance-fleet-status");
+async function loadMaintenanceFleet({ buttonId = "refresh-maintenance-fleet", statusId = "maintenance-fleet-status" } = {}) {
+  const button = byId(buttonId); const status = byId(statusId);
   button.disabled = true; status.textContent = "Collecting bounded workstation, infrastructure, appliance, package, kernel, and service evidence…";
   try {
     const signal = typeof globalThis.AbortSignal?.timeout === "function" ? globalThis.AbortSignal.timeout(120_000) : undefined;
@@ -5523,8 +5613,13 @@ byId("save-mix-title-revision").addEventListener("click", reviseMixTitle);
 byId("preview-mix-handoff").addEventListener("click", previewMixHandoff);
 byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
+byId("local-topology-tab").addEventListener("click", () => switchTab("topology"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet);
+byId("refresh-maintenance-wazuh").addEventListener("click", (event) => refreshWazuhSecurity(event.currentTarget));
+byId("collect-local-topology-fleet").addEventListener("click", () => loadMaintenanceFleet({ buttonId: "collect-local-topology-fleet", statusId: "local-topology-status" }));
+byId("refresh-local-topology-fleet").addEventListener("click", () => loadMaintenanceFleetSnapshot({ statusId: "local-topology-status" }));
+byId("refresh-topology-wazuh").addEventListener("click", (event) => refreshWazuhSecurity(event.currentTarget));
 byId("scan-maintenance-subnet").addEventListener("click", scanMaintenanceSubnet);
 byId("refresh-maintenance-registry").addEventListener("click", loadMaintenanceDiscovery);
 byId("maintenance-enrollment-mode").addEventListener("change", () => {

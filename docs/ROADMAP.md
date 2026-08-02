@@ -37,8 +37,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
   the separately reviewed community-packaged workstation agent is live and
   explicitly passive, and selective ClamAV A3 has live-qualified workstation
   and Fedora plaintext restore-staging lanes with current daily signatures.
-  Wazuh receipt/detection ingestion and later Soul integration remain
-  separately review-gated
+  A4a server-API health projection and Local Topology extraction are implemented
+  as a deterministic candidate; live least-privilege enrollment, Wazuh
+  receipt/detection ingestion, indexer alert access, and durable notification
+  delivery remain separately review-gated
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
 - [x] refine persona fidelity across supported chat models without corrupting structured tool output
 - [x] review durable event-derived Chat progress summaries; automatic stream
