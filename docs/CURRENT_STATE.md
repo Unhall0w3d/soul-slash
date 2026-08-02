@@ -165,7 +165,9 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   AUR execution. The A11 root helper can update only trusted repositories and
   Flatpak. Pending AUR updates remain visible and require a separate expiring,
   digest-bound interactive terminal with clean/diff/PKGBUILD menus and no
-  predetermined answers. The device-card UX
+  predetermined answers. The exact A11 v1 helper was installed and passed its
+  native passwordless self-check on 2026-08-02; no AUR update was pending for a
+  live interactive observation. The device-card UX
   collects and rechecks stale native evidence, retains the exact human-reviewed
   click gate, and refreshes the card from the exact terminal receipt. A2 always
   stops before reboot. Reboot is a distinct A3 transaction with its own

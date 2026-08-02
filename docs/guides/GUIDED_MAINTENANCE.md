@@ -570,8 +570,10 @@ errors stop the transaction; there is no model-driven prompt answering or
 automatic retry. A3 reboot still requires its exact pending restore journal,
 but it contains no package or Flatpak command and never repeats maintenance.
 The historical combined A2 path completed supervised live acceptance on
-2026-07-29. A11 retires its unattended AUR portion; a replacement helper must
-be reviewed and installed before new workstation live maintenance. The distinct
+2026-07-29. A11 retires its unattended AUR portion; its exact replacement
+helper was reviewed, installed, and natively self-checked on 2026-08-02. No AUR
+updates were pending, so the first organic interactive review remains an
+operational observation rather than a manufactured package test. The distinct
 A3 reboot-only path then completed supervised live
 acceptance with zero password prompts, empty package-command vectors, and no
 package replay. The uniform device-card UX remains human-reviewed at each
