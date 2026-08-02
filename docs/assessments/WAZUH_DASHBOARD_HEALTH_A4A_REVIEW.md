@@ -1,8 +1,8 @@
 # Wazuh Dashboard Health A4a Review
 
-Status: implementation candidate; deterministic local verification passed.
-Live least-privilege credential enrollment and Operator visual acceptance remain
-separate deployment gates.
+Status: live least-privilege enrollment and collection accepted; deterministic
+verification passed. Operator visual acceptance remains a separate presentation
+gate.
 
 ## Implemented evidence
 
@@ -21,6 +21,19 @@ separate deployment gates.
   persisted fleet snapshot previously rendered under Guided Maintenance.
 - Guided Maintenance cards expose separate security-health evidence and a safe
   HTTPS investigation link without changing their action authority.
+- Vigil presents a private CA-signed API certificate valid for
+  `vigil.herz.soul` and its reviewed private address; Soul trusts only the
+  installed public CA copy.
+- Dedicated API user `soul-dashboard` has one custom role containing exactly
+  `agent:read` on `agent:id:*` and `manager:read` on the manager resource. It no
+  longer carries Wazuh's broader built-in `readonly` role.
+- Live authorization verifies the manager-status and bounded agent-inventory
+  requests while a broader rules read is denied with HTTP 403.
+- Exact live mappings associate Atelier with agent `002` and Crucible with agent
+  `001`; both agents and all ten required manager daemons were active on the
+  accepted 2026-08-02 collection.
+- Expected stopped optional daemons no longer create a false manager warning,
+  and the ascending agent sort is percent-encoded for Wazuh 4.14 query parsing.
 
 ## Verification
 
@@ -38,10 +51,6 @@ topology ownership; and isolated HTTPS links.
 
 ## Open review gates
 
-- Create and inspect a dedicated whitelist-RBAC Wazuh API identity with only
-  the A4a calls.
-- Install ignored manifest/credential/CA files and collect one live snapshot.
-- Confirm exact Soul device IDs against accepted Wazuh agent IDs.
 - Review the Local Topology and maintenance-card presentation in the running
   Dashboard.
 - Design A4b indexer alert access without silently widening the current

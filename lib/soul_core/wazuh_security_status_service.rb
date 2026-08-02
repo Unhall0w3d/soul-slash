@@ -19,6 +19,18 @@ module SoulCore
     MAX_AGENTS = 256
     MAX_MAPPINGS = 64
     REQUEST_TIMEOUT_SECONDS = 8
+    REQUIRED_MANAGER_DAEMONS = %w[
+      wazuh-analysisd
+      wazuh-authd
+      wazuh-monitord
+      wazuh-execd
+      wazuh-logcollector
+      wazuh-remoted
+      wazuh-syscheckd
+      wazuh-modulesd
+      wazuh-db
+      wazuh-apid
+    ].freeze
     AGENT_ID_PATTERN = /\A\d{3,8}\z/
     DEVICE_ID_PATTERN = /\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/
 
@@ -50,7 +62,7 @@ module SoulCore
       agents = api_json(
         config,
         token,
-        "/agents?limit=#{MAX_AGENTS}&select=id,name,ip,status,lastKeepAlive,version,os.name&sort=+id"
+        "/agents?limit=#{MAX_AGENTS}&select=id,name,ip,status,lastKeepAlive,version,os.name&sort=%2Bid"
       )
       collected_at = @clock.call.iso8601
       normalized_agents = normalize_agents(agents)
@@ -260,8 +272,22 @@ module SoulCore
       record = items.is_a?(Array) ? items.first : items
       daemons = record.is_a?(Hash) ? record : {}
       normalized = daemons.first(64).to_h { |name, state| [bounded(name, 80), bounded(state, 40)] }
-      active = normalized.values.count { |state| state == "running" }
-      {"state" => normalized.empty? ? "unavailable" : (active == normalized.length ? "healthy" : "attention"), "active_daemons" => active, "daemon_count" => normalized.length, "daemons" => normalized}
+      required = REQUIRED_MANAGER_DAEMONS.to_h { |name| [name, normalized[name]] }
+      active = required.values.count { |state| state == "running" }
+      state = if normalized.empty?
+                "unavailable"
+              elsif active == REQUIRED_MANAGER_DAEMONS.length
+                "healthy"
+              else
+                "attention"
+              end
+      {
+        "state" => state,
+        "active_daemons" => active,
+        "daemon_count" => REQUIRED_MANAGER_DAEMONS.length,
+        "optional_daemons" => normalized.keys.reject { |name| REQUIRED_MANAGER_DAEMONS.include?(name) }.length,
+        "daemons" => normalized
+      }
     end
 
     def normalize_agents(payload)
