@@ -13,8 +13,8 @@ Date: 2026-08-02
 ## Candidate status
 
 ```text
-candidate_complete
-human_review_required
+accepted
+human_review_complete
 ```
 
 ## Implementation summary
@@ -74,21 +74,21 @@ Arbitrary conversational root authority added: no
 ## Human review checklist
 
 ```text
-[ ] Only configured roots are available
-[ ] Traversal, absolute paths, hidden paths, and symlinks fail closed
-[ ] Secret-bearing names and high-confidence credential content fail closed
-[ ] Directory and file reads remain bounded
-[ ] Ordinary file conversation does not invoke inspection
-[ ] Chat, Voice Presence, API, registry, invocation guide, and docs agree
-[ ] No writes, index, cache, watcher, service, or private memory were added
+[x] Only configured roots are available
+[x] Traversal, absolute paths, hidden paths, and symlinks fail closed
+[x] Secret-bearing names and high-confidence credential content fail closed
+[x] Directory and file reads remain bounded
+[x] Ordinary file conversation does not invoke inspection
+[x] Chat, Voice Presence, API, registry, invocation guide, and docs agree
+[x] No writes, index, cache, watcher, service, or private memory were added
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: approved
 Reviewer: human owner
-Date:
-Decision summary:
-Required changes:
+Date: 2026-08-02
+Decision summary: Accepted the bounded files.inspect vertical slice as presented.
+Required changes: none
 ```

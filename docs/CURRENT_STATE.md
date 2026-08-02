@@ -55,8 +55,9 @@ read one bounded UTF-8 text file beneath a root approved in local `.env`
 configuration. The portable default exposes only the project root. Absolute
 paths from conversation, traversal, hidden paths, symlinks, secret-bearing
 files, binaries, oversized reads, writes, recursive scans, indexes, caches, and
-background continuation remain unavailable. The candidate is deterministic
-and awaits human review.
+background continuation remain unavailable. The first slice was accepted by
+the Operator on 2026-08-02; each remaining cohort skill retains a separate
+implementation and human-review gate.
 
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the

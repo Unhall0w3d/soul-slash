@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Branch: `codex/fundamental-files-inspect-a1`
 
-Status: candidate-complete; human review required
+Status: human-approved; merge authorized
 
 ## Implementation
 
@@ -103,3 +103,13 @@ model output is not suitable validation for it.
 Confirm root configuration, path and secret failure behavior, ordinary-chat
 restraint, useful rendering, and the absence of mutation or persistence before
 accepting the candidate.
+
+## Human review outcome
+
+- Outcome: approved
+- Reviewer: human owner
+- Date: 2026-08-02
+- Decision: accept the bounded `files.inspect` vertical slice as presented.
+- Required changes: none
+- Scope note: the remaining Fundamental Skill Cohort A1 skills retain their own
+  implementation and human-review gates.
