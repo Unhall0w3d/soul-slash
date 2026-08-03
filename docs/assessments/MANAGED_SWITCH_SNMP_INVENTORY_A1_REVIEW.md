@@ -81,9 +81,9 @@ does not use a model for routing, interpretation, safety, or authorization.
 ## Human review checklist
 
 - [x] Loom live poll proves installed/boot firmware and interface evidence.
-- [ ] Lattice live poll proves installed firmware and interface evidence.
-- [x] Configured Loom community remains absent from argv, output, evidence,
-  logs, and Git; `.env` remains ignored and untracked.
-- [ ] Lattice and Loom cards and topology relationships are readable.
-- [ ] No Maintain/Reboot/SNMP SET authority is present.
-- [ ] Final diff, tests, and PR are approved by the Operator.
+- [x] Lattice live poll proves installed firmware and interface evidence.
+- [x] Configured Lattice and Loom communities remain absent from argv, output,
+  evidence, logs, and Git; `.env` remains ignored and untracked.
+- [x] Lattice and Loom cards and topology relationships are readable.
+- [x] No Maintain/Reboot/SNMP SET authority is present.
+- [x] Final diff, tests, and PR are approved by the Operator.

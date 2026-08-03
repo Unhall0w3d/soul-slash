@@ -334,7 +334,7 @@
       "title": "Synchronize NOC Thoughts links in YouTube descriptions",
       "area": "Publication",
       "horizon": "now",
-      "status": "needs_review",
+      "status": "validated",
       "priority": "low",
       "summary": "Replace one exact managed NOC Thoughts URL in each explicitly mapped Soul Slash Synthesis video while preserving all remaining description and snippet metadata.",
       "acceptance": "Separate metadata OAuth resolves to the expected channel; one previewed batch changes only reviewed URL bytes; private rollback evidence is retained; no upload, status, visibility, or unrelated metadata changes occur.",
@@ -585,7 +585,7 @@
       "references": "docs/soul/MANAGED_SWITCH_SNMP_INVENTORY_A1_BRIEF.md\ndocs/assessments/MANAGED_SWITCH_SNMP_INVENTORY_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
       "acceptance": "Deterministic adapter and fleet regressions pass; live polling reports the reviewed firmware and physical-interface evidence without credential leakage; the normal authenticated card and topology relationship are visually reviewed; no mutation controls or residual processes exist.",
       "source": "Operator-approved Lattice and Loom onboarding, 2026-08-03",
-      "notes": "Lattice firmware 6.3.1.47 is the reviewed target with 6.3.1.33 retained in its alternate image slot. Loom's initial live poll exposed the intermediate 1.3.5.58 image; the Operator then completed the reviewed upgrade procedure. Post-reload CLI and A1 SNMP evidence confirm software 1.4.11.5 active and selected in Image 2, bootloader 1.3.5.06, hardware V02, ten physical ports, three active ports, and zero error ports; Image 1 retains 1.3.5.58 as a fallback. Both switches target Atelier with selected SNMPv2 traps; Soul does not ingest traps in A1. Lattice credential handoff and live Dashboard acceptance remain pending."
+      "notes": "Lattice's owner-private credential handoff and post-restart fleet refresh are live-qualified: software 6.3.1.47 is current, GS724Tv4 identity is present, 26 physical interfaces are projected, four are active, and zero error ports are reported; 6.3.1.33 remains in its alternate image slot. Loom's initial live poll exposed the intermediate 1.3.5.58 image; the Operator then completed the reviewed upgrade procedure. Post-reload CLI and A1 SNMP evidence confirm software 1.4.11.5 active and selected in Image 2, bootloader 1.3.5.06, hardware V02, ten physical ports, three active ports, and zero error ports; Image 1 retains 1.3.5.58 as a fallback. Both switches target Atelier with selected SNMPv2 traps; Soul does not ingest traps in A1. The Operator accepted both authenticated cards and topology relationships on 2026-08-03. Deeper LLDP, VLAN, STP, LAG, RMON, trap, and CLI enrichment is intentionally deferred until the switches are more fully configured."
     },
     {
       "item_id": "track_winboat_windows_inventory",
