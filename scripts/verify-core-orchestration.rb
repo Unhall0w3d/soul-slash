@@ -85,6 +85,29 @@ class DevRuntimeFixture
   def crash! = (@state = "inactive")
 end
 
+class LockAwareDevRuntimeFixture
+  def initialize(root)
+    @leases = SoulCore::ModelRuntimeLeaseStore.new(root: root)
+  end
+
+  def status
+    active = @leases.active_leases
+    {
+      "ok" => true,
+      "lifecycle_state" => "complete",
+      "data" => {
+        "service" => SoulCore::DevModelRuntimeCoordinator::UNIT_NAME,
+        "service_state" => "inactive",
+        "loaded" => false,
+        "resident" => false,
+        "active_leases" => active,
+        "active_work_count" => active.length,
+        "expected_digest" => SoulCore::DevModelRuntimeCoordinator::DEFAULT_DIGEST
+      }
+    }
+  end
+end
+
 def write_profiles(root)
   path = File.join(root, "Soul/config/core-runtime.local.yaml")
   FileUtils.mkdir_p(File.dirname(path))
@@ -226,6 +249,42 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   facade_status = facade.call(request("core.status"))
   facade_preview = facade.call(request("core.activate.preview", "core_id" => "daily"))
   check.call("application contract exposes authenticated Core status and preview", facade_status["lifecycle_state"] == "complete" && facade_preview["lifecycle_state"] == "complete")
+end
+
+Dir.mktmpdir("soul-core-shared-intent-lock-") do |root|
+  file = write_profiles(root)
+  runner = CoreRunner.new("llama-server.service" => "active", "soul-model-gemma.service" => "inactive")
+  http_get = lambda do |uri|
+    case uri.path
+    when "/health" then { status: 200, body: '{"status":"ok"}' }
+    when "/slots" then { status: 200, body: '[{"is_processing":false}]' }
+    when "/metrics" then { status: 200, body: "llamacpp:requests_processing 0\nllamacpp:requests_deferred 0\n" }
+    when "/api/ps" then { status: 200, body: '{"models":[]}' }
+    else { status: 200, body: "" }
+    end
+  end
+  env = { "SOUL_MODEL_RUNTIME_CONTROL" => "1", "SOUL_MODEL_RUNTIME_PROFILES_FILE" => file,
+          "SOUL_LOCAL_OPENAI_MODEL" => "soul-local-chat" }
+  runtime = SoulCore::ModelRuntimeControlService.new(root:, env:, runner:, http_get:)
+  cores = SoulCore::CoreOrchestrationService.new(
+    root:, runtime_control: runtime, dev_runtime: LockAwareDevRuntimeFixture.new(root), env:
+  )
+
+  preview = cores.preview(core_id: "music")
+  switched = cores.execute(
+    core_id: "music", target_profile_id: preview.dig("data", "target_profile", "id"),
+    confirmation: preview.dig("data", "confirmation_phrase"),
+    expected_digest: preview.dig("data", "expected_digest")
+  )
+  repeated = cores.execute(
+    core_id: "music", target_profile_id: preview.dig("data", "target_profile", "id"),
+    confirmation: preview.dig("data", "confirmation_phrase"),
+    expected_digest: preview.dig("data", "expected_digest")
+  )
+  check.call("shared Core intent execution does not re-enter the runtime lease lock",
+             preview["ok"] && switched["ok"] && switched.dig("data", "active_core_id") == "music" &&
+               repeated["lifecycle_state"] == "awaiting_input" &&
+               repeated.dig("data", "active_core_id") == "music" && runner.mutations.empty?)
 end
 
 Dir.mktmpdir("soul-core-selection-integrity-") do |root|

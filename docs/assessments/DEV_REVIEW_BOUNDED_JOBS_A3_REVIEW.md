@@ -2,7 +2,8 @@
 
 ## Candidate status
 
-Candidate-complete; human review required before merge and production use.
+Live runtime validation complete; the Core lock-recursion repair remains a
+candidate requiring pull-request review and merge.
 
 ## Implemented
 
@@ -30,6 +31,8 @@ Candidate-complete; human review required before merge and production use.
 - `lib/soul_core/self_augmentation_dev_handoff_service.rb`
 - `assets/dashboard/dashboard.js`
 - `scripts/verify-dev-review-bounded-jobs-a3.rb`
+- `lib/soul_core/core_orchestration_service.rb`
+- `scripts/verify-core-orchestration.rb`
 - Existing focused verifier compatibility assertions, Makefile, and operator
   documentation.
 
@@ -43,6 +46,7 @@ Passed:
 - `ruby scripts/verify-self-augmentation-dev-critique-a1.rb`
 - `ruby scripts/verify-self-augmentation-dev-handoff-a2.rb`
 - `ruby scripts/verify-dev-core-skill-build.rb`
+- `ruby scripts/verify-core-orchestration.rb`
 - Ruby and JavaScript syntax checks; `git diff --check`
 
 The focused verifier covers all three operation identities, malformed subject
@@ -85,6 +89,40 @@ same running job, and completed once. The untouched worktree produced a
 blocked dossier with zero changed files; both dossier and Gate A2 reported
 `candidate must contain a committed change`.
 
+On 2026-08-03 the remaining live Core matrix was exercised through the exact
+`bin/soul-noctalia` and `bin/soul dev-worker` production gates:
+
+- Soul-Lite → Creative Core initially exposed a false `model runtime control
+  is busy` blocker. No lease or lock owner existed. Shared Core-intent
+  execution was re-reading Dev status while holding the same non-reentrant
+  model-runtime lock used by the Dev lease store.
+- The candidate repair captures bounded Dev status before entering that lock
+  and reuses the same observation only while committing the shared intent.
+  A lock-aware deterministic fixture now reproduces the production topology.
+- After repair, Creative Core activated without restarting Qwen. One exact Dev
+  Worker request returned `awaiting_input` in 0.04 seconds with the expected
+  Creative-Core blocker; GPT-OSS remained inactive and Creative Core remained
+  selected.
+- From Soul-Lite, one exact scoped request completed in 14.912 seconds with
+  `starting_core_id: amd-free`, no chat transition, and reviewed GPT-OSS digest
+  `17052f91...e376f7`. GPT-OSS stopped at terminal return, Qwen stayed active,
+  and Soul-Lite remained selected.
+- From Soul Core, one exact scoped request completed in 11.285 seconds. Its
+  receipt records `daily → amd-free`, one GPT-OSS request, and
+  `amd-free → daily`. The exact `amd-gemma` profile and
+  `soul-model-gemma.service` were active after restoration; Qwen and GPT-OSS
+  were inactive.
+- Explicit Dev Core activation pinned the reviewed GPT-OSS model. Two
+  consecutive exact requests completed in 1.971 and 2.106 seconds with
+  `starting_core_id: dev` and `selected_dev_core: true`. The service remained
+  active under the same PID `894004` and the model remained resident between
+  requests. Leaving Dev Core stopped GPT-OSS, retained Qwen, and restored the
+  initial Soul-Lite state.
+
+The model summaries were treated only as untrusted candidate output. Core,
+service, PID, placement digest, lease, and restoration evidence came from the
+deterministic orchestration receipts and independent service observations.
+
 ## Lifecycle, memory, and risk
 
 - Lifecycle: `awaiting_input` → persisted `accepted`/`running` → one retained
@@ -106,7 +144,7 @@ Core, file, gate, Git, host, memory, or follow-on authority.
 - [x] Start each Dev review action and navigate to another Dashboard page.
 - [x] Refresh during a test job and confirm current/terminal state is retained.
 - [x] Complete one real scoped GPT-OSS job and confirm prior Core restoration.
-- [ ] Confirm Creative Core blocks scoped Dev work rather than being preempted.
-- [ ] Confirm Soul Core and Soul-Lite restore their prior runtime state.
-- [ ] Confirm selected Dev Core retains GPT-OSS between two requests.
+- [x] Confirm Creative Core blocks scoped Dev work rather than being preempted.
+- [x] Confirm Soul Core and Soul-Lite restore their prior runtime state.
+- [x] Confirm selected Dev Core retains GPT-OSS between two requests.
 - [x] Confirm no review result changes evidence or approves a gate.

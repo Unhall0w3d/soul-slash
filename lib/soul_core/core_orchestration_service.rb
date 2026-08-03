@@ -121,9 +121,10 @@ module SoulCore
 
     private
 
-    def project(observation)
-      cores = configured_cores(observation)
-      current = current_core(observation, cores: cores)
+    def project(observation, dev: nil)
+      dev ||= dev_runtime_data
+      cores = configured_cores(observation, dev: dev)
+      current = current_core(observation, cores: cores, dev: dev)
       selected = cores.find { |core| core.fetch("selected") }
       observation.merge(
         "cores" => cores,
@@ -133,12 +134,12 @@ module SoulCore
         "selected_core_label" => selected&.fetch("label", nil),
         "core_mode" => current&.fetch("id", nil) || "unloaded",
         "music_lane" => music_lane(current),
-        "development_lane" => development_lane(current),
+        "development_lane" => development_lane(current, status: dev),
         "automatic_core_switch" => false
       )
     end
 
-    def configured_cores(observation)
+    def configured_cores(observation, dev: nil)
       profiles = observation.fetch("profiles")
       selection = read_selection(profiles: profiles)
       preferences = selection.fetch("profiles")
@@ -163,7 +164,7 @@ module SoulCore
         )
       end
       reserve = cores.find { |core| core.fetch("id") == "amd-free" }
-      dev = dev_runtime_data
+      dev ||= dev_runtime_data
       cores + VIRTUAL_CORE_DEFINITIONS.map do |definition|
         target = definition.fetch("id") == "dev" ? reserve&.fetch("target_profile", nil) : nil
         definition.merge(
@@ -188,8 +189,8 @@ module SoulCore
         (observation.fetch("active_profile_count").zero? ? observation.fetch("can_load_profile", false) : observation.fetch("can_switch", false))
     end
 
-    def current_core(observation, cores: nil)
-      configured = cores || configured_cores(observation)
+    def current_core(observation, cores: nil, dev: nil)
+      configured = cores || configured_cores(observation, dev: dev)
       profile_id = observation["active_profile_id"]
       preferred = read_selection(profiles: observation.fetch("profiles"))["active_core_id"]
       if preferred == "free" && observation.fetch("active_profile_count").zero?
@@ -217,9 +218,9 @@ module SoulCore
       selected
     end
 
-    def core_for_id(observation, core_id)
-      cores = configured_cores(observation)
-      current_core(observation, cores: cores)
+    def core_for_id(observation, core_id, dev: nil)
+      cores = configured_cores(observation, dev: dev)
+      current_core(observation, cores: cores, dev: dev)
       cores.find { |core| core.fetch("id") == core_id.to_s }
     end
 
@@ -258,14 +259,18 @@ module SoulCore
     end
 
     def execute_shared_intent_transition(core_id:, target_profile_id:, confirmation:, expected_digest:)
+      # Capture Dev status before entering the model-runtime control lock. Dev
+      # status reads the shared lease store, so refreshing it while that same
+      # non-reentrant lock is held would falsely report runtime control busy.
+      dev = dev_runtime_data
       @runtime_control.with_controlled_observation do |before|
-        core = core_for_id(before, core_id)
+        core = core_for_id(before, core_id, dev: dev)
         return awaiting("known configured core_id is required") unless core
         target = before.fetch("profiles").find { |profile| profile.fetch("id") == target_profile_id }
         return blocked("Core target changed; preview again") unless target && core.dig("target_profile", "id") == target.fetch("id")
 
-        source = current_core(before)
-        return awaiting("requested Core is already active", data: project(before)) if source&.fetch("id", nil) == core.fetch("id")
+        source = current_core(before, dev: dev)
+        return awaiting("requested Core is already active", data: project(before, dev: dev)) if source&.fetch("id", nil) == core.fetch("id")
         return blocked("shared chat profile cannot represent this Core transition") unless shared_intent_pair?(source&.fetch("id", nil), core.fetch("id"))
 
         blocker = shared_intent_blocker(before, target)
@@ -280,7 +285,7 @@ module SoulCore
         preferences[source.fetch("id")] = target.fetch("id")
         preferences[core.fetch("id")] = target.fetch("id")
         write_selection({ "active_core_id" => core.fetch("id"), "profiles" => preferences }, profiles: before.fetch("profiles"))
-        success(project(before).merge(
+        success(project(before, dev: dev).merge(
           "core_action" => "activate",
           "activated_core_id" => core.fetch("id"),
           "service_mutation_required" => false,
@@ -603,8 +608,8 @@ module SoulCore
       end
     end
 
-    def development_lane(current)
-      status = dev_runtime_data
+    def development_lane(current, status: nil)
+      status ||= dev_runtime_data
       {
         "engine" => "GPT-OSS 20B MXFP4",
         "accelerator" => "AMD Vulkan",
