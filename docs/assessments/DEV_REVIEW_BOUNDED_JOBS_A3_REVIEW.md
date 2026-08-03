@@ -1,9 +1,10 @@
 # Dev Review Bounded Jobs A3 Review
 
-## Candidate status
+## Accepted status
 
-Live runtime validation complete; the Core lock-recursion repair remains a
-candidate requiring pull-request review and merge.
+Live runtime validation is complete. The Operator accepted the slice and the
+Core lock-recursion repair merged through PR #130 on 2026-08-03. The Dashboard
+service was restarted on the merged revision and returned active.
 
 ## Implemented
 
@@ -96,7 +97,7 @@ On 2026-08-03 the remaining live Core matrix was exercised through the exact
   is busy` blocker. No lease or lock owner existed. Shared Core-intent
   execution was re-reading Dev status while holding the same non-reentrant
   model-runtime lock used by the Dev lease store.
-- The candidate repair captures bounded Dev status before entering that lock
+- The merged repair captures bounded Dev status before entering that lock
   and reuses the same observation only while committing the shared intent.
   A lock-aware deterministic fixture now reproduces the production topology.
 - After repair, Creative Core activated without restarting Qwen. One exact Dev
