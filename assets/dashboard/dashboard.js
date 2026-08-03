@@ -44,6 +44,7 @@ state.maintenanceFleetLoaded = false;
 state.wazuhSecurity = null;
 state.wazuhAlerts = null;
 state.wazuhNotifications = null;
+state.wazuhPosture = null;
 state.maintenanceDevicePreview = null;
 state.maintenanceDeviceFlowToken = 0;
 state.maintenanceDiscoveryCandidates = [];
@@ -2906,6 +2907,11 @@ function wazuhAlertsForAgent(agentId) {
   return (state.wazuhAlerts?.alerts || []).filter((alert) => alert.agent_id === agentId);
 }
 
+function wazuhPostureForAgent(agentId) {
+  const posture = state.wazuhPosture;
+  return posture?.available === true && posture.raw_wazuh_result?.agent_id === agentId ? posture : null;
+}
+
 function renderWazuhDeviceSecurity(deviceId) {
   const association = wazuhDeviceAssociation(deviceId); if (!association) return null;
   const block = document.createElement("section"); block.className = "maintenance-device-security"; block.dataset.state = association.state || "unavailable";
@@ -2928,6 +2934,29 @@ function renderWazuhDeviceSecurity(deviceId) {
     block.append(heading, detail, alertDetail);
   } else {
     block.append(heading, detail);
+  }
+  const posture = wazuhPostureForAgent(association.agent_id);
+  if (posture) {
+    const raw = posture.raw_wazuh_result || {};
+    const review = posture.adapted_review || {};
+    const postureDetails = document.createElement("details"); postureDetails.className = "maintenance-security-posture";
+    const postureSummary = document.createElement("summary"); postureSummary.textContent = `Raw Wazuh CIS ${raw.score ?? "—"}% · adapted review ${review.version || "unversioned"}`;
+    const rawCopy = document.createElement("p"); rawCopy.className = "maintenance-security-posture-raw";
+    rawCopy.textContent = `${raw.passed ?? 0} passed · ${raw.failed ?? 0} failed · ${raw.not_applicable ?? 0} N/A · ${raw.total_checks ?? 0} total · scanned ${raw.scanned_at || "unavailable"}`;
+    const classificationList = document.createElement("div"); classificationList.className = "maintenance-security-posture-groups";
+    const labels = {
+      verified_effective_control: "Verified effective",
+      accepted_workstation_exception: "Accepted exception",
+      policy_or_parser_limitation: "Policy/parser limitation",
+      genuine_remaining_decision: "Remaining decision"
+    };
+    (review.classifications || []).forEach((group) => {
+      const item = document.createElement("p"); item.dataset.classification = group.classification;
+      const strong = document.createElement("strong"); strong.textContent = `${labels[group.classification] || group.classification} · ${group.count ?? 0}`;
+      item.append(strong, document.createTextNode(` — ${group.summary || "No review summary recorded."}`)); classificationList.append(item);
+    });
+    const postureBoundary = document.createElement("small"); postureBoundary.textContent = review.boundary || "Interpretation only; the raw Wazuh score remains unchanged and authoritative.";
+    postureDetails.append(postureSummary, rawCopy, classificationList, postureBoundary); block.append(postureDetails);
   }
   const boundary = document.createElement("small"); boundary.textContent = "Read-only normalized evidence · no acknowledgement, suppression, or remediation authority";
   block.append(boundary);
@@ -2956,6 +2985,12 @@ function renderWazuhNotificationStatus(data) {
   updateWazuhSummary();
 }
 
+function renderWazuhPosture(data) {
+  state.wazuhPosture = data;
+  updateWazuhSummary();
+  if (state.maintenanceFleet) renderMaintenanceFleet(state.maintenanceFleet);
+}
+
 function updateWazuhSummary() {
   const data = state.wazuhSecurity || {};
   const summary = data.summary || {};
@@ -2971,10 +3006,16 @@ function updateWazuhSummary() {
   const notificationCopy = notification.initialized
     ? `voice ${receipt.voice_enabled === true ? "enabled" : "disabled"} · ${notification.pending_alerts ?? 0} pending`
     : "voice cursor not initialized";
+  const posture = state.wazuhPosture || {};
+  const rawPosture = posture.raw_wazuh_result || {};
+  const adaptedReview = posture.adapted_review || {};
+  const postureCopy = posture.available === true
+    ? `raw CIS ${rawPosture.score ?? "—"}% (${rawPosture.passed ?? 0} pass / ${rawPosture.failed ?? 0} fail / ${rawPosture.not_applicable ?? 0} N/A) · adapted ${adaptedReview.reviewed_failure_count ?? 0}/${rawPosture.failed ?? 0} classified · ${adaptedReview.genuine_remaining_decision_count ?? 0} decisions`
+    : (posture.reason || "adapted posture unavailable");
   const copy = available
-    ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · ${alertCopy} · ${notificationCopy}`
+    ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · ${alertCopy} · ${notificationCopy} · ${postureCopy}`
     : (data.reason || "Wazuh health is unavailable.");
-  const securityState = available && alertData.available === true && alertData.state === "attention" ? "attention" : data.state;
+  const securityState = available && ((alertData.available === true && alertData.state === "attention") || posture.state === "attention") ? "attention" : data.state;
   ["maintenance", "topology"].forEach((surface) => {
     const summaryElement = byId(`${surface}-wazuh-summary`); const badge = byId(`${surface}-wazuh-state`); const link = byId(`open-${surface}-wazuh`);
     if (summaryElement) summaryElement.textContent = copy;
@@ -3002,6 +3043,15 @@ async function loadWazuhNotificationStatus() {
   }
 }
 
+async function loadWazuhPosture(operation) {
+  try {
+    const envelope = await callSoul(operation); lifecycle(envelope);
+    renderWazuhPosture(dataOf(envelope));
+  } catch (error) {
+    renderWazuhPosture({ available: false, state: "unavailable", reason: error.message });
+  }
+}
+
 async function loadWazuhSecurity(operation, button = null) {
   const original = button?.textContent;
   if (button) { button.disabled = true; button.textContent = "Refreshing…"; }
@@ -3011,6 +3061,7 @@ async function loadWazuhSecurity(operation, button = null) {
     renderWazuhSecurity(dataOf(envelope));
     await loadWazuhAlerts(operation === "security.wazuh.status" ? "security.wazuh.alerts.status" : "security.wazuh.alerts.snapshot");
     await loadWazuhNotificationStatus();
+    await loadWazuhPosture(operation === "security.wazuh.status" ? "security.wazuh.posture.status" : "security.wazuh.posture.snapshot");
   } catch (error) {
     renderWazuhSecurity({ available: false, state: "unavailable", reason: error.message, devices: [], summary: {} });
   } finally {
