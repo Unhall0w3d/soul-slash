@@ -39,6 +39,7 @@ require_relative "maintenance_fleet_status_service"
 require_relative "wazuh_security_status_service"
 require_relative "wazuh_alert_evidence_service"
 require_relative "wazuh_alert_notification_service"
+require_relative "wazuh_compliance_posture_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
 require_relative "maintenance_rehearsal_service"
@@ -105,6 +106,7 @@ module SoulCore
       wazuh_security_status_service: nil,
       wazuh_alert_evidence_service: nil,
       wazuh_alert_notification_service: nil,
+      wazuh_compliance_posture_service: nil,
       maintenance_fleet_discovery_service: nil,
       maintenance_device_control_service: nil,
       maintenance_rehearsal_service: nil,
@@ -168,6 +170,7 @@ module SoulCore
       @wazuh_security_status_service = wazuh_security_status_service
       @wazuh_alert_evidence_service = wazuh_alert_evidence_service
       @wazuh_alert_notification_service = wazuh_alert_notification_service
+      @wazuh_compliance_posture_service = wazuh_compliance_posture_service
       @maintenance_fleet_discovery_service = maintenance_fleet_discovery_service
       @maintenance_device_control_service = maintenance_device_control_service
       @maintenance_rehearsal_service = maintenance_rehearsal_service
@@ -400,6 +403,8 @@ module SoulCore
       when "security.wazuh.alerts.status" then domain(wazuh_alert_evidence.collect)
       when "security.wazuh.alerts.snapshot" then domain(wazuh_alert_evidence.snapshot)
       when "security.wazuh.notifications.status" then domain(wazuh_alert_notifications.status)
+      when "security.wazuh.posture.status" then domain(wazuh_compliance_posture.status)
+      when "security.wazuh.posture.snapshot" then domain(wazuh_compliance_posture.snapshot)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
       when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
@@ -957,6 +962,14 @@ module SoulCore
         clock: @clock,
         process_env: @process_env,
         alert_service: wazuh_alert_evidence
+      )
+    end
+
+    def wazuh_compliance_posture
+      @wazuh_compliance_posture_service ||= WazuhCompliancePostureService.new(
+        root: @root,
+        clock: @clock,
+        process_env: @process_env
       )
     end
 

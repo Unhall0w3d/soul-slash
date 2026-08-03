@@ -25,6 +25,9 @@ check.call("Wazuh health is projected without moving remediation authority",
              js.include?('callSoul(operation)') && js.include?('"security.wazuh.snapshot"') && js.include?('"security.wazuh.status"') &&
              js.include?("Read-only normalized evidence · no acknowledgement, suppression, or remediation authority") &&
              js.include?("security.wazuh.alerts.snapshot") && js.include?("security.wazuh.alerts.status"))
+check.call("adapted compliance remains beside the unaltered Wazuh result",
+           js.include?("security.wazuh.posture.snapshot") && js.include?("security.wazuh.posture.status") &&
+             js.include?("raw CIS") && js.include?("raw Wazuh score remains unchanged and authoritative"))
 check.call("Wazuh investigations open only as isolated HTTPS links",
            html.scan('rel="noopener noreferrer"').length >= 2 && js.include?('url.protocol === "https:"'))
 

@@ -35,6 +35,7 @@ on-access scanner. Official signatures update once daily through the packaged
 5. Soul A4a — least-privilege server-API health on Maintenance cards and Local Topology.
 6. Soul A4b — bounded read-only indexer alert evidence through a restricted tunnel.
 7. Soul A4c — durable high-priority cursor and optional static voice notification.
+8. Soul A4d — owner-reviewed workstation interpretation beside the unchanged raw Wazuh SCA result.
 
 Each stage has a separate review. Installing the central platform does not
 authorize agent enrollment, scanning, quarantine, or remediation.
@@ -137,3 +138,9 @@ A Wazuh alert is evidence requiring investigation, not proof that malware or an
 intrusion occurred. A clean ClamAV scan is not proof that a file is safe. Soul
 may summarize provenance and uncertainty, but the Operator remains the security
 decision-maker.
+
+An adapted workstation posture is likewise an interpretation, not a replacement
+benchmark. A4d keeps Wazuh's raw score and counts visible, classifies every raw
+failure exactly once, and never computes an adjusted compliance percentage. See
+the [A4d contract](../soul/WAZUH_ADAPTED_POSTURE_A4D_BRIEF.md) and
+[A4d review](../assessments/WAZUH_ADAPTED_POSTURE_A4D_REVIEW.md).
