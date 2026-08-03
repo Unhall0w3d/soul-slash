@@ -16,9 +16,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] Self Augmentation isolated experiment and external integration-review lane
 - [x] Music Studio generation, vocal evidence, revision, reference, review, export, trim, and job continuity
 - [x] Visual Studio still generation, guided edit, short generated motion, review, revision, deletion, and Music binding
-- [~] review Mix Studio immutable stereo-source sequencing, portable editor
-  handoff, bounded A1 listening render, and A2 review-bound accepted-audio
-  export; Operator listening and later visual sequencing remain open
+- [x] Mix Studio immutable stereo-source sequencing, portable editor handoff,
+  bounded A1 listening render, and A2 review-bound accepted-audio export are
+  live-accepted; visual sequencing remains a separate future scope
 - [x] static or repeated-motion full-song visual companions and exact local YouTube upload packages
 - [~] review exact-channel NOC Thoughts description-link synchronization; live OAuth and one reviewed batch remain open
 - [x] read-only Chat awareness of exact Music/Visual Studio briefs and existing visual candidates
@@ -52,17 +52,17 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
 - [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
 - [x] reconcile remaining implementation-phase labels and stale active UI/documentation language
-- [~] review A2 bounded source-attributed local project and document search
-  with balanced adapters and matched Qwen/Gemma behavioral evidence
+- [x] A2 bounded source-attributed local project and document search with
+  balanced adapters and matched Qwen/Gemma behavioral evidence
 - [x] consolidate setup guidance for current Gemma/Qwen/ACE-Step/FLUX/Wan production profiles
-- [~] review the accepted local encrypted backup, staged restore, and 30-day
+- [x] accepted local encrypted backup, staged restore, and 30-day
   deletion-aware retention ledger; all 32 required classes, the final
   strict-additive ledger, matching receipt, and accepted Crucible replica are
   verified
-- [~] review the metadata-only Storage & Retention A2 artifact census and
-  backup-coverage contract; the current snapshot verifies 32/32 required
-  classes with no source or exclusion gaps; A3 adds a separately review-gated
-  exact executor for only three accepted disposable/age-review categories
+- [x] metadata-only Storage & Retention A2 artifact census and backup-coverage
+  contract verify 32/32 required classes with no source or exclusion gaps; A3
+  adds an accepted, separately gated exact executor for only three approved
+  disposable/age-review categories
 - [x] qualify guided maintenance: A1 rehearsal, A2/A2B foreground execution,
   and A3 conditional reboot plus one-shot Hyprland restoration are accepted on
   the workstation; live gates remain disabled by default
@@ -80,24 +80,26 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
-- [~] review A0 assembly of finished variable-duration songs into an immutable
-  timeline with trim, crossfade, transition, cues, and editor handoff; visual
-  loop sequencing and final mix rendering remain open
-- [~] review the A0 foreground authenticated YouTube upload candidate; private
-  remains the default and publication remains human-controlled
+- [x] A0/A1/A2 assembly of finished variable-duration songs into an immutable
+  timeline with trim, crossfade, transition, cues, editor handoff, listening
+  render, human review, and exact accepted-audio export; visual loop sequencing
+  remains separate
+- [x] foreground authenticated YouTube upload path; one supervised private
+  upload is accepted, private remains the default, and publication remains
+  human-controlled
 - [x] bounded voice input and speech output through the same conversation and skill core, including visible wake-word presence and natural follow-up
 - [x] image/screen understanding with declared privacy and capability boundaries
   - [x] A0 local runtime, model, capture-tool, and privacy readiness assessment
   - [x] A1 bounded picture attachment and understanding
   - [x] A2 explicit one-shot monitor, window, or region capture
   - [x] A3 voice-mediated perception requests
-- [~] project-aware and local-document lexical search A2 candidate passes the
+- [x] project-aware and local-document lexical search A2 is accepted after
   matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
   remain separately qualified
 - [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
-- [~] review the bounded cleanup A3 candidate for allowlisted old temporary
-  residue, old regular project logs, and failed partial Music quarantine only;
-  broader lifecycle-owned or capacity-bounded cleanup remains unavailable
+- [x] bounded cleanup A3 is accepted for allowlisted old temporary residue, old
+  regular project logs, and failed partial Music quarantine only; broader
+  lifecycle-owned or capacity-bounded cleanup remains unavailable
 - [x] live-qualified Nightly DRS A2/A3 reuses the supervised A1 transaction
   through a host-encrypted credential and hardened no-restart user oneshot;
   the fixed 3:00 AM timer reports exact local and Crucible lineage with no
@@ -105,9 +107,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Separate deployment tracks
 
-- [~] backup and disaster-recovery local foundation, Crucible's encrypted
+- [x] backup and disaster-recovery local foundation, Crucible's encrypted
   second copy, supervised DRS, and the live-qualified nightly credential/timer
   are accepted; remote retention and full isolated recovery rehearsal remain
+  separate future scopes
 - [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
 - [ ] Internet exposure only after a dedicated threat model and deployment review
 

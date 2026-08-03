@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Branch: `codex/fundamental-repository-inspect-a1`
 
-Status: candidate-complete; human review required
+Status: human-approved; merge authorized
 
 ## Implementation
 
@@ -114,7 +114,7 @@ shared application cancellation path remains available. Mutation is always
 
 ## Human review
 
-Review repository authority, fixed argv, extension-point suppression, result
-bounds, privacy behavior, conversational restraint, and the absence of
-mutation, networking, persistence, retries, or background work. Passing tests
-does not authorize merge or production acceptance.
+The Operator approved this candidate on 2026-08-02 after reviewing repository
+authority, fixed argv, extension-point suppression, result bounds, privacy
+behavior, conversational restraint, and the absence of mutation, networking,
+persistence, retries, or background work.

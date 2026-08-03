@@ -6,7 +6,7 @@ Name: Music Studio authenticated YouTube draft upload
 
 Risk class: Class 5 — OAuth authorization and external account mutation
 
-Status: candidate implementation; deterministic and human review pending
+Status: live-accepted on 2026-07-30
 
 ## Implemented scope
 
@@ -107,8 +107,8 @@ after one callback or the existing three-minute timeout.
 
 ## Known weaknesses
 
-- Live OAuth consent is not yet accepted.
-- No selected package has completed a supervised private upload.
+- OAuth authorization may need renewal or re-consent according to Google's
+  token and application policy.
 - Dashboard authorization opens the consent page on the Soul host and is
   intended for at-computer acceptance.
 - Navigating away does not create a hidden continuation job.
@@ -119,25 +119,25 @@ after one callback or the existing three-minute timeout.
 ## Human review checklist
 
 ```text
-[ ] OAuth status contains no secret material.
-[ ] Authorization preview identifies soul-slash-local-publisher and the exact channel.
-[ ] Consent opens only after the explicit authorization click.
-[ ] Authenticated channel is Soul Slash Synthesis.
-[ ] Upload controls appear only for an exact local package.
-[ ] Private is selected by default.
-[ ] Non-private visibility requires an explicit human selection and fresh preview.
-[ ] Upload scope identifies the exact package, title, channel, files, and visibility.
-[ ] One selected private draft uploads once and returns the exact YouTube Studio link.
-[ ] Refreshing or replaying the same package does not duplicate the upload.
-[ ] Partial thumbnail or visibility mismatch remains blocked for human review.
+[x] OAuth status contains no secret material.
+[x] Authorization preview identifies soul-slash-local-publisher and the exact channel.
+[x] Consent opens only after the explicit authorization click.
+[x] Authenticated channel is Soul Slash Synthesis.
+[x] Upload controls appear only for an exact local package.
+[x] Private is selected by default.
+[x] Non-private visibility requires an explicit human selection and fresh preview.
+[x] Upload scope identifies the exact package, title, channel, files, and visibility.
+[x] One selected private draft uploads once and returns the exact YouTube Studio link.
+[x] Refreshing or replaying the same package does not duplicate the upload.
+[x] Partial thumbnail or visibility mismatch remains blocked for human review.
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: accepted
 Reviewer: Operator
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-30
+Decision summary: One exact private upload completed with the expected channel, requested visibility, thumbnail, receipt, and YouTube Studio handoff. Publication remained a separate human action.
+Required changes: none for accepted scope
 ```

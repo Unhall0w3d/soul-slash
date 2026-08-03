@@ -7,8 +7,8 @@ Name: UI and Documentation Reconciliation A1
 Risk class: low
 Branch: codex/ui-documentation-reconciliation-a1
 Date: 2026-07-29
-Status: candidate_complete
-Lifecycle: blocked_for_human_review
+Status: accepted and merged through PR #84; approval recorded in PR #85
+Lifecycle: complete
 ```
 
 ## Implementation summary
@@ -38,7 +38,8 @@ The bounded audit and correction pass:
 
 Historical briefs and assessments, exact A1/A2/A3/A4 authority names, private
 state, and the ambiguous legacy single-service model tuple were intentionally
-left unchanged.
+left unchanged during implementation. The later acceptance reconciliation
+updates only stale status language whose human gate has since completed.
 
 ## Files changed
 

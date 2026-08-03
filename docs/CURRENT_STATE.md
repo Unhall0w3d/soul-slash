@@ -55,31 +55,31 @@ read one bounded UTF-8 text file beneath a root approved in local `.env`
 configuration. The portable default exposes only the project root. Absolute
 paths from conversation, traversal, hidden paths, symlinks, secret-bearing
 files, binaries, oversized reads, writes, recursive scans, indexes, caches, and
-background continuation remain unavailable. The first slice was accepted by
-the Operator on 2026-08-02; each remaining cohort skill retains a separate
-implementation and human-review gate.
+background continuation remain unavailable. The Operator accepted this slice
+on 2026-08-02.
 
-The second cohort candidate, `network.diagnose`, is a bounded foreground network
+The second accepted cohort skill, `network.diagnose`, is a bounded foreground network
 evidence surface. It may inspect local IP addresses and Linux routes, resolve
 one target, send one fixed one-packet reachability probe, or attempt one
 zero-payload TCP connection. It rejects scans, ranges, URLs, multiple targets,
-retries, monitoring, and mutation; human review remains pending.
+retries, monitoring, and mutation. The Operator accepted this slice on
+2026-08-02.
 
-The third cohort candidate, `repository.inspect`, exposes one configured local
+The third accepted cohort skill, `repository.inspect`, exposes one configured local
 Git repository through bounded branch, HEAD, status, recent-log, staged-diff,
 and working-tree-diff evidence. It uses fixed read-only Git commands with time
 and output ceilings, excludes secret-shaped paths, withholds credential-like
 diff content, and cannot mutate or contact a remote. The Operator accepted this
 slice on 2026-08-02.
 
-The fourth cohort candidate, `workspace.artifact.compose`, gives the mature
+The fourth accepted cohort skill, `workspace.artifact.compose`, gives the mature
 Phase 11C/11D artifact workflow a modern public skill identity without adding a
 second writer or approval path. Explicit Chat or Voice deliverables draft one
 bounded local-provider preview; an expiring digest-bound token gates exclusive
 verified creation, canonical attachment, revision lineage, and shared-workspace
 delivery. The Operator accepted this slice on 2026-08-02.
 
-The fifth and final cohort candidate, `web.research`, packages Soul's existing
+The fifth and final accepted cohort skill, `web.research`, packages Soul's existing
 bounded SearXNG/Brave research service, direct CLI, and Chat/Voice evidence path
 without adding another HTTP client or application operation. Provider queries,
 public-source SSRF defenses, provenance, foreground ceilings, grounded artifact
@@ -181,7 +181,7 @@ implementation. See `docs/guides/DEV_WORKER.md`.
 - The read-only motion qualification ledger compares retained duration, frame,
   delivery, elapsed-time, and human-review evidence without automatically
   declaring any profile aesthetically qualified.
-- A reviewed still or short generated-motion candidate can become a music companion with framing, matte, fades, repetition where needed, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. The owner-authorized upload A0 candidate adds a foreground Desktop OAuth flow, exact channel verification, digest-bound upload preview, resumable upload, reviewed thumbnail application, and private local receipt. Private is the default; nothing uploads automatically, and Soul never changes visibility after upload. Live upload acceptance remains open. A separate owner-authorized Description Sync A0 candidate can preview and replace only the exact NOC Thoughts URL block in explicitly mapped existing videos while preserving their remaining descriptions and snippet metadata; live metadata authorization and execution remain open.
+- A reviewed still or short generated-motion candidate can become a music companion with framing, matte, fades, repetition where needed, and full-song audio muxing. A kept/exported song with a final visual can produce an editable exact local YouTube upload package. The accepted owner-authorized upload path adds a foreground Desktop OAuth flow, exact channel verification, digest-bound upload preview, resumable upload, reviewed thumbnail application, and private local receipt. One supervised private upload completed on 2026-07-30; private remains the default, nothing uploads automatically, and Soul never changes visibility after upload. A separate owner-authorized Description Sync A0 candidate can preview and replace only the exact NOC Thoughts URL block in explicitly mapped existing videos while preserving their remaining descriptions and snippet metadata; live metadata authorization and execution remain open.
 
 Historical procedural camera movement is retired. The current generated-motion
 lanes are explicit, short, review-gated candidates: image-guided Wan output is a
@@ -320,15 +320,15 @@ snapshot, canonical retention ledger, owner-private receipt, and accepted
 Crucible replica agree; all 32 required artifact classes are verified with no
 coverage or exclusion gaps.
 
-Bounded Storage Cleanup A3 is implemented as a candidate, review-gated
+Bounded Storage Cleanup A3 is accepted as a review-gated
 foreground executor for only three
 accepted categories: allowlisted temporary review residue older than 24 hours,
 regular project logs older than 30 days, and failed partial Music quarantine
 trees older than 24 hours with no active Music lease. Preview binds a
 metadata-only recursive identity; execute revalidates exact scope, stages in
 the same parent, verifies inode identity, and removes only the reviewed trees.
-Protected data and every other artifact class remain non-executable. Candidate
-evidence does not grant production approval. No automatic cleanup or manifest
+Protected data and every other artifact class remain non-executable. Preview
+evidence does not grant deletion authority. No automatic cleanup or manifest
 mutation exists.
 
 Local Project and Document Search unifies bounded lexical retrieval across

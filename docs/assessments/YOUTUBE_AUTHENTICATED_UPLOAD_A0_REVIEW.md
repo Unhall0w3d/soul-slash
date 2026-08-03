@@ -11,14 +11,16 @@ Branch/checkpoint: `codex/youtube-private-draft-upload`
 
 Date: 2026-07-27
 
-## Candidate status
+## Accepted status
 
 ```text
-candidate_complete
+live_accepted
 ```
 
-Live OAuth consent and one deliberately selected private upload remain human
-acceptance gates. No live upload was performed during implementation.
+The implementation candidate preserved these gates. On 2026-07-30 the
+Operator completed live OAuth consent and one deliberately selected private
+upload through the Dashboard A1 surface; see
+`docs/soul/YOUTUBE_OAUTH_CLIENT_DISCOVERY_A1_REVIEW.md`.
 
 ## Implementation summary
 
@@ -173,8 +175,8 @@ operation returns, as specifically authorized by the brief.
 ## Known weaknesses
 
 ```text
-- Live OAuth consent has not yet been accepted through Google.
-- No real package has been uploaded; live acceptance must deliberately select one.
+- OAuth authorization may need renewal or re-consent according to Google's
+  token and application policy.
 - Google may force the API project's uploads to private until an API audit.
 - OAuth consent in Testing mode can expire after seven days.
 - A0 is CLI-only and does not expose status or upload gates in Music Studio.
@@ -188,26 +190,26 @@ operation returns, as specifically authorized by the brief.
 ## Human review checklist
 
 ```text
-[ ] Matches approved brief
-[ ] No unapproved scope expansion
-[ ] No unapproved persistence/background behavior
-[ ] Risk class is correct
-[ ] Memory behavior is appropriate
-[ ] Confirmation gates are intact
-[ ] Deterministic tests are meaningful
-[ ] Local LLM evals are behavioral only
-[ ] Failure behavior is predictable
-[ ] Logs/reflection are useful
-[ ] Live OAuth channel identity is correct
-[ ] One selected private upload is acceptable
+[x] Matches approved brief
+[x] No unapproved scope expansion
+[x] No unapproved persistence/background behavior
+[x] Risk class is correct
+[x] Memory behavior is appropriate
+[x] Confirmation gates are intact
+[x] Deterministic tests are meaningful
+[x] Local LLM evals are behavioral only
+[x] Failure behavior is predictable
+[x] Logs/reflection are useful
+[x] Live OAuth channel identity is correct
+[x] One selected private upload is acceptable
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
-Reviewer: owner
-Date:
-Decision summary:
-Required changes:
+Outcome: accepted
+Reviewer: Operator
+Date: 2026-07-30
+Decision summary: Exact-channel OAuth and one exact private upload completed through the bounded Dashboard path; later publication remained human-controlled.
+Required changes: none for accepted scope
 ```
