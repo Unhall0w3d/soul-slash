@@ -6,11 +6,10 @@ Music Studio now exposes the same OAuth, exact preview, and upload gates after
 an upload package exists. It does not run at startup, on a schedule, or
 automatically after package export.
 
-The commands below are merged and executable. Authenticated upload has a
-Dashboard A1 candidate; description synchronization remains an A0 CLI
-candidate. Live acceptance is still open. Command or Dashboard availability
-and deterministic tests do not count as live acceptance; every remote mutation
-retains its exact foreground preview and human gate.
+The commands below are merged and executable. Authenticated upload through the
+Dashboard is live-accepted after one supervised private upload on 2026-07-30;
+description synchronization remains a separately reviewed A0 CLI candidate.
+Every remote mutation retains its exact foreground preview and human gate.
 
 ## Boundaries
 

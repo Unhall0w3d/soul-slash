@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Branch: `codex/fundamental-artifact-compose-a1`
 
-Status: candidate-complete; human review required
+Status: human-approved; merge authorized
 
 ## Implementation
 
@@ -95,12 +95,12 @@ not a resident process.
 
 `write_local_state`, Class 2 non-destructive local creation. Preview is
 non-mutating; execution is single-use, expiring, digest-bound, scope-bound,
-exclusive, verified, and non-overwriting. Human review is still required.
+exclusive, verified, and non-overwriting.
 
 ## Human review
 
-Review the single-writer mapping, preview and token scope, local-provider
-restriction, creation verification, revision privacy and lineage, Chat/Voice
-restraint, recovery semantics, and absence of cloud, memory, retry,
-persistence, or background behavior. Passing tests does not authorize merge or
-production acceptance.
+The Operator approved this candidate on 2026-08-02 after reviewing the
+single-writer mapping, preview and token scope, local-provider restriction,
+creation verification, revision privacy and lineage, Chat/Voice restraint,
+recovery semantics, and absence of cloud, memory, retry, persistence, or
+background behavior.

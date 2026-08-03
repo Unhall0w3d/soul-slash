@@ -1,6 +1,6 @@
 # Storage, Retention, and Backup Census A2 Review
 
-Status: candidate-complete; human review required
+Status: accepted and merged through PR #76 on 2026-07-29
 
 ## What was implemented
 

@@ -10,9 +10,9 @@ Branch/checkpoint: `codex/bounded-storage-cleanup-a3`
 
 Date: 2026-07-29
 
-## Candidate status
+## Accepted status
 
-`candidate_complete`
+`accepted; merged through PR #79 on 2026-07-29`
 
 ## Implementation summary
 
@@ -172,26 +172,26 @@ Backup or Restic mutation added: no
 ## Human review checklist
 
 ```text
-[ ] Storage refresh remains read-only
-[ ] Only the three approved categories appear
-[ ] Empty preview exposes no destructive button
-[ ] Non-empty preview lists every exact path and identity digest
-[ ] Protected projects, candidates, exports, memory, Vault, and backups never appear
-[ ] Destructive button is separate from preview and supplies one exact authorization
-[ ] Changed scope requires a fresh preview
-[ ] Active Music work blocks partial-quarantine cleanup
-[ ] Success refreshes the point-in-time census
-[ ] Owner-only receipt contains no raw path
-[ ] No automatic cleanup or persistence behavior exists
-[ ] Merge readiness is approved independently from tests
+[x] Storage refresh remains read-only
+[x] Only the three approved categories appear
+[x] Empty preview exposes no destructive button
+[x] Non-empty preview lists every exact path and identity digest
+[x] Protected projects, candidates, exports, memory, Vault, and backups never appear
+[x] Destructive button is separate from preview and supplies one exact authorization
+[x] Changed scope requires a fresh preview
+[x] Active Music work blocks partial-quarantine cleanup
+[x] Success refreshes the point-in-time census
+[x] Owner-only receipt contains no raw path
+[x] No automatic cleanup or persistence behavior exists
+[x] Merge readiness is approved independently from tests
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
+Outcome: accepted
 Reviewer: Operator
-Date:
-Decision summary:
-Required changes:
+Date: 2026-07-29
+Decision summary: The bounded three-category cleanup contract and empty-state presentation were accepted; a naturally eligible real deletion is not required for contract acceptance.
+Required changes: none for accepted scope
 ```

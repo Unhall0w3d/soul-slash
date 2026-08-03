@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Branch: `codex/fundamental-network-diagnose-a1`
 
-Status: candidate-complete; human review required
+Status: human-approved; merge authorized
 
 ## Implementation
 
@@ -97,6 +97,7 @@ localhost resolution: complete
 
 ## Human review
 
-Confirm command construction, target and port rejection, point-in-time wording,
-privacy expectations, zero-payload TCP behavior, ordinary-chat restraint, and
-the absence of scanning, mutation, persistence, retries, or background work.
+The Operator approved this candidate on 2026-08-02 after reviewing command
+construction, target and port rejection, point-in-time wording, privacy
+expectations, zero-payload TCP behavior, ordinary-chat restraint, and the
+absence of scanning, mutation, persistence, retries, or background work.
