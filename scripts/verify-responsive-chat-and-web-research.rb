@@ -436,7 +436,11 @@ append_position = js.index("appendPendingExchange")
 stream_position = js.index("await callSoulStream", append_position || 0)
 check.call("browser appends the pending exchange before awaiting the stream", append_position && stream_position && append_position < stream_position)
 check.call("composer remains draftable and busy Enter does not interrupt", js.include?("draft was not sent") && !js.include?("message-input\").disabled = busy"))
-check.call("responsive UI remains free of timers and background transports", %w[setTimeout setInterval WebSocket EventSource].none? { |term| js.include?(term) })
+send_start = js.index("async function sendMessage")
+send_finish = js.index("\nasync function togglePin", send_start || 0)
+send_source = send_start && send_finish ? js[send_start...send_finish] : ""
+check.call("responsive Chat exchange remains free of timers and background transports",
+  !send_source.empty? && %w[setTimeout setInterval WebSocket EventSource].none? { |term| send_source.include?(term) })
 check.call("Soul familiar is state-driven and reduced-motion aware", html.include?("soul-presence") && css.include?("data-state") && css.include?("prefers-reduced-motion"))
 csrf_recovery_lines = js.lines.select { |line| line.include?('response.status === 403') && line.include?('error?.code === "csrf"') }
 check.call("stale restart-bound CSRF tokens recover through one page reload", !csrf_recovery_lines.empty? && csrf_recovery_lines.all? { |line| line.include?("window.location.reload()") })

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research Web"
+  short_description: "Run bounded source-backed public research"
+  default_prompt: "Use $research-web to research a current public topic through Soul’s bounded source-backed workflow."

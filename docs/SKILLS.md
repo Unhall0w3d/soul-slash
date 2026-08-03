@@ -211,7 +211,9 @@ web.research
 `web.lookup` performs one narrow DuckDuckGo Instant Answer request. It is useful
 for definitions and known entities, not source comparison. `web.research`
 queries the explicitly configured SearXNG JSON endpoint and retrieves selected
-public HTTPS sources with timestamps and content digests.
+public HTTPS sources with timestamps and content digests. Its modern package
+documents the shared Chat/Voice, CLI, evidence, artifact-handoff, and memory
+boundaries in `docs/skills/WEB_RESEARCH.md`.
 
 ```bash
 ruby Soul/skills/web/lookup.rb --query "What is Ruby?"
