@@ -62,10 +62,13 @@ does not use a model for routing, interpretation, safety, or authorization.
 - Error counters are cumulative observations, not proof of a current fault.
 - Expected firmware is operator-reviewed configuration, not a vendor lookup.
 - Trap delivery is configured on both switches but is not ingested by Soul.
-- Loom's live ENTITY-MIB evidence on 2026-08-03 reports software `1.3.5.58`,
-  boot `1.3.5.06`, hardware `V02`, ten physical ports, and three active ports.
-  This correctly fails the reviewed `1.4.11.5` comparison and requires an
-  Operator check of the final image selection; A1 does not change it.
+- Loom's first live ENTITY-MIB evidence on 2026-08-03 exposed the intermediate
+  `1.3.5.58` software image. The Operator subsequently completed and verified
+  the bounded firmware procedure: software `1.4.11.5` is active and selected
+  in Image 2, bootloader `1.3.5.06` remains installed, and Image 1 retains
+  `1.3.5.58` as a fallback. A post-reload A1 poll reports hardware `V02`, ten
+  physical ports, three active ports, and zero ports with cumulative errors.
+  The A1 integration remains read-only and did not perform the upgrade.
 
 ## Memory, lifecycle, and risk
 
