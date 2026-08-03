@@ -459,3 +459,45 @@ body.core-locked .app-header,body.core-locked main { filter:blur(7px) saturate(.
   .mix-sequence-fields { grid-template-columns:1fr; }
   .mix-boundary { border-left:0; }
 }
+.maintenance-port-inventory {
+  flex-basis: 100%;
+  border: 1px solid color-mix(in srgb, var(--cyan) 30%, transparent);
+  border-radius: 0.7rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.maintenance-port-inventory summary {
+  color: var(--cyan);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.maintenance-port-list {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  margin-top: 0.65rem;
+}
+
+.maintenance-port-list span {
+  border-left: 2px solid color-mix(in srgb, var(--cyan) 65%, transparent);
+  color: var(--copy);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  padding-left: 0.5rem;
+}
+
+.maintenance-port-list span[data-state="unavailable"] {
+  border-left-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  opacity: 0.68;
+}
+
+.maintenance-management-link {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  text-decoration: none;
+}
