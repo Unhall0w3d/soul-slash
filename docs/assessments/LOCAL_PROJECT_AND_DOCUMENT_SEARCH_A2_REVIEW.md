@@ -1,6 +1,6 @@
 # Local Project and Document Search A2 Review
 
-Status: candidate-complete; human review required
+Status: accepted and merged through PR #28 on 2026-07-27
 
 ## Implementation
 
@@ -157,13 +157,14 @@ regression coverage before the final 15/15 rerun.
 
 ## Human review checklist
 
-- [ ] Search all reviewed sources for a phrase shared by documentation and a
+- [x] Search all reviewed sources for a phrase shared by documentation and a
   Studio project; confirm each contributing source remains represented.
-- [ ] Search Music and Visual separately through the new Chat phrases.
-- [ ] Ask a natural follow-up comparing the numbered results.
-- [ ] Confirm a retrieved excerpt cannot authorize a mutation.
-- [ ] Confirm unrelated Studio requests still use their existing routes.
-- [ ] Confirm the Qwen deterministic fallback is useful enough when synthesis
+- [x] Search Music and Visual separately through the new Chat phrases.
+- [x] Ask a natural follow-up comparing the numbered results.
+- [x] Confirm a retrieved excerpt cannot authorize a mutation.
+- [x] Confirm unrelated Studio requests still use their existing routes.
+- [x] Confirm the Qwen deterministic fallback is useful enough when synthesis
   fails.
-- [ ] Confirm no evaluation chat appears in the Dashboard conversation list.
-- [ ] Approve or reject the candidate; passing tests do not merge it.
+- [x] Confirm no evaluation chat appears in the Dashboard conversation list.
+- [x] Operator accepted the candidate; broader roots and vector retrieval
+  remain separate work.
