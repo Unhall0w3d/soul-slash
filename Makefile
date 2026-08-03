@@ -1071,7 +1071,7 @@ crucible-maintenance-authority-install:
 verify-maintenance-device-control:
 > @ruby scripts/verify-maintenance-device-control-c1.rb
 
-.PHONY: verify-conversation-maintenance-workflow verify-operator-capability-catalog verify-skill-studio-conversation verify-fundamental-files-inspect verify-fundamental-network-diagnose verify-fundamental-repository-inspect verify-fundamental-workspace-artifact-compose verify-invocation-catalog
+.PHONY: verify-conversation-maintenance-workflow verify-operator-capability-catalog verify-skill-studio-conversation verify-fundamental-files-inspect verify-fundamental-network-diagnose verify-fundamental-repository-inspect verify-fundamental-workspace-artifact-compose verify-fundamental-web-research verify-invocation-catalog
 
 verify-conversation-maintenance-workflow:
 > @ruby scripts/verify-conversation-maintenance-workflow-a1.rb
@@ -1096,6 +1096,9 @@ verify-fundamental-repository-inspect:
 
 verify-fundamental-workspace-artifact-compose:
 > @ruby scripts/verify-fundamental-workspace-artifact-compose-a1.rb
+
+verify-fundamental-web-research:
+> @ruby scripts/verify-fundamental-web-research-a1.rb
 
 verify-maintenance-fleet-discovery:
 > @ruby scripts/verify-maintenance-fleet-discovery-a1.rb

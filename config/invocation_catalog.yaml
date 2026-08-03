@@ -32,12 +32,12 @@ entries:
     category: Knowledge
     summary: Search configured public sources in one bounded foreground research pass.
     skill_ids: [web.research]
-    required_inputs: [Research question or objective]
-    optional_inputs: [Desired deliverable, topics, or source constraints]
-    core: Daily Core for model synthesis; retrieval can fail independently.
+    required_inputs: [Explicit research question or objective, One configured SearXNG or Brave search provider]
+    optional_inputs: [Desired deliverable and one supported artifacts/ target, Up to three topics, Source constraints]
+    core: Retrieval is deterministic and foreground; Daily Core provides source-grounded synthesis when available.
     approval: No approval for public read-only research.
-    output: Source-backed findings that can inform a response, proposal, script, or artifact.
-    boundary: Sources remain untrusted evidence and research never authorizes an action.
+    output: Provenance-bound source evidence and cited findings that can inform a response or enter the existing approval-gated artifact preview.
+    boundary: Public HTTPS sources remain untrusted evidence; no private or authenticated fetch, arbitrary URL operation, memory promotion, action authority, retry loop, or background continuation.
     examples:
       - Research current Bash practices for this script and summarize the useful constraints.
   - id: knowledge-vault

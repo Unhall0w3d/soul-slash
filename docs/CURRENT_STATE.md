@@ -77,7 +77,14 @@ Phase 11C/11D artifact workflow a modern public skill identity without adding a
 second writer or approval path. Explicit Chat or Voice deliverables draft one
 bounded local-provider preview; an expiring digest-bound token gates exclusive
 verified creation, canonical attachment, revision lineage, and shared-workspace
-delivery. Human review remains pending.
+delivery. The Operator accepted this slice on 2026-08-02.
+
+The fifth and final cohort candidate, `web.research`, packages Soul's existing
+bounded SearXNG/Brave research service, direct CLI, and Chat/Voice evidence path
+without adding another HTTP client or application operation. Provider queries,
+public-source SSRF defenses, provenance, foreground ceilings, grounded artifact
+handoff, and separate reflection and memory gates remain intact. Human review
+remains pending.
 
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the

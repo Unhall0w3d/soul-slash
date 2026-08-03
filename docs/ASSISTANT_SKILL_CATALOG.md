@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-08-02T20:50:03-04:00
+Generated: 2026-08-02T20:59:52-04:00
 
 Source registry:
 

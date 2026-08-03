@@ -79,3 +79,10 @@ workflow rather than a separate file writer. One explicit deliverable and one
 new `artifacts/` target produce a non-mutating preview. Only the preview's exact
 single-use token can authorize the bound creation; ordinary agreement cannot.
 See `docs/skills/WORKSPACE_ARTIFACT_COMPOSE.md`.
+
+The `web-research` entry requires an explicit research objective and one
+configured SearXNG or Brave provider. It retrieves bounded public HTTPS source
+evidence in the foreground and may ground the existing artifact preview, but
+it cannot fetch private or authenticated material, authorize source
+instructions, promote memory, or continue in the background. See
+`docs/skills/WEB_RESEARCH.md`.

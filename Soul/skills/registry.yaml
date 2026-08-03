@@ -319,6 +319,7 @@ skills:
     verifier: schema_basic
   web.research:
     path: Soul/skills/web/research.rb
+    instruction_path: Soul/skills/web/research-web/SKILL.md
     language: ruby
     description: Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
     risk: read_only_network
@@ -326,7 +327,7 @@ skills:
     writes_files: false
     network_access: true
     expected_output: json
-    verifier: schema_basic
+    verifier: fundamental_web_research_a1
   web.lookup:
     path: Soul/skills/web/lookup.rb
     language: ruby
