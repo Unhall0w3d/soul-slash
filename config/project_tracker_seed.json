@@ -571,6 +571,23 @@
       "notes": "Implemented in commits 2ea121c and 0c63647, with Crucible D1 live-accepted. Supervised receipts: Forge maintenance device_receipt_9192a74a3625e208; Pi-hole maintenance device_receipt_713c515392cb4f19; Pi-hole reboot device_receipt_f6b016c37f4ba527; Forge reboot device_receipt_1eb39ab94fb81dde; Crucible maintenance device_receipt_de12d9416cc87d61; Crucible reboot device_receipt_aea88b989d8df1ba. The private dashboard environment keeps remote live execution enabled, but every action still requires a fresh digest and exact device-specific confirmation. Crucible returned on kernel 7.1.5 with zero updates and passed SSH/QEMU guest agent, DNF5, backup-mount, and authority readiness. A10 repaired A9's live systemd-sandbox incompatibility; deterministic and exact-sandbox verification pass, while normal-card visual acceptance remains pending. Workstation conditional reboot and Hyprland restoration remain tracked separately."
     },
     {
+      "item_id": "track_managed_switch_snmp_inventory",
+      "title": "Lattice and Loom managed-switch read-only inventory",
+      "area": "Administration + Infrastructure",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Add the Netgear GS724Tv4 and Cisco SG300-10 access switches as credential-safe, inventory-only fleet evidence without granting switch mutation authority.",
+      "implementation": "A1 adds one shared default-off fixed-target Net-SNMP adapter for Lattice and Loom. Unique source-restricted read-only communities remain in ignored owner-private configuration, pass through mode-0600 ephemeral Net-SNMP files rather than argv, and are removed after each bounded foreground poll. SNMPv2-MIB, IF-MIB, and bounded ENTITY-MIB evidence projects identity, uptime, firmware, available chassis/boot details, and at most 64 physical interfaces with link, speed, traffic-octet, and cumulative-error counters. Guided Maintenance presents firmware comparison, compact interface summaries, an expandable port view, and credential-free private management links. Operations Topology labels each relationship read-only SNMP inventory. SNMP SET, firmware mutation, reboot, configuration export, and trap ingestion are absent.",
+      "technologies": "Ruby bounded command runner; Net-SNMP snmpget and snmpbulkwalk; SNMPv2-MIB, RFC1213/IF-MIB, and ENTITY-MIB; IPAddr; owner-private environment configuration; vanilla Dashboard JavaScript and CSS.",
+      "interfaces": "Administration → Guided Maintenance → Integrated inventory; Lattice and Loom per-device Refresh; Operations Topology read-only SNMP relationships; private HTTP management links; stdin-only credential installers; deterministic Make target.",
+      "commands": "make verify-managed-switch-snmp-inventory\nmake verify-maintenance-fleet-status\nmake lattice-snmp-check\nmake loom-snmp-check",
+      "references": "docs/soul/MANAGED_SWITCH_SNMP_INVENTORY_A1_BRIEF.md\ndocs/assessments/MANAGED_SWITCH_SNMP_INVENTORY_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
+      "acceptance": "Deterministic adapter and fleet regressions pass; live polling reports the reviewed firmware and physical-interface evidence without credential leakage; the normal authenticated card and topology relationship are visually reviewed; no mutation controls or residual processes exist.",
+      "source": "Operator-approved Lattice and Loom onboarding, 2026-08-03",
+      "notes": "Lattice firmware 6.3.1.47 is the reviewed target with 6.3.1.33 retained in its alternate image slot. Loom's initial live poll exposed the intermediate 1.3.5.58 image; the Operator then completed the reviewed upgrade procedure. Post-reload CLI and A1 SNMP evidence confirm software 1.4.11.5 active and selected in Image 2, bootloader 1.3.5.06, hardware V02, ten physical ports, three active ports, and zero error ports; Image 1 retains 1.3.5.58 as a fallback. Both switches target Atelier with selected SNMPv2 traps; Soul does not ingest traps in A1. Lattice credential handoff and live Dashboard acceptance remain pending."
+    },
+    {
       "item_id": "track_winboat_windows_inventory",
       "title": "Host-local WinBoat Windows fleet identity",
       "area": "Administration + Infrastructure",

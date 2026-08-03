@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+exec(File.join(__dir__, "soul-managed-switch-snmp-check"), "loom")

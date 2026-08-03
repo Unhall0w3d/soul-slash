@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+root = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(root, "lib"))
+
+require "json"
+require "soul_core/bounded_command_runner"
+require "soul_core/env_loader"
+require "soul_core/managed_switch_snmp_inventory_adapter"
+
+device_id = ARGV.fetch(0, "")
+abort("Usage: scripts/soul-managed-switch-snmp-check lattice|loom") unless %w[lattice loom].include?(device_id)
+prefix = "SOUL_FLEET_#{device_id.upcase}"
+
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+adapter = SoulCore::ManagedSwitchSnmpInventoryAdapter.new(runner: SoulCore::BoundedCommandRunner.new)
+result = adapter.collect(
+  address: ENV.fetch("#{prefix}_ADDRESS", ""),
+  community: ENV.fetch("#{prefix}_SNMP_COMMUNITY", "")
+)
+puts JSON.generate(
+  "available" => result["available"] == true,
+  "state" => result["state"],
+  "system_name" => result["system_name"],
+  "vendor" => result["vendor"],
+  "model" => result["model"],
+  "product_id" => result["product_id"],
+  "firmware_version" => result["firmware_version"],
+  "boot_version" => result["boot_version"],
+  "hardware_version" => result["hardware_version"],
+  "port_count" => result["port_count"],
+  "active_port_count" => result["active_port_count"],
+  "error_port_count" => result["error_port_count"]
+)
+exit(result["available"] ? 0 : 1)

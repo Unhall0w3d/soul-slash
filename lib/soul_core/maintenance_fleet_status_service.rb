@@ -10,6 +10,7 @@ require "time"
 
 require_relative "bounded_command_runner"
 require_relative "apple_mobile_inventory_adapter"
+require_relative "managed_switch_snmp_inventory_adapter"
 require_relative "winboat_inventory_adapter"
 
 module SoulCore
@@ -59,6 +60,7 @@ module SoulCore
       ruby_path: RbConfig.ruby,
       recovery_scheduler: nil,
       apple_mobile_inventory_adapter: nil,
+      managed_switch_snmp_inventory_adapter: nil,
       winboat_inventory_adapter: nil
     )
       @runner = runner
@@ -75,6 +77,7 @@ module SoulCore
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
       @apple_mobile_inventory_adapter = apple_mobile_inventory_adapter || AppleMobileInventoryAdapter.new(runner: @runner)
+      @managed_switch_snmp_inventory_adapter = managed_switch_snmp_inventory_adapter || ManagedSwitchSnmpInventoryAdapter.new(runner: @runner)
       @winboat_inventory_adapter = winboat_inventory_adapter || WinboatInventoryAdapter.new(runner: @runner)
       @addresses = {
         WORKSTATION_ID => configured_display_value(
@@ -112,6 +115,8 @@ module SoulCore
       ]
       devices << collect_cisco_phone if cisco_phone_enabled?
       devices << collect_chancery if chancery_enabled?
+      devices << collect_managed_switch("lattice") if managed_switch_enabled?("lattice")
+      devices << collect_managed_switch("loom") if managed_switch_enabled?("loom")
       existing_addresses = devices.map { |device| device.fetch("address") }
       registry_records.each do |record|
         devices << collect_enrolled_device(record) unless existing_addresses.include?(record.fetch("address"))
@@ -254,6 +259,11 @@ module SoulCore
         raise "Chancery WinBoat inventory is no longer configured" unless chancery_enabled?
 
         collect_chancery
+      when "lattice", "loom"
+        device_id = canonical_device_id(existing["id"])
+        raise "#{device_id.capitalize} SNMP inventory is no longer configured" unless managed_switch_enabled?(device_id)
+
+        collect_managed_switch(device_id)
       else
         record = registry_records.find { |candidate| candidate["id"] == existing["id"] }
         return collect_enrolled_device(record, schedule_recovery: schedule_recovery) if record
@@ -664,6 +674,76 @@ module SoulCore
         facts: facts,
         control: "inventory_only",
         status: inventory["healthy"] ? "healthy" : "attention"
+      )
+    end
+
+    def collect_managed_switch(device_id)
+      profile = managed_switch_profile(device_id)
+      prefix = "SOUL_FLEET_#{device_id.upcase}"
+      address = @process_env.fetch("#{prefix}_ADDRESS", "").to_s.strip
+      label = configured_display_address("#{prefix}_LABEL", profile.fetch("label"))
+      expected_firmware = @process_env.fetch("#{prefix}_EXPECTED_FIRMWARE", "").to_s.strip
+      web_url = @process_env.fetch("#{prefix}_WEB_URL", "").to_s.strip
+      inventory = @managed_switch_snmp_inventory_adapter.collect(
+        address: address,
+        community: @process_env.fetch("#{prefix}_SNMP_COMMUNITY", "")
+      )
+      role = "#{profile.fetch("role")} · read-only SNMP"
+      facts = {
+        "platform" => "managed_switch",
+        "management_channel" => "snmp_v2c_read_only",
+        "status_adapter" => "managed_switch_snmp_read_only",
+        "control_capability" => "inventory_only",
+        "mutation_supported" => false,
+        "snmp_set_authority" => false,
+        "management_url" => safe_private_management_url(web_url, address),
+        "expected_firmware" => safe_text(expected_firmware),
+        "firmware_status" => firmware_status(inventory["firmware_version"], expected_firmware),
+        "system_name" => inventory["system_name"],
+        "vendor" => inventory["vendor"],
+        "object_id" => inventory["object_id"],
+        "product_id" => inventory["product_id"],
+        "boot_version" => inventory["boot_version"],
+        "hardware_version" => inventory["hardware_version"],
+        "uptime_seconds" => inventory["uptime_seconds"],
+        "port_count" => inventory["port_count"],
+        "active_port_count" => inventory["active_port_count"],
+        "error_port_count" => inventory["error_port_count"],
+        "ports" => Array(inventory["ports"]).first(64)
+      }
+      @evidence << {
+        "adapter" => "#{device_id}.managed_switch_snmp_read_only",
+        "status" => inventory["state"],
+        "bounded" => true,
+        "mutation_authority" => false,
+        "credential_exposed" => false
+      }
+      unless inventory["available"]
+        unavailable = SoulCore::BoundedCommandRunner::Result.new(
+          stdout: "", stderr: inventory["reason"].to_s, exit_status: nil,
+          status: inventory["probe_status"] || "unavailable", truncated: false
+        )
+        return offline_device(device_id, label, role, address, unavailable, control: "inventory_only", facts: facts)
+      end
+
+      firmware_attention = facts["firmware_status"] == "mismatch"
+      device(
+        id: device_id,
+        label: label,
+        role: role,
+        address: address,
+        reachable: true,
+        os: inventory["model"],
+        version: inventory["firmware_version"],
+        kernel: {"running" => "appliance-managed", "available" => "vendor-reviewed", "update_required" => firmware_attention},
+        updates: update_summary(freshness: "firmware_inventory"),
+        reboot: {"required" => false, "reason" => "not assessed · inventory only"},
+        services: [
+          {"id" => "snmp_inventory", "label" => "SNMP read-only inventory", "state" => "active"}
+        ],
+        facts: facts,
+        control: "inventory_only",
+        status: firmware_attention ? "attention" : "healthy"
       )
     end
 
@@ -1442,6 +1522,7 @@ module SoulCore
         channel = case device.dig("facts", "management_channel")
                   when "ssh_inventory" then "fixed SSH inventory"
                   when "host_local_inventory" then "host-local inventory"
+                  when "snmp_v2c_read_only" then "read-only SNMP inventory"
                   else "bounded status probe"
                   end
         edges << {"from" => WORKSTATION_ID, "to" => device.fetch("id"), "label" => channel, "kind" => "inventory"}
@@ -1594,6 +1675,38 @@ module SoulCore
 
     def chancery_enabled?
       %w[1 true yes on].include?(@process_env["SOUL_FLEET_CHANCERY_ENABLED"].to_s.strip.downcase)
+    end
+
+    def managed_switch_enabled?(device_id)
+      %w[1 true yes on].include?(@process_env["SOUL_FLEET_#{device_id.upcase}_ENABLED"].to_s.strip.downcase)
+    end
+
+    def managed_switch_profile(device_id)
+      {
+        "lattice" => {"label" => "Lattice", "role" => "Netgear GS724Tv4 managed access switch"},
+        "loom" => {"label" => "Loom", "role" => "Cisco SG300-10 managed access switch"}
+      }.fetch(device_id)
+    end
+
+    def firmware_status(installed, expected)
+      return "not_assessed" if expected.to_s.empty? || installed.to_s.empty? || installed == "unavailable"
+
+      installed == expected ? "current" : "mismatch"
+    end
+
+    def safe_private_management_url(configured, address)
+      candidate = configured.empty? ? "http://#{address}" : configured
+      match = candidate.match(%r{\Ahttp://([^/:]+)(?::(\d+))?/?\z})
+      return "" unless match
+
+      host = match[1]
+      private_host = begin
+        parsed = IPAddr.new(host)
+        parsed.ipv4? && parsed.private?
+      rescue IPAddr::InvalidAddressError
+        host.match?(/\A[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}\z/)
+      end
+      private_host ? candidate : ""
     end
 
     def registry_records

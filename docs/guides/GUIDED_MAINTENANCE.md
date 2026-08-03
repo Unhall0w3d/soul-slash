@@ -80,6 +80,37 @@ small evidence row retains checked time, status-probe state, and network
 reachability. Firmware, WAN health, client inventory, and vendor-cloud state
 remain unasserted unless a separately reviewed adapter provides that evidence.
 
+### Optional managed-switch inventory
+
+The managed-switch A1 adapter adds the explicitly configured Netgear GS724Tv4
+**Lattice** and Cisco SG300-10 **Loom** as read-only integrated inventory. Each
+uses its own owner-private, source-restricted SNMPv2c community to collect
+system identity, uptime, installed firmware, available ENTITY-MIB chassis and
+boot evidence, and a bounded IF-MIB projection of physical link state, speed,
+traffic octets, and cumulative error counters. Each card compares installed
+firmware with one operator-reviewed expected version and links to its
+credential-free private HTTP management page.
+
+The community never reaches the browser, command arguments, evidence, or Git.
+It is supplied over stdin to the owner-private installer and consumed through a
+short-lived mode-0600 Net-SNMP configuration:
+
+```bash
+wl-paste --no-newline | scripts/soul-configure-lattice-snmp \
+  <private-ipv4> <reviewed-firmware> http://<private-management-name>
+make verify-managed-switch-snmp-inventory
+make lattice-snmp-check
+
+wl-paste --no-newline | scripts/soul-configure-loom-snmp \
+  <private-ipv4> <reviewed-firmware> http://<private-management-name>
+make verify-managed-switch-snmp-inventory
+make loom-snmp-check
+```
+
+Both switches remain inventory-only: no SNMP SET, firmware upload, reboot, or
+configuration control exists. Traps may be configured on the switches, but
+Soul A1 has no trap listener and labels both cards as polling-only.
+
 The card surface is split by actual integration depth. **Integrated inventory**
 contains rich managed or inventory-only cards, including supported host-local
 adapters. **Status only** contains

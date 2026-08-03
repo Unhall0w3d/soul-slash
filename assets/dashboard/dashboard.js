@@ -3133,14 +3133,24 @@ function renderMaintenanceDevice(device) {
   const metrics = document.createElement("dl"); metrics.className = "maintenance-device-metrics";
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
   const readOnlyStatus = inventoryOnly && ["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter);
+  const snmpSwitch = device.facts?.status_adapter === "managed_switch_snmp_read_only";
   const facts = [
     ...(device.facts?.fqdn ? [["Identity", device.facts.fqdn]] : []),
+    ...(snmpSwitch && device.facts?.system_name ? [["SNMP identity", device.facts.system_name]] : []),
     ["Platform", device.os || "unavailable"],
     ["Maintenance adapter", device.facts?.maintenance_adapter ? String(device.facts.maintenance_adapter).replaceAll("_", " ") : (inventoryOnly ? "not authorized" : "fixed platform adapter")],
     ["Version", device.version || "unavailable"],
     ["Updates", formatMaintenanceUpdates(device, inventoryOnly, readOnlyStatus)],
     ["Kernel", inventoryOnly && !readOnlyStatus ? `${device.kernel?.running || "not queried"} · inventory only` : `${device.kernel?.running || "unavailable"}${device.kernel?.update_required ? ` → ${device.kernel?.available || "newer available"}` : " · current"}`],
     ["Reboot", inventoryOnly ? (device.reboot?.reason || "not assessed · inventory only") : (device.reboot?.required ? (device.reboot?.reason || "required") : "not indicated")],
+    ...(snmpSwitch ? [
+      ["Firmware review", device.facts?.firmware_status === "current" ? `${device.version} · matches reviewed target` : (device.facts?.expected_firmware ? `${device.version} · expected ${device.facts.expected_firmware}` : `${device.version} · no reviewed target`)],
+      ...(device.facts?.boot_version ? [["Boot firmware", device.facts.boot_version]] : []),
+      ...(device.facts?.hardware_version ? [["Hardware revision", device.facts.hardware_version]] : []),
+      ["Physical ports", `${device.facts?.active_port_count || 0} active · ${device.facts?.port_count || 0} inventoried`],
+      ["Interface counters", `${device.facts?.error_port_count || 0} ports report cumulative errors`],
+      ["Event path", "bounded polling · traps not ingested"]
+    ] : []),
     ["Checked", observedLabel]
   ];
   facts.forEach(([label, value]) => {
@@ -3168,6 +3178,18 @@ function renderMaintenanceDevice(device) {
       chip.textContent = `${String(guest.type || "guest").toUpperCase()} ${guest.id} · ${guest.name || "unnamed"} · ${guest.status || "unknown"}`; services.append(chip);
     });
   }
+  if (snmpSwitch && Array.isArray(device.facts?.ports)) {
+    const portDetails = document.createElement("details"); portDetails.className = "maintenance-port-inventory";
+    const portSummary = document.createElement("summary"); portSummary.textContent = "Physical interface inventory"; portDetails.append(portSummary);
+    const portList = document.createElement("div"); portList.className = "maintenance-port-list";
+    device.facts.ports.forEach((port) => {
+      const chip = document.createElement("span"); chip.dataset.state = port.oper_status === "up" ? "active" : "unavailable";
+      const errors = Number(port.in_errors || 0) + Number(port.out_errors || 0);
+      chip.textContent = `${port.name || `port ${port.index}`} · ${port.oper_status || "unknown"} · ${port.speed_mbps || 0} Mbps${errors ? ` · ${errors} errors` : ""}`;
+      portList.append(chip);
+    });
+    portDetails.append(portList); services.append(portDetails);
+  }
   const actions = document.createElement("div"); actions.className = "maintenance-device-actions";
   const refresh = document.createElement("button"); refresh.type = "button"; refresh.className = "gate-button maintenance-device-refresh";
   refresh.textContent = "Refresh";
@@ -3183,6 +3205,11 @@ function renderMaintenanceDevice(device) {
           ? "Host-local inventory only · no guest mutation or LAN authority"
           : "Inventory only · discovered capabilities grant no mutation authority"));
     actions.append(notice);
+    if (snmpSwitch && device.facts?.management_url) {
+      const management = document.createElement("a"); management.className = "quiet-button maintenance-management-link";
+      management.href = device.facts.management_url; management.target = "_blank"; management.rel = "noopener noreferrer";
+      management.textContent = "Open switch management"; actions.append(management);
+    }
   } else {
     const controlDeviceId = device.facts?.control_target_id || device.id;
     ["maintenance", "reboot"].forEach((action) => {

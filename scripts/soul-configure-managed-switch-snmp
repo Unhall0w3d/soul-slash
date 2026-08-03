@@ -1,0 +1,84 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "ipaddr"
+
+ROOT = File.expand_path("..", __dir__)
+ENV_PATH = File.join(ROOT, ".env")
+DEVICES = {"lattice" => "Lattice", "loom" => "Loom"}.freeze
+
+def fail_safely(message)
+  warn message
+  exit 1
+end
+
+device_id, address, expected_firmware, web_url = ARGV
+unless ARGV.length == 4 && DEVICES.key?(device_id)
+  fail_safely("Usage: scripts/soul-configure-managed-switch-snmp lattice|loom PRIVATE_IPV4 EXPECTED_FIRMWARE|- HTTP_MANAGEMENT_URL < community")
+end
+label = DEVICES.fetch(device_id)
+prefix = "SOUL_FLEET_#{device_id.upcase}"
+
+begin
+  parsed = IPAddr.new(address)
+  fail_safely("#{label} address must be one exact private IPv4 address") unless parsed.ipv4? && parsed.private?
+rescue IPAddr::InvalidAddressError
+  fail_safely("#{label} address must be one exact private IPv4 address")
+end
+unless expected_firmware == "-" || expected_firmware.match?(/\A\d+(?:\.\d+){2,}\z/)
+  fail_safely("Expected firmware must be a dotted numeric version or - when not yet reviewed")
+end
+fail_safely("Management URL must be plain HTTP with no credentials, path, query, or fragment") unless web_url.match?(%r{\Ahttp://[A-Za-z0-9][A-Za-z0-9.-]{0,252}(?::\d{1,5})?/?\z})
+
+community = STDIN.read(257)
+fail_safely("SNMP community input exceeds 256 bytes") if community.bytesize > 256
+community = community.strip
+community_bytes = community.bytes
+unless community_bytes.length.between?(8, 128) && community_bytes.all? { |byte| byte.between?(33, 126) }
+  fail_safely("SNMP community must contain 8..128 non-whitespace printable ASCII characters")
+end
+
+if File.exist?(ENV_PATH)
+  fail_safely("Refusing to update a symlinked .env") if File.symlink?(ENV_PATH)
+  stat = File.stat(ENV_PATH)
+  fail_safely("Refusing to update an unsafe .env") unless stat.file? && (stat.mode & 0o077).zero?
+  lines = File.readlines(ENV_PATH, chomp: true)
+else
+  lines = []
+end
+
+settings = {
+  "#{prefix}_ENABLED" => "true",
+  "#{prefix}_ADDRESS" => address,
+  "#{prefix}_LABEL" => label,
+  "#{prefix}_WEB_URL" => web_url.sub(%r{/\z}, ""),
+  "#{prefix}_EXPECTED_FIRMWARE" => expected_firmware == "-" ? "" : expected_firmware,
+  "#{prefix}_SNMP_COMMUNITY" => community
+}
+seen = {}
+updated = lines.filter_map do |line|
+  key = line.split("=", 2).first.to_s.strip
+  next line unless settings.key?(key)
+  next if seen[key]
+
+  seen[key] = true
+  "#{key}=#{settings.fetch(key)}"
+end
+settings.each { |key, value| updated << "#{key}=#{value}" unless seen[key] }
+
+temporary = "#{ENV_PATH}.tmp-#{Process.pid}"
+begin
+  File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+    file.write(updated.join("\n"))
+    file.write("\n")
+    file.flush
+    file.fsync
+  end
+  File.rename(temporary, ENV_PATH)
+  File.chmod(0o600, ENV_PATH)
+ensure
+  FileUtils.rm_f(temporary)
+end
+community.replace("\0" * community.bytesize)
+puts "#{label} SNMP inventory configuration installed in owner-private .env (credential not displayed)."

@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+exec(File.join(__dir__, "soul-configure-managed-switch-snmp"), "lattice", *ARGV)
