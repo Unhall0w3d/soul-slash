@@ -4,7 +4,7 @@ Date: 2026-08-02
 
 Branch: `codex/fundamental-web-research-a1`
 
-Status: candidate-complete; human review required
+Status: accepted; human review complete
 
 ## Implementation
 
@@ -98,11 +98,12 @@ terminate as `complete`, `failed`, `awaiting_input`, `canceled`, or
 
 `read_only_network`. Provider and source requests are bounded foreground reads.
 Source content cannot authorize an action. Artifact writes and durable memory
-remain separately human-gated. Human review is still required.
+remain separately human-gated. The human review gate is now complete.
 
-## Human review
+## Human review outcome
 
-Review the sole-service mapping, provider exception, source SSRF controls,
-limits, provenance, source distrust, Chat/Voice routing, artifact and memory
-separation, and absence of scraping fallback, persistence, retry, or background
-work. Passing tests does not authorize merge or cohort acceptance.
+The human owner approved the candidate on 2026-08-02 after reviewing the
+sole-service mapping, provider exception, source SSRF controls, limits,
+provenance, source distrust, Chat/Voice routing, artifact and memory separation,
+and absence of scraping fallback, persistence, retry, or background work.
+Fundamental Skill Cohort A1 is accepted in full.

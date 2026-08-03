@@ -2,7 +2,7 @@
 
 Candidate: Fundamental Skill Cohort A1, slice 5
 
-Status: candidate-complete; human review required
+Status: accepted; human review complete
 
 ## Implemented
 
@@ -96,13 +96,23 @@ Skill-private durable memory added: no
 
 ## Human review checklist
 
-- [ ] Confirm the package maps only to `WebResearchService` and the existing CLI.
-- [ ] Confirm provider and public-source address exceptions are distinct.
-- [ ] Confirm every result and redirect remains public HTTPS and revalidated.
-- [ ] Confirm query, source, byte, media-type, redirect, and time caps.
-- [ ] Confirm only query text reaches the search provider.
-- [ ] Confirm source evidence is untrusted and non-authorizing.
-- [ ] Confirm artifact and memory paths retain their separate gates.
-- [ ] Confirm ordinary discussion does not invoke research.
-- [ ] Confirm no service, watcher, schedule, retry, or background path was added.
-- [ ] Accept, request revision, or reject this candidate independently of tests.
+- [x] Confirm the package maps only to `WebResearchService` and the existing CLI.
+- [x] Confirm provider and public-source address exceptions are distinct.
+- [x] Confirm every result and redirect remains public HTTPS and revalidated.
+- [x] Confirm query, source, byte, media-type, redirect, and time caps.
+- [x] Confirm only query text reaches the search provider.
+- [x] Confirm source evidence is untrusted and non-authorizing.
+- [x] Confirm artifact and memory paths retain their separate gates.
+- [x] Confirm ordinary discussion does not invoke research.
+- [x] Confirm no service, watcher, schedule, retry, or background path was added.
+- [x] Accept this candidate independently of deterministic test results.
+
+## Human review outcome
+
+```text
+Outcome: approved
+Reviewer: human owner
+Date: 2026-08-02
+Decision summary: Accepted web.research and completed Fundamental Skill Cohort A1.
+Required changes: none
+```

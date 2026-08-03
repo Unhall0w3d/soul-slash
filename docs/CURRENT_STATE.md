@@ -83,8 +83,8 @@ The fifth and final cohort candidate, `web.research`, packages Soul's existing
 bounded SearXNG/Brave research service, direct CLI, and Chat/Voice evidence path
 without adding another HTTP client or application operation. Provider queries,
 public-source SSRF defenses, provenance, foreground ceilings, grounded artifact
-handoff, and separate reflection and memory gates remain intact. Human review
-remains pending.
+handoff, and separate reflection and memory gates remain intact. The Operator
+accepted this slice on 2026-08-02, completing Fundamental Skill Cohort A1.
 
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the
