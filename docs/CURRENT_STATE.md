@@ -146,7 +146,11 @@ Creative Core (`music`), Free Core (`free`), and Dev Core (`dev`). Free Core
 unloads all chat and development models and locks the Dashboard to Core
 selection. Dev Core pairs Qwen chat on NVIDIA with digest-pinned GPT-OSS 20B on
 AMD. Scoped Dev work restores the prior eligible Core and never preempts
-Creative work. Mistral remains an explicit fallback only.
+Creative work. The 2026-08-03 live matrix confirmed Creative blocking,
+Soul-Lite and Soul Core restoration, and resident GPT-OSS reuse across two
+selected-Dev requests. A candidate repair prevents shared Soul-Lite/Creative
+intent changes from re-entering the model-runtime lease lock. Mistral remains
+an explicit fallback only.
 
 Primary Codex can also invoke GPT-OSS through the repository-local Soul Dev
 Worker skill. Codex supplies one exact non-secret context packet; Soul returns

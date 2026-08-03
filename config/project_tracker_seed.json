@@ -680,6 +680,23 @@
       "acceptance": "During naturally appropriate reboots, confirm Webex and Opera launch and place only when represented before reboot. Do not schedule repeated reboots solely for this refinement. Any new application requires an exact identity, fixed launch vector, duplicate protection, bounded placement, and human review.",
       "source": "Operator direction and retained zero-prompt reboot evidence, 2026-07-29",
       "notes": "Non-blocking follow-up. The maintenance, A4 authority, reboot-only boundary, display recovery, and workspace lifecycle are accepted."
+    },
+    {
+      "item_id": "track_dev_review_bounded_jobs_a3",
+      "title": "Persist Dev review jobs across Dashboard navigation",
+      "area": "Self Improvement",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Production-test reconnectable GPT-OSS review jobs for Self Assessment synthesis, Self Augmentation proposal critique, and post-Gate A1 implementation handoff.",
+      "acceptance": "Each exact confirmed action survives navigation and browser refresh, retains progress and one terminal result, restores eligible Core state, fails closed across Dashboard restart, and changes no evidence or gate authority.",
+      "notes": "All navigation and restart tests pass. The 2026-08-03 live Core matrix proves Creative blocking, Soul-Lite and Soul Core restoration, and selected Dev Core residency across two consecutive requests. A lock-recursion repair and exact regression fixture await pull-request review and merge before this item moves to validated archive.",
+      "source": "Dev Review Bounded Jobs A3",
+      "implementation": "The existing single bounded creative/development job manager accepts three review-only Dev operations, validates typed subjects, persists owner-private progress and terminal envelopes, exposes neutral authenticated stream/follow/status routes, forwards model progress, and reconnects the relevant Dashboard card without polling or automatic retry. The candidate Core repair captures Dev status before a shared Soul-Lite/Creative intent lock and reuses that bounded observation during the atomic intent change.",
+      "technologies": "Ruby; authenticated NDJSON; owner-private JSON receipts; JavaScript Streams API; GPT-OSS 20B through the reviewed Dev Core coordinator; flock-backed model-runtime leases.",
+      "interfaces": "Self Improvement → Self Assessment → Dev synthesis; Self Improvement → Self Augmentation → Proposal critique and Dev implementation handoff; bin/soul dev-worker; Core selector.",
+      "commands": "make verify-dev-review-bounded-jobs\nruby scripts/verify-core-orchestration.rb\nmake verify-codex-soul-dev-worker\nmake verify-dev-core-runtime",
+      "references": "docs/soul/DEV_REVIEW_BOUNDED_JOBS_A3_BRIEF.md\ndocs/assessments/DEV_REVIEW_BOUNDED_JOBS_A3_REVIEW.md\ndocs/guides/CORES.md\ndocs/guides/DEV_WORKER.md"
     }
   ]
 }
