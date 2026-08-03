@@ -15,6 +15,7 @@ require_relative "invocation_catalog_service"
 require_relative "local_search_chat_controls"
 require_relative "file_inspection_chat_controls"
 require_relative "network_diagnostic_chat_controls"
+require_relative "repository_inspection_chat_controls"
 require_relative "skill_studio_chat_controls"
 
 module SoulCore
@@ -351,6 +352,14 @@ module SoulCore
           kind: "deterministic_passthrough",
           reason: "an explicit one-target network request uses bounded read-only diagnostic evidence without scanning or mutation",
           flags: flags.merge("network_diagnostic_control" => true)
+        )
+      end
+
+      if RepositoryInspectionChatControls::REQUEST_PATTERNS.any? { |pattern| text.match?(pattern) }
+        return decision(
+          kind: "deterministic_passthrough",
+          reason: "an explicit approved-root repository request uses bounded read-only Git evidence without repository mutation",
+          flags: flags.merge("repository_inspection_control" => true)
         )
       end
 

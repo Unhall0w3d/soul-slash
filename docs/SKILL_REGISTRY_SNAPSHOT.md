@@ -11,7 +11,7 @@ This document is a deterministic projection of the registered skill records. Reg
 ## Summary
 
 ```text
-skill_count: 35
+skill_count: 36
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -276,6 +276,16 @@ status: available
 ```
 
 Create or revise one explicitly named implementation-ledger item through the Dashboard editor or an unmistakable timeline-item Chat command.
+
+### `repository.inspect`
+
+```text
+name: not declared
+category: knowledge
+status: available
+```
+
+Inspect bounded branch, HEAD, status, recent-log, staged-diff, and working-tree-diff evidence from one explicitly configured local Git repository without mutation.
 
 ### `skill.brief.draft`
 

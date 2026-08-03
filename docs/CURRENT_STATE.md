@@ -65,6 +65,13 @@ one target, send one fixed one-packet reachability probe, or attempt one
 zero-payload TCP connection. It rejects scans, ranges, URLs, multiple targets,
 retries, monitoring, and mutation; human review remains pending.
 
+The third cohort candidate, `repository.inspect`, exposes one configured local
+Git repository through bounded branch, HEAD, status, recent-log, staged-diff,
+and working-tree-diff evidence. It uses fixed read-only Git commands with time
+and output ceilings, excludes secret-shaped paths, withholds credential-like
+diff content, and cannot mutate or contact a remote. Human review remains
+pending.
+
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the
 same identity; neither changes authority or routing. Explicit Chat commands can

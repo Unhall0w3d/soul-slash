@@ -13,6 +13,7 @@ require_relative "knowledge_vault_service"
 require_relative "local_search_service"
 require_relative "file_inspection_service"
 require_relative "network_diagnostic_service"
+require_relative "repository_inspection_service"
 require_relative "invocation_catalog_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
@@ -136,6 +137,7 @@ module SoulCore
       local_search_service: nil,
       file_inspection_service: nil,
       network_diagnostic_service: nil,
+      repository_inspection_service: nil,
       invocation_catalog_service: nil
     )
       @root = File.expand_path(root)
@@ -198,6 +200,7 @@ module SoulCore
       @local_search_service = local_search_service
       @file_inspection_service = file_inspection_service
       @network_diagnostic_service = network_diagnostic_service
+      @repository_inspection_service = repository_inspection_service
       @invocation_catalog_service = invocation_catalog_service
     end
 
@@ -358,6 +361,8 @@ module SoulCore
       when "network.resolve" then domain(network_diagnostic.resolve(target: required(parameters, "target")))
       when "network.reachability" then domain(network_diagnostic.reachability(target: required(parameters, "target")))
       when "network.socket" then domain(network_diagnostic.socket(target: required(parameters, "target"), port: required(parameters, "port")))
+      when "repositories.roots" then domain(repository_inspection.roots)
+      when "repository.inspect" then domain(repository_inspection.inspect(root_id: required(parameters, "root_id")))
       when "invocations.list" then [invocation_catalog.list(category: parameters["category"], query: parameters["query"]), "complete", "none", false]
       when "skills.list" then [skills_list(parameters), "complete", "none", false]
       when "skill_studio.proposals.list" then domain(skill_studio.proposals(limit: bounded_limit(parameters["limit"], SkillStudioService::MAX_RECORDS)))
@@ -756,6 +761,10 @@ module SoulCore
 
     def network_diagnostic
       @network_diagnostic_service ||= NetworkDiagnosticService.new(clock: @clock)
+    end
+
+    def repository_inspection
+      @repository_inspection_service ||= RepositoryInspectionService.new(root: @root, process_env: @process_env, clock: @clock)
     end
 
     def approvals_pending(parameters)

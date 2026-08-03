@@ -1,0 +1,4 @@
+interface:
+  display_name: "Inspect Repository"
+  short_description: "Inspect approved Git evidence without mutation"
+  default_prompt: "Use $inspect-repository to inspect bounded status, branch, log, and diff evidence from one approved repository."
