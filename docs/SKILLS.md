@@ -70,6 +70,7 @@ knowledge.vault.conversation_reflect
 local.search
 files.inspect
 network.diagnose
+repository.inspect
 ```
 
 Knowledge Vault writes and memory exchange retain their explicit confirmation
@@ -83,6 +84,11 @@ a root approved in local configuration. See `docs/skills/FILES_INSPECT.md`.
 `network.diagnose` inspects bounded local address and route evidence or runs one
 exact-target DNS, reachability, or zero-payload TCP connection check. It does
 not scan or mutate network state. See `docs/skills/NETWORK_DIAGNOSE.md`.
+
+`repository.inspect` returns bounded branch, HEAD, status, recent-log, staged
+diff, and working-tree diff evidence from one repository approved in local
+configuration. It cannot mutate Git or contact a remote. See
+`docs/skills/REPOSITORY_INSPECT.md`.
 
 ### Downloads cleanup skills
 

@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-08-02T18:33:35-04:00
+Generated: 2026-08-02T20:02:46-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-35
+36
 ```
 
 ## Skills
@@ -527,6 +527,25 @@ Example ways the owner might ask for this:
 
 - mark timeline item <ID> as needs review
 - add timeline item: <structured fields>
+
+### Repository Inspect
+
+```text
+id: repository.inspect
+category: knowledge
+status: available
+risk: read_only
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Inspect bounded branch, HEAD, status, recent-log, staged-diff, and working-tree-diff evidence from one explicitly configured local Git repository without mutation.
+
+Example ways the owner might ask for this:
+
+- use repository inspect
+- run repository.inspect
 
 ### Skill Brief Draft
 

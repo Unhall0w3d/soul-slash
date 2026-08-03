@@ -99,6 +99,20 @@ entries:
       - Resolve example.com.
       - Check reachability to 192.0.2.10.
       - Check socket example.com port 443.
+  - id: repository-inspect
+    label: Approved repository inspection
+    category: Knowledge
+    summary: Inspect bounded branch, HEAD, status, recent commit, staged diff, and working-tree diff evidence from one configured Git repository.
+    skill_ids: [repository.inspect]
+    required_inputs: [Exact approved repository root ID]
+    optional_inputs: [List configured repository IDs before selecting one]
+    core: Any Core; inspection is deterministic and local.
+    approval: No approval for this bounded read; configuration alone defines repository authority.
+    output: Point-in-time Git evidence with omission, withholding, truncation, and untrusted-content labels.
+    boundary: Conversation cannot enroll repositories; arbitrary paths, Git mutation, network Git operations, hooks, secret-shaped paths, credential content, memory writes, and background continuation are unavailable.
+    examples:
+      - Show approved repository roots.
+      - Inspect repository root project.
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

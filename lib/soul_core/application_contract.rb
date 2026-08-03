@@ -112,6 +112,8 @@ module SoulCore
       "network.resolve" => %w[target],
       "network.reachability" => %w[target],
       "network.socket" => %w[target port],
+      "repositories.roots" => [],
+      "repository.inspect" => %w[root_id],
       "invocations.list" => %w[category query],
       "skills.list" => %w[limit],
       "skill_studio.proposals.list" => %w[limit],

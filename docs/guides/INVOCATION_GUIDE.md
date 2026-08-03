@@ -69,3 +69,7 @@ The `network-diagnose` entry selects one foreground read at a time. A target in
 conversation does not authorize a subnet scan, port range, traceroute, content
 fetch, retry loop, monitoring, or mutation. See
 `docs/skills/NETWORK_DIAGNOSE.md`.
+
+The `repository-inspect` entry accepts one exact configured repository ID and
+returns point-in-time Git evidence. Conversation cannot enroll a repository or
+authorize any Git mutation. See `docs/skills/REPOSITORY_INSPECT.md`.
