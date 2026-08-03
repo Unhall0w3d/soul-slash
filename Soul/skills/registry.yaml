@@ -9,6 +9,17 @@ skills:
     writes_files: false
     expected_output: json
     verifier: schema_basic
+  security.status:
+    internal_handler: conversation_security_status
+    category: administration
+    status: available
+    description: Collect one privacy-filtered Wazuh manager, agent, recent-alert, and adapted-posture aggregate for Chat or Voice without returning raw events or remediation authority.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: true
+    write_scope: owner_private_wazuh_status_caches_only
+    expected_output: conversation_result
+    verifier: conversation_security_status_a4e
   project.timeline.inspect:
     internal_handler: project_tracker
     category: project_coordination

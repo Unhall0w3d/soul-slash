@@ -2,9 +2,10 @@
 
 ## Status
 
-Architecture candidate ready for human review. No Wazuh VM, package, service,
-agent, API user, firewall rule, certificate, ClamAV process, scan, or schedule
-was created by A0.
+Validated rollout. A0 itself made no runtime change; its separately reviewed
+A1–A4e gates are now deployed, qualified, and accepted. Wazuh remains the
+authoritative investigation console and all Soul integrations remain
+read-only.
 
 ## What this candidate decides
 
@@ -42,18 +43,18 @@ passes, and `git diff --check` reports no whitespace errors.
 None. A language model cannot approve security topology, privileges,
 persistence, destructive behavior, or remediation authority.
 
-## Known weaknesses and open decisions
+## Retained limitations and separate future decisions
 
-- The exact central VM identity remains owner-local and unselected in tracked
-  source.
-- Real index growth and resource use are unknown until a passive pilot runs.
-- A 30-day initial retention is proposed but not yet approved.
-- Exact Wazuh version, package integrity evidence, firewall syntax, certificate
-  flow, and secrets mechanism belong to the A1 deployment plan.
-- Arch-family agent packaging and upgrade behavior requires qualification on
-  the Operator workstation before fleet expansion.
+- Exact deployment identity, credentials, certificates, mappings, and live
+  security evidence remain owner-local.
+- Index growth and the accepted 30-day retention require ordinary operational
+  observation rather than unattended policy changes.
+- The community Arch agent remains an explicitly reviewed packaging exception
+  and can trail the manager release.
 - ClamAV on-access mode is not part of this candidate.
 - Wazuh raw-index backup and isolated restore are not designed yet.
+- Current ClamAV signatures and scan receipts are not centralized into the
+  conversational status invocation.
 
 ## Memory keys added or used
 
@@ -61,20 +62,22 @@ None.
 
 ## Lifecycle states touched
 
-Planning only: `blocked_for_human_review` before A1 installation.
+All accepted stages terminate explicitly. The final A4e foreground read returns
+`complete` with fresh, partial, or unavailable evidence and no automatic retry.
 
 ## Risk classification
 
-Architecture planning: `network_read`, future persistent privileged services,
-and future endpoint security telemetry. No runtime mutation occurred.
+Deployed central and endpoint services remain separately reviewed persistent
+infrastructure. Soul's final operational surface is `read_only_network`; it has
+no response or remediation authority.
 
 ## Human review checklist
 
-- [ ] The Wazuh VM placement and 4 vCPU / 8 GiB / 60 GiB allocation are acceptable.
-- [ ] Private-LAN-only ports and the unexposed indexer API are acceptable.
-- [ ] Passive-first agent collection is appropriately narrow.
-- [ ] ClamAV exclusions protect backups, VM storage, models, and generated media.
-- [ ] Thirty-day initial alert retention is acceptable.
-- [ ] Soul remains read-only and Wazuh remains the investigation console.
-- [ ] Automatic response and remediation remain out of scope.
-- [ ] Proceed to an exact A1 deployment plan and supervised installation.
+- [x] The Wazuh VM placement and 4 vCPU / 8 GiB / 60 GiB allocation are acceptable.
+- [x] Private-LAN-only ports and the unexposed indexer API are acceptable.
+- [x] Passive-first agent collection is appropriately narrow.
+- [x] ClamAV exclusions protect backups, VM storage, models, and generated media.
+- [x] Thirty-day initial alert retention is accepted.
+- [x] Soul remains read-only and Wazuh remains the investigation console.
+- [x] Automatic response and remediation remain out of scope.
+- [x] A1–A4e completed through separate supervised review gates.

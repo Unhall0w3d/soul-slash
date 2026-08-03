@@ -131,6 +131,21 @@ module SoulCore
         ]
       ),
       ToolDefinition.new(
+        id: "security.status",
+        label: "Security monitoring status",
+        risk_class: "read_only_network",
+        canonical_message: "how does security look?",
+        synthesis_allowed: false,
+        scope: "Bounded privacy-filtered Wazuh manager, agent, recent-alert, and adapted-posture aggregates",
+        evidence_profile: "security_status",
+        patterns: [
+          /\A\s*(?:security|wazuh)(?:\s+(?:monitoring))?\s+(?:status|health|summary)\s*[?.!]*\z/i,
+          /\b(?:check|inspect|show|report|review|summari[sz]e)\b.{0,40}\b(?:security|wazuh)\b.{0,30}\b(?:status|health|alerts?|monitoring)?\b/i,
+          /\bhow\b.{0,20}\b(?:security|wazuh)\b.{0,20}\b(?:look|looks|doing|health|status)\b/i,
+          /\b(?:are there|any|show|check)\b.{0,30}\b(?:recent\s+)?security alerts?\b/i
+        ]
+      ),
+      ToolDefinition.new(
         id: "execution.history.summary",
         label: "Execution history summary",
         risk_class: "read_only",

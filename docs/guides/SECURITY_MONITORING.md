@@ -36,6 +36,7 @@ on-access scanner. Official signatures update once daily through the packaged
 6. Soul A4b — bounded read-only indexer alert evidence through a restricted tunnel.
 7. Soul A4c — durable high-priority cursor and optional static voice notification.
 8. Soul A4d — owner-reviewed workstation interpretation beside the unchanged raw Wazuh SCA result.
+9. Soul A4e — privacy-filtered read-only Chat/Voice status invocation over the accepted projections.
 
 Each stage has a separate review. Installing the central platform does not
 authorize agent enrollment, scanning, quarantine, or remediation.
@@ -64,9 +65,9 @@ and [A1 central contract](../soul/WAZUH_CENTRAL_A1_BRIEF.md).
 - measure startup and settled resource cost before adding another endpoint;
 - retain exact endpoint evidence only in ignored owner-local receipts.
 
-The first Fedora pilot is machine-qualified and awaits Operator review in the
-Wazuh dashboard. A pre-existing broad passwordless sudo rule discovered on the
-pilot is a separate hardening blocker; it is not an accepted Wazuh dependency.
+The first Fedora pilot is accepted and active. A pre-existing broad
+passwordless sudo rule discovered on the pilot was repaired through its own
+separately reviewed hardening lane; it is not a Wazuh dependency.
 
 See the [A2 pilot contract](../soul/WAZUH_PASSIVE_AGENT_A2_BRIEF.md) and
 [A2 review](../assessments/WAZUH_PASSIVE_AGENT_A2_REVIEW.md).
@@ -119,18 +120,25 @@ plaintext restore staging. Hypervisor VM storage, encrypted repositories, DNS
 appliances, and maintenance-only laboratories are excluded unless their roles
 later acquire an explicit plaintext ingress path.
 
-## Current interaction boundary
+## Chat and Voice status
 
-Open the private Wazuh HTTPS URL and retrieve the administrator credential from
-the Operator's password manager. A browser warning is expected for the initial
-self-signed certificate. Do not copy credentials into Soul, Chat, project
-state, or Git.
+Ask `How does security look?`, `Check Wazuh status`, or `Are there recent
+security alerts?` through authenticated Chat or Voice Presence. Soul performs
+one foreground A4a manager/agent read and one foreground A4b recent-alert read,
+then returns a deterministic privacy-filtered aggregate. No approval is needed
+for the read. Topical statements do not invoke it.
 
-No Soul Chat security invocation exists. Do not paste Wazuh credentials or raw
-alert payloads into Chat. A4a uses a separate read-only server-API identity;
-A4b uses a separate read-only indexer identity. A4c may speak one generic static
-high-priority cue while Voice Presence is idle, but it never speaks event
-details or performs response work.
+The response exposes manager and agent counts, declared alert window and level,
+bounded severity counts, truncation, and the optional aggregate adapted-posture
+summary. It does not expose event descriptions, rule/event IDs, paths, users,
+addresses, credentials, or raw payloads. Current ClamAV signatures and latest
+scan receipts remain explicitly uncollected because A3 does not centralize
+them. A4c may separately speak one generic static high-priority cue while Voice
+Presence is idle, but it never speaks event details or performs response work.
+
+Open the private Wazuh HTTPS console for investigation. Do not paste Wazuh
+credentials or raw alert payloads into Chat. Soul cannot acknowledge, suppress,
+quarantine, scan, isolate, or remediate through this invocation.
 
 ## Safe interpretation
 
