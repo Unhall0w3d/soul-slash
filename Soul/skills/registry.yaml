@@ -200,6 +200,18 @@ skills:
     writes_files: false
     expected_output: application_envelope
     verifier: fundamental_repository_inspect_a1
+  workspace.artifact.compose:
+    internal_handler: conversation_artifact_creation
+    instruction_path: Soul/skills/workspace/compose-artifact/SKILL.md
+    category: workspace
+    status: available
+    description: Draft or revise exactly one bounded Markdown, plain-text, or JSON artifact through the existing local-provider preview, digest-bound approval, verified creation, canonical attachment, and inbox-delivery workflow.
+    risk: write_local_state
+    requires_approval: true
+    confirmation_mode: expiring_digest_bound_token
+    writes_files: true
+    expected_output: conversation_result
+    verifier: fundamental_workspace_artifact_compose_a1
   knowledge.vault.initialize:
     internal_handler: knowledge_vault
     category: knowledge

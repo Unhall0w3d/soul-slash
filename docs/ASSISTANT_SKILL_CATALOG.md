@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-08-02T20:02:46-04:00
+Generated: 2026-08-02T20:50:03-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-36
+37
 ```
 
 ## Skills
@@ -680,6 +680,26 @@ Example ways the owner might ask for this:
 
 - use web research
 - run web.research
+
+### Workspace Artifact Compose
+
+```text
+id: workspace.artifact.compose
+category: workspace
+status: available
+risk: approval_required
+confirmation_required: true
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Draft or revise exactly one bounded Markdown, plain-text, or JSON artifact through the existing local-provider preview, digest-bound approval, verified creation, canonical attachment, and inbox-delivery workflow.
+
+Example ways the owner might ask for this:
+
+- use workspace artifact compose
+- run workspace.artifact.compose
+- prepare this first and ask before changing anything
 
 ### Youtube Song Search
 

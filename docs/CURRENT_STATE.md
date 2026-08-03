@@ -69,8 +69,15 @@ The third cohort candidate, `repository.inspect`, exposes one configured local
 Git repository through bounded branch, HEAD, status, recent-log, staged-diff,
 and working-tree-diff evidence. It uses fixed read-only Git commands with time
 and output ceilings, excludes secret-shaped paths, withholds credential-like
-diff content, and cannot mutate or contact a remote. Human review remains
-pending.
+diff content, and cannot mutate or contact a remote. The Operator accepted this
+slice on 2026-08-02.
+
+The fourth cohort candidate, `workspace.artifact.compose`, gives the mature
+Phase 11C/11D artifact workflow a modern public skill identity without adding a
+second writer or approval path. Explicit Chat or Voice deliverables draft one
+bounded local-provider preview; an expiring digest-bound token gates exclusive
+verified creation, canonical attachment, revision lineage, and shared-workspace
+delivery. Human review remains pending.
 
 Soul's stable `soul.identity.v1` profile is at version 9. Gemma receives a
 balanced expression projection and Qwen receives a smaller projection of the

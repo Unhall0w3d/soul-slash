@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compose Artifact"
+  short_description: "Draft and approve one bounded text artifact"
+  default_prompt: "Use $compose-artifact to draft one bounded Markdown, text, or JSON artifact through Soul’s existing preview and approval gate."

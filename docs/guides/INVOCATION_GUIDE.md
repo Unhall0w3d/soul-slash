@@ -73,3 +73,9 @@ fetch, retry loop, monitoring, or mutation. See
 The `repository-inspect` entry accepts one exact configured repository ID and
 returns point-in-time Git evidence. Conversation cannot enroll a repository or
 authorize any Git mutation. See `docs/skills/REPOSITORY_INSPECT.md`.
+
+The `artifact-compose` entry uses the established conversational artifact
+workflow rather than a separate file writer. One explicit deliverable and one
+new `artifacts/` target produce a non-mutating preview. Only the preview's exact
+single-use token can authorize the bound creation; ordinary agreement cannot.
+See `docs/skills/WORKSPACE_ARTIFACT_COMPOSE.md`.
