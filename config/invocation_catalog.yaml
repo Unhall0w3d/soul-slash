@@ -113,6 +113,20 @@ entries:
     examples:
       - Show approved repository roots.
       - Inspect repository root project.
+  - id: artifact-compose
+    label: Bounded artifact composition
+    category: Workspace
+    summary: Draft or revise one reviewed Markdown, plain-text, or JSON deliverable in Soul's shared workspace.
+    skill_ids: [workspace.artifact.compose]
+    required_inputs: [Explicit substantial text deliverable requirements, One new project-relative artifacts/ target ending in .md .txt or .json]
+    optional_inputs: [Project public or local_private privacy, One attached source artifact ID and new target for revision, Retained research grounding]
+    core: Daily Core with one configured local-only or local-network drafting provider.
+    approval: Preview is non-mutating; exact create artifact token confirm authorizes one digest-bound write. Exact cancellation remains available.
+    output: One verified canonical artifact attached to the active conversation and delivered to the shared workspace inbox, with digest and lineage evidence.
+    boundary: No cloud drafting, overwrite, arbitrary path, direct edit, code or executable, rich document, media, archive, multi-file package, publication, automatic retry, or background continuation.
+    examples:
+      - Create a project report at artifacts/status.md covering the reviewed findings.
+      - Can you revise artifact art_example into artifacts/status-v2.md with project privacy?
   - id: picture-and-screen
     label: Picture and screen understanding
     category: Perception

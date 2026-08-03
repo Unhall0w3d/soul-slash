@@ -71,6 +71,7 @@ local.search
 files.inspect
 network.diagnose
 repository.inspect
+workspace.artifact.compose
 ```
 
 Knowledge Vault writes and memory exchange retain their explicit confirmation
@@ -89,6 +90,13 @@ not scan or mutate network state. See `docs/skills/NETWORK_DIAGNOSE.md`.
 diff, and working-tree diff evidence from one repository approved in local
 configuration. It cannot mutate Git or contact a remote. See
 `docs/skills/REPOSITORY_INSPECT.md`.
+
+`workspace.artifact.compose` packages Soul's existing bounded artifact writer
+as a first-class skill. It drafts or revises exactly one `.md`, `.txt`, or
+`.json` file below `artifacts/`, presents a non-mutating local-provider preview,
+and requires the preview's digest-bound token before exclusive verified
+creation, attachment, and inbox delivery. See
+`docs/skills/WORKSPACE_ARTIFACT_COMPOSE.md`.
 
 ### Downloads cleanup skills
 

@@ -11,7 +11,7 @@ This document is a deterministic projection of the registered skill records. Reg
 ## Summary
 
 ```text
-skill_count: 36
+skill_count: 37
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -356,6 +356,16 @@ status: registered (availability not declared)
 ```
 
 Bounded foreground public-web search and HTTPS source retrieval with provenance and SSRF protection.
+
+### `workspace.artifact.compose`
+
+```text
+name: not declared
+category: workspace
+status: available
+```
+
+Draft or revise exactly one bounded Markdown, plain-text, or JSON artifact through the existing local-provider preview, digest-bound approval, verified creation, canonical attachment, and inbox-delivery workflow.
 
 ### `youtube.song_search`
 
