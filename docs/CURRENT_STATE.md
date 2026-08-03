@@ -248,6 +248,14 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - Guided Maintenance separates rich **SSH integrated** cards from compact
   **Status only** network-presence cards. Each surface lays out independently,
   preserving compact status-only rows as the fleet grows.
+- **Security Monitoring** is live and read-only. Wazuh remains the authoritative
+  investigation console; Guided Maintenance and Local Topology show accepted
+  manager, exact agent, alert, notification, and adapted-posture projections.
+  Chat and Voice Presence share one deterministic `security.status` invocation
+  for explicit questions such as `How does security look?`. It refreshes the
+  bounded A4a/A4b evidence in the foreground and retains aggregate counts only.
+  Raw events, alert descriptions, ClamAV freshness, acknowledgement,
+  suppression, quarantine, and remediation are unavailable.
 - **Backup & Recovery** inspects the configured encrypted restic repository,
   captures the exact owner allow-list through a reviewed gate, verifies and
   inventories snapshots, preserves deleted paths through a 30-day

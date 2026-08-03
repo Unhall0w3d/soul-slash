@@ -4,11 +4,11 @@ surfaces:
   - id: chat
     label: Chat
     aliases: [chat, conversation, transmission]
-    summary: Conversation, bounded research, local search, weather, system status, reviewed knowledge, and explicitly mapped operator workflows.
+    summary: Conversation, bounded research, local search, weather, system and security status, reviewed knowledge, and explicitly mapped operator workflows.
     inputs: Ask naturally; action wording and required targets must be explicit before Soul invokes a capability.
     boundary: A topical mention remains conversation and grants no execution authority.
-    skills: [system.status, weather.report, web.lookup, web.research, knowledge.vault.search, local.search, files.inspect, network.diagnose, repository.inspect, workspace.artifact.compose]
-    invocations: [system-status, weather, web-research, knowledge-vault, local-search, files-inspect, network-diagnose, repository-inspect, artifact-compose]
+    skills: [system.status, security.status, weather.report, web.lookup, web.research, knowledge.vault.search, local.search, files.inspect, network.diagnose, repository.inspect, workspace.artifact.compose]
+    invocations: [system-status, security-status, weather, web-research, knowledge-vault, local-search, files-inspect, network-diagnose, repository-inspect, artifact-compose]
     operations: [chats.send, files.roots, files.list, files.stat, files.read, network.snapshot, network.resolve, network.reachability, network.socket, workspace.list, workspace.chat, workspace.detail, inbox.list, inbox.deliver, inbox.mark_seen, inbox.dismiss]
     targets: [active conversation]
     interfaces: [dashboard, voice_presence]
@@ -180,6 +180,24 @@ surfaces:
       conversational_confirmation: [create backup, copy off-device]
       operator_gesture_required: [restore, retention deletion, snapshot deletion]
     completion: {progress: streamed, receipt: backup and replication receipts}
+
+  - id: security_monitoring
+    label: Security Monitoring
+    aliases: [security, security status, wazuh, security monitoring]
+    summary: Inspect bounded Wazuh manager, agent, recent-alert, and adapted-posture aggregates through Dashboard, Chat, or Voice Presence.
+    inputs: Ask an explicit security-status or recent-alert question; no target is required for the aggregate read.
+    boundary: Wazuh remains the investigation console; raw events, alert descriptions, ClamAV scan freshness, acknowledgement, suppression, quarantine, and remediation are unavailable.
+    skills: [security.status]
+    invocations: [security-status]
+    operations: [security.wazuh.status, security.wazuh.snapshot, security.wazuh.alerts.status, security.wazuh.alerts.snapshot, security.wazuh.notifications.status, security.wazuh.posture.status]
+    targets: [Wazuh monitoring plane, enrolled-agent aggregates, recent-alert aggregates]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: read_only
+      conversational_confirmation: []
+      operator_gesture_required: [investigation, acknowledgement, suppression, quarantine, remediation]
+    completion: {progress: immediate, receipt: dated privacy-filtered conversation evidence}
 
   - id: skill_studio
     label: Skill Studio

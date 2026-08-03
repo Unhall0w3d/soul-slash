@@ -1,7 +1,7 @@
 # Wazuh Alert Evidence A4b Review
 
-Status: deterministic verification and live least-privilege authorization pass;
-authenticated Dashboard visual review remains open.
+Status: accepted. Deterministic verification, live least-privilege
+authorization, and authenticated Dashboard visual review pass.
 
 ## Live evidence
 
@@ -26,7 +26,7 @@ make verify-wazuh-security-status
 make verify-maintenance-local-topology
 ```
 
-## Open gate
+## Human review outcome
 
-- Review the alert summary and associated Atelier/Crucible card presentation in
-  the authenticated deployed Dashboard.
+- The Operator approved the alert summary and associated Atelier/Crucible card
+  presentation in the authenticated deployed Dashboard on 2026-08-03.

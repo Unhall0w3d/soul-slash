@@ -18,6 +18,7 @@ require_relative "invocation_catalog_service"
 require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
+require_relative "conversation_security_status_service"
 require_relative "conversation_creative_workflow_service"
 require_relative "conversation_maintenance_workflow_service"
 require_relative "conversation_core_workflow_service"
@@ -822,6 +823,11 @@ module SoulCore
         creative_workflow_service: conversation_creative_workflow,
         core_workflow_service: conversation_core_workflow,
         maintenance_workflow_service: conversation_maintenance_workflow,
+        security_status_service: ConversationSecurityStatusService.new(
+          wazuh_status_service: wazuh_security_status,
+          alert_evidence_service: wazuh_alert_evidence,
+          posture_service: wazuh_compliance_posture
+        ),
         identity_compact_resolver: -> { %w[amd-free music].include?(core_orchestration.status.dig("data", "active_core_id")) })
     end
 

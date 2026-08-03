@@ -27,6 +27,20 @@ entries:
     boundary: A failed fetch does not become a model-memory weather claim.
     examples:
       - What does the weather look like?
+  - id: security-status
+    label: Security monitoring status
+    category: Everyday
+    summary: Collect a privacy-filtered Wazuh manager, agent, recent-alert, and adapted-posture summary through Chat or Voice Presence.
+    skill_ids: [security.status]
+    required_inputs: []
+    optional_inputs: []
+    core: Any conversational Core; the collection itself is deterministic and foreground.
+    approval: No approval for this bounded read.
+    output: A fresh, partial, or unavailable aggregate with manager and agent health, declared alert scope and severity counts, and an explicit ClamAV evidence limitation.
+    boundary: Wazuh remains the investigation console; raw events, alert descriptions, acknowledgement, suppression, quarantine, scans, and remediation are unavailable.
+    examples:
+      - How does security look?
+      - Are there recent security alerts?
   - id: web-research
     label: Web research
     category: Knowledge

@@ -29,11 +29,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Near-term refinement
 
-- [~] Wazuh Central A1 is Operator-accepted behind a private firewall with
+- [x] Wazuh Central A1 is Operator-accepted behind a private firewall with
   matched components, 30-day time-series retention, and reboot recovery. The
   single Fedora A2 pilot is enrolled, active, explicitly passive, and
-  machine-qualified; Operator evidence review remains open before cohort
-  expansion or Soul integration. The separately gated sudo drift is repaired,
+  machine-qualified and accepted. The separately gated sudo drift is repaired,
   the separately reviewed community-packaged workstation agent is live and
   explicitly passive, and selective ClamAV A3 has live-qualified workstation
   and Fedora plaintext restore-staging lanes with current daily signatures.
@@ -41,10 +40,12 @@ This roadmap tracks product bodies rather than the repository's historical phase
   an exact custom read-only role, private CA validation, accepted manager health,
   exact active Atelier/Crucible mappings, and accepted Dashboard presentation.
   A4b read-only alert search is live-qualified through a restricted loopback
-  tunnel and exact index-only role; its Dashboard presentation remains a human
-  gate. A4c is live-accepted with a silently seeded historical baseline, an
+  tunnel and exact index-only role; its Dashboard presentation is accepted.
+  A4c is live-accepted with a silently seeded historical baseline, an
   exact installed one-minute timer, durable private cursor, cooldown batching,
-  and one Operator-heard privacy-safe controlled cue
+  and one Operator-heard privacy-safe controlled cue. A4e adds one deterministic
+  privacy-filtered read-only Chat/Voice security-status invocation; Wazuh
+  remains the investigation console and no remediation authority exists
 - [x] expose supported Dashboard creative, perception, project, and administrative capabilities to Chat through bounded invocations and contextual routing
 - [x] refine persona fidelity across supported chat models without corrupting structured tool output
 - [x] review durable event-derived Chat progress summaries; automatic stream
