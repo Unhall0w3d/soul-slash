@@ -946,7 +946,7 @@ module SoulCore
         "enrolled_device.witness_apt_updates",
         target,
         "/usr/bin/apt-get", "-s", "-o", "Debug::NoLocking=1", "dist-upgrade",
-        timeout: 60
+        timeout: 120
       )
       running_kernel_result = remote_run(
         "enrolled_device.witness_kernel",

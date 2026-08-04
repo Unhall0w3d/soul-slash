@@ -743,8 +743,8 @@
       "item_id": "track_witness_raspberry_pi",
       "title": "Witness Raspberry Pi security and maintenance enrollment",
       "area": "Administration + Security",
-      "horizon": "now",
-      "status": "needs_review",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "high",
       "summary": "Operate one Raspberry Pi OS endpoint as a passive Wazuh sensor and separately gated, device-scoped APT maintenance target.",
       "implementation": "Witness uses a stable owner-local lease, literal key-only SSH alias, official version-matched ARM64 Wazuh agent, endpoint-specific event transport, closed post-enrollment registration, and explicitly disabled Active Response. Its separate root-owned helper accepts only self-check, apt-upgrade, and reboot. Digest-qualified sudoers replaces the image-generated broad passwordless cloud-init rule. Exact address, alias, environment opt-in, and helper self-check evidence are all required before the shared preview and receipt lifecycle exposes controls.",
@@ -752,9 +752,9 @@
       "interfaces": "Administration → Guided Maintenance → Witness card; Wazuh investigation console; exact Makefile authority and verifier targets.",
       "commands": "make verify-witness-maintenance-control\nmake witness-maintenance-authority-status\nmake verify-maintenance-fleet-status\nmake verify-maintenance-device-control",
       "references": "docs/soul/WITNESS_RASPBERRY_PI_MAINTENANCE_A1_BRIEF.md\ndocs/assessments/WITNESS_RASPBERRY_PI_MAINTENANCE_A1_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md\ndocs/guides/SECURITY_MONITORING.md",
-      "acceptance": "Passive Wazuh enrollment, exact authority install, broad-sudo removal, arbitrary-sudo denial, complete APT evidence, and live managed-card rendering pass. One separately approved live reboot must reconnect and restore SSH, Wazuh, APT, and authority readiness before this item archives as validated.",
+      "acceptance": "Passive Wazuh enrollment, exact authority install, broad-sudo removal, arbitrary-sudo denial, complete APT evidence, and live managed-card rendering pass. Exact REBOOT_WITNESS qualification issued one request, observed a changed boot identity, and restored SSH, Wazuh, APT, and authority readiness without automatic retry.",
       "source": "Operator-approved Witness enrollment, 2026-08-04",
-      "notes": "Implementation and non-disruptive live qualification are complete. The Dashboard reports 11 cached-metadata APT updates and no current reboot-required marker. Maintenance was not executed, and live reboot qualification remains the only review gate. Private addressing, SSH keys, host keys, Wazuh agent keys, mappings, and receipts remain owner-local."
+      "notes": "Validated 2026-08-04. The Dashboard reported 11 cached-metadata APT updates and no reboot-required marker before qualification. Private receipt device_receipt_5d6cdfad11d349d1 records one reboot request, changed boot identity, reconnect on attempt 6, complete readiness, and no retry. Maintenance was not executed. Private addressing, SSH keys, host keys, Wazuh agent keys, mappings, and receipts remain owner-local."
     },
     {
       "item_id": "track_post_login_application_restoration",

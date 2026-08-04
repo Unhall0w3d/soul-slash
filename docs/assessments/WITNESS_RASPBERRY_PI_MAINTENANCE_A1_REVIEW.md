@@ -56,6 +56,12 @@ make verify-maintenance-device-control
 - The final Dashboard collection exposes a managed Witness card with complete
   APT evidence, 11 cached-metadata updates, no current reboot marker, and active
   SSH, Wazuh, and fixed-authority readiness.
+- Exact `REBOOT_WITNESS` execution completed as private receipt
+  `device_receipt_5d6cdfad11d349d1`: one reboot request, changed boot identity,
+  no automatic retry, and restored SSH/Wazuh, APT, and authority readiness on
+  reconnect attempt 6. The first cold-boot APT simulation exceeded 60 seconds;
+  its Witness-only read timeout is now 120 seconds while mutation timeouts and
+  gates remain unchanged.
 - Exact local and remote temporary installer script/package files were removed
   after checksum, installation, and connection evidence was retained.
 
@@ -81,4 +87,4 @@ and has no remediation authority.
 - [x] Review and install the digest-bound authority.
 - [x] Confirm broad passwordless sudo is absent and arbitrary sudo is denied.
 - [x] Review the live maintenance-enabled Witness card.
-- [ ] Separately approve and verify a live reboot qualification.
+- [x] Separately approve and verify a live reboot qualification.
