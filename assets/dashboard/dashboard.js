@@ -2909,7 +2909,9 @@ function wazuhAlertsForAgent(agentId) {
 
 function wazuhPostureForAgent(agentId) {
   const posture = state.wazuhPosture;
-  return posture?.available === true && posture.raw_wazuh_result?.agent_id === agentId ? posture : null;
+  if (posture?.available !== true) return null;
+  if (Array.isArray(posture.postures)) return posture.postures.find((entry) => entry.raw_wazuh_result?.agent_id === agentId) || null;
+  return posture.raw_wazuh_result?.agent_id === agentId ? posture : null;
 }
 
 function renderWazuhDeviceSecurity(deviceId) {
@@ -3009,8 +3011,12 @@ function updateWazuhSummary() {
   const posture = state.wazuhPosture || {};
   const rawPosture = posture.raw_wazuh_result || {};
   const adaptedReview = posture.adapted_review || {};
+  const postureSummary = posture.summary || {};
+  const postureCount = postureSummary.posture_count ?? (posture.available === true && rawPosture.agent_id ? 1 : 0);
   const postureCopy = posture.available === true
-    ? `raw CIS ${rawPosture.score ?? "—"}% (${rawPosture.passed ?? 0} pass / ${rawPosture.failed ?? 0} fail / ${rawPosture.not_applicable ?? 0} N/A) · adapted ${adaptedReview.reviewed_failure_count ?? 0}/${rawPosture.failed ?? 0} classified · ${adaptedReview.genuine_remaining_decision_count ?? 0} decisions`
+    ? (postureCount === 1
+      ? `raw CIS ${rawPosture.score ?? posture.postures?.[0]?.raw_wazuh_result?.score ?? "—"}% · one endpoint review · ${(adaptedReview.reviewed_failure_count ?? postureSummary.reviewed_failure_count) ?? 0} classified · ${(adaptedReview.genuine_remaining_decision_count ?? postureSummary.genuine_remaining_decision_count) ?? 0} decisions`
+      : `${postureCount} endpoint reviews · separate raw results preserved · ${postureSummary.reviewed_failure_count ?? 0}/${postureSummary.raw_failed ?? 0} failures classified · ${postureSummary.genuine_remaining_decision_count ?? 0} decisions`)
     : (posture.reason || "adapted posture unavailable");
   const copy = available
     ? `${summary.active ?? 0} active of ${summary.agent_count ?? 0} endpoint agents · manager ${data.manager?.state || "unknown"} · ${alertCopy} · ${notificationCopy} · ${postureCopy}`

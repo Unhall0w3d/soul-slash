@@ -6,6 +6,9 @@
 
 ### Conversational Soul
 
+- Extended the read-only Wazuh adapted-posture projection from one workstation
+  to a bounded set of exact agent reviews, preserving separate raw results for
+  Atelier and Crucible across device cards and aggregate Chat/Voice status.
 - Repaired AMD Vulkan inventory under the hardened dashboard by making the
   bounded `vulkaninfo` child device-only instead of inheriting unusable display
   variables and failing on an unrelated XCB surface connection.

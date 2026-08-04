@@ -251,6 +251,10 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.
+  The posture layer now accepts a bounded owner-private set of independently
+  scan-bound endpoint reviews: Atelier and Crucible retain separate raw scores,
+  exact device cards select only their associated agent review, and aggregate
+  Chat/Voice status never invents a fleet compliance percentage.
   Chat and Voice Presence share one deterministic `security.status` invocation
   for explicit questions such as `How does security look?`. It refreshes the
   bounded A4a/A4b evidence in the foreground and retains aggregate counts only.

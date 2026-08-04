@@ -89,11 +89,11 @@ alert_data = {
 }
 posture_data = {
   "available" => true,
-  "state" => "reviewed",
+  "state" => "attention",
   "loaded_at" => "2026-08-03T05:59:57Z",
   "raw_result_preserved" => true,
-  "raw_wazuh_result" => { "score" => 45, "passed" => 59, "failed" => 71, "not_applicable" => 7 },
-  "adapted_review" => { "genuine_remaining_decision_count" => 0, "classifications" => [{ "summary" => "private posture explanation" }] }
+  "postures" => [{ "raw_wazuh_result" => { "agent_id" => "001" } }, { "raw_wazuh_result" => { "agent_id" => "002" } }],
+  "summary" => { "posture_count" => 2, "raw_passed" => 179, "raw_failed" => 136, "raw_not_applicable" => 12, "genuine_remaining_decision_count" => 1 }
 }
 
 health = SecuritySourceFixture.new(health_data)
@@ -112,8 +112,16 @@ check(checks, "one foreground collection is made from each accepted source", hea
 check(checks, "high alert aggregate produces attention without claiming global security", result.dig("report", "state") == "attention" && result["content"].include?("needs attention within the checked Wazuh scope"))
 check(checks, "declared query scope and bounded counts remain explicit", result["content"].include?("24h, level 7+") && result["content"].include?("314 matched") && result["content"].include?("newest 100") && result["content"].include?("result is truncated"))
 check(checks, "raw and normalized event details are absent", !serialized.include?("secret-event-id") && !serialized.include?("sensitive alert description") && !serialized.include?("private-agent") && !serialized.include?("private.example"))
-check(checks, "adapted posture is aggregate-only and preserves raw authority", result["content"].include?("raw Wazuh score 45%") && result["content"].include?("raw result remains unchanged") && !serialized.include?("private posture explanation"))
+check(checks, "multi-endpoint posture is aggregate-only and preserves separate raw authority", result["content"].include?("2 endpoint reviews preserve their separate raw Wazuh results") && result["content"].include?("136 raw failures") && !serialized.include?("private posture explanation"))
 check(checks, "ClamAV and remediation limitations are explicit", result["content"].include?("ClamAV freshness and latest scan receipts were not collected") && result["content"].include?("no remediation was performed or authorized"))
+
+posture_attention = SoulCore::ConversationSecurityStatusService.new(
+  wazuh_status_service: SecuritySourceFixture.new(health_data),
+  alert_evidence_service: SecuritySourceFixture.new(alert_data.merge("state" => "healthy", "summary" => { "elevated" => 0, "high" => 0, "critical" => 0 })),
+  posture_service: SecuritySourceFixture.new(posture_data, method_name: :status),
+  clock: clock
+).report
+check(checks, "a genuine endpoint posture decision independently produces attention", posture_attention.dig("report", "state") == "attention")
 
 partial_alerts = SecuritySourceFixture.new({ "available" => false, "state" => "unavailable", "reason" => "tunnel unavailable", "last_successful_at" => "2026-08-02T00:00:00Z" })
 partial = SoulCore::ConversationSecurityStatusService.new(
