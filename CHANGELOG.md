@@ -6,6 +6,11 @@
 
 ### Conversational Soul
 
+- Reconciled the public Project Timeline seed with accepted implementation
+  evidence and the revisioned owner ledger: completed switch and Noctalia
+  companion work is inventoried, pending YouTube/Chancery/discovery/Core-control
+  gates remain visible, and active host CIS decisions are represented without
+  adding automatic synchronization or inferred completion.
 - Extended the read-only Wazuh adapted-posture projection from one workstation
   to a bounded set of exact agent reviews, preserving separate raw results for
   Atelier and Crucible across device cards and aggregate Chat/Voice status.

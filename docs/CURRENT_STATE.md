@@ -370,6 +370,9 @@ commands, references, acceptance criteria, notes, source, and optimistic
 revision. The curated seed includes a compact implemented-feature inventory as
 well as active and pending work. Soul does not infer status from tests, commits,
 conversation, or model output, and no watcher or background tracker exists.
+The seed is intentionally first-use only. A later mismatch with the revisioned
+owner ledger can be repaired only through an explicit, additive manual
+reconciliation that preserves private-only records and current revisions.
 
 Conversations, skill candidates, music projects, visual projects, reference profiles, logs, and generated artifacts have explicit lifecycle boundaries. Reversible archive/Trash behavior is preferred where appropriate. Permanent deletion exists only for previewed exact scopes and preserves separately exported finished files where the relevant workflow says so.
 

@@ -11,7 +11,7 @@ This document is a deterministic projection of the registered skill records. Reg
 ## Summary
 
 ```text
-skill_count: 37
+skill_count: 38
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -286,6 +286,16 @@ status: available
 ```
 
 Inspect bounded branch, HEAD, status, recent-log, staged-diff, and working-tree-diff evidence from one explicitly configured local Git repository without mutation.
+
+### `security.status`
+
+```text
+name: not declared
+category: administration
+status: available
+```
+
+Collect one privacy-filtered Wazuh manager, agent, recent-alert, and adapted-posture aggregate for Chat or Voice without returning raw events or remediation authority.
 
 ### `skill.brief.draft`
 

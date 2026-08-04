@@ -133,6 +133,20 @@ short-lived confirmation; reboot, workstation maintenance, deletion,
 credentials, and other protected actions remain outside conversational
 authority. See `docs/guides/GUIDED_MAINTENANCE.md`.
 
+### Security monitoring
+
+```text
+security.status
+```
+
+This deterministic read-only invocation refreshes the accepted Wazuh manager,
+agent, recent-alert, and adapted-posture sources and returns a bounded
+privacy-filtered aggregate to Chat or Voice Presence. It never returns raw
+events, combines endpoint compliance scores, or grants acknowledgement,
+suppression, quarantine, Active Response, or remediation authority. Wazuh
+remains the authoritative investigation console. See
+`docs/guides/SECURITY_MONITORING.md`.
+
 ### Conversation lifecycle skills
 
 ```text
