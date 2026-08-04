@@ -2,8 +2,9 @@
 
 ## Result
 
-Candidate-complete pending Lattice credential handoff and normal authenticated
-Dashboard review. Loom's bounded live poll is complete.
+Accepted and merged. Lattice and Loom both completed credential-safe live
+polling, authenticated Dashboard-card review, and topology review without
+gaining switch mutation authority.
 
 ## Implementation summary
 

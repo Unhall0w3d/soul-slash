@@ -59,8 +59,15 @@ Additional checks passed:
 
 Risk: low, read-only local interpretation.
 
-- [ ] Confirm Atelier and Crucible cards show only their associated posture.
-- [ ] Confirm aggregate summary says two endpoint reviews.
-- [ ] Confirm raw Wazuh values remain unchanged.
-- [ ] Confirm Wazuh investigation links still open the authoritative console.
-- [ ] Confirm Chat/Voice return aggregate-only posture evidence.
+- [x] Confirm Atelier and Crucible cards show only their associated posture.
+- [x] Confirm aggregate summary says two endpoint reviews.
+- [x] Confirm raw Wazuh values remain unchanged.
+- [x] Confirm Wazuh investigation links still open the authoritative console.
+- [x] Confirm Chat/Voice return aggregate-only posture evidence.
+
+## Human review outcome
+
+Accepted by the Operator and merged through PR #137 on 2026-08-04. The live
+owner-private manifest retains Atelier agent `002` and Crucible agent `001` as
+separate scan-bound reviews. Dashboard links still open Wazuh, and aggregate
+Chat/Voice output does not calculate or present a combined compliance score.

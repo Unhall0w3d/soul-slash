@@ -15,6 +15,15 @@ commits, conversation, or model output.
 This keeps personal project decisions out of the public repository while
 providing a useful initial timeline to another person who checks out Soul.
 
+The public seed is not reapplied after owner-local state exists. Later seed
+changes therefore never overwrite private notes, revisions, priorities, or
+planning decisions. When repository evidence and the owner ledger diverge, the
+Operator may authorize one explicit manual reconciliation: preserve every
+private-only item, import selected missing public records through
+`ProjectTrackerService`, and update only reviewed exact IDs at their current
+revisions. Reconciliation is a bounded maintenance action, not a watcher,
+automatic migration, or permission to infer completion from Git history.
+
 ## Dashboard flow
 
 Open **Administration → Project Timeline** in the top navigation.

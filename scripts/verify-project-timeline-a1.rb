@@ -33,6 +33,24 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
                File.file?(state_path) &&
                (File.stat(state_path).mode & 0o777) == 0o600)
 
+  reconciled = first.dig("data", "items").to_h { |record| [record.fetch("item_id"), record] }
+  check.call("public seed preserves reviewed completion and pending human gates",
+             reconciled.dig("track_managed_switch_snmp_inventory", "status") == "validated" &&
+               reconciled.dig("track_managed_switch_snmp_inventory", "horizon") == "archive" &&
+               reconciled.dig("track_youtube_description_sync", "status") == "needs_review" &&
+               reconciled.dig("track_winboat_windows_inventory", "status") == "needs_review" &&
+               reconciled.dig("track_portable_fleet_discovery", "status") == "needs_review" &&
+               reconciled.dig("track_noctalia_core_control", "status") == "needs_review")
+  check.call("public seed inventories accepted companion and exact hardening scope",
+             reconciled.dig("track_noctalia_companion", "status") == "validated" &&
+               reconciled.dig("track_noctalia_companion", "horizon") == "archive" &&
+               reconciled.dig("track_harden_crucible_sudo_policy", "status") == "done" &&
+               reconciled.dig("track_host_cis_hardening", "status") == "in_progress" &&
+               reconciled.dig("track_host_cis_hardening", "horizon") == "now")
+  check.call("multi-endpoint Wazuh acceptance is recorded without a fleet score",
+             reconciled.dig("track_wazuh_clamav_security", "notes").include?("PR #137") &&
+               reconciled.dig("track_wazuh_clamav_security", "notes").include?("without inventing a fleet compliance score"))
+
   item = {
     "title" => "Timeline verifier",
     "area" => "Tests",
