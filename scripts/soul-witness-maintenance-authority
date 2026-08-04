@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+
+require_relative "../lib/soul_core/witness_maintenance_authority"
+
+ROOT = File.expand_path("..", __dir__)
+options = {}
+OptionParser.new do |parser|
+  parser.on("--expected-digest SHA256") { |value| options[:expected_digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!
+
+authority = SoulCore::WitnessMaintenanceAuthority.new(root: ROOT)
+action = ARGV.shift.to_s
+result = case action
+         when "plan" then authority.plan
+         when "status" then authority.status
+         when "install"
+           authority.install(expected_digest: options[:expected_digest], confirmation: options[:confirmation])
+         else
+           {"ok" => false, "lifecycle_state" => "awaiting_input", "reason" => "action must be plan, status, or install"}
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

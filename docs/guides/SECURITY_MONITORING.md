@@ -72,6 +72,16 @@ separately reviewed hardening lane; it is not a Wazuh dependency.
 See the [A2 pilot contract](../soul/WAZUH_PASSIVE_AGENT_A2_BRIEF.md) and
 [A2 review](../assessments/WAZUH_PASSIVE_AGENT_A2_REVIEW.md).
 
+Witness extends the same passive boundary to an ARM64 Raspberry Pi OS /
+Debian endpoint. Its agent package must exactly match the manager release,
+temporary TCP 1515 enrollment access is removed immediately afterward, and
+only endpoint-specific TCP 1514 event transport remains. Endpoint Active
+Response is explicitly disabled. The separately reviewed maintenance helper
+does not grant Wazuh remediation authority; it exposes only fixed APT upgrade,
+reboot, and self-check operations. See the
+[Witness contract](../soul/WITNESS_RASPBERRY_PI_MAINTENANCE_A1_BRIEF.md) and
+[Witness review](../assessments/WITNESS_RASPBERRY_PI_MAINTENANCE_A1_REVIEW.md).
+
 An Arch-family Operator workstation is a separate A2B lane. Wazuh does not
 publish a native Arch package, so Soul does not install or automatically trust
 an AUR package. If the Operator chooses a community package, review its exact

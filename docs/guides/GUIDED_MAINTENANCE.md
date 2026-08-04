@@ -344,6 +344,30 @@ one declarative system generation. A reboot is recommended only when
 self-check evidence is required before Maintain or Reboot becomes available.
 See `docs/soul/NIXOS_TEMPER_MAINTENANCE_A1_BRIEF.md`.
 
+### Witness Raspberry Pi target
+
+Witness is a Raspberry Pi OS / Debian security telemetry endpoint. Enrollment
+alone remains inventory-only. After installing the separately reviewed
+root-owned authority, local deployment may enable the adapter with ignored
+settings:
+
+```text
+SOUL_FLEET_WITNESS_CONTROL_ENABLED=true
+SOUL_FLEET_WITNESS_SSH_ALIAS=witness
+SOUL_FLEET_WITNESS_ADDRESS=192.168.1.13
+SOUL_FLEET_WITNESS_LABEL=Witness
+```
+
+The address and literal SSH alias must both match the enrolled record. The card
+reports an APT simulation, running kernel, reboot marker, SSH, Wazuh agent, and
+authority state. Fixed authority exposes only `self-check`, `apt-upgrade`, and
+`reboot`; the helper does not forward request arguments. Its self-check also
+proves the image-generated broad cloud-init sudo rule is absent. Maintenance
+and reboot still require a fresh preview and exact device-specific gate. Reboot
+is separate, never automatic, and must restore SSH, Wazuh, APT, and authority
+readiness before the card refreshes. See
+`docs/soul/WITNESS_RASPBERRY_PI_MAINTENANCE_A1_BRIEF.md`.
+
 An unsubscribed, non-production Proxmox VE node must use Proxmox's
 `pve-no-subscription` repository rather than the authenticated enterprise PVE
 or Ceph repositories. For Proxmox VE 9 on Debian 13, the reviewed deb822 source

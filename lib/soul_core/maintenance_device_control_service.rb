@@ -26,6 +26,8 @@ module SoulCore
     LIFECYCLE_CONTRACT = "device_scoped_v1"
     CRUCIBLE_HELPER_PATH = "/usr/local/libexec/soul-crucible-maintenance"
     CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
+    WITNESS_HELPER_PATH = "/usr/local/libexec/soul-witness-maintenance"
+    WITNESS_AUTHORITY_VERSION = "soul-witness-maintenance-a1-v1"
     NIXOS_HELPER_PATH = "/run/current-system/sw/bin/soul-nixos-maintenance"
     NIXOS_AUTHORITY_VERSION = "soul-nixos-maintenance-a1-v1"
     SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
@@ -146,6 +148,35 @@ module SoulCore
             "label" => "Fixed Crucible authority",
             "argv" => ["/usr/bin/sudo", "-n", CRUCIBLE_HELPER_PATH, "self-check"],
             "stdout_includes" => [CRUCIBLE_AUTHORITY_VERSION]
+          }
+        ]
+      },
+      "witness" => {
+        "label" => "Witness",
+        "maintenance_adapter" => "debian_apt_raspberry_pi",
+        "ssh_alias" => "witness",
+        "impact" => ["Witness security telemetry is unavailable while the Raspberry Pi reboots"],
+        "maintenance" => [
+          ["/usr/bin/sudo", "-n", WITNESS_HELPER_PATH, "apt-upgrade"]
+        ],
+        "reboot" => [
+          "/usr/bin/sudo", "-n", WITNESS_HELPER_PATH, "reboot"
+        ],
+        "reboot_readiness" => [
+          {
+            "label" => "SSH and Wazuh agent",
+            "argv" => ["/usr/bin/systemctl", "is-active", "ssh", "wazuh-agent"],
+            "stdout_includes" => ["active\nactive"]
+          },
+          {
+            "label" => "APT package manager",
+            "argv" => ["/usr/bin/apt-get", "--version"],
+            "stdout_includes" => ["apt "]
+          },
+          {
+            "label" => "Fixed Witness authority",
+            "argv" => ["/usr/bin/sudo", "-n", WITNESS_HELPER_PATH, "self-check"],
+            "stdout_includes" => [WITNESS_AUTHORITY_VERSION]
           }
         ]
       },
@@ -655,8 +686,38 @@ module SoulCore
 
       target = TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
       return temper_target!(target) if device_id.to_s == "temper"
+      return witness_target!(target) if device_id.to_s == "witness"
 
       target
+    end
+
+    def witness_target!(target)
+      raise ArgumentError, "Witness control is not enabled" unless truthy?(@process_env["SOUL_FLEET_WITNESS_CONTROL_ENABLED"])
+
+      ssh_alias = @process_env.fetch("SOUL_FLEET_WITNESS_SSH_ALIAS", "witness").to_s.strip
+      raise ArgumentError, "Witness SSH alias is invalid" unless ssh_alias.match?(SSH_ALIAS_PATTERN)
+      raise ArgumentError, "Witness enrolled control evidence is unavailable; refresh fleet status" unless witness_control_evidence?
+
+      target.merge(
+        "label" => target_display_label("witness", target.fetch("label")),
+        "ssh_alias" => ssh_alias
+      )
+    end
+
+    def witness_control_evidence?
+      snapshot = @fleet_status_service.snapshot
+      return false unless snapshot["ok"] == true && snapshot["lifecycle_state"] == "complete"
+      configured_address = @process_env.fetch("SOUL_FLEET_WITNESS_ADDRESS", "witness").to_s.strip
+
+      Array(snapshot.dig("data", "devices")).any? do |device|
+        device["address"].to_s == configured_address &&
+          device["control"] == "maintenance" &&
+          device.dig("facts", "control_target_id") == "witness" &&
+          device.dig("facts", "mutation_supported") == true &&
+          device.dig("facts", "status_adapter") == "debian_apt_fixed_maintenance"
+      end
+    rescue StandardError
+      false
     end
 
     def temper_target!(target)
@@ -724,6 +785,7 @@ module SoulCore
                       when "crucible" then ["SOUL_FLEET_CRUCIBLE_ADDRESS", "crucible-maintenance"]
                       when "foundry" then ["SOUL_FLEET_FOUNDRY_ADDRESS", "foundry"]
                       when "temper" then ["SOUL_FLEET_TEMPER_ADDRESS", "temper"]
+                      when "witness" then ["SOUL_FLEET_WITNESS_ADDRESS", "witness"]
                       else raise ArgumentError, "device is not available for remote maintenance"
                       end
       value = @process_env[key].to_s.strip
@@ -737,6 +799,7 @@ module SoulCore
             when "forge" then nil
             when "foundry" then "SOUL_FLEET_FOUNDRY_LABEL"
             when "temper" then "SOUL_FLEET_TEMPER_LABEL"
+            when "witness" then "SOUL_FLEET_WITNESS_LABEL"
             else raise ArgumentError, "device is not available for remote maintenance"
             end
       value = key && @process_env[key].to_s.strip

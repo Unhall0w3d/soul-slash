@@ -794,6 +794,12 @@ module SoulCore
       if record.fetch("connection_mode") == "ssh" && enrolled_proxmox?(record, facts)
         return collect_enrolled_proxmox_device(record, facts, package_managers)
       end
+      if record.fetch("connection_mode") == "ssh" &&
+          facts["os_id"] == "debian" &&
+          package_managers.any? { |manager| %w[apt apt-get].include?(manager) } &&
+          witness_control_authorized?(record)
+        return collect_witness_inventory_device(record, facts, package_managers)
+      end
       if (mobile_inventory = apple_mobile_inventory_for(record))
         facts = facts.merge("apple_mobile_inventory" => mobile_inventory)
       end
@@ -932,6 +938,128 @@ module SoulCore
 
       configured_alias = @process_env.fetch("SOUL_FLEET_FOUNDRY_SSH_ALIAS", "foundry").to_s.strip
       configured_alias.match?(SSH_ALIAS_PATTERN) && record["ssh_alias"].to_s == configured_alias
+    end
+
+    def collect_witness_inventory_device(record, facts, package_managers)
+      target = record.fetch("ssh_alias")
+      updates_result = remote_run(
+        "enrolled_device.witness_apt_updates",
+        target,
+        "/usr/bin/apt-get", "-s", "-o", "Debug::NoLocking=1", "dist-upgrade",
+        timeout: 60
+      )
+      running_kernel_result = remote_run(
+        "enrolled_device.witness_kernel",
+        target,
+        "/usr/bin/uname", "-r"
+      )
+      reboot_file = remote_run(
+        "enrolled_device.witness_reboot_required",
+        target,
+        "/usr/bin/test", "-e", "/var/run/reboot-required",
+        accepted_exit_statuses: [0, 1]
+      )
+      ssh = remote_run(
+        "enrolled_device.witness_ssh_service",
+        target,
+        "/usr/bin/systemctl", "is-active", "ssh"
+      )
+      wazuh = remote_run(
+        "enrolled_device.witness_wazuh_service",
+        target,
+        "/usr/bin/systemctl", "is-active", "wazuh-agent"
+      )
+      authority = remote_run(
+        "enrolled_device.witness_authority",
+        target,
+        "/usr/bin/sudo", "-n", "/usr/local/libexec/soul-witness-maintenance", "self-check",
+        timeout: 10
+      )
+
+      authority_ready = witness_authority_ready?(authority)
+      running_kernel = successful?(running_kernel_result) ? output(running_kernel_result) : facts["kernel"].to_s
+      update_count = apt_update_count(updates_result)
+      available_kernel = apt_package_candidate(updates_result, "linux-image-rpi-v8")
+      services = [
+        {
+          "id" => "apt_evidence",
+          "label" => "APT evidence",
+          "state" => successful?(updates_result) ? "active" : "failed"
+        },
+        service_record("SSH", ssh),
+        service_record("Wazuh agent", wazuh),
+        {
+          "id" => "witness_authority",
+          "label" => "Witness authority",
+          "state" => authority_ready ? "active" : "unavailable"
+        }
+      ]
+
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: "Passive security telemetry · Raspberry Pi",
+        address: record.fetch("address"),
+        reachable: true,
+        os: facts["os_pretty_name"].to_s.empty? ? "Debian GNU/Linux" : facts["os_pretty_name"],
+        version: authority_ready ? "APT · managed evidence" : "APT · read-only evidence",
+        kernel: {
+          "running" => running_kernel,
+          "available" => available_kernel.empty? ? running_kernel : "linux-image-rpi-v8 #{available_kernel}",
+          "update_required" => !available_kernel.empty? || reboot_file.exit_status == 0
+        },
+        updates: update_summary(
+          native: update_count,
+          channels: [
+            assessed_update_channel(
+              id: "native", label: "APT", manager: "apt",
+              results: [updates_result], count: update_count
+            )
+          ],
+          freshness: successful?(updates_result) ? "cached_apt_metadata" : "apt_status_unavailable"
+        ),
+        reboot: {
+          "required" => reboot_file.exit_status == 0,
+          "reason" => reboot_file.exit_status == 0 ? "reboot-required marker exists" : "no reboot-required marker"
+        },
+        services: services,
+        facts: facts.merge(
+          "reachability" => "reachable",
+          "kernel" => running_kernel,
+          "package_managers" => package_managers,
+          "status_adapter" => authority_ready ? "debian_apt_fixed_maintenance" : "debian_apt_read_only",
+          "control_target_id" => "witness",
+          "control_capability" => authority_ready ? "fixed_maintenance" : "inventory_only",
+          "maintenance_authority" => authority_ready ? "root_owned_fixed_operations" : "unavailable",
+          "maintenance_adapter" => authority_ready ? "debian_apt_raspberry_pi" : nil,
+          "maintenance_lifecycle" => authority_ready ? "device_scoped_v1" : nil,
+          "mutation_supported" => authority_ready
+        ),
+        control: authority_ready ? "maintenance" : "inventory_only"
+      )
+    end
+
+    def witness_control_authorized?(record)
+      return false unless %w[1 true yes on].include?(@process_env["SOUL_FLEET_WITNESS_CONTROL_ENABLED"].to_s.strip.downcase)
+
+      configured_alias = @process_env.fetch("SOUL_FLEET_WITNESS_SSH_ALIAS", "witness").to_s.strip
+      configured_address = @process_env.fetch("SOUL_FLEET_WITNESS_ADDRESS", "witness").to_s.strip
+      configured_alias.match?(SSH_ALIAS_PATTERN) &&
+        record["ssh_alias"].to_s == configured_alias &&
+        record["address"].to_s == configured_address
+    end
+
+    def witness_authority_ready?(result)
+      return false unless successful?(result)
+
+      parsed = JSON.parse(result.stdout.to_s)
+      parsed.is_a?(Hash) &&
+        parsed["version"] == "soul-witness-maintenance-a1-v1" &&
+        parsed["arbitrary_command_forwarding"] == false &&
+        parsed["password_storage"] == false &&
+        parsed["broad_cloud_init_authority_present"] == false
+    rescue JSON::ParserError
+      false
     end
 
     def collect_nixos_inventory_device(record, facts, package_managers)
@@ -2048,6 +2176,17 @@ module SoulCore
       return 0 unless successful?(result)
 
       output(result).lines.count { |line| line.start_with?("Inst ") }
+    end
+
+    def apt_package_candidate(result, package)
+      return "" unless successful?(result)
+
+      prefix = "Inst #{package} "
+      line = output(result).lines.find { |candidate| candidate.start_with?(prefix) }
+      return "" unless line
+
+      match = line.match(/\((\S+)/)
+      safe_text(match && match[1]).byteslice(0, 120).to_s
     end
 
     def assessed_update_channel(id:, label:, manager:, results:, count:, optional: false)
