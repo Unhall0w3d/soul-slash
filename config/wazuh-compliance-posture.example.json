@@ -1,43 +1,31 @@
 {
-  "schema_version": "soul.wazuh.compliance-posture.v1",
+  "schema_version": "soul.wazuh.compliance-postures.v2",
   "enabled": true,
-  "raw_wazuh_result": {
-    "agent_id": "001",
-    "policy_id": "example_policy",
-    "policy_name": "Example Wazuh SCA policy",
-    "scan_id": "replace-with-source-scan-id",
-    "scan_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "scanned_at": "2026-01-01T00:00:00Z",
-    "passed": 1,
-    "failed": 4,
-    "not_applicable": 0,
-    "total_checks": 5,
-    "score": 20
-  },
-  "adapted_review": {
-    "version": "example-review-v1",
-    "reviewed_at": "2026-01-01T01:00:00Z",
-    "classifications": [
-      {
-        "classification": "verified_effective_control",
-        "check_ids": [1001],
-        "summary": "The control was independently verified; the policy parser did not recognize its equivalent configuration."
+  "postures": [
+    {
+      "raw_wazuh_result": {
+        "agent_id": "001",
+        "policy_id": "example_policy",
+        "policy_name": "Example Wazuh SCA policy",
+        "scan_id": "replace-with-source-scan-id",
+        "scan_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "scanned_at": "2026-01-01T00:00:00Z",
+        "passed": 1,
+        "failed": 4,
+        "not_applicable": 0,
+        "total_checks": 5,
+        "score": 20
       },
-      {
-        "classification": "accepted_workstation_exception",
-        "check_ids": [1002],
-        "summary": "The owner accepted this explicit workstation requirement after review."
-      },
-      {
-        "classification": "policy_or_parser_limitation",
-        "check_ids": [1003],
-        "summary": "The check is incompatible, obsolete, duplicated, or internally inconsistent for this platform."
-      },
-      {
-        "classification": "genuine_remaining_decision",
-        "check_ids": [1004],
-        "summary": "A real hardening choice remains open and is not represented as compliant."
+      "adapted_review": {
+        "version": "example-review-v1",
+        "reviewed_at": "2026-01-01T01:00:00Z",
+        "classifications": [
+          {"classification": "verified_effective_control", "check_ids": [1001], "summary": "The control was independently verified."},
+          {"classification": "accepted_workstation_exception", "check_ids": [1002], "summary": "The owner accepted this endpoint-specific design exception."},
+          {"classification": "policy_or_parser_limitation", "check_ids": [1003], "summary": "The check is incompatible, obsolete, duplicated, or inconsistent."},
+          {"classification": "genuine_remaining_decision", "check_ids": [1004], "summary": "A real hardening choice remains open."}
+        ]
       }
-    ]
-  }
+    }
+  ]
 }

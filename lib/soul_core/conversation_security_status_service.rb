@@ -49,15 +49,18 @@ module SoulCore
     def normalize(health, alerts, posture)
       health_available = health["available"] == true
       alerts_available = alerts["available"] == true
-      state = overall_state(health, alerts, posture)
+      normalized_health = normalize_health(health)
+      normalized_alerts = normalize_alerts(alerts)
+      normalized_posture = normalize_posture(posture)
+      state = overall_state(normalized_health, normalized_alerts, normalized_posture)
       {
         "schema_version" => SCHEMA_VERSION,
         "available" => health_available || alerts_available,
         "state" => state,
         "checked_at" => @clock.call.utc.iso8601,
-        "wazuh" => normalize_health(health),
-        "alerts" => normalize_alerts(alerts),
-        "posture" => normalize_posture(posture),
+        "wazuh" => normalized_health,
+        "alerts" => normalized_alerts,
+        "posture" => normalized_posture,
         "clamav" => {
           "collected" => false,
           "reason" => "Current ClamAV signatures and latest scan receipts are not centralized by the accepted A3 lane."
@@ -118,16 +121,20 @@ module SoulCore
     def normalize_posture(data)
       raw = hash(data["raw_wazuh_result"])
       review = hash(data["adapted_review"])
+      summary = hash(data["summary"])
+      posture_count = integer(summary["posture_count"])
+      posture_count = 1 if posture_count.zero? && data["available"] == true && !raw.empty?
       {
         "available" => data["available"] == true,
         "state" => bounded(data["state"], 40),
         "loaded_at" => bounded(data["loaded_at"], 64),
         "reason" => bounded(data["reason"], 240),
-        "raw_score" => integer(raw["score"]),
-        "raw_passed" => integer(raw["passed"]),
-        "raw_failed" => integer(raw["failed"]),
-        "raw_not_applicable" => integer(raw["not_applicable"]),
-        "genuine_remaining_decisions" => integer(review["genuine_remaining_decision_count"]),
+        "posture_count" => posture_count,
+        "raw_score" => posture_count == 1 ? integer(raw["score"]) : 0,
+        "raw_passed" => integer(summary["raw_passed"] || raw["passed"]),
+        "raw_failed" => integer(summary["raw_failed"] || raw["failed"]),
+        "raw_not_applicable" => integer(summary["raw_not_applicable"] || raw["not_applicable"]),
+        "genuine_remaining_decisions" => integer(summary["genuine_remaining_decision_count"] || review["genuine_remaining_decision_count"]),
         "raw_result_preserved" => data["raw_result_preserved"] == true
       }
     end
@@ -137,7 +144,7 @@ module SoulCore
       return "unavailable" if available.zero?
       return "partial" if available < 2
       return "attention" if health["state"] != "healthy" || alerts["state"] != "healthy"
-      return "attention" if posture["available"] == true && posture.dig("adapted_review", "genuine_remaining_decision_count").to_i.positive?
+      return "attention" if posture["available"] == true && posture["genuine_remaining_decisions"].to_i.positive?
 
       "healthy"
     end
@@ -164,7 +171,11 @@ module SoulCore
       end
 
       if posture["available"]
-        lines << "Adapted posture: raw Wazuh score #{posture['raw_score']}%, with #{posture['genuine_remaining_decisions']} genuine remaining decisions; the raw result remains unchanged."
+        if posture["posture_count"] == 1
+          lines << "Adapted posture: raw Wazuh score #{posture['raw_score']}%, with #{posture['genuine_remaining_decisions']} genuine remaining decisions; the raw result remains unchanged."
+        else
+          lines << "Adapted posture: #{posture['posture_count']} endpoint reviews preserve their separate raw Wazuh results; #{posture['raw_failed']} raw failures are classified with #{posture['genuine_remaining_decisions']} genuine remaining decisions."
+        end
       end
 
       lines << "ClamAV freshness and latest scan receipts were not collected by this status check."

@@ -5,10 +5,12 @@ require "time"
 
 module SoulCore
   class WazuhCompliancePostureService
-    SCHEMA_VERSION = "soul.security.wazuh-compliance-posture.v1"
-    MANIFEST_SCHEMA = "soul.wazuh.compliance-posture.v1"
+    SCHEMA_VERSION = "soul.security.wazuh-compliance-posture.v2"
+    MANIFEST_SCHEMA_V1 = "soul.wazuh.compliance-posture.v1"
+    MANIFEST_SCHEMA_V2 = "soul.wazuh.compliance-postures.v2"
     MAX_MANIFEST_BYTES = 256 * 1024
     MAX_FINDINGS = 512
+    MAX_POSTURES = 16
     CLASSIFICATIONS = %w[
       verified_effective_control
       accepted_workstation_exception
@@ -57,16 +59,20 @@ module SoulCore
     end
 
     def normalize(manifest)
-      raise "Wazuh posture manifest schema is unsupported" unless manifest.is_a?(Hash) && manifest["schema_version"] == MANIFEST_SCHEMA
+      raise "Wazuh posture manifest is invalid" unless manifest.is_a?(Hash)
       raise "Wazuh posture manifest is disabled" unless manifest["enabled"] == true
 
-      raw = normalize_raw(manifest.fetch("raw_wazuh_result"))
-      review = normalize_review(manifest.fetch("adapted_review"), raw)
-      {
+      entries, allow_empty = manifest_entries(manifest)
+      postures = entries.map { |entry| normalize_posture(entry, allow_empty:) }
+      agent_ids = postures.map { |posture| posture.dig("raw_wazuh_result", "agent_id") }
+      raise "Wazuh posture agent identities must be unique" unless agent_ids.uniq.length == agent_ids.length
+
+      summary = summarize(postures)
+      data = {
         "schema_version" => SCHEMA_VERSION,
         "available" => true,
         "configured" => true,
-        "state" => review.fetch("genuine_remaining_decision_count").positive? ? "attention" : "reviewed",
+        "state" => summary.fetch("attention_count").positive? ? "attention" : "reviewed",
         "loaded_at" => @clock.call.utc.iso8601,
         "source" => "owner_reviewed_wazuh_sca_snapshot",
         "read_only" => true,
@@ -74,6 +80,43 @@ module SoulCore
         "wazuh_remains_authoritative" => true,
         "remote_query" => false,
         "remote_mutation" => false,
+        "postures" => postures,
+        "summary" => summary,
+        "verification" => {
+          "all_raw_failures_classified" => postures.all? { |posture| posture.dig("verification", "all_raw_failures_classified") },
+          "classification_ids_unique" => true,
+          "agent_ids_unique" => true,
+          "score_recalculated" => false,
+          "wazuh_result_modified" => false
+        }
+      }
+      if manifest["schema_version"] == MANIFEST_SCHEMA_V1
+        data["raw_wazuh_result"] = postures.first.fetch("raw_wazuh_result")
+        data["adapted_review"] = postures.first.fetch("adapted_review")
+      end
+      data
+    end
+
+    def manifest_entries(manifest)
+      case manifest["schema_version"]
+      when MANIFEST_SCHEMA_V1
+        [[manifest], false]
+      when MANIFEST_SCHEMA_V2
+        entries = manifest["postures"]
+        raise "Wazuh posture entries are invalid" unless entries.is_a?(Array) && entries.any? && entries.length <= MAX_POSTURES
+        raise "Wazuh posture entries are invalid" unless entries.all? { |entry| entry.is_a?(Hash) }
+
+        [entries, true]
+      else
+        raise "Wazuh posture manifest schema is unsupported"
+      end
+    end
+
+    def normalize_posture(entry, allow_empty:)
+      raw = normalize_raw(entry.fetch("raw_wazuh_result"))
+      review = normalize_review(entry.fetch("adapted_review"), raw, allow_empty:)
+      {
+        "state" => review.fetch("genuine_remaining_decision_count").positive? ? "attention" : "reviewed",
         "raw_wazuh_result" => raw,
         "adapted_review" => review,
         "verification" => {
@@ -82,6 +125,18 @@ module SoulCore
           "score_recalculated" => false,
           "wazuh_result_modified" => false
         }
+      }
+    end
+
+    def summarize(postures)
+      {
+        "posture_count" => postures.length,
+        "attention_count" => postures.count { |posture| posture["state"] == "attention" },
+        "raw_passed" => postures.sum { |posture| posture.dig("raw_wazuh_result", "passed") },
+        "raw_failed" => postures.sum { |posture| posture.dig("raw_wazuh_result", "failed") },
+        "raw_not_applicable" => postures.sum { |posture| posture.dig("raw_wazuh_result", "not_applicable") },
+        "reviewed_failure_count" => postures.sum { |posture| posture.dig("adapted_review", "reviewed_failure_count") },
+        "genuine_remaining_decision_count" => postures.sum { |posture| posture.dig("adapted_review", "genuine_remaining_decision_count") }
       }
     end
 
@@ -118,7 +173,7 @@ module SoulCore
       }
     end
 
-    def normalize_review(review, raw)
+    def normalize_review(review, raw, allow_empty:)
       raise "adapted posture review is invalid" unless review.is_a?(Hash)
 
       version = bounded_text(review["version"], 64)
@@ -126,7 +181,7 @@ module SoulCore
       groups = review.fetch("classifications")
       raise "adapted posture classifications are invalid" unless groups.is_a?(Array) && groups.length == CLASSIFICATIONS.length
 
-      normalized = groups.map { |group| normalize_group(group) }
+      normalized = groups.map { |group| normalize_group(group, allow_empty:) }
       kinds = normalized.map { |group| group.fetch("classification") }
       raise "adapted posture classifications must be complete and unique" unless kinds.sort == CLASSIFICATIONS.sort
       ids = normalized.flat_map { |group| group.fetch("check_ids") }
@@ -147,12 +202,13 @@ module SoulCore
       }
     end
 
-    def normalize_group(group)
+    def normalize_group(group, allow_empty:)
       raise "adapted posture classification is invalid" unless group.is_a?(Hash)
       classification = group["classification"].to_s
       raise "adapted posture classification is unsupported" unless CLASSIFICATIONS.include?(classification)
       ids = group.fetch("check_ids")
-      raise "adapted posture check IDs are invalid" unless ids.is_a?(Array) && !ids.empty? && ids.length <= MAX_FINDINGS
+      valid_length = allow_empty ? ids&.length.to_i <= MAX_FINDINGS : ids&.any? && ids.length <= MAX_FINDINGS
+      raise "adapted posture check IDs are invalid" unless ids.is_a?(Array) && valid_length
       ids = ids.map { |id| bounded_integer(id, 1, 999_999) }.sort
       raise "adapted posture check IDs must be unique" unless ids.uniq.length == ids.length
 
