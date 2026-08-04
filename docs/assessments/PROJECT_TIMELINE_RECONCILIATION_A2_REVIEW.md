@@ -54,6 +54,12 @@ item disappeared, and confirm that the owner-local file remains mode `0600`.
 
 - [x] Public seed semantic checks pass.
 - [x] No owner-local timeline item was removed.
-- [ ] The Dashboard **Now** column presents the actual remaining review work.
-- [ ] Implemented inventory contains the accepted switch and Noctalia companion records.
+- [x] The Dashboard **Now** column presents the actual remaining review work.
+- [x] Implemented inventory contains the accepted switch and Noctalia companion records.
 - [x] No sensitive deployment value entered tracked files.
+
+## Human review outcome
+
+Accepted by the Operator on 2026-08-04 after authenticated review of the live
+Project Timeline. The reconciled **Now** column and implemented inventory are
+approved without further changes.
