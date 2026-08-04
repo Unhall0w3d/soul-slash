@@ -71,6 +71,14 @@ as supplemental operational context. If route evidence is unavailable or
 malformed, the map keeps known devices visible and labels the route boundary
 unavailable rather than inventing topology.
 
+Integrated inventory cards open in a compact identity-and-status view so mixed
+platform evidence does not create an uneven wall of permanently expanded
+cards. Click the card or its keyboard-accessible **Details** control to reveal
+the full platform, package, kernel, service, security, and action surface;
+click again or choose **Collapse** to return it to the compact view. Expansion
+is presentation state for the current page session and grants no additional
+authority.
+
 Every device card also has **Refresh**. It runs only that device's existing
 bounded collector, atomically replaces its card in the private snapshot, and
 updates the visible **Checked** timestamp. It does not rescan the subnet or
@@ -176,7 +184,12 @@ SOUL_FLEET_CISCO_PHONE_ADDRESS=<reserved IPv4 address or hostname>
 SOUL_FLEET_CISCO_PHONE_LABEL=Cisco 8851
 ```
 
-Use a DHCP reservation if the phone should retain a stable address. Cisco
+This legacy optional card is deliberately fixed-address configuration. It does
+not participate in MAC-based retargeting. Use a DHCP reservation if the phone
+should retain a stable address. To use Soul's reviewed MAC-tracked DHCP
+identity instead, disable this legacy card and enroll the phone once through
+fleet discovery as a status-only device with reviewed MAC and subnet evidence;
+do not keep both representations enabled. Cisco
 documents richer read-only Product Information and Status pages when phone web
 access is enabled; Soul does not enable, authenticate to, or retain those pages
 in the present supported boundary.

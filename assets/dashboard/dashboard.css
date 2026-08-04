@@ -333,6 +333,14 @@ body.core-locked .app-header,body.core-locked main { filter:blur(7px) saturate(.
 .maintenance-device-card>header { display:flex; justify-content:space-between; gap:15px; }
 .maintenance-device-card h3 { margin:3px 0 5px; color:#C4DCE4; font:400 27px var(--serif); }
 .maintenance-device-role { min-height:2.8em; margin:0; color:#78949D; font-size:11px; line-height:1.45; }
+.maintenance-device-card--compact { grid-column:span 1; align-self:start; min-height:0; padding:14px 15px 13px; }
+.maintenance-device-card--compact:not(.maintenance-device-card--status-only) { cursor:pointer; }
+.maintenance-device-card--compact>header { align-items:center; }
+.maintenance-device-card--compact h3 { margin:2px 0 0; font-size:21px; }
+.maintenance-device-card--compact .eyebrow { font-size:10px; }
+.maintenance-device-card--compact .maintenance-device-role { display:none; }
+.maintenance-device-expand-toggle { flex:none; align-self:center; min-height:32px; padding:6px 9px; border:1px solid rgba(58,174,223,.32); border-radius:9px 2px 9px 2px; background:rgba(7,24,32,.6); color:#91CBD5; font:10px var(--mono); letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+.maintenance-device-expand-toggle:hover,.maintenance-device-expand-toggle:focus-visible { border-color:var(--cyan); color:#C6F5FA; box-shadow:0 0 12px rgba(0,229,255,.13); outline:none; }
 .maintenance-state-badge { flex:none; height:max-content; padding:6px 8px; border:1px solid rgba(58,174,223,.28); border-radius:10px 2px 10px 2px; color:#8DCBD6; font:var(--type-micro) var(--mono); text-transform:uppercase; }
 [data-state="healthy"] .maintenance-state-badge,[data-state="reachable"] .maintenance-state-badge,.maintenance-state-badge[data-state="healthy"],.maintenance-state-badge[data-state="reachable"] { border-color:rgba(85,214,165,.42); color:#86E8BE; }
 [data-state="updates_available"] .maintenance-state-badge,.maintenance-state-badge[data-state="updates_available"] { border-color:rgba(229,196,92,.48); color:#F1D77B; }
@@ -341,6 +349,7 @@ body.core-locked .app-header,body.core-locked main { filter:blur(7px) saturate(.
 .maintenance-device-metrics>div { display:grid; grid-template-columns:68px minmax(0,1fr); gap:9px; padding:8px 0; border-bottom:1px solid rgba(167,123,91,.1); }
 .maintenance-device-metrics dt { color:#637B84; font:var(--type-micro) var(--mono); text-transform:uppercase; }
 .maintenance-device-metrics dd { margin:0; color:#9DB7C0; font:11px/1.5 var(--mono); overflow-wrap:anywhere; }
+.maintenance-device-details { display:none; }
 .maintenance-service-list { display:flex; flex-wrap:wrap; gap:6px; }
 .maintenance-service-list span { padding:5px 7px; border:1px solid var(--line); border-radius:8px 2px; color:#76939B; font:10px var(--mono); text-transform:uppercase; }
 .maintenance-service-list span[data-state="active"] { border-color:rgba(58,174,223,.28); color:#85C4CE; }
@@ -353,6 +362,9 @@ body.core-locked .app-header,body.core-locked main { filter:blur(7px) saturate(.
 .maintenance-device-card--status-only>header { align-items:center; }
 .maintenance-device-card--status-only h3 { margin:2px 0 0; font-size:21px; }
 .maintenance-device-card--status-only .eyebrow { font-size:10px; }
+.maintenance-device-card--expanded.maintenance-device-card--compact { padding:20px; }
+.maintenance-device-card--expanded .maintenance-device-details { display:block; }
+.maintenance-device-card--expanded .maintenance-device-role { display:block; }
 .maintenance-status-only-controls { display:flex; align-items:center; gap:8px; }
 .maintenance-status-only-controls .maintenance-device-refresh { min-width:70px; min-height:34px; padding:6px 10px; }
 .maintenance-status-only-evidence { display:flex; flex-wrap:wrap; gap:6px 13px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(167,123,91,.1); }
