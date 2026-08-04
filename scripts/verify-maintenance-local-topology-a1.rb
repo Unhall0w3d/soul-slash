@@ -31,6 +31,29 @@ check.call("adapted compliance remains beside the unaltered Wazuh result",
 check.call("Wazuh investigations open only as isolated HTTPS links",
            html.scan('rel="noopener noreferrer"').length >= 2 && js.include?('url.protocol === "https:"'))
 
+check.call("rich maintenance cards provide a keyboard-accessible disclosure control",
+           js.include?('setMaintenanceDeviceExpanded(card, expanded)') &&
+             js.include?('toggleMaintenanceDeviceExpansion(event, card)') &&
+             js.include?('maintenance-device-expand-toggle') &&
+             js.include?('expandToggle.addEventListener("click"') &&
+             js.include?('expandToggle.setAttribute("aria-controls"'))
+check.call("rich maintenance cards expose collapsible details with stable compact state",
+           js.include?('maintenance-device-card--compact') &&
+             js.include?('maintenance-device-details') &&
+             js.include?('setMaintenanceDeviceExpanded(card, state.maintenanceDeviceExpanded.has(card.dataset.deviceId))') &&
+             js.include?('card.setAttribute("aria-controls"') &&
+             js.include?('card.setAttribute("aria-expanded"'))
+check.call("compact styling keeps rich card details hidden until expanded",
+           css.include?('.maintenance-device-details { display:none; }') &&
+             css.include?('.maintenance-device-card--expanded .maintenance-device-details { display:block; }') &&
+             css.include?('.maintenance-device-card--expanded.maintenance-device-card--compact { padding:20px; }'))
+check.call("rich card interaction guards preserve button/link actions",
+           js.include?("isMaintenanceCardInteractiveElement") && js.include?("target !== card") && js.include?("closest(\"button, a, input, select, textarea, details, summary, label, [role='button'], [role='link']\")"))
+
+check.call("status-only cards remain compact and separate from expanded controls",
+           js.include?("card.classList.add(\"maintenance-device-card--status-only\")") &&
+             js.include?('role.remove()'))
+
 abort("Local topology A1 verification failed: #{errors.join(', ')}") unless errors.empty?
 
 puts "Local topology A1 verification passed."

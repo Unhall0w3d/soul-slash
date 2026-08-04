@@ -41,6 +41,7 @@ state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
+state.maintenanceDeviceExpanded = new Set();
 state.wazuhSecurity = null;
 state.wazuhAlerts = null;
 state.wazuhNotifications = null;
@@ -2844,6 +2845,47 @@ function maintenanceDeviceIsStatusOnly(device) {
   return device.control === "status_only" || device.facts?.management_channel === "icmp_status";
 }
 
+function sanitizedMaintenanceDeviceId(value) {
+  return String(value || "unknown").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function maintenanceDeviceElementId(device) {
+  return sanitizedMaintenanceDeviceId(device.id || `${device.address || "unknown"}-${device.label || device.role || "managed"}`);
+}
+
+function isMaintenanceCardInteractiveElement(target, card) {
+  return target !== card && !!target.closest("button, a, input, select, textarea, details, summary, label, [role='button'], [role='link']");
+}
+
+function setMaintenanceDeviceExpanded(card, expanded) {
+  const deviceId = card.dataset.deviceId;
+  card.classList.toggle("maintenance-device-card--compact", !expanded);
+  card.classList.toggle("maintenance-device-card--expanded", expanded);
+  if (deviceId) {
+    if (expanded) {
+      state.maintenanceDeviceExpanded.add(deviceId);
+    } else {
+      state.maintenanceDeviceExpanded.delete(deviceId);
+    }
+  }
+  card.setAttribute("aria-expanded", String(Boolean(expanded)));
+  const toggle = card.querySelector(".maintenance-device-expand-toggle");
+  if (toggle) {
+    toggle.textContent = expanded ? "Collapse" : "Details";
+    toggle.setAttribute("aria-expanded", String(Boolean(expanded)));
+  }
+}
+
+function toggleMaintenanceDeviceExpansion(event, card) {
+  if (isMaintenanceCardInteractiveElement(event.target, card)) return;
+  if (event.type === "keydown") {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+  }
+  const expanded = !card.classList.contains("maintenance-device-card--expanded");
+  setMaintenanceDeviceExpanded(card, expanded);
+}
+
 function canonicalMaintenanceManagerLabel(manager) {
   return {
     apt: "APT",
@@ -3226,10 +3268,23 @@ function renderMaintenanceDevice(device) {
       actions.append(button);
     });
   }
+
+  const detailId = `maintenance-device-details-${maintenanceDeviceElementId(device)}`;
+  const details = document.createElement("div"); details.className = "maintenance-device-details"; details.id = detailId;
+  const expandToggle = document.createElement("button"); expandToggle.type = "button"; expandToggle.className = "maintenance-device-expand-toggle";
+  expandToggle.setAttribute("aria-controls", detailId);
+  expandToggle.addEventListener("click", () => setMaintenanceDeviceExpanded(card, !card.classList.contains("maintenance-device-card--expanded")));
+  heading.append(expandToggle);
   const security = renderWazuhDeviceSecurity(device.id);
-  card.append(heading, metrics, services);
-  if (security) card.append(security);
-  card.append(actions);
+  details.append(metrics, services);
+  if (security) details.append(security);
+  details.append(actions);
+  card.append(heading, details);
+  card.classList.add("maintenance-device-card--compact");
+  card.dataset.deviceId = maintenanceDeviceElementId(device);
+  card.setAttribute("aria-controls", detailId);
+  setMaintenanceDeviceExpanded(card, state.maintenanceDeviceExpanded.has(card.dataset.deviceId));
+  card.addEventListener("click", (event) => toggleMaintenanceDeviceExpansion(event, card));
   return card;
 }
 
@@ -3360,6 +3415,10 @@ function renderMaintenanceFleet(data) {
   const statusDevices = (data.devices || []).filter(maintenanceDeviceIsStatusOnly);
   managedDevices.forEach((device) => managedGrid.append(renderMaintenanceDevice(device)));
   statusDevices.forEach((device) => statusGrid.append(renderMaintenanceDevice(device)));
+  const renderedDeviceIds = new Set(managedDevices.map((device) => maintenanceDeviceElementId(device)));
+  Array.from(state.maintenanceDeviceExpanded).forEach((deviceId) => {
+    if (!renderedDeviceIds.has(deviceId)) state.maintenanceDeviceExpanded.delete(deviceId);
+  });
   byId("maintenance-managed-count").textContent = String(managedDevices.length);
   byId("maintenance-presence-count").textContent = String(statusDevices.length);
   if (!managedDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No integrated systems returned."; managedGrid.append(empty); }
