@@ -72,6 +72,12 @@ Dir.mktmpdir("soul-noctalia-v2-") do |root|
       "collected_at" => "2026-07-30T11:59:00Z",
       "devices" => [
         {
+          "id" => "workstation", "label" => "Atelier", "address" => "192.0.2.5",
+          "control" => "maintenance", "status" => "healthy", "reachable" => true,
+          "role" => "Local workstation", "os" => "Linux", "version" => "test",
+          "facts" => {"hostname" => "atelier", "management_channel" => "local"}
+        },
+        {
           "id" => "node_alpha", "label" => "Node Alpha", "address" => "192.0.2.6",
           "status" => "healthy", "reachable" => true, "role" => "Hypervisor",
           "os" => "Proxmox VE", "version" => "9.2.5", "observed_at" => "2026-07-30T11:59:00Z",
@@ -89,9 +95,28 @@ Dir.mktmpdir("soul-noctalia-v2-") do |root|
           "facts" => {"hostname" => "node-beta", "management_channel" => "ssh_inventory"}
         },
         {
+          "id" => "chancery", "label" => "Chancery", "address" => "172.30.0.2",
+          "control" => "inventory_only", "status" => "healthy", "reachable" => true,
+          "role" => "Host-local Windows guest", "os" => "Windows 11", "version" => "WinBoat",
+          "updates" => {"total" => 0, "freshness" => "not_queried", "channels" => []},
+          "facts" => {"management_channel" => "host_local_inventory"}
+        },
+        {
+          "id" => "lattice", "label" => "Lattice", "address" => "192.0.2.10",
+          "control" => "inventory_only", "status" => "healthy", "reachable" => true,
+          "role" => "Managed access switch", "os" => "GS724Tv4", "version" => "6.3.1.47",
+          "updates" => {"total" => 0, "freshness" => "firmware_inventory", "channels" => []},
+          "facts" => {"hostname" => "lattice", "management_channel" => "snmp_v2c_read_only"}
+        },
+        {
           "id" => "speaker", "label" => "Speaker", "address" => "192.0.2.8",
-          "status" => "reachable", "reachable" => true,
+          "control" => "inventory_only", "status" => "reachable", "reachable" => true,
           "facts" => {"hostname" => "speaker", "management_channel" => "icmp_status"}
+        },
+        {
+          "id" => "unsupported", "label" => "Unsupported", "address" => "192.0.2.9",
+          "control" => "inventory_only", "status" => "healthy", "reachable" => true,
+          "facts" => {"management_channel" => "unreviewed_protocol"}
         }
       ]
     }
@@ -110,10 +135,15 @@ Dir.mktmpdir("soul-noctalia-v2-") do |root|
   assert.call(result.dig("core", "label") == "Soul Core", "Core projection differs")
   assert.call(result.dig("core", "choices").map { |choice| choice["id"] } == %w[daily amd-free music free dev], "Core choices differ")
   assert.call(result.dig("core", "choices").find { |choice| choice["id"] == "free" } == {"id" => "free", "label" => "Free Core", "purpose" => "No model", "active" => false, "can_activate" => true}, "Free Core choice differs")
-  assert.call(devices.map { |device| device["id"] } == %w[node_alpha node_beta], "SSH filtering differs")
-  assert.call(devices.first["summary_rows"].any? { |row| row == {"label" => "Hostname", "value" => "node-alpha"} }, "generic summary is missing")
-  assert.call(devices.first["detail_rows"].any? { |row| row["label"] == "Updates" && row["value"].include?("APT 0") }, "generic details are missing")
-  assert.call(devices.all? { |device| device["actions"] == [{"id" => "connect", "label" => "Connect", "kind" => "terminal", "enabled" => true}] }, "connect action differs")
+  assert.call(devices.map { |device| device["id"] } == %w[workstation node_alpha node_beta chancery lattice], "integrated-inventory filtering differs")
+  alpha = devices.find { |device| device["id"] == "node_alpha" }
+  lattice = devices.find { |device| device["id"] == "lattice" }
+  assert.call(alpha["summary_rows"].any? { |row| row == {"label" => "Hostname", "value" => "node-alpha"} }, "generic summary is missing")
+  assert.call(alpha["detail_rows"].any? { |row| row["label"] == "Updates" && row["value"].include?("APT 0") }, "generic details are missing")
+  assert.call(lattice["detail_rows"].include?({"label" => "Connection", "value" => "read-only SNMP inventory"}), "SNMP connection boundary is missing")
+  assert.call(lattice["detail_rows"].include?({"label" => "Updates", "value" => "firmware inventory"}), "SNMP firmware evidence is misleading")
+  assert.call(%w[node_alpha node_beta].all? { |id| devices.find { |device| device["id"] == id }["actions"] == [{"id" => "connect", "label" => "Connect", "kind" => "terminal", "enabled" => true}] }, "SSH connect actions differ")
+  assert.call(%w[workstation chancery lattice].all? { |id| devices.find { |device| device["id"] == id }["actions"] == [] }, "non-SSH inventory gained an interactive action")
   assert.call(!serialized.include?("node-alpha-interactive") && !serialized.include?("node-beta-interactive"), "private SSH target leaked into status")
   assert.call(!serialized.include?("ssh_target"), "legacy target field leaked into status")
   assert.call(registry.ssh_argv("node_alpha") == ["/usr/bin/ssh", "node-alpha-interactive"], "private override was not resolved")

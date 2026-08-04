@@ -3,13 +3,19 @@
 > A1 extension: `NOCTALIA_CORE_CONTROL_A1_BRIEF.md` adds a separately reviewed,
 > two-click Core preview/activation flow. All A0 device and privacy boundaries
 > remain in force.
+>
+> A2 extension: `NOCTALIA_INTEGRATED_INVENTORY_A2_BRIEF.md` aligns the dynamic
+> fleet with the Dashboard's integrated-inventory boundary while keeping
+> status-only presence devices out of the companion and terminal actions
+> restricted to Soul's existing opaque allowlist.
 
 ## Human-approved objective
 
 Replace the owner-local Soul Overview plugin's embedded fleet topology and SSH
 targets with a public-safe, versioned integration boundary. The Noctalia plugin
-must render devices dynamically from Soul, associate details and actions by a
-stable opaque device ID, and ask Soul to open the selected SSH session.
+must render integrated systems dynamically from Soul, associate details and
+actions by a stable opaque device ID, and ask Soul to open a selected SSH
+session only when Soul supplies that action.
 
 ## Boundary
 
@@ -47,7 +53,9 @@ reviewed private target.
 `summary_rows`, `detail_rows`, and an allowlist of action descriptors. Targets
 used to execute those actions are intentionally absent.
 
-Newly enrolled SSH devices inherit their reviewed registry alias. Private
+Newly enrolled SSH devices inherit their reviewed registry alias. Integrated
+local, host-local, and read-only network-inventory devices may appear without
+actions. Private
 `device_actions.json` entries may override that alias when interactive access
 must use a different identity from restricted automation.
 
