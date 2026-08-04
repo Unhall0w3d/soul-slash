@@ -13,7 +13,13 @@ module SoulCore
     SCHEMA_VERSION = "soul.noctalia.status.v2"
     MAX_VERSION_BYTES = 128
     MAX_TEXT_BYTES = 240
-    SSH_CHANNELS = %w[ssh ssh_inventory].freeze
+    INTEGRATED_CHANNELS = %w[
+      local
+      ssh
+      ssh_inventory
+      host_local_inventory
+      snmp_v2c_read_only
+    ].freeze
 
     def initialize(
       root: Dir.pwd,
@@ -128,7 +134,8 @@ module SoulCore
       return nil unless device.is_a?(Hash)
 
       facts = device["facts"].is_a?(Hash) ? device["facts"] : {}
-      return nil unless SSH_CHANNELS.include?(facts["management_channel"])
+      channel = safe_text(facts["management_channel"], 48)
+      return nil unless integrated_device?(device, channel)
 
       id = safe_text(device["id"], 128)
       return nil unless id.match?(NoctaliaDeviceRegistry::DEVICE_ID_PATTERN)
@@ -138,7 +145,7 @@ module SoulCore
       {
         "id" => id,
         "display_name" => safe_text(device["label"].to_s.empty? ? id : device["label"]),
-        "subtitle" => safe_text(device["role"].to_s.empty? ? "SSH-integrated device" : device["role"]),
+        "subtitle" => safe_text(device["role"].to_s.empty? ? "Integrated system" : device["role"]),
         "health" => health,
         "reachable" => reachable,
         "summary_rows" => compact_rows([
@@ -153,6 +160,7 @@ module SoulCore
     def detail_rows(device, facts)
       compact_rows([
         row("Role", device["role"]),
+        row("Connection", connection_label(facts["management_channel"])),
         row("Platform", device["os"]),
         row("Version", device["version"]),
         row("Updates", format_updates(device["updates"])),
@@ -161,6 +169,23 @@ module SoulCore
         row("Services", format_services(device["services"], facts)),
         row("Checked", device["observed_at"])
       ])
+    end
+
+    def integrated_device?(device, channel)
+      return false unless INTEGRATED_CHANNELS.include?(channel)
+      return false if device["control"] == "status_only"
+
+      channel != "icmp_status"
+    end
+
+    def connection_label(channel)
+      {
+        "local" => "local workstation",
+        "ssh" => "reviewed SSH maintenance",
+        "ssh_inventory" => "reviewed SSH inventory",
+        "host_local_inventory" => "host-local inventory",
+        "snmp_v2c_read_only" => "read-only SNMP inventory"
+      }.fetch(channel.to_s, "integrated inventory")
     end
 
     def device_actions(id)
@@ -179,6 +204,10 @@ module SoulCore
 
     def format_updates(value)
       updates = value.is_a?(Hash) ? value : {}
+      freshness = safe_text(updates["freshness"]).tr("_", " ")
+      return "firmware inventory" if freshness == "firmware inventory"
+      return "not queried" if freshness == "not queried"
+
       channels = Array(updates["channels"]).first(12).filter_map do |channel|
         next unless channel.is_a?(Hash)
 
@@ -186,7 +215,6 @@ module SoulCore
         channel["status"] == "complete" ? "#{label} #{channel["count"].to_i}" : "#{label} unavailable"
       end
       channels << "#{updates["total"].to_i} available" if channels.empty?
-      freshness = safe_text(updates["freshness"]).tr("_", " ")
       channels << freshness unless freshness.empty?
       safe_text(channels.join(" · "))
     end

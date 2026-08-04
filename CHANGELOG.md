@@ -6,6 +6,10 @@
 
 ### Conversational Soul
 
+- Aligned the public-safe Noctalia companion with Guided Maintenance's
+  integrated-inventory boundary, adding actionless Atelier, Chancery, Lattice,
+  and Loom cards while keeping compact ICMP presence excluded and terminal
+  connections restricted to reviewed private SSH targets.
 - Reconciled the public Project Timeline seed with accepted implementation
   evidence and the revisioned owner ledger: completed switch and Noctalia
   companion work is inventoried, pending YouTube/Chancery/discovery/Core-control

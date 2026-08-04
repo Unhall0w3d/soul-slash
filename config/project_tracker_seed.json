@@ -57,15 +57,15 @@
       "horizon": "archive",
       "status": "validated",
       "priority": "medium",
-      "summary": "Expose Soul's active Core, Voice Presence, and SSH-integrated fleet through a public Noctalia v5 plugin without publishing private device targets.",
-      "implementation": "The versioned soul.noctalia.status.v2 projection emits generic bounded device summaries and opaque allowlisted actions. Soul resolves private interactive aliases only when the companion receives a validated device ID. The public Git-source plugin renders dynamic cards, detail flips, terminal connections, Voice Presence launch, and local companion configuration without embedding workstation-specific values.",
+      "summary": "Expose Soul's active Core, Voice Presence, and integrated fleet through a public Noctalia v5 plugin without publishing private device targets.",
+      "implementation": "The versioned soul.noctalia.status.v2 projection emits generic bounded device summaries and opaque allowlisted actions. It mirrors the Dashboard's integrated-inventory boundary across local, reviewed SSH, host-local, and read-only SNMP channels while excluding compact ICMP/status-only presence. Soul resolves private interactive aliases only when the companion receives a validated device ID, so read-only cards remain inert. The public Git-source plugin renders dynamic cards, detail flips, allowed terminal connections, Voice Presence launch, and local companion configuration without embedding workstation-specific values.",
       "technologies": "Ruby companion CLI and services; versioned JSON schemas; Noctalia v5 Git-source plugin; owner-private device-action registry; fixed OpenSSH execution.",
       "interfaces": "Noctalia top-bar Soul Overview panel; bin/soul-noctalia status/connect; typed plugin setting for the installed companion path.",
       "commands": "make verify-noctalia-companion\nbin/soul-noctalia status",
-      "references": "docs/soul/NOCTALIA_COMPANION_CONTRACT_A0_BRIEF.md\ndocs/assessments/NOCTALIA_COMPANION_CONTRACT_A0_REVIEW.md",
+      "references": "docs/soul/NOCTALIA_COMPANION_CONTRACT_A0_BRIEF.md\ndocs/soul/NOCTALIA_INTEGRATED_INVENTORY_A2_BRIEF.md\ndocs/assessments/NOCTALIA_COMPANION_CONTRACT_A0_REVIEW.md\ndocs/assessments/NOCTALIA_INTEGRATED_INVENTORY_A2_REVIEW.md",
       "acceptance": "The Git-materialized plugin loads without runtime errors, renders the dynamic fleet within the panel, opens only reviewed opaque SSH targets, launches Voice Presence, and exposes no private alias, credential, or maintenance authority.",
       "source": "Operator-requested Soul/Noctalia integration, 2026-07-30",
-      "notes": "Accepted, published, and active from the public Unhall0w3d/soul-noctalia Git source. Five-device layout, detail flips, SSH connections, Voice Presence launch, and exposure audit passed."
+      "notes": "Accepted, published, and active from the public Unhall0w3d/soul-noctalia Git source. The A2 candidate expands the live projection from five SSH-channel cards to the Dashboard's nine integrated systems: Atelier, Forge, Warden, Chancery, Lattice, Loom, Crucible, Foundry, and Temper. Only the five reviewed SSH targets retain Connect actions."
     },
     {
       "item_id": "track_noctalia_core_control",
