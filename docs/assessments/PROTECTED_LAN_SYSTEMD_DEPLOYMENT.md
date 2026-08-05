@@ -22,6 +22,9 @@
 - Corrected reinstall behavior to enable and restart the same two approved
   services, ensuring changed unit hardening is applied rather than leaving the
   previous process restrictions active.
+- Added a bounded proxy boot preflight that waits for the exact configured LAN
+  IPv4 address before Caddy starts, preventing an early boot bind failure from
+  exhausting the user-service restart limit.
 - Added Make targets for the complete preview, confirmed install, status, logs, and confirmed uninstall lifecycle.
 - Documented Caddy and lingering prerequisites, first-login sequencing, narrow UFW access, public-CA transfer, client validation, and rollback.
 - Kept machine paths, addresses, and generated certificate state out of Git.
@@ -39,6 +42,7 @@
 - `lib/soul_core/dashboard_deployment_assessor.rb`
 - `lib/soul_core/app.rb`
 - `scripts/soul-dashboard-service`
+- `scripts/soul-wait-for-local-ip`
 - `scripts/verify-protected-lan-systemd-deployment.rb`
 - `docs/soul/PROTECTED_LAN_SYSTEMD_DEPLOYMENT_BRIEF.md`
 - `docs/soul/LOCAL_SYSTEMD_HTTPS_DEPLOYMENT.md`
@@ -51,6 +55,9 @@
 ruby -c lib/soul_core/dashboard_deployment.rb
 ruby -c lib/soul_core/dashboard_deployment_assessor.rb
 ruby -c scripts/soul-dashboard-service
+ruby -c scripts/soul-wait-for-local-ip
+scripts/soul-wait-for-local-ip <assigned-ip> 2
+scripts/soul-wait-for-local-ip <unassigned-ip> 1
 ruby bin/soul assess phase12a-configuration --json
 ruby bin/soul assess dashboard-authentication --json
 ruby bin/soul assess dashboard-deployment --json
@@ -99,6 +106,14 @@ restriction. A deliberate dashboard restart loaded `AF_UNIX`; the installer is
 now regression-tested to enable and restart both exact approved services on
 reinstall so rendered unit changes cannot remain dormant.
 
+The 2026-08-05 reboot exposed an early-bind race: the user proxy attempted to
+bind the exact LAN address before it was assigned, failed three times, and hit
+systemd's restart limit while the loopback dashboard recovered normally. The
+installed proxy was manually reset and started after the address appeared.
+The rendered proxy unit now runs `scripts/soul-wait-for-local-ip` as a bounded
+`ExecStartPre` check before Caddy starts; the bind remains exact and no
+wildcard listener is introduced.
+
 The corrected installation completed at `2026-07-15T21:48:13Z`. Both allowlisted user services became enabled and active. Live verification returned HTTP 200 through trusted HTTPS, HTTP 401 for an anonymous private API call after valid CSRF handling, HTTP 200 on Soul's loopback endpoint, and connection refusal for direct LAN access to Soul port `4567`.
 
 ## Deterministic test results
@@ -114,6 +129,8 @@ The deployment assessor verifies:
 - the valid plan returns `blocked_for_human_review` without writes;
 - the bootstrap-password state blocks deployment;
 - rendered configuration keeps Soul on `127.0.0.1:4567` and binds Caddy to one exact LAN address;
+- the proxy waits for that exact local address during boot before attempting
+  the Caddy bind;
 - generated files contain no password, password hash, session value, model credential, or project `.env` content;
 - Caddy validation precedes rendered writes and service enablement;
 - install and uninstall require exact confirmation;

@@ -21,6 +21,7 @@ required = %w[
   lib/soul_core/dashboard_deployment.rb
   lib/soul_core/dashboard_deployment_assessor.rb
   scripts/soul-dashboard-service
+  scripts/soul-wait-for-local-ip
   scripts/verify-protected-lan-systemd-deployment.rb
 ]
 
@@ -50,6 +51,10 @@ check("dashboard hardening grants write access only to project state and the con
       deployment.include?("ProtectSystem=strict") &&
         deployment.include?('ReadWritePaths=#{unit_path(@root)} -#{unit_quote(@backup_mount)}') &&
         deployment.include?("Backup mount must be one normalized absolute path other than root."),
+      errors)
+check("proxy waits for exact local bind address during boot",
+      deployment.include?("ExecStartPre=\#{unit_quote(@ruby_path)} \#{unit_quote(File.join(@root, \"scripts/soul-wait-for-local-ip\"))} \#{unit_quote(lan_host)} 45") &&
+        deployment.include?("RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK"),
       errors)
 make_targets = %w[dashboard-service-plan dashboard-service-install dashboard-service-status dashboard-service-logs dashboard-service-uninstall]
 check("Makefile exposes gated deployment lifecycle", make_targets.all? { |target| makefile.match?(/^#{Regexp.escape(target)}:/) } && makefile.include?("CONFIRM=INSTALL_SOUL_LAN_SERVICES") && makefile.include?("CONFIRM=REMOVE_SOUL_LAN_SERVICES"), errors)

@@ -220,6 +220,7 @@ module SoulCore
           Type=simple
           Environment=XDG_DATA_HOME=%h/.local/share
           Environment=XDG_CONFIG_HOME=%h/.config
+          ExecStartPre=#{unit_quote(@ruby_path)} #{unit_quote(File.join(@root, "scripts/soul-wait-for-local-ip"))} #{unit_quote(lan_host)} 45
           ExecStart=#{unit_quote(@caddy_path.to_s)} run --config %h/.config/soul/Caddyfile --adapter caddyfile
           Restart=on-failure
           RestartSec=5
@@ -234,7 +235,7 @@ module SoulCore
           ProtectKernelTunables=true
           RestrictSUIDSGID=true
           LockPersonality=true
-          RestrictAddressFamilies=AF_INET AF_INET6
+          RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK
 
           [Install]
           WantedBy=default.target
