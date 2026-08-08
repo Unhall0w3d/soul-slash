@@ -1,6 +1,6 @@
 # Atelier CIS Hardening A1 Review
 
-Status: candidate — live root transaction and fresh Wazuh scan pending
+Status: live-installed — observation and fresh Wazuh scan pending
 
 ## Candidate summary
 
@@ -56,15 +56,34 @@ surfaces. The foreground transaction uses `blocked_for_human_review`,
 - Wazuh may retain raw findings because its Arch policy contains duplicate and
   older rule assumptions. Adapted review remains separate from raw scoring.
 
+## Live acceptance evidence
+
+The Operator completed the digest-bound root installation and the privileged
+status verifier on 2026-08-08. The accepted transaction established all four
+exact managed files and loaded the three audit key families. Independent
+non-root follow-up confirmed that:
+
+- DCCP resolves to `install /bin/false`;
+- `auditd` and `wazuh-agent` remain active and enabled;
+- the audit, logrotate, and module-denial files retain their reviewed modes;
+- `/var/log/sudo.log` is owner-private and received evidence from the live
+  verification; and
+- no new Soul service, timer, listener, watcher, credential, or generic
+  privileged execution surface was introduced.
+
+The remaining work is deliberately observational: confirm ordinary desktop use
+does not create unreasonable audit volume, run a fresh Wazuh SCA scan, and bind
+the adapted posture to that new scan without rewriting Wazuh's raw score.
+
 ## Human review checklist
 
 - [x] Operator chose the five controls and four exceptions.
-- [ ] Review the exact plan digest.
-- [ ] Run the one-shot root installation.
-- [ ] Confirm all four managed files are exact.
-- [ ] Confirm DCCP resolves to the deny rule.
-- [ ] Confirm `perm_mod`, `access`, and `delete` are live audit keys.
-- [ ] Exercise one sudo command and confirm `/var/log/sudo.log` records it.
+- [x] Review the exact plan digest.
+- [x] Run the one-shot root installation.
+- [x] Confirm all four managed files are exact.
+- [x] Confirm DCCP resolves to the deny rule.
+- [x] Confirm `perm_mod`, `access`, and `delete` are live audit keys.
+- [x] Exercise one sudo command and confirm `/var/log/sudo.log` records it.
 - [ ] Observe audit volume during ordinary desktop use.
 - [ ] Run a fresh Wazuh SCA scan.
 - [ ] Create a new scan-bound adapted posture with zero open decisions.
