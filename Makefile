@@ -80,6 +80,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
+.PHONY: atelier-cis-hardening-plan atelier-cis-hardening-status atelier-cis-hardening-install atelier-cis-hardening-remove verify-atelier-cis-hardening
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
 
 help:
@@ -206,6 +207,10 @@ help:
 > @echo "  make verify-wazuh-security-status  Verify bounded read-only Wazuh A4a status collection"
 > @echo "  make verify-wazuh-compliance-posture  Verify raw-plus-adapted Wazuh SCA posture projection"
 > @echo "  make verify-wazuh-conversation-status  Verify privacy-filtered Wazuh Chat/Voice status invocation"
+> @echo "  make atelier-cis-hardening-plan  Review the exact workstation hardening files and digest"
+> @echo "  make atelier-cis-hardening-install EXPECTED_DIGEST=... CONFIRM=INSTALL_ATELIER_CIS_HARDENING"
+> @echo "  make atelier-cis-hardening-status  Verify root-owned files and active audit controls"
+> @echo "  make verify-atelier-cis-hardening  Exercise gates, collisions, exact install, and rollback in a fixture root"
 > @echo "  make verify-apple-mobile-fleet-inventory"
 > @echo "  make apple-mobile-inventory-check  Check optional usbmuxd/libimobiledevice support"
 > @echo "  make verify-crucible-fedora-status"
@@ -1029,6 +1034,25 @@ verify-wazuh-compliance-posture:
 
 verify-wazuh-conversation-status:
 > @ruby scripts/verify-conversation-security-status-a4e.rb
+
+atelier-cis-hardening-plan:
+> @ruby scripts/soul-atelier-cis-hardening plan
+
+atelier-cis-hardening-status:
+> @sudo ruby scripts/soul-atelier-cis-hardening status
+
+atelier-cis-hardening-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run atelier-cis-hardening-plan first, then provide EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_ATELIER_CIS_HARDENING" || { echo "Exact confirmation INSTALL_ATELIER_CIS_HARDENING is required."; exit 2; }
+> @sudo ruby scripts/soul-atelier-cis-hardening install "$(EXPECTED_DIGEST)" "$(CONFIRM)"
+
+atelier-cis-hardening-remove:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run atelier-cis-hardening-plan first, then provide EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "REMOVE_ATELIER_CIS_HARDENING" || { echo "Exact confirmation REMOVE_ATELIER_CIS_HARDENING is required."; exit 2; }
+> @sudo ruby scripts/soul-atelier-cis-hardening remove "$(EXPECTED_DIGEST)" "$(CONFIRM)"
+
+verify-atelier-cis-hardening:
+> @ruby scripts/verify-atelier-cis-hardening-a1.rb
 
 wazuh-alert-notifications-plan:
 > @test -n "$(WAZUH_ALERTS_INTEGRATION_FILE)" || { echo "WAZUH_ALERTS_INTEGRATION_FILE is required."; exit 2; }

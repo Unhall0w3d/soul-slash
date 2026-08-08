@@ -162,3 +162,35 @@ benchmark. A4d keeps Wazuh's raw score and counts visible, classifies every raw
 failure exactly once, and never computes an adjusted compliance percentage. See
 the [A4d contract](../soul/WAZUH_ADAPTED_POSTURE_A4D_BRIEF.md) and
 [A4d review](../assessments/WAZUH_ADAPTED_POSTURE_A4D_REVIEW.md).
+
+## Reviewed Atelier CIS hardening
+
+Atelier's 2026-08-08 review selected five exact host controls and retained four
+explicit exceptions. The selected controls add a rotated sudo command log, an
+explicit DCCP module deny, and audit rules for permission changes, failed file
+access, and deletion or rename events. Password aging and SELinux/AppArmor
+policy watches remain reviewed exceptions; the latter frameworks are not active
+on this host.
+
+Review and deterministically verify the exact transaction before using root:
+
+```bash
+make atelier-cis-hardening-plan
+make verify-atelier-cis-hardening
+```
+
+Install only the displayed digest and exact confirmation:
+
+```bash
+make atelier-cis-hardening-install \
+  EXPECTED_DIGEST=<reviewed-digest> \
+  CONFIRM=INSTALL_ATELIER_CIS_HARDENING
+make atelier-cis-hardening-status
+```
+
+The transaction owns only four uniquely named configuration files. It adds no
+passwordless authority and retains `/var/log/sudo.log` during rollback. A fresh
+Wazuh scan and scan-bound adapted review are still required before the Timeline
+item may be validated. See the
+[A1 brief](../soul/ATELIER_CIS_HARDENING_A1_BRIEF.md) and
+[candidate review](../assessments/ATELIER_CIS_HARDENING_A1_REVIEW.md).

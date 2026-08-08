@@ -41,14 +41,14 @@
       "status": "in_progress",
       "priority": "high",
       "summary": "Preserve service functionality while applying safe host hardening and explicitly adjudicating the remaining Wazuh CIS findings on Atelier and Crucible.",
-      "implementation": "Use host-appropriate, rollback-backed hardening slices; rescan through Wazuh; retain raw benchmark scores unchanged; and record every failed check as remediated, accepted exception, parser applicability note, or genuine remaining decision. Soul presents the scan-bound interpretation read-only and grants no remediation authority.",
+      "implementation": "Use host-appropriate, rollback-backed hardening slices; rescan through Wazuh; retain raw benchmark scores unchanged; and record every failed check as remediated, accepted exception, parser applicability note, or genuine remaining decision. The Atelier A1 candidate implements the five approved controls through four exact root-owned files while preserving four explicit reviewed exceptions. Soul presents the scan-bound interpretation read-only and grants no remediation authority.",
       "technologies": "Wazuh SCA and CIS benchmarks; Arch Linux and Fedora Linux; sudoers, auditd, PAM, systemd mounts and host security controls; owner-private scan-bound posture manifests.",
       "interfaces": "Wazuh remains the authoritative investigation console; Guided Maintenance and Local Topology expose raw and reviewed posture for the exact endpoint; Chat and Voice expose aggregate counts only.",
-      "commands": "make verify-wazuh-compliance-posture\nmake verify-wazuh-conversation-status",
-      "references": "docs/guides/SECURITY_MONITORING.md\ndocs/soul/WAZUH_MULTI_ENDPOINT_POSTURE_A4D2_BRIEF.md\ndocs/assessments/WAZUH_MULTI_ENDPOINT_POSTURE_A4D2_REVIEW.md",
+      "commands": "make verify-wazuh-compliance-posture\nmake verify-wazuh-conversation-status\nmake verify-atelier-cis-hardening\nmake atelier-cis-hardening-plan\nmake atelier-cis-hardening-status",
+      "references": "docs/guides/SECURITY_MONITORING.md\ndocs/soul/WAZUH_MULTI_ENDPOINT_POSTURE_A4D2_BRIEF.md\ndocs/assessments/WAZUH_MULTI_ENDPOINT_POSTURE_A4D2_REVIEW.md\ndocs/soul/ATELIER_CIS_HARDENING_A1_BRIEF.md\ndocs/assessments/ATELIER_CIS_HARDENING_A1_REVIEW.md",
       "acceptance": "Crucible retains zero open posture decisions after its reviewed scan; every Atelier residual is explicitly remediated or reviewed without breaking desktop, maintenance, backup, security, or network functionality; a fresh scan-bound manifest remains exact and raw Wazuh values are never rewritten.",
       "source": "Operator-approved CIS review and safe remediation, 2026-08-02 through 2026-08-04",
-      "notes": "Crucible is reviewed at raw 69% with all 56 failed checks classified and zero open decisions. Atelier remains raw 45% with 11 genuine remaining decisions in the current reviewed manifest; those decisions are the active scope."
+      "notes": "Crucible is reviewed at raw 69% with all 56 failed checks classified and zero open decisions. On 2026-08-08 the Operator resolved Atelier's nine distinct decisions: four reviewed exceptions and five approved controls. The exact installation, runtime observation, fresh Wazuh scan, and new scan-bound adapted posture remain pending before validation."
     },
     {
       "item_id": "track_noctalia_companion",

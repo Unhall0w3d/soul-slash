@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+ROOT = File.expand_path("..", __dir__)
+$LOAD_PATH.unshift(File.join(ROOT, "lib"))
+require "soul_core/atelier_cis_hardening"
+
+begin
+service = SoulCore::AtelierCisHardening.new
+operation = ARGV.shift.to_s
+
+result = case operation
+         when "plan"
+           service.plan
+         when "status"
+           service.status
+         when "install"
+           service.install(expected_digest: ARGV.shift.to_s, confirmation: ARGV.shift.to_s)
+         when "remove"
+           service.remove(expected_digest: ARGV.shift.to_s, confirmation: ARGV.shift.to_s)
+         else
+           {
+             "ok" => false,
+             "lifecycle_state" => "awaiting_input",
+             "reason" => "usage: soul-atelier-cis-hardening plan | status | install EXPECTED_DIGEST INSTALL_ATELIER_CIS_HARDENING | remove EXPECTED_DIGEST REMOVE_ATELIER_CIS_HARDENING",
+             "data" => {},
+             "mutation" => "none"
+           }
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 2)
+rescue StandardError => error
+  warn JSON.generate({
+    "ok" => false,
+    "lifecycle_state" => "failed",
+    "reason" => "#{error.class}: #{error.message}",
+    "data" => {},
+    "mutation" => "none"
+  })
+  exit 1
+end
