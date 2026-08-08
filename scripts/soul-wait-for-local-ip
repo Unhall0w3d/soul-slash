@@ -1,0 +1,35 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "ipaddr"
+require "socket"
+
+address = ARGV.fetch(0, "").to_s
+timeout = Integer(ARGV.fetch(1, "45"), 10)
+deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout.clamp(1, 120)
+
+begin
+  expected = IPAddr.new(address)
+rescue IPAddr::InvalidAddressError
+  warn "local IP wait address is invalid"
+  exit 2
+end
+
+unless expected.ipv4? && !expected.loopback?
+  warn "local IP wait address must be one non-loopback IPv4 address"
+  exit 2
+end
+
+loop do
+  present = Socket.getifaddrs.any? do |interface|
+    candidate = interface.addr
+    candidate&.ipv4? && candidate.ip_address == address
+  end
+  exit 0 if present
+  break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+  sleep 1
+end
+
+warn "local IP #{address} was not assigned before timeout"
+exit 1
