@@ -189,8 +189,9 @@ make atelier-cis-hardening-status
 ```
 
 The transaction owns only four uniquely named configuration files. It adds no
-passwordless authority and retains `/var/log/sudo.log` during rollback. A fresh
-Wazuh scan and scan-bound adapted review are still required before the Timeline
-item may be validated. See the
+passwordless authority and retains `/var/log/sudo.log` during rollback. The
+Operator accepted the live installation and closed the implementation item on
+2026-08-08. A fresh Wazuh scan and scan-bound adapted review remain deferred
+routine security follow-up; no refreshed score is claimed. See the
 [A1 brief](../soul/ATELIER_CIS_HARDENING_A1_BRIEF.md) and
 [candidate review](../assessments/ATELIER_CIS_HARDENING_A1_REVIEW.md).

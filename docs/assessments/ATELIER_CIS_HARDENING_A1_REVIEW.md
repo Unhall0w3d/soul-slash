@@ -1,6 +1,6 @@
 # Atelier CIS Hardening A1 Review
 
-Status: live-installed — observation and fresh Wazuh scan pending
+Status: accepted — live-installed; post-install SCA refresh deferred
 
 ## Candidate summary
 
@@ -51,8 +51,8 @@ surfaces. The foreground transaction uses `blocked_for_human_review`,
 - The existing `auditd` service must already be installed and active.
 - The live rule load may expose pre-existing audit-rule ordering or immutable
   mode problems. Such a failure must remain visible and must not be bypassed.
-- The broader event coverage may increase audit volume. Live acceptance must
-  observe volume before final validation.
+- The broader event coverage may increase audit volume. Routine security review
+  should continue to observe it after acceptance.
 - Wazuh may retain raw findings because its Arch policy contains duplicate and
   older rule assumptions. Adapted review remains separate from raw scoring.
 
@@ -71,9 +71,10 @@ non-root follow-up confirmed that:
 - no new Soul service, timer, listener, watcher, credential, or generic
   privileged execution surface was introduced.
 
-The remaining work is deliberately observational: confirm ordinary desktop use
-does not create unreasonable audit volume, run a fresh Wazuh SCA scan, and bind
-the adapted posture to that new scan without rewriting Wazuh's raw score.
+The Operator accepted this implementation as complete on 2026-08-08. A fresh
+Wazuh SCA scan and new scan-bound adapted posture were not run and are recorded
+as deferred routine security follow-up. No refreshed score or scan evidence is
+claimed by this review.
 
 ## Human review checklist
 
@@ -84,6 +85,6 @@ the adapted posture to that new scan without rewriting Wazuh's raw score.
 - [x] Confirm DCCP resolves to the deny rule.
 - [x] Confirm `perm_mod`, `access`, and `delete` are live audit keys.
 - [x] Exercise one sudo command and confirm `/var/log/sudo.log` records it.
-- [ ] Observe audit volume during ordinary desktop use.
-- [ ] Run a fresh Wazuh SCA scan.
-- [ ] Create a new scan-bound adapted posture with zero open decisions.
+- [ ] Deferred follow-up: observe audit volume during ordinary desktop use.
+- [ ] Deferred follow-up: run a fresh Wazuh SCA scan.
+- [ ] Deferred follow-up: create a new scan-bound adapted posture.
