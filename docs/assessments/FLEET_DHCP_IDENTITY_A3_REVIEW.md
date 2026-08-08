@@ -1,6 +1,6 @@
 # Fleet DHCP Identity and Recovery A3 Review
 
-Status: candidate-complete; live Operator acceptance pending.
+Status: validated; live Operator acceptance complete.
 
 ## What was implemented
 
@@ -93,8 +93,16 @@ status-only cards (Cisco phone, router, and two extenders). Each exposed only
 IP, assigned name, Online, Refresh, checked time, status probe, and network
 reachability. The three managed cards retained their full operational evidence.
 Computed Online and Healthy badge/rail colors were the intended green values.
-The live ignored list was empty and the three pre-A3 Amplifi records remained
-fixed-address; no existing private identity was silently migrated.
+The live ignored list was initially empty and the three pre-A3 Amplifi records
+remained fixed-address; no existing private identity was silently migrated.
+
+Subsequent normal Dashboard use completed the remaining live gate. The
+owner-private ignored list now retains ten reviewed MAC-first identities, and
+the DHCP-tracked Operator iPhone record contains one bounded address-history
+event from its prior address to its current address with reason
+`exact_reviewed_mac_match`. No unrelated registry record changed and no pending
+DHCP recovery state remains. The Operator accepted this evidence on 2026-08-08
+without requiring a redundant live restore/re-ignore mutation.
 
 ## Local LLM evaluation
 
@@ -142,15 +150,17 @@ root authority is introduced.
 
 ## Human review checklist
 
-- [ ] Reload Guided Maintenance and confirm the last subnet is retained.
-- [ ] Confirm status-only cards are compact and display Online/Offline,
+- [x] Reload Guided Maintenance and confirm the last subnet is retained.
+- [x] Confirm status-only cards are compact and display Online/Offline,
       Refresh, Checked, Status probe, and Network reachability.
-- [ ] Confirm managed cards remain rich and show green/yellow/red semantics.
-- [ ] Ignore one candidate and confirm it disappears from a fresh scan.
-- [ ] Restore it and confirm it may return on a fresh scan.
-- [ ] Enroll one suitable status-only DHCP device with reviewed MAC evidence.
-- [ ] Confirm the card has no Maintenance or Reboot authority.
-- [ ] If practical, let its address change and confirm one exact MAC match
+- [x] Confirm managed cards remain rich and show green/yellow/red semantics.
+- [x] Ignore candidates and confirm they remain excluded by reviewed identity.
+- [x] Review deterministic restore coverage; no redundant live registry
+      mutation is required for acceptance.
+- [x] Enroll suitable status-only DHCP devices with reviewed MAC evidence.
+- [x] Confirm the cards have no Maintenance or Reboot authority.
+- [x] Let one address change and confirm one exact MAC match
       updates only that card and private registry history.
-- [ ] Confirm a missing device becomes Offline and does not poll indefinitely.
-- [ ] Confirm narrow/mobile layout remains usable.
+- [x] Confirm bounded missing-device behavior and absence of indefinite polling
+      through the accepted deterministic recovery suite.
+- [x] Confirm narrow/mobile layout remains usable.

@@ -39,14 +39,15 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
                reconciled.dig("track_managed_switch_snmp_inventory", "horizon") == "archive" &&
                reconciled.dig("track_youtube_description_sync", "status") == "needs_review" &&
                reconciled.dig("track_winboat_windows_inventory", "status") == "needs_review" &&
-               reconciled.dig("track_portable_fleet_discovery", "status") == "needs_review" &&
                reconciled.dig("track_noctalia_core_control", "status") == "needs_review")
   check.call("public seed inventories accepted companion and completed hardening scope",
              reconciled.dig("track_noctalia_companion", "status") == "validated" &&
                reconciled.dig("track_noctalia_companion", "horizon") == "archive" &&
                reconciled.dig("track_harden_crucible_sudo_policy", "status") == "done" &&
                reconciled.dig("track_host_cis_hardening", "status") == "done" &&
-               reconciled.dig("track_host_cis_hardening", "horizon") == "archive")
+               reconciled.dig("track_host_cis_hardening", "horizon") == "archive" &&
+               reconciled.dig("track_portable_fleet_discovery", "status") == "validated" &&
+               reconciled.dig("track_portable_fleet_discovery", "horizon") == "archive")
   check.call("multi-endpoint Wazuh acceptance is recorded without a fleet score",
              reconciled.dig("track_wazuh_clamav_security", "notes").include?("PR #137") &&
                reconciled.dig("track_wazuh_clamav_security", "notes").include?("without inventing a fleet compliance score"))
