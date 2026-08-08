@@ -1,8 +1,7 @@
 # Portable Fleet Discovery and Enrollment A1 Review
 
-Status: candidate-complete; live acceptance passed; merge pre-approved by the
-Operator. Guided missing-alias extension was live-accepted against Foundry on
-2026-07-29 and awaits PR merge approval.
+Status: validated. Live discovery, enrollment, refresh, candidate continuity,
+guided SSH alias, ignored identity, and DHCP retarget acceptance are complete.
 
 ## What was implemented
 
@@ -141,6 +140,15 @@ was not yet trusted. One explicit terminal `ssh-copy-id` invocation using
 the public key. The subsequent Dashboard enrollment completed, verified the
 alias-to-address binding, identified Debian 13 and a PVE kernel, and presented
 Foundry as generic inventory-only SSH evidence with no mutation controls.
+
+Later normal operation completed the A3 evidence that remained open in the
+original review. Ten reviewed MAC-first identities are retained in the ignored
+list, and the DHCP-tracked Operator iPhone was retargeted exactly once from its
+prior address to its current address by one exact reviewed-MAC match. The
+bounded registry history records that event, unrelated records remained
+unchanged, and no persistent recovery job exists. On 2026-08-08 the Operator
+accepted the complete A1–A4 behavior and waived a redundant live restore test
+because reversible restore remains deterministically covered.
 
 The candidate-filter and identity-hint follow-up was exercised live on Maven.
 One `/24` scan detected 22 reachable addresses, excluded five configured or
