@@ -109,12 +109,16 @@ Core-aware invocation handoff completed Operator live acceptance on
 2026-07-27. Minor refinements remain ordinary follow-up work rather than open
 release gates.
 
-Dashboard notification delivery now has voice, cues-only, and muted modes.
-Submission, wake, completion, and attention cues are static local assets.
+Dashboard notification delivery now has full voice, priority voice, cues-only,
+and muted modes. Submission, wake, completion, and attention cues are static
+local assets. Priority Voice limits speech to material attention such as a
+fleet degradation, reboot requirement, or backup verification issue; a first
+fleet snapshot is deliberately silent. Review-ready music, visual, lyric,
+improvement, and recovery events remain visible in the exact Dashboard record.
 When Voice Presence is visibly open and idle-listening, Chat, music, visual,
-and lyric-analysis completions may additionally use a pre-generated notice in
-the selected F3 or M3 voice. Each event performs one point-in-time status check;
-there is no polling or event-time synthesis.
+lyric-analysis, improvement, and recovery completions may additionally use a
+pre-generated notice in the selected F3 or M3 voice. Each event performs one
+point-in-time status check; there is no polling or event-time synthesis.
 
 Voice screen requests also resolve fresh explicit targets for the active
 Hyprland window, focused monitor, all monitors, left/right or numbered monitor,

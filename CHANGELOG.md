@@ -6,6 +6,11 @@
 
 ### Conversational Soul
 
+- Added the candidate Unified Notification Lane A2: serialized static F3/M3
+  notices, a browser-local Priority Voice mode, silent fleet baselines, and
+  bounded review/attention integration for improvement and backup surfaces.
+  Wazuh remains the only separately accepted durable notification path.
+
 - Aligned the public-safe Noctalia companion with Guided Maintenance's
   integrated-inventory boundary, adding actionless Atelier, Chancery, Lattice,
   and Loom cards while keeping compact ICMP presence excluded and terminal

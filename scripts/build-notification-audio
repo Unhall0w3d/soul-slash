@@ -16,7 +16,12 @@ PHRASES = {
   "music-ready" => "Your music candidate is ready for review.",
   "visual-ready" => "Your visual candidate is ready for review.",
   "lyrics-ready" => "Lyric analysis is ready for review.",
+  "improvement-ready" => "A new improvement review is ready.",
+  "backup-ready" => "Recovery preparation is ready for review.",
   "attention" => "A task needs your attention.",
+  "device-attention" => "A system needs attention. Open Guided Maintenance.",
+  "reboot-required" => "A system restart is required.",
+  "backup-attention" => "Backup verification needs review.",
   "security-alert" => "Soul detected a high-priority security alert. Review Wazuh."
 }.freeze
 CUES = {
