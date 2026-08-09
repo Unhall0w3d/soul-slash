@@ -351,8 +351,8 @@
       "item_id": "track_visual_motion_quality",
       "title": "Higher-fidelity visual motion qualification",
       "area": "Visual Studio",
-      "horizon": "now",
-      "status": "in_progress",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "medium",
       "summary": "Continue evaluating loop length, native motion fidelity, interpolation, and scene adherence.",
       "acceptance": "Measured visual benefit justifies runtime and resource cost at the supported duration and frame rate.",
@@ -362,7 +362,7 @@
       "interfaces": "Visual Studio native scene and motion-study review lanes; read-only Qualification ledger; Music Studio generated-motion binding.",
       "commands": "ruby scripts/verify-conversational-native-motion-a1.rb\nruby scripts/verify-visual-studio-native-video.rb\nruby scripts/verify-visual-studio-generated-motion.rb",
       "references": "docs/soul/VISUAL_STUDIO_A5_NATIVE_VIDEO_BRIEF.md\ndocs/soul/CONVERSATIONAL_NATIVE_MOTION_AND_QUALIFICATION_A1_BRIEF.md\ndocs/assessments/CONVERSATIONAL_NATIVE_MOTION_AND_QUALIFICATION_A1_REVIEW.md",
-      "notes": "The current live ledger inventories 10 retained motion samples: 7 reviewed and 3 awaiting review. Human evidence exists at 4 seconds (2/4 reviewed, 4.5/5 average), 8 seconds (1/2, 3/5), and 12 seconds (4/4, 3.5/5). Operator A/B judgment remains required before any profile is aesthetically qualified."
+      "notes": "The Operator accepted the current bounded 4-second, 8-second, and 12-second Visual Motion profiles on 2026-08-08 after completing the retained-sample review. This qualification does not extend duration support, approve new runtime profiles, or permit automatic aesthetic approval."
     },
     {
       "item_id": "track_structured_creative_exports",

@@ -55,8 +55,8 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
              reconciled.dig("track_music_variable_duration", "horizon") == "now" &&
                reconciled.dig("track_music_variable_duration", "status") == "in_progress" &&
                reconciled.dig("track_music_finishing_refinement", "horizon") == "now" &&
-               reconciled.dig("track_visual_motion_quality", "horizon") == "now" &&
-               reconciled.dig("track_visual_motion_quality", "status") == "in_progress" &&
+               reconciled.dig("track_visual_motion_quality", "horizon") == "archive" &&
+               reconciled.dig("track_visual_motion_quality", "status") == "validated" &&
                reconciled.dig("track_music_long_form", "horizon") == "next" &&
                reconciled.dig("track_music_long_form", "status") == "planned")
 
