@@ -1,6 +1,6 @@
 # Selectable Recovery Rehearsal A3 Brief
 
-Status: Operator-approved implementation scope; live qualification required
+Status: Implemented and human-accepted on 2026-08-09
 
 ## Objective
 

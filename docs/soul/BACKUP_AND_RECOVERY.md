@@ -423,13 +423,13 @@ failure. It shares the workstation's chassis, power, administrative boundary,
 and location. Crucible provides an independently hosted encrypted second copy.
 The manual initialize/copy/check path and exact
 cross-repository lineage reconciliation were live-accepted on 2026-07-29. A
-selectable local/Crucible full-recovery candidate now awaits live qualification.
+selectable local/Crucible full-recovery implementation was human-accepted on
+2026-08-09 after deterministic recovery and boundary qualification. Each actual
+restore remains an explicit human-gated operation and produces its own receipt.
 The supervised DRS A1 transaction composes capture and replication without storing
 its page-session password. A2/A3 adds the separately reviewed host-encrypted
 credential and qualification-before-permanent systemd timer. Neither path
-deletes remote snapshots. The rehearsal remains incomplete until its live
-receipt and human inspection are accepted. Remote retention policy remains
-separate work.
+deletes remote snapshots. Remote retention policy remains separate work.
 
 ### Rotating both repository passwords
 

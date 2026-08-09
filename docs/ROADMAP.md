@@ -116,9 +116,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 - [x] backup and disaster-recovery local foundation, Crucible's encrypted
   second copy, supervised DRS, and the live-qualified nightly credential/timer
-  are accepted; a selectable local/Crucible full-recovery rehearsal is
-  candidate-complete and awaits live qualification, while remote retention
-  remains a separate future scope
+  are accepted; selectable local/Crucible full-recovery into an exact
+  Operator-selected isolated directory is also accepted, while remote
+  retention remains a separate future scope
 - [x] reviewed Proxmox deployment provides Crucible as a Fedora 44 KVM backup target and DNF5 laboratory; exact maintenance, separate reboot, remote repository initialization/copy/check, and credential rotation are live-accepted
 - [ ] Internet exposure only after a dedicated threat model and deployment review
 

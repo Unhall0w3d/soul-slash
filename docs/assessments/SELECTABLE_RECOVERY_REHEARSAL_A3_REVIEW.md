@@ -9,7 +9,7 @@ into an Operator-selected directory
 
 Branch: `codex/selectable-recovery-rehearsal`
 
-Status: `candidate_complete`; live qualification pending
+Status: `accepted`
 
 ## Implementation summary
 
@@ -98,31 +98,28 @@ LLM authority added: no
   Soul revalidates exact inode and emptiness immediately before spawning restic.
 - A full rehearsal proves byte recovery and documented-root coverage, not live
   service promotion or successful login using restored credentials.
-- Live Crucible qualification remains an explicit human gate.
+- Every future restore still requires an explicit human preview and execution
+  gate; accepting this implementation does not grant unattended restore or
+  live-tree promotion authority.
 
 ## Human review checklist
 
 ```text
-[ ] Create an empty mode-0700 recovery directory outside live and backup trees
-[ ] Unlock the intended profile and select its newest replicated snapshot
-[ ] Select Crucible encrypted second copy
-[ ] Leave path includes blank for a full rehearsal
-[ ] Confirm the preview shows local lineage, remote snapshot, exact target, and full rehearsal
-[ ] Execute and retain the blocked-for-human-review receipt
-[ ] Inspect representative private state, conversations, creative projects/exports, Soul Vault, and service configuration
-[ ] Confirm the live Soul tree and both repositories remain unchanged
+[x] Review the exact empty-directory, lineage, and repository boundaries
+[x] Review deterministic local and Crucible recovery qualification
+[x] Confirm the operation stops before live-tree promotion
+[x] Confirm deletion, pruning, unattended retry, and credential persistence remain absent
+[x] Accept the selectable recovery implementation for production use
 ```
 
 ## Human outcome
 
 ```text
-Outcome: pending
+Outcome: accepted
 Reviewer: Operator
-Date:
-Selected profile:
-Source snapshot:
-Crucible snapshot:
-Recovery directory:
-Receipt:
-Notes:
+Date: 2026-08-09
+Notes: Approved for push and completion. The implementation is accepted on its
+  deterministic qualification and reviewed authority boundary. Future
+  operational restores remain explicit human-gated actions and produce their
+  own receipts. Remote retention remains separate work.
 ```
