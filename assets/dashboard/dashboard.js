@@ -57,29 +57,38 @@ state.chatProgress = new Map();
 state.localChatRequests = new Set();
 const VOICE_OUTPUT_PROFILES = new Set(["F3", "M3"]);
 const VOICE_OUTPUT_QUALITIES = new Set(["responsive", "expressive"]);
-const NOTIFICATION_MODES = ["voice", "cues", "muted"];
+const NOTIFICATION_MODES = ["voice", "priority", "cues", "muted"];
 const NOTIFICATION_EVENTS = Object.freeze({
   submit: { cue: "submit" },
   chat_ready: { cue: "complete", spoken: "chat-ready" },
   music_ready: { cue: "complete", spoken: "music-ready" },
   visual_ready: { cue: "complete", spoken: "visual-ready" },
   lyrics_ready: { cue: "complete", spoken: "lyrics-ready" },
-  attention: { cue: "attention", spoken: "attention" }
+  improvement_ready: { cue: "complete", spoken: "improvement-ready" },
+  backup_ready: { cue: "complete", spoken: "backup-ready" },
+  attention: { cue: "attention", spoken: "attention", priority: true },
+  device_attention: { cue: "attention", spoken: "device-attention", priority: true },
+  reboot_required: { cue: "attention", spoken: "reboot-required", priority: true },
+  backup_attention: { cue: "attention", spoken: "backup-attention", priority: true }
 });
 try { const storedVoice = localStorage.getItem("soul.voice.output.profile"); state.voiceOutputProfile = VOICE_OUTPUT_PROFILES.has(storedVoice) ? storedVoice : "F3"; } catch (_error) { state.voiceOutputProfile = "F3"; }
 try { const storedQuality = localStorage.getItem("soul.voice.output.quality"); state.voiceOutputQuality = VOICE_OUTPUT_QUALITIES.has(storedQuality) ? storedQuality : "responsive"; } catch (_error) { state.voiceOutputQuality = "responsive"; }
-try { const storedMode = localStorage.getItem("soul.notifications.mode"); state.notificationMode = NOTIFICATION_MODES.includes(storedMode) ? storedMode : "voice"; } catch (_error) { state.notificationMode = "voice"; }
+try { const storedMode = localStorage.getItem("soul.notifications.mode"); state.notificationMode = NOTIFICATION_MODES.includes(storedMode) ? storedMode : "priority"; } catch (_error) { state.notificationMode = "priority"; }
 state.notificationPlayback = null;
 state.notificationKeys = new Set();
+state.notificationQueue = Promise.resolve();
+state.maintenanceNotificationStates = new Map();
 
 function renderNotificationMode() {
   const button = byId("notification-mode"); if (!button) return;
-  const labels = { voice: "Alerts Voice", cues: "Alerts Cues", muted: "Alerts Muted" };
+  const labels = { voice: "Alerts Voice", priority: "Alerts Priority", cues: "Alerts Cues", muted: "Alerts Muted" };
   button.querySelector("span").textContent = labels[state.notificationMode];
   button.dataset.mode = state.notificationMode;
   button.title = state.notificationMode === "voice"
-    ? "Cues plus pre-generated speech while Voice Presence is open and idle · click to change"
-    : (state.notificationMode === "cues" ? "Nonverbal notification cues only · click to change" : "Local notifications muted · click to change");
+    ? "Cues plus all pre-generated speech while Voice Presence is open and idle · click to change"
+    : (state.notificationMode === "priority"
+      ? "Cues plus priority speech while Voice Presence is open and idle · click to change"
+      : (state.notificationMode === "cues" ? "Nonverbal notification cues only · click to change" : "Local notifications muted · click to change"));
 }
 
 function cycleNotificationMode() {
@@ -112,7 +121,7 @@ async function voicePresenceReceipt() {
   } catch (_error) { return {}; }
 }
 
-async function emitSoulNotification(eventName, uniqueKey = null) {
+async function deliverSoulNotification(eventName, uniqueKey = null) {
   const event = NOTIFICATION_EVENTS[eventName]; if (!event || state.notificationMode === "muted") return;
   if (uniqueKey && state.notificationKeys.has(uniqueKey)) return;
   if (uniqueKey) {
@@ -120,11 +129,35 @@ async function emitSoulNotification(eventName, uniqueKey = null) {
     if (state.notificationKeys.size > 100) state.notificationKeys.delete(state.notificationKeys.values().next().value);
   }
   await playNotificationFile(`/notifications/cue-${event.cue}.wav`, 0.48);
-  if (state.notificationMode !== "voice" || !event.spoken) return;
+  if ((state.notificationMode !== "voice" && !(state.notificationMode === "priority" && event.priority === true)) || !event.spoken) return;
   const presence = await voicePresenceReceipt();
   if (presence.running !== true || presence.presence_state !== "listening") return;
   const voice = presence.notification_voice === "M3" ? "m3" : "f3";
   await playNotificationFile(`/notifications/${voice}-${event.spoken}.wav`, 0.78);
+}
+
+function emitSoulNotification(eventName, uniqueKey = null) {
+  state.notificationQueue = state.notificationQueue
+    .catch(() => undefined)
+    .then(() => deliverSoulNotification(eventName, uniqueKey));
+  return state.notificationQueue;
+}
+
+function maintenanceNotificationState(device) {
+  if (device?.reboot?.required === true) return "reboot_required";
+  return String(device?.status || "unknown");
+}
+
+function emitMaintenanceTransitions(devices) {
+  (devices || []).forEach((device) => {
+    const id = String(device.id || device.label || "").trim(); if (!id) return;
+    const next = maintenanceNotificationState(device); const prior = state.maintenanceNotificationStates.get(id);
+    state.maintenanceNotificationStates.set(id, next);
+    if (!prior || prior === next) return;
+    if (next === "reboot_required") emitSoulNotification("reboot_required", `fleet:${id}:${next}`);
+    else if (["attention", "offline"].includes(next)) emitSoulNotification("device_attention", `fleet:${id}:${next}`);
+    else if (next === "updates_available") emitSoulNotification("attention", `fleet:${id}:${next}`);
+  });
 }
 
 function formatBytes(value) {
@@ -2607,6 +2640,7 @@ async function executeBetaDevBuild() {
       ? `Machine tests passed ${data.test_summary?.passed || 0}/${data.test_summary?.declared || 0}. Candidate awaits human Beta review.`
       : (envelope.errors?.[0]?.message || data.reason || "The candidate failed safely; inspect its review evidence.");
     state.studioLoaded = false; await loadSkillStudio(); await selectBeta(betaId);
+    if (data.implementation_complete) emitSoulNotification("improvement_ready", `beta:${betaId}:${data.revision || data.updated_at || "candidate"}`);
   } catch (error) { status.textContent = error.message; }
   finally { hideGenerationProgress(progress); }
 }
@@ -2846,7 +2880,7 @@ async function executeAssessmentDevSynthesis() {
   try {
     const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_improvement.dev_synthesis.execute", { scope: preview.scope, confirmation: byId("assessment-dev-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev synthesis in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev synthesis failed safely");
-    state.assessmentDevPreview = null; byId("assessment-dev-confirm").hidden = true; await loadAssessmentDevReviews(); status.textContent = "Advisory review recorded. Source evidence remains authoritative; no follow-on action was invoked."; announce("Self Assessment Dev synthesis review ready");
+    state.assessmentDevPreview = null; byId("assessment-dev-confirm").hidden = true; await loadAssessmentDevReviews(); status.textContent = "Advisory review recorded. Source evidence remains authoritative; no follow-on action was invoked."; announce("Self Assessment Dev synthesis review ready"); emitSoulNotification("improvement_ready", `assessment-review:${preview.scope}:${preview.evidence_sha256}`);
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev synthesis exceeded its foreground time limit." : error.message; }
   finally { progress.hidden = true; button.disabled = !state.assessmentDevPreview; }
 }
@@ -2878,6 +2912,7 @@ async function executeImprovementProposals() {
   if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Generation blocked; preview again."; return; }
   renderImprovementProposals(data.proposals); status.textContent = `${data.written_count || 0} new advisory packet${data.written_count === 1 ? "" : "s"} written. Human review is still required.`;
   state.improvementProposalPreview = null; byId("improvement-proposal-confirm").hidden = true; announce("Improvement proposal generation complete");
+  if (Number(data.written_count || 0) > 0) emitSoulNotification("improvement_ready", `improvement:${state.improvementScope || "environment"}:${data.expected_digest || data.written_count}`);
 }
 
 function maintenanceStateLabel(status, rebootRequired = false) {
@@ -3476,6 +3511,7 @@ function renderMaintenanceFleet(data) {
   if (!statusDevices.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No status-only devices returned."; statusGrid.append(empty); }
   renderMaintenanceTopology(data.topology, { canvasId: "maintenance-topology" });
   renderMaintenanceTopology(data.topology, { canvasId: "local-topology" });
+  emitMaintenanceTransitions(data.devices || []);
   state.maintenanceFleetLoaded = true;
 }
 
@@ -4463,7 +4499,7 @@ async function executeAugmentationDevHandoff() {
   try {
     const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_augmentation.dev_handoff.execute", { experiment_id: preview.experiment_id, confirmation: byId("augmentation-dev-handoff-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev handoff in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev implementation handoff failed safely");
-    state.augmentationDevHandoffPreview = null; byId("augmentation-dev-handoff-confirm").hidden = true; await loadAugmentationDevHandoffs(); status.textContent = "Advisory handoff recorded. No code, worktree, gate, or integration state changed."; announce("Self Augmentation Dev handoff ready");
+    state.augmentationDevHandoffPreview = null; byId("augmentation-dev-handoff-confirm").hidden = true; await loadAugmentationDevHandoffs(); status.textContent = "Advisory handoff recorded. No code, worktree, gate, or integration state changed."; announce("Self Augmentation Dev handoff ready"); emitSoulNotification("improvement_ready", `augmentation-handoff:${preview.experiment_id}:${preview.expected_digest}`);
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev handoff exceeded its foreground time limit." : error.message; }
   finally { progress.hidden = true; button.disabled = !state.augmentationDevHandoffPreview; }
 }
@@ -4486,7 +4522,7 @@ async function executeAugmentationDevCritique() {
   try {
     const envelope = await callNdjson("/api/v1/bounded-job-stream", "self_augmentation.dev_critique.execute", { proposal_id: preview.proposal_id, confirmation: byId("augmentation-dev-critique-confirmation").value, expected_digest: preview.expected_digest }, {}, (event) => { status.textContent = event.message || "Bounded Dev critique in progress…"; });
     if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Dev critique failed safely");
-    state.augmentationDevCritiquePreview = null; byId("augmentation-dev-critique-confirm").hidden = true; await loadAugmentationDevCritiques(); status.textContent = "Advisory critique recorded. Gate A1 and worktree creation remain unchanged."; announce("Self Augmentation Dev critique ready");
+    state.augmentationDevCritiquePreview = null; byId("augmentation-dev-critique-confirm").hidden = true; await loadAugmentationDevCritiques(); status.textContent = "Advisory critique recorded. Gate A1 and worktree creation remain unchanged."; announce("Self Augmentation Dev critique ready"); emitSoulNotification("improvement_ready", `augmentation-critique:${preview.proposal_id}:${preview.expected_digest}`);
   } catch (error) { status.textContent = error.name === "TimeoutError" ? "Dev critique exceeded its foreground time limit." : error.message; }
   finally { progress.hidden = true; button.disabled = !state.augmentationDevCritiquePreview; }
 }
@@ -5252,7 +5288,8 @@ async function executeBackupDrs() {
     const result = backupResult(envelope);
     byId("backup-drs-status").textContent = `Snapshot ${result.snapshot_id?.slice(0, 12) || "created"} and exact Crucible lineage verified.`;
     resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
-  } catch (error) { byId("backup-drs-status").textContent = error.message; }
+    emitSoulNotification("backup_ready", `backup:drs:${result.snapshot_id || result.completed_at || "complete"}`);
+  } catch (error) { byId("backup-drs-status").textContent = error.message; emitSoulNotification("backup_attention", "backup:drs:attention"); }
   finally { state.backupBusy = false; byId("execute-backup-drs").disabled = false; hideGenerationProgress(progress); }
 }
 
@@ -5389,7 +5426,8 @@ async function executeBackupRestore() {
     const rehearsal = result.recovery_rehearsal?.status === "verified" ? ` Full recovery coverage verified across ${result.recovery_rehearsal.restored_source_root_count} documented roots.` : "";
     byId("backup-restore-status").textContent = `Restore verified in ${result.staged_path}; live state remains unchanged.${rehearsal}`;
     resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
-  } catch (error) { byId("backup-restore-status").textContent = error.message; }
+    emitSoulNotification("backup_ready", `backup:restore:${result.staged_path || "ready"}`);
+  } catch (error) { byId("backup-restore-status").textContent = error.message; emitSoulNotification("backup_attention", "backup:restore:attention"); }
   finally { state.backupBusy = false; byId("execute-backup-restore").disabled = false; hideGenerationProgress(progress); }
 }
 

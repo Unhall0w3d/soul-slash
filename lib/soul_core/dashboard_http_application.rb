@@ -36,8 +36,18 @@ module SoulCore
       "/notifications/m3-visual-ready.wav" => ["assets/notifications/m3-visual-ready.wav", "audio/wav"],
       "/notifications/f3-lyrics-ready.wav" => ["assets/notifications/f3-lyrics-ready.wav", "audio/wav"],
       "/notifications/m3-lyrics-ready.wav" => ["assets/notifications/m3-lyrics-ready.wav", "audio/wav"],
+      "/notifications/f3-improvement-ready.wav" => ["assets/notifications/f3-improvement-ready.wav", "audio/wav"],
+      "/notifications/m3-improvement-ready.wav" => ["assets/notifications/m3-improvement-ready.wav", "audio/wav"],
+      "/notifications/f3-backup-ready.wav" => ["assets/notifications/f3-backup-ready.wav", "audio/wav"],
+      "/notifications/m3-backup-ready.wav" => ["assets/notifications/m3-backup-ready.wav", "audio/wav"],
       "/notifications/f3-attention.wav" => ["assets/notifications/f3-attention.wav", "audio/wav"],
       "/notifications/m3-attention.wav" => ["assets/notifications/m3-attention.wav", "audio/wav"],
+      "/notifications/f3-device-attention.wav" => ["assets/notifications/f3-device-attention.wav", "audio/wav"],
+      "/notifications/m3-device-attention.wav" => ["assets/notifications/m3-device-attention.wav", "audio/wav"],
+      "/notifications/f3-reboot-required.wav" => ["assets/notifications/f3-reboot-required.wav", "audio/wav"],
+      "/notifications/m3-reboot-required.wav" => ["assets/notifications/m3-reboot-required.wav", "audio/wav"],
+      "/notifications/f3-backup-attention.wav" => ["assets/notifications/f3-backup-attention.wav", "audio/wav"],
+      "/notifications/m3-backup-attention.wav" => ["assets/notifications/m3-backup-attention.wav", "audio/wav"],
       "/notifications/f3-security-alert.wav" => ["assets/notifications/f3-security-alert.wav", "audio/wav"],
       "/notifications/m3-security-alert.wav" => ["assets/notifications/m3-security-alert.wav", "audio/wav"]
     }.freeze

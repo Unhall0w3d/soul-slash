@@ -108,6 +108,21 @@
       "notes": "Operator completed live acceptance on 2026-07-27. Notification cues and spoken notices are accepted for the current release; minor refinements may return through later slices."
     },
     {
+      "item_id": "track_unified_notification_lane_a2",
+      "title": "Unify Dashboard review and attention notifications",
+      "area": "Voice + Dashboard",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Add static, idle-Presence notices for material creative, improvement, fleet, and backup/recovery events without creating a general background notifier.",
+      "implementation": "The browser-local lane serializes playback, deduplicates exact terminal events, establishes a silent fleet baseline, and offers Voice, Priority Voice, Cues, and Muted delivery. Wazuh's accepted high-priority durable poller remains separate.",
+      "interfaces": "Authenticated Dashboard notification mode control; visible Voice Presence static F3/M3 playback; Guided Maintenance, Self Improvement, Self Augmentation, Skill Studio Beta build, and Backup & Recovery completion paths.",
+      "references": "docs/soul/NOTIFICATION_CUES_A1_BRIEF.md\ndocs/soul/UNIFIED_NOTIFICATION_LANE_A2_BRIEF.md\ndocs/assessments/UNIFIED_NOTIFICATION_LANE_A2_REVIEW.md",
+      "acceptance": "Operator verifies Priority Voice speaks only degraded fleet, reboot-required, and backup-attention outcomes while visible Presence is idle; full Voice adds review-ready notices; first fleet baseline is silent; Cues and Muted remain non-speaking.",
+      "source": "Unified Notification Lane A2",
+      "notes": "Candidate complete for human review. A Dashboard-closed owner-private outbox is intentionally deferred to a separately approved persistent-loop brief; no subsystem-specific timers or pollers are added."
+    },
+    {
       "item_id": "track_project_timeline",
       "title": "Project Timeline and implementation tracker",
       "area": "Dashboard + Chat",
