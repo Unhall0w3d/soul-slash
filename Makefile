@@ -415,6 +415,10 @@ verify-visual-motion-qualification:
 verify-music-qualification:
 > @ruby scripts/verify-music-qualification-a1.rb
 
+.PHONY: verify-music-vocal-diagnostics
+verify-music-vocal-diagnostics:
+> @ruby scripts/verify-music-vocal-diagnostics-a1.rb
+
 visual-native-check:
 > @ruby scripts/soul-visual-motion-runtime check --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)"
 

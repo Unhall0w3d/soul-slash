@@ -280,12 +280,12 @@
       "summary": "Use real generations to refine prompt translation, collapse recovery, vocal adherence, revision targeting, natural endings, and lightweight source-preserving trim.",
       "acceptance": "Common revision feedback reliably changes the intended musical property; failures remain diagnosable; kept exports preserve exact reviewed lineage.",
       "source": "Near-term creative refinement",
-      "implementation": "Existing production services preserve immutable prompt and seed inputs, bounded collapse recovery, machine-heard lyric evidence, review-led revision drafting, source-preserving trim, FLAC/MP3 export, and exact publication lineage. The qualification ledger now exposes retained review and finishing evidence for the active cohort.",
+      "implementation": "Existing production services preserve immutable prompt and seed inputs, bounded collapse recovery, machine-heard lyric evidence, review-led revision drafting, source-preserving trim, FLAC/MP3 export, and exact publication lineage. The qualification ledger exposes retained review and finishing evidence. A read-only vocal diagnostic now separates preflight intelligibility risks from structured human and machine failure evidence without blocking generation or rewriting a project.",
       "technologies": "Ruby Music Studio services; ACE-Step 1.5 Vulkan; whisper.cpp transcription; ffmpeg/ffprobe; bounded Gemma/Qwen revision drafting.",
-      "interfaces": "Music Studio candidate review, Soul Revision Draft, retry, trim, export, Chat creative workflow, and Duration & finishing ledger.",
-      "commands": "make verify-music-qualification\nmake verify-music-a2\nmake verify-music-vocal-analysis\nmake verify-music-lite-edit\nruby scripts/verify-music-revision-draft.rb",
-      "references": "docs/guides/MUSIC_STUDIO.md\ndocs/soul/CREATIVE_QUALIFICATION_PROGRAM_A1_BRIEF.md\ndocs/assessments/CREATIVE_QUALIFICATION_PROGRAM_A1_REVIEW.md\ndocs/soul/MUSIC_STUDIO_REVISION_PIPELINE_BRIEF.md\ndocs/assessments/MUSIC_STUDIO_REVISION_PIPELINE_REVIEW.md",
-      "notes": "Implementation is available; active work is human review of adherence, useful revisions, endings, and source-preserving finishing across real retained generations."
+      "interfaces": "Music Studio vocal feasibility card, candidate review, Soul Revision Draft, retry, trim, export, Chat creative workflow, and Duration & finishing ledger.",
+      "commands": "make verify-music-qualification\nmake verify-music-vocal-diagnostics\nmake verify-music-a2\nmake verify-music-vocal-analysis\nmake verify-music-lite-edit\nruby scripts/verify-music-revision-draft.rb",
+      "references": "docs/guides/MUSIC_STUDIO.md\ndocs/soul/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_BRIEF.md\ndocs/assessments/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_REVIEW.md\ndocs/soul/CREATIVE_QUALIFICATION_PROGRAM_A1_BRIEF.md\ndocs/assessments/CREATIVE_QUALIFICATION_PROGRAM_A1_REVIEW.md\ndocs/soul/MUSIC_STUDIO_REVISION_PIPELINE_BRIEF.md\ndocs/assessments/MUSIC_STUDIO_REVISION_PIPELINE_REVIEW.md",
+      "notes": "Diagnostic implementation is candidate-complete. Active work remains human review of adherence, useful revisions, endings, and source-preserving finishing across real retained generations."
     },
     {
       "item_id": "track_cleanup_retention",
