@@ -411,6 +411,10 @@ visual-motion-pilot-run:
 verify-visual-motion-qualification:
 > @ruby scripts/verify-visual-motion-qualification.rb
 
+.PHONY: verify-music-qualification
+verify-music-qualification:
+> @ruby scripts/verify-music-qualification-a1.rb
+
 visual-native-check:
 > @ruby scripts/soul-visual-motion-runtime check --manifest "$(VISUAL_NATIVE_MANIFEST)" --root "$(VISUAL_NATIVE_ROOT)"
 

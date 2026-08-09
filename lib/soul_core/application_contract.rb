@@ -204,6 +204,7 @@ module SoulCore
       "music.projects.list" => %w[limit],
       "music.projects.create" => %w[project],
       "music.projects.get" => %w[project_id],
+      "music.qualification" => [],
       "music.projects.release" => %w[project_id],
       "music.projects.restore" => %w[project_id],
       "music.projects.delete.preview" => %w[project_id],

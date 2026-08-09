@@ -1187,10 +1187,37 @@ async function loadMusicStudio() {
   state.musicLoaded = true;
   try {
     const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope);
-    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicReferenceStatus(); await refreshMusicResources();
+    state.musicProjects = dataOf(envelope).projects || []; renderMusicProjects(); await loadMusicReferences(); await refreshMusicReferenceStatus(); await refreshMusicResources(); await refreshMusicQualification();
     const first = state.musicProjects.find((project) => (project.release_state || "active") === state.musicProjectView);
     if (first) await selectMusicProject(first);
   } catch (error) { state.musicLoaded = false; byId("music-form-status").textContent = error.message; }
+}
+
+async function refreshMusicQualification() {
+  const button = byId("refresh-music-qualification"); const summary = byId("music-qualification-summary"); const status = byId("music-qualification-status");
+  button.disabled = true; status.textContent = "Reading retained music candidates and human reviews…";
+  try {
+    const envelope = await callSoul("music.qualification"); lifecycle(envelope); const data = dataOf(envelope);
+    const overview = document.createElement("dl");
+    [["Projects", data.project_count], ["Candidates", data.candidate_count], ["Human reviewed", data.reviewed_count], ["Unreviewed records", data.unreviewed_count]].forEach(([label, value]) => {
+      const row = document.createElement("div"); const term = document.createElement("dt"); const detail = document.createElement("dd"); term.textContent = label; detail.textContent = String(value); row.append(term, detail); overview.append(row);
+    });
+    const coverage = document.createElement("div");
+    (data.coverage || []).forEach((item) => {
+      const row = document.createElement("div"); row.className = "qualification-duration";
+      const heading = document.createElement("strong"); heading.textContent = `${item.duration_seconds} seconds`;
+      const evidence = document.createElement("span"); const technical = item.technical_evidence_present ? "technical pass" : "technical gap"; const kept = item.kept_evidence_present ? "keep recorded" : "human decision pending";
+      evidence.textContent = `${item.reviewed_count}/${item.candidate_count} reviewed · ${technical} · ${kept} · ${(item.current_states || []).join(", ") || "no project"}`;
+      row.append(heading, evidence); coverage.append(row);
+    });
+    const next = document.createElement("p"); next.className = "muted"; next.textContent = data.next_review;
+    summary.replaceChildren(overview, coverage, next);
+    status.textContent = `${String(data.evidence_state || "pending").replaceAll("_", " ")} · human qualification only`;
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function loadMusicReferences() {
@@ -5932,6 +5959,7 @@ byId("music-project-release").addEventListener("click", toggleMusicProjectReleas
 byId("music-project-form").addEventListener("submit", createMusicProject);
 byId("music-vocal-mode").addEventListener("change", syncMusicCompositionMode);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
+byId("refresh-music-qualification").addEventListener("click", refreshMusicQualification);
 byId("preview-music-reference").addEventListener("click", previewMusicReference);
 byId("music-reference-confirmation").addEventListener("input", () => { byId("analyze-music-reference").disabled = !state.musicReferencePreview || byId("music-reference-confirmation").value !== state.musicReferencePreview.confirmation_phrase; });
 byId("analyze-music-reference").addEventListener("click", analyzeMusicReference);
