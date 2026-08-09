@@ -51,6 +51,7 @@ require_relative "self_augmentation_experiment_service"
 require_relative "self_augmentation_dev_critique_service"
 require_relative "self_augmentation_dev_handoff_service"
 require_relative "music_generation_service"
+require_relative "music_vocal_diagnostic_service"
 require_relative "music_qualification_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
@@ -119,6 +120,7 @@ module SoulCore
       self_augmentation_dev_critique_service: nil,
       self_augmentation_dev_handoff_service: nil,
       music_generation_service: nil,
+      music_vocal_diagnostic_service: nil,
       music_qualification_service: nil,
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
@@ -184,6 +186,7 @@ module SoulCore
       @self_augmentation_dev_critique_service = self_augmentation_dev_critique_service
       @self_augmentation_dev_handoff_service = self_augmentation_dev_handoff_service
       @music_generation_service = music_generation_service
+      @music_vocal_diagnostic_service = music_vocal_diagnostic_service
       @music_qualification_service = music_qualification_service
       @music_candidate_analysis_service = music_candidate_analysis_service
       @music_revision_draft_service = music_revision_draft_service
@@ -460,6 +463,7 @@ module SoulCore
       when "music.projects.list" then domain(project_release.decorate_outcome(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)), kind: "music"))
       when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
       when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.vocals.diagnostic" then domain(music_vocal_diagnostic.inspect(project_id: required(parameters, "project_id")))
       when "music.qualification" then domain(music_qualification.snapshot)
       when "music.projects.release" then domain(project_release.release(kind: "music", project_id: required(parameters, "project_id")))
       when "music.projects.restore" then domain(project_release.restore(kind: "music", project_id: required(parameters, "project_id")))
@@ -1055,6 +1059,13 @@ module SoulCore
 
     def music_generation
       @music_generation_service ||= MusicGenerationService.new(root: @root)
+    end
+
+    def music_vocal_diagnostic
+      @music_vocal_diagnostic_service ||= MusicVocalDiagnosticService.new(
+        music_generation: music_generation,
+        analysis_service: music_candidate_analysis
+      )
     end
 
     def visual_studio

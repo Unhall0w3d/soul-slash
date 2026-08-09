@@ -1394,7 +1394,7 @@ function renderMusicProjects() {
 function setMusicProjectView(view) { state.musicProjectView = view; state.selectedMusicProject = null; resetMusicForm(); }
 
 function resetMusicForm() {
-  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); syncMusicCompositionMode(); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-release").hidden = true; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
+  state.selectedMusicProject = null; state.musicProjectDeletePreview = null; state.musicPreview = null; byId("music-project-form").reset(); byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = false; }); byId("music-bpm").value = "110"; byId("music-key").value = "C minor"; byId("music-time").value = "4"; byId("music-seed").value = String(Math.floor(Math.random() * 2147483647)); syncMusicCompositionMode(); byId("music-workbench-title").textContent = "New composition"; byId("save-music-project").hidden = false; byId("music-project-release").hidden = true; byId("music-vocal-diagnostic-card").hidden = true; byId("music-project-delete-card").hidden = true; byId("music-project-delete-confirm").hidden = true; byId("music-generation-card").hidden = true; byId("music-candidates").hidden = true; byId("music-form-status").textContent = "A new project preserves its exact creative inputs."; renderMusicProjects();
 }
 
 async function createMusicProject(event) {
@@ -1403,7 +1403,31 @@ async function createMusicProject(event) {
 }
 
 async function selectMusicProject(project) {
-  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); syncMusicCompositionMode(); byId("save-music-project").hidden = true; const release = byId("music-project-release"); release.hidden = false; release.textContent = p.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); } catch (error) { byId("music-form-status").textContent = error.message; }
+  try { const envelope = await callSoul("music.projects.get", { project_id: project.project_id }); lifecycle(envelope); const data = dataOf(envelope); state.selectedMusicProject = data.project; state.musicProjectDeletePreview = null; state.musicPreview = null; renderMusicProjects(); const p = data.project; byId("music-workbench-title").textContent = p.title; byId("music-title").value = p.title; byId("music-intent").value = p.intent; byId("music-duration").value = String(p.target_duration_seconds); byId("music-vocal-mode").value = p.vocal_mode; byId("music-rights").value = p.rights_status; byId("music-bpm").value = String(p.bpm); byId("music-key").value = p.keyscale; byId("music-time").value = p.timesignature; byId("music-seed").value = String(p.seed); byId("music-caption").value = p.caption; byId("music-lyrics").value = p.lyrics; byId("music-project-form").querySelectorAll("input,textarea,select").forEach((field) => { field.disabled = true; }); syncMusicCompositionMode(); byId("save-music-project").hidden = true; const release = byId("music-project-release"); release.hidden = false; release.textContent = p.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("music-vocal-diagnostic-card").hidden = false; byId("music-project-delete-card").hidden = false; byId("music-project-delete-confirm").hidden = true; byId("music-project-delete-status").textContent = "Preview inventories this project before permanent deletion."; byId("music-generation-card").hidden = false; byId("music-generation-confirm").hidden = true; renderMusicCandidates(data.generations || []); await refreshMusicVocalDiagnostic(); } catch (error) { byId("music-form-status").textContent = error.message; }
+}
+
+async function refreshMusicVocalDiagnostic() {
+  const project = state.selectedMusicProject; if (!project) return;
+  const button = byId("refresh-music-vocal-diagnostic"); const status = byId("music-vocal-diagnostic-status"); button.disabled = true; status.textContent = "Inspecting lyric structure and retained candidate evidence…";
+  try { const envelope = await callSoul("music.vocals.diagnostic", { project_id: project.project_id }); lifecycle(envelope); if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.lifecycle_state); renderMusicVocalDiagnostic(dataOf(envelope)); status.textContent = "Read-only evidence refreshed. Generation and review authority remain unchanged."; }
+  catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+function renderMusicVocalDiagnostic(diagnostic) {
+  const root = byId("music-vocal-diagnostic-output"); root.replaceChildren();
+  const summary = document.createElement("p"); summary.className = "music-vocal-diagnostic-summary"; summary.textContent = diagnostic.summary;
+  const metrics = document.createElement("dl"); metrics.className = "studio-meta";
+  const entries = diagnostic.state === "not_applicable" ? [["State", "Instrumental · not applicable"]] : [
+    ["Script", `${diagnostic.preflight.line_count} lines · ${diagnostic.preflight.word_count} words · ${diagnostic.preflight.section_count} tags`],
+    ["Vocal attempts", `${diagnostic.attempts.vocal_candidate_count} of ${diagnostic.attempts.candidate_count} candidates · ${diagnostic.attempts.reviewed_count} reviewed · ${diagnostic.attempts.unreviewed_count} unreviewed`],
+    ["Lyric reviews", `${diagnostic.attempts.lyric_passed_reviews} passed · ${diagnostic.attempts.lyric_partial_reviews} partial · ${diagnostic.attempts.lyric_failed_reviews} failed`],
+    ["Best machine recall", diagnostic.attempts.best_sequence_recall == null ? "No retained transcription" : `${Math.round(Number(diagnostic.attempts.best_sequence_recall) * 100)}%`]
+  ];
+  entries.forEach(([label, value]) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = label; dd.textContent = value; row.append(dt, dd); metrics.append(row); });
+  root.append(summary, metrics);
+  if (diagnostic.preflight.risks.length) { const heading = document.createElement("strong"); heading.textContent = "Detected risks"; const list = document.createElement("ul"); list.className = "test-list"; diagnostic.preflight.risks.forEach((risk) => { const item = document.createElement("li"); item.textContent = `${risk.explanation}. Evidence: ${risk.evidence.join(" · ")}`; list.append(item); }); root.append(heading, list); }
+  const recHeading = document.createElement("strong"); recHeading.textContent = "Bounded recommendations"; const recommendations = document.createElement("ul"); recommendations.className = "test-list"; diagnostic.recommendations.forEach((text) => { const item = document.createElement("li"); item.textContent = text; recommendations.append(item); }); root.append(recHeading, recommendations);
 }
 
 async function toggleMusicProjectRelease() {
@@ -5957,6 +5981,7 @@ byId("music-folder-active").addEventListener("click", () => setMusicProjectView(
 byId("music-folder-released").addEventListener("click", () => setMusicProjectView("released"));
 byId("music-project-release").addEventListener("click", toggleMusicProjectRelease);
 byId("music-project-form").addEventListener("submit", createMusicProject);
+byId("refresh-music-vocal-diagnostic").addEventListener("click", refreshMusicVocalDiagnostic);
 byId("music-vocal-mode").addEventListener("change", syncMusicCompositionMode);
 byId("refresh-music-resources").addEventListener("click", refreshMusicResources);
 byId("refresh-music-qualification").addEventListener("click", refreshMusicQualification);

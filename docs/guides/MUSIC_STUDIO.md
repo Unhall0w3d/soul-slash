@@ -77,6 +77,20 @@ coherence, endings, and transition utility before closing the cohort.
 
 Optional CPU transcription compares intended and machine-heard lyrics, formats repeated sections, reports sequence recall and likely problem lines, then exits. “Machine heard OK” routes to human listening; “Machine heard BAD” recommends revision. Neither route approves or rejects music.
 
+The selected project also exposes **Vocal feasibility — Adherence & failure
+evidence**. This read-only diagnostic runs without a model. Before generation it
+identifies advisory risks such as very short lyric lines, performance directions
+that are not anchored to ordinary song sections, and explicit requests for
+inaudible, distant, buried, or transmission-damaged vocals. After generation it
+summarizes only structured listening reviews and retained machine sequence
+recall. Historical instrumental candidates are excluded from vocal outcome
+counts.
+
+The diagnostic follows ACE-Step's usual guidance—concise structural tags and
+roughly six to ten syllables per lyric line—but does not treat those preferences
+as validation rules. It never blocks the generation button, rewrites the brief,
+or claims that a clear preflight guarantees adherence.
+
 **Ask Soul to draft revision** translates recorded evidence into an editable sound/structure block, lyrics, BPM, key, meter, and new seed. Review and edit that packet before previewing a new candidate. A retry uses a new candidate and preserves the source.
 
 ## References and artist profiles
@@ -114,3 +128,4 @@ Project deletion inventories and permanently removes the private composition, ca
 - [`docs/GETTING_STARTED.md`](../GETTING_STARTED.md)
 - [`docs/soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md`](../soul/MULTI_MODEL_AND_MUSIC_STUDIO_ARCHITECTURE.md)
 - [`docs/soul/MUSIC_YOUTUBE_PACKAGE_BRIEF.md`](../soul/MUSIC_YOUTUBE_PACKAGE_BRIEF.md)
+- [`docs/soul/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_BRIEF.md`](../soul/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_BRIEF.md)
