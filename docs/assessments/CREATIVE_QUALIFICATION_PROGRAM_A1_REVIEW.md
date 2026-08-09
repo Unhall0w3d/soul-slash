@@ -76,8 +76,12 @@ Memory keys added or used: none. Task lifecycle states touched: `complete`,
 - [ ] Review the latest 57-second candidate.
 - [ ] Complete the 57- and 71-second revision decisions.
 - [ ] Compare the accepted 43-, 144-, and 248-second candidates for coherence, endings, and transition utility.
-- [ ] Review the three retained unreviewed Visual Motion candidates.
-- [ ] Decide whether each supported motion duration/profile is aesthetically qualified.
+- [x] Review the three retained unreviewed Visual Motion candidates.
+- [x] Decide whether each supported motion duration/profile is aesthetically qualified.
 - [ ] Decide whether the five-duration music cohort is qualified.
 
 Passing deterministic checks does not complete either aesthetic decision.
+
+Visual Motion acceptance: the Operator accepted the current bounded 4-, 8-,
+and 12-second profiles on 2026-08-08 after full retained-sample review. Longer
+durations and new profiles remain outside that decision.

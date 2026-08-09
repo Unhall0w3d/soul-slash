@@ -83,7 +83,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 ## Qualified expansion candidates
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
-- [ ] Operator qualification of longer or higher-fidelity motion only when the ledger's measured output justifies runtime and resource cost
+- [x] Operator qualification of the current bounded 4-second, 8-second, and
+  12-second Visual Motion profiles through the retained evidence ledger; longer
+  durations and new runtime profiles remain separately gated
 - [x] A0/A1/A2 assembly of finished variable-duration songs into an immutable
   timeline with trim, crossfade, transition, cues, editor handoff, listening
   render, human review, and exact accepted-audio export; visual loop sequencing
