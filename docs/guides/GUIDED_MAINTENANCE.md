@@ -694,10 +694,13 @@ fixed allowlisted applications, skips already-running background entries,
 places supported windows through Hyprland's typed Lua dispatchers, restores the
 previously active workspace last, writes a terminal receipt, and consumes the
 journal. The unit and native handoff use the stable `/usr/bin/ruby` runtime.
-The workstation's reviewed registry includes Webex and Teams for Linux as
-`launch_if_absent` entries: they are recorded only when their window or process
-exists before reboot, never launched merely because they are installed, and
-never duplicated if autologin already restored them.
+The workstation's reviewed registry includes Webex, Teams for Linux, and Steam
+as `launch_if_absent` entries: they are recorded only when their window or
+process exists before reboot, never launched merely because they are installed,
+and never duplicated if autologin already restored them. Steam uses the same
+fixed `NO_AT_BRIDGE=1` client launcher as the Operator's desktop entry and does
+not include a game URI, so restoring the client cannot implicitly launch a
+game.
 
 Hosts that require a physical display-link retrain after autologin may provide
 one owner-controlled executable:
