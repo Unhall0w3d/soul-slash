@@ -28,10 +28,12 @@ The page has five exact-gated operations:
    any selection that would leave fewer than two snapshots. Preview runs
    restic's dry-run; execution performs one bounded forget/prune and verifies
    repository metadata again.
-3. **Stage a restore** restores one full snapshot or up to 20 exact absolute
-   paths into a new owner-private staging directory with restic verification.
-   It inventories and hashes the result, then stops as
-   `blocked_for_human_review`. It never overwrites live state.
+3. **Stage or rehearse a restore** restores one full snapshot or up to 20 exact
+   absolute paths from either the local repository or the exact Crucible
+   replica lineage. Blank target input creates managed private staging. An
+   explicit target must be an existing empty owner-only directory outside live
+   sources and backup storage. It inventories and hashes the result, then
+   stops as `blocked_for_human_review`. It never overwrites live state.
 4. **Copy to Crucible** verifies the fixed SSH/SFTP target, initializes its
    encrypted repository when absent, copies missing `soul-state` snapshots,
    verifies target metadata, and proves exact source-snapshot coverage through
@@ -383,6 +385,21 @@ live recovery. Promotion is deliberately external because replacing current
 credentials, conversations, creative projects, or runtime state may require
 stopping services and invalidating active sessions.
 
+For a selectable rehearsal, create the destination yourself and retain control
+of its location:
+
+```sh
+mkdir -m 700 /absolute/path/to/soul-recovery-rehearsal
+```
+
+Enter that exact absolute path in the Dashboard. Soul refuses symlinks,
+nonempty or non-owner-only directories, live/source overlap, and backup
+repository overlap. Selecting **Crucible encrypted second copy** resolves the
+chosen local snapshot ID through restic's preserved `original` lineage and
+restores the corresponding remote snapshot through the fixed reviewed SFTP
+transport. A full restore verifies every root in the captured manifest and
+records recovery-class evidence; it still grants no live promotion authority.
+
 A full disaster rehearsal should separately document:
 
 1. restoring into an empty staging location;
@@ -405,12 +422,14 @@ This internal SSD protects against accidental deletion and primary-filesystem
 failure. It shares the workstation's chassis, power, administrative boundary,
 and location. Crucible provides an independently hosted encrypted second copy.
 The manual initialize/copy/check path and exact
-cross-repository lineage reconciliation were live-accepted on 2026-07-29. The
-supervised DRS A1 transaction composes capture and replication without storing
+cross-repository lineage reconciliation were live-accepted on 2026-07-29. A
+selectable local/Crucible full-recovery implementation was human-accepted on
+2026-08-09 after deterministic recovery and boundary qualification. Each actual
+restore remains an explicit human-gated operation and produces its own receipt.
+The supervised DRS A1 transaction composes capture and replication without storing
 its page-session password. A2/A3 adds the separately reviewed host-encrypted
 credential and qualification-before-permanent systemd timer. Neither path
-deletes remote snapshots. Remote retention policy and a complete disaster
-rehearsal remain separate work.
+deletes remote snapshots. Remote retention policy remains separate work.
 
 ### Rotating both repository passwords
 

@@ -5134,6 +5134,7 @@ async function loadBackupAdministration({ unlock = false } = {}) {
 function resetBackupPreviews() {
   state.backupManifestPreview = null; state.backupCreatePreview = null; state.backupRetentionPreview = null; state.backupRestorePreview = null; state.backupReplicaPreview = null; state.backupDrsPreview = null;
   ["backup-manifest-confirm", "backup-create-confirm", "backup-retention-confirm", "backup-restore-confirm", "backup-replica-confirm", "backup-drs-confirm"].forEach((id) => { byId(id).hidden = true; });
+  byId("execute-backup-restore").textContent = "Restore into staging";
 }
 
 function selectedBackupSnapshotIds() {
@@ -5146,6 +5147,14 @@ function selectedBackupRestoreId() {
 
 function backupRestorePaths() {
   return byId("backup-restore-paths").value.split("\n").map((line) => line.trim()).filter(Boolean);
+}
+
+function backupRestoreTarget() {
+  return byId("backup-restore-target").value.trim();
+}
+
+function backupRestoreSource() {
+  return byId("backup-restore-source").value;
 }
 
 async function previewBackupManifestReconciliation() {
@@ -5161,6 +5170,7 @@ async function previewBackupManifestReconciliation() {
       starts_restic: false,
       fresh_snapshot_required: state.backupManifestPreview.snapshot_verification_required
     }, null, 2);
+    byId("execute-backup-restore").textContent = state.backupRestorePreview.full_recovery_rehearsal ? "Run recovery rehearsal" : "Restore into staging";
     byId("backup-manifest-confirm").hidden = false;
     byId("execute-backup-manifests").disabled = !state.backupManifestPreview.changes_required;
     byId("backup-manifest-status").textContent = state.backupManifestPreview.changes_required
@@ -5340,14 +5350,20 @@ async function previewBackupRestore() {
   byId("preview-backup-restore").disabled = true;
   try {
     const envelope = await callSoul(backupOperation("restore.preview"), {
-      password: backupPassword(), snapshot_id: selectedBackupRestoreId(), paths: backupRestorePaths()
+      password: backupPassword(), snapshot_id: selectedBackupRestoreId(), paths: backupRestorePaths(),
+      target_root: backupRestoreTarget(), repository_source: backupRestoreSource()
     });
     state.backupRestorePreview = backupResult(envelope);
     byId("backup-restore-scope").textContent = JSON.stringify({
       snapshot_id: state.backupRestorePreview.snapshot_id,
+      source_snapshot_id: state.backupRestorePreview.source_snapshot_id,
+      repository_source: state.backupRestorePreview.repository_source,
       scope: state.backupRestorePreview.scope,
       includes: state.backupRestorePreview.includes,
       target_root: state.backupRestorePreview.target_root,
+      target_mode: state.backupRestorePreview.target?.mode,
+      full_recovery_rehearsal: state.backupRestorePreview.full_recovery_rehearsal,
+      source_root_count: state.backupRestorePreview.source_root_count,
       live_tree_mutation: false
     }, null, 2);
     byId("backup-restore-confirm").hidden = false;
@@ -5363,12 +5379,15 @@ async function executeBackupRestore() {
   try {
     showGenerationProgress(progress, { stage: "preparing", message: "Revalidating the exact isolated restore." });
     const envelope = await callNdjson("/api/v1/administration-stream", backupOperation("restore.execute"), {
-      password: backupPassword(), snapshot_id: state.backupRestorePreview.snapshot_id,
-      paths: state.backupRestorePreview.includes, confirmation: state.backupRestorePreview.confirmation_phrase,
+      password: backupPassword(), snapshot_id: state.backupRestorePreview.source_snapshot_id,
+      paths: state.backupRestorePreview.includes, target_root: state.backupRestorePreview.target?.mode === "selected_empty_directory" ? state.backupRestorePreview.target.path : "",
+      repository_source: state.backupRestorePreview.repository_source,
+      confirmation: state.backupRestorePreview.confirmation_phrase,
       expected_digest: state.backupRestorePreview.expected_digest
     }, {}, (event) => showGenerationProgress(progress, event));
     const result = backupResult(envelope, ["blocked_for_human_review"]);
-    byId("backup-restore-status").textContent = `Restore verified in ${result.staged_path}; live state remains unchanged.`;
+    const rehearsal = result.recovery_rehearsal?.status === "verified" ? ` Full recovery coverage verified across ${result.recovery_rehearsal.restored_source_root_count} documented roots.` : "";
+    byId("backup-restore-status").textContent = `Restore verified in ${result.staged_path}; live state remains unchanged.${rehearsal}`;
     resetBackupPreviews(); await loadBackupAdministration({ unlock: true });
   } catch (error) { byId("backup-restore-status").textContent = error.message; }
   finally { state.backupBusy = false; byId("execute-backup-restore").disabled = false; hideGenerationProgress(progress); }

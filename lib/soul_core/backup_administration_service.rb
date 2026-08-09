@@ -559,25 +559,39 @@ module SoulCore
       password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
     end
 
-    def restore_preview(password:, snapshot_id:, paths: [])
+    def restore_preview(password:, snapshot_id:, paths: [], target_root: nil, repository_source: "local")
       password = validate_password(password)
       id = snapshot_id.to_s
       raise ArgumentError, "snapshot ID is invalid" unless id.match?(SNAPSHOT_ID)
       snapshots = snapshot_inventory(password)
       raise ArgumentError, "snapshot was not found" unless snapshots.any? { |item| item["id"] == id }
+      source = normalize_restore_repository_source(repository_source)
+      recovery_snapshot = restore_snapshot_context(password, source_snapshot_id: id, repository_source: source)
       includes = normalize_restore_paths(paths)
-      inventory = snapshot_paths(password, id)
+      inventory = recovery_snapshot.fetch("inventory")
       missing = includes.reject { |path| inventory.any? { |candidate| candidate == path || candidate.start_with?("#{path}/") } }
       raise ArgumentError, "restore path is absent from the snapshot" unless missing.empty?
+      target = restore_target_scope(target_root)
+      rehearsal = includes.empty? && target.fetch("mode") == "selected_empty_directory"
+      source_roots = if rehearsal
+        recovery_snapshot["source_roots"] || snapshot_manifest_source_roots(id, inventory)
+      else
+        []
+      end
       scope = {
         "operation" => "backup_staged_restore",
         "profile_id" => @profile_id,
         "snapshot_tag" => @snapshot_tag,
-        "repository_fingerprint" => repository_fingerprint,
-        "snapshot_id" => id,
+        "repository_source" => source,
+        "repository_fingerprint" => recovery_snapshot.fetch("repository_fingerprint"),
+        "source_snapshot_id" => id,
+        "snapshot_id" => recovery_snapshot.fetch("restore_snapshot_id"),
         "includes" => includes,
         "scope" => includes.empty? ? "full_snapshot" : "selected_paths",
-        "target_root" => display_path(@restore_root),
+        "target" => target,
+        "target_root" => target.fetch("display_path"),
+        "source_root_count" => source_roots.length,
+        "full_recovery_rehearsal" => rehearsal,
         "verify_restored_files" => true,
         "live_tree_mutation" => false,
         "automatic_retry" => false
@@ -594,37 +608,68 @@ module SoulCore
       password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
     end
 
-    def restore_execute(password:, snapshot_id:, paths: [], confirmation:, expected_digest:, progress: nil)
+    def restore_execute(password:, snapshot_id:, paths: [], target_root: nil, repository_source: "local", confirmation:, expected_digest:, progress: nil)
       password = validate_password(password)
       return awaiting("exact staged-restore confirmation is required") unless confirmation.to_s == @confirmations.fetch(:restore)
       operation_lock = acquire_operation_lock
       return blocked("another backup administration operation is already active") unless operation_lock
-      preview = restore_preview(password: password, snapshot_id: snapshot_id, paths: paths)
+      preview = restore_preview(password: password, snapshot_id: snapshot_id, paths: paths, target_root: target_root, repository_source: repository_source)
       return preview unless preview["ok"]
       return blocked("restore preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
-      restore_id = "restore_#{@id_generator.call}"
-      raise "restore ID is invalid" unless restore_id.match?(/\Arestore_[a-f0-9]{16}\z/)
-      target = File.join(@restore_root, restore_id)
-      FileUtils.mkdir_p(@restore_root, mode: 0o700)
-      raise "restore target already exists" if File.exist?(target) || File.symlink?(target)
-      FileUtils.mkdir(target, mode: 0o700)
+      target_scope = preview.dig("data", "target")
+      if target_scope.fetch("mode") == "managed_private_staging"
+        restore_id = "restore_#{@id_generator.call}"
+        raise "restore ID is invalid" unless restore_id.match?(/\Arestore_[a-f0-9]{16}\z/)
+        target = File.join(@restore_root, restore_id)
+        FileUtils.mkdir_p(@restore_root, mode: 0o700)
+        raise "restore target already exists" if File.exist?(target) || File.symlink?(target)
+        FileUtils.mkdir(target, mode: 0o700)
+      else
+        restore_id = "rehearsal_#{@id_generator.call}"
+        raise "rehearsal ID is invalid" unless restore_id.match?(/\Arehearsal_[a-f0-9]{16}\z/)
+        target = target_scope.fetch("path")
+        current_target = restore_target_scope(target)
+        raise "selected restore target changed after review" unless current_target == target_scope
+      end
       args = ["restore", preview.dig("data", "snapshot_id"), "--target", target, "--verify"]
       preview.dig("data", "includes").each { |path| args.concat(["--include", path]) }
       progress&.call("stage" => "restore", "message" => "Restoring the approved snapshot into isolated staging…")
-      result = restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
+      result = if preview.dig("data", "repository_source") == "crucible_replica"
+        replica_restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
+      else
+        restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
+      end
       ownership_normalized = !result.success? && restic_ancestor_ownership_only_failure?(
         result, target: target, includes: preview.dig("data", "includes")
       )
       raise "restic restore failed#{restic_failure_suffix(result)}" unless result.success? || ownership_normalized
       evidence = staged_inventory(target)
+      rehearsal = if preview.dig("data", "full_recovery_rehearsal")
+        recovery_snapshot = restore_snapshot_context(
+          password,
+          source_snapshot_id: preview.dig("data", "source_snapshot_id"),
+          repository_source: preview.dig("data", "repository_source")
+        )
+        source_roots = recovery_snapshot["source_roots"] || snapshot_manifest_source_roots(
+          preview.dig("data", "source_snapshot_id"), recovery_snapshot.fetch("inventory")
+        )
+        recovery_rehearsal_evidence(target, source_roots)
+      else
+        {"mode" => preview.dig("data", "scope"), "status" => "staged_restore_only"}
+      end
       receipt = write_receipt("restore", {
         "restore_id" => restore_id,
         "snapshot_id" => preview.dig("data", "snapshot_id"),
+        "source_snapshot_id" => preview.dig("data", "source_snapshot_id"),
+        "repository_source" => preview.dig("data", "repository_source"),
         "includes" => preview.dig("data", "includes"),
         "staged_path" => display_path(target),
         "file_count" => evidence.fetch("file_count"),
         "total_bytes" => evidence.fetch("total_bytes"),
         "inventory_digest" => evidence.fetch("inventory_digest"),
+        "target_mode" => target_scope.fetch("mode"),
+        "target_identity" => target_scope["identity"],
+        "recovery_rehearsal" => rehearsal,
         "content_verification" => "passed",
         "ownership" => ownership_normalized ? "normalized_to_current_user_for_unprivileged_staging" : "restored_without_error",
         "live_tree_mutation" => false
@@ -909,13 +954,20 @@ module SoulCore
 
     def replica_inventory(password)
       result = replica_restic(password, "snapshots", "--json", "--tag", @snapshot_tag, timeout: 60, output: 1024 * 1024)
-      return { "state" => "uninitialized", "ids" => [], "lineage_ids" => [], "repository_id" => nil } if result.exit_status == 10
+      return { "state" => "uninitialized", "ids" => [], "lineage_ids" => [], "records" => [], "repository_id" => nil } if result.exit_status == 10
       raise ArgumentError, "Crucible repository password was rejected" if result.exit_status == 12
       raise "Crucible snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
       snapshots = JSON.parse(result.stdout)
       raise "Crucible snapshot inventory is invalid" unless snapshots.is_a?(Array) && snapshots.length <= MAX_SNAPSHOTS
-      identities = snapshots.map { |item| snapshot_identity(item, "Crucible") }
-      ids = identities.map { |item| item.fetch("id") }
+      records = snapshots.map do |item|
+        identity = snapshot_identity(item, "Crucible")
+        roots = Array(item["paths"])
+        unless roots.any? && roots.length <= OPERATOR_MAX_SOURCE_ROOTS && roots.all? { |root| root.is_a?(String) && root == File.expand_path(root) }
+          raise "Crucible snapshot inventory contains invalid source roots"
+        end
+        identity.merge("source_roots" => roots.uniq.sort)
+      end
+      ids = records.map { |item| item.fetch("id") }
       raise "Crucible snapshot inventory contains an invalid ID" unless ids.all? { |id| id.match?(SNAPSHOT_ID) } && ids.uniq.length == ids.length
       config = replica_restic(password, "cat", "config", timeout: 60, output: 1024 * 1024)
       raise "Crucible repository identity failed#{restic_failure_suffix(config)}" unless config.success?
@@ -924,8 +976,9 @@ module SoulCore
       {
         "state" => "ready",
         "ids" => ids.sort,
-        "lineage_ids" => identities.map { |item| item.fetch("lineage_id") }.uniq.sort,
-        "repository_id" => repository_id
+        "lineage_ids" => records.map { |item| item.fetch("lineage_id") }.uniq.sort,
+        "repository_id" => repository_id,
+        "records" => records
       }
     rescue JSON::ParserError, KeyError
       raise "Crucible repository inventory is invalid"
@@ -1021,6 +1074,15 @@ module SoulCore
       paths
     end
 
+    def replica_snapshot_paths(password, snapshot_id)
+      result = replica_restic(password, "ls", "--json", snapshot_id, timeout: CHECK_TIMEOUT, output: 16 * 1024 * 1024)
+      raise "Crucible snapshot path inventory failed#{restic_failure_suffix(result)}" unless result.success?
+      paths = json_lines(result.stdout).filter_map { |item| item["path"].to_s if item["struct_type"] == "node" }
+      paths = paths.map { |path| File.expand_path(path) }.uniq.sort
+      raise "Crucible snapshot path inventory is empty or too large" if paths.empty? || paths.length > MAX_INVENTORY_PATHS
+      paths
+    end
+
     def verify_repository!(password)
       result = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024)
       raise "repository verification failed#{restic_failure_suffix(result)}" unless result.success?
@@ -1085,6 +1147,133 @@ module SoulCore
       paths = value.map { |path| File.expand_path(path.to_s) }
       raise ArgumentError, "restore paths must be absolute, unique, and normalized" unless paths == value && paths.uniq.length == paths.length && paths.all? { |path| path.start_with?("/") }
       paths.sort
+    end
+
+    def normalize_restore_repository_source(value)
+      source = value.to_s
+      raise ArgumentError, "restore repository source must be local or crucible_replica" unless %w[local crucible_replica].include?(source)
+      source
+    end
+
+    def restore_snapshot_context(password, source_snapshot_id:, repository_source:)
+      if repository_source == "local"
+        return {
+          "restore_snapshot_id" => source_snapshot_id,
+          "repository_fingerprint" => repository_fingerprint,
+          "inventory" => snapshot_paths(password, source_snapshot_id)
+        }
+      end
+
+      validate_replica_configuration!
+      target = replica_target_status
+      raise ArgumentError, "Crucible backup target identity is invalid" unless target["ready"]
+      remote = replica_inventory(password)
+      identity = remote.fetch("records").find { |item| item.fetch("lineage_id") == source_snapshot_id }
+      raise ArgumentError, "selected local snapshot lineage is absent from Crucible" unless identity
+      {
+        "restore_snapshot_id" => identity.fetch("id"),
+        "repository_fingerprint" => remote.fetch("repository_id"),
+        "inventory" => replica_snapshot_paths(password, identity.fetch("id")),
+        "source_roots" => identity.fetch("source_roots")
+      }
+    end
+
+    def restore_target_scope(value)
+      raw = value.to_s.strip
+      if raw.empty?
+        return {
+          "mode" => "managed_private_staging",
+          "path" => @restore_root,
+          "display_path" => display_path(@restore_root),
+          "empty_required" => false
+        }
+      end
+
+      raise ArgumentError, "restore target exceeds size limit" if raw.bytesize > 4096 || raw.include?("\0")
+      path = File.expand_path(raw)
+      raise ArgumentError, "restore target must be an exact normalized absolute path" unless raw == path && path.start_with?("/")
+      raise ArgumentError, "restore target must already exist" unless File.exist?(path)
+      stat = File.lstat(path)
+      raise ArgumentError, "restore target must be a regular directory" unless stat.directory? && !stat.symlink?
+      raise ArgumentError, "restore target path must not traverse a symlink" unless File.realpath(path) == path
+      raise ArgumentError, "restore target must be owned by the current operator" unless stat.uid == Process.uid
+      raise ArgumentError, "restore target must be owner-only" unless (stat.mode & 0o077).zero?
+      raise ArgumentError, "restore target must be readable, writable, and searchable" unless File.readable?(path) && File.writable?(path) && File.executable?(path)
+
+      protected = [@root, @state_root, @mount, @repository].uniq
+      if path == "/" || path == @home || protected.any? { |item| within?(path, item) || within?(item, path) }
+        raise ArgumentError, "restore target overlaps protected live or repository state"
+      end
+      sources = safe_manifest_lines(@sources_path)
+      if sources.any? { |source| within?(path, source) || within?(source, path) }
+        raise ArgumentError, "restore target overlaps a configured backup source"
+      end
+      raise ArgumentError, "restore target must be empty" unless Dir.children(path).empty?
+
+      {
+        "mode" => "selected_empty_directory",
+        "path" => path,
+        "display_path" => display_path(path),
+        "empty_required" => true,
+        "identity" => {
+          "device" => stat.dev,
+          "inode" => stat.ino,
+          "uid" => stat.uid,
+          "mode" => format("%04o", stat.mode & 0o7777)
+        }
+      }
+    rescue Errno::ENOENT, Errno::EACCES, Errno::ENOTDIR, Errno::ELOOP => error
+      raise ArgumentError, "restore target is unavailable: #{error.class.name.split('::').last}"
+    end
+
+    def snapshot_manifest_source_roots(snapshot_id, inventory)
+      path = File.join(@manifest_root, "#{snapshot_id}.json")
+      raise "verified snapshot manifest is unavailable for recovery rehearsal" unless regular_file?(path) && File.size(path) <= 64 * 1024 * 1024
+      manifest = JSON.parse(File.read(path))
+      raise "verified snapshot manifest does not match the selected snapshot" unless manifest["snapshot_id"] == snapshot_id
+      raise "verified snapshot manifest repository identity changed" unless manifest["repository_id"] == repository_fingerprint
+      roots = Array(manifest["source_roots"])
+      unless roots.any? && roots.length <= OPERATOR_MAX_SOURCE_ROOTS && roots.all? { |root| root.is_a?(String) && root == File.expand_path(root) }
+        raise "verified snapshot manifest source roots are invalid"
+      end
+      missing = roots.reject { |root| inventory.include?(root) || inventory.any? { |item| item.start_with?("#{root}/") } }
+      raise "verified snapshot inventory no longer covers every source root" unless missing.empty?
+      roots.sort
+    rescue JSON::ParserError
+      raise "verified snapshot manifest is invalid"
+    end
+
+    def recovery_rehearsal_evidence(target, source_roots)
+      missing = source_roots.reject do |root|
+        restored = File.join(target, root.delete_prefix("/"))
+        File.exist?(restored) && !File.symlink?(restored)
+      end
+      raise "full recovery rehearsal omitted one or more documented source roots" unless missing.empty?
+      {
+        "mode" => "full_snapshot",
+        "status" => "verified",
+        "source_root_count" => source_roots.length,
+        "restored_source_root_count" => source_roots.length,
+        "missing_source_root_count" => 0,
+        "coverage_classes" => recovery_coverage_classes(source_roots),
+        "live_promotion" => false
+      }
+    end
+
+    def recovery_coverage_classes(source_roots)
+      patterns = {
+        "private_state" => [File.join(@root, "Soul", "private")],
+        "conversation_state" => [File.join(@root, "Soul", "runtime", "chats"), File.join(@root, "Soul", "chats")],
+        "creative_archives" => [File.join(@root, "Soul", "music"), File.join(@root, "Soul", "visual"), File.join(@home, "Music", "soul-music")],
+        "knowledge_vault" => [File.join(@home, "Knowledge", "soul-vault")],
+        "service_configuration" => [File.join(@home, ".config", "soul"), File.join(@home, ".config", "systemd", "user"), File.join(@home, ".local", "share", "caddy")]
+      }
+      patterns.map do |id, candidates|
+        count = source_roots.count do |root|
+          candidates.any? { |candidate| within?(root, candidate) || within?(candidate, root) }
+        end
+        {"id" => id, "covered" => count.positive?, "source_root_count" => count}
+      end
     end
 
     def staged_inventory(root)
