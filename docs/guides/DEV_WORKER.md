@@ -1,15 +1,16 @@
 # Soul Dev Worker
 
 Soul Dev Worker exposes the local GPT-OSS 20B Dev runtime as a bounded,
-foreground reasoning assistant for primary Codex. It is not a Codex-native
+foreground reasoning assistant for primary Sol. It is not a Codex-native
 subagent and it does not inherit Codex tools.
 
 Use it when Codex has already selected a small, non-secret evidence packet and
 wants structured analysis, critique, or candidate unified-diff text. Use a
-native Spark agent when the task requires repository exploration or a small
-tool-using implementation. Keep architecture, security, credentials,
+native Codex subagent when the task requires repository exploration or a
+tool-using implementation. Spark, Luna, and Terra routing is defined in
+[Codex Native Subagents](CODEX_SUBAGENTS.md). Keep architecture, security, credentials,
 privileged or destructive work, final edits, tests, Git, and merge decisions
-with primary Codex.
+with primary Sol.
 
 ## Authority boundary
 
@@ -59,7 +60,7 @@ bin/soul dev-worker execute \
 ```
 
 The result is a JSON envelope. `data.candidate` remains untrusted candidate
-material. Primary Codex must verify its claims against source, decide whether
+material. Primary Sol must verify its claims against source, decide whether
 to reproduce any edit, and run the normal tests.
 
 ## Core behavior

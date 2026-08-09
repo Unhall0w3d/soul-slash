@@ -171,8 +171,13 @@ Primary Codex can also invoke GPT-OSS through the repository-local Soul Dev
 Worker skill. Codex supplies one exact non-secret context packet; Soul returns
 schema-validated analysis, critique, or candidate unified-diff text without
 repository, shell, network, test, Git, approval, or merge authority. Native
-Spark agents remain the tool-using choice for repository mapping and bounded
-implementation. See `docs/guides/DEV_WORKER.md`.
+Codex delegation now routes among Spark, Luna, and Terra according to task
+scope, risk, complexity, model allowance, and review cost. Exact assignment
+contracts support evidence-trusted mapping and change-trusted reversible work
+without repeating successful delegated work; security, credentials,
+privileged or destructive behavior, persistence, remote maintenance,
+backup/recovery, and final integration remain independently verified by primary
+Sol. See `docs/guides/CODEX_SUBAGENTS.md` and `docs/guides/DEV_WORKER.md`.
 
 ### Creative Studios
 

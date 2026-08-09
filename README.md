@@ -58,6 +58,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |
 | Cores | Understand Soul, Soul-Lite, Creative, Free, and Dev runtime arrangements and the optional Dev setup | [Soul Cores](docs/guides/CORES.md) |
 | Soul Dev Worker | Delegate bounded evidence synthesis to local GPT-OSS while Codex retains every tool and authority decision | [Soul Dev Worker](docs/guides/DEV_WORKER.md) |
+| Codex subagents | Understand native Spark, Luna, and Terra routing and evidence-based trust | [Codex Native Subagents](docs/guides/CODEX_SUBAGENTS.md) |
 | Skill Studio | Move a bounded capability from proposal through Beta evidence to explicit production promotion | [Skill Studio](docs/guides/SKILL_STUDIO.md) |
 | Self Assessment | Inspect host, runtime, capability, update, and storage evidence without mutating the machine | [Self Assessment](docs/guides/SELF_ASSESSMENT.md) |
 | Self Augmentation | Prepare isolated architecture-level experiments when a skill is not sufficient | [Self Augmentation](docs/guides/SELF_AUGMENTATION.md) |
