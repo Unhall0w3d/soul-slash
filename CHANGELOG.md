@@ -6,6 +6,13 @@
 
 ### Conversational Soul
 
+- Added the candidate Voice Presence Desktop Notification Observer A3: an
+  opt-in child of the visible app classifies a narrow metadata-only desktop
+  cohort without replacing Noctalia, retaining notification content, or
+  surviving window close. Only recognized high-urgency communications can use
+  one cooldown-limited pre-generated notice; ordinary, social, browser, and
+  unknown notifications remain visual-only or suppressed.
+
 - Added the candidate Unified Notification Lane A2: serialized static F3/M3
   notices, a browser-local Priority Voice mode, silent fleet baselines, and
   bounded review/attention integration for improvement and backup surfaces.

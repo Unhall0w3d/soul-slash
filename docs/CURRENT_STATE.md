@@ -120,6 +120,16 @@ lyric-analysis, improvement, and recovery completions may additionally use a
 pre-generated notice in the selected F3 or M3 voice. Each event performs one
 point-in-time status check; there is no polling or event-time synthesis.
 
+Voice Presence can also opt into observing the standard desktop-notification
+D-Bus method while its own visible window remains open. It does not replace or
+control Noctalia. The first reviewed cohort classifies Discord, Webex, Teams,
+and Steam from application metadata only; notification titles, bodies, images,
+actions, and history are never retained. Normal items remain visual-only. A
+recognized high-urgency communication may use one cooldown-limited static
+notice while Soul is idle-listening. Browser-originated sites and native popup
+windows remain outside this narrow observer and are never guessed from screen
+content.
+
 Voice screen requests also resolve fresh explicit targets for the active
 Hyprland window, focused monitor, all monitors, left/right or numbered monitor,
 and a currently visible workspace. Hidden workspaces are never switched
