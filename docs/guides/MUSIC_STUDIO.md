@@ -60,6 +60,19 @@ Each candidate shows newest first, provides an MP3 player and lossless FLAC, and
 
 Older revised versions collapse but remain inspectable.
 
+### Duration and finishing qualification
+
+The right-side **Duration & finishing ledger** is a read-only evidence surface
+for the retained 43-, 57-, 71-, 144-, and 248-second review cohort. It reports
+technical artifact coverage, human-review coverage, latest candidate state, and
+whether a kept candidate exists at each duration. Refreshing it does not
+generate, revise, trim, export, or approve music.
+
+`technical pass` means only that a retained FLAC is within two seconds of its
+target and is 48 kHz stereo. `keep recorded` means a human review exists; it is
+still not automatic qualification. The Operator compares adherence, musical
+coherence, endings, and transition utility before closing the cohort.
+
 ## Vocal evidence and revision
 
 Optional CPU transcription compares intended and machine-heard lyrics, formats repeated sections, reports sequence recall and likely problem lines, then exits. “Machine heard OK” routes to human listening; “Machine heard BAD” recommends revision. Neither route approves or rejects music.

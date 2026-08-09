@@ -51,6 +51,7 @@ require_relative "self_augmentation_experiment_service"
 require_relative "self_augmentation_dev_critique_service"
 require_relative "self_augmentation_dev_handoff_service"
 require_relative "music_generation_service"
+require_relative "music_qualification_service"
 require_relative "music_candidate_analysis_service"
 require_relative "music_revision_draft_service"
 require_relative "music_candidate_disposition_service"
@@ -118,6 +119,7 @@ module SoulCore
       self_augmentation_dev_critique_service: nil,
       self_augmentation_dev_handoff_service: nil,
       music_generation_service: nil,
+      music_qualification_service: nil,
       music_candidate_analysis_service: nil,
       music_revision_draft_service: nil,
       music_revision_provider: nil,
@@ -182,6 +184,7 @@ module SoulCore
       @self_augmentation_dev_critique_service = self_augmentation_dev_critique_service
       @self_augmentation_dev_handoff_service = self_augmentation_dev_handoff_service
       @music_generation_service = music_generation_service
+      @music_qualification_service = music_qualification_service
       @music_candidate_analysis_service = music_candidate_analysis_service
       @music_revision_draft_service = music_revision_draft_service
       @music_revision_provider = music_revision_provider
@@ -457,6 +460,7 @@ module SoulCore
       when "music.projects.list" then domain(project_release.decorate_outcome(music_generation.list_projects(limit: bounded_limit(parameters["limit"], 200)), kind: "music"))
       when "music.projects.create" then domain(music_generation.create_project(required(parameters, "project")))
       when "music.projects.get" then domain(music_project_with_analysis(project_id: required(parameters, "project_id")))
+      when "music.qualification" then domain(music_qualification.snapshot)
       when "music.projects.release" then domain(project_release.release(kind: "music", project_id: required(parameters, "project_id")))
       when "music.projects.restore" then domain(project_release.restore(kind: "music", project_id: required(parameters, "project_id")))
       when "music.projects.delete.preview" then domain(music_project_deletion.preview(project_id: required(parameters, "project_id")))
@@ -1059,6 +1063,10 @@ module SoulCore
 
     def visual_motion_qualification
       @visual_motion_qualification_service ||= VisualMotionQualificationService.new(visual_studio: visual_studio)
+    end
+
+    def music_qualification
+      @music_qualification_service ||= MusicQualificationService.new(music_generation: music_generation)
     end
 
     def project_tracker

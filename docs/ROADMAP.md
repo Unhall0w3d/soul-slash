@@ -51,7 +51,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] review durable event-derived Chat progress summaries; automatic stream
   reattachment and broader Studio/administration progress remain deferred
 - [x] add context-aware weather speech and fresh-current-view safeguards for Voice Presence
-- [ ] continue Music Studio prompt/adherence, revision, and finishing refinement from real projects
+- [ ] qualify the retained 43-, 57-, 71-, 144-, and 248-second Music Studio
+  cohort through the read-only duration and finishing ledger; technical support
+  is implemented, while musical adherence, revision usefulness, endings, and
+  transition utility remain Operator decisions
 - [x] reconcile remaining implementation-phase labels and stale active UI/documentation language
 - [x] A2 bounded source-attributed local project and document search with
   balanced adapters and matched Qwen/Gemma behavioral evidence
