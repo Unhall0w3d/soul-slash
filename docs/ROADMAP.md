@@ -76,9 +76,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
   preserving a distinct reboot-only action that rejects package-command replay;
   the separate zero-prompt A3 reboot completed on 2026-07-29 without replaying
   maintenance
-- [ ] refine individual allowlisted post-login application restoration during
-  natural future reboots; this does not block the accepted maintenance,
-  passwordless-authority, reboot, display-recovery, or workspace lifecycle
+- [x] qualify individual allowlisted post-login application restoration during
+  a natural supervised reboot: Vesktop, Steam, Teams, Opera GX, Codex Desktop,
+  displays, and active-workspace restoration passed; Webex is an accepted
+  manual post-login action
 
 ## Qualified expansion candidates
 

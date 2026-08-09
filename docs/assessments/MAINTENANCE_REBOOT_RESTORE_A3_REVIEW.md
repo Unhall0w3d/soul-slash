@@ -164,6 +164,15 @@ links were quarantined reversibly and Opera recreated current `atelier` locks.
 Winboat, LACT, xfreerdp, and the maintenance terminal remained visibly
 unsupported rather than being silently attempted.
 
+The next natural supervised reboot on 2026-08-09 used the root-owned
+passwordless authority with an empty package-command vector. Boot identity
+changed, all three displays and the active workspace restored, and Vesktop,
+Steam, Teams for Linux, Opera GX, and Codex Desktop completed. Steam used its
+reviewed `NO_AT_BRIDGE=1` client vector and launched no game. Webex was the sole
+bounded application failure; it launched normally later under direct Operator
+control and is accepted as a manual post-login action. The pending journal was
+consumed, and the Operator accepted the orchestration as implemented.
+
 ## Local LLM eval results
 
 None. Reboot authority, fixed command vectors, journal integrity, application
@@ -180,6 +189,9 @@ delegated to a model.
 - Individual application launchers can retain their own state or environment
   constraints. Their bounded failure does not invalidate an otherwise
   successful reboot, display recovery, or workspace lifecycle.
+- Webex is intentionally restored manually after login; its inability to
+  present a window within the bounded one-shot interval is not retried or
+  treated as an open orchestration requirement.
 - Browser tabs, documents, unsaved work, application-internal state, and
   terminal commands are intentionally not captured or reconstructed.
 - Browser session recovery remains the browser's responsibility.

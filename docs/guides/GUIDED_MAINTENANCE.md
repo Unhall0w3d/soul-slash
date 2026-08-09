@@ -715,11 +715,12 @@ executable with the discovered Hyprland environment and a 30-second bound.
 Failure is recorded for human review; it never broadens the application
 restore registry or gains reboot authority.
 
-The zero-prompt reboot-only transaction completed supervised live acceptance on
-2026-07-29 with no package replay. Teams, Vesktop, Codex, displays, and
-workspace state restored. Webex and Opera reported bounded
-application-specific failures; refining those restorations remains
-non-blocking work during natural future reboots.
+The zero-prompt reboot-only path completed supervised live acceptance again on
+2026-08-09 with no package replay or password prompt. All three displays, the
+active workspace, Vesktop, Steam, Teams, Opera GX, and Codex Desktop restored;
+Steam launched no game. Webex remained the sole bounded application result and
+is an accepted manual post-login action. Its manual exception does not cause
+automatic retry or hold the accepted orchestration lifecycle open.
 
 Chat and Voice may explain the plan but cannot arm or authorize A3. Each live
 A3 reboot remains a separate supervised human gate even after deterministic

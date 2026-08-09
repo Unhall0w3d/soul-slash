@@ -786,20 +786,20 @@
     },
     {
       "item_id": "track_post_login_application_restoration",
-      "title": "Post-login application restoration refinement",
+      "title": "Post-login application restoration",
       "area": "Administration",
-      "horizon": "later",
-      "status": "planned",
+      "horizon": "archive",
+      "status": "validated",
       "priority": "medium",
-      "summary": "Refine individual allowlisted application launch and placement during natural future reboots without holding the accepted maintenance and reboot lifecycle open.",
-      "implementation": "The bounded one-shot restorer already reports each application independently. The 2026-07-29 zero-prompt reboot isolated two application-level failures: Webex required its reviewed Wayland environment, and Opera rejected a stale singleton lock left by the workstation hostname migration. The Webex launch vector is corrected. The local Opera links were quarantined reversibly rather than deleted or generalized into automatic profile mutation. Winboat, LACT, xfreerdp, and maintenance terminals remain explicitly unsupported pending separate safe launch contracts.",
+      "summary": "Restore reviewed applications, displays, and the active Hyprland workspace through one bounded post-login pass after a separately authorized workstation reboot.",
+      "implementation": "The bounded one-shot restorer reports every application independently, skips already-running processes, and consumes its boot-bound journal after one attempt. Opera's stale pre-rename singleton links were quarantined reversibly. Steam uses the reviewed NO_AT_BRIDGE=1 client vector and cannot launch a game. Webex remains represented in snapshots but is an accepted manual post-login restore because its application loader does not reliably present a window inside the bounded restoration interval. Winboat, LACT, xfreerdp, and maintenance terminals remain explicitly unsupported pending separate safe launch contracts.",
       "technologies": "Ruby bounded one-shot restorer; reviewed JSON restore registry; systemd-run user transient units; Hyprland typed placement; application-owned desktop launch environments.",
       "interfaces": "Administration → Guided Maintenance → Reboot; retained private restore journal and redacted receipt; project timeline.",
       "commands": "make verify-maintenance-reboot-restore\njournalctl --user -u soul-maintenance-resume.service",
       "references": "docs/assessments/MAINTENANCE_REBOOT_RESTORE_A3_REVIEW.md\ndocs/guides/GUIDED_MAINTENANCE.md",
-      "acceptance": "During naturally appropriate reboots, confirm Webex and Opera launch and place only when represented before reboot. Do not schedule repeated reboots solely for this refinement. Any new application requires an exact identity, fixed launch vector, duplicate protection, bounded placement, and human review.",
-      "source": "Operator direction and retained zero-prompt reboot evidence, 2026-07-29",
-      "notes": "Non-blocking follow-up. The maintenance, A4 authority, reboot-only boundary, display recovery, and workspace lifecycle are accepted."
+      "acceptance": "A supervised 2026-08-09 reboot changed boot identity without package replay or a password prompt; restored all three displays, the active workspace, Vesktop, Steam, Teams for Linux, Opera GX, and Codex Desktop; launched no game; consumed the pending journal; and retained the single Webex result for review. The Operator accepted Webex as a manual restore and approved the orchestration as implemented. Any new automatic application requires an exact identity, fixed launch vector, duplicate protection, bounded placement, and human review.",
+      "source": "Operator-approved retained reboot evidence, 2026-08-09",
+      "notes": "Implemented inventory. Webex manual launch is an accepted application-specific exception and does not hold the reboot, display, workspace, or reviewed application-restoration lifecycle open."
     },
     {
       "item_id": "track_dev_review_bounded_jobs_a3",
