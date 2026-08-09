@@ -51,10 +51,11 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
   check.call("multi-endpoint Wazuh acceptance is recorded without a fleet score",
              reconciled.dig("track_wazuh_clamav_security", "notes").include?("PR #137") &&
                reconciled.dig("track_wazuh_clamav_security", "notes").include?("without inventing a fleet compliance score"))
-  check.call("creative qualification work is grouped without prematurely expanding long-form support",
-             reconciled.dig("track_music_variable_duration", "horizon") == "now" &&
-               reconciled.dig("track_music_variable_duration", "status") == "in_progress" &&
-               reconciled.dig("track_music_finishing_refinement", "horizon") == "now" &&
+  check.call("reviewed creative qualification milestones close without prematurely expanding long-form support",
+             reconciled.dig("track_music_variable_duration", "horizon") == "archive" &&
+               reconciled.dig("track_music_variable_duration", "status") == "done" &&
+               reconciled.dig("track_music_finishing_refinement", "horizon") == "archive" &&
+               reconciled.dig("track_music_finishing_refinement", "status") == "done" &&
                reconciled.dig("track_visual_motion_quality", "horizon") == "archive" &&
                reconciled.dig("track_visual_motion_quality", "status") == "validated" &&
                reconciled.dig("track_music_long_form", "horizon") == "next" &&
