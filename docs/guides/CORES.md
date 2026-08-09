@@ -49,5 +49,5 @@ The optional repository-local `$soul-dev-worker` Codex skill can borrow this
 runtime for one tool-less structured analysis, critique, or candidate-patch
 request. It does not register GPT-OSS as a native Codex model or give it Codex
 tools. See [Soul Dev Worker](DEV_WORKER.md) for the exact request and review
-flow; use native Spark agents when repository exploration or tool-using changes
-are required.
+flow. Native Spark, Luna, and Terra roles and their evidence-based trust model
+are documented in [Codex Native Subagents](CODEX_SUBAGENTS.md).
