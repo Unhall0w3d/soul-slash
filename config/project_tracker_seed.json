@@ -382,17 +382,6 @@
       "references": "docs/guides/MIX_STUDIO.md; docs/assessments/LONG_FORM_MIX_A1_LISTENING_RENDER_REVIEW.md"
     },
     {
-      "item_id": "track_cloud_core",
-      "title": "Design an optional usage-bounded Cloud Core",
-      "area": "Cores + Providers",
-      "horizon": "later",
-      "status": "planned",
-      "priority": "low",
-      "summary": "Evaluate a manually selected cloud reasoning Core for scoped high-capability work while preserving local privacy, usage visibility, and local fallbacks.",
-      "acceptance": "Provider, model, privacy boundary, budget behavior, unavailable-state fallback, and explicit activation are documented and tested before enablement.",
-      "source": "Qualified future Core discussion"
-    },
-    {
       "item_id": "track_youtube_draft_upload",
       "title": "Authenticated YouTube draft upload",
       "area": "Publication",
