@@ -215,12 +215,13 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   stops before reboot. Reboot is a distinct A3 transaction with its own
   preview, digest, journal, and authorization; package-command vectors must be
   empty, so it cannot rerun `yay`, pacman, or Flatpak. The accepted zero-prompt
-  reboot-only path completed on 2026-07-29 with no package replay; Teams,
-  Vesktop, Codex, displays, and workspace state restored, while Webex and Opera
-  produced bounded application-specific failures. Further application
-  restoration qualification is non-blocking and will occur during natural
-  future reboots. Both live gates remain disabled outside an exact supervised
-  transaction. Portable status-only devices retain compact LAN cards; the
+  reboot-only path completed again on 2026-08-09 with no package replay or
+  password prompt. All three displays, the active workspace, Vesktop, Steam,
+  Teams, Opera GX, and Codex Desktop restored; Steam launched no game. Webex
+  remained the sole bounded application result and is now an accepted manual
+  post-login action. The pending journal was consumed, and the Operator accepted
+  the orchestration as implemented. Both live gates remain disabled outside an
+  exact supervised transaction. Portable status-only devices retain compact LAN cards; the
   current Apple-mobile candidate can additionally attach a privacy-filtered
   wired product/iOS/battery projection after an exact reviewed private-MAC
   match, without granting device mutation authority.
