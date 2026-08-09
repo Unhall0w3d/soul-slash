@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
 require "open3"
 require "tmpdir"
@@ -37,7 +38,9 @@ class BackupAdministrationFakeRunner
   end
 
   def which(name)
-    name == "restic" ? "/usr/bin/restic" : nil
+    return "/usr/bin/restic" if name == "restic"
+    return "/usr/bin/ssh" if name == "ssh"
+    nil
   end
 
   def run(*command, **options)
@@ -46,12 +49,24 @@ class BackupAdministrationFakeRunner
     @calls << { "argv" => argv, "env" => captured_env, "timeout" => options[:timeout_seconds] }
     return ok(JSON.generate("filesystems" => [{ "target" => @mount_target, "source" => "/dev/test1", "fstype" => "ext4", "options" => @mount_options }])) if argv.first == "findmnt"
     return ok("4096 #{@source_root}\n") if argv.first == "du"
+    return ok("directory,souladmin,700\n") if argv.first == "ssh"
     return failed("unexpected command") unless argv.first == "restic"
 
+    repository = argv[argv.index("--repo") + 1]
+    remote = repository.start_with?("sftp:")
     action = argv[argv.index("--repo") + 2]
     case action
     when "snapshots"
-      ok(JSON.generate(@snapshots))
+      snapshots = if remote
+        @snapshots.map do |item|
+          item.merge("id" => Digest::SHA256.hexdigest("remote:#{item.fetch('id')}"), "original" => item.fetch("id"))
+        end
+      else
+        @snapshots
+      end
+      ok(JSON.generate(snapshots))
+    when "cat"
+      remote ? ok(JSON.generate("id" => "9" * 64)) : failed("local cat not supported")
     when "backup"
       id = "d" * 64
       @snapshots << {
@@ -63,7 +78,8 @@ class BackupAdministrationFakeRunner
       ok("repository metadata verified")
     when "ls"
       id = argv.last
-      return failed("missing snapshot") unless @snapshots.any? { |item| item["id"] == id }
+      ids = remote ? @snapshots.map { |item| Digest::SHA256.hexdigest("remote:#{item.fetch('id')}") } : @snapshots.map { |item| item["id"] }
+      return failed("missing snapshot") unless ids.include?(id)
       nodes = [@source_root, File.join(@source_root, "state.json")].map { |path| JSON.generate("struct_type" => "node", "path" => path) }
       ok(nodes.join("\n") + "\n")
     when "forget"
@@ -103,7 +119,8 @@ restore_contract = {
   "parameters" => {
     "password" => "fixture-secret-never-persist",
     "snapshot_id" => "d" * 64,
-    "paths" => ["/home/operator/.ssh/config", "/home/operator/.zshrc"]
+    "paths" => ["/home/operator/.ssh/config", "/home/operator/.zshrc"],
+    "target_root" => "/home/operator/Recovery/soul-rehearsal"
   },
   "context" => { "interface" => "dashboard" }
 }
@@ -130,10 +147,14 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
   FileUtils.mkdir_p(state_root)
   File.chmod(0o700, state_root)
   FileUtils.mkdir_p(source_root)
+  File.chmod(0o700, source_root)
   File.write(File.join(repository, "config"), "encrypted repository fixture\n")
   File.write(File.join(source_root, "state.json"), "{\"state\":true}\n")
   File.write(File.join(state_root, "sources.txt"), "#{source_root}\n")
   File.write(File.join(state_root, "excludes.txt"), "#{File.join(state_root, "restores")}/**\n")
+  FileUtils.mkdir_p(File.join(root, ".ssh"))
+  File.write(File.join(root, ".ssh", "config"), "Host crucible-maintenance\n  HostName 192.0.2.2\n")
+  File.chmod(0o600, File.join(root, ".ssh", "config"))
   File.chmod(0o600, File.join(state_root, "sources.txt"))
   File.chmod(0o600, File.join(state_root, "excludes.txt"))
 
@@ -266,6 +287,83 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
                restored.dig("data", "live_tree_mutation") == false &&
                staged_path.include?("Soul/private/backup/restores/restore_"))
 
+  Dir.mktmpdir("soul-selected-recovery-") do |selected_target|
+    File.chmod(0o700, selected_target)
+    rehearsal_preview = service.restore_preview(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target
+    )
+    rehearsal = service.restore_execute(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target,
+      confirmation: rehearsal_preview.dig("data", "confirmation_phrase"),
+      expected_digest: rehearsal_preview.dig("data", "expected_digest")
+    )
+    check.call("an exact empty owner-selected directory is digest-bound and receives a verified full recovery rehearsal",
+               rehearsal_preview["ok"] &&
+                 rehearsal_preview.dig("data", "target", "mode") == "selected_empty_directory" &&
+                 rehearsal_preview.dig("data", "full_recovery_rehearsal") == true &&
+                 rehearsal["lifecycle_state"] == "blocked_for_human_review" &&
+                 rehearsal.dig("data", "staged_path") == selected_target &&
+                 rehearsal.dig("data", "recovery_rehearsal", "status") == "verified" &&
+                 rehearsal.dig("data", "recovery_rehearsal", "missing_source_root_count") == 0 &&
+                 runner.calls.any? { |call| call["argv"].include?("restore") && call["argv"].include?(selected_target) })
+  end
+
+  Dir.mktmpdir("soul-crucible-recovery-") do |selected_target|
+    File.chmod(0o700, selected_target)
+    replica_preview = service.restore_preview(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target,
+      repository_source: "crucible_replica"
+    )
+    replica_rehearsal = service.restore_execute(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target,
+      repository_source: "crucible_replica",
+      confirmation: replica_preview.dig("data", "confirmation_phrase"),
+      expected_digest: replica_preview.dig("data", "expected_digest")
+    )
+    check.call("Crucible recovery binds local lineage to its independent remote snapshot and restores from SFTP",
+               replica_preview["ok"] &&
+                 replica_preview.dig("data", "repository_source") == "crucible_replica" &&
+                 replica_preview.dig("data", "source_snapshot_id") == "d" * 64 &&
+                 replica_preview.dig("data", "snapshot_id") != "d" * 64 &&
+                 replica_rehearsal.dig("data", "recovery_rehearsal", "status") == "verified" &&
+                 replica_rehearsal.dig("data", "repository_source") == "crucible_replica" &&
+                 runner.calls.any? { |call| call["argv"].include?("restore") && call["argv"].any? { |item| item.start_with?("sftp:") } })
+  end
+
+  Dir.mktmpdir("soul-recovery-drift-") do |target_parent|
+    selected_target = File.join(target_parent, "selected")
+    FileUtils.mkdir(selected_target, mode: 0o700)
+    drift_preview = service.restore_preview(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target
+    )
+    FileUtils.remove_entry(selected_target)
+    FileUtils.mkdir(selected_target, mode: 0o700)
+    drifted = service.restore_execute(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: selected_target,
+      confirmation: drift_preview.dig("data", "confirmation_phrase"),
+      expected_digest: drift_preview.dig("data", "expected_digest")
+    )
+    check.call("selected directory identity drift invalidates the reviewed digest before restore",
+               drifted["lifecycle_state"] == "blocked_for_human_review" &&
+                 drifted["reason"].include?("digest is stale") &&
+                 Dir.children(selected_target).empty?)
+  end
+
+  unsafe_target = service.restore_preview(
+    password: password, snapshot_id: "d" * 64, paths: [], target_root: source_root
+  )
+  Dir.mktmpdir("soul-permissive-recovery-") do |permissive_target|
+    File.chmod(0o755, permissive_target)
+    permissive = service.restore_preview(
+      password: password, snapshot_id: "d" * 64, paths: [], target_root: permissive_target
+    )
+    check.call("selected recovery roots fail closed on live-source overlap or non-owner-only permissions",
+               unsafe_target["lifecycle_state"] == "awaiting_input" &&
+                 (unsafe_target["reason"].include?("protected live") || unsafe_target["reason"].include?("backup source")) &&
+                 permissive["lifecycle_state"] == "awaiting_input" &&
+                 permissive["reason"].include?("owner-only"))
+  end
+
   lock_path = File.join(state_root, "operation.lock")
   File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
     lock.flock(File::LOCK_EX | File::LOCK_NB)
@@ -335,10 +433,12 @@ html = File.read(File.expand_path("../assets/dashboard/index.html", __dir__))
 javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 http = File.read(File.expand_path("../lib/soul_core/dashboard_http_application.rb", __dir__))
-check.call("dashboard exposes Administration navigation, repository unlock, exact gates, snapshots, and staged restore",
-           %w[administration-tab administration-menu backup-panel backup-password backup-snapshot-list preview-backup-create execute-backup-create preview-backup-retention execute-backup-retention preview-backup-restore execute-backup-restore].all? { |id| html.include?("id=\"#{id}\"") } &&
+check.call("dashboard exposes Administration navigation, repository unlock, exact gates, snapshots, and selectable recovery rehearsal",
+           %w[administration-tab administration-menu backup-panel backup-password backup-snapshot-list preview-backup-create execute-backup-create preview-backup-retention execute-backup-retention backup-restore-source backup-restore-target preview-backup-restore execute-backup-restore].all? { |id| html.include?("id=\"#{id}\"") } &&
              javascript.include?('retainText.textContent = "Forget"') &&
              javascript.include?('restoreText.textContent = "Restore"') &&
+             javascript.include?('repository_source: backupRestoreSource()') &&
+             javascript.include?('state.backupRestorePreview.source_snapshot_id') &&
              css.include?(".backup-snapshot-control") &&
              javascript.include?('backupOperation("create.preview")') &&
              javascript.include?('"/api/v1/administration-stream"') &&

@@ -838,7 +838,10 @@
             <p id="backup-retention-status" class="dialog-status" role="status"></p>
           </section>
           <section class="gate-card">
-            <div><p class="eyebrow">Isolated recovery</p><h3>Stage a restore</h3><p>Choose one snapshot. Optional absolute paths below narrow the restore; blank restores the full snapshot into private staging.</p></div>
+            <div><p class="eyebrow">Isolated recovery</p><h3>Stage or rehearse a restore</h3><p>Choose one snapshot. Leave the recovery directory blank for managed private staging, or provide an existing empty owner-only directory for an exact recovery rehearsal.</p></div>
+            <label for="backup-restore-source">Repository source</label><select id="backup-restore-source"><option value="local">Local encrypted repository</option><option value="crucible_replica">Crucible encrypted second copy</option></select>
+            <label for="backup-restore-target">Optional recovery directory · exact absolute path</label><input id="backup-restore-target" type="text" autocomplete="off" spellcheck="false" placeholder="/home/USER/Recovery/soul-rehearsal" />
+            <p class="card-note">A selected directory must already exist, be empty, mode 0700, owned by you, and outside live sources and backup storage.</p>
             <label for="backup-restore-paths">Optional paths · one per line</label><textarea id="backup-restore-paths" rows="4" placeholder="/home/USER/Projects/soul/Soul/private/project_tracker/state.json"></textarea>
             <button id="preview-backup-restore" class="gate-button" type="button">Preview staged restore</button>
             <div id="backup-restore-confirm" hidden><pre id="backup-restore-scope" class="clear-preview-list"></pre><button id="execute-backup-restore" class="gate-button gate-button--gold" type="button">Restore into staging</button></div>

@@ -139,7 +139,7 @@ help:
 > @echo "  make verify-backup-manifest-reconciliation  Verify exact add-only owner manifest reconciliation"
 > @echo "  make backup-config-plan  Preview portable owner backup manifests"
 > @echo "  make backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_SOUL_BACKUP_MANIFESTS"
-> @echo "  make verify-backup-administration  Verify capture, retention, and staged restore gates"
+> @echo "  make verify-backup-administration  Verify capture, retention, staged restore, and selectable recovery gates"
 > @echo "  make operator-backup-config-plan  Preview Operator home, dotfile, and host-rebuild manifests"
 > @echo "  make operator-backup-configure EXPECTED_DIGEST=... CONFIRM=CONFIGURE_OPERATOR_BACKUP_MANIFESTS"
 > @echo "  make verify-operator-backup  Verify separated Operator scope, policy, and gates"
