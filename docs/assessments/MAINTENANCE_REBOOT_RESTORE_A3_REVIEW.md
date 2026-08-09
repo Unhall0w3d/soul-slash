@@ -120,9 +120,10 @@ The focused verifier proves:
   journal, and journal tampering fail closed;
 - unsupported applications are never launched;
 - already-running background applications are not duplicated;
-- Maven's current native snapshot maps running Webex and Teams for Linux to
-  their exact fixed launch vectors on workspace 4/monitor 1 without retaining
-  titles or raw process arguments;
+- Atelier's reviewed registry maps running Webex, Teams for Linux, and Steam to
+  exact fixed launch vectors without retaining titles or raw process
+  arguments; Steam inherits the desktop's `NO_AT_BRIDGE=1` stability override
+  and its vector cannot launch a game;
 - partial restoration uses at most one retry and terminates for human review;
 - completed restoration consumes the journal and a later unit invocation is a
   no-op;
@@ -182,8 +183,9 @@ delegated to a model.
 - Browser tabs, documents, unsaved work, application-internal state, and
   terminal commands are intentionally not captured or reconstructed.
 - Browser session recovery remains the browser's responsibility.
-- The restore registry remains conservative and owner-reviewed. Unknown
-  applications, games, transient dialogs, and changed executable paths remain
+- The restore registry remains conservative and owner-reviewed. The Steam
+  client is supported only when it was already running; individual games,
+  unknown applications, transient dialogs, and changed executable paths remain
   unsupported.
 - Active-work detection covers persisted music jobs, model leases, and the
   backup operation lock. Future long-running subsystems must register before a

@@ -167,8 +167,9 @@ tracked_registry = JSON.parse(File.binread(File.expand_path("../config/maintenan
 tracked_entries = tracked_registry.fetch("entries").to_h { |entry| [entry.fetch("entry_id"), entry] }
 webex = tracked_entries["communication.webex"]
 teams = tracked_entries["communication.teams_for_linux"]
+steam = tracked_entries["games.steam"]
 check.call(
-  "Webex and Teams restore only when represented in the pre-reboot window or process snapshot",
+  "Webex, Teams, and Steam restore only when represented in the pre-reboot window or process snapshot",
   webex == {
     "entry_id" => "communication.webex",
     "identities" => ["webex"],
@@ -183,6 +184,15 @@ check.call(
       "identities" => ["teams-for-linux"],
       "process_identities" => ["teams-for-linux"],
       "argv" => ["/usr/bin/teams-for-linux", "--gtk-version=3"],
+      "maximum_instances" => 1,
+      "title_policy" => "omit",
+      "startup_policy" => "launch_if_absent"
+    } &&
+    steam == {
+      "entry_id" => "games.steam",
+      "identities" => ["steam"],
+      "process_identities" => ["steam"],
+      "argv" => ["/usr/bin/env", "NO_AT_BRIDGE=1", "/usr/bin/steam"],
       "maximum_instances" => 1,
       "title_policy" => "omit",
       "startup_policy" => "launch_if_absent"

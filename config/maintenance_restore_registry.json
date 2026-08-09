@@ -83,6 +83,15 @@
       "startup_policy": "launch_if_absent"
     },
     {
+      "entry_id": "games.steam",
+      "identities": ["steam"],
+      "process_identities": ["steam"],
+      "argv": ["/usr/bin/env", "NO_AT_BRIDGE=1", "/usr/bin/steam"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_if_absent"
+    },
+    {
       "entry_id": "transfer.qbittorrent",
       "identities": ["qbittorrent", "org.qbittorrent.qbittorrent"],
       "process_identities": ["qbittorrent"],
