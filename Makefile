@@ -537,6 +537,7 @@ voice-presence-launch:
 verify-voice-presence:
 > @ruby scripts/verify-voice-presence-a2.rb
 > @ruby scripts/verify-voice-presence-a3.rb
+> @python3 scripts/verify-voice-presence-notification-observer-a3.py
 
 notification-audio-build:
 > @ruby scripts/build-notification-audio

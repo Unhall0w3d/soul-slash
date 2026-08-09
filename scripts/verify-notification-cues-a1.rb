@@ -21,6 +21,7 @@ assets = %w[
   f3-device-attention m3-device-attention
   f3-reboot-required m3-reboot-required
   f3-backup-attention m3-backup-attention
+  f3-communication-urgent m3-communication-urgent
   f3-security-alert m3-security-alert
 ]
 assets.each do |name|
@@ -32,6 +33,7 @@ javascript = File.read(File.join(ROOT, "assets", "dashboard", "dashboard.js"))
 html = File.read(File.join(ROOT, "assets", "dashboard", "index.html"))
 http = File.read(File.join(ROOT, "lib", "soul_core", "dashboard_http_application.rb"))
 presence = File.read(File.join(ROOT, "scripts", "soul-voice-presence-app.py"))
+observer = File.read(File.join(ROOT, "scripts", "soul_voice_notification_observer.py"))
 
 check("Dashboard exposes full voice, priority voice, cues, and muted preferences", html.include?('id="notification-mode"') && %w[voice priority cues muted].all? { |mode| javascript.include?(mode) })
 notification_source = javascript[/function emitSoulNotification.*?^}/m].to_s
@@ -45,5 +47,6 @@ check("notification cannot authorize application operations", !notification_sour
 check("all notification assets are explicit static routes", assets.all? { |name| http.include?("/notifications/#{name}.wav") })
 check("Presence publishes state and selected voice without an IPC or network listener", presence.include?("presence.json") && presence.include?("notification_voice") && !presence.match?(/QTcpServer|QLocalServer|AF_UNIX|TCPServer|\.bind\(|\.listen\(/))
 check("wake uses a distinct static cue", presence.include?("play_wake_cue") && presence.include?("notification_wake"))
+check("Voice Presence desktop urgency uses a reviewed static notice", observer.include?("communication-urgent") && presence.include?("play_notification"))
 
 puts "Notification Cues A1 verification complete."

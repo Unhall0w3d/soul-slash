@@ -123,6 +123,23 @@
       "notes": "Candidate complete for human review. A Dashboard-closed owner-private outbox is intentionally deferred to a separately approved persistent-loop brief; no subsystem-specific timers or pollers are added."
     },
     {
+      "item_id": "track_voice_presence_desktop_notification_observer_a3",
+      "title": "Validate Voice Presence desktop notification observer",
+      "area": "Voice + Desktop Integration",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "medium",
+      "summary": "Classify a reviewed first cohort of standard desktop notifications only while the visible Voice Presence app is open and explicitly opted in.",
+      "implementation": "A Voice Presence-owned dbus-monitor child parses only source and urgency metadata in memory. It never owns Noctalia's D-Bus service, records notification content, or survives the visible application. Discord, Webex, Teams, and Steam are visual-only by default; Facebook/Messenger is suppressed; only high-urgency known communication uses a 90-second cooldown-limited static notice while Presence is idle-listening.",
+      "technologies": "PySide6 QProcess; standard freedesktop D-Bus Notify metadata; local pw-play; static F3/M3 WAV assets.",
+      "interfaces": "Voice Presence: Observe desktop notifications toggle and ephemeral classification status. Noctalia native notification UI remains unmodified.",
+      "commands": "make verify-voice-presence\nmake verify-notification-cues",
+      "references": "docs/soul/VOICE_PRESENCE_DESKTOP_NOTIFICATION_OBSERVER_A3_BRIEF.md\ndocs/assessments/VOICE_PRESENCE_DESKTOP_NOTIFICATION_OBSERVER_A3_REVIEW.md",
+      "acceptance": "A standard test popup still arrives in Noctalia; normal known sources remain visual-only; one recognized urgent communication plays once per cooldown only while Presence is idle-listening; toggle-off, restart, and close terminate the observer child.",
+      "source": "Voice Presence Desktop Notification Observer A3",
+      "notes": "Candidate complete pending live review. Native application popup windows and browser-originated site content intentionally remain outside the metadata-only observer."
+    },
+    {
       "item_id": "track_project_timeline",
       "title": "Project Timeline and implementation tracker",
       "area": "Dashboard + Chat",

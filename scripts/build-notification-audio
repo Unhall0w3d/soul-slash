@@ -22,6 +22,7 @@ PHRASES = {
   "device-attention" => "A system needs attention. Open Guided Maintenance.",
   "reboot-required" => "A system restart is required.",
   "backup-attention" => "Backup verification needs review.",
+  "communication-urgent" => "An incoming communication needs attention.",
   "security-alert" => "Soul detected a high-priority security alert. Review Wazuh."
 }.freeze
 CUES = {

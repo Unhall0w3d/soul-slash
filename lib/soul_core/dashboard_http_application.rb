@@ -48,6 +48,8 @@ module SoulCore
       "/notifications/m3-reboot-required.wav" => ["assets/notifications/m3-reboot-required.wav", "audio/wav"],
       "/notifications/f3-backup-attention.wav" => ["assets/notifications/f3-backup-attention.wav", "audio/wav"],
       "/notifications/m3-backup-attention.wav" => ["assets/notifications/m3-backup-attention.wav", "audio/wav"],
+      "/notifications/f3-communication-urgent.wav" => ["assets/notifications/f3-communication-urgent.wav", "audio/wav"],
+      "/notifications/m3-communication-urgent.wav" => ["assets/notifications/m3-communication-urgent.wav", "audio/wav"],
       "/notifications/f3-security-alert.wav" => ["assets/notifications/f3-security-alert.wav", "audio/wav"],
       "/notifications/m3-security-alert.wav" => ["assets/notifications/m3-security-alert.wav", "audio/wav"]
     }.freeze
