@@ -91,14 +91,15 @@ This roadmap tracks product bodies rather than the repository's historical phase
   graph, and lets FL Studio remain the only native `.flp` writer. See
   `docs/soul/DAW_NATIVE_MUSIC_PRODUCTION_ARCHITECTURE.md`.
 
-- Blender Scene is a researched third Visual Studio lane for controlled,
-  reusable 3D and audio-reactive music companions beside local still and
-  diffusion-motion generation. A0 is candidate-complete: Blender 5.2.0 LTS and
-  EEVEE rendered a bounded repository-owned motion fixture on the RX 6900 XT,
-  retained an editable `.blend` and exact receipt, and released the shared AMD
-  lease. Operator review precedes A1's closed scene manifest and trusted
-  adapter. See `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md` and
-  `docs/assessments/BLENDER_VISUAL_PIPELINE_A0_REVIEW.md`.
+- Blender Scene A1–A5 is candidate-complete for consolidated Operator review.
+  The third Visual Studio lane now validates a closed scene manifest, builds an
+  editable `.blend` through a trusted adapter, derives bounded music curves,
+  renders resumable whole-bar EEVEE loops, preserves review/revision lineage,
+  binds only to the exact kept song, and reuses full-duration plus private
+  YouTube-package gates. Five reviewed procedural scene families are exposed;
+  rich imported asset packs and conversational manifest compilation remain
+  future separately qualified work. See
+  `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md`.
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [x] Operator qualification of the current bounded 4-second, 8-second, and

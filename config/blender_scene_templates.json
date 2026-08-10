@@ -1,0 +1,781 @@
+{
+  "schema_version": "soul.blender.scene.templates.v1",
+  "templates": {
+    "abstract": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": {
+        "id": "soul-blender-abstract-01",
+        "project_id": "music-visual-a1",
+        "revision": "a1-0001",
+        "music_candidate_id": "music-abstract-probe"
+      },
+      "render": {
+        "renderer": "BLENDER_EEVEE",
+        "width": 768,
+        "height": 432,
+        "fps": 24,
+        "frame_start": 1,
+        "frame_end": 72,
+        "seed": 1001
+      },
+      "palette": {
+        "ambient": [0.02, 0.03, 0.07],
+        "horizon": [0.03, 0.04, 0.09],
+        "accent": [0.24, 0.88, 1.00],
+        "contrast": 1.25
+      },
+      "world": {
+        "horizon_color": [0.02, 0.03, 0.05],
+        "ambient_strength": 0.25
+      },
+      "camera": {
+        "id": "cam",
+        "type": "PERSP",
+        "location": [0.0, -8.0, 2.5],
+        "rotation_euler": [1.2, 0.0, 0.0],
+        "lens": 48
+      },
+      "lights": [
+        {
+          "id": "rim",
+          "type": "AREA",
+          "location": [2.5, -3.0, 4.5],
+          "energy": 420,
+          "color": [0.12, 0.45, 0.85]
+        },
+        {
+          "id": "fill",
+          "type": "POINT",
+          "location": [-2.0, 3.5, 2.0],
+          "energy": 140,
+          "color": [0.05, 0.55, 0.95]
+        }
+      ],
+      "materials": [
+        {
+          "id": "abs_void",
+          "name": "Void",
+          "type": "PRINCIPLED",
+          "base_color": [0.01, 0.03, 0.08],
+          "metallic": 0.02,
+          "roughness": 0.42,
+          "emission": null,
+          "emission_strength": 0.0
+        },
+        {
+          "id": "abs_core",
+          "name": "Core",
+          "type": "PRINCIPLED",
+          "base_color": [0.12, 0.82, 1.00],
+          "metallic": 0.05,
+          "roughness": 0.18,
+          "emission": [0.01, 0.30, 0.60],
+          "emission_strength": 0.65
+        }
+      ],
+      "objects": [
+        {
+          "id": "ring",
+          "type": "TORUS",
+          "location": [0.0, 0.0, 0.5],
+          "rotation_euler": [0.4, 0.0, 0.0],
+          "scale": [1.8, 1.8, 1.8],
+          "material": "abs_void"
+        },
+        {
+          "id": "arch",
+          "type": "CUBE",
+          "location": [0.0, 0.0, 0.0],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [2.5, 2.5, 0.15],
+          "material": "abs_core"
+        }
+      ],
+      "animation": {
+        "objects": [
+          {
+            "target_id": "ring",
+            "property": "rotation_euler",
+            "frames": [1, 72],
+            "values": [[0.4, 0.0, 0.0], [0.4, 6.28318, 0.0]],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "materials": [
+          {
+            "target_id": "abs_core",
+            "property": "emission_strength",
+            "frames": [1, 72],
+            "values": [0.25, 1.05],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "camera": [
+          {
+            "target_id": "cam",
+            "property": "lens",
+            "frames": [1, 72],
+            "values": [45, 60],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "lights": [
+          {
+            "target_id": "rim",
+            "property": "energy",
+            "frames": [1, 72],
+            "values": [340, 520],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "world": []
+      },
+      "audio_binding": {
+        "enabled": true,
+        "tracks": []
+      },
+      "output": {
+        "blend_name": "abstract_scene.blend",
+        "still_name": "abstract_still.png",
+        "still_frame": 1,
+        "retention": "preview_only"
+      }
+    },
+    "liminal": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": {
+        "id": "soul-blender-liminal-01",
+        "project_id": "music-visual-a1",
+        "revision": "a1-0002",
+        "music_candidate_id": "music-liminal-probe"
+      },
+      "render": {
+        "renderer": "BLENDER_EEVEE",
+        "width": 960,
+        "height": 540,
+        "fps": 24,
+        "frame_start": 1,
+        "frame_end": 96,
+        "seed": 1002
+      },
+      "palette": {
+        "ambient": [0.02, 0.02, 0.04],
+        "horizon": [0.05, 0.06, 0.09],
+        "accent": [0.72, 0.31, 1.00],
+        "contrast": 1.08
+      },
+      "world": {
+        "horizon_color": [0.03, 0.05, 0.12],
+        "ambient_strength": 0.18
+      },
+      "camera": {
+        "id": "cam",
+        "type": "PERSP",
+        "location": [0.0, -10.0, 4.0],
+        "rotation_euler": [1.05, 0.0, 0.0],
+        "lens": 52
+      },
+      "lights": [
+        {
+          "id": "back",
+          "type": "SUN",
+          "location": [0.0, 8.0, 10.0],
+          "energy": 0.85,
+          "color": [0.10, 0.16, 0.40]
+        }
+      ],
+      "materials": [
+        {
+          "id": "lim_floor",
+          "name": "Floor",
+          "type": "PRINCIPLED",
+          "base_color": [0.04, 0.06, 0.08],
+          "metallic": 0.0,
+          "roughness": 0.78,
+          "emission": [0.01, 0.02, 0.05],
+          "emission_strength": 0.12
+        },
+        {
+          "id": "lim_pillar",
+          "name": "Pillar",
+          "type": "PRINCIPLED",
+          "base_color": [0.16, 0.16, 0.34],
+          "metallic": 0.15,
+          "roughness": 0.3,
+          "emission": [0.0, 0.0, 0.0],
+          "emission_strength": 0.0
+        }
+      ],
+      "objects": [
+        {
+          "id": "floor",
+          "type": "PLANE",
+          "location": [0.0, 0.0, 0.0],
+          "rotation_euler": [1.57, 0.0, 0.0],
+          "scale": [18.0, 18.0, 1.0],
+          "material": "lim_floor"
+        },
+        {
+          "id": "pillar_a",
+          "type": "CYLINDER",
+          "location": [2.0, -1.0, 0.0],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [1.0, 1.0, 4.0],
+          "material": "lim_pillar"
+        }
+      ],
+      "animation": {
+        "objects": [
+          {
+            "target_id": "pillar_a",
+            "property": "scale",
+            "frames": [1, 96],
+            "values": [[1.0, 1.0, 4.0], [1.08, 1.08, 3.65]],
+            "interpolation": "BEZIER"
+          }
+        ],
+        "materials": [],
+        "camera": [],
+        "lights": [
+          {
+            "target_id": "back",
+            "property": "energy",
+            "frames": [1, 96],
+            "values": [0.60, 1.12],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "world": [
+          {
+            "target_id": "world",
+            "property": "horizon_color",
+            "frames": [1, 96],
+            "values": [[0.03, 0.06, 0.12], [0.07, 0.08, 0.18]],
+            "interpolation": "LINEAR"
+          }
+        ]
+      },
+      "audio_binding": {
+        "enabled": true,
+        "tracks": [
+          {
+            "target_type": "object",
+            "target_id": "pillar_a",
+            "property": "scale",
+            "curve": "low_band",
+            "gain": 0.2,
+            "offset": 0
+          }
+        ]
+      },
+      "output": {
+        "blend_name": "liminal_scene.blend",
+        "still_name": "liminal_still.png",
+        "still_frame": 1,
+        "retention": "preview_only"
+      }
+    },
+    "architectural": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": {
+        "id": "soul-blender-architectural-01",
+        "project_id": "music-visual-a1",
+        "revision": "a1-0003",
+        "music_candidate_id": "music-architectural-probe"
+      },
+      "render": {
+        "renderer": "BLENDER_EEVEE",
+        "width": 1024,
+        "height": 576,
+        "fps": 30,
+        "frame_start": 1,
+        "frame_end": 120,
+        "seed": 1003
+      },
+      "palette": {
+        "ambient": [0.04, 0.06, 0.08],
+        "horizon": [0.10, 0.18, 0.22],
+        "accent": [0.20, 0.82, 0.90],
+        "contrast": 1.15
+      },
+      "world": {
+        "horizon_color": [0.01, 0.03, 0.07],
+        "ambient_strength": 0.3
+      },
+      "camera": {
+        "id": "cam",
+        "type": "PERSP",
+        "location": [0.0, -12.5, 4.5],
+        "rotation_euler": [1.05, 0.0, 0.0],
+        "lens": 50
+      },
+      "lights": [
+        {
+          "id": "line",
+          "type": "AREA",
+          "location": [4.5, 0.0, 4.0],
+          "energy": 280,
+          "color": [0.22, 0.62, 0.82]
+        },
+        {
+          "id": "edge",
+          "type": "POINT",
+          "location": [-4.0, 1.4, 3.0],
+          "energy": 100,
+          "color": [0.14, 0.20, 0.40]
+        }
+      ],
+      "materials": [
+        {
+          "id": "arc_brick",
+          "name": "Brick",
+          "type": "PRINCIPLED",
+          "base_color": [0.20, 0.20, 0.23],
+          "metallic": 0.2,
+          "roughness": 0.9,
+          "emission": [0.0, 0.0, 0.0],
+          "emission_strength": 0.0
+        },
+        {
+          "id": "arc_glass",
+          "name": "Glass",
+          "type": "PRINCIPLED",
+          "base_color": [0.05, 0.25, 0.35],
+          "metallic": 0.0,
+          "roughness": 0.28,
+          "emission": [0.01, 0.10, 0.20],
+          "emission_strength": 0.35
+        }
+      ],
+      "objects": [
+        {
+          "id": "pillars",
+          "type": "CUBE",
+          "location": [0.0, 0.0, 1.5],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [8.0, 1.25, 3.0],
+          "material": "arc_brick"
+        },
+        {
+          "id": "frame",
+          "type": "CIRCLE",
+          "location": [0.0, 0.0, 3.2],
+          "rotation_euler": [1.57, 0.0, 0.0],
+          "scale": [3.8, 3.8, 1.0],
+          "material": "arc_glass"
+        }
+      ],
+      "animation": {
+        "objects": [],
+        "materials": [
+          {
+            "target_id": "arc_glass",
+            "property": "roughness",
+            "frames": [1, 120],
+            "values": [0.36, 0.24],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "camera": [
+          {
+            "target_id": "cam",
+            "property": "location",
+            "frames": [1, 60, 120],
+            "values": [[0.0, -12.5, 4.5], [0.4, -12.5, 4.2], [0.0, -12.5, 4.5]],
+            "interpolation": "BEZIER"
+          }
+        ],
+        "lights": [
+          {
+            "target_id": "line",
+            "property": "energy",
+            "frames": [1, 120],
+            "values": [220, 340],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "world": []
+      },
+      "audio_binding": {
+        "enabled": true,
+        "tracks": [
+          {
+            "target_type": "camera",
+            "target_id": "cam",
+            "property": "lens",
+            "curve": "energy",
+            "gain": 0.18,
+            "offset": 0
+          }
+        ]
+      },
+      "output": {
+        "blend_name": "architectural_scene.blend",
+        "still_name": "architectural_still.png",
+        "still_frame": 1,
+        "retention": "preview_only"
+      }
+    },
+    "audio_reactive": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": {
+        "id": "soul-blender-audio-reactive-01",
+        "project_id": "music-visual-a1",
+        "revision": "a1-0004",
+        "music_candidate_id": "music-audio-reactive-probe"
+      },
+      "render": {
+        "renderer": "BLENDER_EEVEE",
+        "width": 960,
+        "height": 540,
+        "fps": 24,
+        "frame_start": 1,
+        "frame_end": 120,
+        "seed": 1004
+      },
+      "palette": {
+        "ambient": [0.01, 0.01, 0.06],
+        "horizon": [0.05, 0.11, 0.20],
+        "accent": [0.94, 0.34, 1.00],
+        "contrast": 1.35
+      },
+      "world": {
+        "horizon_color": [0.02, 0.02, 0.05],
+        "ambient_strength": 0.22
+      },
+      "camera": {
+        "id": "cam",
+        "type": "PERSP",
+        "location": [0.0, -15.0, 5.5],
+        "rotation_euler": [1.20, 0.0, 0.0],
+        "lens": 52
+      },
+      "lights": [
+        {
+          "id": "pulse",
+          "type": "POINT",
+          "location": [0.0, 0.0, 5.0],
+          "energy": 190,
+          "color": [0.0, 0.45, 0.95]
+        }
+      ],
+      "materials": [
+        {
+          "id": "reactive_core",
+          "name": "ReactiveCore",
+          "type": "PRINCIPLED",
+          "base_color": [0.03, 0.09, 0.18],
+          "metallic": 0.0,
+          "roughness": 0.45,
+          "emission": [0.0, 0.02, 0.20],
+          "emission_strength": 0.2
+        },
+        {
+          "id": "reactive_shell",
+          "name": "Shell",
+          "type": "PRINCIPLED",
+          "base_color": [0.01, 0.22, 0.44],
+          "metallic": 0.2,
+          "roughness": 0.35,
+          "emission": [0.12, 0.00, 0.32],
+          "emission_strength": 0.2
+        },
+        {
+          "id": "copper_frame",
+          "name": "CopperFrame",
+          "type": "PRINCIPLED",
+          "base_color": [0.32, 0.12, 0.05],
+          "metallic": 0.86,
+          "roughness": 0.24,
+          "emission": [0.12, 0.02, 0.0],
+          "emission_strength": 0.08
+        },
+        {
+          "id": "obsidian",
+          "name": "Obsidian",
+          "type": "PRINCIPLED",
+          "base_color": [0.008, 0.012, 0.022],
+          "metallic": 0.34,
+          "roughness": 0.2,
+          "emission": [0.0, 0.01, 0.025],
+          "emission_strength": 0.04
+        },
+        {
+          "id": "cyan_trace",
+          "name": "CyanTrace",
+          "type": "PRINCIPLED",
+          "base_color": [0.0, 0.18, 0.24],
+          "metallic": 0.42,
+          "roughness": 0.18,
+          "emission": [0.0, 0.55, 0.9],
+          "emission_strength": 1.1
+        }
+      ],
+      "objects": [
+        {
+          "id": "core",
+          "type": "ICO_SPHERE",
+          "location": [0.0, 0.0, 0.8],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [1.15, 1.15, 1.15],
+          "material": "reactive_core"
+        },
+        {
+          "id": "shell",
+          "type": "ICO_SPHERE",
+          "location": [0.0, 0.0, 0.8],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [1.7, 1.7, 1.7],
+          "material": "reactive_shell"
+        },
+        {
+          "id": "floor",
+          "type": "CYLINDER",
+          "location": [0.0, 0.0, -0.48],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [4.8, 4.8, 0.18],
+          "material": "obsidian"
+        },
+        {
+          "id": "ring_inner",
+          "type": "TORUS",
+          "location": [0.0, 0.0, 0.8],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [2.25, 2.25, 2.25],
+          "material": "cyan_trace"
+        },
+        {
+          "id": "ring_middle",
+          "type": "TORUS",
+          "location": [0.0, 0.0, 0.8],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [2.8, 2.8, 2.8],
+          "material": "copper_frame"
+        },
+        {
+          "id": "ring_outer",
+          "type": "TORUS",
+          "location": [0.0, 0.0, 0.8],
+          "rotation_euler": [0.35, 0.15, 0.0],
+          "scale": [3.35, 3.35, 3.35],
+          "material": "copper_frame"
+        },
+        {
+          "id": "spire_north",
+          "type": "CYLINDER",
+          "location": [-4.0, 1.8, 0.35],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.18, 0.18, 1.1],
+          "material": "copper_frame"
+        },
+        {
+          "id": "spire_south",
+          "type": "CYLINDER",
+          "location": [4.0, -1.8, 0.35],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.18, 0.18, 1.1],
+          "material": "copper_frame"
+        },
+        {
+          "id": "spire_east",
+          "type": "CYLINDER",
+          "location": [4.0, 1.8, 0.35],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.18, 0.18, 1.1],
+          "material": "copper_frame"
+        },
+        {
+          "id": "spire_west",
+          "type": "CYLINDER",
+          "location": [-4.0, -1.8, 0.35],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.18, 0.18, 1.1],
+          "material": "copper_frame"
+        },
+        {
+          "id": "satellite_ne",
+          "type": "ICO_SPHERE",
+          "location": [2.2, 1.8, 1.4],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.22, 0.22, 0.22],
+          "material": "cyan_trace"
+        },
+        {
+          "id": "satellite_nw",
+          "type": "ICO_SPHERE",
+          "location": [-2.2, 1.8, 1.4],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.22, 0.22, 0.22],
+          "material": "cyan_trace"
+        },
+        {
+          "id": "satellite_se",
+          "type": "ICO_SPHERE",
+          "location": [2.2, -1.8, 1.4],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.22, 0.22, 0.22],
+          "material": "cyan_trace"
+        },
+        {
+          "id": "satellite_sw",
+          "type": "ICO_SPHERE",
+          "location": [-2.2, -1.8, 1.4],
+          "rotation_euler": [0.0, 0.0, 0.0],
+          "scale": [0.22, 0.22, 0.22],
+          "material": "cyan_trace"
+        }
+      ],
+      "animation": {
+        "objects": [
+          {
+            "target_id": "core",
+            "property": "scale",
+            "frames": [1, 120],
+            "values": [[1.15, 1.15, 1.15], [1.35, 1.35, 1.35]],
+            "interpolation": "LINEAR"
+          },
+          {
+            "target_id": "ring_middle",
+            "property": "rotation_euler",
+            "frames": [1, 120],
+            "values": [[0.0, 0.0, 0.0], [0.0, 0.0, 6.28]],
+            "interpolation": "LINEAR"
+          },
+          {
+            "target_id": "ring_outer",
+            "property": "rotation_euler",
+            "frames": [1, 120],
+            "values": [[0.35, 0.15, 0.0], [0.35, 0.15, -6.28]],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "materials": [
+          {
+            "target_id": "reactive_core",
+            "property": "emission_strength",
+            "frames": [1, 120],
+            "values": [0.3, 1.1],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "camera": [],
+        "lights": [
+          {
+            "target_id": "pulse",
+            "property": "energy",
+            "frames": [1, 120],
+            "values": [150, 420],
+            "interpolation": "LINEAR"
+          }
+        ],
+        "world": []
+      },
+      "audio_binding": {
+        "enabled": true,
+        "tracks": [
+          {
+            "target_type": "material",
+            "target_id": "reactive_core",
+            "property": "emission_strength",
+            "curve": "kick",
+            "gain": 0.9,
+            "offset": 1
+          },
+          {
+            "target_type": "object",
+            "target_id": "shell",
+            "property": "scale",
+            "curve": "high_band",
+            "gain": 0.15,
+            "offset": 0
+          },
+          {
+            "target_type": "material",
+            "target_id": "cyan_trace",
+            "property": "emission_strength",
+            "curve": "mid_band",
+            "gain": 1.6,
+            "offset": 0
+          },
+          {
+            "target_type": "light",
+            "target_id": "pulse",
+            "property": "energy",
+            "curve": "energy",
+            "gain": 1.8,
+            "offset": 0
+          }
+        ]
+      },
+      "output": {
+        "blend_name": "audio_reactive_scene.blend",
+        "still_name": "audio_reactive_still.png",
+        "still_frame": 1,
+        "retention": "preview_only"
+      }
+    },
+    "bioluminescent_grove": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": { "id": "soul-blender-bioluminescent-grove-01", "project_id": "music-visual-a1", "revision": "a5-0001", "music_candidate_id": "music-grove-probe" },
+      "render": { "renderer": "BLENDER_EEVEE", "width": 960, "height": 540, "fps": 30, "frame_start": 1, "frame_end": 240, "seed": 2001 },
+      "palette": { "ambient": [0.005, 0.01, 0.018], "horizon": [0.012, 0.018, 0.035], "accent": [0.12, 0.92, 0.76], "contrast": 1.5 },
+      "world": { "horizon_color": [0.003, 0.006, 0.014], "ambient_strength": 0.1 },
+      "camera": { "id": "cam", "type": "PERSP", "location": [0.0, -16.0, 3.4], "rotation_euler": [1.43, 0.0, 0.0], "lens": 48 },
+      "lights": [
+        { "id": "moonlight", "type": "AREA", "location": [-4.0, -1.0, 8.5], "energy": 460, "color": [0.10, 0.34, 0.72] },
+        { "id": "grove_glow", "type": "POINT", "location": [0.0, 1.2, 2.0], "energy": 280, "color": [0.05, 0.90, 0.62] },
+        { "id": "ember_glow", "type": "POINT", "location": [3.8, 1.5, 1.0], "energy": 160, "color": [0.98, 0.22, 0.36] }
+      ],
+      "materials": [
+        { "id": "ground_dark", "name": "GroundDark", "type": "PRINCIPLED", "base_color": [0.006, 0.014, 0.017], "metallic": 0.05, "roughness": 0.82, "emission": [0.0, 0.01, 0.008], "emission_strength": 0.02 },
+        { "id": "bark_magenta", "name": "BarkMagenta", "type": "PRINCIPLED", "base_color": [0.18, 0.025, 0.09], "metallic": 0.0, "roughness": 0.72, "emission": [0.12, 0.0, 0.03], "emission_strength": 0.08 },
+        { "id": "canopy_void", "name": "CanopyVoid", "type": "PRINCIPLED", "base_color": [0.008, 0.018, 0.016], "metallic": 0.0, "roughness": 0.68, "emission": [0.0, 0.08, 0.04], "emission_strength": 0.12 },
+        { "id": "growth_cyan", "name": "GrowthCyan", "type": "PRINCIPLED", "base_color": [0.0, 0.22, 0.17], "metallic": 0.08, "roughness": 0.35, "emission": [0.02, 0.9, 0.62], "emission_strength": 1.0 },
+        { "id": "growth_violet", "name": "GrowthViolet", "type": "PRINCIPLED", "base_color": [0.14, 0.02, 0.24], "metallic": 0.08, "roughness": 0.32, "emission": [0.46, 0.06, 0.92], "emission_strength": 0.8 },
+        { "id": "stone", "name": "Stone", "type": "PRINCIPLED", "base_color": [0.035, 0.05, 0.07], "metallic": 0.14, "roughness": 0.74, "emission": [0.0, 0.0, 0.0], "emission_strength": 0.0 },
+        { "id": "moon", "name": "Moon", "type": "PRINCIPLED", "base_color": [0.15, 0.42, 0.58], "metallic": 0.0, "roughness": 0.42, "emission": [0.16, 0.72, 0.95], "emission_strength": 1.5 }
+      ],
+      "objects": [
+        { "id": "ground", "type": "CYLINDER", "location": [0.0, 1.2, -0.75], "rotation_euler": [0.0, 0.0, 0.0], "scale": [7.0, 6.0, 0.45], "material": "ground_dark" },
+        { "id": "moon", "type": "UV_SPHERE", "location": [-4.8, 5.0, 7.4], "rotation_euler": [0.0, 0.0, 0.0], "scale": [1.7, 1.7, 1.7], "material": "moon" },
+        { "id": "trunk_center", "type": "CYLINDER", "location": [0.2, 2.7, 2.0], "rotation_euler": [0.0, 0.12, -0.08], "scale": [0.68, 0.74, 3.5], "material": "bark_magenta" },
+        { "id": "crown_center_a", "type": "ICO_SPHERE", "location": [-0.7, 2.6, 5.2], "rotation_euler": [0.0, 0.0, 0.0], "scale": [2.0, 1.35, 1.45], "material": "canopy_void" },
+        { "id": "crown_center_b", "type": "ICO_SPHERE", "location": [1.0, 3.1, 5.5], "rotation_euler": [0.0, 0.0, 0.0], "scale": [1.7, 1.4, 1.25], "material": "canopy_void" },
+        { "id": "trunk_left", "type": "CYLINDER", "location": [-4.2, 3.5, 1.55], "rotation_euler": [0.0, -0.15, 0.04], "scale": [0.46, 0.52, 2.8], "material": "bark_magenta" },
+        { "id": "crown_left", "type": "ICO_SPHERE", "location": [-4.6, 3.6, 4.25], "rotation_euler": [0.0, 0.0, 0.0], "scale": [1.55, 1.2, 1.0], "material": "canopy_void" },
+        { "id": "trunk_right", "type": "CYLINDER", "location": [4.4, 4.0, 1.65], "rotation_euler": [0.0, 0.18, -0.06], "scale": [0.5, 0.55, 2.9], "material": "bark_magenta" },
+        { "id": "crown_right", "type": "ICO_SPHERE", "location": [4.9, 4.1, 4.5], "rotation_euler": [0.0, 0.0, 0.0], "scale": [1.6, 1.25, 1.05], "material": "canopy_void" },
+        { "id": "mushroom_1_stem", "type": "CYLINDER", "location": [-2.7, 0.3, 0.15], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.12, 0.12, 0.55], "material": "growth_cyan" },
+        { "id": "mushroom_1_cap", "type": "UV_SPHERE", "location": [-2.7, 0.3, 0.72], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.48, 0.48, 0.18], "material": "growth_cyan" },
+        { "id": "mushroom_2_stem", "type": "CYLINDER", "location": [2.5, 0.8, 0.08], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.1, 0.1, 0.42], "material": "growth_violet" },
+        { "id": "mushroom_2_cap", "type": "UV_SPHERE", "location": [2.5, 0.8, 0.52], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.4, 0.4, 0.15], "material": "growth_violet" },
+        { "id": "mushroom_3_stem", "type": "CYLINDER", "location": [3.7, 2.0, 0.12], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.13, 0.13, 0.62], "material": "growth_cyan" },
+        { "id": "mushroom_3_cap", "type": "UV_SPHERE", "location": [3.7, 2.0, 0.75], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.5, 0.5, 0.2], "material": "growth_cyan" },
+        { "id": "mushroom_4_stem", "type": "CYLINDER", "location": [-3.6, 2.2, 0.08], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.09, 0.09, 0.4], "material": "growth_violet" },
+        { "id": "mushroom_4_cap", "type": "UV_SPHERE", "location": [-3.6, 2.2, 0.5], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.36, 0.36, 0.14], "material": "growth_violet" },
+        { "id": "stone_1", "type": "ICO_SPHERE", "location": [-1.4, -0.1, -0.2], "rotation_euler": [0.2, 0.1, 0.0], "scale": [0.8, 0.55, 0.42], "material": "stone" },
+        { "id": "stone_2", "type": "ICO_SPHERE", "location": [1.1, 1.5, -0.26], "rotation_euler": [0.0, 0.2, 0.1], "scale": [0.62, 0.5, 0.34], "material": "stone" },
+        { "id": "stone_3", "type": "ICO_SPHERE", "location": [4.4, -0.2, -0.25], "rotation_euler": [0.1, 0.0, 0.2], "scale": [0.7, 0.42, 0.35], "material": "stone" },
+        { "id": "growth_orb_1", "type": "ICO_SPHERE", "location": [-1.8, 1.7, 0.28], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.16, 0.16, 0.16], "material": "growth_cyan" },
+        { "id": "growth_orb_2", "type": "ICO_SPHERE", "location": [1.8, 2.4, 0.35], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.2, 0.2, 0.2], "material": "growth_violet" },
+        { "id": "growth_orb_3", "type": "ICO_SPHERE", "location": [0.0, 0.0, 0.22], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.14, 0.14, 0.14], "material": "growth_cyan" }
+      ],
+      "animation": {
+        "objects": [
+          { "target_id": "growth_orb_1", "property": "scale", "frames": [1, 120, 240], "values": [[0.16, 0.16, 0.16], [0.24, 0.24, 0.24], [0.16, 0.16, 0.16]], "interpolation": "BEZIER" },
+          { "target_id": "growth_orb_2", "property": "scale", "frames": [1, 120, 240], "values": [[0.2, 0.2, 0.2], [0.13, 0.13, 0.13], [0.2, 0.2, 0.2]], "interpolation": "BEZIER" }
+        ],
+        "materials": [], "camera": [],
+        "lights": [ { "target_id": "grove_glow", "property": "energy", "frames": [1, 120, 240], "values": [220, 410, 220], "interpolation": "BEZIER" } ],
+        "world": []
+      },
+      "audio_binding": { "enabled": true, "tracks": [
+        { "target_type": "material", "target_id": "growth_cyan", "property": "emission_strength", "curve": "high_band", "gain": 1.25, "offset": 0 },
+        { "target_type": "material", "target_id": "growth_violet", "property": "emission_strength", "curve": "mid_band", "gain": 1.0, "offset": 0 },
+        { "target_type": "light", "target_id": "grove_glow", "property": "energy", "curve": "energy", "gain": 1.1, "offset": 0 },
+        { "target_type": "object", "target_id": "growth_orb_3", "property": "scale", "curve": "kick", "gain": 0.65, "offset": 0 }
+      ] },
+      "output": { "blend_name": "bioluminescent_grove.blend", "still_name": "bioluminescent_grove.png", "still_frame": 1, "retention": "full_candidate" }
+    }
+  }
+}

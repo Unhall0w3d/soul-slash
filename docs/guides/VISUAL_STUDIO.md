@@ -6,7 +6,7 @@ Open it from **Creative Studios → Visual Studio**.
 
 ## Current production boundary
 
-The supported still lane uses the reviewed FLUX.2 Klein Vulkan profile. Image-guided motion uses Wan 2.2; native text-to-video uses the distilled FastWan 2.2 profile. Each model is loaded for one foreground render and exits afterward. There is no resident image server, automatic publication, or silent promotion into Music Studio.
+The supported still lane uses the reviewed FLUX.2 Klein Vulkan profile. Image-guided motion uses Wan 2.2; native text-to-video uses the distilled FastWan 2.2 profile. The candidate Blender Scene lane uses pinned Blender 5.2 LTS and EEVEE to construct editable procedural scenes. Each model or renderer runs for one bounded foreground operation. There is no resident image server, Blender daemon, automatic publication, or silent promotion into Music Studio.
 
 Both motion paths currently produce a short 832×480 study. Native text-to-video offers four-, eight-, and twelve-second studies at 24 fps. Runtime varies with the chosen duration and decoder placement; the 1,050-second hard timeout is authoritative. After review and binding, Music Studio repeats the exact accepted clip to the song duration and muxes it with the exact audio. Soul does not represent this as several minutes of unique generated footage.
 
@@ -68,6 +68,45 @@ Record motion review here. If disposition is `revise`, Chat can prepare the
 next linked native revision from explicit replacement direction. Motion
 review, image-guided motion, binding motion to music, and deletion retain their
 Visual Studio controls.
+
+## Build an editable Blender scene
+
+**Whole-bar Blender companion** is the source-editable procedural lane. It
+requires one exact Music candidate whose human review is `keep`. Choose a
+reviewed scene family, an 8- or 12-musical-bar span, review or production
+resolution, and a deterministic seed. Creative direction is retained with the
+candidate as intent and revision evidence, but it does not silently rewrite
+the trusted template.
+
+Preview binds the exact music digest, review digest, BPM, meter, whole-bar
+duration, frame count, template, render profile, seed, manifest digest,
+analysis digest, and resource lease. Execution then:
+
+1. derives bounded low-, mid-, high-band, energy, and kick curves from the
+   exact lossless song candidate;
+2. constructs a new `.blend` through the repository-owned adapter;
+3. renders a verified PNG frame sequence through EEVEE;
+4. encodes the exact whole-bar MP4 loop with source audio only after every
+   frame exists; and
+5. returns the MP4, still, editable `.blend`, manifest, and audio evidence for
+   human review.
+
+The available scene families are **Bioluminescent grove**, **Audio reactive
+chamber**, **Architectural**, **Liminal**, and **Abstract**. They are reusable
+art directions, not unrestricted text-to-3D. Character rigs, arbitrary add-ons,
+downloaded `.blend` auto-execution, arbitrary asset paths, and model-authored
+Python remain unsupported.
+
+Record a 1–5 `keep` or `revise` review. A revision is a new immutable scene;
+the source remains available. A failed partial frame set can be resumed only
+through its explicit exact gate. A kept scene can be bound only to the music
+candidate that supplied its audio evidence. Continue in Music Studio to render
+the full-duration loop and prepare the normal private YouTube package.
+
+Chat and Voice can explain this lane and enumerate its required inputs through
+the shared capability catalog. First-generation scene construction remains a
+Visual Studio action in A5; conversation does not silently compile geometry or
+start Blender.
 
 ## Review a candidate
 

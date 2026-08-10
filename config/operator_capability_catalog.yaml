@@ -39,14 +39,14 @@ surfaces:
 
   - id: visual_studio
     label: Visual Studio
-    aliases: [visual studio, visual, image, artwork, motion]
-    summary: Gather visual briefs and create, review, revise, bind, and render still or native-motion candidates.
-    inputs: A clear visual intent; motion additionally needs reviewed context, supported duration, and chronological direction.
+    aliases: [visual studio, visual, image, artwork, motion, blender scene, procedural scene, audio reactive visual]
+    summary: Gather visual briefs and create, review, revise, bind, and render still, generated-motion, or reviewed procedural Blender scene candidates.
+    inputs: A clear visual intent; generated motion additionally needs reviewed context, supported duration, and chronological direction; Blender scenes need one exact kept song, a reviewed template, 8 or 12 musical bars, a render profile, seed, and retained creative direction.
     boundary: Destructive actions, binding, and external publication retain their owning human gates.
     skills: [creative.visual_production, creative.companion_production]
     invocations: [visual-production, companion-production]
-    operations: [visual.projects.create, visual.generation.preview, visual.generation.execute, visual.native_motion.preview, visual.native_motion.execute, visual.native_motion.revision.preview, visual.native_motion.revision.execute]
-    targets: [visual project, still candidate, motion candidate]
+    operations: [visual.projects.create, visual.generation.preview, visual.generation.execute, visual.native_motion.preview, visual.native_motion.execute, visual.native_motion.revision.preview, visual.native_motion.revision.execute, visual.blender.resources, visual.blender.templates, visual.blender.preview, visual.blender.execute, visual.blender.review, visual.blender.promotion.preview, visual.blender.promotion.execute]
+    targets: [visual project, still candidate, motion candidate, procedural Blender scene, editable blend]
     interfaces: [dashboard, chat, voice_presence]
     coverage: {dashboard: available, chat: available, voice: available}
     authority:

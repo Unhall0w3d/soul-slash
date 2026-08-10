@@ -194,6 +194,55 @@ module SoulCore
       FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
     end
 
+    def generated_blender_import_preview(project_id:, candidate_id:, source_project_id:, source_scene_id:, source_path:, prompt_summary:, source_receipt:)
+      scope = generated_blender_import_scope(project_id, candidate_id, source_project_id, source_scene_id, source_path, prompt_summary, source_receipt)
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Blender scene is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+      outcome("blocked_for_human_review", true, "exact reviewed Blender scene binding requires approval", data: gate(IMPORT_CONFIRMATION, scope))
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    end
+
+    def generated_blender_import_execute(project_id:, candidate_id:, source_project_id:, source_scene_id:, source_path:, prompt_summary:, source_receipt:, confirmation:, expected_digest:)
+      return missing_gate unless confirmation.to_s.length.positive? && expected_digest.to_s.length.positive?
+      scope = generated_blender_import_scope(project_id, candidate_id, source_project_id, source_scene_id, source_path, prompt_summary, source_receipt)
+      return gate_mismatch("exact reviewed Blender scene confirmation did not match") unless confirmation == IMPORT_CONFIRMATION
+      return gate_mismatch("Blender scene or Music candidate changed; preview again") unless secure_compare(expected_digest, digest(scope))
+      existing = existing_visual(scope)
+      return outcome("complete", true, "this Blender scene is already bound", data: { "visual" => existing, "idempotent_replay" => true }) if existing
+
+      root = visuals_root(project_id, create: true)
+      target = File.join(root, scope.fetch("visual_id"))
+      raise MusicProjectStore::IntegrityError, "visual destination already exists" if File.exist?(target) || File.symlink?(target)
+      staging = File.join(root, ".#{scope.fetch('visual_id')}.partial-#{SecureRandom.hex(4)}")
+      Dir.mkdir(staging, 0o700)
+      FileUtils.cp(source_path, File.join(staging, "loop.mp4"), preserve: false)
+      File.chmod(0o600, File.join(staging, "loop.mp4"))
+      record = scope.merge(
+        "schema_version" => "soul.music.visual.v1", "source_kind" => "blender_scene", "lifecycle_state" => "blocked_for_human_review",
+        "stage" => "loop_ready", "created_at" => @clock.call.iso8601, "updated_at" => @clock.call.iso8601,
+        "render_profile" => blender_render_profile(source_receipt),
+        "artifacts" => { "loop" => artifact("loop.mp4", staging).merge(
+          "duration_seconds" => source_receipt.fetch("duration_seconds"), "width" => source_receipt.fetch("width"),
+          "height" => source_receipt.fetch("height"), "fps" => source_receipt.fetch("fps"),
+          "motion_profile" => "blender-eevee-whole-bar", "frame_change_expected" => true,
+          "bars" => source_receipt.fetch("bars"), "manifest_sha256" => source_receipt.fetch("manifest_sha256")
+        ) },
+        "human_review_required" => true
+      )
+      write_json(File.join(staging, "visual.json"), record)
+      File.rename(staging, target)
+      outcome("blocked_for_human_review", true, "reviewed Blender loop bound; full-duration Music Studio preview remains gated", data: { "visual" => record }, mutation: "music_visual_blender_bound")
+    rescue MusicProjectStore::ValidationError => error
+      outcome("awaiting_input", false, error.message)
+    rescue MusicProjectStore::IntegrityError, KeyError, SystemCallError => error
+      outcome("blocked_for_human_review", false, error.message)
+    ensure
+      FileUtils.rm_rf(staging) if defined?(staging) && staging && File.directory?(staging) && !File.symlink?(staging)
+    end
+
     def loop_preview(project_id:, candidate_id:, visual_id:, presentation: nil)
       record = read_visual(project_id, candidate_id, visual_id)
       return outcome("complete", true, "visual loop already exists", data: { "visual" => record, "idempotent_replay" => true }) if record.dig("artifacts", "loop")
@@ -257,15 +306,23 @@ module SoulCore
       progress&.call({ "stage" => "visual_companion", "message" => "Extending the approved static presentation and binding the exact lossless candidate" })
       output = File.join(directory, ".preview.partial.mp4")
       render_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      if record["source_kind"] == "generated_motion"
-        render_motion_final(File.join(directory, "loop.webm"), audio, output, duration)
+      motion_source = %w[generated_motion blender_scene].include?(record["source_kind"])
+      if motion_source
+        loop_name = record["source_kind"] == "generated_motion" ? "loop.webm" : "loop.mp4"
+        render_motion_final(
+          File.join(directory, loop_name), audio, output, duration,
+          width: Integer(record.dig("render_profile", "width") || WIDTH),
+          height: Integer(record.dig("render_profile", "height") || HEIGHT)
+        )
       else
         render_final(File.join(directory, "base.png"), audio, output, duration, record.fetch("presentation", DEFAULT_PRESENTATION))
       end
       render_seconds = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - render_started).round(3)
       File.rename(output, File.join(directory, "preview.mp4"))
-      preview_fps = record["source_kind"] == "generated_motion" ? record.dig("render_profile", "fps") : FPS
-      record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => WIDTH, "height" => HEIGHT, "fps" => preview_fps, "render_seconds" => render_seconds)
+      preview_fps = motion_source ? record.dig("render_profile", "fps") : FPS
+      preview_width = motion_source ? record.dig("render_profile", "width") : WIDTH
+      preview_height = motion_source ? record.dig("render_profile", "height") : HEIGHT
+      record["artifacts"]["preview"] = artifact("preview.mp4", directory).merge("duration_seconds" => duration, "width" => preview_width, "height" => preview_height, "fps" => preview_fps, "render_seconds" => render_seconds)
       record["stage"] = "preview_ready"
       record["updated_at"] = @clock.call.iso8601
       replace_json(File.join(directory, "visual.json"), record)
@@ -282,6 +339,8 @@ module SoulCore
       record = read_visual(project_id, candidate_id, visual_id)
       filename = if record["source_kind"] == "generated_motion" && artifact.to_s == "loop"
         "loop.webm"
+      elsif record["source_kind"] == "blender_scene" && artifact.to_s == "loop"
+        "loop.mp4"
       else
         { "base" => "base.png", "loop" => "loop.mp4", "preview" => "preview.mp4" }[artifact.to_s]
       end
@@ -349,6 +408,28 @@ module SoulCore
       base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
     end
 
+    def generated_blender_import_scope(project_id, candidate_id, source_project_id, source_scene_id, source_path, prompt_summary, source_receipt)
+      project, candidate, audio = validate_binding!(project_id, candidate_id)
+      expanded = File.expand_path(source_path.to_s)
+      allowed_root = File.join(@root, "Soul", "visual", "projects")
+      raise MusicProjectStore::ValidationError, "Blender scene path is outside the private Visual Studio archive" unless within?(expanded, allowed_root)
+      raise MusicProjectStore::IntegrityError, "Blender scene preview is invalid" unless File.file?(expanded) && !File.symlink?(expanded) && File.size(expanded).positive?
+      raise MusicProjectStore::ValidationError, "Blender source identity is invalid" unless source_project_id.to_s.match?(/\Avisual_project_[a-f0-9]{16}\z/) && source_scene_id.to_s.match?(/\Ablender_scene_[a-f0-9]{16}\z/)
+      prompt = prompt_summary.to_s.strip
+      raise MusicProjectStore::ValidationError, "Blender scene direction is invalid" unless prompt.length.between?(12, 2_000)
+      raise MusicProjectStore::IntegrityError, "Blender scene preview digest changed" unless secure_compare(source_receipt.dig("artifacts", "preview", "sha256"), Digest::SHA256.file(expanded).hexdigest)
+      raise MusicProjectStore::ValidationError, "Blender scene must remain bound to its exact music candidate" unless source_receipt["music_project_id"] == project_id && source_receipt["music_candidate_id"] == candidate_id
+      base = {
+        "operation" => "bind_visual_studio_blender_scene", "project_id" => project.fetch("project_id"), "candidate_id" => candidate.fetch("candidate_id"),
+        "candidate_audio_sha256" => Digest::SHA256.file(audio).hexdigest, "source_visual_project_id" => source_project_id,
+        "source_blender_scene_id" => source_scene_id, "source_video_sha256" => Digest::SHA256.file(expanded).hexdigest,
+        "source_manifest_sha256" => source_receipt.fetch("manifest_sha256"), "source_audio_analysis_sha256" => source_receipt.fetch("audio_analysis_sha256"),
+        "provider" => "Soul Visual Studio / Blender EEVEE", "rights_status" => "operator_reviewed_local_generation",
+        "prompt_summary" => prompt, "render_profile_id" => "blender-eevee-whole-bar-v1", "external_publication" => false
+      }
+      base.merge("visual_id" => "visual_#{digest(base)[0, 16]}")
+    end
+
     def loop_scope(record, presentation)
       raise MusicProjectStore::ValidationError, "visual source is not ready" unless record["stage"] == "base_bound"
       raise MusicProjectStore::ValidationError, "legacy visual effect profiles cannot advance; bind an approved Visual Studio still" unless record.dig("render_profile", "profile_id") == STATIC_PROFILE_ID
@@ -363,20 +444,20 @@ module SoulCore
       raise MusicProjectStore::ValidationError, "review the rendered loop before creating the full preview" unless record["stage"] == "loop_ready"
       {
         "operation" => "render_music_visual_companion", "project_id" => record.fetch("project_id"), "candidate_id" => record.fetch("candidate_id"),
-        "visual_id" => record.fetch("visual_id"), "source_sha256" => record.dig("artifacts", record["source_kind"] == "generated_motion" ? "loop" : "base", "sha256"),
+        "visual_id" => record.fetch("visual_id"), "source_sha256" => record.dig("artifacts", %w[generated_motion blender_scene].include?(record["source_kind"]) ? "loop" : "base", "sha256"),
         "review_loop_sha256" => record.dig("artifacts", "loop", "sha256"),
         "candidate_audio_sha256" => record.fetch("candidate_audio_sha256"),
         "presentation" => record.fetch("presentation", DEFAULT_PRESENTATION),
-        "encoding" => record["source_kind"] == "generated_motion" ?
+        "encoding" => %w[generated_motion blender_scene].include?(record["source_kind"]) ?
           { "video" => "H.264 CRF 16 repeated reviewed motion", "pixel_format" => "yuv420p", "audio" => "AAC 256k" } :
           { "video" => "H.264 CRF 16 still-image", "pixel_format" => "yuv420p", "dark_gradient_dither" => "gradfun=1.2:16", "audio" => "AAC 256k" },
         "output" => "H.264/AAC MP4", "external_publication" => false
       }
     end
 
-    def render_motion_final(loop_video, audio, output, duration)
+    def render_motion_final(loop_video, audio, output, duration, width: WIDTH, height: HEIGHT)
       require_tools!
-      filter = "[0:v]scale=#{WIDTH}:#{HEIGHT}:force_original_aspect_ratio=decrease,pad=#{WIDTH}:#{HEIGHT}:(ow-iw)/2:(oh-ih)/2:color=0x060B11,format=yuv420p[v]"
+      filter = "[0:v]scale=#{width}:#{height}:force_original_aspect_ratio=decrease,pad=#{width}:#{height}:(ow-iw)/2:(oh-ih)/2:color=0x060B11,format=yuv420p[v]"
       command = [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-stream_loop", "-1", "-i", loop_video, "-i", audio, "-t", duration.to_s,
         "-filter_complex", filter, "-map", "[v]", "-map", "1:a:0", "-c:v", "libx264", "-preset", "medium", "-crf", "16", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", output]
       run_media!(command, output, "generated-motion visual companion")
@@ -516,6 +597,17 @@ module SoulCore
         "width" => receipt.fetch("width"), "height" => receipt.fetch("height"), "fps" => receipt.fetch("fps"),
         "renderer" => "Wan 2.2 TI2V / stable-diffusion.cpp Vulkan", "creative_effects" => true,
         "model_inference" => true, "resource_lane" => "amd-foreground", "generated_motion" => "human_reviewed"
+      }
+    end
+
+    def blender_render_profile(receipt)
+      {
+        "profile_id" => "blender-eevee-whole-bar-v1", "label" => "Reviewed Blender whole-bar loop",
+        "loop_seconds" => receipt.fetch("duration_seconds"), "bars" => receipt.fetch("bars"),
+        "width" => receipt.fetch("width"), "height" => receipt.fetch("height"), "fps" => receipt.fetch("fps"),
+        "renderer" => "Blender 5.2 LTS / EEVEE", "creative_effects" => true, "model_inference" => false,
+        "resource_lane" => "amd-foreground", "generated_motion" => "human_reviewed",
+        "manifest_sha256" => receipt.fetch("manifest_sha256"), "audio_analysis_sha256" => receipt.fetch("audio_analysis_sha256")
       }
     end
 

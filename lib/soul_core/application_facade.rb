@@ -70,6 +70,7 @@ require_relative "music_reference_analysis_service"
 require_relative "music_reference_synthesis_service"
 require_relative "visual_studio_service"
 require_relative "visual_motion_qualification_service"
+require_relative "blender_scene_service"
 
 module SoulCore
   class ApplicationFacade
@@ -140,6 +141,7 @@ module SoulCore
       music_reference_synthesis_service: nil,
       music_reference_synthesis_provider: nil,
       visual_studio_service: nil,
+      blender_scene_service: nil,
       knowledge_vault_service: nil,
       local_search_service: nil,
       file_inspection_service: nil,
@@ -206,6 +208,7 @@ module SoulCore
       @music_reference_synthesis_service = music_reference_synthesis_service
       @music_reference_synthesis_provider = music_reference_synthesis_provider
       @visual_studio_service = visual_studio_service
+      @blender_scene_service = blender_scene_service
       @knowledge_vault_service = knowledge_vault_service
       @local_search_service = local_search_service
       @file_inspection_service = file_inspection_service
@@ -255,6 +258,10 @@ module SoulCore
 
     def visual_motion_artifact_path(project_id:, motion_id:)
       visual_studio.motion_artifact_path(project_id: project_id, motion_id: motion_id)
+    end
+
+    def visual_blender_artifact_path(project_id:, scene_id:, artifact:)
+      blender_scene.artifact_path(project_id: project_id, scene_id: scene_id, artifact: artifact)
     end
 
     private
@@ -558,6 +565,18 @@ module SoulCore
       when "visual.motion.delete.execute" then domain(visual_studio.motion_delete_execute(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "visual.motion.promotion.preview" then domain(visual_studio.motion_promotion_preview(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id")))
       when "visual.motion.promotion.execute" then domain(visual_studio.motion_promotion_execute(project_id: required(parameters, "visual_project_id"), motion_id: required(parameters, "motion_candidate_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "visual.blender.resources" then domain(blender_scene.resources)
+      when "visual.blender.templates" then domain(blender_scene.templates)
+      when "visual.blender.list" then domain(blender_scene.list(project_id: required(parameters, "visual_project_id")))
+      when "visual.blender.preview" then domain(blender_scene.preview(project_id: required(parameters, "visual_project_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), template_id: required(parameters, "template_id"), bars: required(parameters, "bars"), direction: required(parameters, "direction"), seed: required(parameters, "seed"), quality: parameters.fetch("quality", "review"), source_scene_id: parameters["source_blender_scene_id"]))
+      when "visual.blender.execute" then domain(blender_scene.execute(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id"), music_project_id: required(parameters, "project_id"), music_candidate_id: required(parameters, "candidate_id"), template_id: required(parameters, "template_id"), bars: required(parameters, "bars"), direction: required(parameters, "direction"), seed: required(parameters, "seed"), quality: parameters.fetch("quality", "review"), source_scene_id: parameters["source_blender_scene_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.blender.resume.preview" then domain(blender_scene.resume_preview(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id")))
+      when "visual.blender.resume.execute" then domain(blender_scene.resume_execute(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "visual.blender.review" then domain(blender_scene.review(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id"), review: required(parameters, "visual_review")))
+      when "visual.blender.delete.preview" then domain(blender_scene.delete_preview(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id")))
+      when "visual.blender.delete.execute" then domain(blender_scene.delete_execute(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "visual.blender.promotion.preview" then domain(blender_scene.promotion_preview(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id")))
+      when "visual.blender.promotion.execute" then domain(blender_scene.promotion_execute(project_id: required(parameters, "visual_project_id"), scene_id: required(parameters, "blender_scene_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "approvals.pending" then [approvals_pending(parameters), "complete", "none", false]
       when "activities.recent" then [activities_recent(parameters), "complete", "none", false]
       else
@@ -1069,7 +1088,11 @@ module SoulCore
     end
 
     def visual_studio
-      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion)
+      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion, blender_scene_service: blender_scene)
+    end
+
+    def blender_scene
+      @blender_scene_service ||= BlenderSceneService.new(root: @root, music_visual_companion: music_visual_companion)
     end
 
     def visual_motion_qualification

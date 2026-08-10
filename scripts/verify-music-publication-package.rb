@@ -113,6 +113,28 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   motion_complete = motion_service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual_id, description: description, confirmation: "EXPORT_YOUTUBE_PACKAGE", expected_digest: motion_preview.dig("data", "expected_digest"))
   motion_thumbnail = File.join(motion_destination, "youtube", "thumbnail.png")
   check.call("generated motion package derives one deterministic thumbnail without requiring base.png", motion_preview.dig("data", "preview_scope", "thumbnail_derivation") == "reviewed-preview-frame-v1" && motion_complete["lifecycle_state"] == "complete" && File.file?(motion_thumbnail) && motion_runner.commands.one? && motion_runner.commands.first.each_cons(2).include?(["-ss", "1.0"]))
+
+  blender_destination = File.join(export_root, "afterimage-blender-fixture")
+  FileUtils.mkdir_p(blender_destination)
+  %w[master.flac listening.mp3 song.json song-info.md].each { |name| File.binwrite(File.join(blender_destination, name), "blender fixture #{name}") }
+  File.write(File.join(exports, "#{candidate_id}.json"), JSON.generate({ "schema_version" => "soul.music.finished_export.v1", "project_id" => project_id, "candidate_id" => candidate_id, "destination" => blender_destination, "scope_digest" => "c" * 64 }))
+  blender_visual_id = "visual_#{'5' * 16}"
+  blender_visual = {
+    "project_id" => project_id, "candidate_id" => candidate_id, "visual_id" => blender_visual_id,
+    "source_kind" => "blender_scene", "stage" => "preview_ready",
+    "source_manifest_sha256" => "d" * 64, "source_audio_analysis_sha256" => "e" * 64,
+    "artifacts" => { "preview" => { "sha256" => Digest::SHA256.file(video).hexdigest } }
+  }
+  blender_runner = PublicationRunner.new
+  blender_service = SoulCore::MusicPublicationPackageService.new(
+    root: root, export_root: export_root, project_store: store,
+    visual_service: PublicationVisualFixture.new(blender_visual, nil, video), runner: blender_runner,
+    clock: -> { Time.utc(2026, 7, 19, 5, 3) }
+  )
+  blender_preview = blender_service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual_id, description: description)
+  blender_complete = blender_service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual_id, description: description, confirmation: "EXPORT_YOUTUBE_PACKAGE", expected_digest: blender_preview.dig("data", "expected_digest"))
+  blender_upload = JSON.parse(File.binread(File.join(blender_destination, "youtube", "upload.json")))
+  check.call("Blender companion produces the same exact private YouTube package boundary", blender_preview.dig("data", "preview_scope", "thumbnail_derivation") == "reviewed-preview-frame-v1" && blender_complete["lifecycle_state"] == "complete" && blender_upload["privacy_status"] == "private" && blender_upload["api_upload_performed"] == false && File.file?(File.join(blender_destination, "youtube", "video.mp4")) && blender_runner.commands.one?)
 end
 
 contract = File.binread(File.expand_path("../lib/soul_core/application_contract.rb", __dir__))
