@@ -15,7 +15,7 @@ module SoulCore
   class BlenderSceneService
     SCENE_ID = /\Ablender_scene_[a-f0-9]{16}\z/
     VISUAL_PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
-    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge].freeze
+    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove].freeze
     LOOK_PROFILES = {
       "template" => nil,
       "cinematic_organic" => { "surface" => "organic", "atmosphere" => "mist", "camera" => "cinematic_dof", "glow" => "soft", "grade" => "cinematic" },

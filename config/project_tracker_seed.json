@@ -431,6 +431,23 @@
       "references": "docs/soul/BLENDER_VISUAL_LOOK_SYSTEM_A6_BRIEF.md\ndocs/assessments/BLENDER_VISUAL_LOOK_SYSTEM_A6_REVIEW.md\ndocs/guides/VISUAL_STUDIO.md"
     },
     {
+      "item_id": "track_blender_procedural_organics",
+      "title": "Add trusted procedural trees and fungal forms",
+      "area": "Visual Studio + Creative Tooling",
+      "horizon": "now",
+      "status": "in_progress",
+      "priority": "high",
+      "summary": "Replace the grove's stacked primitive silhouettes with bounded adapter-authored willow and mushroom geometry.",
+      "acceptance": "A closed organics manifest collection constructs a visibly branching and drooping willow plus mushroom clusters with curved tapered stems, profiled caps, overhangs, and underside gills; legacy scenes remain valid; unknown archetypes, keys, roles, enums, and counts fail closed; one exact whole-bar candidate remains editable, loop-safe, private, digest-bound, and human-reviewed.",
+      "source": "Operator review of the A6 Glassroot Signal candidate, 2026-08-10",
+      "notes": "Materials and reflections improved substantially in A6, but the Operator correctly identified mushrooms as oblate spheroids on cylinders and trees as simple trunks with coarse crowns. A7 now has a complete host-GPU review candidate, blender_scene_d86c38c5c2589779, in Glassroot Signal — Bioluminescent Grove; promotion remains pending Operator review.",
+      "implementation": "Additive A7 organics collection with exact common and archetype-specific keys; trusted deterministic willow curve/leaf construction; trusted revolved mushroom stems, caps, and gills; one reviewed Willow fungal grove family; deterministic Ruby/Python rejection coverage and live host-GPU qualification.",
+      "technologies": "Blender 5.2 LTS; bpy Curve and Mesh data blocks; deterministic seeded procedural construction; EEVEE; closed JSON archetypes and bounded parameters; SHA-256 scene lineage.",
+      "interfaces": "Visual Studio Willow fungal grove template; existing look, preview, exact execute, progress, review, revision, deletion, binding, and publication gates.",
+      "commands": "make verify-blender-scene-a1-a7\nnode --check assets/dashboard/dashboard.js",
+      "references": "docs/soul/BLENDER_PROCEDURAL_ORGANICS_A7_BRIEF.md\ndocs/assessments/BLENDER_PROCEDURAL_ORGANICS_A7_REVIEW.md\ndocs/guides/VISUAL_STUDIO.md"
+    },
+    {
       "item_id": "track_blender_scene_composition_director",
       "title": "Add a staged Blender scene-composition director",
       "area": "Visual Studio + Creative Tooling",
@@ -441,7 +458,7 @@
       "acceptance": "A closed composition map selects reviewed layout modules, focal structures, depth layers, camera paths, and section-aware state changes; Void Sanctuary renders as monumental architecture rather than a recolored grove; revision can preserve accepted look and music binding while changing only reviewed composition dimensions; arbitrary Python, node graphs, untrusted assets, and free-form model execution remain prohibited.",
       "source": "A6 live Void Sanctuary qualification, 2026-08-10",
       "notes": "A6 proved that richer trusted materials, atmosphere, DOF, glow, and grading work through the full Dashboard lifecycle, but also proved that look profiles cannot substitute for differentiated geometry and composition. Favor modular plinths, arches, rings, spires, suspended focal structures, parallax layers, and section-aware camera/light states before considering imported asset packs.",
-      "implementation": "Proposed A7: add enum-only composition and shot maps to the manifest; implement reviewed repository-owned construction modules in the trusted adapter; expose coherent Dashboard presets and surgical revision controls; render side-by-side whole-bar candidates with identical music, seed, and look to prove that composition—not post-processing—changed.",
+      "implementation": "Proposed A8: add enum-only composition and shot maps to the manifest; implement reviewed repository-owned construction modules in the trusted adapter; expose coherent Dashboard presets and surgical revision controls; render side-by-side whole-bar candidates with identical music, seed, and look to prove that composition—not post-processing—changed.",
       "technologies": "Blender 5.2 LTS; EEVEE; trusted bpy mesh/data-block construction; closed JSON composition modules; baked music section and envelope evidence; immutable scene revisions; deterministic SHA-256 lineage.",
       "interfaces": "Visual Studio Blender Scene composition and shot controls; preserved exact Music binding; existing review, revision, deletion, full-duration, and YouTube publication gates.",
       "commands": "make verify-blender-scene-a1-a7\nnode --check assets/dashboard/dashboard.js",

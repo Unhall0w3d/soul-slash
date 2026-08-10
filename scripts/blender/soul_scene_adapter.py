@@ -27,6 +27,13 @@ LOOK_ATMOSPHERES = {"none", "mist", "void_haze"}
 LOOK_CAMERAS = {"crisp", "subtle_dof", "cinematic_dof"}
 LOOK_GLOWS = {"none", "soft", "signal"}
 LOOK_GRADES = {"neutral", "cinematic", "high_contrast"}
+ORGANIC_ARCHETYPES = {"willow_tree", "mushroom_cluster"}
+WILLOW_MATERIAL_ROLES = {"bark", "foliage"}
+MUSHROOM_MATERIAL_ROLES = {"stem", "cap", "gill"}
+WILLOW_PARAMETER_KEYS = {"branch_depth", "primary_branches", "strands_per_branch", "leaf_density", "trunk_segments", "sway"}
+MUSHROOM_PARAMETER_KEYS = {"count", "cap_profile", "gill_segments", "spread", "height_variation"}
+WILLOW_SWAY_PRESETS = {"none", "restrained", "windborne"}
+MUSHROOM_CAP_PROFILES = {"bell", "convex", "conical", "flat"}
 
 
 def parse_args():
@@ -160,13 +167,13 @@ def validate_manifest(manifest):
         "audio_binding",
         "output",
         "look",
+        "organics",
     }
-    if set(manifest.keys()) == (top_level | {"look"}):
-        pass
-    elif set(manifest.keys()) == top_level - {"look"}:
-        manifest["look"] = {}
-    else:
+    required_top_level = top_level - {"look", "organics"}
+    if not required_top_level.issubset(manifest.keys()) or not set(manifest.keys()).issubset(top_level):
         reject_unknown(manifest, top_level, "manifest")
+    manifest.setdefault("look", {})
+    manifest.setdefault("organics", [])
 
     identity = manifest["identity"]
     render = manifest["render"]
@@ -180,6 +187,7 @@ def validate_manifest(manifest):
     audio_binding = manifest["audio_binding"]
     output = manifest["output"]
     look = manifest["look"]
+    organics = manifest["organics"]
 
     for key in ("id", "project_id", "revision", "music_candidate_id"):
         require_string(identity[key], f"identity.{key}", min_length=1, max_length=64)
@@ -269,6 +277,8 @@ def validate_manifest(manifest):
         require_vector3(obj["scale"], "object.scale", 0.05, 25.0)
         if obj["material"] not in material_ids:
             raise ValueError(f"object references unknown material: {obj['material']}")
+
+    validate_organics(organics, material_ids, {entry["id"] for entry in objects})
 
     for light in lights:
         if not isinstance(light, dict):
@@ -371,6 +381,66 @@ def validate_manifest(manifest):
     return manifest
 
 
+def validate_organics(organics, material_ids, object_ids):
+    """Validate A7's closed, repository-owned procedural construction vocabulary."""
+    if not isinstance(organics, list):
+        raise ValueError("organics must be a list")
+    if len(organics) > 16:
+        raise ValueError("organics exceeds maximum of 16")
+
+    organic_ids = set()
+    for organic in organics:
+        if not isinstance(organic, dict):
+            raise ValueError("organic must be map")
+        keys = {"id", "archetype", "location", "rotation_euler", "scale", "seed", "materials", "parameters"}
+        reject_unknown(organic, keys, "organic")
+        for forbidden in ("path", "paths", "script", "scripts", "driver", "addon", "nodes", "asset", "asset_path", "import"):
+            forbid_key(organic, forbidden, "organic")
+        require_string(organic["id"], "organic.id", 2, 64, r"[A-Za-z0-9_-]+")
+        if organic["id"] in organic_ids:
+            raise ValueError(f"duplicate organic id: {organic['id']}")
+        if organic["id"] in object_ids:
+            raise ValueError("organic.id conflicts with object id")
+        organic_ids.add(organic["id"])
+        if organic["archetype"] not in ORGANIC_ARCHETYPES:
+            raise ValueError("organic.archetype unsupported")
+        require_vector3(organic["location"], "organic.location", -1000.0, 1000.0)
+        require_vector3(organic["rotation_euler"], "organic.rotation_euler", -6.28, 6.28)
+        require_vector3(organic["scale"], "organic.scale", 0.05, 25.0)
+        require_int(organic["seed"], "organic.seed", 0, 2**31 - 1)
+
+        material_roles = WILLOW_MATERIAL_ROLES if organic["archetype"] == "willow_tree" else MUSHROOM_MATERIAL_ROLES
+        materials = organic["materials"]
+        if not isinstance(materials, dict):
+            raise ValueError("organic.materials must be map")
+        reject_unknown(materials, material_roles, "organic.materials")
+        for role, material_id in materials.items():
+            require_string(material_id, f"organic.materials.{role}", 2, 64, r"[A-Za-z0-9_-]+")
+            if material_id not in material_ids:
+                raise ValueError(f"organic material unknown: {material_id}")
+
+        parameters = organic["parameters"]
+        if not isinstance(parameters, dict):
+            raise ValueError("organic.parameters must be map")
+        if organic["archetype"] == "willow_tree":
+            reject_unknown(parameters, WILLOW_PARAMETER_KEYS, "organic.parameters")
+            require_int(parameters["branch_depth"], "organic.parameters.branch_depth", 2, 4)
+            require_int(parameters["primary_branches"], "organic.parameters.primary_branches", 4, 10)
+            require_int(parameters["strands_per_branch"], "organic.parameters.strands_per_branch", 3, 9)
+            require_int(parameters["leaf_density"], "organic.parameters.leaf_density", 2, 8)
+            require_int(parameters["trunk_segments"], "organic.parameters.trunk_segments", 5, 12)
+            if parameters["sway"] not in WILLOW_SWAY_PRESETS:
+                raise ValueError("organic.parameters.sway unsupported")
+        else:
+            reject_unknown(parameters, MUSHROOM_PARAMETER_KEYS, "organic.parameters")
+            require_int(parameters["count"], "organic.parameters.count", 3, 12)
+            if parameters["cap_profile"] not in MUSHROOM_CAP_PROFILES:
+                raise ValueError("organic.parameters.cap_profile unsupported")
+            require_int(parameters["gill_segments"], "organic.parameters.gill_segments", 12, 40)
+            require_number(parameters["spread"], "organic.parameters.spread", 0.5, 5.0)
+            require_number(parameters["height_variation"], "organic.parameters.height_variation", 0.0, 0.8)
+
+
 def build_material_collection(material_spec):
     created = {}
     for item in sorted(material_spec, key=lambda entry: entry["id"]):
@@ -432,6 +502,259 @@ def build_objects(specs, materials):
             bevel = obj.modifiers.new(name="SoulBevel", type="BEVEL")
             bevel.width = 0.06
             bevel.segments = 3
+
+
+def create_organic_mesh(name, vertices, faces, material, parent):
+    """Create one trusted mesh from bounded in-memory geometry only."""
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(material)
+    for polygon in mesh.polygons:
+        polygon.use_smooth = True
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.parent = parent
+    return obj
+
+
+def append_tapered_tube(vertices, faces, centers, radii, sides=8):
+    """Append a bounded ring mesh suitable for curved trunks, roots, and stems."""
+    import math
+
+    start = len(vertices)
+    for center, radius in zip(centers, radii):
+        for side in range(sides):
+            angle = 2.0 * math.pi * side / sides
+            vertices.append((center[0] + radius * math.cos(angle), center[1] + radius * math.sin(angle), center[2]))
+    for ring in range(len(centers) - 1):
+        for side in range(sides):
+            next_side = (side + 1) % sides
+            first = start + ring * sides + side
+            second = start + ring * sides + next_side
+            third = start + (ring + 1) * sides + next_side
+            fourth = start + (ring + 1) * sides + side
+            faces.append((first, second, third, fourth))
+    faces.append(tuple(reversed(range(start, start + sides))))
+    end = start + (len(centers) - 1) * sides
+    faces.append(tuple(range(end, end + sides)))
+
+
+def add_curve_spline(curve_data, points):
+    spline = curve_data.splines.new("BEZIER")
+    spline.bezier_points.add(len(points) - 1)
+    for point, coordinate in zip(spline.bezier_points, points):
+        point.co = coordinate
+        point.handle_left_type = "AUTO"
+        point.handle_right_type = "AUTO"
+
+
+def add_willow_sway(root, scene, preset):
+    """Keyframe a single bounded, seamless loop; no drivers or background work."""
+    if preset == "none":
+        return
+    amplitude = 0.025 if preset == "restrained" else 0.075
+    start = scene.frame_start
+    middle = start + (scene.frame_end - start) // 2
+    end = scene.frame_end
+    for frame, angle in ((start, 0.0), (middle, amplitude), (end, 0.0)):
+        root.rotation_euler[1] = angle
+        root.keyframe_insert(data_path="rotation_euler", index=1, frame=frame)
+
+
+def build_willow_tree(organic, materials, scene):
+    """Trusted A7 willow builder: tapered roots/trunk, curved hierarchy, and one leaf mesh."""
+    import math
+    import random
+
+    params = organic["parameters"]
+    rng = random.Random(organic["seed"])
+    root = bpy.data.objects.new(organic["id"], None)
+    root.empty_display_type = "PLAIN_AXES"
+    root.location = organic["location"]
+    root.rotation_euler = organic["rotation_euler"]
+    root.scale = organic["scale"]
+    root["soul_organic_archetype"] = "willow_tree"
+    root["soul_organic_builder"] = "trusted_a7_willow"
+    bpy.context.scene.collection.objects.link(root)
+
+    trunk_vertices, trunk_faces = [], []
+    trunk_height = 2.8 + rng.uniform(-0.20, 0.20)
+    trunk_centers = []
+    for index in range(params["trunk_segments"]):
+        fraction = index / (params["trunk_segments"] - 1)
+        trunk_centers.append((0.10 * math.sin(fraction * 3.1), 0.08 * math.cos(fraction * 2.4), trunk_height * fraction))
+    trunk_radii = [0.48 * (1.0 - 0.68 * index / (params["trunk_segments"] - 1)) for index in range(params["trunk_segments"])]
+    append_tapered_tube(trunk_vertices, trunk_faces, trunk_centers, trunk_radii)
+    for root_index in range(5):
+        angle = 2.0 * math.pi * root_index / 5.0 + rng.uniform(-0.20, 0.20)
+        reach = 1.35 + rng.uniform(0.0, 0.60)
+        centers = [(0.0, 0.0, 0.12), (0.34 * math.cos(angle), 0.34 * math.sin(angle), 0.08),
+                   (reach * math.cos(angle), reach * math.sin(angle), -0.04)]
+        append_tapered_tube(trunk_vertices, trunk_faces, centers, (0.20, 0.12, 0.025), sides=6)
+    create_organic_mesh(f"{organic['id']}_trunk_roots", trunk_vertices, trunk_faces, materials[organic["materials"]["bark"]], root)
+
+    branch_data = bpy.data.curves.new(f"{organic['id']}_branches", type="CURVE")
+    branch_data.dimensions = "3D"
+    branch_data.resolution_u = 2
+    branch_data.bevel_depth = 0.055
+    branch_data.bevel_resolution = 2
+    branch_obj = bpy.data.objects.new(f"{organic['id']}_branches", branch_data)
+    branch_data.materials.append(materials[organic["materials"]["bark"]])
+    bpy.context.scene.collection.objects.link(branch_obj)
+    branch_obj.parent = root
+
+    leaf_vertices, leaf_faces = [], []
+    for primary in range(params["primary_branches"]):
+        angle = 2.0 * math.pi * primary / params["primary_branches"] + rng.uniform(-0.22, 0.22)
+        origin = trunk_centers[-1]
+        direction = (math.cos(angle), math.sin(angle))
+        terminal = origin
+        branch_nodes = [origin]
+        for depth in range(params["branch_depth"]):
+            length = (0.85 - depth * 0.10) * rng.uniform(0.86, 1.12)
+            rise = 0.20 - depth * 0.08
+            end = (terminal[0] + direction[0] * length, terminal[1] + direction[1] * length, terminal[2] + rise)
+            branch_nodes.append(end)
+            terminal = end
+            angle += rng.uniform(-0.38, 0.38)
+            direction = (math.cos(angle), math.sin(angle))
+        # One continuous curved primary limb avoids the jointed umbrella
+        # silhouette of individual two-point branch segments.
+        add_curve_spline(branch_data, tuple(branch_nodes))
+        # Small deterministic forks make the crown read as a hierarchy rather
+        # than a wheel of identical spokes, while remaining inside the closed
+        # branch-depth and primary-branch bounds.
+        for fork_index, fork_origin in enumerate(branch_nodes[1:-1], start=1):
+            fork_angle = angle + (-1.0 if fork_index % 2 else 1.0) * rng.uniform(0.38, 0.72)
+            fork_length = rng.uniform(0.48, 0.82)
+            fork_end = (fork_origin[0] + math.cos(fork_angle) * fork_length,
+                        fork_origin[1] + math.sin(fork_angle) * fork_length,
+                        fork_origin[2] - rng.uniform(0.02, 0.18))
+            fork_control = ((fork_origin[0] + fork_end[0]) * 0.5,
+                            (fork_origin[1] + fork_end[1]) * 0.5,
+                            fork_origin[2] + 0.16)
+            add_curve_spline(branch_data, (fork_origin, fork_control, fork_end))
+        for strand in range(params["strands_per_branch"]):
+            strand_angle = angle + rng.uniform(-0.52, 0.52)
+            strand_length = 1.0 + rng.uniform(0.25, 1.10)
+            attachment = branch_nodes[1 + strand % (len(branch_nodes) - 1)]
+            start = (attachment[0] + rng.uniform(-0.22, 0.22),
+                     attachment[1] + rng.uniform(-0.22, 0.22),
+                     attachment[2] + rng.uniform(-0.06, 0.10))
+            middle = (start[0] + 0.18 * math.cos(strand_angle), start[1] + 0.18 * math.sin(strand_angle), start[2] - strand_length * 0.38)
+            end = (middle[0] + 0.12 * math.cos(strand_angle), middle[1] + 0.12 * math.sin(strand_angle), start[2] - strand_length)
+            add_curve_spline(branch_data, (start, middle, end))
+            for leaf_index in range(params["leaf_density"] * 2):
+                fraction = (leaf_index + 1) / (params["leaf_density"] * 2 + 1)
+                center = tuple(start[axis] * (1.0 - fraction) + end[axis] * fraction for axis in range(3))
+                width = 0.045 + rng.uniform(0.0, 0.035)
+                height = 0.13 + rng.uniform(0.0, 0.06)
+                # Two crossed, tapered blades keep the bounded combined mesh
+                # legible from both frontal and oblique camera positions.  The
+                # earlier single XY-facing quad became almost invisible when
+                # viewed across the grove.
+                offset = len(leaf_vertices)
+                leaf_vertices.extend((
+                    (center[0], center[1], center[2] + height * 0.18),
+                    (center[0] - width, center[1], center[2] - height * 0.40),
+                    (center[0], center[1], center[2] - height),
+                    (center[0] + width, center[1], center[2] - height * 0.40),
+                    (center[0], center[1], center[2] + height * 0.18),
+                    (center[0], center[1] - width, center[2] - height * 0.40),
+                    (center[0], center[1], center[2] - height),
+                    (center[0], center[1] + width, center[2] - height * 0.40),
+                ))
+                leaf_faces.extend(((offset, offset + 1, offset + 2, offset + 3),
+                                   (offset + 4, offset + 5, offset + 6, offset + 7)))
+    create_organic_mesh(f"{organic['id']}_leaf_mesh", leaf_vertices, leaf_faces, materials[organic["materials"]["foliage"]], root)
+    add_willow_sway(root, scene, params["sway"])
+
+
+def cap_profile_points(profile):
+    """Reviewed revolved profiles all include an outward overhang before the underside."""
+    profiles = {
+        "bell": ((0.04, 0.52), (0.38, 0.44), (0.84, 0.18), (1.08, -0.08), (0.72, -0.18)),
+        "convex": ((0.04, 0.40), (0.42, 0.43), (0.90, 0.18), (1.10, -0.06), (0.74, -0.14)),
+        "conical": ((0.04, 0.68), (0.46, 0.34), (0.92, 0.02), (1.08, -0.09), (0.70, -0.16)),
+        "flat": ((0.06, 0.25), (0.50, 0.28), (0.95, 0.10), (1.09, -0.07), (0.73, -0.13)),
+    }
+    return profiles[profile]
+
+
+def append_revolved_cap(vertices, faces, center, radius, profile, segments=16):
+    import math
+
+    start = len(vertices)
+    points = cap_profile_points(profile)
+    for radial, height in points:
+        for segment in range(segments):
+            angle = 2.0 * math.pi * segment / segments
+            vertices.append((center[0] + radius * radial * math.cos(angle), center[1] + radius * radial * math.sin(angle), center[2] + radius * height))
+    for ring in range(len(points) - 1):
+        for segment in range(segments):
+            next_segment = (segment + 1) % segments
+            first = start + ring * segments + segment
+            second = start + ring * segments + next_segment
+            third = start + (ring + 1) * segments + next_segment
+            fourth = start + (ring + 1) * segments + segment
+            faces.append((first, second, third, fourth))
+
+
+def build_mushroom_cluster(organic, materials):
+    """Trusted A7 mushroom builder: curved tapered stems, revolved caps, and radial gills."""
+    import math
+    import random
+
+    params = organic["parameters"]
+    rng = random.Random(organic["seed"])
+    root = bpy.data.objects.new(organic["id"], None)
+    root.empty_display_type = "SINGLE_ARROW"
+    root.location = organic["location"]
+    root.rotation_euler = organic["rotation_euler"]
+    root.scale = organic["scale"]
+    root["soul_organic_archetype"] = "mushroom_cluster"
+    root["soul_organic_builder"] = "trusted_a7_mushroom"
+    bpy.context.scene.collection.objects.link(root)
+
+    stem_vertices, stem_faces, cap_vertices, cap_faces, gill_vertices, gill_faces = [], [], [], [], [], []
+    for index in range(params["count"]):
+        angle = 2.0 * math.pi * index / params["count"] + rng.uniform(-0.30, 0.30)
+        radial = params["spread"] * math.sqrt(rng.random())
+        x, y = radial * math.cos(angle), radial * math.sin(angle)
+        height = 0.72 + rng.uniform(-params["height_variation"], params["height_variation"])
+        height = max(0.28, height)
+        radius = 0.20 + rng.uniform(-0.035, 0.075)
+        lean = rng.uniform(-0.18, 0.18)
+        centers = [(x + lean * (level / 5.0) ** 2, y + 0.06 * math.sin(level), height * level / 5.0) for level in range(6)]
+        append_tapered_tube(stem_vertices, stem_faces, centers, [radius * (1.0 - 0.38 * level / 5.0) for level in range(6)], sides=8)
+        cap_center = centers[-1]
+        cap_radius = radius * rng.uniform(2.1, 3.4)
+        append_revolved_cap(cap_vertices, cap_faces, cap_center, cap_radius, params["cap_profile"])
+        underside_z = cap_center[2] - cap_radius * 0.13
+        for gill in range(params["gill_segments"]):
+            gill_angle = 2.0 * math.pi * gill / params["gill_segments"]
+            perpendicular = (-math.sin(gill_angle) * cap_radius * 0.018, math.cos(gill_angle) * cap_radius * 0.018)
+            inner = cap_radius * 0.18
+            outer = cap_radius * 0.92
+            a = (cap_center[0] + inner * math.cos(gill_angle), cap_center[1] + inner * math.sin(gill_angle), underside_z)
+            b = (cap_center[0] + outer * math.cos(gill_angle), cap_center[1] + outer * math.sin(gill_angle), underside_z - cap_radius * 0.035)
+            offset = len(gill_vertices)
+            gill_vertices.extend(((a[0] + perpendicular[0], a[1] + perpendicular[1], a[2]), (a[0] - perpendicular[0], a[1] - perpendicular[1], a[2]),
+                                  (b[0] - perpendicular[0], b[1] - perpendicular[1], b[2]), (b[0] + perpendicular[0], b[1] + perpendicular[1], b[2])))
+            gill_faces.append((offset, offset + 1, offset + 2, offset + 3))
+    create_organic_mesh(f"{organic['id']}_stems", stem_vertices, stem_faces, materials[organic["materials"]["stem"]], root)
+    create_organic_mesh(f"{organic['id']}_caps", cap_vertices, cap_faces, materials[organic["materials"]["cap"]], root)
+    create_organic_mesh(f"{organic['id']}_gills", gill_vertices, gill_faces, materials[organic["materials"]["gill"]], root)
+
+
+def build_organics(specs, materials, scene):
+    for organic in sorted(specs, key=lambda entry: entry["id"]):
+        if organic["archetype"] == "willow_tree":
+            build_willow_tree(organic, materials, scene)
+        elif organic["archetype"] == "mushroom_cluster":
+            build_mushroom_cluster(organic, materials)
+        else:
+            raise ValueError(f"unsupported organic archetype: {organic['archetype']}")
 
 
 def apply_surface_look(materials, profile):
@@ -737,6 +1060,7 @@ def run(manifest, blend_path, still_path, still_frame):
     materials = build_material_collection(manifest["materials"])
     build_lights(manifest["lights"], bpy.context.scene.collection)
     build_objects(manifest["objects"], materials)
+    build_organics(manifest["organics"], materials, scene)
 
     apply_surface_look(materials, manifest["look"]["surface"])
     apply_atmosphere(world, manifest["look"]["atmosphere"])
@@ -778,7 +1102,7 @@ def main():
     clear_scene()
     run(manifest, blend_path, still_path, int(manifest["output"]["still_frame"]))
     frame_count = manifest["render"]["frame_end"] - manifest["render"]["frame_start"] + 1
-    print("SOUL_SCENE_ADAPTER_RUN=" + json.dumps({"blend_path": blend_path, "still_path": still_path, "frames": frame_count, "objects": len(manifest["objects"]) }))
+    print("SOUL_SCENE_ADAPTER_RUN=" + json.dumps({"blend_path": blend_path, "still_path": still_path, "frames": frame_count, "objects": len(manifest["objects"]), "organics": len(manifest["organics"])}))
     return 0
 
 

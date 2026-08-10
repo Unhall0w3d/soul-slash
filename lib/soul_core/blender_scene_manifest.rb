@@ -24,6 +24,7 @@ module SoulCore
       animation
       audio_binding
       look
+      organics
       output
     ].freeze
 
@@ -39,6 +40,14 @@ module SoulCore
     AUDIO_TRACK_KEYS = %w[target_type target_id property curve gain offset].freeze
     OUTPUT_KEYS = %w[blend_name still_name still_frame retention].freeze
     LOOK_KEYS = %w[surface atmosphere camera glow grade].freeze
+    ORGANIC_KEYS = %w[id archetype location rotation_euler scale seed materials parameters].freeze
+    WILLOW_MATERIAL_ROLES = %w[bark foliage].freeze
+    MUSHROOM_MATERIAL_ROLES = %w[stem cap gill].freeze
+    WILLOW_PARAMETER_KEYS = %w[branch_depth primary_branches strands_per_branch leaf_density trunk_segments sway].freeze
+    MUSHROOM_PARAMETER_KEYS = %w[count cap_profile gill_segments spread height_variation].freeze
+    ORGANIC_ARCHETYPES = %w[willow_tree mushroom_cluster].freeze
+    WILLOW_SWAY_PRESETS = %w[none restrained windborne].freeze
+    MUSHROOM_CAP_PROFILES = %w[bell convex conical flat].freeze
 
     LOOK_DEFAULTS = {
       "surface" => "clean",
@@ -67,6 +76,7 @@ module SoulCore
       raw = require_hash!(manifest, "manifest")
       raw = raw.dup
       raw["look"] ||= LOOK_DEFAULTS.dup
+      raw["organics"] ||= []
       @normalized_manifest = validate_and_normalize!(raw)
     end
 
@@ -97,6 +107,7 @@ module SoulCore
       lights = validate_lights(require_array!(manifest["lights"], "lights"))
       materials = validate_materials(require_array!(manifest["materials"], "materials"))
       objects = validate_objects(require_array!(manifest["objects"], "objects"), materials)
+      organics = validate_organics(require_array!(manifest["organics"], "organics"), materials, objects)
       animation = validate_animation(require_hash!(manifest["animation"], "animation"), objects, materials, camera, lights, render)
       audio_binding = validate_audio_binding(require_hash!(manifest["audio_binding"], "audio_binding"), objects, materials, camera, lights)
       output = validate_output(require_hash!(manifest["output"], "output"))
@@ -112,6 +123,7 @@ module SoulCore
         "lights" => lights,
         "objects" => objects,
         "materials" => materials,
+        "organics" => organics,
         "animation" => animation,
         "look" => look,
         "audio_binding" => audio_binding,
@@ -231,6 +243,60 @@ module SoulCore
       end
       require_unique_ids!(normalized, "objects")
       normalized
+    end
+
+    def validate_organics(organics, materials, objects)
+      raise ValidationError, "organics exceeds maximum of 16" if organics.length > 16
+      material_ids = materials.map { |entry| entry.fetch("id") }
+      object_ids = objects.map { |entry| entry.fetch("id") }
+      normalized = organics.map do |organic|
+        organic = require_hash!(organic, "organic")
+        reject_unknown(organic, ORGANIC_KEYS, "organic")
+        reject_forbidden(organic, "organic")
+        require_string!(organic["id"], "organic.id", min: 2, max: 64, pattern: /\A[a-zA-Z0-9_-]+\z/)
+        raise ValidationError, "organic.id conflicts with object id" if object_ids.include?(organic["id"])
+        raise ValidationError, "organic.archetype unsupported" unless ORGANIC_ARCHETYPES.include?(organic["archetype"])
+        require_vector3!(organic["location"], "organic.location")
+        require_vector3!(organic["rotation_euler"], "organic.rotation_euler", min: -6.29, max: 6.29)
+        require_scale_vector!(organic["scale"], "organic.scale")
+        require_int!(organic["seed"], "organic.seed", min: 0, max: 2**31 - 1)
+
+        validate_organic_materials!(organic, material_ids)
+        validate_organic_parameters!(organic)
+        organic
+      end
+      require_unique_ids!(normalized, "organics")
+      normalized
+    end
+
+    def validate_organic_materials!(organic, material_ids)
+      materials = require_hash!(organic["materials"], "organic.materials")
+      roles = organic["archetype"] == "willow_tree" ? WILLOW_MATERIAL_ROLES : MUSHROOM_MATERIAL_ROLES
+      require_exact_keys!(materials, roles, "organic.materials")
+      materials.each do |role, material_id|
+        require_string!(material_id, "organic.materials.#{role}", min: 2, max: 64, pattern: /\A[a-zA-Z0-9_-]+\z/)
+        raise ValidationError, "organic material unknown: #{material_id}" unless material_ids.include?(material_id)
+      end
+    end
+
+    def validate_organic_parameters!(organic)
+      parameters = require_hash!(organic["parameters"], "organic.parameters")
+      if organic["archetype"] == "willow_tree"
+        require_exact_keys!(parameters, WILLOW_PARAMETER_KEYS, "organic.parameters")
+        require_int!(parameters["branch_depth"], "organic.parameters.branch_depth", min: 2, max: 4)
+        require_int!(parameters["primary_branches"], "organic.parameters.primary_branches", min: 4, max: 10)
+        require_int!(parameters["strands_per_branch"], "organic.parameters.strands_per_branch", min: 3, max: 9)
+        require_int!(parameters["leaf_density"], "organic.parameters.leaf_density", min: 2, max: 8)
+        require_int!(parameters["trunk_segments"], "organic.parameters.trunk_segments", min: 5, max: 12)
+        raise ValidationError, "organic.parameters.sway unsupported" unless WILLOW_SWAY_PRESETS.include?(parameters["sway"])
+      else
+        require_exact_keys!(parameters, MUSHROOM_PARAMETER_KEYS, "organic.parameters")
+        require_int!(parameters["count"], "organic.parameters.count", min: 3, max: 12)
+        raise ValidationError, "organic.parameters.cap_profile unsupported" unless MUSHROOM_CAP_PROFILES.include?(parameters["cap_profile"])
+        require_int!(parameters["gill_segments"], "organic.parameters.gill_segments", min: 12, max: 40)
+        require_number!(parameters["spread"], "organic.parameters.spread", min: 0.5, max: 5.0)
+        require_number!(parameters["height_variation"], "organic.parameters.height_variation", min: 0.0, max: 0.8)
+      end
     end
 
     def validate_animation(animation, objects, materials, camera, lights, render)
@@ -462,6 +528,7 @@ module SoulCore
       normalized["lights"] = manifest.fetch("lights").sort_by { |entry| entry.fetch("id") }
       normalized["materials"] = manifest.fetch("materials").sort_by { |entry| entry.fetch("id") }
       normalized["objects"] = manifest.fetch("objects").sort_by { |entry| entry.fetch("id") }
+      normalized["organics"] = manifest.fetch("organics").sort_by { |entry| entry.fetch("id") }
       normalized["animation"] = {}
       ANIMATION_KEYS.each do |section|
         normalized["animation"][section] = manifest.fetch("animation").fetch(section).sort_by do |entry|

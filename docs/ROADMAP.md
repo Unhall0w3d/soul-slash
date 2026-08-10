@@ -99,8 +99,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
   YouTube-package gates. Its first end-to-end candidate also proved authenticated
   upload, unlisted publication, and public playback after YouTube processing.
   A6 now expands the deliberately conservative visual vocabulary through closed
-  surface, atmosphere, camera, glow, and grading profiles; rich imported asset
-  packs remain future separately qualified work. See
+  surface, atmosphere, camera, glow, and grading profiles. A7 is adding a
+  trusted procedural-organics vocabulary so willow trees and fungal clusters
+  use generated curves and meshes instead of stacked primitives; rich imported
+  asset packs remain future separately qualified work. See
   `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md`.
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification

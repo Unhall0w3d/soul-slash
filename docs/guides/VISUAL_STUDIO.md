@@ -91,13 +91,20 @@ analysis digest, and resource lease. Execution then:
 5. returns the MP4, still, editable `.blend`, manifest, and audio evidence for
    human review.
 
-The available scene families are **Void sanctuary**, **Signal forge**,
+The available scene families are **Willow fungal grove**, **Void sanctuary**, **Signal forge**,
 **Bioluminescent grove**, **Audio reactive chamber**, **Architectural**,
 **Liminal**, and **Abstract**. Look profiles can retain the template treatment
 or apply reviewed cinematic-organic, liminal-haze, signal-forge, or
 crystalline-void combinations. Those combinations select only trusted surface,
 atmosphere, camera-depth, glow, and AgX grading presets inside Soul's adapter.
 They do not accept node graphs or Blender code from the model or browser.
+
+**Willow fungal grove** exercises the first trusted procedural-organics
+vocabulary. Its willow is constructed from bounded tapered curves, hierarchical
+drooping branches, visible roots, and combined leaf geometry. Its fungal
+clusters use curved tapered stems, revolved cap profiles, and radial underside
+gills. The manifest selects only reviewed archetypes, material roles, seeds,
+and bounded parameters; all Blender geometry remains repository-owned.
 
 Scene families remain reusable art directions, not unrestricted text-to-3D.
 Character rigs, arbitrary add-ons, downloaded `.blend` auto-execution,
