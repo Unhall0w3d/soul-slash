@@ -55,8 +55,9 @@ class OAuthApiFixture
 end
 
 class OAuthCallbackRunner
-  def initialize(state: :valid)
+  def initialize(state: :valid, probe_first: false)
     @state = state
+    @probe_first = probe_first
   end
 
   def run(*command, **_options)
@@ -66,6 +67,10 @@ class OAuthCallbackRunner
       callback = URI.parse(query.fetch("redirect_uri"))
       state = @state == :valid ? query.fetch("state") : "wrong-state"
       Thread.new do
+        if @probe_first
+          probe = TCPSocket.new(callback.host, callback.port)
+          probe.close
+        end
         socket = TCPSocket.new(callback.host, callback.port)
         target = "#{callback.path}?#{URI.encode_www_form("state" => state, "code" => "fixture-code")}"
         socket.write("GET #{target} HTTP/1.1\r\nHost: #{callback.host}\r\nConnection: close\r\n\r\n")
@@ -204,6 +209,20 @@ Dir.mktmpdir("soul-youtube-a0-") do |root|
              rejected_refresh.message.include?("Testing") &&
              !rejected_refresh.message.include?("invalid_grant"))
   oauth_api.reject_refresh = false
+
+  probe_root = File.join(root, "probe-first")
+  probe_oauth = SoulCore::YouTubeOAuthService.new(
+    root: probe_root, api: OAuthApiFixture.new, runner: OAuthCallbackRunner.new(probe_first: true),
+    callback_timeout: 1
+  )
+  probe_preview = probe_oauth.preview(client_path: client_path)
+  probe_result = probe_oauth.execute(
+    client_path: client_path, confirmation: "AUTHORIZE_YOUTUBE",
+    expected_digest: probe_preview.dig("data", "expected_digest")
+  )
+  check.call("empty browser preconnect cannot consume the real OAuth callback",
+             probe_result["lifecycle_state"] == "complete" &&
+             File.file?(File.join(probe_root, "Soul", "runtime", "youtube_auth", "oauth.json")))
 
   wrong_state_root = File.join(root, "wrong-state")
   wrong_state = SoulCore::YouTubeOAuthService.new(

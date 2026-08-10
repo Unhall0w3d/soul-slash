@@ -24,6 +24,8 @@ module SoulCore
       SCOPES + ["https://www.googleapis.com/auth/youtube.force-ssl"]
     ).freeze
     CALLBACK_TIMEOUT = 180
+    CALLBACK_REQUEST_TIMEOUT = 2
+    MAX_CALLBACK_ATTEMPTS = 8
     MAX_CREDENTIAL_BYTES = 64 * 1024
     MAX_DISCOVERY_FILES = 64
     CLIENT_FILENAME_PATTERN = /\Aclient_secret_[A-Za-z0-9._-]+\.apps\.googleusercontent\.com\.json\z/
@@ -232,6 +234,7 @@ module SoulCore
 
     def receive_authorization(client)
       server = TCPServer.new("127.0.0.1", 0)
+      socket = nil
       port = server.addr[1]
       redirect_uri = "http://127.0.0.1:#{port}/oauth2/callback"
       state = @random.urlsafe_base64(32)
@@ -251,26 +254,58 @@ module SoulCore
       launch = @runner.run("xdg-open", "#{client.fetch('auth_uri')}?#{query}", timeout_seconds: 10, max_output_bytes: 8 * 1024)
       raise CredentialError, "could not open the Google authorization page" unless launch.success?
 
-      ready = IO.select([server], nil, nil, @callback_timeout)
-      raise CredentialError, "Google authorization timed out" unless ready
-      socket = server.accept
-      request_line = socket.gets.to_s
-      raise CredentialError, "OAuth callback request is invalid" if request_line.bytesize > 8 * 1024
-      target = request_line.split(" ", 3)[1].to_s
-      uri = URI.parse(target)
-      parameters = URI.decode_www_form(uri.query.to_s).to_h
-      valid = uri.path == "/oauth2/callback" && secure_compare(parameters["state"], state)
-      if valid && !parameters["code"].to_s.empty?
-        respond_callback(socket, 200, "Soul received authorization. You may close this tab.")
-        {
-          "code" => parameters.fetch("code"),
-          "redirect_uri" => redirect_uri,
-          "code_verifier" => verifier
-        }
-      else
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @callback_timeout
+      attempts = 0
+      loop do
+        remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        raise CredentialError, "Google authorization timed out" unless remaining.positive?
+        raise CredentialError, "OAuth callback received too many invalid connections" if attempts >= MAX_CALLBACK_ATTEMPTS
+
+        ready = IO.select([server], nil, nil, remaining)
+        raise CredentialError, "Google authorization timed out" unless ready
+        socket = server.accept
+        attempts += 1
+        readable = IO.select([socket], nil, nil, [remaining, CALLBACK_REQUEST_TIMEOUT].min)
+        unless readable
+          socket.close
+          socket = nil
+          next
+        end
+        request_line = socket.gets("\n", 8 * 1024 + 1).to_s
+        if request_line.empty? || request_line.bytesize > 8 * 1024
+          respond_callback(socket, 400, "Soul rejected this authorization response.") unless request_line.empty?
+          socket.close
+          socket = nil
+          next
+        end
+
+        target = request_line.split(" ", 3)[1].to_s
+        begin
+          uri = URI.parse(target)
+          parameters = URI.decode_www_form(uri.query.to_s).to_h
+        rescue URI::InvalidURIError, ArgumentError
+          respond_callback(socket, 400, "Soul rejected this authorization response.")
+          socket.close
+          socket = nil
+          next
+        end
+        valid = uri.path == "/oauth2/callback" && secure_compare(parameters["state"], state)
+        if valid && !parameters["code"].to_s.empty?
+          respond_callback(socket, 200, "Soul received authorization. You may close this tab.")
+          return {
+            "code" => parameters.fetch("code"),
+            "redirect_uri" => redirect_uri,
+            "code_verifier" => verifier
+          }
+        end
+        if valid && !parameters["error"].to_s.empty?
+          respond_callback(socket, 400, "Google authorization was not granted.")
+          raise CredentialError, "Google authorization was not granted"
+        end
+
         respond_callback(socket, 400, "Soul rejected this authorization response.")
-        reason = parameters["error"].to_s.empty? ? "OAuth callback state or code was invalid" : "Google authorization was not granted"
-        raise CredentialError, reason
+        socket.close
+        socket = nil
       end
     ensure
       socket&.close
