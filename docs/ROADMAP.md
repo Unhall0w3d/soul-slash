@@ -83,6 +83,13 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Qualified expansion candidates
 
+- Track-aware new-song production is now under active architecture review. The
+  candidate keeps ACE-Step Turbo as the accepted full-mix baseline, adds a
+  separately qualified Base lane for extract/Lego/complete operations, preserves
+  aligned audio with selective MIDI and samples in a DAW-independent production
+  graph, and lets FL Studio remain the only native `.flp` writer. See
+  `docs/soul/DAW_NATIVE_MUSIC_PRODUCTION_ARCHITECTURE.md`.
+
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [x] Operator qualification of the current bounded 4-second, 8-second, and
   12-second Visual Motion profiles through the retained evidence ledger; longer
