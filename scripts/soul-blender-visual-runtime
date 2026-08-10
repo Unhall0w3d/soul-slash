@@ -1,0 +1,402 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "timeout"
+require "time"
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "soul_core/model_runtime_lease_store"
+
+class SoulBlenderVisualRuntime
+  CONFIRMATION = "RUN_BLENDER_VISUAL_A0"
+  MAX_OUTPUT_BYTES = 2 * 1024 * 1024
+  MAX_MANIFEST_BYTES = 64 * 1024
+
+  def initialize(options)
+    @root = File.expand_path(options.fetch(:root))
+    raise "runtime root must not be a symlink" if File.symlink?(@root)
+    @manifest_path = regular_path!(options.fetch(:manifest), "manifest")
+    raise "manifest exceeds size limit" if File.size(@manifest_path) > MAX_MANIFEST_BYTES
+    @manifest = JSON.parse(File.binread(@manifest_path, MAX_MANIFEST_BYTES))
+    raise "unsupported Blender runtime manifest" unless @manifest["schema_version"] == "soul.blender_visual.runtime.v1"
+    @project_root = File.expand_path("..", __dir__)
+    @fixture_path = trusted_repo_file!(@manifest.fetch("fixture"), "fixture")
+    @probe_path = trusted_repo_file!(@manifest.fetch("probe"), "probe")
+    @binary = options[:blender] ? regular_executable!(options[:blender], "Blender binary") : find_executable(@manifest.fetch("binary_name"))
+    @ffmpeg = options[:ffmpeg] ? regular_executable!(options[:ffmpeg], "FFmpeg binary") : find_executable("ffmpeg")
+    @ffprobe = options[:ffprobe] ? regular_executable!(options[:ffprobe], "FFprobe binary") : find_executable("ffprobe")
+    @expected_digest = options[:expected_digest]
+    @confirmation = options[:confirmation]
+    @lease_store = SoulCore::ModelRuntimeLeaseStore.new(root: @project_root, directory: options[:lease_directory] || SoulCore::ModelRuntimeLeaseStore::DEFAULT_DIRECTORY)
+  end
+
+  def check
+    version = version_evidence
+    probe = probe_evidence
+    startup_clean = version.fetch("clean") && probe.fetch("clean")
+    emit(
+      "lifecycle_state" => "complete",
+      "runtime_ready" => startup_clean && version.fetch("matches") && probe.fetch("success"),
+      "profile_id" => @manifest.fetch("profile_id"),
+      "binary" => @binary,
+      "binary_sha256" => Digest::SHA256.file(@binary).hexdigest,
+      "required_version" => @manifest.fetch("required_version"),
+      "version" => version,
+      "probe" => probe,
+      "startup_clean" => startup_clean,
+      "persistent_service" => false,
+      "network_listener" => false,
+      "bounded_foreground_operation" => true
+    )
+  rescue StandardError => error
+    fail_with(error)
+  end
+
+  def plan
+    data = plan_data
+    emit(data.merge("lifecycle_state" => "blocked_for_human_review"))
+  rescue StandardError => error
+    fail_with(error)
+  end
+
+  def run
+    plan = plan_data
+    authorize!(plan)
+    readiness = runtime_evidence
+    raise "Blender runtime is not ready: startup must be clean and the adopted version must match" unless readiness.fetch("runtime_ready")
+
+    run_id = "blender_a0_#{plan.fetch('expected_digest')[0, 16]}"
+    runs = File.join(@root, "runs")
+    final = File.join(runs, run_id)
+    partial = "#{final}.partial-#{Process.pid}"
+    raise "exact Blender A0 run already exists" if File.exist?(final)
+    FileUtils.mkdir_p(runs, mode: 0o700)
+    FileUtils.mkdir_p(partial, mode: 0o700)
+    FileUtils.mkdir_p(File.join(partial, "frames"), mode: 0o700)
+
+    lease = @lease_store.acquire_exclusive(
+      provider_id: "blender-visual",
+      model_id: @manifest.fetch("profile_id"),
+      request_id: run_id,
+      conversation_id: "blender-a0",
+      resource_group: @manifest.fetch("resource_group"),
+      ttl_seconds: @manifest.fetch("timeout_seconds") + 120
+    )
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    logs = []
+    blend_path = File.join(partial, "scene.blend")
+    logs << command!(build_command(blend_path), timeout: 60)
+    raise "trusted fixture did not produce a regular .blend" unless regular_nonempty?(blend_path)
+
+    half = @manifest.fetch("frames") / 2
+    frame_prefix = File.join(partial, "frames", "frame_")
+    logs << command!(render_command(blend_path, frame_prefix, 1, half), timeout: @manifest.fetch("timeout_seconds"))
+    logs << command!(render_command(blend_path, frame_prefix, half + 1, @manifest.fetch("frames")), timeout: @manifest.fetch("timeout_seconds"))
+    frames = validate_frames!(File.join(partial, "frames"))
+
+    preview = File.join(partial, "preview.mp4")
+    logs << command!(encode_command(frame_prefix, preview), timeout: 60)
+    video = probe_video(preview)
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+    receipt = plan.merge(
+      "lifecycle_state" => "blocked_for_human_review",
+      "run_id" => run_id,
+      "output_path" => File.join(final, "preview.mp4"),
+      "blend_path" => File.join(final, "scene.blend"),
+      "receipt_path" => File.join(final, "receipt.json"),
+      "elapsed_seconds" => elapsed.round(3),
+      "runtime" => readiness,
+      "frame_ranges" => [[1, half], [half + 1, @manifest.fetch("frames")]],
+      "frame_count" => frames.length,
+      "frames_sha256" => Digest::SHA256.hexdigest(frames.map { |path| "#{File.basename(path)}:#{Digest::SHA256.file(path).hexdigest}" }.join("\n")),
+      "scene_sha256" => Digest::SHA256.file(blend_path).hexdigest,
+      "preview_sha256" => Digest::SHA256.file(preview).hexdigest,
+      "preview_bytes" => File.size(preview),
+      "video" => video,
+      "renderer_log_tail" => tail(logs.join("\n"), 4_000)
+    )
+    receipt_path = File.join(partial, "receipt.json")
+    File.binwrite(receipt_path, JSON.pretty_generate(receipt) + "\n")
+    ([blend_path, preview, receipt_path] + frames).each { |path| File.chmod(0o600, path) }
+    File.rename(partial, final)
+    emit(receipt)
+  rescue Interrupt
+    FileUtils.rm_rf(partial) if defined?(partial) && partial
+    emit("lifecycle_state" => "canceled", "error" => "Blender A0 run canceled")
+    exit 130
+  rescue SoulCore::ModelRuntimeLeaseStore::ResourceBusy => error
+    FileUtils.rm_rf(partial) if defined?(partial) && partial
+    fail_with(error)
+  rescue StandardError => error
+    FileUtils.rm_rf(partial) if defined?(partial) && partial
+    fail_with(error)
+  ensure
+    @lease_store.release(lease["lease_id"]) if defined?(lease) && lease
+  end
+
+  private
+
+  def plan_data
+    scope = {
+      "operation" => "blender_visual_a0_qualification",
+      "profile_id" => @manifest.fetch("profile_id"),
+      "binary" => @binary,
+      "binary_sha256" => Digest::SHA256.file(@binary).hexdigest,
+      "runtime_sha256" => Digest::SHA256.file(__FILE__).hexdigest,
+      "required_version" => @manifest.fetch("required_version"),
+      "manifest_sha256" => Digest::SHA256.file(@manifest_path).hexdigest,
+      "fixture_sha256" => Digest::SHA256.file(@fixture_path).hexdigest,
+      "probe_sha256" => Digest::SHA256.file(@probe_path).hexdigest,
+      "renderer" => @manifest.fetch("renderer"),
+      "width" => @manifest.fetch("width"),
+      "height" => @manifest.fetch("height"),
+      "fps" => @manifest.fetch("fps"),
+      "frames" => @manifest.fetch("frames"),
+      "resource_group" => @manifest.fetch("resource_group"),
+      "confirmation_phrase" => CONFIRMATION,
+      "persistent_service" => false,
+      "network_listener" => false,
+      "external_publication" => false,
+      "bounded_foreground_operation" => true
+    }
+    validate_profile!(scope)
+    scope.merge("expected_digest" => digest(scope))
+  end
+
+  def runtime_evidence
+    version = version_evidence
+    probe = probe_evidence
+    clean = version.fetch("clean") && probe.fetch("clean")
+    {
+      "runtime_ready" => clean && version.fetch("matches") && probe.fetch("success"),
+      "startup_clean" => clean,
+      "version" => version,
+      "probe" => probe
+    }
+  end
+
+  def version_evidence
+    result = command_result([@binary, "--version"], timeout: 10)
+    first = result.fetch("stdout").lines.first.to_s.strip
+    {
+      "success" => result.fetch("success"),
+      "reported" => first,
+      "matches" => first == @manifest.fetch("required_version"),
+      "clean" => clean_startup?(result),
+      "stderr" => tail(result.fetch("stderr"), 2_000)
+    }
+  end
+
+  def probe_evidence
+    result = command_result(base_command + ["--python", @probe_path], timeout: 30)
+    marker = result.fetch("stdout").lines.find { |line| line.start_with?("SOUL_BLENDER_PROBE=") }
+    payload = marker ? JSON.parse(marker.split("=", 2).last) : nil
+    {
+      "success" => result.fetch("success") && payload.is_a?(Hash),
+      "clean" => clean_startup?(result),
+      "data" => payload,
+      "stderr" => tail(result.fetch("stderr"), 4_000)
+    }
+  rescue JSON::ParserError => error
+    { "success" => false, "clean" => false, "data" => nil, "stderr" => "probe JSON invalid: #{error.message}" }
+  end
+
+  def build_command(blend_path)
+    base_command + [
+      "--python", @fixture_path, "--",
+      "--blend-path", blend_path,
+      "--width", @manifest.fetch("width").to_s,
+      "--height", @manifest.fetch("height").to_s,
+      "--fps", @manifest.fetch("fps").to_s,
+      "--frames", @manifest.fetch("frames").to_s
+    ]
+  end
+
+  def render_command(blend_path, prefix, first, last)
+    base_command + [
+      blend_path,
+      "--render-output", prefix,
+      "--render-format", @manifest.fetch("frame_format"),
+      "--render-frame", "#{first}..#{last}"
+    ]
+  end
+
+  def encode_command(prefix, preview)
+    [
+      @ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+      "-framerate", @manifest.fetch("fps").to_s,
+      "-start_number", "1", "-i", "#{prefix}%04d.png",
+      "-frames:v", @manifest.fetch("frames").to_s,
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", preview
+    ]
+  end
+
+  def probe_video(path)
+    raise "preview is missing" unless regular_nonempty?(path)
+    result = command_result([
+      @ffprobe, "-v", "error", "-show_entries",
+      "stream=codec_type,width,height,avg_frame_rate,nb_frames,duration:format=duration",
+      "-of", "json", path
+    ], timeout: 15)
+    raise "FFprobe failed: #{tail(result.fetch('stderr'), 1_000)}" unless result.fetch("success")
+    data = JSON.parse(result.fetch("stdout"))
+    stream = Array(data["streams"]).find { |entry| entry["codec_type"] == "video" }
+    raise "preview has no video stream" unless stream
+    raise "preview dimensions are invalid" unless stream["width"] == @manifest.fetch("width") && stream["height"] == @manifest.fetch("height")
+    expected_rate = "#{@manifest.fetch('fps')}/1"
+    raise "preview frame rate is invalid" unless stream["avg_frame_rate"] == expected_rate
+    duration = Float(stream["duration"] || data.dig("format", "duration"))
+    expected_duration = @manifest.fetch("frames").fdiv(@manifest.fetch("fps"))
+    raise "preview duration is invalid" unless (duration - expected_duration).abs <= 0.05
+    { "width" => stream["width"], "height" => stream["height"], "fps" => @manifest.fetch("fps"), "duration_seconds" => duration.round(3), "frame_count" => Integer(stream["nb_frames"] || @manifest.fetch("frames")) }
+  end
+
+  def validate_frames!(directory)
+    expected = (1..@manifest.fetch("frames")).map { |frame| File.join(directory, format("frame_%04d.png", frame)) }
+    invalid = expected.reject { |path| regular_nonempty?(path) }
+    raise "frame sequence is incomplete: #{invalid.map { |path| File.basename(path) }.join(', ')}" unless invalid.empty?
+    extras = Dir.children(directory).reject { |name| expected.map { |path| File.basename(path) }.include?(name) }
+    raise "frame sequence contains unexpected files" unless extras.empty?
+    expected
+  end
+
+  def base_command
+    [@binary, "--background", "--factory-startup", "--disable-autoexec", "--offline-mode"]
+  end
+
+  def authorize!(plan)
+    raise "confirmation phrase is invalid" unless secure_compare(@confirmation, CONFIRMATION)
+    raise "EXPECTED_DIGEST is required" if @expected_digest.to_s.empty?
+    raise "approved Blender plan changed; preview again" unless secure_compare(@expected_digest, plan.fetch("expected_digest"))
+  end
+
+  def validate_profile!(scope)
+    raise "renderer is not the adopted EEVEE profile" unless scope["renderer"] == "BLENDER_EEVEE"
+    raise "canvas is outside A0 bounds" unless (64..1920).cover?(scope["width"]) && (64..1080).cover?(scope["height"])
+    raise "frame rate is outside A0 bounds" unless (1..60).cover?(scope["fps"])
+    raise "frame count is outside A0 bounds" unless (2..240).cover?(scope["frames"])
+  end
+
+  def command!(command, timeout:)
+    result = command_result(command, timeout: timeout)
+    raise "bounded command timed out: #{command.first}" if result.fetch("status") == "timeout"
+    raise "command failed: #{command.first}: #{tail(result.fetch('stdout') + result.fetch('stderr'), 4_000)}" unless result.fetch("success")
+    raise "command emitted a startup traceback: #{tail(result.fetch('stdout') + result.fetch('stderr'), 4_000)}" unless clean_startup?(result)
+    tail(result.fetch("stdout") + result.fetch("stderr"), MAX_OUTPUT_BYTES)
+  end
+
+  def command_result(command, timeout:)
+    stdout = +""; stderr = +""; process_status = nil; status = "failed"; wait = nil; readers = []
+    Open3.popen3(*command, pgroup: true) do |stdin, out, err, thread|
+      wait = thread
+      stdin.close
+      readers = [[out, stdout], [err, stderr]].map { |io, buffer| bounded_reader(io, buffer) }
+      begin
+        Timeout.timeout(Float(timeout)) { process_status = wait.value }
+        status = process_status.success? ? "ok" : "failed"
+      rescue Timeout::Error
+        status = "timeout"
+        terminate_group(wait)
+        process_status = wait.value
+      rescue Interrupt
+        terminate_group(wait)
+        raise
+      ensure
+        readers.each { |reader| reader.join(2) || reader.kill }
+      end
+    end
+    { "success" => status == "ok", "status" => status, "exit_status" => process_status&.exitstatus, "stdout" => safe_text(stdout), "stderr" => safe_text(stderr) }
+  rescue Errno::ENOENT => error
+    { "success" => false, "status" => "unavailable", "exit_status" => nil, "stdout" => "", "stderr" => error.message }
+  end
+
+  def bounded_reader(io, buffer)
+    Thread.new do
+      loop do
+        chunk = io.readpartial(16 * 1024)
+        remaining = MAX_OUTPUT_BYTES - buffer.bytesize
+        buffer << chunk.byteslice(0, remaining) if remaining.positive?
+      end
+    rescue EOFError, IOError
+      nil
+    end
+  end
+
+  def terminate_group(wait)
+    Process.kill("TERM", -wait.pid) rescue nil
+    return if wait.join(2)
+    Process.kill("KILL", -wait.pid) rescue nil
+    wait.join
+  end
+
+  def clean_startup?(result)
+    combined = result.fetch("stdout") + result.fetch("stderr")
+    !combined.match?(/Traceback \(most recent call last\)|Exception in module register|ModuleNotFoundError/)
+  end
+
+  def trusted_repo_file!(relative, label)
+    expanded = File.expand_path(relative, @project_root)
+    raise "#{label} must stay inside the repository" unless expanded.start_with?(@project_root + File::SEPARATOR)
+    regular_path!(expanded, label)
+  end
+
+  def regular_path!(path, label)
+    expanded = File.expand_path(path)
+    raise "#{label} must be a regular non-symlink file" unless File.file?(expanded) && !File.symlink?(expanded)
+    expanded
+  end
+
+  def regular_executable!(path, label)
+    expanded = regular_path!(path, label)
+    raise "#{label} must be executable" unless File.executable?(expanded)
+    expanded
+  end
+
+  def find_executable(name)
+    candidate = ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).map { |directory| File.join(directory, name) }.find { |path| File.file?(path) && !File.symlink?(path) && File.executable?(path) }
+    raise "required executable is unavailable: #{name}" unless candidate
+    File.expand_path(candidate)
+  end
+
+  def regular_nonempty?(path) = File.file?(path) && !File.symlink?(path) && File.size(path).positive?
+  def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))
+  def safe_text(value) = value.to_s.byteslice(0, MAX_OUTPUT_BYTES).to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�")
+  def tail(value, limit) = value.to_s.bytesize > limit ? value.to_s.byteslice(value.to_s.bytesize - limit, limit) : value.to_s
+  def secure_compare(left, right) = left.to_s.bytesize == right.to_s.bytesize && left.to_s.bytes.zip(right.to_s.bytes).reduce(0) { |memo, (a, b)| memo | (a ^ b) }.zero?
+  def emit(value) = puts(JSON.pretty_generate(value))
+  def fail_with(error)
+    emit("lifecycle_state" => "failed", "error" => error.message)
+    exit 1
+  end
+end
+
+options = {
+  manifest: File.expand_path("../config/blender_visual_runtime.json", __dir__),
+  root: File.join(Dir.home, ".local", "share", "soul", "blender-visual")
+}
+parser = OptionParser.new do |opts|
+  opts.on("--manifest PATH") { |value| options[:manifest] = value }
+  opts.on("--root PATH") { |value| options[:root] = value }
+  opts.on("--blender PATH") { |value| options[:blender] = value }
+  opts.on("--ffmpeg PATH") { |value| options[:ffmpeg] = value }
+  opts.on("--ffprobe PATH") { |value| options[:ffprobe] = value }
+  opts.on("--lease-directory PATH") { |value| options[:lease_directory] = value }
+  opts.on("--expected-digest DIGEST") { |value| options[:expected_digest] = value }
+  opts.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end
+command = ARGV.shift
+parser.parse!(ARGV)
+runtime = SoulBlenderVisualRuntime.new(options)
+case command
+when "check" then runtime.check
+when "plan" then runtime.plan
+when "run" then runtime.run
+else abort "usage: soul-blender-visual-runtime [check|plan|run] [options]"
+end
