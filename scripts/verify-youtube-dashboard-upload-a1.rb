@@ -283,6 +283,7 @@ check("YouTube OAuth UI prefills a validated detected client while retaining man
     javascript.include?("oauth.client_candidates") &&
     javascript.include?("path.value = detected.value"), failures)
 check("YouTube upload preview + bounded stream execute are present", javascript.include?('callSoul("youtube.upload.preview"') && javascript.include?('callNdjson("/api/v1/music-stream", "youtube.upload.execute"'), failures)
+check("configured YouTube authorization can be replaced without deleting local credentials", javascript.include?("Reauthorize YouTube") && javascript.include?("renderYouTubeAuthorization(identity, panel, status, status, oauth)"), failures)
 check("upload visibility gate is explicit with private default and all three choices", javascript.include?('visibility.value = "private"') &&
   javascript.include?('["private","Private · recommended draft"]') &&
   javascript.include?('["unlisted","Unlisted · explicit publication choice"]') &&

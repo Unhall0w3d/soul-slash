@@ -13,6 +13,7 @@ module SoulCore
   class MusicPublicationPackageService
     CONFIRMATION = "EXPORT_YOUTUBE_PACKAGE"
     MAX_DESCRIPTION = 5_000
+    MAX_DESCRIPTION_BYTES = MAX_DESCRIPTION * 4
     MAX_RECORD_BYTES = 8 * 1024 * 1024
 
     def initialize(root: Dir.pwd, export_root: File.join(Dir.home, "Music", "soul-music"), project_store: nil, visual_service: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc })
@@ -27,6 +28,18 @@ module SoulCore
 
     def draft(project_id:, candidate_id:, visual_id:)
       context = publication_context(project_id, candidate_id, visual_id)
+      existing = existing_package_for(context)
+      if existing
+        return outcome("complete", true, "existing YouTube package restored for authenticated upload review", data: {
+          "title" => context.fetch("project").fetch("title"),
+          "description" => existing.fetch("description"),
+          "description_editable" => false,
+          "package" => existing.fetch("receipt"),
+          "idempotent_replay" => true,
+          "publication_performed" => false,
+          "api_upload_performed" => false
+        })
+      end
       outcome("complete", true, "YouTube package description drafted for human review", data: {
         "title" => context.fetch("project").fetch("title"),
         "description" => description_for(context),
@@ -249,6 +262,22 @@ module SoulCore
       receipt
     rescue JSON::ParserError
       raise MusicProjectStore::IntegrityError, "YouTube package receipt is invalid"
+    end
+
+    def existing_package_for(context)
+      project_id = context.fetch("project").fetch("project_id")
+      visual = context.fetch("visual")
+      receipt_path = package_receipt_path(project_id, visual.fetch("candidate_id"), visual.fetch("visual_id"))
+      return nil unless File.exist?(receipt_path)
+
+      destination = File.join(context.fetch("export_destination"), "youtube")
+      description_path = File.join(destination, "youtube-description.txt")
+      unless File.file?(description_path) && !File.symlink?(description_path) && File.size(description_path).between?(1, MAX_DESCRIPTION_BYTES)
+        raise MusicProjectStore::IntegrityError, "existing YouTube package description is invalid"
+      end
+      description = validate_description(File.binread(description_path, MAX_DESCRIPTION_BYTES))
+      receipt = existing_package(package_scope(context, description))
+      { "receipt" => receipt, "description" => description }
     end
 
     def package_receipt_path(project_id, candidate_id, visual_id) = File.join(@store.project_path(project_id), "publications", "#{candidate_id}-#{visual_id}.json")

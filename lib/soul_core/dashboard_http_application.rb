@@ -171,6 +171,10 @@ module SoulCore
         return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
         return visual_motion(normalized_headers, *match.captures)
       end
+      if (match = target.match(%r{\A/api/v1/visual/blender/(visual_project_[a-f0-9]{16})/(blender_scene_[a-f0-9]{16})/(preview|still|blend|manifest|audio_analysis)\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return visual_blender(normalized_headers, *match.captures)
+      end
 
       response(404, "Not Found")
     rescue JSON::ParserError
@@ -232,7 +236,7 @@ module SoulCore
       return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
       return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
       request = JSON.parse(body)
-      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute youtube.upload.execute visual.generation.execute visual.edit.execute visual.motion.execute visual.native_motion.execute visual.native_motion.revision.execute]
+      allowed = %w[music.generation.execute music.candidates.analysis.execute music.candidates.revision.execute music.references.analysis.execute music.visuals.loop.execute music.visuals.final.execute youtube.upload.execute visual.generation.execute visual.edit.execute visual.motion.execute visual.native_motion.execute visual.native_motion.revision.execute visual.blender.execute visual.blender.resume.execute]
       unless request.is_a?(Hash) && allowed.include?(request["operation"])
         return json_response(422, error_envelope("invalid_stream_operation", "music stream accepts bounded music, analysis, publication, or visual rendering only"))
       end
@@ -580,6 +584,27 @@ module SoulCore
       extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
       response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
     rescue ArgumentError
+      response(404, "Not Found")
+    end
+
+    def visual_blender(headers, project_id, scene_id, artifact)
+      session = @authentication.session(session_token(headers))
+      return json_response(401, error_envelope("authentication_required", "dashboard login required")) unless session
+      return json_response(403, error_envelope("password_change_required", "replace the bootstrap password before using the dashboard")) if session.fetch("password_change_required")
+      path = @facade.visual_blender_artifact_path(project_id: project_id, scene_id: scene_id, artifact: artifact)
+      content_type = {
+        "preview" => "video/mp4", "still" => "image/png", "blend" => "application/octet-stream",
+        "manifest" => "application/json", "audio_analysis" => "application/json"
+      }.fetch(artifact)
+      size = File.size(path)
+      range = audio_range(headers["range"], size)
+      return response(416, "Range Not Satisfiable", "Content-Range" => "bytes */#{size}") if headers["range"] && !range
+      offset, length = range || [0, size]
+      disposition = %w[preview still].include?(artifact) ? "inline" : "attachment"
+      extra = { "Content-Type" => content_type, "Content-Length" => length.to_s, "Content-Disposition" => "#{disposition}; filename=\"#{File.basename(path)}\"", "Cache-Control" => "private, no-store", "Accept-Ranges" => "bytes" }
+      extra["Content-Range"] = "bytes #{offset}-#{offset + length - 1}/#{size}" if range
+      response(range ? 206 : 200, FileStream.new(path, offset: offset, length: length), extra)
+    rescue ArgumentError, RuntimeError, KeyError
       response(404, "Not Found")
     end
 

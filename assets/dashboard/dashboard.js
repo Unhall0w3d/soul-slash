@@ -32,7 +32,7 @@ state.pictureAttachment = null;
 state.screenCapturing = false;
 state.coreLocked = false;
 state.betaDevBuildPreview = null;
-Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null });
+Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
@@ -1563,25 +1563,27 @@ function musicVisualCompanionPanel(candidate) {
 function musicVisualLineage(candidate, visual, source) {
   const staticProfile = visual.render_profile?.profile_id === "static-hold-v2";
   const generatedMotion = visual.source_kind === "generated_motion";
+  const blenderScene = visual.source_kind === "blender_scene";
+  const reviewedMotion = generatedMotion || blenderScene;
   const lineage = document.createElement("section"); lineage.className = "music-visual-lineage";
-  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = staticProfile ? "Static visual presentation" : (generatedMotion ? "Generated motion companion" : "Historical visual effect"); const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
+  const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = staticProfile ? "Static visual presentation" : (blenderScene ? "Blender whole-bar companion" : (generatedMotion ? "Generated motion companion" : "Historical visual effect")); const badge = document.createElement("small"); badge.textContent = visual.stage.replaceAll("_", " "); heading.append(title, badge); lineage.append(heading);
   const status = document.createElement("p"); status.className = "dialog-status";
   const media = document.createElement("div"); media.className = "music-visual-media";
-  if (!generatedMotion) { const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base); }
-  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "none"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual presentation preview" : "Retired visual effect preview"); media.append(loop); }
+  if (!reviewedMotion) { const base = document.createElement("img"); base.src = musicVisualUrl(candidate, visual, "base"); base.alt = "Approved visual companion base scene"; media.append(base); }
+  if (visual.artifacts?.loop) { const loop = document.createElement("video"); loop.controls = true; loop.loop = true; loop.muted = true; loop.preload = "none"; loop.src = musicVisualUrl(candidate, visual, "loop"); loop.setAttribute("aria-label", staticProfile ? "Static visual presentation preview" : (blenderScene ? "Reviewed Blender whole-bar loop" : (generatedMotion ? "Reviewed generated motion preview" : "Retired visual effect preview"))); media.append(loop); }
   if (visual.artifacts?.preview) { const preview = document.createElement("video"); preview.controls = true; preview.preload = "none"; preview.src = musicVisualUrl(candidate, visual, "preview"); preview.setAttribute("aria-label", "Full-duration visual companion with candidate audio"); media.append(preview); }
   lineage.append(media);
-  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold · no synthesized motion" : (generatedMotion ? "Reviewed generated motion" : "Historical effect")} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Approved still is immutable; presentation encoding has not started."; lineage.append(metrics);
+  const metrics = document.createElement("p"); metrics.className = "music-candidate-timing"; metrics.textContent = visual.artifacts?.loop ? `${staticProfile ? "Static hold · no synthesized motion" : (blenderScene ? "Reviewed Blender whole-bar loop" : (generatedMotion ? "Reviewed generated motion" : "Historical effect"))} · ${visual.artifacts.loop.duration_seconds}s · ${visual.artifacts.loop.width}×${visual.artifacts.loop.height} · ${visual.artifacts.loop.fps} fps` : "Approved still is immutable; presentation encoding has not started."; lineage.append(metrics);
   if (staticProfile && !visual.artifacts?.loop) {
     const settings = musicVisualPresentationSettings(visual); lineage.append(settings.element);
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview static presentation"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "loop", { visual_id: visual.visual_id, visual_presentation: settings.value() })); lineage.append(button);
   } else if (staticProfile && !visual.artifacts?.preview) {
     const note = document.createElement("p"); note.textContent = "The frame is held exactly as approved. FFmpeg only handles framing, encoding, fades, and audio muxing.";
     const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview full-duration render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
-  } else if (generatedMotion && !visual.artifacts?.preview) {
-    const note = document.createElement("p"); note.textContent = "The exact reviewed motion study will repeat to the candidate duration and be muxed with the exact lossless audio. No new inference occurs.";
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = "Preview full-duration motion render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
-  } else if (!staticProfile && !generatedMotion) {
+  } else if (reviewedMotion && !visual.artifacts?.preview) {
+    const note = document.createElement("p"); note.textContent = `The exact reviewed ${blenderScene ? "Blender whole-bar loop" : "motion study"} will repeat to the candidate duration and be muxed with the exact lossless audio. No new inference occurs.`;
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = blenderScene ? "Preview full-duration Blender render" : "Preview full-duration motion render"; button.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, button, status, "final", { visual_id: visual.visual_id })); lineage.append(note, button);
+  } else if (!staticProfile && !reviewedMotion) {
     const note = document.createElement("p"); note.textContent = "Historical effect evidence remains playable, but retired procedural-motion profiles cannot advance."; lineage.append(note);
     if (source) { const replacement = document.createElement("button"); replacement.type = "button"; replacement.className = "gate-button"; replacement.textContent = "Prepare static replacement"; replacement.addEventListener("click", () => previewMusicVisualAction(candidate, lineage, replacement, status, "import", { asset_id: source.asset_id })); lineage.append(replacement); }
   } else {
@@ -1589,7 +1591,7 @@ function musicVisualLineage(candidate, visual, source) {
     const packageButton = document.createElement("button"); packageButton.type = "button"; packageButton.className = "gate-button gate-button--gold"; packageButton.textContent = "Prepare YouTube upload package";
     packageButton.addEventListener("click", () => draftMusicPublicationPackage(candidate, visual, lineage, packageButton, status)); lineage.append(packageButton);
   }
-  const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = generatedMotion ? "Bound and reviewed" : "Available in Visual Studio"; const motionNote = document.createElement("small"); motionNote.textContent = generatedMotion ? "This exact Wan motion study remains tied to the reviewed source still and candidate audio digest." : "Keep a still in Visual Studio to create and review a bounded Wan motion study."; motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
+  const motion = document.createElement("div"); motion.className = "music-visual-motion-boundary"; const motionTitle = document.createElement("strong"); motionTitle.textContent = blenderScene ? "Procedural scene" : "Generated motion"; const motionState = document.createElement("span"); motionState.textContent = reviewedMotion ? "Bound and reviewed" : "Available in Visual Studio"; const motionNote = document.createElement("small"); motionNote.textContent = blenderScene ? "This exact Blender whole-bar loop remains tied to the reviewed scene manifest and candidate audio digest." : (generatedMotion ? "This exact Wan motion study remains tied to the reviewed source still and candidate audio digest." : "Keep a still in Visual Studio to create and review a bounded Wan motion study."); motion.append(motionTitle, motionState, motionNote); lineage.append(motion);
   lineage.append(status); return lineage;
 }
 
@@ -1600,11 +1602,17 @@ async function draftMusicPublicationPackage(candidate, visual, panel, button, st
     const envelope = await callSoul("music.publication.draft", identity); lifecycle(envelope); const data = dataOf(envelope);
     if (!data.description) throw new Error(envelope.errors?.[0]?.message || "Export the kept song before preparing its upload package");
     const editor = document.createElement("div"); editor.className = "music-publication-editor";
-    const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "YouTube description"; const boundary = document.createElement("small"); boundary.textContent = "editable · local package only"; heading.append(title, boundary);
+    const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "YouTube description"; const boundary = document.createElement("small"); boundary.textContent = data.package ? "approved · exact package" : "editable · local package only"; heading.append(title, boundary);
     const textarea = document.createElement("textarea"); textarea.rows = 18; textarea.maxLength = 5000; textarea.value = data.description; textarea.setAttribute("aria-label", "Editable YouTube description");
+    const note = document.createElement("p"); note.className = "card-note"; note.textContent = "The package contains the upload-ready MP4, thumbnail, youtube-description.txt sidecar, and private-upload metadata. It does not contact YouTube.";
+    if (data.package) {
+      textarea.disabled = true; editor.append(heading, textarea, note); button.replaceWith(editor);
+      status.textContent = `Upload package restored from ${data.package.destination}.`;
+      await renderYouTubeAuthenticatedUpload(identity, editor, status);
+      return;
+    }
     const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact upload package";
     preview.addEventListener("click", () => previewMusicPublicationPackage(identity, textarea, editor, preview, status));
-    const note = document.createElement("p"); note.className = "card-note"; note.textContent = "The package contains the upload-ready MP4, thumbnail, youtube-description.txt sidecar, and private-upload metadata. It does not contact YouTube.";
     editor.append(heading, textarea, preview, note); button.replaceWith(editor); status.textContent = "Review the wording, links, credits, and lyrics before binding the exact package.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
@@ -1703,6 +1711,12 @@ function renderYouTubeUploadGate(identity, panel, status, oauth) {
   [["private","Private · recommended draft"],["unlisted","Unlisted · explicit publication choice"],["public","Public · explicit publication choice"]].forEach(([value, text]) => { const option = document.createElement("option"); option.value = value; option.textContent = text; visibility.append(option); });
   visibility.value = "private"; visibilityLabel.append(visibility);
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact YouTube upload";
+  const reauthorize = document.createElement("button"); reauthorize.type = "button"; reauthorize.className = "gate-button"; reauthorize.textContent = "Reauthorize YouTube";
+  reauthorize.addEventListener("click", () => {
+    const heading = panel.querySelector(".card-heading");
+    Array.from(panel.children).forEach((child) => { if (child !== heading && child !== status) child.remove(); });
+    renderYouTubeAuthorization(identity, panel, status, status, oauth);
+  });
   preview.addEventListener("click", async () => {
     preview.disabled = true; status.textContent = "Revalidating the channel, package receipt, metadata, and every file digest…";
     try {
@@ -1729,7 +1743,7 @@ function renderYouTubeUploadGate(identity, panel, status, oauth) {
       status.textContent = `Review the exact ${selectedVisibility} scope. Clicking Upload supplies ${data.confirmation_phrase}; Soul will not change visibility later.`;
     } catch (error) { status.textContent = error.message; preview.disabled = false; }
   });
-  panel.append(channel, visibilityLabel, preview);
+  panel.append(channel, visibilityLabel, preview, reauthorize);
   status.textContent = "Authorization matches Soul Slash Synthesis. Private is selected; preview one exact package before upload.";
 }
 
@@ -4741,10 +4755,11 @@ function openReviewCenter() {
 function closeReviewCenter() { byId("review-center").close(); }
 
 function resetVisualForm() {
-  state.selectedVisualProject = null; state.visualPreview = null; state.visualProjectDeletePreview = null;
+  state.selectedVisualProject = null; state.visualPreview = null; state.visualProjectDeletePreview = null; state.visualBlenderPreview = null; state.visualBlenderResumePreview = null; state.visualBlenderSourceSceneId = null;
   byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
   byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true; byId("visual-project-release").hidden = true;
-  byId("visual-generation-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
+  byId("visual-generation-card").hidden = true; byId("visual-blender-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
+  byId("visual-blender-confirm").hidden = true; byId("execute-visual-blender").disabled = true; byId("preview-visual-blender").disabled = true; byId("visual-blender-status").textContent = "Select or create a visual project first.";
   byId("preview-native-motion").disabled = true; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "Select or create a visual project first.";
   renderVisualProjects();
 }
@@ -4769,8 +4784,8 @@ function renderVisualProjects() {
 function setVisualProjectView(view) { state.visualProjectView = view; state.selectedVisualProject = null; resetVisualForm(); }
 
 function renderVisualCandidates(project) {
-  const candidates = project.candidates || []; const motions = project.motions || []; const list = byId("visual-candidate-list"); list.replaceChildren();
-  byId("visual-candidate-count").textContent = String(candidates.length + motions.length); byId("visual-candidates").hidden = candidates.length === 0 && motions.length === 0;
+  const candidates = project.candidates || []; const motions = project.motions || []; const blenderScenes = project.blender_scenes || []; const list = byId("visual-candidate-list"); list.replaceChildren();
+  byId("visual-candidate-count").textContent = String(candidates.length + motions.length + blenderScenes.length); byId("visual-candidates").hidden = candidates.length === 0 && motions.length === 0 && blenderScenes.length === 0;
   candidates.forEach((candidate) => {
     const card = document.createElement("article"); card.className = "visual-candidate";
     const image = document.createElement("img"); image.alt = `${project.title} visual draft`; image.loading = "lazy"; image.src = `/api/v1/visual/image/${project.project_id}/${candidate.candidate_id}`;
@@ -4796,6 +4811,7 @@ function renderVisualCandidates(project) {
     card.append(image, footer, controls); list.append(card);
   });
   motions.forEach((motion) => list.append(renderVisualMotionCandidate(project, motion)));
+  blenderScenes.forEach((scene) => list.append(renderVisualBlenderCandidate(project, scene)));
 }
 
 function renderVisualMotionCandidate(project, motion) {
@@ -4816,6 +4832,28 @@ function renderVisualMotionCandidate(project, motion) {
   bind.addEventListener("click", () => renderVisualMotionPromotionGate(gate, project, motion, status));
   remove.addEventListener("click", async () => { remove.disabled = true; try { const envelope = await callSoul("visual.motion.delete.preview", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact motion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.motion.delete.execute", { visual_project_id: project.project_id, motion_candidate_id: motion.motion_candidate_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; remove.disabled = false; } });
   controls.append(rating, disposition, notes, review, revise, bind, remove, gate, status); card.append(video, footer, controls); return card;
+}
+
+function renderVisualBlenderCandidate(project, scene) {
+  const card = document.createElement("article"); card.className = "visual-candidate visual-blender-candidate";
+  const video = document.createElement("video"); video.controls = true; video.loop = true; video.preload = "none"; video.src = `/api/v1/visual/blender/${project.project_id}/${scene.scene_id}/preview`; video.setAttribute("aria-label", `${project.title} whole-bar Blender scene`);
+  const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${scene.bars} bars · ${scene.template_id} · ${scene.width}×${scene.height}`; const stateLabel = document.createElement("span"); stateLabel.textContent = scene.review ? `${scene.review.disposition} · ${scene.review.rating}/5` : "3D scene review required"; footer.append(timing, stateLabel);
+  const lineage = document.createElement("div"); lineage.className = "visual-blender-lineage"; lineage.textContent = `${scene.bpm} BPM · ${scene.beats_per_bar}/4 · ${Number(scene.duration_seconds).toFixed(2)}s loop · ${scene.loop_state_equal ? "matched boundary" : "boundary attention"}`;
+  const controls = document.createElement("div"); controls.className = "visual-candidate-controls";
+  const rating = document.createElement("select"); rating.ariaLabel = "Blender scene rating"; [1,2,3,4,5].forEach((value) => { const option = document.createElement("option"); option.value = String(value); option.textContent = `${value} · ${["failed","weak","workable","strong","exceptional"][value - 1]}`; rating.append(option); }); rating.value = String(scene.review?.rating || 3);
+  const disposition = document.createElement("select"); disposition.ariaLabel = "Blender scene disposition"; [["keep","Keep"],["revise","Revise"]].forEach(([value,label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; disposition.append(option); }); disposition.value = scene.review?.disposition || "keep";
+  const notes = document.createElement("textarea"); notes.rows = 3; notes.maxLength = 8000; notes.placeholder = "Composition, motion, loop seam, audio response, lighting, and material notes."; notes.value = scene.review?.notes || "";
+  const review = document.createElement("button"); review.type = "button"; review.className = "gate-button"; review.textContent = "Record 3D scene review";
+  const revise = document.createElement("button"); revise.type = "button"; revise.className = "gate-button"; revise.textContent = "Revise procedural scene"; revise.disabled = scene.review?.disposition !== "revise";
+  const bind = document.createElement("button"); bind.type = "button"; bind.className = "gate-button gate-button--gold"; bind.textContent = "Bind reviewed loop to Music"; bind.disabled = scene.review?.disposition !== "keep";
+  const download = document.createElement("a"); download.className = "gate-button"; download.textContent = "Download editable .blend"; download.href = `/api/v1/visual/blender/${project.project_id}/${scene.scene_id}/blend`;
+  const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger-button"; remove.textContent = "Delete 3D scene";
+  const gate = document.createElement("div"); gate.className = "visual-candidate-gate"; gate.hidden = true; const status = document.createElement("p"); status.className = "dialog-status"; status.role = "status";
+  review.addEventListener("click", async () => { review.disabled = true; try { const envelope = await callSoul("visual.blender.review", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, visual_review: { rating: Number(rating.value), disposition: disposition.value, notes: notes.value } }); lifecycle(envelope); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; review.disabled = false; } });
+  revise.addEventListener("click", () => { state.visualBlenderSourceSceneId = scene.scene_id; byId("visual-blender-template").value = scene.template_id; byId("visual-blender-bars").value = String(scene.bars); byId("visual-blender-quality").value = scene.quality; byId("visual-blender-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("visual-blender-direction").value = scene.review?.notes || scene.direction; byId("visual-blender-music-project").value = scene.music_project_id; loadVisualBlenderMusicCandidates(scene.music_candidate_id).then(() => { byId("visual-blender-status").textContent = "Revision lineage selected. Edit the direction, then preview a new immutable scene."; byId("visual-blender-card").scrollIntoView({ behavior: "smooth", block: "start" }); }); });
+  bind.addEventListener("click", async () => { bind.disabled = true; status.textContent = "Preparing the exact reviewed loop binding…"; try { const envelope = await callSoul("visual.blender.promotion.preview", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Bind exact Blender companion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.blender.promotion.execute", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); status.textContent = "Blender loop bound to its exact Music candidate. Full-duration assembly is available in Music Studio."; } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; bind.disabled = false; } });
+  remove.addEventListener("click", async () => { remove.disabled = true; try { const envelope = await callSoul("visual.blender.delete.preview", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact 3D scene"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.blender.delete.execute", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; remove.disabled = false; } });
+  controls.append(rating, disposition, notes, review, revise, bind, download, remove, gate, status); card.append(video, footer, lineage, controls); return card;
 }
 
 function renderNativeMotionRevisionGate(gate, project, motion, status) {
@@ -4871,6 +4909,71 @@ async function ensureVisualMusicProjects() {
   const envelope = await callSoul("music.projects.list", { limit: 100 }); lifecycle(envelope); state.musicProjects = dataOf(envelope).projects || []; return state.musicProjects;
 }
 
+async function loadVisualBlenderMusicProjects() {
+  const select = byId("visual-blender-music-project"); const previous = select.value; select.replaceChildren();
+  const projects = await ensureVisualMusicProjects();
+  projects.forEach((project) => { const option = document.createElement("option"); option.value = project.project_id; option.textContent = project.title; select.append(option); });
+  if (previous && projects.some((project) => project.project_id === previous)) select.value = previous;
+  await loadVisualBlenderMusicCandidates();
+}
+
+async function loadVisualBlenderMusicCandidates(preferredCandidateId = null) {
+  const projectId = byId("visual-blender-music-project").value; const select = byId("visual-blender-music-candidate"); const preview = byId("preview-visual-blender"); select.replaceChildren();
+  if (!projectId) { preview.disabled = true; byId("visual-blender-status").textContent = "A human-kept Music candidate is required."; return; }
+  const envelope = await callSoul("music.projects.get", { project_id: projectId }); lifecycle(envelope); const candidates = (dataOf(envelope).generations || []).filter((candidate) => candidate.review?.disposition === "keep");
+  candidates.forEach((candidate) => { const option = document.createElement("option"); option.value = candidate.candidate_id; const duration = candidate.generation_input?.duration_seconds || candidate.duration_seconds; option.textContent = `${candidate.candidate_id.slice(-8)} · ${duration ? `${duration}s · ` : ""}kept`; select.append(option); });
+  if (preferredCandidateId && candidates.some((candidate) => candidate.candidate_id === preferredCandidateId)) select.value = preferredCandidateId;
+  preview.disabled = !state.selectedVisualProject || candidates.length === 0;
+  byId("visual-blender-status").textContent = candidates.length ? "Choose a template and musical span, then preview the exact scene." : "This Music project has no retained keep candidate.";
+}
+
+function visualBlenderInput() {
+  const input = {
+    visual_project_id: state.selectedVisualProject?.project_id,
+    project_id: byId("visual-blender-music-project").value,
+    candidate_id: byId("visual-blender-music-candidate").value,
+    template_id: byId("visual-blender-template").value,
+    bars: String(byId("visual-blender-bars").value),
+    quality: byId("visual-blender-quality").value,
+    direction: byId("visual-blender-direction").value,
+    seed: String(byId("visual-blender-seed").value)
+  };
+  if (state.visualBlenderSourceSceneId) input.source_blender_scene_id = state.visualBlenderSourceSceneId;
+  return input;
+}
+
+async function previewVisualBlender() {
+  if (!state.selectedVisualProject || state.visualBlenderGenerating) return;
+  const button = byId("preview-visual-blender"); button.disabled = true; byId("visual-blender-status").textContent = "Analyzing the exact audio and constructing a whole-bar scene manifest…"; byId("visual-blender-confirm").hidden = true;
+  try { const envelope = await callSoul("visual.blender.preview", visualBlenderInput()); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Blender scene preview failed safely"); state.visualBlenderResumePreview = null; state.visualBlenderPreview = scope; byId("visual-blender-scope").textContent = JSON.stringify(scope, null, 2); byId("visual-blender-confirm").hidden = false; byId("execute-visual-blender").disabled = false; byId("execute-visual-blender").textContent = state.visualBlenderSourceSceneId ? "Render exact scene revision" : "Render exact whole-bar scene"; byId("visual-blender-status").textContent = `Exact ${scope.bars}-bar · ${scope.frame_count}-frame scene ready for click approval.`; }
+  catch (error) { byId("visual-blender-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+
+async function executeVisualBlender() {
+  if ((!state.visualBlenderPreview && !state.visualBlenderResumePreview) || state.visualBlenderGenerating) return;
+  if (state.visualBlenderResumePreview) return executeVisualBlenderResume();
+  state.visualBlenderGenerating = true; const button = byId("execute-visual-blender"); button.disabled = true; const parameters = { ...visualBlenderInput(), blender_scene_id: state.visualBlenderPreview.scene_id, confirmation: state.visualBlenderPreview.confirmation_phrase, expected_digest: state.visualBlenderPreview.expected_digest };
+  showGenerationProgress(byId("visual-blender-progress"), { stage: "blender_scene", message: "Constructing the trusted Blender scene." });
+  try {
+    const envelope = await callNdjson("/api/v1/music-stream", "visual.blender.execute", parameters, {}, (event) => showGenerationProgress(byId("visual-blender-progress"), event));
+    if (envelope.lifecycle_state === "failed" && dataOf(envelope).resumable) { await renderVisualBlenderResume(dataOf(envelope)); throw new Error(envelope.errors?.[0]?.message || "Blender rendering stopped with resumable frames retained"); }
+    requireLifecycle(envelope, ["blocked_for_human_review"], "Blender scene rendering failed safely"); const sceneId = state.visualBlenderPreview.scene_id; state.visualBlenderPreview = null; state.visualBlenderSourceSceneId = null; byId("visual-blender-confirm").hidden = true; await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-blender-status").textContent = "Whole-bar Blender scene rendered. Review the loop and editable scene below."; emitSoulNotification("visual_ready", `visual:${sceneId}`);
+  } catch (error) { byId("visual-blender-status").textContent = error.message; emitSoulNotification("attention"); }
+  finally { state.visualBlenderGenerating = false; hideGenerationProgress(byId("visual-blender-progress")); }
+}
+
+async function renderVisualBlenderResume(retained) {
+  const envelope = await callSoul("visual.blender.resume.preview", { visual_project_id: state.selectedVisualProject.project_id, blender_scene_id: retained.scene_id }); lifecycle(envelope); const scope = dataOf(envelope); state.visualBlenderPreview = null; state.visualBlenderResumePreview = scope; byId("visual-blender-scope").textContent = JSON.stringify(scope, null, 2); byId("visual-blender-confirm").hidden = false; const button = byId("execute-visual-blender"); button.disabled = false; button.textContent = `Resume ${scope.missing_frames} missing frames`;
+}
+
+async function executeVisualBlenderResume() {
+  const scope = state.visualBlenderResumePreview; if (!scope) return; const button = byId("execute-visual-blender"); button.disabled = true; showGenerationProgress(byId("visual-blender-progress"), { stage: "blender_frames", message: "Resuming only the retained scene's missing frames." });
+  try { const result = await callNdjson("/api/v1/music-stream", "visual.blender.resume.execute", { visual_project_id: state.selectedVisualProject.project_id, blender_scene_id: scope.scene_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }, {}, (event) => showGenerationProgress(byId("visual-blender-progress"), event)); requireLifecycle(result, ["blocked_for_human_review"], "Blender scene resume failed safely"); state.visualBlenderResumePreview = null; byId("visual-blender-confirm").hidden = true; await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-blender-status").textContent = "Retained scene completed. Review it below."; }
+  catch (error) { byId("visual-blender-status").textContent = error.message; button.disabled = false; }
+  finally { hideGenerationProgress(byId("visual-blender-progress")); }
+}
+
 async function renderVisualPromotionGate(gate, project, candidate, status) {
   gate.replaceChildren(); gate.hidden = false; status.textContent = "Inspecting Music Studio candidates…";
   try {
@@ -4906,7 +5009,8 @@ async function selectVisualProject(projectId) {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
     state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
     byId("visual-native-motion-instruction").value = project.prompt; byId("visual-native-motion-seed").value = String(project.seed);
-    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; const release = byId("visual-project-release"); release.hidden = false; release.textContent = project.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("visual-generation-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualProjectDeletePreview = null;
+    byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; const release = byId("visual-project-release"); release.hidden = false; release.textContent = project.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("visual-generation-card").hidden = false; byId("visual-blender-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-blender-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualBlenderPreview = null; state.visualBlenderResumePreview = null; state.visualBlenderSourceSceneId = null; state.visualProjectDeletePreview = null;
+    byId("visual-blender-direction").value = project.prompt; byId("visual-blender-seed").value = String(project.seed); await loadVisualBlenderMusicProjects();
     byId("preview-native-motion").disabled = false; byId("visual-native-motion-confirm").hidden = true; byId("visual-native-motion-confirm").replaceChildren(); byId("visual-native-motion-status").textContent = "The stored scene prompt is prefilled as an editable text-to-video direction; no still candidate is read.";
     renderVisualProjects(); renderVisualCandidates(project);
   } catch (error) { byId("visual-form-status").textContent = error.message; }
@@ -4937,7 +5041,7 @@ async function previewNativeMotion() {
 
 async function refreshVisualResources() {
   const button = byId("refresh-visual-resources"); button.disabled = true; byId("visual-form-status").textContent = "Verifying the pinned visual runtime and model files… the first pass may take several seconds.";
-  try { const envelope = await callSoul("visual.resources.status"); lifecycle(envelope); const data = dataOf(envelope); const native = data.native_motion || {}; const label = byId("visual-resource-state"); label.textContent = data.ready && native.ready ? "Still + native video ready" : (data.ready ? `${data.profile} ready` : "Runtime attention"); label.classList.toggle("is-ready", data.ready && native.ready); byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · still verified · native video ${native.ready ? `${native.profile} verified` : `attention (${(native.missing_roles || []).join(", ") || native.core?.reason || "runtime"})`} · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
+  try { const [envelope, blenderEnvelope, templateEnvelope] = await Promise.all([callSoul("visual.resources.status"), callSoul("visual.blender.resources"), callSoul("visual.blender.templates")]); lifecycle(envelope); lifecycle(blenderEnvelope); lifecycle(templateEnvelope); const data = dataOf(envelope); const blender = dataOf(blenderEnvelope); const native = data.native_motion || {}; const label = byId("visual-resource-state"); label.textContent = data.ready && native.ready && blender.ready ? "All visual lanes ready" : (data.ready ? `${data.profile} ready` : "Runtime attention"); label.classList.toggle("is-ready", data.ready && native.ready && blender.ready); const blenderLabel = byId("visual-blender-resource-state"); blenderLabel.textContent = blender.ready ? "Blender ready" : "Runtime attention"; blenderLabel.classList.toggle("is-ready", blender.ready); state.visualBlenderTemplates = dataOf(templateEnvelope).templates || []; byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · still verified · native video ${native.ready ? `${native.profile} verified` : "attention"} · Blender ${blender.ready ? `${blender.templates.length} trusted templates` : "attention"} · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
   catch (error) { byId("visual-form-status").textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -6028,6 +6132,9 @@ byId("visual-project-form").addEventListener("submit", createVisualProject);
 byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
+byId("visual-blender-music-project").addEventListener("change", () => loadVisualBlenderMusicCandidates());
+byId("preview-visual-blender").addEventListener("click", previewVisualBlender);
+byId("execute-visual-blender").addEventListener("click", executeVisualBlender);
 byId("preview-native-motion").addEventListener("click", previewNativeMotion);
 byId("refresh-motion-qualification").addEventListener("click", refreshMotionQualification);
 byId("start-visual-generation").addEventListener("click", startVisualGeneration);

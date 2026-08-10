@@ -27,7 +27,7 @@ module SoulCore
     MAX_RECORD_BYTES = 128 * 1024
     TIMEOUT_SECONDS = 900
 
-    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, motion_runtime_root: nil, motion_manifest_path: nil, native_runtime_root: nil, native_manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil, generation_lease_store: nil)
+    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, motion_runtime_root: nil, motion_manifest_path: nil, native_runtime_root: nil, native_manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil, generation_lease_store: nil, blender_scene_service: nil)
       @root = File.expand_path(root)
       @visual_root = File.expand_path(visual_root || File.join(@root, "Soul", "visual", "projects"))
       @runtime_root = File.expand_path(runtime_root || File.join(Dir.home, ".local", "share", "soul", "visual"))
@@ -41,6 +41,7 @@ module SoulCore
       @id_generator = id_generator
       @core_status = core_status
       @music_visual_companion = music_visual_companion
+      @blender_scene_service = blender_scene_service
       @generation_lease_store = generation_lease_store || ModelRuntimeLeaseStore.new(root: @root)
       @verification_mutex = Mutex.new
       @verification_cache = {}
@@ -57,7 +58,8 @@ module SoulCore
       outcome("complete", true, "visual resources inspected", data: {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
         "runtime_ready" => executable?(binary), "models_ready" => missing.empty?, "ready" => ready,
-        "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => motion_resources(core), "native_motion" => native_motion_resources(core)
+        "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => motion_resources(core), "native_motion" => native_motion_resources(core),
+        "blender" => @blender_scene_service&.resources&.fetch("data", {}) || { "ready" => false }
       })
     rescue KeyError, JSON::ParserError, SystemCallError => error
       outcome("failed", false, "visual resource manifest failed safely: #{error.class}")
@@ -802,7 +804,8 @@ module SoulCore
       rescue ArgumentError, JSON::ParserError
         nil
       end.sort_by { |item| item.fetch("created_at") }.reverse
-      project.merge("candidates" => candidates, "motions" => motions)
+      blender_scenes = @blender_scene_service ? @blender_scene_service.list(project_id: project.fetch("project_id")).dig("data", "blender_scenes") || [] : []
+      project.merge("candidates" => candidates, "motions" => motions, "blender_scenes" => blender_scenes)
     end
 
     def prepare_root!

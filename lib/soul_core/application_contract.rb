@@ -299,6 +299,18 @@ module SoulCore
       "visual.motion.promotion.preview" => %w[visual_project_id motion_candidate_id project_id candidate_id],
       "visual.motion.promotion.execute" => %w[visual_project_id motion_candidate_id project_id candidate_id confirmation expected_digest],
       "visual.motion.qualification" => [],
+      "visual.blender.resources" => [],
+      "visual.blender.templates" => [],
+      "visual.blender.list" => %w[visual_project_id],
+      "visual.blender.preview" => %w[visual_project_id project_id candidate_id template_id bars direction seed quality source_blender_scene_id],
+      "visual.blender.execute" => %w[visual_project_id blender_scene_id project_id candidate_id template_id bars direction seed quality source_blender_scene_id confirmation expected_digest],
+      "visual.blender.resume.preview" => %w[visual_project_id blender_scene_id],
+      "visual.blender.resume.execute" => %w[visual_project_id blender_scene_id confirmation expected_digest],
+      "visual.blender.review" => %w[visual_project_id blender_scene_id visual_review],
+      "visual.blender.delete.preview" => %w[visual_project_id blender_scene_id],
+      "visual.blender.delete.execute" => %w[visual_project_id blender_scene_id confirmation expected_digest],
+      "visual.blender.promotion.preview" => %w[visual_project_id blender_scene_id],
+      "visual.blender.promotion.execute" => %w[visual_project_id blender_scene_id confirmation expected_digest],
       "approvals.pending" => %w[limit],
       "activities.recent" => %w[limit filters]
     }.freeze

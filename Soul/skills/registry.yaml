@@ -125,7 +125,7 @@ skills:
     internal_handler: conversation_creative_workflow
     category: creative_studios
     status: available
-    description: Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, and continue a kept visual context into exact native text-to-video generation or a review-led native revision.
+    description: Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, continue a kept visual context into exact native text-to-video generation or a review-led native revision, and explain the reviewed Blender Scene lane without implying that conversation text silently rewrites or renders its closed templates.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW
@@ -138,7 +138,7 @@ skills:
     internal_handler: conversation_creative_workflow
     category: creative_studios
     status: available
-    description: Coordinate supported reviewed music, still, and native-motion work through exact generation, lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
+    description: Coordinate supported reviewed music, still, native-motion, and exact Blender-scene work through lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; Blender construction remains Dashboard-gated, while image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
     risk: write_local_state_and_bounded_generation
     requires_approval: true
     confirmation_phrase: START_CREATIVE_WORKFLOW

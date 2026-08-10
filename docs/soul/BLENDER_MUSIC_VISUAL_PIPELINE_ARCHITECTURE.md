@@ -1,6 +1,6 @@
 # Blender Music-Visual Pipeline Architecture
 
-Status: research candidate; no Blender runtime or Dashboard lane is promoted.
+Status: A1–A5 implementation candidate; available for one consolidated Operator review and not yet promoted.
 
 ## Decision
 
@@ -210,7 +210,7 @@ than masquerading as Wan/FastWan output. It may reuse the existing review,
 binding, final companion, and publication layers after their source-kind checks
 are deliberately extended.
 
-## Qualification slices
+## Implemented qualification slices
 
 ### A0 — installation and capability proof
 
@@ -228,12 +228,25 @@ are deliberately extended.
 - Produce a deterministic `.blend` and low-resolution still.
 - Reject unknown operations, unsafe paths, embedded scripts, and manifest drift.
 
+Implemented. The closed manifest caps objects, materials, lights, animation
+channels, supported primitives, scalar/vector ranges, exact IDs, safe output
+names, and strictly increasing frame positions. The repository-owned adapter
+constructs data blocks without accepting paths, scripts, drivers, add-ons,
+node programs, or downloaded `.blend` input.
+
 ### A2 — bounded loop and music-reactive proof
 
-- Analyze one reviewed music candidate into bounded curves and section markers.
-- Render one 8- to 12-second, whole-bar, 24 or 30 FPS EEVEE loop.
+- Analyze one reviewed music candidate into bounded curves.
+- Render one 8- or 12-musical-bar, 24 or 30 FPS EEVEE loop.
 - Qualify seam continuity, cancellation, partial-frame resume, and encoding.
 - Compare EEVEE with one bounded Cycles render before offering Cycles publicly.
+
+Implemented for EEVEE. Soul decodes the exact kept FLAC into bounded low,
+mid, high, energy, and kick evidence outside Blender, validates equality at
+the loop boundary, renders PNG frames, verifies completeness, and only then
+encodes the MP4 with the exact source audio. Failed partial frame sets are
+retained for one explicit bounded resume. Cycles remains inventoried but is
+not offered by the Dashboard.
 
 ### A3 — Visual Studio candidate lifecycle
 
@@ -241,11 +254,21 @@ are deliberately extended.
 - Expose renderer, device, progress, frame evidence, and terminal state.
 - Preserve exact source, revision, asset, and render lineage.
 
+Implemented as an additive full-width Visual Studio lane with closed template,
+kept-song, whole-bar, quality, seed, and retained-direction controls. It
+supports preview, exact execution, review, immutable revision, retained-frame
+resume, private artifact delivery, binding, and deletion.
+
 ### A4 — Music binding and publication
 
 - Bind one kept Blender candidate to one kept music candidate.
 - Reuse the full-duration companion and upload-package gates.
 - Prove thumbnails, MP4/WebM compatibility, description lineage, and cleanup.
+
+Implemented. One kept Blender candidate may be copied into only its exact kept
+music lineage. The existing full-duration mux and private YouTube package
+gates accept the reviewed MP4 loop, derive a thumbnail when no still binding
+exists, and preserve Blender, music, and publication digests.
 
 ### A5 — templates and conversational collaboration
 
@@ -255,6 +278,35 @@ are deliberately extended.
   rendering.
 - Keep character rigs, arbitrary add-ons, downloaded `.blend` auto-execution,
   and unrestricted Python outside the supported lane.
+
+Implemented as five reviewed construction families: abstract, liminal,
+architectural, Soul-themed audio-reactive chamber, and bioluminescent grove.
+The shared capability catalog teaches Chat and Voice what Blender Scene can
+do and which inputs it needs, but first-generation Blender construction stays
+an explicit Visual Studio action. Creative-direction prose is retained as
+review/revision evidence; the current closed templates, not model-written
+Python, determine geometry. Conversational scene-manifest compilation remains
+a future separately qualified expansion.
+
+## Reference visualizer assessment
+
+The three Operator-selected DROELOE visualizers establish a useful complexity
+ladder rather than one all-or-nothing target:
+
+- *Downside Up* and *Landscape* use stylized low-poly terrain, celestial
+  bodies, geometric structures, strong color scripting, and deliberate camera
+  motion. That visual language is achievable with the current closed
+  procedural vocabulary and richer template authoring.
+- *Feeble Games* adds a dense authored bioluminescent forest, painterly
+  foliage, varied silhouettes, and a travel-through-environment composition.
+  The current grove template can reproduce the broad mood and reusable scene
+  logic, but not that exact richness. Comparable fidelity will require a later
+  reviewed asset lane for local meshes, curves, foliage, and textures rather
+  than weakening the adapter to accept arbitrary files or Python.
+
+This boundary is intentional: the A5 lane is useful today, source-editable,
+and safe to iterate, while richer authored asset packs can extend visual
+quality without replacing its lineage and approval model.
 
 ## First recommended experiment
 

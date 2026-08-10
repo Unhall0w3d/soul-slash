@@ -103,6 +103,24 @@ Dir.mktmpdir("soul-visual-companion-") do |root|
   full = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: full_preview.dig("data", "expected_digest"))
   motion_command = runner.commands.reverse.find { |command| command.first.end_with?("ffmpeg") && command.include?(motion_path.sub(%r{/[^/]+\z}, "/not-used")) == false && command.include?("-stream_loop") }
   check.call("reviewed generated motion binds directly to the full-duration mux gate", motion_bound["lifecycle_state"] == "blocked_for_human_review" && motion_visual["stage"] == "loop_ready" && full["lifecycle_state"] == "blocked_for_human_review" && full.dig("data", "visual", "artifacts", "preview", "fps") == 8 && full.dig("data", "visual", "artifacts", "preview", "render_seconds").is_a?(Numeric) && motion_command && motion_command[motion_command.index("-stream_loop") + 1] == "-1")
+
+  blender_root = File.join(root, "Soul", "visual", "projects", "visual_project_#{'8' * 16}", "blender-scenes", "blender_scene_#{'9' * 16}")
+  FileUtils.mkdir_p(blender_root)
+  blender_path = File.join(blender_root, "preview.mp4")
+  File.binwrite(blender_path, "reviewed whole-bar Blender preview fixture")
+  blender_receipt = {
+    "music_project_id" => project_id, "music_candidate_id" => candidate_id,
+    "duration_seconds" => 11.034, "width" => 1920, "height" => 1080, "fps" => 30, "bars" => 8,
+    "manifest_sha256" => "a" * 64, "audio_analysis_sha256" => "b" * 64,
+    "artifacts" => { "preview" => { "sha256" => Digest::SHA256.file(blender_path).hexdigest } }
+  }
+  blender_preview = service.generated_blender_import_preview(project_id: project_id, candidate_id: candidate_id, source_project_id: "visual_project_#{'8' * 16}", source_scene_id: "blender_scene_#{'9' * 16}", source_path: blender_path, prompt_summary: "A procedural nocturnal signal chamber whose geometry follows the exact retained music envelopes.", source_receipt: blender_receipt)
+  blender_bound = service.generated_blender_import_execute(project_id: project_id, candidate_id: candidate_id, source_project_id: "visual_project_#{'8' * 16}", source_scene_id: "blender_scene_#{'9' * 16}", source_path: blender_path, prompt_summary: "A procedural nocturnal signal chamber whose geometry follows the exact retained music envelopes.", source_receipt: blender_receipt, confirmation: "BIND_VISUAL_COMPANION", expected_digest: blender_preview.dig("data", "expected_digest"))
+  blender_visual = blender_bound.dig("data", "visual")
+  blender_final_preview = service.final_preview(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual.fetch("visual_id"))
+  blender_full = service.final_execute(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual.fetch("visual_id"), confirmation: "RENDER_VISUAL_COMPANION", expected_digest: blender_final_preview.dig("data", "expected_digest"))
+  blender_command = runner.commands.reverse.find { |command| command.first.end_with?("ffmpeg") && command.include?(File.join(store.project_path(project_id), "visuals", blender_visual.fetch("visual_id"), "loop.mp4")) }
+  check.call("reviewed Blender scene preserves exact lineage and loops into the full-duration companion", blender_bound["lifecycle_state"] == "blocked_for_human_review" && blender_visual["source_kind"] == "blender_scene" && blender_visual.dig("artifacts", "loop", "bars") == 8 && blender_visual["source_manifest_sha256"] == "a" * 64 && blender_full["lifecycle_state"] == "blocked_for_human_review" && blender_command && blender_command[blender_command.index("-stream_loop") + 1] == "-1" && blender_command.include?(audio))
 end
 
 contract = File.read(File.join(__dir__, "..", "lib", "soul_core", "application_contract.rb"))

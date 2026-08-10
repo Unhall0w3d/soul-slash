@@ -81,6 +81,8 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   check.call("colon-delimited genre identity remains complete", foreboding_genre == "Funeral doom fused with dark ambient and restrained industrial noise")
   check.call("instrument-led captions retain their concise genre identity", service.send(:genre_influence, "Liquid drum and bass with warm sub-bass and restrained Rhodes chords.") == "Liquid drum and bass")
 
+  description = "#{description}\n\nOperator-selected package wording."
+
   preview = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   wrong = service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description, confirmation: "WRONG", expected_digest: preview.dig("data", "expected_digest"))
   check.call("wrong exact gate creates no package", wrong["lifecycle_state"] == "blocked_for_human_review" && !File.exist?(File.join(destination, "youtube")))
@@ -92,6 +94,13 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   check.call("upload metadata defaults to private human publication", upload.values_at("category_id", "privacy_status", "made_for_kids", "contains_synthetic_media", "api_upload_performed", "human_publication_required") == ["10", "private", false, true, false, true])
   replay = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   check.call("identical package replay is idempotent", replay["lifecycle_state"] == "complete" && replay.dig("data", "idempotent_replay") == true)
+  resumed = service.draft(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id)
+  check.call("dashboard resume restores the approved package description instead of regenerating it",
+             resumed["lifecycle_state"] == "complete" &&
+             resumed.dig("data", "idempotent_replay") == true &&
+             resumed.dig("data", "description") == description &&
+             resumed.dig("data", "description_editable") == false &&
+             resumed.dig("data", "package", "scope_digest") == package["scope_digest"])
 
   motion_destination = File.join(export_root, "afterimage-motion-fixture")
   FileUtils.mkdir_p(motion_destination)
@@ -113,6 +122,28 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   motion_complete = motion_service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: motion_visual_id, description: description, confirmation: "EXPORT_YOUTUBE_PACKAGE", expected_digest: motion_preview.dig("data", "expected_digest"))
   motion_thumbnail = File.join(motion_destination, "youtube", "thumbnail.png")
   check.call("generated motion package derives one deterministic thumbnail without requiring base.png", motion_preview.dig("data", "preview_scope", "thumbnail_derivation") == "reviewed-preview-frame-v1" && motion_complete["lifecycle_state"] == "complete" && File.file?(motion_thumbnail) && motion_runner.commands.one? && motion_runner.commands.first.each_cons(2).include?(["-ss", "1.0"]))
+
+  blender_destination = File.join(export_root, "afterimage-blender-fixture")
+  FileUtils.mkdir_p(blender_destination)
+  %w[master.flac listening.mp3 song.json song-info.md].each { |name| File.binwrite(File.join(blender_destination, name), "blender fixture #{name}") }
+  File.write(File.join(exports, "#{candidate_id}.json"), JSON.generate({ "schema_version" => "soul.music.finished_export.v1", "project_id" => project_id, "candidate_id" => candidate_id, "destination" => blender_destination, "scope_digest" => "c" * 64 }))
+  blender_visual_id = "visual_#{'5' * 16}"
+  blender_visual = {
+    "project_id" => project_id, "candidate_id" => candidate_id, "visual_id" => blender_visual_id,
+    "source_kind" => "blender_scene", "stage" => "preview_ready",
+    "source_manifest_sha256" => "d" * 64, "source_audio_analysis_sha256" => "e" * 64,
+    "artifacts" => { "preview" => { "sha256" => Digest::SHA256.file(video).hexdigest } }
+  }
+  blender_runner = PublicationRunner.new
+  blender_service = SoulCore::MusicPublicationPackageService.new(
+    root: root, export_root: export_root, project_store: store,
+    visual_service: PublicationVisualFixture.new(blender_visual, nil, video), runner: blender_runner,
+    clock: -> { Time.utc(2026, 7, 19, 5, 3) }
+  )
+  blender_preview = blender_service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual_id, description: description)
+  blender_complete = blender_service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: blender_visual_id, description: description, confirmation: "EXPORT_YOUTUBE_PACKAGE", expected_digest: blender_preview.dig("data", "expected_digest"))
+  blender_upload = JSON.parse(File.binread(File.join(blender_destination, "youtube", "upload.json")))
+  check.call("Blender companion produces the same exact private YouTube package boundary", blender_preview.dig("data", "preview_scope", "thumbnail_derivation") == "reviewed-preview-frame-v1" && blender_complete["lifecycle_state"] == "complete" && blender_upload["privacy_status"] == "private" && blender_upload["api_upload_performed"] == false && File.file?(File.join(blender_destination, "youtube", "video.mp4")) && blender_runner.commands.one?)
 end
 
 contract = File.binread(File.expand_path("../lib/soul_core/application_contract.rb", __dir__))
@@ -120,6 +151,7 @@ facade = File.binread(File.expand_path("../lib/soul_core/application_facade.rb",
 javascript = File.binread(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("application and dashboard expose draft preview execute gates", %w[music.publication.draft music.publication.preview music.publication.execute].all? { |operation| contract.include?(operation) && facade.include?(operation) && javascript.include?(operation) })
 check.call("dashboard makes description editable before exact export", javascript.include?("youtube-description.txt") && javascript.include?("textarea.maxLength = 5000") && javascript.include?("Prepare YouTube upload package"))
+check.call("dashboard resumes an existing exact package without rebuilding its description", javascript.include?('boundary.textContent = data.package ?') && javascript.include?("await renderYouTubeAuthenticatedUpload(identity, editor, status)"))
 
 abort "music publication package verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music publication package deterministic verification passed."
