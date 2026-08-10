@@ -4914,17 +4914,18 @@ async function loadVisualBlenderMusicCandidates(preferredCandidateId = null) {
 }
 
 function visualBlenderInput() {
-  return {
+  const input = {
     visual_project_id: state.selectedVisualProject?.project_id,
     project_id: byId("visual-blender-music-project").value,
     candidate_id: byId("visual-blender-music-candidate").value,
     template_id: byId("visual-blender-template").value,
-    bars: Number(byId("visual-blender-bars").value),
+    bars: String(byId("visual-blender-bars").value),
     quality: byId("visual-blender-quality").value,
     direction: byId("visual-blender-direction").value,
-    seed: Number(byId("visual-blender-seed").value),
-    source_blender_scene_id: state.visualBlenderSourceSceneId
+    seed: String(byId("visual-blender-seed").value)
   };
+  if (state.visualBlenderSourceSceneId) input.source_blender_scene_id = state.visualBlenderSourceSceneId;
+  return input;
 }
 
 async function previewVisualBlender() {

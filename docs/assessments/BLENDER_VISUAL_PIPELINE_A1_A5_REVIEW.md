@@ -60,6 +60,30 @@ The artifact is owner-local and appears in the normal Visual Studio project.
 It is qualification evidence only; no review disposition or music binding was
 fabricated.
 
+The consolidated Operator-path test then used the exact kept *Glassroot Signal*
+candidate through the authenticated Dashboard rather than calling the service
+directly:
+
+```text
+Scene: blender_scene_d5fe3f1f6ed6ccd0
+Renderer: Blender 5.2 LTS / EEVEE
+Resolution: 1920x1080
+Frame rate: 30 fps
+Musical span: 8 bars at 150 BPM in 4/4
+Frames: 384/384
+Rendered loop: 12.8 seconds
+Loop boundary: matched
+Artifacts: scene.json, scene.blend, still.png, audio-analysis.json, preview.mp4
+Lifecycle: blocked_for_human_review
+```
+
+That live pass exposed and repaired three integration defects before the render
+started: numeric select controls now preserve the application contract's string
+boundary, absent revision lineage is omitted instead of sent as `null`, and the
+Blender service now returns Soul's standard `lifecycle_state` key. Deterministic
+coverage retains all three repairs. The resulting candidate remains unreviewed;
+only the Operator may record its disposition or bind it to Music Studio.
+
 ## Reference assessment
 
 The selected *Downside Up* and *Landscape* visualizers are realistic targets

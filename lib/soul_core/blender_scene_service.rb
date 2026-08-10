@@ -686,7 +686,7 @@ module SoulCore
     end
 
     def outcome(lifecycle, ok, message, data: {}, mutation: "none")
-      { "lifecycle" => lifecycle, "ok" => ok, "message" => message, "data" => data, "mutation" => mutation }
+      { "lifecycle_state" => lifecycle, "ok" => ok, "message" => message, "data" => data, "mutation" => mutation }
     end
   end
 end

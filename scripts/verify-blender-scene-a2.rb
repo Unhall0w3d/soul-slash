@@ -125,7 +125,7 @@ Dir.mktmpdir(".soul-blender-a2-", ROOT) do |temporary|
   preview = service.preview(**parameters)
   scene_id = preview.dig("data", "scene_id")
   check.call("preview binds reviewed music, whole bars, manifest, and exact gate") do
-    raise "preview failed" unless preview["ok"] && preview["lifecycle"] == "blocked_for_human_review"
+    raise "preview failed" unless preview["ok"] && preview["lifecycle_state"] == "blocked_for_human_review"
     raise "wrong bars" unless preview.dig("data", "bars") == 8
     raise "loop is not closed" unless preview.dig("data", "audio_analysis_summary", "loop_state_equal")
     raise "missing gate" unless preview.dig("data", "confirmation_phrase") == SoulCore::BlenderSceneService::CONFIRMATION
@@ -137,7 +137,7 @@ Dir.mktmpdir(".soul-blender-a2-", ROOT) do |temporary|
   runner.fail_render_once = true
   failed = service.execute(**parameters.merge(scene_id: scene_id, confirmation: preview.dig("data", "confirmation_phrase"), expected_digest: preview.dig("data", "expected_digest")))
   check.call("interrupted render retains bounded resumable frames") do
-    raise "failure was not retained" unless failed["lifecycle"] == "failed" && failed.dig("data", "resumable")
+    raise "failure was not retained" unless failed["lifecycle_state"] == "failed" && failed.dig("data", "resumable")
     raise "no retained frames" unless failed.dig("data", "retained_frames").positive?
   end
 
@@ -147,7 +147,7 @@ Dir.mktmpdir(".soul-blender-a2-", ROOT) do |temporary|
     expected_digest: resume_preview.dig("data", "expected_digest")
   )
   check.call("retained render resumes only missing frames and becomes reviewable") do
-    raise "resume failed: #{resumed}" unless resumed["ok"] && resumed["lifecycle"] == "blocked_for_human_review"
+    raise "resume failed: #{resumed}" unless resumed["ok"] && resumed["lifecycle_state"] == "blocked_for_human_review"
     record = resumed.dig("data", "blender_scene")
     raise "wrong lifecycle" unless record["lifecycle_state"] == "blocked_for_human_review"
     raise "artifact package incomplete" unless %w[manifest blend still audio_analysis preview].all? { |name| record.dig("artifacts", name, "sha256") }
