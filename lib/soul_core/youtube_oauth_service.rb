@@ -160,7 +160,8 @@ module SoulCore
         "channel_id" => credential.fetch("channel_id"),
         "channel_title" => credential.fetch("channel_title"),
         "scopes" => credential.fetch("scopes"),
-        "credential_path" => credential_path
+        "credential_path" => credential_path,
+        "client_candidates" => discover_client_candidates
       })
     rescue CredentialError, Errno::ENOENT, Errno::EACCES
       outcome("complete", true, "YouTube OAuth is not configured", data: {

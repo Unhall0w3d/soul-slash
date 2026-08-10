@@ -1602,11 +1602,17 @@ async function draftMusicPublicationPackage(candidate, visual, panel, button, st
     const envelope = await callSoul("music.publication.draft", identity); lifecycle(envelope); const data = dataOf(envelope);
     if (!data.description) throw new Error(envelope.errors?.[0]?.message || "Export the kept song before preparing its upload package");
     const editor = document.createElement("div"); editor.className = "music-publication-editor";
-    const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "YouTube description"; const boundary = document.createElement("small"); boundary.textContent = "editable · local package only"; heading.append(title, boundary);
+    const heading = document.createElement("div"); heading.className = "card-heading"; const title = document.createElement("strong"); title.textContent = "YouTube description"; const boundary = document.createElement("small"); boundary.textContent = data.package ? "approved · exact package" : "editable · local package only"; heading.append(title, boundary);
     const textarea = document.createElement("textarea"); textarea.rows = 18; textarea.maxLength = 5000; textarea.value = data.description; textarea.setAttribute("aria-label", "Editable YouTube description");
+    const note = document.createElement("p"); note.className = "card-note"; note.textContent = "The package contains the upload-ready MP4, thumbnail, youtube-description.txt sidecar, and private-upload metadata. It does not contact YouTube.";
+    if (data.package) {
+      textarea.disabled = true; editor.append(heading, textarea, note); button.replaceWith(editor);
+      status.textContent = `Upload package restored from ${data.package.destination}.`;
+      await renderYouTubeAuthenticatedUpload(identity, editor, status);
+      return;
+    }
     const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact upload package";
     preview.addEventListener("click", () => previewMusicPublicationPackage(identity, textarea, editor, preview, status));
-    const note = document.createElement("p"); note.className = "card-note"; note.textContent = "The package contains the upload-ready MP4, thumbnail, youtube-description.txt sidecar, and private-upload metadata. It does not contact YouTube.";
     editor.append(heading, textarea, preview, note); button.replaceWith(editor); status.textContent = "Review the wording, links, credits, and lyrics before binding the exact package.";
   } catch (error) { status.textContent = error.message; button.disabled = false; }
 }
@@ -1705,6 +1711,12 @@ function renderYouTubeUploadGate(identity, panel, status, oauth) {
   [["private","Private · recommended draft"],["unlisted","Unlisted · explicit publication choice"],["public","Public · explicit publication choice"]].forEach(([value, text]) => { const option = document.createElement("option"); option.value = value; option.textContent = text; visibility.append(option); });
   visibility.value = "private"; visibilityLabel.append(visibility);
   const preview = document.createElement("button"); preview.type = "button"; preview.className = "gate-button"; preview.textContent = "Preview exact YouTube upload";
+  const reauthorize = document.createElement("button"); reauthorize.type = "button"; reauthorize.className = "gate-button"; reauthorize.textContent = "Reauthorize YouTube";
+  reauthorize.addEventListener("click", () => {
+    const heading = panel.querySelector(".card-heading");
+    Array.from(panel.children).forEach((child) => { if (child !== heading && child !== status) child.remove(); });
+    renderYouTubeAuthorization(identity, panel, status, status, oauth);
+  });
   preview.addEventListener("click", async () => {
     preview.disabled = true; status.textContent = "Revalidating the channel, package receipt, metadata, and every file digest…";
     try {
@@ -1731,7 +1743,7 @@ function renderYouTubeUploadGate(identity, panel, status, oauth) {
       status.textContent = `Review the exact ${selectedVisibility} scope. Clicking Upload supplies ${data.confirmation_phrase}; Soul will not change visibility later.`;
     } catch (error) { status.textContent = error.message; preview.disabled = false; }
   });
-  panel.append(channel, visibilityLabel, preview);
+  panel.append(channel, visibilityLabel, preview, reauthorize);
   status.textContent = "Authorization matches Soul Slash Synthesis. Private is selected; preview one exact package before upload.";
 }
 

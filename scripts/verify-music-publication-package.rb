@@ -81,6 +81,8 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   check.call("colon-delimited genre identity remains complete", foreboding_genre == "Funeral doom fused with dark ambient and restrained industrial noise")
   check.call("instrument-led captions retain their concise genre identity", service.send(:genre_influence, "Liquid drum and bass with warm sub-bass and restrained Rhodes chords.") == "Liquid drum and bass")
 
+  description = "#{description}\n\nOperator-selected package wording."
+
   preview = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   wrong = service.execute(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description, confirmation: "WRONG", expected_digest: preview.dig("data", "expected_digest"))
   check.call("wrong exact gate creates no package", wrong["lifecycle_state"] == "blocked_for_human_review" && !File.exist?(File.join(destination, "youtube")))
@@ -92,6 +94,13 @@ Dir.mktmpdir("soul-publication-package-") do |root|
   check.call("upload metadata defaults to private human publication", upload.values_at("category_id", "privacy_status", "made_for_kids", "contains_synthetic_media", "api_upload_performed", "human_publication_required") == ["10", "private", false, true, false, true])
   replay = service.preview(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id, description: description)
   check.call("identical package replay is idempotent", replay["lifecycle_state"] == "complete" && replay.dig("data", "idempotent_replay") == true)
+  resumed = service.draft(project_id: project_id, candidate_id: candidate_id, visual_id: visual_id)
+  check.call("dashboard resume restores the approved package description instead of regenerating it",
+             resumed["lifecycle_state"] == "complete" &&
+             resumed.dig("data", "idempotent_replay") == true &&
+             resumed.dig("data", "description") == description &&
+             resumed.dig("data", "description_editable") == false &&
+             resumed.dig("data", "package", "scope_digest") == package["scope_digest"])
 
   motion_destination = File.join(export_root, "afterimage-motion-fixture")
   FileUtils.mkdir_p(motion_destination)
@@ -142,6 +151,7 @@ facade = File.binread(File.expand_path("../lib/soul_core/application_facade.rb",
 javascript = File.binread(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
 check.call("application and dashboard expose draft preview execute gates", %w[music.publication.draft music.publication.preview music.publication.execute].all? { |operation| contract.include?(operation) && facade.include?(operation) && javascript.include?(operation) })
 check.call("dashboard makes description editable before exact export", javascript.include?("youtube-description.txt") && javascript.include?("textarea.maxLength = 5000") && javascript.include?("Prepare YouTube upload package"))
+check.call("dashboard resumes an existing exact package without rebuilding its description", javascript.include?('boundary.textContent = data.package ?') && javascript.include?("await renderYouTubeAuthenticatedUpload(identity, editor, status)"))
 
 abort "music publication package verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Music publication package deterministic verification passed."
