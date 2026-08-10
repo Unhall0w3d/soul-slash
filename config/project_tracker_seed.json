@@ -397,6 +397,23 @@
       "notes": "The Operator accepted the current bounded 4-second, 8-second, and 12-second Visual Motion profiles on 2026-08-08 after completing the retained-sample review. This qualification does not extend duration support, approve new runtime profiles, or permit automatic aesthetic approval."
     },
     {
+      "item_id": "track_blender_visual_pipeline",
+      "title": "Qualify a Blender scene pipeline for music visuals",
+      "area": "Visual Studio + Creative Tooling",
+      "horizon": "later",
+      "status": "planned",
+      "priority": "medium",
+      "summary": "Research and qualify a controlled Blender scene lane for reusable 3D, procedural, and audio-reactive music companions beside the existing still and generated-motion paths.",
+      "acceptance": "A pinned Blender runtime accepts only a validated closed scene manifest, constructs a source-preserving .blend through a trusted adapter, renders bounded resumable frames with explicit resource evidence, produces a reviewed still or seamless loop, binds one exact kept candidate to one exact kept song, and reuses the full-duration and publication gates without arbitrary model-written Python, untrusted auto-execution, or background render services.",
+      "source": "Operator-requested Blender music-visual alternative, 2026-08-09",
+      "notes": "Architecture research only. Favor procedural, abstract, liminal, and architectural scenes before characters or organic animation. EEVEE is the first qualification renderer; Cycles is optional after measured benefit. The RX 6900 XT is the preferred device and must retain exclusive creative-resource scheduling.",
+      "implementation": "Planned phases: A0 pinned installation and capability proof; A1 closed scene manifest and trusted adapter; A2 audio-reactive seamless-loop and cancellation/resume proof; A3 Visual Studio lifecycle; A4 Music binding and publication; A5 reviewed templates and conversational collaboration.",
+      "technologies": "Blender LTS; bpy data-block API; EEVEE; optional Cycles HIP/CUDA; procedural geometry and materials; baked music-analysis curves; PNG or OpenEXR frame sequences; FFmpeg packaging; JSON manifests and SHA-256 lineage.",
+      "interfaces": "Future Visual Studio Blender Scene mode; existing AMD creative-resource lease; Visual Studio review and revision; Music Studio exact visual binding; full-duration companion and YouTube package gates.",
+      "commands": "Research only. Installation and render commands remain gated until A0 adopts a pinned Blender version and fixture.",
+      "references": "docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md\ndocs/guides/VISUAL_STUDIO.md\ndocs/soul/VISUAL_STUDIO_A5_NATIVE_VIDEO_BRIEF.md"
+    },
+    {
       "item_id": "track_structured_creative_exports",
       "title": "Track-aware AI and FL Studio production for new songs",
       "area": "Music Studio + Creative Tooling",

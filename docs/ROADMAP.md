@@ -83,12 +83,20 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Qualified expansion candidates
 
-- Track-aware new-song production is now under active architecture review. The
+- Track-aware new-song production has an accepted architecture candidate and is
+  paused pending FL Studio installation and its A0 interchange proof. The
   candidate keeps ACE-Step Turbo as the accepted full-mix baseline, adds a
   separately qualified Base lane for extract/Lego/complete operations, preserves
   aligned audio with selective MIDI and samples in a DAW-independent production
   graph, and lets FL Studio remain the only native `.flp` writer. See
   `docs/soul/DAW_NATIVE_MUSIC_PRODUCTION_ARCHITECTURE.md`.
+
+- Blender Scene is a researched third Visual Studio lane for controlled,
+  reusable 3D and audio-reactive music companions beside local still and
+  diffusion-motion generation. It remains planned: the first gate is a pinned,
+  bounded EEVEE capability and cancellation/resume proof using a closed scene
+  manifest and repository-owned adapter. See
+  `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md`.
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [x] Operator qualification of the current bounded 4-second, 8-second, and
