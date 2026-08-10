@@ -93,10 +93,12 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 - Blender Scene is a researched third Visual Studio lane for controlled,
   reusable 3D and audio-reactive music companions beside local still and
-  diffusion-motion generation. It remains planned: the first gate is a pinned,
-  bounded EEVEE capability and cancellation/resume proof using a closed scene
-  manifest and repository-owned adapter. See
-  `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md`.
+  diffusion-motion generation. A0 is candidate-complete: Blender 5.2.0 LTS and
+  EEVEE rendered a bounded repository-owned motion fixture on the RX 6900 XT,
+  retained an editable `.blend` and exact receipt, and released the shared AMD
+  lease. Operator review precedes A1's closed scene manifest and trusted
+  adapter. See `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md` and
+  `docs/assessments/BLENDER_VISUAL_PIPELINE_A0_REVIEW.md`.
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification
 - [x] Operator qualification of the current bounded 4-second, 8-second, and

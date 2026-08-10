@@ -1,0 +1,16 @@
+{
+  "schema_version": "soul.blender_visual.runtime.v1",
+  "profile_id": "blender-5.2-lts-eevee-a0",
+  "binary_name": "blender",
+  "required_version": "Blender 5.2.0 LTS",
+  "renderer": "BLENDER_EEVEE",
+  "width": 640,
+  "height": 360,
+  "fps": 24,
+  "frames": 24,
+  "frame_format": "PNG",
+  "timeout_seconds": 180,
+  "resource_group": "amd-vulkan-generation",
+  "fixture": "scripts/blender/soul_a0_fixture.py",
+  "probe": "scripts/blender/soul_runtime_probe.py"
+}
