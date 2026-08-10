@@ -251,8 +251,9 @@ module SoulCore
         "code_challenge" => challenge,
         "code_challenge_method" => "S256"
       )
-      launch = @runner.run("xdg-open", "#{client.fetch('auth_uri')}?#{query}", timeout_seconds: 10, max_output_bytes: 8 * 1024)
-      raise CredentialError, "could not open the Google authorization page" unless launch.success?
+      authorization_url = "#{client.fetch('auth_uri')}?#{query}"
+      launch = @runner.run(*browser_launcher, authorization_url, timeout_seconds: 10, max_output_bytes: 8 * 1024)
+      raise CredentialError, "could not dispatch the Google authorization page" unless launch.success?
 
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + @callback_timeout
       attempts = 0
@@ -372,6 +373,18 @@ module SoulCore
       uri.is_a?(URI::HTTPS) && %w[accounts.google.com oauth2.googleapis.com].include?(uri.host)
     rescue URI::InvalidURIError
       false
+    end
+
+    def browser_launcher
+      return ["xdg-open"] unless @runner.respond_to?(:which)
+
+      gio = @runner.which("gio")
+      return [gio, "open"] if gio
+
+      xdg_open = @runner.which("xdg-open")
+      raise CredentialError, "no supported desktop browser launcher is available" unless xdg_open
+
+      [xdg_open]
     end
 
     def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))

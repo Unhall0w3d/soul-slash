@@ -455,6 +455,7 @@ Dir.mktmpdir("soul-youtube-chunks-") do |root|
 end
 
 source = File.binread(File.expand_path("../lib/soul_core/youtube_api_client.rb", __dir__))
+oauth_source = File.binread(File.expand_path("../lib/soul_core/youtube_oauth_service.rb", __dir__))
 brief = File.binread(File.expand_path("../docs/soul/YOUTUBE_AUTHENTICATED_UPLOAD_A0_BRIEF.md", __dir__))
 check.call("live transport is bounded and brief forbids background publication",
            source.include?("MAX_ATTEMPTS = 3") &&
@@ -463,6 +464,10 @@ check.call("live transport is bounded and brief forbids background publication",
            source.include?("notifySubscribers=false") &&
            brief.include?("No daemon, watcher, scheduled task") &&
            brief.match?(/Soul never chooses\s+to publish/))
+check.call("OAuth browser dispatch prefers bounded GLib handoff over Opera-attached xdg-open",
+           oauth_source.include?('@runner.which("gio")') &&
+           oauth_source.include?('[gio, "open"]') &&
+           oauth_source.include?('@runner.which("xdg-open")'))
 
 abort "authenticated YouTube upload A0 verification failed: #{failures.join(', ')}" unless failures.empty?
 puts "Authenticated YouTube upload A0 deterministic verification passed."
