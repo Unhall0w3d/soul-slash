@@ -13,6 +13,7 @@ companion = read.call("lib/soul_core/music_visual_companion_service.rb")
 guide = read.call("docs/guides/VISUAL_STUDIO.md")
 review = read.call("docs/assessments/BLENDER_VISUAL_PIPELINE_A1_A5_REVIEW.md")
 html = read.call("assets/dashboard/index.html")
+dashboard = read.call("assets/dashboard/dashboard.js")
 
 checks = []
 check = lambda do |label, condition|
@@ -27,6 +28,7 @@ check.call("every A5 template contains geometry lights and animation", templates
 check.call("Visual Studio capability catalog names Blender inputs and operations", catalog.fetch("surfaces").find { |item| item["id"] == "visual_studio" }.then { |item| item["inputs"].include?("exact kept song") && item.fetch("operations").include?("visual.blender.execute") })
 check.call("creative skills preserve Dashboard Blender construction boundary", registry.dig("skills", "creative.visual_production", "description").include?("without implying") && registry.dig("skills", "creative.companion_production", "description").include?("Dashboard-gated"))
 check.call("A4 full-duration path treats Blender as reviewed motion", companion.include?('%w[generated_motion blender_scene]') && companion.include?('loop_name = record["source_kind"] == "generated_motion" ? "loop.webm" : "loop.mp4"'))
+check.call("Music Studio advances reviewed Blender loops instead of retiring them", dashboard.include?('const blenderScene = visual.source_kind === "blender_scene"') && dashboard.include?("const reviewedMotion = generatedMotion || blenderScene") && dashboard.include?("Preview full-duration Blender render"))
 check.call("A4 publication validation is covered by exact existing verifier", read.call("scripts/verify-music-publication-package.rb").include?("Blender companion produces the same exact private YouTube package boundary"))
 check.call("Dashboard truthfully states retained direction does not rewrite geometry", html.include?("it does not silently rewrite template geometry"))
 check.call("Visual guide documents source editable whole bar workflow", guide.include?("Build an editable Blender scene") && guide.include?("8- or 12-musical-bar") && guide.include?("arbitrary add-ons"))
