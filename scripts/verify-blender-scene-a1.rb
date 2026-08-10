@@ -53,7 +53,7 @@ end
 checks = run_check(checks, failures, "load valid template manifest and compute deterministic digest") do
   manifest = read_json(File.join(ROOT, "config", "blender_scene_templates.json"))
   templates = manifest.fetch("templates")
-  template_keys = %w[abstract liminal architectural audio_reactive bioluminescent_grove]
+  template_keys = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge]
   template_keys.each do |template_name|
     parsed = normalize_manifest(templates.fetch(template_name))
     raise "template #{template_name} schema version mismatch" unless parsed.normalized_manifest.fetch("schema_version") == SoulCore::BlenderSceneManifest::SCHEMA_VERSION
@@ -159,8 +159,8 @@ checks = run_check(checks, failures, "template catalog is closed and exact") do
   raise "catalog root schema wrong" unless catalog.fetch("schema_version") == "soul.blender.scene.templates.v1"
   templates = catalog.fetch("templates")
   raise "catalog templates must be object" unless templates.is_a?(Hash)
-  unless (templates.keys - %w[abstract liminal architectural audio_reactive bioluminescent_grove]).empty?
-    raise "catalog contains unknown templates: #{(templates.keys - %w[abstract liminal architectural audio_reactive bioluminescent_grove]).join(', ')}"
+  unless (templates.keys - %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge]).empty?
+    raise "catalog contains unknown templates: #{(templates.keys - %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge]).join(', ')}"
   end
 end
 

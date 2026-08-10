@@ -4933,6 +4933,7 @@ function visualBlenderInput() {
     project_id: byId("visual-blender-music-project").value,
     candidate_id: byId("visual-blender-music-candidate").value,
     template_id: byId("visual-blender-template").value,
+    look_profile: byId("visual-blender-look").value,
     bars: String(byId("visual-blender-bars").value),
     quality: byId("visual-blender-quality").value,
     direction: byId("visual-blender-direction").value,

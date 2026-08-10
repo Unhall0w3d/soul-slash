@@ -23,6 +23,7 @@ module SoulCore
       materials
       animation
       audio_binding
+      look
       output
     ].freeze
 
@@ -37,6 +38,20 @@ module SoulCore
     AUDIO_KEYS = %w[enabled tracks].freeze
     AUDIO_TRACK_KEYS = %w[target_type target_id property curve gain offset].freeze
     OUTPUT_KEYS = %w[blend_name still_name still_frame retention].freeze
+    LOOK_KEYS = %w[surface atmosphere camera glow grade].freeze
+
+    LOOK_DEFAULTS = {
+      "surface" => "clean",
+      "atmosphere" => "none",
+      "camera" => "crisp",
+      "glow" => "none",
+      "grade" => "neutral"
+    }.freeze
+    LOOK_SURFACES = %w[clean organic crystalline machined].freeze
+    LOOK_ATMOSPHERES = %w[none mist void_haze].freeze
+    LOOK_CAMERAS = %w[crisp subtle_dof cinematic_dof].freeze
+    LOOK_GLOWS = %w[none soft signal].freeze
+    LOOK_GRADES = %w[neutral cinematic high_contrast].freeze
 
     FORBIDDEN_KEYS = %w[path path_dir paths script scripts driver addon nodes import asset_path asset].freeze
     ALLOWED_RENDERERS = %w[BLENDER_EEVEE BLENDER_CYCLES].freeze
@@ -50,6 +65,8 @@ module SoulCore
 
     def initialize(manifest)
       raw = require_hash!(manifest, "manifest")
+      raw = raw.dup
+      raw["look"] ||= LOOK_DEFAULTS.dup
       @normalized_manifest = validate_and_normalize!(raw)
     end
 
@@ -83,6 +100,7 @@ module SoulCore
       animation = validate_animation(require_hash!(manifest["animation"], "animation"), objects, materials, camera, lights, render)
       audio_binding = validate_audio_binding(require_hash!(manifest["audio_binding"], "audio_binding"), objects, materials, camera, lights)
       output = validate_output(require_hash!(manifest["output"], "output"))
+      look = validate_look(require_hash!(manifest["look"], "look"))
 
       normalized = {
         "schema_version" => SCHEMA_VERSION,
@@ -95,6 +113,7 @@ module SoulCore
         "objects" => objects,
         "materials" => materials,
         "animation" => animation,
+        "look" => look,
         "audio_binding" => audio_binding,
         "output" => output
       }
@@ -270,6 +289,17 @@ module SoulCore
         channel["interpolation"] = channel["interpolation"]
         channel
       end
+    end
+
+    def validate_look(look)
+      reject_unknown(look, LOOK_KEYS, "look")
+      reject_forbidden(look, "look")
+      raise ValidationError, "look.surface invalid" unless LOOK_SURFACES.include?(look["surface"])
+      raise ValidationError, "look.atmosphere invalid" unless LOOK_ATMOSPHERES.include?(look["atmosphere"])
+      raise ValidationError, "look.camera invalid" unless LOOK_CAMERAS.include?(look["camera"])
+      raise ValidationError, "look.glow invalid" unless LOOK_GLOWS.include?(look["glow"])
+      raise ValidationError, "look.grade invalid" unless LOOK_GRADES.include?(look["grade"])
+      look
     end
 
     def validate_audio_binding(audio_binding, objects, materials, camera, lights)
@@ -448,6 +478,7 @@ module SoulCore
       normalized["output"] = manifest.fetch("output").sort_by { |key, _| key }.to_h
       normalized["palette"] = manifest.fetch("palette").sort_by { |key, _| key }.to_h
       normalized["render"] = manifest.fetch("render").sort_by { |key, _| key }.to_h
+      normalized["look"] = manifest.fetch("look").sort_by { |key, _| key }.to_h
       normalized
     end
 

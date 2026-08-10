@@ -460,7 +460,7 @@ blender-visual-run:
 verify-blender-visual-a0:
 > @ruby scripts/verify-blender-visual-a0.rb
 
-.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a1-a5
+.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a6 verify-blender-scene-a1-a5 verify-blender-scene-a1-a6
 verify-blender-scene-a1:
 > @ruby scripts/verify-blender-scene-a1.rb
 
@@ -478,6 +478,12 @@ verify-blender-scene-a5:
 > @ruby scripts/verify-blender-scene-a4-a5.rb
 
 verify-blender-scene-a1-a5: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5
+
+verify-blender-scene-a6:
+> @ruby scripts/verify-blender-scene-a6.rb
+> @ruby scripts/verify-blender-scene-a6-dashboard.rb
+
+verify-blender-scene-a1-a6: verify-blender-scene-a1-a5 verify-blender-scene-a6
 
 verify-music-publication-package:
 > @ruby scripts/verify-music-publication-package.rb

@@ -15,7 +15,14 @@ module SoulCore
   class BlenderSceneService
     SCENE_ID = /\Ablender_scene_[a-f0-9]{16}\z/
     VISUAL_PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
-    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove].freeze
+    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge].freeze
+    LOOK_PROFILES = {
+      "template" => nil,
+      "cinematic_organic" => { "surface" => "organic", "atmosphere" => "mist", "camera" => "cinematic_dof", "glow" => "soft", "grade" => "cinematic" },
+      "liminal_haze" => { "surface" => "clean", "atmosphere" => "void_haze", "camera" => "subtle_dof", "glow" => "soft", "grade" => "high_contrast" },
+      "signal_forge" => { "surface" => "machined", "atmosphere" => "mist", "camera" => "crisp", "glow" => "signal", "grade" => "high_contrast" },
+      "crystalline_void" => { "surface" => "crystalline", "atmosphere" => "void_haze", "camera" => "cinematic_dof", "glow" => "signal", "grade" => "cinematic" }
+    }.freeze
     BAR_COUNTS = [8, 12].freeze
     QUALITY = {
       "review" => { "width" => 1_280, "height" => 720 },
@@ -111,13 +118,13 @@ module SoulCore
       outcome("failed", false, error.message)
     end
 
-    def preview(project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", source_scene_id: nil)
+    def preview(project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", source_scene_id: nil)
       operation = source_scene_id ? "blender_scene_revision" : "blender_scene_generation"
       confirmation = source_scene_id ? REVISION_CONFIRMATION : CONFIRMATION
       plan = build_plan(
         operation: operation, project_id: project_id, music_project_id: music_project_id,
         music_candidate_id: music_candidate_id, template_id: template_id, bars: bars,
-        direction: direction, seed: seed, quality: quality, source_scene_id: source_scene_id
+        direction: direction, seed: seed, quality: quality, look_profile: look_profile, source_scene_id: source_scene_id
       )
       outcome("blocked_for_human_review", true, "exact whole-bar Blender scene requires approval", data: plan.fetch("scope").merge(
         "expected_digest" => digest(plan.fetch("scope")), "confirmation_phrase" => confirmation,
@@ -129,14 +136,14 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def execute(project_id:, scene_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", source_scene_id: nil, confirmation:, expected_digest:, progress: nil)
+    def execute(project_id:, scene_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", source_scene_id: nil, confirmation:, expected_digest:, progress: nil)
       raise ArgumentError, "Blender scene candidate ID is invalid" unless scene_id.to_s.match?(SCENE_ID)
       operation = source_scene_id ? "blender_scene_revision" : "blender_scene_generation"
       phrase = source_scene_id ? REVISION_CONFIRMATION : CONFIRMATION
       plan = build_plan(
         operation: operation, project_id: project_id, music_project_id: music_project_id,
         music_candidate_id: music_candidate_id, template_id: template_id, bars: bars,
-        direction: direction, seed: seed, quality: quality, source_scene_id: source_scene_id,
+        direction: direction, seed: seed, quality: quality, look_profile: look_profile, source_scene_id: source_scene_id,
         scene_id: scene_id
       )
       scope = plan.fetch("scope")
@@ -280,7 +287,7 @@ module SoulCore
 
     private
 
-    def build_plan(operation:, project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality:, source_scene_id: nil, scene_id: nil)
+    def build_plan(operation:, project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality:, look_profile: "template", source_scene_id: nil, scene_id: nil)
       project = read_visual_project(project_id)
       template_id = template_id.to_s
       raise ArgumentError, "Blender template is invalid" unless TEMPLATE_IDS.include?(template_id)
@@ -290,6 +297,8 @@ module SoulCore
       raise ArgumentError, "Blender seed must be 0..2147483647" unless seed.between?(0, 2**31 - 1)
       quality = quality.to_s
       raise ArgumentError, "Blender quality profile is invalid" unless QUALITY.key?(quality)
+      look_profile = look_profile.to_s
+      raise ArgumentError, "Blender look profile is invalid" unless LOOK_PROFILES.key?(look_profile)
       direction = direction.to_s.strip
       raise ArgumentError, "Blender scene direction must be 12..2000 characters" unless direction.length.between?(12, 2_000)
       source = source_scene_id ? reviewed_scene!(project_id, source_scene_id) : nil
@@ -304,7 +313,7 @@ module SoulCore
       analysis = @analyzer.analyze(path: audio, bpm: music_input.fetch("bpm"), beats_per_bar: beats_per_bar, bars: bars, fps: fps)
       scene_id ||= "blender_scene_#{@id_generator.call}"
       raise "generated Blender scene ID is invalid" unless scene_id.match?(SCENE_ID)
-      manifest = materialize_manifest(template, project_id: project_id, scene_id: scene_id, music_candidate_id: music_candidate_id, seed: seed, quality: quality, analysis: analysis)
+      manifest = materialize_manifest(template, project_id: project_id, scene_id: scene_id, music_candidate_id: music_candidate_id, seed: seed, quality: quality, look_profile: look_profile, analysis: analysis)
       parsed = BlenderSceneManifest.new(manifest)
       scope = {
         "operation" => operation, "visual_project_id" => project.fetch("project_id"), "visual_project_sha256" => digest(project),
@@ -312,7 +321,7 @@ module SoulCore
         "music_project_id" => music_project.fetch("project_id"), "music_candidate_id" => music_candidate_id,
         "music_candidate_review_sha256" => digest(review), "music_audio_sha256" => Digest::SHA256.file(audio).hexdigest,
         "template_id" => template_id, "bars" => bars, "beats_per_bar" => beats_per_bar,
-        "bpm" => Float(music_input.fetch("bpm")), "quality" => quality, "direction" => direction, "seed" => seed,
+        "bpm" => Float(music_input.fetch("bpm")), "quality" => quality, "look_profile" => look_profile, "direction" => direction, "seed" => seed,
         "frame_count" => analysis.fetch("frame_count"), "fps" => fps,
         "nominal_duration_seconds" => analysis.fetch("nominal_duration_seconds"),
         "rendered_duration_seconds" => analysis.fetch("rendered_duration_seconds"),
@@ -327,7 +336,7 @@ module SoulCore
       }
     end
 
-    def materialize_manifest(template, project_id:, scene_id:, music_candidate_id:, seed:, quality:, analysis:)
+    def materialize_manifest(template, project_id:, scene_id:, music_candidate_id:, seed:, quality:, look_profile:, analysis:)
       template["identity"] = {
         "id" => scene_id, "project_id" => project_id,
         "revision" => "a2-#{scene_id.delete_prefix('blender_scene_')}", "music_candidate_id" => music_candidate_id
@@ -336,6 +345,7 @@ module SoulCore
       template["render"]["frame_start"] = 1
       template["render"]["frame_end"] = analysis.fetch("frame_count")
       template["render"]["seed"] = seed
+      template["look"] = deep_copy(LOOK_PROFILES.fetch(look_profile)) unless look_profile == "template"
       remap_template_animation!(template)
       expand_audio_bindings!(template, analysis)
       template["output"] = { "blend_name" => "scene.blend", "still_name" => "still.png", "still_frame" => 1, "retention" => "full_candidate" }
@@ -464,7 +474,7 @@ module SoulCore
         "schema_version" => "soul.visual.blender_scene.v1", "project_id" => scope.fetch("visual_project_id"),
         "scene_id" => scope.fetch("scene_id"), "source_scene_id" => scope["source_scene_id"],
         "music_project_id" => scope.fetch("music_project_id"), "music_candidate_id" => scope.fetch("music_candidate_id"),
-        "template_id" => scope.fetch("template_id"), "direction" => scope.fetch("direction"), "quality" => scope.fetch("quality"),
+        "template_id" => scope.fetch("template_id"), "look_profile" => scope.fetch("look_profile"), "direction" => scope.fetch("direction"), "quality" => scope.fetch("quality"),
         "bars" => scope.fetch("bars"), "beats_per_bar" => scope.fetch("beats_per_bar"), "bpm" => scope.fetch("bpm"),
         "fps" => scope.fetch("fps"), "frame_count" => scope.fetch("frame_count"),
         "duration_seconds" => scope.fetch("rendered_duration_seconds"), "width" => plan.dig("manifest", "render", "width"),

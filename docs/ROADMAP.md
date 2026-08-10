@@ -91,14 +91,16 @@ This roadmap tracks product bodies rather than the repository's historical phase
   graph, and lets FL Studio remain the only native `.flp` writer. See
   `docs/soul/DAW_NATIVE_MUSIC_PRODUCTION_ARCHITECTURE.md`.
 
-- Blender Scene A1–A5 is candidate-complete for consolidated Operator review.
+- Blender Scene A1–A5 passed consolidated Operator review on 2026-08-10.
   The third Visual Studio lane now validates a closed scene manifest, builds an
   editable `.blend` through a trusted adapter, derives bounded music curves,
   renders resumable whole-bar EEVEE loops, preserves review/revision lineage,
   binds only to the exact kept song, and reuses full-duration plus private
-  YouTube-package gates. Five reviewed procedural scene families are exposed;
-  rich imported asset packs and conversational manifest compilation remain
-  future separately qualified work. See
+  YouTube-package gates. Its first end-to-end candidate also proved authenticated
+  upload, unlisted publication, and public playback after YouTube processing.
+  A6 now expands the deliberately conservative visual vocabulary through closed
+  surface, atmosphere, camera, glow, and grading profiles; rich imported asset
+  packs remain future separately qualified work. See
   `docs/soul/BLENDER_MUSIC_VISUAL_PIPELINE_ARCHITECTURE.md`.
 
 - [x] production short generated-motion lane after AMD compatibility, integrity, resource, and cleanup qualification

@@ -1,10 +1,11 @@
-# Blender Visual Pipeline A1–A5 Candidate Review
+# Blender Visual Pipeline A1–A5 Accepted Review
 
 ## Candidate status
 
-`candidate_complete` pending one consolidated Operator review. This packet
-does not approve merge, production promotion, a template aesthetic, or any
-external publication.
+`accepted` following consolidated Operator review on 2026-08-10. The exact
+Glassroot Signal candidate was retained, bound to its reviewed music, packaged,
+uploaded through the authenticated YouTube lane, changed to unlisted, and
+confirmed playable through its public link after processing completed.
 
 ## What was implemented
 
@@ -81,8 +82,9 @@ That live pass exposed and repaired three integration defects before the render
 started: numeric select controls now preserve the application contract's string
 boundary, absent revision lineage is omitted instead of sent as `null`, and the
 Blender service now returns Soul's standard `lifecycle_state` key. Deterministic
-coverage retains all three repairs. The resulting candidate remains unreviewed;
-only the Operator may record its disposition or bind it to Music Studio.
+coverage retains all three repairs. The Operator subsequently reviewed and
+retained the result, completed its binding and publication flow, and approved
+A1–A5 for merge.
 
 ## Reference assessment
 
@@ -146,12 +148,12 @@ unattended Core change, or external publication.
 
 ## Human review checklist
 
-- [ ] Visual Studio clearly distinguishes Blender Scene from diffusion motion
-- [ ] Template, kept song, musical bars, quality, seed, and retained direction are understandable
-- [ ] Production loop motion is coherent and the seam is acceptable
-- [ ] The editable `.blend` and private evidence downloads are useful
-- [ ] Review, immutable revision, resume, deletion, and exact binding controls are clear
-- [ ] A kept Blender loop can render a full-duration companion
-- [ ] The exact local YouTube package is correct and remains private by default
-- [ ] The procedural-vs-authored-asset limitation is acceptable
-- [ ] A1–A5 may be promoted only after this consolidated review
+- [x] Visual Studio clearly distinguishes Blender Scene from diffusion motion
+- [x] Template, kept song, musical bars, quality, seed, and retained direction are understandable
+- [x] Production loop motion is coherent and the seam is acceptable
+- [x] The editable `.blend` and private evidence downloads are useful
+- [x] Review, immutable revision, resume, deletion, and exact binding controls are clear
+- [x] A kept Blender loop can render a full-duration companion
+- [x] The exact local YouTube package is correct and remains private by default
+- [x] The procedural-vs-authored-asset limitation is acceptable
+- [x] A1–A5 is accepted and merged
