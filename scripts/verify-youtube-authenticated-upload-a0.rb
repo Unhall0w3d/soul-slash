@@ -21,10 +21,12 @@ end
 
 class OAuthApiFixture
   attr_reader :calls
+  attr_accessor :reject_refresh
 
   def initialize(channel_id: SoulCore::YouTubeOAuthService::EXPECTED_CHANNEL_ID)
     @channel_id = channel_id
     @calls = []
+    @reject_refresh = false
   end
 
   def exchange_code(**arguments)
@@ -38,6 +40,11 @@ class OAuthApiFixture
 
   def refresh_access_token(**arguments)
     @calls << ["refresh_access_token", arguments.keys.sort]
+    if @reject_refresh
+      raise SoulCore::YouTubeApiClient::ApiError.new(
+        "YouTube API returned HTTP 400: invalid_grant", status: 400
+      )
+    end
     { "access_token" => "ya29.fixture-refreshed-never-output" }
   end
 
@@ -185,6 +192,18 @@ Dir.mktmpdir("soul-youtube-a0-") do |root|
   check.call("stored credential refresh re-verifies channel without returning refresh material",
              access["channel_id"] == SoulCore::YouTubeOAuthService::EXPECTED_CHANNEL_ID &&
              !JSON.generate(access.reject { |key, _| key == "access_token" }).include?("fixture-refresh"))
+  oauth_api.reject_refresh = true
+  rejected_refresh = begin
+    oauth.access_context
+    nil
+  rescue SoulCore::YouTubeOAuthService::CredentialError => error
+    error
+  end
+  check.call("rejected stored authorization gives bounded reauthorization guidance",
+             rejected_refresh&.message&.include?("authorize YouTube again") &&
+             rejected_refresh.message.include?("Testing") &&
+             !rejected_refresh.message.include?("invalid_grant"))
+  oauth_api.reject_refresh = false
 
   wrong_state_root = File.join(root, "wrong-state")
   wrong_state = SoulCore::YouTubeOAuthService.new(
@@ -360,6 +379,23 @@ check.call("transient API failures retry only to the fixed attempt bound",
            retry_token["access_token"] == "ya29.retry-fixture" &&
            retry_calls == SoulCore::YouTubeApiClient::MAX_ATTEMPTS &&
            retry_sleeps == [1, 2])
+
+string_error_client = SoulCore::YouTubeApiClient.new(
+  http_adapter: ->(_uri, _request, _timeout) { HttpResponseFixture.new("400", JSON.generate("invalid_grant"), {}) }
+)
+string_error = begin
+  string_error_client.refresh_access_token(
+    token_uri: "https://oauth2.googleapis.com/token",
+    client_id: "fixture",
+    client_secret: "fixture",
+    refresh_token: "fixture"
+  )
+  nil
+rescue SoulCore::YouTubeApiClient::ApiError => error
+  error
+end
+check.call("scalar JSON API failures remain bounded actionable errors",
+           string_error&.message&.include?("HTTP 400: invalid_grant") && string_error.reason.nil?)
 
 Dir.mktmpdir("soul-youtube-chunks-") do |root|
   video_path = File.join(root, "video.mp4")

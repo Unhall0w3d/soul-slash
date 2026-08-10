@@ -145,6 +145,11 @@ module SoulCore
         "channel_title" => channel.fetch("title"),
         "project_id" => credential.fetch("project_id")
       }
+    rescue YouTubeApiClient::ApiError => error
+      raise unless error.status == 400
+
+      raise CredentialError,
+            "stored YouTube authorization was rejected by Google; move the OAuth app from Testing to In production if needed, then authorize YouTube again"
     end
 
     def status

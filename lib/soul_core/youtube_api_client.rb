@@ -244,15 +244,18 @@ module SoulCore
 
     def safe_error(response)
       parsed = JSON.parse(response.body.to_s.byteslice(0, MAX_RESPONSE_BYTES))
-      parsed.dig("error", "message").to_s.gsub(/\s+/, " ").slice(0, 300)
-    rescue JSON::ParserError
+      detail = parsed.is_a?(Hash) ? parsed.dig("error", "message") : (parsed if parsed.is_a?(String))
+      detail.to_s.gsub(/\s+/, " ").slice(0, 300)
+    rescue JSON::ParserError, TypeError
       ""
     end
 
     def error_reason(response)
       parsed = JSON.parse(response.body.to_s.byteslice(0, MAX_RESPONSE_BYTES))
+      return nil unless parsed.is_a?(Hash)
+
       parsed.dig("error", "errors", 0, "reason").to_s
-    rescue JSON::ParserError
+    rescue JSON::ParserError, TypeError
       nil
     end
 
