@@ -22,7 +22,7 @@ check = lambda do |label, condition|
   puts "PASS: #{label}"
 end
 
-expected = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove]
+expected = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove orbital_campfire_study]
 check.call("reviewed template catalog remains closed and complete", templates.fetch("templates").keys.sort == expected.sort)
 check.call("every A5 template contains geometry lights and animation", templates.fetch("templates").values.all? { |item| item.fetch("objects").length >= 2 && item.fetch("lights").any? && item.fetch("animation").is_a?(Hash) })
 check.call("Visual Studio capability catalog names Blender inputs and operations", catalog.fetch("surfaces").find { |item| item["id"] == "visual_studio" }.then { |item| item["inputs"].include?("exact kept song") && item.fetch("operations").include?("visual.blender.execute") })

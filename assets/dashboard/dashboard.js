@@ -4836,24 +4836,39 @@ function renderVisualMotionCandidate(project, motion) {
 
 function renderVisualBlenderCandidate(project, scene) {
   const card = document.createElement("article"); card.className = "visual-candidate visual-blender-candidate";
-  const video = document.createElement("video"); video.controls = true; video.loop = true; video.preload = "none"; video.src = `/api/v1/visual/blender/${project.project_id}/${scene.scene_id}/preview`; video.setAttribute("aria-label", `${project.title} whole-bar Blender scene`);
-  const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${scene.bars} bars · ${scene.template_id} · ${scene.width}×${scene.height}`; const stateLabel = document.createElement("span"); stateLabel.textContent = scene.review ? `${scene.review.disposition} · ${scene.review.rating}/5` : "3D scene review required"; footer.append(timing, stateLabel);
-  const lineage = document.createElement("div"); lineage.className = "visual-blender-lineage"; lineage.textContent = `${scene.bpm} BPM · ${scene.beats_per_bar}/4 · ${Number(scene.duration_seconds).toFixed(2)}s loop · ${scene.loop_state_equal ? "matched boundary" : "boundary attention"}`;
+  const study = scene.temporal_mode === "thirty_second_study";
+  const video = document.createElement("video"); video.controls = true; video.loop = !study; video.preload = "none"; video.src = `/api/v1/visual/blender/${project.project_id}/${scene.scene_id}/preview`; video.setAttribute("aria-label", `${project.title} ${study ? "30-second Blender study" : "whole-bar Blender scene"}`);
+  const footer = document.createElement("footer"); const timing = document.createElement("span"); timing.textContent = `${study ? "30-second study" : `${scene.bars} bars`} · ${scene.template_id} · ${scene.width}×${scene.height}`; const stateLabel = document.createElement("span"); stateLabel.textContent = scene.review ? `${scene.review.disposition} · ${scene.review.rating}/5` : "3D scene review required"; footer.append(timing, stateLabel);
+  const lineage = document.createElement("div"); lineage.className = "visual-blender-lineage"; lineage.textContent = `${scene.bpm} BPM · ${scene.beats_per_bar}/4 · ${Number(scene.duration_seconds).toFixed(2)}s ${study ? "bounded comparison · not publishable" : `loop · ${scene.loop_state_equal ? "matched boundary" : "boundary attention"}`}`;
   const controls = document.createElement("div"); controls.className = "visual-candidate-controls";
   const rating = document.createElement("select"); rating.ariaLabel = "Blender scene rating"; [1,2,3,4,5].forEach((value) => { const option = document.createElement("option"); option.value = String(value); option.textContent = `${value} · ${["failed","weak","workable","strong","exceptional"][value - 1]}`; rating.append(option); }); rating.value = String(scene.review?.rating || 3);
   const disposition = document.createElement("select"); disposition.ariaLabel = "Blender scene disposition"; [["keep","Keep"],["revise","Revise"]].forEach(([value,label]) => { const option = document.createElement("option"); option.value = value; option.textContent = label; disposition.append(option); }); disposition.value = scene.review?.disposition || "keep";
   const notes = document.createElement("textarea"); notes.rows = 3; notes.maxLength = 8000; notes.placeholder = "Composition, motion, loop seam, audio response, lighting, and material notes."; notes.value = scene.review?.notes || "";
   const review = document.createElement("button"); review.type = "button"; review.className = "gate-button"; review.textContent = "Record 3D scene review";
   const revise = document.createElement("button"); revise.type = "button"; revise.className = "gate-button"; revise.textContent = "Revise procedural scene"; revise.disabled = scene.review?.disposition !== "revise";
-  const bind = document.createElement("button"); bind.type = "button"; bind.className = "gate-button gate-button--gold"; bind.textContent = "Bind reviewed loop to Music"; bind.disabled = scene.review?.disposition !== "keep";
+  const bind = document.createElement("button"); bind.type = "button"; bind.className = "gate-button gate-button--gold"; bind.textContent = study ? "Comparison study · binding unavailable" : "Bind reviewed loop to Music"; bind.disabled = study || scene.review?.disposition !== "keep";
   const download = document.createElement("a"); download.className = "gate-button"; download.textContent = "Download editable .blend"; download.href = `/api/v1/visual/blender/${project.project_id}/${scene.scene_id}/blend`;
   const remove = document.createElement("button"); remove.type = "button"; remove.className = "danger-button"; remove.textContent = "Delete 3D scene";
   const gate = document.createElement("div"); gate.className = "visual-candidate-gate"; gate.hidden = true; const status = document.createElement("p"); status.className = "dialog-status"; status.role = "status";
   review.addEventListener("click", async () => { review.disabled = true; try { const envelope = await callSoul("visual.blender.review", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, visual_review: { rating: Number(rating.value), disposition: disposition.value, notes: notes.value } }); lifecycle(envelope); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; review.disabled = false; } });
-  revise.addEventListener("click", () => { state.visualBlenderSourceSceneId = scene.scene_id; byId("visual-blender-template").value = scene.template_id; byId("visual-blender-bars").value = String(scene.bars); byId("visual-blender-quality").value = scene.quality; byId("visual-blender-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("visual-blender-direction").value = scene.review?.notes || scene.direction; byId("visual-blender-music-project").value = scene.music_project_id; loadVisualBlenderMusicCandidates(scene.music_candidate_id).then(() => { byId("visual-blender-status").textContent = "Revision lineage selected. Edit the direction, then preview a new immutable scene."; byId("visual-blender-card").scrollIntoView({ behavior: "smooth", block: "start" }); }); });
+  revise.addEventListener("click", () => { state.visualBlenderSourceSceneId = scene.scene_id; byId("visual-blender-template").value = scene.template_id; byId("visual-blender-temporal").value = scene.temporal_mode || "whole_bar_loop"; if (scene.bars) byId("visual-blender-bars").value = String(scene.bars); byId("visual-blender-quality").value = scene.quality; byId("visual-blender-seed").value = String(Math.floor(Math.random() * 2147483647)); byId("visual-blender-direction").value = scene.review?.notes || scene.direction; byId("visual-blender-music-project").value = scene.music_project_id; loadVisualBlenderMusicCandidates(scene.music_candidate_id).then(() => { byId("visual-blender-status").textContent = "Revision lineage selected. Edit the direction, then preview a new immutable scene."; byId("visual-blender-card").scrollIntoView({ behavior: "smooth", block: "start" }); }); });
   bind.addEventListener("click", async () => { bind.disabled = true; status.textContent = "Preparing the exact reviewed loop binding…"; try { const envelope = await callSoul("visual.blender.promotion.preview", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "gate-button gate-button--gold"; execute.textContent = "Bind exact Blender companion"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.blender.promotion.execute", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); status.textContent = "Blender loop bound to its exact Music candidate. Full-duration assembly is available in Music Studio."; } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; bind.disabled = false; } });
   remove.addEventListener("click", async () => { remove.disabled = true; try { const envelope = await callSoul("visual.blender.delete.preview", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id }); lifecycle(envelope); const scope = dataOf(envelope); const summary = document.createElement("pre"); summary.className = "diagnostic-output"; summary.textContent = JSON.stringify(scope, null, 2); const execute = document.createElement("button"); execute.type = "button"; execute.className = "danger-button"; execute.textContent = "Permanently delete exact 3D scene"; execute.addEventListener("click", async () => { execute.disabled = true; try { const result = await callSoul("visual.blender.delete.execute", { visual_project_id: project.project_id, blender_scene_id: scene.scene_id, confirmation: scope.confirmation_phrase, expected_digest: scope.expected_digest }); lifecycle(result); await selectVisualProject(project.project_id); } catch (error) { status.textContent = error.message; execute.disabled = false; } }); gate.replaceChildren(summary, execute); gate.hidden = false; } catch (error) { status.textContent = error.message; remove.disabled = false; } });
-  controls.append(rating, disposition, notes, review, revise, bind, download, remove, gate, status); card.append(video, footer, lineage, controls); return card;
+  controls.append(rating, disposition, notes, review, revise, bind, download, remove, gate, status);
+  if (study && Array.isArray(scene.comparison_scenes) && scene.comparison_scenes.length === 3) {
+    const comparison = document.createElement("section"); comparison.className = "visual-blender-comparison";
+    const heading = document.createElement("div"); heading.className = "visual-blender-comparison-heading"; heading.innerHTML = "<strong>A5–A8 exact comparison</strong><span>Players reference digest-verified private artifacts; no baseline is substituted.</span>";
+    const grid = document.createElement("div"); grid.className = "visual-blender-comparison-grid";
+    [{ scene_id: scene.scene_id, template_id: scene.template_id, current: true }, ...scene.comparison_scenes].forEach((reference) => {
+      const baseline = reference.current ? scene : (project.blender_scenes || []).find((entry) => entry.scene_id === reference.scene_id);
+      const figure = document.createElement("figure"); const label = document.createElement("figcaption"); label.textContent = reference.current ? `A8 · ${scene.template_id}` : (baseline ? `${baseline.template_id} · ${Number(baseline.duration_seconds).toFixed(1)}s` : `${reference.template_id} · unavailable`);
+      if (baseline) { const player = document.createElement("video"); player.controls = true; player.loop = baseline.temporal_mode !== "thirty_second_study"; player.preload = "none"; player.src = `/api/v1/visual/blender/${project.project_id}/${baseline.scene_id}/preview`; figure.append(player); }
+      else { const missing = document.createElement("p"); missing.textContent = "Exact baseline artifact is unavailable."; figure.append(missing); }
+      figure.append(label); grid.append(figure);
+    });
+    comparison.append(heading, grid); card.append(video, footer, lineage, comparison, controls);
+  } else card.append(video, footer, lineage, controls);
+  return card;
 }
 
 function renderNativeMotionRevisionGate(gate, project, motion, status) {
@@ -4928,6 +4943,8 @@ async function loadVisualBlenderMusicCandidates(preferredCandidateId = null) {
 }
 
 function visualBlenderInput() {
+  const temporalMode = byId("visual-blender-temporal").value;
+  const comparisonSceneIds = temporalMode === "thirty_second_study" ? (state.selectedVisualProject?.blender_scenes || []).filter((scene) => scene.temporal_mode !== "thirty_second_study").slice(0, 3).map((scene) => scene.scene_id) : [];
   const input = {
     visual_project_id: state.selectedVisualProject?.project_id,
     project_id: byId("visual-blender-music-project").value,
@@ -4935,6 +4952,8 @@ function visualBlenderInput() {
     template_id: byId("visual-blender-template").value,
     look_profile: byId("visual-blender-look").value,
     bars: String(byId("visual-blender-bars").value),
+    temporal_mode: temporalMode,
+    comparison_scene_ids: comparisonSceneIds,
     quality: byId("visual-blender-quality").value,
     direction: byId("visual-blender-direction").value,
     seed: String(byId("visual-blender-seed").value)
@@ -4945,8 +4964,8 @@ function visualBlenderInput() {
 
 async function previewVisualBlender() {
   if (!state.selectedVisualProject || state.visualBlenderGenerating) return;
-  const button = byId("preview-visual-blender"); button.disabled = true; byId("visual-blender-status").textContent = "Analyzing the exact audio and constructing a whole-bar scene manifest…"; byId("visual-blender-confirm").hidden = true;
-  try { const envelope = await callSoul("visual.blender.preview", visualBlenderInput()); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Blender scene preview failed safely"); state.visualBlenderResumePreview = null; state.visualBlenderPreview = scope; byId("visual-blender-scope").textContent = JSON.stringify(scope, null, 2); byId("visual-blender-confirm").hidden = false; byId("execute-visual-blender").disabled = false; byId("execute-visual-blender").textContent = state.visualBlenderSourceSceneId ? "Render exact scene revision" : "Render exact whole-bar scene"; byId("visual-blender-status").textContent = `Exact ${scope.bars}-bar · ${scope.frame_count}-frame scene ready for click approval.`; }
+  const button = byId("preview-visual-blender"); const study = byId("visual-blender-temporal").value === "thirty_second_study"; button.disabled = true; byId("visual-blender-status").textContent = study ? "Verifying curated assets and constructing the exact 30-second comparison…" : "Analyzing the exact audio and constructing a whole-bar scene manifest…"; byId("visual-blender-confirm").hidden = true;
+  try { const envelope = await callSoul("visual.blender.preview", visualBlenderInput()); lifecycle(envelope); const scope = dataOf(envelope); if (!scope.expected_digest) throw new Error(envelope.errors?.[0]?.message || "Blender scene preview failed safely"); state.visualBlenderResumePreview = null; state.visualBlenderPreview = scope; byId("visual-blender-scope").textContent = JSON.stringify(scope, null, 2); byId("visual-blender-confirm").hidden = false; byId("execute-visual-blender").disabled = false; byId("execute-visual-blender").textContent = state.visualBlenderSourceSceneId ? "Render exact scene revision" : (study ? "Render exact 30-second comparison" : "Render exact whole-bar scene"); byId("visual-blender-status").textContent = study ? `Exact 30-second · ${scope.frame_count}-frame study ready for click approval.` : `Exact ${scope.bars}-bar · ${scope.frame_count}-frame scene ready for click approval.`; }
   catch (error) { byId("visual-blender-status").textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -4954,12 +4973,12 @@ async function previewVisualBlender() {
 async function executeVisualBlender() {
   if ((!state.visualBlenderPreview && !state.visualBlenderResumePreview) || state.visualBlenderGenerating) return;
   if (state.visualBlenderResumePreview) return executeVisualBlenderResume();
-  state.visualBlenderGenerating = true; const button = byId("execute-visual-blender"); button.disabled = true; const parameters = { ...visualBlenderInput(), blender_scene_id: state.visualBlenderPreview.scene_id, confirmation: state.visualBlenderPreview.confirmation_phrase, expected_digest: state.visualBlenderPreview.expected_digest };
+  state.visualBlenderGenerating = true; const study = state.visualBlenderPreview.temporal_mode === "thirty_second_study"; const button = byId("execute-visual-blender"); button.disabled = true; const parameters = { ...visualBlenderInput(), blender_scene_id: state.visualBlenderPreview.scene_id, confirmation: state.visualBlenderPreview.confirmation_phrase, expected_digest: state.visualBlenderPreview.expected_digest };
   showGenerationProgress(byId("visual-blender-progress"), { stage: "blender_scene", message: "Constructing the trusted Blender scene." });
   try {
     const envelope = await callNdjson("/api/v1/music-stream", "visual.blender.execute", parameters, {}, (event) => showGenerationProgress(byId("visual-blender-progress"), event));
     if (envelope.lifecycle_state === "failed" && dataOf(envelope).resumable) { await renderVisualBlenderResume(dataOf(envelope)); throw new Error(envelope.errors?.[0]?.message || "Blender rendering stopped with resumable frames retained"); }
-    requireLifecycle(envelope, ["blocked_for_human_review"], "Blender scene rendering failed safely"); const sceneId = state.visualBlenderPreview.scene_id; state.visualBlenderPreview = null; state.visualBlenderSourceSceneId = null; byId("visual-blender-confirm").hidden = true; await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-blender-status").textContent = "Whole-bar Blender scene rendered. Review the loop and editable scene below."; emitSoulNotification("visual_ready", `visual:${sceneId}`);
+    requireLifecycle(envelope, ["blocked_for_human_review"], "Blender scene rendering failed safely"); const sceneId = state.visualBlenderPreview.scene_id; state.visualBlenderPreview = null; state.visualBlenderSourceSceneId = null; byId("visual-blender-confirm").hidden = true; await selectVisualProject(state.selectedVisualProject.project_id); byId("visual-blender-status").textContent = study ? "30-second Blender comparison rendered. Review all four exact players below." : "Whole-bar Blender scene rendered. Review the loop and editable scene below."; emitSoulNotification("visual_ready", `visual:${sceneId}`);
   } catch (error) { byId("visual-blender-status").textContent = error.message; emitSoulNotification("attention"); }
   finally { state.visualBlenderGenerating = false; hideGenerationProgress(byId("visual-blender-progress")); }
 }
@@ -6134,6 +6153,8 @@ byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
 byId("visual-blender-music-project").addEventListener("change", () => loadVisualBlenderMusicCandidates());
+byId("visual-blender-template").addEventListener("change", () => { byId("visual-blender-temporal").value = byId("visual-blender-template").value === "orbital_campfire_study" ? "thirty_second_study" : "whole_bar_loop"; });
+byId("visual-blender-temporal").addEventListener("change", () => { if (byId("visual-blender-temporal").value === "thirty_second_study") byId("visual-blender-template").value = "orbital_campfire_study"; else if (byId("visual-blender-template").value === "orbital_campfire_study") byId("visual-blender-template").value = "willow_fungal_grove"; });
 byId("preview-visual-blender").addEventListener("click", previewVisualBlender);
 byId("execute-visual-blender").addEventListener("click", executeVisualBlender);
 byId("preview-native-motion").addEventListener("click", previewNativeMotion);

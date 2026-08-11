@@ -2196,6 +2196,48 @@
         "glow": "signal",
         "grade": "high_contrast"
       }
+    },
+    "orbital_campfire_study": {
+      "schema_version": "soul.blender.scene_manifest.a1.v1",
+      "identity": {"id": "soul-blender-campfire-01", "project_id": "music-visual-a8", "revision": "a8-0001", "music_candidate_id": "music-campfire-probe"},
+      "render": {"renderer": "BLENDER_EEVEE", "width": 1280, "height": 720, "fps": 30, "frame_start": 1, "frame_end": 900, "seed": 8088},
+      "palette": {"ambient": [0.006, 0.012, 0.03], "horizon": [0.008, 0.016, 0.04], "accent": [1.0, 0.31, 0.05], "contrast": 1.12},
+      "world": {"horizon_color": [0.002, 0.005, 0.015], "ambient_strength": 0.10},
+      "camera": {"id": "cam", "type": "PERSP", "location": [0.0, -15.5, 5.4], "rotation_euler": [1.22, 0.0, 0.0], "lens": 48},
+      "lights": [
+        {"id": "campfire_light", "type": "POINT", "location": [0.0, 0.0, 1.25], "energy": 1300, "color": [1.0, 0.18, 0.025]},
+        {"id": "moon_key", "type": "AREA", "location": [4.0, 7.0, 6.0], "energy": 1200, "color": [0.24, 0.38, 0.68]},
+        {"id": "night_rim", "type": "AREA", "location": [-7.0, -2.0, 7.0], "energy": 700, "color": [0.05, 0.12, 0.32]}
+      ],
+      "materials": [
+        {"id": "ground", "name": "Ground", "type": "PRINCIPLED", "base_color": [0.018, 0.025, 0.024], "metallic": 0.0, "roughness": 0.92, "emission": null, "emission_strength": 0.0},
+        {"id": "ember", "name": "Ember", "type": "PRINCIPLED", "base_color": [0.24, 0.025, 0.004], "metallic": 0.0, "roughness": 0.42, "emission": [1.0, 0.08, 0.005], "emission_strength": 2.8},
+        {"id": "log", "name": "Log", "type": "PRINCIPLED", "base_color": [0.055, 0.018, 0.008], "metallic": 0.0, "roughness": 0.84, "emission": null, "emission_strength": 0.0}
+      ],
+      "objects": [
+        {"id": "ground_slice", "type": "CYLINDER", "location": [0.0, 0.0, -0.55], "rotation_euler": [0.0, 0.0, 0.0], "scale": [6.8, 6.8, 0.58], "material": "ground"},
+        {"id": "fire_ember", "type": "ICO_SPHERE", "location": [0.0, 0.0, 0.42], "rotation_euler": [0.0, 0.0, 0.0], "scale": [0.48, 0.48, 0.72], "material": "ember"},
+        {"id": "log_a", "type": "CYLINDER", "location": [0.0, 0.0, 0.12], "rotation_euler": [0.0, 1.5708, 0.72], "scale": [0.18, 0.18, 1.0], "material": "log"},
+        {"id": "log_b", "type": "CYLINDER", "location": [0.0, 0.0, 0.12], "rotation_euler": [0.0, 1.5708, -0.72], "scale": [0.18, 0.18, 1.0], "material": "log"}
+      ],
+      "organics": [],
+      "curated_assets": [
+        {"id": "tree_north", "asset_id": "island_tree_01", "location": [0.0, 4.8, 0.0], "rotation_euler": [0.0, 0.0, 2.7], "scale": [1.0, 1.0, 1.0]},
+        {"id": "tree_west", "asset_id": "island_tree_01", "location": [-4.6, 1.8, 0.0], "rotation_euler": [0.0, 0.0, 0.55], "scale": [0.86, 0.86, 0.86]},
+        {"id": "tree_east", "asset_id": "island_tree_01", "location": [4.9, 1.3, 0.0], "rotation_euler": [0.0, 0.0, -0.8], "scale": [0.92, 0.92, 0.92]},
+        {"id": "boulder_a", "asset_id": "boulder_01", "location": [-1.45, 0.45, 0.0], "rotation_euler": [0.0, 0.0, 0.3], "scale": [0.72, 0.72, 0.72]},
+        {"id": "boulder_b", "asset_id": "boulder_01", "location": [1.4, 0.6, 0.0], "rotation_euler": [0.0, 0.0, 1.5], "scale": [0.61, 0.61, 0.61]},
+        {"id": "boulder_c", "asset_id": "boulder_01", "location": [-0.7, -1.25, 0.0], "rotation_euler": [0.0, 0.0, 2.1], "scale": [0.52, 0.52, 0.52]},
+        {"id": "boulder_d", "asset_id": "boulder_01", "location": [0.85, -1.1, 0.0], "rotation_euler": [0.0, 0.0, -0.8], "scale": [0.58, 0.58, 0.58]}
+      ],
+      "composition": {"preset": "orbital_campfire_study"},
+      "animation": {"objects": [], "materials": [], "camera": [], "lights": [], "world": []},
+      "audio_binding": {"enabled": true, "tracks": [
+        {"target_type": "material", "target_id": "ember", "property": "emission_strength", "curve": "mid_band", "gain": 2.2, "offset": 0},
+        {"target_type": "light", "target_id": "campfire_light", "property": "energy", "curve": "energy", "gain": 0.8, "offset": 0}
+      ]},
+      "output": {"blend_name": "orbital_campfire_study.blend", "still_name": "orbital_campfire_still.png", "still_frame": 1, "retention": "full_candidate"},
+      "look": {"surface": "organic", "atmosphere": "none", "camera": "subtle_dof", "glow": "none", "grade": "cinematic"}
     }
   }
 }

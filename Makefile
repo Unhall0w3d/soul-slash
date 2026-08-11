@@ -70,6 +70,8 @@ VISUAL_NATIVE_MANIFEST ?= $(PROJECT_ROOT)/config/visual_native_models.json
 BLENDER_VISUAL_ROOT ?= $(HOME)/.local/share/soul/blender-visual
 BLENDER_VISUAL_MANIFEST ?= $(PROJECT_ROOT)/config/blender_visual_runtime.json
 BLENDER_BINARY ?=
+BLENDER_CURATED_ASSET_REGISTRY ?= $(PROJECT_ROOT)/config/blender_curated_assets.json
+BLENDER_CURATED_ASSET_ROOT ?= $(PROJECT_ROOT)
 KNOWLEDGE_REFLECTION_INPUT ?=
 BACKUP_HOME ?= $(HOME)
 FLEET_SUBNET ?=
@@ -460,7 +462,22 @@ blender-visual-run:
 verify-blender-visual-a0:
 > @ruby scripts/verify-blender-visual-a0.rb
 
-.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a6 verify-blender-scene-a7 verify-blender-scene-a1-a5 verify-blender-scene-a1-a6 verify-blender-scene-a1-a7
+.PHONY: blender-curated-assets-plan blender-curated-assets-install blender-curated-assets-check verify-blender-curated-assets-a8
+blender-curated-assets-plan:
+> @ruby scripts/install-blender-curated-assets.rb preview --registry "$(BLENDER_CURATED_ASSET_REGISTRY)" --root "$(BLENDER_CURATED_ASSET_ROOT)"
+
+blender-curated-assets-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run blender-curated-assets-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_BLENDER_CURATED_ASSETS" || { echo "Exact confirmation INSTALL_BLENDER_CURATED_ASSETS is required."; exit 2; }
+> @ruby scripts/install-blender-curated-assets.rb install --registry "$(BLENDER_CURATED_ASSET_REGISTRY)" --root "$(BLENDER_CURATED_ASSET_ROOT)" --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+blender-curated-assets-check:
+> @ruby scripts/install-blender-curated-assets.rb check --registry "$(BLENDER_CURATED_ASSET_REGISTRY)" --root "$(BLENDER_CURATED_ASSET_ROOT)"
+
+verify-blender-curated-assets-a8:
+> @ruby scripts/verify-blender-curated-assets-a8.rb
+
+.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a6 verify-blender-scene-a7 verify-blender-scene-a8 verify-blender-scene-a1-a5 verify-blender-scene-a1-a6 verify-blender-scene-a1-a7 verify-blender-scene-a1-a8
 verify-blender-scene-a1:
 > @ruby scripts/verify-blender-scene-a1.rb
 
@@ -490,6 +507,11 @@ verify-blender-scene-a7:
 > @ruby scripts/verify-blender-scene-a7-dashboard.rb
 
 verify-blender-scene-a1-a7: verify-blender-scene-a1-a6 verify-blender-scene-a7
+
+verify-blender-scene-a8:
+> @ruby scripts/verify-blender-scene-a8.rb
+
+verify-blender-scene-a1-a8: verify-blender-scene-a1-a7 verify-blender-curated-assets-a8 verify-blender-scene-a8
 
 verify-music-publication-package:
 > @ruby scripts/verify-music-publication-package.rb

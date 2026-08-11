@@ -6,6 +6,7 @@ require "json"
 require "securerandom"
 require "time"
 require_relative "blender_audio_analyzer"
+require_relative "blender_curated_asset_registry"
 require_relative "blender_scene_manifest"
 require_relative "bounded_command_runner"
 require_relative "model_runtime_lease_store"
@@ -15,7 +16,7 @@ module SoulCore
   class BlenderSceneService
     SCENE_ID = /\Ablender_scene_[a-f0-9]{16}\z/
     VISUAL_PROJECT_ID = /\Avisual_project_[a-f0-9]{16}\z/
-    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove].freeze
+    TEMPLATE_IDS = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove orbital_campfire_study].freeze
     LOOK_PROFILES = {
       "template" => nil,
       "cinematic_organic" => { "surface" => "organic", "atmosphere" => "mist", "camera" => "cinematic_dof", "glow" => "soft", "grade" => "cinematic" },
@@ -24,6 +25,7 @@ module SoulCore
       "crystalline_void" => { "surface" => "crystalline", "atmosphere" => "void_haze", "camera" => "cinematic_dof", "glow" => "signal", "grade" => "cinematic" }
     }.freeze
     BAR_COUNTS = [8, 12].freeze
+    TEMPORAL_MODES = %w[whole_bar_loop thirty_second_study].freeze
     QUALITY = {
       "review" => { "width" => 1_280, "height" => 720 },
       "production" => { "width" => 1_920, "height" => 1_080 }
@@ -50,6 +52,8 @@ module SoulCore
       @ffmpeg = @runner.which("ffmpeg")
       @ffprobe = @runner.which("ffprobe")
       @template_path = File.join(@root, "config", "blender_scene_templates.json")
+      @asset_registry_path = File.join(@root, "config", "blender_curated_assets.json")
+      @asset_root = File.join(@root, BlenderCuratedAssetRegistry::INSTALL_RELATIVE_ROOT)
       @adapter_path = File.join(@root, "scripts", "blender", "soul_scene_adapter.py")
       @render_path = File.join(@root, "scripts", "blender", "soul_scene_render.py")
       raise ArgumentError, "Blender scene archive must remain inside the repository" unless within?(@visual_root, @root)
@@ -62,6 +66,8 @@ module SoulCore
       version_result = tools_ready ? @runner.run([@blender, "--version"], timeout_seconds: 30, max_output_bytes: 16 * 1024) : nil
       blender_version = version_result&.success? ? version_result.stdout.to_s.lines.first.to_s.strip : nil
       ready = tools_ready && scripts_ready && version_result&.success?
+      asset_registry = BlenderCuratedAssetRegistry.new(registry_path: @asset_registry_path, root: @root)
+      asset_status = asset_registry.verify
       outcome("complete", true, "Blender scene resources inspected", data: {
         "ready" => ready,
         "blender" => @blender,
@@ -70,6 +76,10 @@ module SoulCore
         "ffprobe" => @ffprobe,
         "templates" => catalog.fetch("templates").keys,
         "bars" => BAR_COUNTS,
+        "temporal_modes" => TEMPORAL_MODES,
+        "curated_assets_ready" => asset_status["ok"],
+        "curated_asset_registry_sha256" => asset_status["registry_sha256"],
+        "curated_asset_source" => "Powered by Poly Haven · CC0 1K",
         "quality_profiles" => QUALITY,
         "resource_group" => RESOURCE_GROUP,
         "foreground_only" => true,
@@ -118,15 +128,17 @@ module SoulCore
       outcome("failed", false, error.message)
     end
 
-    def preview(project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", source_scene_id: nil)
+    def preview(project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", temporal_mode: "whole_bar_loop", comparison_scene_ids: nil, source_scene_id: nil)
       operation = source_scene_id ? "blender_scene_revision" : "blender_scene_generation"
       confirmation = source_scene_id ? REVISION_CONFIRMATION : CONFIRMATION
       plan = build_plan(
         operation: operation, project_id: project_id, music_project_id: music_project_id,
         music_candidate_id: music_candidate_id, template_id: template_id, bars: bars,
-        direction: direction, seed: seed, quality: quality, look_profile: look_profile, source_scene_id: source_scene_id
+        direction: direction, seed: seed, quality: quality, look_profile: look_profile, temporal_mode: temporal_mode,
+        comparison_scene_ids: comparison_scene_ids, source_scene_id: source_scene_id
       )
-      outcome("blocked_for_human_review", true, "exact whole-bar Blender scene requires approval", data: plan.fetch("scope").merge(
+      temporal_label = plan.dig("scope", "temporal_mode") == "thirty_second_study" ? "exact 30-second Blender comparison requires approval" : "exact whole-bar Blender scene requires approval"
+      outcome("blocked_for_human_review", true, temporal_label, data: plan.fetch("scope").merge(
         "expected_digest" => digest(plan.fetch("scope")), "confirmation_phrase" => confirmation,
         "manifest" => plan.fetch("manifest"), "audio_analysis_summary" => analysis_summary(plan.fetch("analysis"))
       ))
@@ -136,14 +148,15 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def execute(project_id:, scene_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", source_scene_id: nil, confirmation:, expected_digest:, progress: nil)
+    def execute(project_id:, scene_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality: "review", look_profile: "template", temporal_mode: "whole_bar_loop", comparison_scene_ids: nil, source_scene_id: nil, confirmation:, expected_digest:, progress: nil)
       raise ArgumentError, "Blender scene candidate ID is invalid" unless scene_id.to_s.match?(SCENE_ID)
       operation = source_scene_id ? "blender_scene_revision" : "blender_scene_generation"
       phrase = source_scene_id ? REVISION_CONFIRMATION : CONFIRMATION
       plan = build_plan(
         operation: operation, project_id: project_id, music_project_id: music_project_id,
         music_candidate_id: music_candidate_id, template_id: template_id, bars: bars,
-        direction: direction, seed: seed, quality: quality, look_profile: look_profile, source_scene_id: source_scene_id,
+        direction: direction, seed: seed, quality: quality, look_profile: look_profile, temporal_mode: temporal_mode,
+        comparison_scene_ids: comparison_scene_ids, source_scene_id: source_scene_id,
         scene_id: scene_id
       )
       scope = plan.fetch("scope")
@@ -255,6 +268,7 @@ module SoulCore
     def promotion_preview(project_id:, scene_id:)
       companion = require_music_companion!
       scene = reviewed_scene!(project_id, scene_id)
+      raise ArgumentError, "30-second Blender studies are comparison evidence and cannot be bound" if scene["publication_eligible"] == false
       companion.generated_blender_import_preview(
         project_id: scene.fetch("music_project_id"), candidate_id: scene.fetch("music_candidate_id"),
         source_project_id: project_id, source_scene_id: scene_id,
@@ -266,6 +280,7 @@ module SoulCore
     def promotion_execute(project_id:, scene_id:, confirmation:, expected_digest:)
       companion = require_music_companion!
       scene = reviewed_scene!(project_id, scene_id)
+      raise ArgumentError, "30-second Blender studies are comparison evidence and cannot be bound" if scene["publication_eligible"] == false
       companion.generated_blender_import_execute(
         project_id: scene.fetch("music_project_id"), candidate_id: scene.fetch("music_candidate_id"),
         source_project_id: project_id, source_scene_id: scene_id,
@@ -287,12 +302,17 @@ module SoulCore
 
     private
 
-    def build_plan(operation:, project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality:, look_profile: "template", source_scene_id: nil, scene_id: nil)
+    def build_plan(operation:, project_id:, music_project_id:, music_candidate_id:, template_id:, bars:, direction:, seed:, quality:, look_profile: "template", temporal_mode: "whole_bar_loop", comparison_scene_ids: nil, source_scene_id: nil, scene_id: nil)
       project = read_visual_project(project_id)
       template_id = template_id.to_s
       raise ArgumentError, "Blender template is invalid" unless TEMPLATE_IDS.include?(template_id)
-      bars = Integer(bars)
-      raise ArgumentError, "Blender loop must contain exactly 8 or 12 whole bars" unless BAR_COUNTS.include?(bars)
+      temporal_mode = temporal_mode.to_s
+      raise ArgumentError, "Blender temporal mode is invalid" unless TEMPORAL_MODES.include?(temporal_mode)
+      study = temporal_mode == "thirty_second_study"
+      raise ArgumentError, "30-second study requires the reviewed orbital campfire template" if study && template_id != "orbital_campfire_study"
+      raise ArgumentError, "orbital campfire template is limited to the 30-second study" if !study && template_id == "orbital_campfire_study"
+      bars = study ? nil : Integer(bars)
+      raise ArgumentError, "Blender loop must contain exactly 8 or 12 whole bars" if !study && !BAR_COUNTS.include?(bars)
       seed = Integer(seed)
       raise ArgumentError, "Blender seed must be 0..2147483647" unless seed.between?(0, 2**31 - 1)
       quality = quality.to_s
@@ -310,7 +330,16 @@ module SoulCore
       beats_per_bar = time_signature_numerator(music_input.fetch("timesignature"))
       template = deep_copy(template_catalog.fetch("templates").fetch(template_id))
       fps = Integer(template.dig("render", "fps"))
-      analysis = @analyzer.analyze(path: audio, bpm: music_input.fetch("bpm"), beats_per_bar: beats_per_bar, bars: bars, fps: fps)
+      analyzer_parameters = { path: audio, bpm: music_input.fetch("bpm"), beats_per_bar: beats_per_bar, bars: bars, fps: fps }
+      analyzer_parameters[:duration_seconds] = 30.0 if study
+      analysis = @analyzer.analyze(**analyzer_parameters)
+      asset_receipt = nil
+      if study
+        asset_registry = BlenderCuratedAssetRegistry.new(registry_path: @asset_registry_path, root: @root)
+        asset_receipt = asset_registry.verify
+        raise ArgumentError, "reviewed Blender curated assets are unavailable: #{asset_receipt['error']}" unless asset_receipt["ok"]
+      end
+      comparisons = normalize_comparison_scene_ids(project_id, comparison_scene_ids, required: study)
       scene_id ||= "blender_scene_#{@id_generator.call}"
       raise "generated Blender scene ID is invalid" unless scene_id.match?(SCENE_ID)
       manifest = materialize_manifest(template, project_id: project_id, scene_id: scene_id, music_candidate_id: music_candidate_id, seed: seed, quality: quality, look_profile: look_profile, analysis: analysis)
@@ -320,20 +349,41 @@ module SoulCore
         "scene_id" => scene_id, "source_scene_id" => source_scene_id,
         "music_project_id" => music_project.fetch("project_id"), "music_candidate_id" => music_candidate_id,
         "music_candidate_review_sha256" => digest(review), "music_audio_sha256" => Digest::SHA256.file(audio).hexdigest,
-        "template_id" => template_id, "bars" => bars, "beats_per_bar" => beats_per_bar,
+        "template_id" => template_id, "temporal_mode" => temporal_mode, "bars" => bars, "beats_per_bar" => beats_per_bar,
         "bpm" => Float(music_input.fetch("bpm")), "quality" => quality, "look_profile" => look_profile, "direction" => direction, "seed" => seed,
         "frame_count" => analysis.fetch("frame_count"), "fps" => fps,
         "nominal_duration_seconds" => analysis.fetch("nominal_duration_seconds"),
         "rendered_duration_seconds" => analysis.fetch("rendered_duration_seconds"),
         "manifest_sha256" => parsed.sha256, "audio_analysis_sha256" => digest(analysis),
+        "curated_asset_registry_sha256" => asset_receipt && asset_receipt["registry_sha256"],
+        "comparison_scenes" => comparisons,
         "resource_group" => RESOURCE_GROUP, "timeout_seconds" => TIMEOUT_SECONDS,
-        "automatic_retry" => false, "external_publication" => false
+        "automatic_retry" => false, "external_publication" => false, "publication_eligible" => !study
       }.compact
       {
         "scope" => scope, "manifest" => parsed.to_h, "manifest_sha256" => parsed.sha256,
         "analysis" => analysis, "audio_analysis_sha256" => digest(analysis), "audio_path" => audio,
         "direction" => direction, "created_at" => @clock.call.iso8601
       }
+    end
+
+    def normalize_comparison_scene_ids(project_id, value, required:)
+      return [] unless required
+      ids = value.is_a?(Array) ? value.map(&:to_s) : []
+      raise ArgumentError, "30-second study requires exactly three comparison scenes" unless ids.length == 3 && ids.uniq.length == 3
+      ids.map do |id|
+        raise ArgumentError, "comparison Blender scene ID is invalid" unless id.match?(SCENE_ID)
+        record = read_scene(project_id, id)
+        preview = record.dig("artifacts", "preview")
+        raise ArgumentError, "comparison Blender preview is unavailable" unless preview
+        artifact_path(project_id: project_id, scene_id: id, artifact: "preview")
+        {
+          "scene_id" => id,
+          "template_id" => record.fetch("template_id"),
+          "candidate_sha256" => digest(record),
+          "preview_sha256" => preview.fetch("sha256")
+        }
+      end
     end
 
     def materialize_manifest(template, project_id:, scene_id:, music_candidate_id:, seed:, quality:, look_profile:, analysis:)
@@ -423,11 +473,16 @@ module SoulCore
         write_json(File.join(staging, "plan.json"), serializable_plan(plan))
       end
 
-      progress&.call({ "stage" => "blender_scene", "message" => resume ? "Resuming retained whole-bar frames" : "Constructing the trusted Blender scene" })
+      temporal_label = scope.fetch("temporal_mode", "whole_bar_loop") == "thirty_second_study" ? "30-second comparison study" : "whole-bar scene"
+      progress&.call({ "stage" => "blender_scene", "message" => resume ? "Resuming retained #{temporal_label} frames" : "Constructing the trusted #{temporal_label}" })
       unless File.file?(File.join(staging, "scene.blend"))
+        adapter_command = [@blender, "--background", "--python", @adapter_path, "--", "--manifest", File.join(staging, "scene.json"),
+                           "--blend-path", File.join(staging, "scene.blend"), "--still-path", File.join(staging, "still.png"), "--frame", "1"]
+        if scope.fetch("temporal_mode", "whole_bar_loop") == "thirty_second_study"
+          adapter_command.concat(["--asset-root", @asset_root, "--asset-registry", @asset_registry_path])
+        end
         run_command!(
-          [@blender, "--background", "--python", @adapter_path, "--", "--manifest", File.join(staging, "scene.json"),
-           "--blend-path", File.join(staging, "scene.blend"), "--still-path", File.join(staging, "still.png"), "--frame", "1"],
+          adapter_command,
           "Blender scene construction", timeout: 180
         )
       end
@@ -443,7 +498,7 @@ module SoulCore
       end
       raise "Blender frame set is incomplete" unless missing_frames(staging, plan.dig("analysis", "frame_count")).empty?
 
-      progress&.call({ "stage" => "blender_encode", "message" => "Encoding the reviewed whole-bar loop with exact candidate audio" })
+      progress&.call({ "stage" => "blender_encode", "message" => "Encoding the reviewed #{temporal_label} with exact candidate audio" })
       preview = File.join(staging, "preview.mp4")
       run_command!(
         [@ffmpeg, "-y", "-nostdin", "-hide_banner", "-loglevel", "error", "-framerate", scope.fetch("fps").to_s,
@@ -458,7 +513,7 @@ module SoulCore
       replace_json(File.join(staging, "candidate.json"), record)
       FileUtils.rm_f(File.join(staging, "failure.json"))
       File.rename(staging, target)
-      outcome("blocked_for_human_review", true, "whole-bar Blender scene ready for human review", data: { "blender_scene" => record }, mutation: "blender_scene_generated")
+      outcome("blocked_for_human_review", true, "#{temporal_label} ready for human review", data: { "blender_scene" => record }, mutation: "blender_scene_generated")
     end
 
     def scene_record(plan, staging)
@@ -475,14 +530,15 @@ module SoulCore
         "scene_id" => scope.fetch("scene_id"), "source_scene_id" => scope["source_scene_id"],
         "music_project_id" => scope.fetch("music_project_id"), "music_candidate_id" => scope.fetch("music_candidate_id"),
         "template_id" => scope.fetch("template_id"), "look_profile" => scope.fetch("look_profile"), "direction" => scope.fetch("direction"), "quality" => scope.fetch("quality"),
-        "bars" => scope.fetch("bars"), "beats_per_bar" => scope.fetch("beats_per_bar"), "bpm" => scope.fetch("bpm"),
+        "temporal_mode" => scope.fetch("temporal_mode", "whole_bar_loop"), "bars" => scope["bars"], "beats_per_bar" => scope.fetch("beats_per_bar"), "bpm" => scope.fetch("bpm"),
         "fps" => scope.fetch("fps"), "frame_count" => scope.fetch("frame_count"),
         "duration_seconds" => scope.fetch("rendered_duration_seconds"), "width" => plan.dig("manifest", "render", "width"),
         "height" => plan.dig("manifest", "render", "height"), "manifest_sha256" => plan.fetch("manifest_sha256"),
         "audio_analysis_sha256" => plan.fetch("audio_analysis_sha256"), "music_audio_sha256" => scope.fetch("music_audio_sha256"),
+        "curated_asset_registry_sha256" => scope["curated_asset_registry_sha256"], "comparison_scenes" => scope["comparison_scenes"],
         "loop_state_equal" => plan.dig("analysis", "loop_state_equal"), "lifecycle_state" => "blocked_for_human_review",
         "artifacts" => artifacts, "created_at" => plan.fetch("created_at"), "completed_at" => @clock.call.iso8601,
-        "human_review_required" => true, "external_publication" => false
+        "human_review_required" => true, "external_publication" => false, "publication_eligible" => scope.fetch("publication_eligible", true)
       }.compact
     end
 
