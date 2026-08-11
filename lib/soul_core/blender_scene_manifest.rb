@@ -25,6 +25,8 @@ module SoulCore
       audio_binding
       look
       organics
+      curated_assets
+      composition
       output
     ].freeze
 
@@ -41,11 +43,15 @@ module SoulCore
     OUTPUT_KEYS = %w[blend_name still_name still_frame retention].freeze
     LOOK_KEYS = %w[surface atmosphere camera glow grade].freeze
     ORGANIC_KEYS = %w[id archetype location rotation_euler scale seed materials parameters].freeze
+    CURATED_ASSET_KEYS = %w[id asset_id location rotation_euler scale].freeze
+    COMPOSITION_KEYS = %w[preset].freeze
     WILLOW_MATERIAL_ROLES = %w[bark foliage].freeze
     MUSHROOM_MATERIAL_ROLES = %w[stem cap gill].freeze
     WILLOW_PARAMETER_KEYS = %w[branch_depth primary_branches strands_per_branch leaf_density trunk_segments sway].freeze
     MUSHROOM_PARAMETER_KEYS = %w[count cap_profile gill_segments spread height_variation].freeze
     ORGANIC_ARCHETYPES = %w[willow_tree mushroom_cluster].freeze
+    CURATED_ASSET_IDS = %w[island_tree_01 boulder_01].freeze
+    COMPOSITION_PRESETS = %w[none orbital_campfire_study].freeze
     WILLOW_SWAY_PRESETS = %w[none restrained windborne].freeze
     MUSHROOM_CAP_PROFILES = %w[bell convex conical flat].freeze
 
@@ -77,6 +83,8 @@ module SoulCore
       raw = raw.dup
       raw["look"] ||= LOOK_DEFAULTS.dup
       raw["organics"] ||= []
+      raw["curated_assets"] ||= []
+      raw["composition"] ||= { "preset" => "none" }
       @normalized_manifest = validate_and_normalize!(raw)
     end
 
@@ -108,6 +116,8 @@ module SoulCore
       materials = validate_materials(require_array!(manifest["materials"], "materials"))
       objects = validate_objects(require_array!(manifest["objects"], "objects"), materials)
       organics = validate_organics(require_array!(manifest["organics"], "organics"), materials, objects)
+      curated_assets = validate_curated_assets(require_array!(manifest["curated_assets"], "curated_assets"), objects, organics)
+      composition = validate_composition(require_hash!(manifest["composition"], "composition"))
       animation = validate_animation(require_hash!(manifest["animation"], "animation"), objects, materials, camera, lights, render)
       audio_binding = validate_audio_binding(require_hash!(manifest["audio_binding"], "audio_binding"), objects, materials, camera, lights)
       output = validate_output(require_hash!(manifest["output"], "output"))
@@ -124,6 +134,8 @@ module SoulCore
         "objects" => objects,
         "materials" => materials,
         "organics" => organics,
+        "curated_assets" => curated_assets,
+        "composition" => composition,
         "animation" => animation,
         "look" => look,
         "audio_binding" => audio_binding,
@@ -267,6 +279,31 @@ module SoulCore
       end
       require_unique_ids!(normalized, "organics")
       normalized
+    end
+
+    def validate_curated_assets(entries, objects, organics)
+      raise ValidationError, "curated_assets exceeds maximum of 16" if entries.length > 16
+      occupied = objects.map { |entry| entry.fetch("id") } + organics.map { |entry| entry.fetch("id") }
+      normalized = entries.map do |entry|
+        entry = require_hash!(entry, "curated_asset")
+        reject_unknown(entry, CURATED_ASSET_KEYS, "curated_asset")
+        reject_forbidden(entry, "curated_asset")
+        require_string!(entry["id"], "curated_asset.id", min: 2, max: 64, pattern: /\A[a-zA-Z0-9_-]+\z/)
+        raise ValidationError, "curated_asset.id conflicts with scene id" if occupied.include?(entry["id"])
+        raise ValidationError, "curated_asset.asset_id unsupported" unless CURATED_ASSET_IDS.include?(entry["asset_id"])
+        require_vector3!(entry["location"], "curated_asset.location")
+        require_vector3!(entry["rotation_euler"], "curated_asset.rotation_euler", min: -6.29, max: 6.29)
+        require_scale_vector!(entry["scale"], "curated_asset.scale")
+        entry
+      end
+      require_unique_ids!(normalized, "curated_assets")
+      normalized
+    end
+
+    def validate_composition(composition)
+      reject_unknown(composition, COMPOSITION_KEYS, "composition")
+      raise ValidationError, "composition.preset unsupported" unless COMPOSITION_PRESETS.include?(composition["preset"])
+      composition
     end
 
     def validate_organic_materials!(organic, material_ids)

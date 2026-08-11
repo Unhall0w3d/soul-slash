@@ -7,7 +7,7 @@ require_relative "../lib/soul_core/blender_scene_manifest"
 root = File.expand_path("..", __dir__)
 catalog = JSON.parse(File.binread(File.join(root, "config/blender_scene_templates.json"))).fetch("templates")
 adapter = File.binread(File.join(root, "scripts/blender/soul_scene_adapter.py"))
-expected = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove]
+expected = %w[abstract liminal architectural audio_reactive bioluminescent_grove void_sanctuary signal_forge willow_fungal_grove orbital_campfire_study]
 checks = []
 
 check = lambda do |label, &block|

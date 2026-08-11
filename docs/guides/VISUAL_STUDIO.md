@@ -106,8 +106,25 @@ clusters use curved tapered stems, revolved cap profiles, and radial underside
 gills. The manifest selects only reviewed archetypes, material roles, seeds,
 and bounded parameters; all Blender geometry remains repository-owned.
 
+**Orbital campfire study** is a separate 30-second comparison lane. It uses
+three digest-verified Poly Haven CC0 trees, four digest-verified Poly Haven CC0
+boulders, repository-owned campfire/moon/star construction, and one continuous
+camera orbit. Preview binds exactly three earlier Blender candidate and preview
+digests; the Dashboard then presents A5 through A8 together. The study is 900
+frames at 720p30, follows the exact first 30 seconds of one kept Music candidate,
+does not force its last frame to match its first, and cannot be bound, expanded
+to full duration, packaged, or published. It exists to answer whether curated
+asset fidelity and a longer non-repeating camera move are materially better
+before that vocabulary is admitted to production templates.
+
+Curated assets are never fetched by Blender. The separate foreground installer
+previews and downloads only the pinned registry from Poly Haven; local
+verification rejects missing, changed, symlinked, or extra files. The renderer
+may append only the two reviewed datablock names from that verified registry.
+Manifest input cannot provide paths, URLs, library names, or Python.
+
 Scene families remain reusable art directions, not unrestricted text-to-3D.
-Character rigs, arbitrary add-ons, downloaded `.blend` auto-execution,
+Character rigs, arbitrary add-ons, unreviewed `.blend` auto-execution,
 arbitrary asset paths, and model-authored Python remain unsupported.
 
 Record a 1–5 `keep` or `revise` review. A revision is a new immutable scene;

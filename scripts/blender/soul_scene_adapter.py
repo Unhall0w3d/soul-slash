@@ -9,6 +9,7 @@ blend and still image deterministically.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -34,6 +35,9 @@ WILLOW_PARAMETER_KEYS = {"branch_depth", "primary_branches", "strands_per_branch
 MUSHROOM_PARAMETER_KEYS = {"count", "cap_profile", "gill_segments", "spread", "height_variation"}
 WILLOW_SWAY_PRESETS = {"none", "restrained", "windborne"}
 MUSHROOM_CAP_PROFILES = {"bell", "convex", "conical", "flat"}
+CURATED_ASSET_IDS = {"island_tree_01", "boulder_01"}
+CURATED_ASSET_OBJECTS = {"island_tree_01": "island_tree_01_LOD1", "boulder_01": "boulder_01_LOD1"}
+COMPOSITION_PRESETS = {"none", "orbital_campfire_study"}
 
 
 def parse_args():
@@ -43,6 +47,8 @@ def parse_args():
     parser.add_argument("--still-path", default="")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--frame", type=int, default=1)
+    parser.add_argument("--asset-root", default="")
+    parser.add_argument("--asset-registry", default="")
     arguments = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else sys.argv[1:]
     return parser.parse_args(arguments)
 
@@ -168,12 +174,16 @@ def validate_manifest(manifest):
         "output",
         "look",
         "organics",
+        "curated_assets",
+        "composition",
     }
-    required_top_level = top_level - {"look", "organics"}
+    required_top_level = top_level - {"look", "organics", "curated_assets", "composition"}
     if not required_top_level.issubset(manifest.keys()) or not set(manifest.keys()).issubset(top_level):
         reject_unknown(manifest, top_level, "manifest")
     manifest.setdefault("look", {})
     manifest.setdefault("organics", [])
+    manifest.setdefault("curated_assets", [])
+    manifest.setdefault("composition", {"preset": "none"})
 
     identity = manifest["identity"]
     render = manifest["render"]
@@ -188,6 +198,8 @@ def validate_manifest(manifest):
     output = manifest["output"]
     look = manifest["look"]
     organics = manifest["organics"]
+    curated_assets = manifest["curated_assets"]
+    composition = manifest["composition"]
 
     for key in ("id", "project_id", "revision", "music_candidate_id"):
         require_string(identity[key], f"identity.{key}", min_length=1, max_length=64)
@@ -279,6 +291,10 @@ def validate_manifest(manifest):
             raise ValueError(f"object references unknown material: {obj['material']}")
 
     validate_organics(organics, material_ids, {entry["id"] for entry in objects})
+    validate_curated_assets(curated_assets, {entry["id"] for entry in objects}, {entry["id"] for entry in organics})
+    reject_unknown(composition, {"preset"}, "composition")
+    if composition["preset"] not in COMPOSITION_PRESETS:
+        raise ValueError("composition.preset invalid")
 
     for light in lights:
         if not isinstance(light, dict):
@@ -439,6 +455,28 @@ def validate_organics(organics, material_ids, object_ids):
             require_int(parameters["gill_segments"], "organic.parameters.gill_segments", 12, 40)
             require_number(parameters["spread"], "organic.parameters.spread", 0.5, 5.0)
             require_number(parameters["height_variation"], "organic.parameters.height_variation", 0.0, 0.8)
+
+
+def validate_curated_assets(entries, object_ids, organic_ids):
+    if not isinstance(entries, list):
+        raise ValueError("curated_assets must be a list")
+    if len(entries) > 16:
+        raise ValueError("curated_assets exceeds maximum of 16")
+    seen = set(object_ids) | set(organic_ids)
+    keys = {"id", "asset_id", "location", "rotation_euler", "scale"}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ValueError("curated_asset must be a map")
+        reject_unknown(entry, keys, "curated_asset")
+        require_string(entry["id"], "curated_asset.id", 2, 64, r"[A-Za-z0-9_-]+")
+        if entry["id"] in seen:
+            raise ValueError("curated_asset.id conflicts with scene id")
+        seen.add(entry["id"])
+        if entry["asset_id"] not in CURATED_ASSET_IDS:
+            raise ValueError("curated_asset.asset_id invalid")
+        require_vector3(entry["location"], "curated_asset.location")
+        require_vector3(entry["rotation_euler"], "curated_asset.rotation_euler", -6.29, 6.29)
+        require_vector3(entry["scale"], "curated_asset.scale", 0.01, 100.0)
 
 
 def build_material_collection(material_spec):
@@ -757,6 +795,195 @@ def build_organics(specs, materials, scene):
             raise ValueError(f"unsupported organic archetype: {organic['archetype']}")
 
 
+def load_curated_asset_map(asset_root, registry_path, required_ids):
+    if not required_ids:
+        return {}
+    if not asset_root or not registry_path:
+        raise ValueError("curated assets require trusted asset root and registry")
+    asset_root = os.path.realpath(asset_root)
+    registry_path = os.path.realpath(registry_path)
+    if not os.path.isfile(registry_path) or os.path.islink(registry_path):
+        raise ValueError("curated asset registry is invalid")
+    with open(registry_path, "r", encoding="utf-8") as stream:
+        registry = json.load(stream)
+    if registry.get("schema_version") != 1:
+        raise ValueError("curated asset registry schema is invalid")
+    assets = {entry["id"]: entry for entry in registry.get("assets", [])}
+    if set(assets) != CURATED_ASSET_IDS or not required_ids.issubset(assets):
+        raise ValueError("curated asset registry identity is invalid")
+    mapped = {}
+    for asset_id in sorted(required_ids):
+        blend_path = None
+        for entry in assets[asset_id]["files"]:
+            relative = entry["path"]
+            candidate = os.path.realpath(os.path.join(asset_root, relative))
+            if not candidate.startswith(asset_root + os.sep) or os.path.islink(candidate) or not os.path.isfile(candidate):
+                raise ValueError(f"curated asset path is invalid: {asset_id}")
+            if os.path.getsize(candidate) != entry["bytes"]:
+                raise ValueError(f"curated asset size changed: {asset_id}")
+            with open(candidate, "rb") as stream:
+                actual = hashlib.sha256(stream.read()).hexdigest()
+            if actual != entry["sha256"]:
+                raise ValueError(f"curated asset digest changed: {asset_id}")
+            if relative.endswith(".blend"):
+                blend_path = candidate
+        if not blend_path:
+            raise ValueError(f"curated asset blend file is missing: {asset_id}")
+        mapped[asset_id] = blend_path
+    return mapped
+
+
+def build_curated_assets(specs, asset_map, collection):
+    loaded = {}
+    for entry in sorted(specs, key=lambda item: item["id"]):
+        asset_id = entry["asset_id"]
+        if asset_id not in loaded:
+            object_name = CURATED_ASSET_OBJECTS[asset_id]
+            with bpy.data.libraries.load(asset_map[asset_id], link=False) as (source, target):
+                if object_name not in source.objects:
+                    raise ValueError(f"reviewed curated object is missing: {asset_id}")
+                target.objects = [object_name]
+            loaded[asset_id] = target.objects[0]
+        source = loaded[asset_id]
+        instance = source if not any(obj.get("soul_curated_asset") == asset_id for obj in collection.objects) else source.copy()
+        if instance.name not in collection.objects:
+            collection.objects.link(instance)
+        instance.name = entry["id"]
+        instance.location = entry["location"]
+        instance.rotation_euler = entry["rotation_euler"]
+        instance.scale = entry["scale"]
+        instance["soul_curated_asset"] = asset_id
+        instance["soul_asset_source"] = "Poly Haven CC0 1K"
+
+
+def emission_material(name, color, strength):
+    material = bpy.data.materials.new(name=name)
+    material.use_nodes = True
+    principled = material.node_tree.nodes.get("Principled BSDF")
+    principled.inputs["Base Color"].default_value = tuple(color) + (1.0,)
+    principled.inputs["Emission Color"].default_value = tuple(color) + (1.0,)
+    principled.inputs["Emission Strength"].default_value = strength
+    principled.inputs["Roughness"].default_value = 0.7
+    return material
+
+
+def build_star_field(scene, seed):
+    import math
+    import random
+
+    rng = random.Random(seed + 9107)
+    vertices, faces = [], []
+    for index in range(150):
+        azimuth = rng.uniform(0.0, 2.0 * math.pi)
+        # A low cylindrical field stays in the orbiting camera's upper field of
+        # view. Its large radius keeps it visually behind the bounded set.
+        radius = rng.uniform(32.0, 46.0)
+        center = (radius * math.cos(azimuth), radius * math.sin(azimuth), rng.uniform(-12.0, -0.5))
+        size = rng.uniform(0.035, 0.085) * (1.65 if index % 19 == 0 else 1.0)
+        offset = len(vertices)
+        vertices.extend(((center[0] + size, center[1], center[2]), (center[0] - size, center[1], center[2]),
+                         (center[0], center[1] + size, center[2]), (center[0], center[1] - size, center[2]),
+                         (center[0], center[1], center[2] + size), (center[0], center[1], center[2] - size)))
+        faces.extend(((offset, offset + 2, offset + 4), (offset + 2, offset + 1, offset + 4),
+                      (offset + 1, offset + 3, offset + 4), (offset + 3, offset, offset + 4),
+                      (offset + 2, offset, offset + 5), (offset + 1, offset + 2, offset + 5),
+                      (offset + 3, offset + 1, offset + 5), (offset, offset + 3, offset + 5)))
+    mesh = bpy.data.meshes.new("a8_star_field_mesh")
+    mesh.from_pydata(vertices, [], faces)
+    stars = bpy.data.objects.new("a8_star_field", mesh)
+    mesh.materials.append(emission_material("a8_starlight", (0.48, 0.66, 1.0), 10.0))
+    scene.collection.objects.link(stars)
+
+
+def build_orbital_campfire_composition(scene, camera, seed):
+    import math
+
+    build_star_field(scene, seed)
+    moon_material = emission_material("a8_moon_surface", (0.42, 0.49, 0.64), 0.55)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32, location=(4.0, 8.0, 2.5), scale=(0.82, 0.82, 0.82))
+    moon = bpy.context.object
+    moon.name = "a8_moon"
+    moon.data.materials.append(moon_material)
+    noise = moon_material.node_tree.nodes.new(type="ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 5.5
+    noise.inputs["Detail"].default_value = 5.0
+    bump = moon_material.node_tree.nodes.new(type="ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.32
+    bump.inputs["Distance"].default_value = 0.18
+    moon_material.node_tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    moon_material.node_tree.links.new(bump.outputs["Normal"], moon_material.node_tree.nodes["Principled BSDF"].inputs["Normal"])
+
+    flame_layers = (
+        ((-0.08, 0.03, 0.20), (1.0, 0.86, 1.0), (1.0, 0.025, 0.002), 1.5),
+        ((0.09, -0.04, 0.23), (0.72, 0.62, 0.82), (1.0, 0.16, 0.004), 2.0),
+        ((0.0, 0.04, 0.27), (0.42, 0.38, 0.64), (1.0, 0.46, 0.015), 2.6),
+    )
+    for index, (location, scale, color, strength) in enumerate(flame_layers):
+        segments = 14
+        ring_spec = ((0.0, 0.10, 0.0), (0.24, 0.28, 0.02), (0.55, 0.22, -0.025), (0.82, 0.13, 0.035), (1.12, 0.0, 0.0))
+        vertices = []
+        for z_value, radius, x_offset in ring_spec:
+            if radius == 0.0:
+                vertices.append((x_offset, 0.0, z_value))
+            else:
+                vertices.extend(
+                    (x_offset + radius * math.cos(2.0 * math.pi * step / segments),
+                     radius * math.sin(2.0 * math.pi * step / segments), z_value)
+                    for step in range(segments)
+                )
+        faces = []
+        first_ring = 1
+        for step in range(segments):
+            faces.append((0, first_ring + step, first_ring + ((step + 1) % segments)))
+        second_ring = first_ring + segments
+        third_ring = second_ring + segments
+        for lower, upper in ((first_ring, second_ring), (second_ring, third_ring)):
+            for step in range(segments):
+                faces.append((lower + step, upper + step, upper + ((step + 1) % segments), lower + ((step + 1) % segments)))
+        apex = len(vertices) - 1
+        for step in range(segments):
+            faces.append((third_ring + step, apex, third_ring + ((step + 1) % segments)))
+        mesh = bpy.data.meshes.new(f"a8_flame_{index + 1}_mesh")
+        mesh.from_pydata(vertices, [], faces)
+        flame = bpy.data.objects.new(f"a8_flame_{index + 1}", mesh)
+        scene.collection.objects.link(flame)
+        flame.location = location
+        flame.name = f"a8_flame_{index + 1}"
+        flame.scale = scale
+        for polygon in mesh.polygons:
+            polygon.use_smooth = True
+        flame.data.materials.append(emission_material(f"a8_flame_{index + 1}_material", color, strength))
+        for frame, factor in ((scene.frame_start, 1.0), ((scene.frame_start + scene.frame_end) // 2, 1.08), (scene.frame_end, 1.0)):
+            flame.scale.z = scale[2] * factor
+            flame.keyframe_insert(data_path="scale", frame=frame)
+
+    orbit = bpy.data.objects.new("a8_camera_orbit", None)
+    orbit.location = (0.0, 0.0, 1.15)
+    scene.collection.objects.link(orbit)
+    camera.parent = orbit
+    target = bpy.data.objects.new("a8_camera_target", None)
+    target.location = (0.0, 0.0, 1.0)
+    scene.collection.objects.link(target)
+    track = camera.constraints.new(type="TRACK_TO")
+    track.target = target
+    track.track_axis = "TRACK_NEGATIVE_Z"
+    track.up_axis = "UP_Y"
+    for frame, angle in ((scene.frame_start, 0.0), (scene.frame_end, 2.0 * math.pi)):
+        orbit.rotation_euler[2] = angle
+        orbit.keyframe_insert(data_path="rotation_euler", index=2, frame=frame)
+    set_action_interpolation(orbit, "LINEAR")
+
+
+def build_composition(spec, scene, camera, seed):
+    preset = spec["preset"]
+    if preset == "none":
+        return
+    if preset == "orbital_campfire_study":
+        build_orbital_campfire_composition(scene, camera, seed)
+        return
+    raise ValueError(f"unsupported composition preset: {preset}")
+
+
 def apply_surface_look(materials, profile):
     for material in sorted(materials.values(), key=lambda entry: entry.name):
         node_tree = material.node_tree
@@ -1024,7 +1251,7 @@ def clear_scene():
         bpy.data.lights.remove(item, do_unlink=True)
 
 
-def run(manifest, blend_path, still_path, still_frame):
+def run(manifest, blend_path, still_path, still_frame, asset_map):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     scene.render.engine = manifest["render"]["renderer"]
@@ -1061,12 +1288,16 @@ def run(manifest, blend_path, still_path, still_frame):
     build_lights(manifest["lights"], bpy.context.scene.collection)
     build_objects(manifest["objects"], materials)
     build_organics(manifest["organics"], materials, scene)
+    build_curated_assets(manifest["curated_assets"], asset_map, scene.collection)
+    build_composition(manifest["composition"], scene, camera, manifest["render"]["seed"])
 
     apply_surface_look(materials, manifest["look"]["surface"])
     apply_atmosphere(world, manifest["look"]["atmosphere"])
     apply_glow(scene, manifest["look"]["glow"])
     apply_animation(manifest)
 
+    if manifest["curated_assets"]:
+        bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=blend_path, check_existing=False)
     scene.frame_set(still_frame)
     scene.render.image_settings.file_format = "PNG"
@@ -1099,10 +1330,12 @@ def main():
     global bpy
     import bpy  # local import keeps py_compile lightweight and allows structural checks.
 
+    required_assets = {entry["asset_id"] for entry in manifest["curated_assets"]}
+    asset_map = load_curated_asset_map(args.asset_root, args.asset_registry, required_assets)
     clear_scene()
-    run(manifest, blend_path, still_path, int(manifest["output"]["still_frame"]))
+    run(manifest, blend_path, still_path, int(manifest["output"]["still_frame"]), asset_map)
     frame_count = manifest["render"]["frame_end"] - manifest["render"]["frame_start"] + 1
-    print("SOUL_SCENE_ADAPTER_RUN=" + json.dumps({"blend_path": blend_path, "still_path": still_path, "frames": frame_count, "objects": len(manifest["objects"]), "organics": len(manifest["organics"])}))
+    print("SOUL_SCENE_ADAPTER_RUN=" + json.dumps({"blend_path": blend_path, "still_path": still_path, "frames": frame_count, "objects": len(manifest["objects"]), "organics": len(manifest["organics"]), "curated_assets": len(manifest["curated_assets"]), "composition": manifest["composition"]["preset"]}))
     return 0
 
 

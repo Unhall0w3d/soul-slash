@@ -17,20 +17,23 @@ module SoulCore
       @ffmpeg = @runner.which("ffmpeg")
     end
 
-    def analyze(path:, bpm:, beats_per_bar:, bars:, fps:)
+    def analyze(path:, bpm:, beats_per_bar:, bars: nil, fps:, duration_seconds: nil)
       raise ArgumentError, "ffmpeg is required for Blender audio analysis" unless @ffmpeg
       bpm = Float(bpm)
       beats_per_bar = Integer(beats_per_bar)
-      bars = Integer(bars)
+      bars = bars.nil? ? nil : Integer(bars)
       fps = Integer(fps)
       raise ArgumentError, "bpm must be 30..240" unless bpm.between?(30, 240)
       raise ArgumentError, "beats_per_bar must be 2..12" unless beats_per_bar.between?(2, 12)
-      raise ArgumentError, "bars must be 8 or 12" unless [8, 12].include?(bars)
+      study = !duration_seconds.nil?
+      raise ArgumentError, "choose whole bars or one bounded duration, not both" if study && bars
+      raise ArgumentError, "bars must be 8 or 12" unless study || [8, 12].include?(bars)
       raise ArgumentError, "fps must be 12..60" unless fps.between?(12, 60)
       raise ArgumentError, "music artifact is invalid" unless File.file?(path) && !File.symlink?(path)
 
-      nominal_duration = bars * beats_per_bar * 60.0 / bpm
-      raise ArgumentError, "whole-bar loop duration exceeds bounded analyzer limit" if nominal_duration > MAX_DURATION_SECONDS
+      nominal_duration = study ? Float(duration_seconds) : bars * beats_per_bar * 60.0 / bpm
+      raise ArgumentError, "bounded study duration must be exactly 30 seconds" if study && nominal_duration != 30.0
+      raise ArgumentError, "bounded Blender duration exceeds analyzer limit" if nominal_duration > MAX_DURATION_SECONDS
       frame_count = [(nominal_duration * fps).round, 2].max
       rendered_duration = frame_count.to_f / fps
 
@@ -41,21 +44,22 @@ module SoulCore
         raise ArgumentError, "music artifact did not yield usable audio" if samples.length < SAMPLE_RATE
         curves = extract_curves(samples, point_count: [frame_count, MAX_POINTS].min)
         frames = evenly_spaced_frames(frame_count, curves.fetch("energy").length)
-        curves.each_value { |values| values[-1] = values[0] }
+        curves.each_value { |values| values[-1] = values[0] } unless study
         {
           "schema_version" => "soul.blender.audio_analysis.v1",
           "source_audio_sha256" => Digest::SHA256.file(path).hexdigest,
           "bpm" => bpm,
           "beats_per_bar" => beats_per_bar,
           "bars" => bars,
+          "temporal_mode" => study ? "thirty_second_study" : "whole_bar_loop",
           "fps" => fps,
           "frame_count" => frame_count,
           "nominal_duration_seconds" => nominal_duration.round(6),
           "rendered_duration_seconds" => rendered_duration.round(6),
-          "bar_frames" => (0..bars).map { |bar| 1 + ((bar.to_f / bars) * (frame_count - 1)).round },
+          "bar_frames" => study ? [] : (0..bars).map { |bar| 1 + ((bar.to_f / bars) * (frame_count - 1)).round },
           "curve_frames" => frames,
           "curves" => curves,
-          "loop_state_equal" => curves.values.all? { |values| (values.first - values.last).abs <= 1e-9 },
+          "loop_state_equal" => !study && curves.values.all? { |values| (values.first - values.last).abs <= 1e-9 },
           "analysis_process" => "ffmpeg mono 8kHz decode plus deterministic bounded three-band envelope extraction"
         }
       end

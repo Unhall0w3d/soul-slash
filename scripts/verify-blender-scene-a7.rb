@@ -155,11 +155,14 @@ check.call("adapter retains no forbidden runtime capabilities") do
   source = File.binread(ADAPTER)
   forbidden = %w[
     subprocess socket requests urllib
-    bpy.data.libraries.load bpy.ops.wm.append bpy.ops.wm.link
+    bpy.ops.wm.append bpy.ops.wm.link
     bpy.ops.script.python_file_run bpy.ops.preferences.addon_enable autoexec
   ]
   found = forbidden.select { |token| source.include?(token) }
   raise "forbidden runtime capability: #{found.join(', ')}" unless found.empty?
+  raise "curated library loader count changed" unless source.scan("bpy.data.libraries.load").length == 1
+  loader_scope = source[/def build_curated_assets\(.*?\n\n\ndef /m]
+  raise "curated library loader escaped reviewed function" unless loader_scope&.include?("bpy.data.libraries.load")
 end
 
 puts "Blender Scene A7 checks passed: #{checks.length}"
