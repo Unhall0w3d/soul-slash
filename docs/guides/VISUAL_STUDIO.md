@@ -73,13 +73,13 @@ Visual Studio controls.
 
 **Whole-bar Blender companion** is the source-editable procedural lane. It
 requires one exact Music candidate whose human review is `keep`. Choose a
-reviewed scene family, an 8- or 12-musical-bar span, review or production
-resolution, and a deterministic seed. Creative direction is retained with the
+reviewed scene family, a closed **Look profile**, an 8- or 12-musical-bar span,
+review or production resolution, and a deterministic seed. Creative direction is retained with the
 candidate as intent and revision evidence, but it does not silently rewrite
 the trusted template.
 
 Preview binds the exact music digest, review digest, BPM, meter, whole-bar
-duration, frame count, template, render profile, seed, manifest digest,
+duration, frame count, template, look profile, render profile, seed, manifest digest,
 analysis digest, and resource lease. Execution then:
 
 1. derives bounded low-, mid-, high-band, energy, and kick curves from the
@@ -91,11 +91,24 @@ analysis digest, and resource lease. Execution then:
 5. returns the MP4, still, editable `.blend`, manifest, and audio evidence for
    human review.
 
-The available scene families are **Bioluminescent grove**, **Audio reactive
-chamber**, **Architectural**, **Liminal**, and **Abstract**. They are reusable
-art directions, not unrestricted text-to-3D. Character rigs, arbitrary add-ons,
-downloaded `.blend` auto-execution, arbitrary asset paths, and model-authored
-Python remain unsupported.
+The available scene families are **Willow fungal grove**, **Void sanctuary**, **Signal forge**,
+**Bioluminescent grove**, **Audio reactive chamber**, **Architectural**,
+**Liminal**, and **Abstract**. Look profiles can retain the template treatment
+or apply reviewed cinematic-organic, liminal-haze, signal-forge, or
+crystalline-void combinations. Those combinations select only trusted surface,
+atmosphere, camera-depth, glow, and AgX grading presets inside Soul's adapter.
+They do not accept node graphs or Blender code from the model or browser.
+
+**Willow fungal grove** exercises the first trusted procedural-organics
+vocabulary. Its willow is constructed from bounded tapered curves, hierarchical
+drooping branches, visible roots, and combined leaf geometry. Its fungal
+clusters use curved tapered stems, revolved cap profiles, and radial underside
+gills. The manifest selects only reviewed archetypes, material roles, seeds,
+and bounded parameters; all Blender geometry remains repository-owned.
+
+Scene families remain reusable art directions, not unrestricted text-to-3D.
+Character rigs, arbitrary add-ons, downloaded `.blend` auto-execution,
+arbitrary asset paths, and model-authored Python remain unsupported.
 
 Record a 1–5 `keep` or `revise` review. A revision is a new immutable scene;
 the source remains available. A failed partial frame set can be resumed only

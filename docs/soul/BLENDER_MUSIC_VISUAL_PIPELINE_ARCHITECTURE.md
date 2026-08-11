@@ -1,6 +1,6 @@
 # Blender Music-Visual Pipeline Architecture
 
-Status: A1–A5 implementation candidate; available for one consolidated Operator review and not yet promoted.
+Status: A1–A5 accepted and merged; A6 visual-fidelity expansion is in progress for Operator review.
 
 ## Decision
 
