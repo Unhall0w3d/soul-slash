@@ -130,6 +130,13 @@ javascript = File.read(File.expand_path("../assets/dashboard/dashboard.js", __di
 css = File.read(File.expand_path("../assets/dashboard/dashboard.css", __dir__))
 check.call("Dashboard exposes Host Stewardship and File Steward controls", %w[host-stewardship-tab host-stewardship-panel refresh-host-presence file-steward-root file-steward-inventory preview-file-operation preview-file-quarantine restore-file-quarantine].all? { |id| html.include?("id=\"#{id}\"") })
 check.call("Dashboard preserves Host Stewardship location across refresh", javascript.include?('host: "#host-stewardship-panel"') && javascript.include?("loadHostStewardship") && css.include?(".host-stewardship-panel"))
+check.call(
+  "Dashboard keeps all seven Host Stewardship sections compact and keyboard-accessible",
+  html.scan(/<details class="[^"]*host-stewardship-disclosure[^"]*"/).length == 7 &&
+    html.scan(/<summary class="card-heading host-stewardship-disclosure-summary">/).length == 7 &&
+    css.include?(".host-stewardship-disclosure[open]") &&
+    css.include?(".host-stewardship-disclosure-summary:focus-visible")
+)
 
 if errors.empty?
   puts "Host Stewardship and File Steward A0-A2 verification passed."
