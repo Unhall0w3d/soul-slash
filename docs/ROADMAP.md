@@ -83,6 +83,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
 
 ## Qualified expansion candidates
 
+- [ ] Operator review of Host Stewardship A0–A2: capability registry,
+  foreground Host Presence, bounded File Steward inventory, exact
+  rename/move/copy, and owner-private quarantine/restore. Permanent deletion,
+  directory mutation, background polling, and broader roots remain excluded.
+
 - Track-aware new-song production has an accepted architecture candidate and is
   paused pending FL Studio installation and its A0 interchange proof. The
   candidate keeps ACE-Step Turbo as the accepted full-mix baseline, adds a

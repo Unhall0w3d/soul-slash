@@ -67,6 +67,7 @@
       <div id="administration-navigation" class="tab-menu">
         <button id="administration-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="administration-menu">Administration <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="administration-menu" class="self-improvement-menu" role="menu" aria-label="Administration surfaces" hidden>
+          <button id="host-stewardship-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="host-stewardship-panel"><strong>Host Stewardship</strong><span>Foreground host posture, capability boundaries, and reversible file work</span></button>
           <button id="timeline-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="timeline-panel"><strong>Project Timeline</strong><span>Implementation state, priorities, deferred work, and completed inventory</span></button>
           <button id="local-topology-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="local-topology-panel"><strong>Local Topology</strong><span>Read-only network topology evidence and route links</span></button>
           <button id="backup-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="backup-panel"><strong>Backup &amp; Recovery</strong><span>Verified snapshots, deletion holds, retention, and staged restore</span></button>
@@ -193,6 +194,85 @@
             <p id="inbox-summary" class="muted">No active conversation.</p>
           </section>
         </aside>
+      </div>
+    </section>
+
+    <section id="host-stewardship-panel" class="tab-panel host-stewardship-panel" role="tabpanel" aria-labelledby="host-stewardship-tab" hidden>
+      <header class="studio-header host-stewardship-header">
+        <div><p class="eyebrow">Operator-visible host boundary</p><h1>Host Stewardship</h1><p>Read current host evidence, understand exactly what Soul can do, and stage bounded file changes without granting broad filesystem authority.</p></div>
+        <div class="studio-boundary"><strong>Foreground and reversible</strong><span>Observe → preview → confirm → verify</span><small>No watcher, scheduler, recursive directory mutation, overwrite, or permanent deletion is introduced.</small></div>
+      </header>
+
+      <div class="host-stewardship-grid">
+        <section class="improvement-card host-presence-card" aria-labelledby="host-presence-heading">
+          <div class="card-heading"><div><p class="eyebrow">Current evidence</p><h2 id="host-presence-heading">Host Presence</h2></div><span id="host-presence-state" class="count-badge">Not read</span></div>
+          <p class="card-note">A bounded foreground snapshot. Sources retain their own collection timestamps; this page does not poll in the background.</p>
+          <button id="refresh-host-presence" class="refresh-button" type="button">Read current presence</button>
+          <div id="host-presence-signals" class="host-presence-signals"><p class="muted">Open this surface to read the host.</p></div>
+          <p id="host-presence-status" class="dialog-status" role="status" aria-live="polite">No snapshot requested.</p>
+        </section>
+
+        <section class="improvement-card host-capability-card" aria-labelledby="host-capability-heading">
+          <div class="card-heading"><div><p class="eyebrow">Declared authority</p><h2 id="host-capability-heading">Capability Registry</h2></div><span id="host-capability-count" class="count-badge">0</span></div>
+          <p class="card-note">Availability is not authority. Each record declares whether it reads, mutates, or remains intentionally unavailable.</p>
+          <div id="host-capability-list" class="host-capability-list"><p class="muted">No capability evidence loaded.</p></div>
+        </section>
+
+        <section class="improvement-card file-steward-card" aria-labelledby="file-steward-heading">
+          <div class="card-heading"><div><p class="eyebrow">Bounded file work</p><h2 id="file-steward-heading">File Steward</h2></div><span class="count-badge">A0–A2</span></div>
+          <p class="card-note">Only explicitly configured roots are visible. Hidden paths, symlinks, secrets, hard links, devices, recursive directory operations, overwrites, and permanent deletion fail closed.</p>
+
+          <div class="file-steward-browser">
+            <label>Root <select id="file-steward-root"></select></label>
+            <label>Relative directory <input id="file-steward-path" value="." autocomplete="off" spellcheck="false"></label>
+            <button id="inspect-file-steward" class="refresh-button" type="button">Inspect directory</button>
+          </div>
+          <div id="file-steward-inventory" class="file-steward-inventory"><p class="muted">Configure owner-local roots, then inspect one directory.</p></div>
+          <p id="file-steward-inventory-status" class="dialog-status" role="status" aria-live="polite">Inventory has not been requested.</p>
+
+          <div class="file-steward-actions">
+            <section class="gate-card">
+              <p class="eyebrow">A1 exact operation</p><h3>Rename, move, or copy one file</h3>
+              <div class="file-steward-form-grid">
+                <label>Action <select id="file-steward-action"><option value="rename">Rename</option><option value="move">Move</option><option value="copy">Copy</option></select></label>
+                <label>Source root <select id="file-steward-source-root"></select></label>
+                <label>Source path <input id="file-steward-source-path" autocomplete="off" spellcheck="false"></label>
+                <label>Destination root <select id="file-steward-destination-root"></select></label>
+                <label>Destination path <input id="file-steward-destination-path" autocomplete="off" spellcheck="false"></label>
+              </div>
+              <button id="preview-file-operation" class="gate-button" type="button">Preview exact operation</button>
+              <div id="file-steward-operation-gate" class="file-steward-gate" hidden>
+                <pre id="file-steward-operation-preview"></pre>
+                <label>Exact confirmation <input id="file-steward-operation-confirmation" readonly></label>
+                <button id="execute-file-operation" class="gate-button gate-button--gold" type="button">Execute reviewed operation</button>
+              </div>
+              <p id="file-steward-operation-status" class="dialog-status" role="status" aria-live="polite">No operation previewed.</p>
+            </section>
+
+            <section class="gate-card file-steward-quarantine-card">
+              <p class="eyebrow">A2 reversible removal</p><h3>Quarantine one file</h3>
+              <p>Quarantine moves exact bytes into Soul's owner-private store. It is not permanent deletion.</p>
+              <button id="preview-file-quarantine" class="danger-button" type="button">Preview quarantine</button>
+              <div id="file-steward-quarantine-gate" class="file-steward-gate" hidden>
+                <pre id="file-steward-quarantine-preview"></pre>
+                <label>Exact confirmation <input id="file-steward-quarantine-confirmation" readonly></label>
+                <button id="execute-file-quarantine" class="danger-button" type="button">Quarantine reviewed file</button>
+              </div>
+              <p id="file-steward-quarantine-status" class="dialog-status" role="status" aria-live="polite">No quarantine previewed.</p>
+            </section>
+          </div>
+        </section>
+
+        <section class="improvement-card file-steward-quarantine-list-card" aria-labelledby="file-steward-quarantine-heading">
+          <div class="card-heading"><div><p class="eyebrow">Owner-private recovery</p><h2 id="file-steward-quarantine-heading">Quarantine</h2></div><span id="file-steward-quarantine-count" class="count-badge">0</span></div>
+          <div id="file-steward-quarantine-list" class="file-steward-quarantine-list"><p class="muted">No quarantine evidence loaded.</p></div>
+          <div id="file-steward-restore-gate" class="file-steward-gate" hidden>
+            <pre id="file-steward-restore-preview"></pre>
+            <label>Exact confirmation <input id="file-steward-restore-confirmation" readonly></label>
+            <button id="restore-file-quarantine" class="gate-button gate-button--gold" type="button">Restore exact file</button>
+          </div>
+          <p id="file-steward-restore-status" class="dialog-status" role="status" aria-live="polite">Select a quarantined file to preview restoration.</p>
+        </section>
       </div>
     </section>
 

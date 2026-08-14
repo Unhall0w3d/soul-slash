@@ -11,8 +11,10 @@ Human-facing inputs and outputs:
 - CLI chat
 - single-shot CLI messages
 - authenticated dashboard over the versioned application facade
-- Chat plus grouped Self Improvement and Creative Studios navigation
+- Chat plus grouped Self Improvement, Creative Studios, and Administration navigation
 - Skill Studio, Self Assessment, Self Augmentation, Music Studio, and Visual Studio
+- Host Stewardship with a static capability registry, foreground Host Presence,
+  and a separately configured File Steward boundary
 - header-level Review Center and manual Core selection
 - shared workspace and inbox metadata inside Chat
 - explicit Chat push-to-talk through bounded local CPU transcription

@@ -17,7 +17,7 @@ The authenticated dashboard provides:
 - **Chat** — persistent transmissions, explicit local push-to-talk transcription, bounded per-message local speech, visible five-second Voice Presence follow-ups, deterministic voice-mediated screen requests, immediate message rendering, local-model responses, bounded skill routing, read-only Creative Studio archive awareness, picture and explicit one-shot screen understanding, memory, artifacts, workspace, inbox, system status, model runtime controls, and exact-gated Core switching;
 - **Self Improvement** — Skill Studio, Self Assessment, and Self Augmentation behind one navigation group;
 - **Creative Studios** — Music Studio, Visual Studio, and Mix Studio with local generation, evidence, revision, lineage, sequencing, and export flows;
-- **Administration** — Project Timeline, Backup & Recovery, and Guided Maintenance with separate review gates for every mutation;
+- **Administration** — Host Stewardship, Project Timeline, Backup & Recovery, and Guided Maintenance with separate review gates for every mutation;
 - **Review Center** — redacted pending-approval and recent bounded-execution evidence without granting approval authority.
 
 The supported local runtime topology currently includes:
@@ -50,6 +50,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Knowledge Vault | Share a portable Markdown knowledge surface with Soul and optionally open it in Obsidian | [Knowledge Vault](docs/guides/KNOWLEDGE_VAULT.md) |
 | Local Search | Search reviewed documentation, Knowledge Vault notes, and canonical Music/Visual briefs with source citations | [Local Project and Document Search](docs/guides/LOCAL_SEARCH.md) |
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
+| Host Stewardship | Read bounded host posture and stage reversible file rename, move, copy, quarantine, and restore operations inside explicitly configured roots | [Host Stewardship and File Steward](docs/guides/HOST_STEWARDSHIP.md) |
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
 | Guided Maintenance | Maintain trusted repositories and Flatpak, review AUR updates separately, and operate the distinct reboot/Hyprland restoration flow | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
 | Security Monitoring | Operate accepted Wazuh observability, selective ClamAV scanning, and privacy-filtered read-only Chat/Voice status | [Security Monitoring](docs/guides/SECURITY_MONITORING.md) |
