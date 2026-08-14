@@ -319,11 +319,15 @@ module SoulCore
 
     def receipts(limit: MAX_RECEIPTS)
       prepare_directories
+      retained_receipts(limit: limit)
+    end
+
+    def retained_receipts(limit: MAX_RECEIPTS)
       count = [[Integer(limit), 1].max, MAX_RECEIPTS].min
       rows = Dir.glob(File.join(@receipts_root, "*.json")).filter_map do |path|
         read_receipt(path)
       end.sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count)
-      outcome("complete", true, "Device maintenance receipts loaded", {"receipts" => rows, "live_execution_enabled" => @live_execution_enabled})
+      outcome("complete", true, "Retained device maintenance receipts loaded", {"receipts" => rows, "live_execution_enabled" => @live_execution_enabled})
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
     rescue StandardError => error

@@ -167,6 +167,7 @@ module SoulCore
       "security.wazuh.notifications.status" => [],
       "security.wazuh.posture.status" => [],
       "security.wazuh.posture.snapshot" => [],
+      "incident_narrator.compose" => [],
       "maintenance.discovery.status" => [],
       "maintenance.discovery.scan" => %w[subnet],
       "maintenance.discovery.registry" => [],

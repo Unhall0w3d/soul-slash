@@ -4,7 +4,7 @@ Host Stewardship is Soul's owner-facing surface for understanding the local
 host before deciding whether any action is appropriate. Open it from
 **Administration → Host Stewardship**.
 
-This surface contains five related but separate boundaries:
+This surface contains six related but separate boundaries:
 
 - the **Capability Registry** declares what exists, its maturity, evidence,
   privacy, mutation class, dependencies, and approval requirement;
@@ -15,8 +15,25 @@ This surface contains five related but separate boundaries:
   and public Arch security evidence without changing installed software;
 - **Storage Steward** reports bounded device, filesystem, NVMe, and configured
   Btrfs compression evidence, with a separate one-shot I/O diagnostic; and
+- **Incident Narrator** composes retained security, maintenance, and continuity
+  evidence into a deterministic chronology with facts, cautious inference, and
+  explicit evidence gaps; and
 - **File Steward** inventories explicitly configured roots and stages exact,
   reversible regular-file operations.
+
+## Incident Narrator
+
+Select **Compose incident narrative** to read the already-retained Wazuh,
+maintenance-receipt, and backup/DRS summaries. This does not refresh any source.
+The result shows newest-first evidence and keeps observations, cautious
+inferences, and missing evidence visibly separate.
+
+Incident Narrator is not a root-cause engine. It omits raw alert descriptions,
+command lines, absolute paths, credentials, repository locations, and private
+configuration. It does not acknowledge or suppress alerts, run maintenance,
+start a backup, recommend remediation, or invoke a model. Detailed security
+investigation remains in Wazuh; operational actions remain in their existing
+reviewed surfaces.
 
 ## Software Steward
 
@@ -127,6 +144,7 @@ paths.
 ```bash
 make verify-host-stewardship-file-steward
 make verify-software-storage-steward
+make verify-incident-narrator
 ```
 
 This proves the public root boundary, bounded inventory, stale-preview and
@@ -136,3 +154,6 @@ Presence, and Dashboard integration. It does not replace Operator review.
 The Software and Storage verifier additionally proves source bounds, response
 redaction, separate I/O invocation, absent mutation authority, and fail-closed
 behavior when optional tools or privileges are unavailable.
+The Incident Narrator verifier proves retained-source-only composition,
+chronology, explicit gaps, evidence attribution, privacy filtering, and absence
+of model or mutation authority.

@@ -203,16 +203,23 @@ module SoulCore
 
     def receipts(limit: MAX_RECEIPTS)
       prepare_directories
+      result = retained_receipts(limit: limit)
+      if result["lifecycle_state"] == "complete" && result["data"].is_a?(Hash)
+        result["data"]["desktop_handoff"] = @desktop_handoff.status
+        result["data"]["native_package_evidence"] = @desktop_handoff.native_evidence.except("package_evidence")
+      end
+      result
+    end
+
+    def retained_receipts(limit: MAX_RECEIPTS)
       count = [[Integer(limit), 1].max, MAX_RECEIPTS].min
       rows = receipt_paths.filter_map { |path| read_json(path, RECEIPT_SCHEMA) }
         .sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count)
-      outcome("complete", true, "maintenance receipts loaded", {
+      outcome("complete", true, "retained maintenance receipts loaded", {
         "receipts" => rows,
         "aur_review_receipts" => aur_receipt_paths.filter_map { |path| read_json(path, "soul.maintenance.aur_review_receipt.v1") }
           .sort_by { |row| row.fetch("finished_at", "") }.reverse.first(count),
-        "live_execution_enabled" => @live_execution_enabled,
-        "desktop_handoff" => @desktop_handoff.status,
-        "native_package_evidence" => @desktop_handoff.native_evidence.except("package_evidence")
+        "live_execution_enabled" => @live_execution_enabled
       })
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)

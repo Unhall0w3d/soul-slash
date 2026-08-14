@@ -107,6 +107,17 @@ module SoulCore
         "mutation" => "none",
         "approval" => "none",
         "required_commands" => %w[iotop]
+      },
+      {
+        "id" => "incident_narrator.compose",
+        "label" => "Incident Narrator",
+        "maturity" => "A0",
+        "evidence" => "deterministic chronology over retained normalized security, maintenance, and continuity evidence",
+        "freshness" => "retained_sources_on_request",
+        "privacy" => "owner_private_normalized_summary",
+        "mutation" => "none",
+        "approval" => "none",
+        "required_commands" => []
       }
     ].freeze
 

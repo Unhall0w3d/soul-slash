@@ -3,6 +3,23 @@
   "title": "Soul / Project Timeline",
   "items": [
     {
+      "item_id": "track_incident_narrator_a0",
+      "title": "Review Incident Narrator A0",
+      "area": "Administration + Host Stewardship + Security",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Review one deterministic, source-attributed explanation built from retained security, maintenance, and continuity evidence.",
+      "implementation": "Incident Narrator A0 reads only retained normalized Wazuh snapshots, bounded maintenance receipts, and the latest backup/DRS summary. It renders newest-first facts, cautious evidence-bound inferences, and explicit source gaps without refreshing sources, using a model, or offering remediation.",
+      "technologies": "Ruby deterministic evidence composer; existing Wazuh, maintenance-receipt, and backup-status schemas; authenticated Dashboard HTML, CSS, and JavaScript.",
+      "interfaces": "Administration → Host Stewardship → Incident Narrator; one explicit foreground Compose incident narrative button.",
+      "commands": "make verify-incident-narrator\nmake verify-host-stewardship-file-steward",
+      "references": "docs/soul/INCIDENT_NARRATOR_A0_BRIEF.md\ndocs/assessments/INCIDENT_NARRATOR_A0_REVIEW.md\ndocs/guides/HOST_STEWARDSHIP.md",
+      "acceptance": "Chronology is accurate and newest-first; observations, inference, and gaps remain distinct; every inference cites retained evidence and stays cautious; unavailable sources never read as healthy; no raw description, path, command, credential, or private configuration leaks; no source refresh or mutation exists; responsive presentation passes Operator review.",
+      "source": "Operator-approved Incident Narrator continuation, 2026-08-14",
+      "notes": "A0 is candidate work and remains pending live Operator review. Root-cause diagnosis, model-written prose, remediation, acknowledgement, suppression, and automatic collection are excluded."
+    },
+    {
       "item_id": "track_software_storage_steward_a0_a1",
       "title": "Review Software and Storage Steward A0–A1",
       "area": "Administration + Host Stewardship",
