@@ -26,6 +26,9 @@ require_relative "conversation_clear_service"
 require_relative "conversation_forget_service"
 require_relative "conversation_workspace_service"
 require_relative "host_system_status_collector"
+require_relative "host_stewardship_capability_registry"
+require_relative "host_stewardship_service"
+require_relative "file_steward_service"
 require_relative "backup_administration_service"
 require_relative "nightly_drs_deployment"
 require_relative "project_tracker_service"
@@ -92,6 +95,9 @@ module SoulCore
       conversation_forget_service: nil,
       workspace_service: nil,
       status_collector: nil,
+      host_stewardship_capability_registry: nil,
+      host_stewardship_service: nil,
+      file_steward_service: nil,
       backup_administration_service: nil,
       operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
@@ -159,6 +165,9 @@ module SoulCore
       @conversation_forget_service = conversation_forget_service
       @workspace_service = workspace_service
       @status_collector = status_collector
+      @host_stewardship_capability_registry = host_stewardship_capability_registry
+      @host_stewardship_service = host_stewardship_service
+      @file_steward_service = file_steward_service
       @backup_administration_service = backup_administration_service
       @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
@@ -292,6 +301,17 @@ module SoulCore
       when "inbox.mark_seen" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "seen"))
       when "inbox.dismiss" then domain(workspace.change_state(delivery_id: required(parameters, "delivery_id"), chat_id: required(parameters, "chat_id"), state: "dismissed"))
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
+      when "host_stewardship.capabilities" then domain(host_stewardship_capabilities.snapshot(file_steward_configured: file_steward.configured?))
+      when "host_stewardship.snapshot" then domain(host_stewardship.snapshot)
+      when "file_steward.roots" then domain(file_steward.roots)
+      when "file_steward.inventory" then domain(file_steward.inventory(root_id: required(parameters, "root_id"), relative_path: parameters["relative_path"] || "."))
+      when "file_steward.operation.preview" then domain(file_steward.operation_preview(action: required(parameters, "action"), source_root_id: required(parameters, "source_root_id"), source_relative_path: required(parameters, "source_relative_path"), destination_root_id: required(parameters, "destination_root_id"), destination_relative_path: required(parameters, "destination_relative_path")))
+      when "file_steward.operation.execute" then domain(file_steward.operation_execute(action: required(parameters, "action"), source_root_id: required(parameters, "source_root_id"), source_relative_path: required(parameters, "source_relative_path"), destination_root_id: required(parameters, "destination_root_id"), destination_relative_path: required(parameters, "destination_relative_path"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "file_steward.quarantine.list" then domain(file_steward.quarantine_list)
+      when "file_steward.quarantine.preview" then domain(file_steward.quarantine_preview(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path")))
+      when "file_steward.quarantine.execute" then domain(file_steward.quarantine_execute(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
+      when "file_steward.restore.preview" then domain(file_steward.restore_preview(quarantine_id: required(parameters, "quarantine_id")))
+      when "file_steward.restore.execute" then domain(file_steward.restore_execute(quarantine_id: required(parameters, "quarantine_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "backup.status" then domain(backup_status(password: parameters["password"]))
       when "backup.manifests.reconcile.preview" then domain(backup_administration.manifest_reconciliation_preview)
       when "backup.manifests.reconcile.execute" then domain(backup_administration.manifest_reconciliation_execute(confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
@@ -591,7 +611,7 @@ module SoulCore
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
         "product_tabs" => ["Chat", "Self Improvement", "Creative Studios", "Administration"],
-        "administration_surfaces" => ["Project Timeline", "Local Topology", "Backup & Recovery", "Guided Maintenance"],
+        "administration_surfaces" => ["Host Stewardship", "Project Timeline", "Local Topology", "Backup & Recovery", "Guided Maintenance"],
         "creative_surfaces" => ["Music Studio", "Visual Studio", "Mix Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
         "configuration" => {
@@ -868,6 +888,32 @@ module SoulCore
 
     def status_collector
       @status_collector ||= HostSystemStatusCollector.new
+    end
+
+    def host_stewardship_capabilities
+      @host_stewardship_capability_registry ||= HostStewardshipCapabilityRegistry.new(
+        process_env: @process_env,
+        clock: @clock
+      )
+    end
+
+    def file_steward
+      @file_steward_service ||= FileStewardService.new(
+        root: @root,
+        process_env: @process_env,
+        clock: @clock
+      )
+    end
+
+    def host_stewardship
+      @host_stewardship_service ||= HostStewardshipService.new(
+        host_source: -> { collect_system_status },
+        security_source: -> { wazuh_security_status.snapshot },
+        backup_source: -> { nightly_drs_deployment.status },
+        capability_registry: host_stewardship_capabilities,
+        file_steward: file_steward,
+        clock: @clock
+      )
     end
 
     def collect_system_status

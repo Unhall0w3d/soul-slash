@@ -268,6 +268,15 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - Guided Maintenance separates rich **SSH integrated** cards from compact
   **Status only** network-presence cards. Each surface lays out independently,
   preserving compact status-only rows as the fleet grows.
+- **Host Stewardship A0–A2** is candidate-complete for Operator review. Its
+  static capability registry distinguishes availability from authority; Host
+  Presence composes bounded current host/Core evidence with source-attributed
+  persisted security and backup-automation status only when requested. File
+  Steward uses a separate, empty-by-default `SOUL_FILE_STEWARD_ROOTS` allowlist
+  for one-level inventory and exact regular-file rename, move, copy,
+  quarantine, and restore. Every mutation is digest-bound, revalidated, and
+  receipt-backed. Overwrite, recursion, symlinks, hidden/secret-shaped paths,
+  hard links, directory mutation, and permanent deletion remain unavailable.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

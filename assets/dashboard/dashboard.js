@@ -3,6 +3,7 @@
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
 const TAB_LOCATIONS = Object.freeze({
   chat: "#chat-panel",
+  host: "#host-stewardship-panel",
   timeline: "#timeline-panel",
   studio: "#studio-panel",
   improvement: "#improvement-panel",
@@ -35,6 +36,7 @@ state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
+Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
 state.storageCleanupPreview = null;
@@ -571,6 +573,7 @@ function tabFromLocation() { return Object.entries(TAB_LOCATIONS).find(([, hash]
 function switchTab(name, { updateLocation = true } = {}) {
   if (!Object.hasOwn(TAB_LOCATIONS, name)) name = "chat";
   const chat = name === "chat";
+  const host = name === "host";
   const timeline = name === "timeline";
   if (!chat && state.voiceRecorder) cancelVoiceRecording("Voice capture stopped because Chat was closed.");
   if (!chat) stopVoicePlayback();
@@ -585,8 +588,9 @@ function switchTab(name, { updateLocation = true } = {}) {
   const backup = name === "backup";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual || mix;
-  const administration = timeline || maintenance || topology || backup;
+  const administration = host || timeline || maintenance || topology || backup;
   byId("chat-panel").hidden = !chat;
+  byId("host-stewardship-panel").hidden = !host;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
   byId("improvement-panel").hidden = !improvement;
@@ -598,6 +602,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("local-topology-panel").hidden = !topology;
   byId("backup-panel").hidden = !backup;
   byId("chat-tab").classList.toggle("is-active", chat);
+  byId("host-stewardship-tab").classList.toggle("is-active", host);
   byId("timeline-tab").classList.toggle("is-active", timeline);
   byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
   byId("studio-tab").classList.toggle("is-active", studio);
@@ -612,6 +617,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("backup-tab").classList.toggle("is-active", backup);
   byId("local-topology-tab").classList.toggle("is-active", topology);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
+  byId("host-stewardship-tab").setAttribute("aria-current", host ? "page" : "false");
   byId("timeline-tab").setAttribute("aria-current", timeline ? "page" : "false");
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
   byId("studio-tab").classList.toggle("is-active", studio);
@@ -639,6 +645,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (visual && state.authenticated && !state.visualLoaded) loadVisualStudio();
   if (mix && state.authenticated && !state.mixLoaded) loadMixStudio();
   if (timeline && state.authenticated && !state.timelineLoaded) loadProjectTimeline();
+  if (host && state.authenticated && !state.hostStewardshipLoaded) loadHostStewardship();
   if (maintenance && state.authenticated) {
     if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
     loadWazuhSecuritySnapshot();
@@ -4857,7 +4864,10 @@ function renderVisualBlenderCandidate(project, scene) {
   controls.append(rating, disposition, notes, review, revise, bind, download, remove, gate, status);
   if (study && Array.isArray(scene.comparison_scenes) && scene.comparison_scenes.length === 3) {
     const comparison = document.createElement("section"); comparison.className = "visual-blender-comparison";
-    const heading = document.createElement("div"); heading.className = "visual-blender-comparison-heading"; heading.innerHTML = "<strong>A5–A8 exact comparison</strong><span>Players reference digest-verified private artifacts; no baseline is substituted.</span>";
+    const heading = document.createElement("div"); heading.className = "visual-blender-comparison-heading";
+    const headingTitle = document.createElement("strong"); headingTitle.textContent = "A5–A8 exact comparison";
+    const headingCopy = document.createElement("span"); headingCopy.textContent = "Players reference digest-verified private artifacts; no baseline is substituted.";
+    heading.append(headingTitle, headingCopy);
     const grid = document.createElement("div"); grid.className = "visual-blender-comparison-grid";
     [{ scene_id: scene.scene_id, template_id: scene.template_id, current: true }, ...scene.comparison_scenes].forEach((reference) => {
       const baseline = reference.current ? scene : (project.blender_scenes || []).find((entry) => entry.scene_id === reference.scene_id);
@@ -5555,6 +5565,191 @@ async function executeBackupRestore() {
   finally { state.backupBusy = false; byId("execute-backup-restore").disabled = false; hideGenerationProgress(progress); }
 }
 
+function hostEnvelopeMessage(envelope, fallback) {
+  return envelope?.message || envelope?.errors?.[0]?.message || envelope?.error?.reason || fallback;
+}
+
+function renderHostPresence(snapshot) {
+  state.hostPresence = snapshot;
+  const stateLabel = byId("host-presence-state");
+  stateLabel.textContent = (snapshot.state || "unavailable").replaceAll("_", " ");
+  stateLabel.dataset.state = snapshot.state || "unavailable";
+  const target = byId("host-presence-signals");
+  target.replaceChildren();
+  const signals = Array.isArray(snapshot.signals) ? snapshot.signals : [];
+  if (!signals.length) {
+    const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No host signals were available."; target.append(empty);
+    return;
+  }
+  signals.forEach((signal) => {
+    const row = document.createElement("div"); row.className = "host-presence-signal"; row.dataset.state = signal.state || "unavailable";
+    const copy = document.createElement("div");
+    const label = document.createElement("strong"); label.textContent = String(signal.id || "signal").replaceAll("_", " ");
+    const summary = document.createElement("span"); summary.textContent = signal.summary || "No summary";
+    copy.append(label, summary);
+    const meta = document.createElement("small"); meta.textContent = [signal.state, signal.observed_at].filter(Boolean).join(" · ");
+    row.append(copy, meta); target.append(row);
+  });
+}
+
+function renderHostCapabilities(capabilities) {
+  state.hostCapabilities = Array.isArray(capabilities.records) ? capabilities.records : [];
+  byId("host-capability-count").textContent = String(state.hostCapabilities.length);
+  const target = byId("host-capability-list"); target.replaceChildren();
+  state.hostCapabilities.forEach((record) => {
+    const item = document.createElement("article"); item.className = "host-capability"; item.dataset.available = String(record.available === true);
+    const heading = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = record.label || record.id;
+    const maturity = document.createElement("span"); maturity.textContent = record.maturity || "unknown";
+    heading.append(title, maturity);
+    const evidence = document.createElement("p"); evidence.textContent = record.evidence || "No evidence declared";
+    const boundary = document.createElement("small"); boundary.textContent = record.available
+      ? `${record.mutation || "none"} · ${record.approval || "none"}`
+      : (record.unavailable_reason || "Unavailable by design");
+    item.append(heading, evidence, boundary); target.append(item);
+  });
+}
+
+function fillFileStewardRoots(roots) {
+  state.fileStewardRoots = roots.filter((root) => root.available);
+  ["file-steward-root", "file-steward-source-root", "file-steward-destination-root"].forEach((id) => {
+    const select = byId(id); const previous = select.value; select.replaceChildren();
+    state.fileStewardRoots.forEach((root) => { const option = document.createElement("option"); option.value = root.root_id; option.textContent = root.root_id; select.append(option); });
+    if (state.fileStewardRoots.some((root) => root.root_id === previous)) select.value = previous;
+  });
+}
+
+function fileStewardSelection() {
+  return { root_id: byId("file-steward-source-root").value, relative_path: byId("file-steward-source-path").value.trim() };
+}
+
+async function loadFileStewardInventory() {
+  const status = byId("file-steward-inventory-status");
+  if (!byId("file-steward-root").value) { status.textContent = "No owner-local File Steward roots are configured."; return; }
+  status.textContent = "Reading one bounded directory…";
+  try {
+    const envelope = await callSoul("file_steward.inventory", { root_id: byId("file-steward-root").value, relative_path: byId("file-steward-path").value.trim() || "." });
+    if (envelope.lifecycle_state !== "complete") { status.textContent = hostEnvelopeMessage(envelope, "Inventory stopped safely."); return; }
+    const inventory = dataOf(envelope); const target = byId("file-steward-inventory"); target.replaceChildren();
+    if (!inventory.entries?.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No visible regular files or directories."; target.append(empty); }
+    (inventory.entries || []).forEach((entry) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = "file-steward-entry"; button.dataset.type = entry.type;
+      const title = document.createElement("strong"); title.textContent = entry.name;
+      const meta = document.createElement("small"); meta.textContent = [entry.type, entry.bytes == null ? null : `${entry.bytes} bytes`, entry.modified_at].filter(Boolean).join(" · ");
+      button.append(title, meta);
+      button.addEventListener("click", () => {
+        const base = inventory.relative_path === "." ? "" : `${inventory.relative_path}/`; const relative = `${base}${entry.name}`;
+        if (entry.type === "directory") { byId("file-steward-path").value = relative; loadFileStewardInventory(); return; }
+        byId("file-steward-source-root").value = inventory.root_id; byId("file-steward-source-path").value = relative;
+        byId("file-steward-destination-root").value = inventory.root_id;
+        byId("file-steward-destination-path").value = relative;
+        status.textContent = `${entry.name} selected as the exact source.`;
+      });
+      target.append(button);
+    });
+    status.textContent = `${inventory.count || 0} entries · ${inventory.omitted_count || 0} protected or unsupported omitted${inventory.truncated ? " · bounded result truncated" : ""}`;
+  } catch (error) { status.textContent = error.message || "Inventory failed safely."; }
+}
+
+function renderFileStewardPreview(kind, preview) {
+  const gate = byId(`file-steward-${kind}-gate`); const output = byId(`file-steward-${kind}-preview`); const confirmation = byId(`file-steward-${kind}-confirmation`);
+  output.textContent = JSON.stringify(preview, null, 2); confirmation.value = preview.confirmation_phrase || ""; gate.hidden = false;
+}
+
+async function previewFileStewardOperation() {
+  const status = byId("file-steward-operation-status"); status.textContent = "Building an exact, non-overwriting plan…";
+  const parameters = { action: byId("file-steward-action").value, source_root_id: byId("file-steward-source-root").value, source_relative_path: byId("file-steward-source-path").value.trim(), destination_root_id: byId("file-steward-destination-root").value, destination_relative_path: byId("file-steward-destination-path").value.trim() };
+  try {
+    const envelope = await callSoul("file_steward.operation.preview", parameters);
+    if (envelope.lifecycle_state !== "complete") { state.fileStewardOperationPreview = null; byId("file-steward-operation-gate").hidden = true; status.textContent = hostEnvelopeMessage(envelope, "Preview stopped safely."); return; }
+    state.fileStewardOperationPreview = { parameters, plan: dataOf(envelope) }; renderFileStewardPreview("operation", dataOf(envelope)); status.textContent = "Review the exact source, destination, fingerprint, and confirmation.";
+  } catch (error) { status.textContent = error.message || "Preview failed safely."; }
+}
+
+async function executeFileStewardOperation() {
+  const preview = state.fileStewardOperationPreview; const status = byId("file-steward-operation-status"); if (!preview) return;
+  status.textContent = "Revalidating and executing the reviewed operation…";
+  try {
+    const envelope = await callSoul("file_steward.operation.execute", { ...preview.parameters, confirmation: byId("file-steward-operation-confirmation").value, expected_digest: preview.plan.expected_digest });
+    status.textContent = hostEnvelopeMessage(envelope, envelope.lifecycle_state === "complete" ? "Operation completed." : "Operation stopped safely.");
+    if (envelope.lifecycle_state === "complete") { state.fileStewardOperationPreview = null; byId("file-steward-operation-gate").hidden = true; await loadFileStewardInventory(); }
+  } catch (error) { status.textContent = error.message || "Operation failed safely."; }
+}
+
+async function previewFileStewardQuarantine() {
+  const status = byId("file-steward-quarantine-status"); const parameters = fileStewardSelection(); status.textContent = "Building an exact reversible quarantine plan…";
+  try {
+    const envelope = await callSoul("file_steward.quarantine.preview", parameters);
+    if (envelope.lifecycle_state !== "complete") { state.fileStewardQuarantinePreview = null; byId("file-steward-quarantine-gate").hidden = true; status.textContent = hostEnvelopeMessage(envelope, "Preview stopped safely."); return; }
+    state.fileStewardQuarantinePreview = { parameters, plan: dataOf(envelope) }; renderFileStewardPreview("quarantine", dataOf(envelope)); status.textContent = "Review this exact reversible removal. Permanent deletion is unavailable.";
+  } catch (error) { status.textContent = error.message || "Quarantine preview failed safely."; }
+}
+
+async function executeFileStewardQuarantine() {
+  const preview = state.fileStewardQuarantinePreview; const status = byId("file-steward-quarantine-status"); if (!preview) return;
+  status.textContent = "Revalidating bytes and moving the file into owner-private quarantine…";
+  try {
+    const envelope = await callSoul("file_steward.quarantine.execute", { ...preview.parameters, confirmation: byId("file-steward-quarantine-confirmation").value, expected_digest: preview.plan.expected_digest });
+    status.textContent = hostEnvelopeMessage(envelope, envelope.lifecycle_state === "complete" ? "File quarantined." : "Quarantine stopped safely.");
+    if (envelope.lifecycle_state === "complete") { state.fileStewardQuarantinePreview = null; byId("file-steward-quarantine-gate").hidden = true; await Promise.all([loadFileStewardInventory(), loadFileStewardQuarantine()]); }
+  } catch (error) { status.textContent = error.message || "Quarantine failed safely."; }
+}
+
+async function loadFileStewardQuarantine(payload = null) {
+  if (!payload) {
+    const envelope = await callSoul("file_steward.quarantine.list");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "Quarantine evidence unavailable."));
+    payload = dataOf(envelope);
+  }
+  state.fileStewardQuarantine = payload.entries || []; byId("file-steward-quarantine-count").textContent = String(payload.count || 0);
+  const target = byId("file-steward-quarantine-list"); target.replaceChildren();
+  if (!state.fileStewardQuarantine.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No files are quarantined."; target.append(empty); return; }
+  state.fileStewardQuarantine.forEach((entry) => {
+    const item = document.createElement("article"); item.className = "file-steward-quarantine-entry";
+    const copy = document.createElement("div"); const title = document.createElement("strong"); title.textContent = entry.source?.relative_path || entry.quarantine_id; const meta = document.createElement("small"); meta.textContent = `${entry.source?.root_id || "root"} · ${entry.quarantined_at || "time unavailable"}`; copy.append(title, meta);
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button"; button.textContent = "Preview restore"; button.addEventListener("click", () => previewFileStewardRestore(entry.quarantine_id));
+    item.append(copy, button); target.append(item);
+  });
+}
+
+async function previewFileStewardRestore(quarantineId) {
+  const status = byId("file-steward-restore-status"); status.textContent = "Revalidating quarantine bytes and original destination…";
+  try {
+    const envelope = await callSoul("file_steward.restore.preview", { quarantine_id: quarantineId });
+    if (envelope.lifecycle_state !== "complete") { state.fileStewardRestorePreview = null; byId("file-steward-restore-gate").hidden = true; status.textContent = hostEnvelopeMessage(envelope, "Restore preview stopped safely."); return; }
+    state.fileStewardRestorePreview = { quarantine_id: quarantineId, plan: dataOf(envelope) };
+    byId("file-steward-restore-preview").textContent = JSON.stringify(dataOf(envelope), null, 2); byId("file-steward-restore-confirmation").value = dataOf(envelope).confirmation_phrase || ""; byId("file-steward-restore-gate").hidden = false;
+    status.textContent = "Restore is allowed only when the original path remains absent.";
+  } catch (error) { status.textContent = error.message || "Restore preview failed safely."; }
+}
+
+async function executeFileStewardRestore() {
+  const preview = state.fileStewardRestorePreview; const status = byId("file-steward-restore-status"); if (!preview) return;
+  status.textContent = "Restoring and verifying exact bytes…";
+  try {
+    const envelope = await callSoul("file_steward.restore.execute", { quarantine_id: preview.quarantine_id, confirmation: byId("file-steward-restore-confirmation").value, expected_digest: preview.plan.expected_digest });
+    status.textContent = hostEnvelopeMessage(envelope, envelope.lifecycle_state === "complete" ? "File restored." : "Restore stopped safely.");
+    if (envelope.lifecycle_state === "complete") { state.fileStewardRestorePreview = null; byId("file-steward-restore-gate").hidden = true; await Promise.all([loadFileStewardQuarantine(), loadFileStewardInventory()]); }
+  } catch (error) { status.textContent = error.message || "Restore failed safely."; }
+}
+
+async function loadHostStewardship({ refresh = false } = {}) {
+  const status = byId("host-presence-status"); status.textContent = refresh ? "Reading current foreground evidence…" : "Opening Host Stewardship…";
+  try {
+    const [presenceEnvelope, rootsEnvelope, quarantineEnvelope] = await Promise.all([callSoul("host_stewardship.snapshot"), callSoul("file_steward.roots"), callSoul("file_steward.quarantine.list")]);
+    if (presenceEnvelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(presenceEnvelope, "Host Presence unavailable."));
+    const presence = dataOf(presenceEnvelope); renderHostPresence(presence); renderHostCapabilities(presence.capabilities || {});
+    if (rootsEnvelope.lifecycle_state === "complete") fillFileStewardRoots(dataOf(rootsEnvelope).roots || []);
+    if (quarantineEnvelope.lifecycle_state === "complete") {
+      const quarantine = dataOf(quarantineEnvelope); state.fileStewardQuarantine = quarantine.entries || [];
+      byId("file-steward-quarantine-count").textContent = String(quarantine.count || 0);
+      await loadFileStewardQuarantine(quarantine);
+    }
+    state.hostStewardshipLoaded = true; status.textContent = `Foreground snapshot complete · ${presence.state || "unavailable"} · no background polling`;
+    if (state.fileStewardRoots.length) await loadFileStewardInventory(); else byId("file-steward-inventory-status").textContent = "No owner-local SOUL_FILE_STEWARD_ROOTS are configured.";
+  } catch (error) { status.textContent = error.message || "Host Stewardship failed safely."; }
+}
+
 async function bootstrap() {
   if (state.bootstrapped) return;
   state.bootstrapped = true;
@@ -6032,6 +6227,7 @@ document.querySelectorAll("[data-activity-filter]").forEach((button) => button.a
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
 byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
 byId("chat-tab").addEventListener("click", () => switchTab("chat"));
+byId("host-stewardship-tab").addEventListener("click", () => switchTab("host"));
 byId("timeline-tab").addEventListener("click", () => switchTab("timeline"));
 byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
 byId("creative-tab").addEventListener("click", () => setCreativeMenu(byId("creative-menu").hidden));
@@ -6055,6 +6251,17 @@ byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("local-topology-tab").addEventListener("click", () => switchTab("topology"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
+byId("refresh-host-presence").addEventListener("click", () => loadHostStewardship({ refresh: true }));
+byId("inspect-file-steward").addEventListener("click", loadFileStewardInventory);
+byId("preview-file-operation").addEventListener("click", previewFileStewardOperation);
+byId("execute-file-operation").addEventListener("click", executeFileStewardOperation);
+byId("preview-file-quarantine").addEventListener("click", previewFileStewardQuarantine);
+byId("execute-file-quarantine").addEventListener("click", executeFileStewardQuarantine);
+byId("restore-file-quarantine").addEventListener("click", executeFileStewardRestore);
+byId("file-steward-action").addEventListener("change", () => {
+  if (byId("file-steward-action").value === "rename") byId("file-steward-destination-root").value = byId("file-steward-source-root").value;
+  state.fileStewardOperationPreview = null; byId("file-steward-operation-gate").hidden = true;
+});
 byId("refresh-maintenance-fleet").addEventListener("click", loadMaintenanceFleet);
 byId("refresh-maintenance-wazuh").addEventListener("click", (event) => refreshWazuhSecurity(event.currentTarget));
 byId("collect-local-topology-fleet").addEventListener("click", () => loadMaintenanceFleet({ buttonId: "collect-local-topology-fleet", statusId: "local-topology-status" }));
