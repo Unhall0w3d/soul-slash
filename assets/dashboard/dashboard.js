@@ -36,7 +36,7 @@ state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
-Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
+Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
 state.storageCleanupPreview = null;
@@ -5610,6 +5610,142 @@ function renderHostCapabilities(capabilities) {
   });
 }
 
+function stewardEmpty(target, message) {
+  const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = message; target.append(empty);
+}
+
+function stewardStat(target, value, label) {
+  const item = document.createElement("div"); item.className = "steward-stat";
+  const count = document.createElement("strong"); count.textContent = String(value ?? "—");
+  const copy = document.createElement("span"); copy.textContent = label;
+  item.append(count, copy); target.append(item);
+}
+
+function stewardEvidence(target, titleText, summaryText, metaText, evidenceState = "healthy") {
+  const item = document.createElement("article"); item.className = "steward-evidence"; item.dataset.state = evidenceState;
+  const title = document.createElement("strong"); title.textContent = titleText;
+  const summary = document.createElement("span"); summary.textContent = summaryText;
+  const meta = document.createElement("small"); meta.textContent = metaText;
+  item.append(title, summary, meta); target.append(item);
+}
+
+function renderSoftwareSteward(snapshot) {
+  state.softwareSteward = snapshot;
+  const packageInventory = snapshot.package_inventory || {};
+  const audit = snapshot.arch_audit || {};
+  const auditCount = Number(audit.count || 0);
+  const criticalCount = Number(audit.findings_by_severity?.critical || 0);
+  const badge = byId("software-steward-state");
+  badge.textContent = criticalCount > 0 ? "Critical findings" : (auditCount > 0 ? "Review findings" : "Read only");
+  badge.dataset.state = criticalCount > 0 ? "critical" : (auditCount > 0 ? "attention" : "healthy");
+
+  const summary = byId("software-steward-summary"); summary.replaceChildren();
+  stewardStat(summary, packageInventory.installed?.count, "Installed packages");
+  stewardStat(summary, packageInventory.explicit?.count, "Explicit native");
+  stewardStat(summary, packageInventory.foreign?.count, "Foreign / AUR");
+  stewardStat(summary, packageInventory.orphans?.count, "Orphan candidates");
+  stewardStat(summary, snapshot.flatpak?.count, "Flatpak applications");
+  stewardStat(summary, audit.available === false ? "—" : auditCount, "Security findings");
+
+  const target = byId("software-steward-audit"); target.replaceChildren();
+  [["Foreign / AUR packages", packageInventory.foreign], ["Orphan candidates", packageInventory.orphans], ["Flatpak applications", snapshot.flatpak]].forEach(([label, source]) => {
+    if (source?.available === false) stewardEvidence(target, `${label} unavailable`, source.reason || "The source could not be read.", "No package mutation attempted", "attention");
+    else if (source?.items?.length) stewardEvidence(target, label, source.items.join(", "), source.truncated ? `Showing first ${source.items.length} of ${source.count}` : `${source.count} reported`, "healthy");
+  });
+  if (audit.available === false) {
+    stewardEvidence(target, "Arch security evidence unavailable", audit.reason || "The source could not be read.", "No package mutation attempted", "attention");
+    return;
+  }
+  if (!(audit.findings || []).length) {
+    stewardEvidence(target, "No reported findings", "arch-audit did not report an affected installed package.", "Public Arch security evidence", "healthy");
+    return;
+  }
+  (audit.findings || []).forEach((finding) => {
+    const advisories = (finding.advisories || []).map((advisory) => advisory.advisory).filter(Boolean);
+    const fixed = (finding.advisories || []).map((advisory) => advisory.fixed_version).filter(Boolean);
+    stewardEvidence(target, finding.affected_package || "Affected package", advisories.length ? advisories.join(", ") : "Security advisory reported", [finding.severity || "unknown severity", fixed.length ? `fixed ${fixed.join(", ")}` : null].filter(Boolean).join(" · "), finding.severity === "critical" ? "critical" : "attention");
+  });
+}
+
+async function refreshSoftwareSteward() {
+  const status = byId("software-steward-status"); const button = byId("refresh-software-steward");
+  button.disabled = true; status.textContent = "Reading bounded package and public security evidence…";
+  try {
+    const envelope = await callSoul("software_steward.refresh");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "Software inventory stopped safely."));
+    const snapshot = dataOf(envelope); renderSoftwareSteward(snapshot);
+    const audit = snapshot.arch_audit || {}; const truncated = [snapshot.package_inventory?.foreign, snapshot.package_inventory?.orphans, snapshot.flatpak, audit].some((source) => source?.truncated);
+    status.textContent = `${snapshot.package_inventory?.installed?.count || 0} installed · ${audit.available === false ? "security lookup unavailable" : `${audit.count || 0} security findings`} · ${truncated ? "bounded results truncated · " : ""}no mutation authority`;
+  } catch (error) { byId("software-steward-state").textContent = "Unavailable"; status.textContent = error.message || "Software inventory failed safely."; }
+  finally { button.disabled = false; }
+}
+
+function renderStorageSteward(snapshot) {
+  state.storageSteward = snapshot;
+  const devices = snapshot.block_devices || {};
+  const filesystems = snapshot.filesystems || {};
+  const nvme = snapshot.nvme || {};
+  const compression = Array.isArray(snapshot.compression_roots) ? snapshot.compression_roots : [];
+  const unavailable = [devices, filesystems, nvme].filter((source) => source.available === false).length + compression.filter((root) => root.available === false).length;
+  const badge = byId("storage-steward-state"); badge.textContent = unavailable ? `${unavailable} unavailable` : "Read only"; badge.dataset.state = unavailable ? "attention" : "healthy";
+
+  const summary = byId("storage-steward-summary"); summary.replaceChildren();
+  stewardStat(summary, devices.available === false ? "—" : devices.count, "Block devices");
+  stewardStat(summary, filesystems.available === false ? "—" : filesystems.count, "Filesystems");
+  stewardStat(summary, nvme.available === false ? "—" : nvme.count, "NVMe devices");
+  stewardStat(summary, compression.length, "Compression roots");
+
+  const target = byId("storage-steward-evidence"); target.replaceChildren();
+  if (devices.available === false) stewardEvidence(target, "Block device evidence unavailable", devices.reason || "The source could not be read.", "No elevation attempted", "attention");
+  (devices.entries || []).forEach((device) => stewardEvidence(target, device.model || device.device_id || device.kernel_name || "Block device", [formatBytes(device.size_bytes), device.transport, device.rotational ? "rotational" : "solid state"].filter(Boolean).join(" · "), device.device_id || device.kernel_name || "bounded identifier", "healthy"));
+  if (filesystems.available === false) stewardEvidence(target, "Filesystem evidence unavailable", filesystems.reason || "The source could not be read.", "No elevation attempted", "attention");
+  (filesystems.entries || []).forEach((filesystem) => stewardEvidence(target, filesystem.mount_id || "Filesystem", `${filesystem.filesystem_type || "unknown type"} · ${filesystem.used_percent ?? "—"}% used`, `${formatBytes(filesystem.used_bytes)} of ${formatBytes(filesystem.size_bytes)}`, Number(filesystem.used_percent || 0) >= 90 ? "critical" : (Number(filesystem.used_percent || 0) >= 80 ? "attention" : "healthy")));
+  if (nvme.available === false) stewardEvidence(target, "NVMe evidence unavailable", nvme.reason || "The source could not be read.", "No elevation attempted", "attention");
+  (nvme.devices || []).forEach((device) => stewardEvidence(target, device.model || device.device_id || "NVMe device", `${formatBytes(device.namespace_capacity_bytes)} · firmware ${device.firmware || "unknown"}`, device.device_id || "bounded identifier", "healthy"));
+  (nvme.smart || []).forEach((smart) => {
+    const health = smart.health && typeof smart.health === "object" ? Object.entries(smart.health).map(([key, value]) => `${key.replaceAll("_", " ")} ${value}`).join(" · ") : (smart.health || "SMART evidence available");
+    stewardEvidence(target, `${smart.device_id || "NVMe"} health`, smart.available ? health : (smart.reason || "SMART evidence unavailable without privilege"), smart.available ? "unprivileged evidence" : "no elevation attempted", smart.available ? "healthy" : "attention");
+  });
+  compression.forEach((root) => stewardEvidence(target, `Compression · ${root.root_id || "root"}`, root.available ? (root.summary || "Compression evidence available") : (root.reason || "Compression evidence unavailable"), "Configured root identifier only", root.available ? "healthy" : "attention"));
+  if (!target.childElementCount) stewardEmpty(target, "No storage evidence was returned.");
+}
+
+async function refreshStorageSteward() {
+  const status = byId("storage-steward-status"); const button = byId("refresh-storage-steward");
+  button.disabled = true; status.textContent = "Reading bounded storage evidence…";
+  try {
+    const envelope = await callSoul("storage_steward.refresh");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "Storage inventory stopped safely."));
+    const snapshot = dataOf(envelope); renderStorageSteward(snapshot);
+    const truncated = [snapshot.block_devices, snapshot.filesystems, snapshot.nvme].some((source) => source?.truncated);
+    status.textContent = `${snapshot.block_devices?.count || 0} devices · ${snapshot.filesystems?.count || 0} filesystems · ${truncated ? "bounded results truncated · " : ""}foreground only · no mutation authority`;
+  } catch (error) { byId("storage-steward-state").textContent = "Unavailable"; status.textContent = error.message || "Storage inventory failed safely."; }
+  finally { button.disabled = false; }
+}
+
+function renderStorageIoDiagnostic(snapshot) {
+  state.storageIoDiagnostic = snapshot;
+  const target = byId("storage-steward-io"); target.replaceChildren();
+  if (snapshot.available === false) {
+    stewardEvidence(target, "I/O sample unavailable", snapshot.reason || "iotop requires authority not held by the Dashboard.", "No sudo or capability change attempted", "attention");
+    return;
+  }
+  if (!(snapshot.rows || []).length) { stewardEvidence(target, "No active I/O observed", "The bounded sample returned no process rows.", "Point-in-time evidence", "healthy"); return; }
+  (snapshot.rows || []).forEach((row) => stewardEvidence(target, `Process ${row.process_id || "unknown"}`, `read ${row.disk_read || "0"} · write ${row.disk_write || "0"}`, [row.user, row.priority, `I/O ${row.io || "0"}`].filter(Boolean).join(" · "), "healthy"));
+}
+
+async function sampleStorageIo() {
+  const status = byId("storage-steward-status"); const button = byId("sample-storage-io");
+  button.disabled = true; status.textContent = "Taking one bounded foreground I/O sample…";
+  try {
+    const envelope = await callSoul("storage_steward.io_diagnostic");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "I/O sample stopped safely."));
+    const snapshot = dataOf(envelope); renderStorageIoDiagnostic(snapshot);
+    status.textContent = snapshot.available === false ? "I/O source unavailable without existing authority; no elevation attempted." : `${snapshot.rows?.length || 0} I/O rows sampled · foreground operation complete`;
+  } catch (error) { status.textContent = error.message || "I/O sample failed safely."; }
+  finally { button.disabled = false; }
+}
+
 function fillFileStewardRoots(roots) {
   state.fileStewardRoots = roots.filter((root) => root.available);
   ["file-steward-root", "file-steward-source-root", "file-steward-destination-root"].forEach((id) => {
@@ -6252,6 +6388,9 @@ byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance")
 byId("local-topology-tab").addEventListener("click", () => switchTab("topology"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("refresh-host-presence").addEventListener("click", () => loadHostStewardship({ refresh: true }));
+byId("refresh-software-steward").addEventListener("click", refreshSoftwareSteward);
+byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);
+byId("sample-storage-io").addEventListener("click", sampleStorageIo);
 byId("inspect-file-steward").addEventListener("click", loadFileStewardInventory);
 byId("preview-file-operation").addEventListener("click", previewFileStewardOperation);
 byId("execute-file-operation").addEventListener("click", executeFileStewardOperation);
