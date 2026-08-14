@@ -14,8 +14,8 @@ Human-facing inputs and outputs:
 - Chat plus grouped Self Improvement, Creative Studios, and Administration navigation
 - Skill Studio, Self Assessment, Self Augmentation, Music Studio, and Visual Studio
 - Host Stewardship with a static capability registry, foreground Host Presence,
-  read-only Software and Storage Stewards, and a separately configured File
-  Steward mutation boundary
+  read-only Software and Storage Stewards, deterministic retained-evidence
+  Incident Narrator, and a separately configured File Steward mutation boundary
 - header-level Review Center and manual Core selection
 - shared workspace and inbox metadata inside Chat
 - explicit Chat push-to-talk through bounded local CPU transcription

@@ -184,12 +184,12 @@ surfaces:
   - id: security_monitoring
     label: Security Monitoring
     aliases: [security, security status, wazuh, security monitoring]
-    summary: Inspect bounded Wazuh manager, agent, recent-alert, and adapted-posture aggregates through Dashboard, Chat, or Voice Presence.
+    summary: Inspect bounded Wazuh manager, agent, recent-alert, and adapted-posture aggregates, then compose retained evidence through a separate deterministic Dashboard narrator.
     inputs: Ask an explicit security-status or recent-alert question; no target is required for the aggregate read.
-    boundary: Wazuh remains the investigation console; raw events, alert descriptions, ClamAV scan freshness, acknowledgement, suppression, quarantine, and remediation are unavailable.
+    boundary: Wazuh remains the investigation console; Incident Narrator does not refresh sources or claim root cause; raw events, alert descriptions, ClamAV scan freshness, acknowledgement, suppression, quarantine, and remediation are unavailable.
     skills: [security.status]
     invocations: [security-status]
-    operations: [security.wazuh.status, security.wazuh.snapshot, security.wazuh.alerts.status, security.wazuh.alerts.snapshot, security.wazuh.notifications.status, security.wazuh.posture.status]
+    operations: [security.wazuh.status, security.wazuh.snapshot, security.wazuh.alerts.status, security.wazuh.alerts.snapshot, security.wazuh.notifications.status, security.wazuh.posture.status, incident_narrator.compose]
     targets: [Wazuh monitoring plane, enrolled-agent aggregates, recent-alert aggregates]
     interfaces: [dashboard, chat, voice_presence]
     coverage: {dashboard: available, chat: available, voice: available}

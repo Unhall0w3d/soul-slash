@@ -284,6 +284,11 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   compression evidence without paths, serials, command lines, or storage
   mutation. I/O diagnosis remains a separate one-shot request and does not
   elevate when `iotop` is unavailable to the Dashboard process.
+- **Incident Narrator A0** is candidate-complete for Operator review. It composes only
+  retained normalized Wazuh, maintenance-receipt, and backup/DRS evidence into
+  a deterministic newest-first chronology. Observations, cautious inference,
+  and missing evidence remain distinct; raw alert descriptions, paths, command
+  lines, credentials, model use, source refresh, and remediation are excluded.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

@@ -139,6 +139,22 @@ module SoulCore
       validated_password&.replace("\0" * validated_password.bytesize)
     end
 
+    def retained_drs_status
+      {
+        "ok" => true,
+        "lifecycle_state" => "complete",
+        "mutation" => "none",
+        "data" => {
+          "profile_id" => @profile_id,
+          "drs" => latest_drs_status,
+          "source" => "retained_backup_receipt",
+          "automatic_refresh" => false
+        }
+      }
+    rescue StandardError => error
+      blocked("retained DRS status failed safely: #{safe_error(error)}")
+    end
+
     def manifest_reconciliation_preview
       scope = manifest_reconciliation_scope
       complete("exact add-only backup manifest reconciliation prepared", manifest_reconciliation_view(scope).merge(

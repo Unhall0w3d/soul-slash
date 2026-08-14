@@ -36,7 +36,7 @@ state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
 Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTimelineItem: null });
-Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
+Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, incidentNarrative: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
 state.storageCleanupPreview = null;
@@ -5746,6 +5746,50 @@ async function sampleStorageIo() {
   finally { button.disabled = false; }
 }
 
+function renderIncidentNarrative(report) {
+  state.incidentNarrative = report;
+  const badge = byId("incident-narrator-state");
+  const reportState = String(report.state || "unavailable");
+  badge.textContent = reportState.replaceAll("_", " ");
+  badge.dataset.state = reportState === "critical" ? "critical" : (reportState === "attention" ? "attention" : (reportState === "quiet" ? "healthy" : "attention"));
+
+  const summary = byId("incident-narrator-summary"); summary.replaceChildren();
+  const headline = document.createElement("strong"); headline.textContent = report.headline || "Evidence could not be summarized";
+  const copy = document.createElement("span"); copy.textContent = report.summary || "No deterministic summary was returned.";
+  summary.append(headline, copy);
+
+  const events = byId("incident-narrator-events"); events.replaceChildren();
+  if (!(report.events || []).length) stewardEmpty(events, "No retained events were available.");
+  (report.events || []).forEach((event) => {
+    const title = [event.category, event.severity].filter(Boolean).map((value) => String(value).replaceAll("_", " ")).join(" · ") || "Observed evidence";
+    stewardEvidence(events, title, event.statement || "Retained event", [event.observed_at, event.evidence_id].filter(Boolean).join(" · "), event.severity === "critical" ? "critical" : (["high", "failed", "blocked_for_human_review"].includes(event.severity) ? "attention" : "healthy"));
+  });
+
+  const findings = byId("incident-narrator-findings"); findings.replaceChildren();
+  if (!(report.findings || []).length) stewardEmpty(findings, "No interpretation was produced.");
+  (report.findings || []).forEach((finding) => {
+    const kind = String(finding.kind || "observation");
+    const support = Array(finding.supporting_evidence_ids || finding.evidence_ids).filter(Boolean);
+    const meta = [finding.confidence ? `${finding.confidence} confidence` : null, support.length ? `evidence ${support.join(", ")}` : null].filter(Boolean).join(" · ");
+    stewardEvidence(findings, kind.replaceAll("_", " "), finding.statement || "No finding text returned", meta || "Source status only", kind === "gap" ? "gap" : (kind === "inference" ? "inference" : "healthy"));
+  });
+}
+
+async function composeIncidentNarrative() {
+  const status = byId("incident-narrator-status"); const button = byId("compose-incident-narrative");
+  button.disabled = true; status.textContent = "Composing retained evidence without refreshing its sources…";
+  try {
+    const envelope = await callSoul("incident_narrator.compose");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "Incident narrative stopped safely."));
+    const report = dataOf(envelope); renderIncidentNarrative(report);
+    const gaps = (report.findings || []).filter((finding) => finding.kind === "gap").length;
+    status.textContent = `${report.events?.length || 0} retained events · ${gaps} evidence gaps · deterministic · no source refresh · no mutation authority`;
+  } catch (error) {
+    byId("incident-narrator-state").textContent = "Unavailable";
+    status.textContent = error.message || "Incident narrative failed safely.";
+  } finally { button.disabled = false; }
+}
+
 function fillFileStewardRoots(roots) {
   state.fileStewardRoots = roots.filter((root) => root.available);
   ["file-steward-root", "file-steward-source-root", "file-steward-destination-root"].forEach((id) => {
@@ -6391,6 +6435,7 @@ byId("refresh-host-presence").addEventListener("click", () => loadHostStewardshi
 byId("refresh-software-steward").addEventListener("click", refreshSoftwareSteward);
 byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);
 byId("sample-storage-io").addEventListener("click", sampleStorageIo);
+byId("compose-incident-narrative").addEventListener("click", composeIncidentNarrative);
 byId("inspect-file-steward").addEventListener("click", loadFileStewardInventory);
 byId("preview-file-operation").addEventListener("click", previewFileStewardOperation);
 byId("execute-file-operation").addEventListener("click", executeFileStewardOperation);

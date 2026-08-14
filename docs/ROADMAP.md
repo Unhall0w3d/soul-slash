@@ -92,6 +92,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   compression-root, and separately invoked I/O evidence. Package and storage
   mutation, privilege elevation, command-line disclosure, and background
   collection remain excluded.
+- [ ] Operator review of Incident Narrator A0: deterministic retained-evidence
+  chronology, cautious source-bound inference, explicit evidence gaps, and no
+  source refresh, model use, diagnosis claim, or remediation authority.
 
 - Track-aware new-song production has an accepted architecture candidate and is
   paused pending FL Studio installation and its A0 interchange proof. The

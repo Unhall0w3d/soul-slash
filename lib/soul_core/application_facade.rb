@@ -31,6 +31,7 @@ require_relative "host_stewardship_service"
 require_relative "file_steward_service"
 require_relative "software_steward_service"
 require_relative "storage_steward_service"
+require_relative "incident_narrator_service"
 require_relative "backup_administration_service"
 require_relative "nightly_drs_deployment"
 require_relative "project_tracker_service"
@@ -102,6 +103,7 @@ module SoulCore
       file_steward_service: nil,
       software_steward_service: nil,
       storage_steward_service: nil,
+      incident_narrator_service: nil,
       backup_administration_service: nil,
       operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
@@ -174,6 +176,7 @@ module SoulCore
       @file_steward_service = file_steward_service
       @software_steward_service = software_steward_service
       @storage_steward_service = storage_steward_service
+      @incident_narrator_service = incident_narrator_service
       @backup_administration_service = backup_administration_service
       @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
@@ -448,6 +451,7 @@ module SoulCore
       when "security.wazuh.notifications.status" then domain(wazuh_alert_notifications.status)
       when "security.wazuh.posture.status" then domain(wazuh_compliance_posture.status)
       when "security.wazuh.posture.snapshot" then domain(wazuh_compliance_posture.snapshot)
+      when "incident_narrator.compose" then domain(incident_narrator.compose)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
       when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
@@ -920,6 +924,17 @@ module SoulCore
 
     def storage_steward
       @storage_steward_service ||= StorageStewardService.new(process_env: @process_env, clock: @clock)
+    end
+
+    def incident_narrator
+      @incident_narrator_service ||= IncidentNarratorService.new(
+        alert_source: -> { wazuh_alert_evidence.snapshot },
+        security_source: -> { wazuh_security_status.snapshot },
+        maintenance_device_receipt_source: -> { maintenance_device_control.retained_receipts(limit: 16) },
+        maintenance_host_receipt_source: -> { maintenance_foreground_execution.retained_receipts(limit: 16) },
+        backup_source: -> { backup_administration.retained_drs_status },
+        clock: @clock
+      )
     end
 
     def host_stewardship

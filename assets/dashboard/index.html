@@ -240,6 +240,18 @@
           <p id="storage-steward-status" class="dialog-status" role="status" aria-live="polite">Unavailable unprivileged sources remain unavailable; this surface never elevates.</p>
         </section>
 
+        <section class="improvement-card incident-narrator-card" aria-labelledby="incident-narrator-heading">
+          <div class="card-heading"><div><p class="eyebrow">Evidence synthesis</p><h2 id="incident-narrator-heading">Incident Narrator</h2></div><span id="incident-narrator-state" class="count-badge">Not composed</span></div>
+          <p class="card-note">Builds one deterministic explanation from retained security, maintenance, and continuity evidence. It does not refresh sources, diagnose root cause, or perform remediation.</p>
+          <button id="compose-incident-narrative" class="refresh-button" type="button">Compose incident narrative</button>
+          <div id="incident-narrator-summary" class="incident-narrator-summary"><p class="muted">No narrative requested.</p></div>
+          <div class="incident-narrator-columns">
+            <section><h3>Evidence timeline</h3><div id="incident-narrator-events" class="steward-evidence-list"><p class="muted">No retained evidence composed.</p></div></section>
+            <section><h3>Interpretation</h3><div id="incident-narrator-findings" class="steward-evidence-list"><p class="muted">Observations, inferences, and gaps will remain distinct.</p></div></section>
+          </div>
+          <p id="incident-narrator-status" class="dialog-status" role="status" aria-live="polite">Runs only when requested · model-free · no mutation authority.</p>
+        </section>
+
         <section class="improvement-card file-steward-card" aria-labelledby="file-steward-heading">
           <div class="card-heading"><div><p class="eyebrow">Bounded file work</p><h2 id="file-steward-heading">File Steward</h2></div><span class="count-badge">A0–A2</span></div>
           <p class="card-note">Only explicitly configured roots are visible. Hidden paths, symlinks, secrets, hard links, devices, recursive directory operations, overwrites, and permanent deletion fail closed.</p>
