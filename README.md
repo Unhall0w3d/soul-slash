@@ -50,7 +50,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Knowledge Vault | Share a portable Markdown knowledge surface with Soul and optionally open it in Obsidian | [Knowledge Vault](docs/guides/KNOWLEDGE_VAULT.md) |
 | Local Search | Search reviewed documentation, Knowledge Vault notes, and canonical Music/Visual briefs with source citations | [Local Project and Document Search](docs/guides/LOCAL_SEARCH.md) |
 | Project Timeline | Share and explicitly maintain the owner-local implementation ledger through the Dashboard or Chat | [Project Timeline](docs/guides/PROJECT_TIMELINE.md) |
-| Host Stewardship | Read bounded host posture and stage reversible file rename, move, copy, quarantine, and restore operations inside explicitly configured roots | [Host Stewardship and File Steward](docs/guides/HOST_STEWARDSHIP.md) |
+| Host Stewardship | Read bounded host, software, storage, and security posture; stage reversible file rename, move, copy, quarantine, and restore operations inside explicitly configured roots | [Host Stewardship and File Steward](docs/guides/HOST_STEWARDSHIP.md) |
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
 | Guided Maintenance | Maintain trusted repositories and Flatpak, review AUR updates separately, and operate the distinct reboot/Hyprland restoration flow | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
 | Security Monitoring | Operate accepted Wazuh observability, selective ClamAV scanning, and privacy-filtered read-only Chat/Voice status | [Security Monitoring](docs/guides/SECURITY_MONITORING.md) |

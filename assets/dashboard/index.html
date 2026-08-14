@@ -218,6 +218,28 @@
           <div id="host-capability-list" class="host-capability-list"><p class="muted">No capability evidence loaded.</p></div>
         </section>
 
+        <section class="improvement-card software-steward-card" aria-labelledby="software-steward-heading">
+          <div class="card-heading"><div><p class="eyebrow">Installed software posture</p><h2 id="software-steward-heading">Software Steward</h2></div><span id="software-steward-state" class="count-badge">Not read</span></div>
+          <p class="card-note">A read-only pacman, Flatpak, and Arch security snapshot. Security lookup may contact the public Arch security tracker; no package is installed, upgraded, or removed.</p>
+          <button id="refresh-software-steward" class="refresh-button" type="button">Inspect installed software</button>
+          <div id="software-steward-summary" class="steward-summary"><p class="muted">No software inventory requested.</p></div>
+          <div id="software-steward-audit" class="steward-evidence-list"><p class="muted">No vulnerability evidence requested.</p></div>
+          <p id="software-steward-status" class="dialog-status" role="status" aria-live="polite">Runs only when requested.</p>
+        </section>
+
+        <section class="improvement-card storage-steward-card" aria-labelledby="storage-steward-heading">
+          <div class="card-heading"><div><p class="eyebrow">Storage posture</p><h2 id="storage-steward-heading">Storage Steward</h2></div><span id="storage-steward-state" class="count-badge">Not read</span></div>
+          <p class="card-note">Reads bounded device, filesystem, NVMe, and configured Btrfs compression evidence. Serial numbers, file contents, command lines, and absolute paths stay private.</p>
+          <div class="steward-button-row">
+            <button id="refresh-storage-steward" class="refresh-button" type="button">Inspect storage</button>
+            <button id="sample-storage-io" class="refresh-button" type="button">Sample I/O once</button>
+          </div>
+          <div id="storage-steward-summary" class="steward-summary"><p class="muted">No storage evidence requested.</p></div>
+          <div id="storage-steward-evidence" class="steward-evidence-list"><p class="muted">No device evidence requested.</p></div>
+          <div id="storage-steward-io" class="steward-io-evidence"><p class="muted">I/O has not been sampled.</p></div>
+          <p id="storage-steward-status" class="dialog-status" role="status" aria-live="polite">Unavailable unprivileged sources remain unavailable; this surface never elevates.</p>
+        </section>
+
         <section class="improvement-card file-steward-card" aria-labelledby="file-steward-heading">
           <div class="card-heading"><div><p class="eyebrow">Bounded file work</p><h2 id="file-steward-heading">File Steward</h2></div><span class="count-badge">A0–A2</span></div>
           <p class="card-note">Only explicitly configured roots are visible. Hidden paths, symlinks, secrets, hard links, devices, recursive directory operations, overwrites, and permanent deletion fail closed.</p>

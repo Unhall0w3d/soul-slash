@@ -29,6 +29,8 @@ require_relative "host_system_status_collector"
 require_relative "host_stewardship_capability_registry"
 require_relative "host_stewardship_service"
 require_relative "file_steward_service"
+require_relative "software_steward_service"
+require_relative "storage_steward_service"
 require_relative "backup_administration_service"
 require_relative "nightly_drs_deployment"
 require_relative "project_tracker_service"
@@ -98,6 +100,8 @@ module SoulCore
       host_stewardship_capability_registry: nil,
       host_stewardship_service: nil,
       file_steward_service: nil,
+      software_steward_service: nil,
+      storage_steward_service: nil,
       backup_administration_service: nil,
       operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
@@ -168,6 +172,8 @@ module SoulCore
       @host_stewardship_capability_registry = host_stewardship_capability_registry
       @host_stewardship_service = host_stewardship_service
       @file_steward_service = file_steward_service
+      @software_steward_service = software_steward_service
+      @storage_steward_service = storage_steward_service
       @backup_administration_service = backup_administration_service
       @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
@@ -303,6 +309,9 @@ module SoulCore
       when "system_status.refresh" then [collect_system_status, "complete", "none", false]
       when "host_stewardship.capabilities" then domain(host_stewardship_capabilities.snapshot(file_steward_configured: file_steward.configured?))
       when "host_stewardship.snapshot" then domain(host_stewardship.snapshot)
+      when "software_steward.refresh" then domain(software_steward.refresh)
+      when "storage_steward.refresh" then domain(storage_steward.refresh)
+      when "storage_steward.io_diagnostic" then domain(storage_steward.io_diagnostic)
       when "file_steward.roots" then domain(file_steward.roots)
       when "file_steward.inventory" then domain(file_steward.inventory(root_id: required(parameters, "root_id"), relative_path: parameters["relative_path"] || "."))
       when "file_steward.operation.preview" then domain(file_steward.operation_preview(action: required(parameters, "action"), source_root_id: required(parameters, "source_root_id"), source_relative_path: required(parameters, "source_relative_path"), destination_root_id: required(parameters, "destination_root_id"), destination_relative_path: required(parameters, "destination_relative_path")))
@@ -903,6 +912,14 @@ module SoulCore
         process_env: @process_env,
         clock: @clock
       )
+    end
+
+    def software_steward
+      @software_steward_service ||= SoftwareStewardService.new(clock: @clock)
+    end
+
+    def storage_steward
+      @storage_steward_service ||= StorageStewardService.new(process_env: @process_env, clock: @clock)
     end
 
     def host_stewardship

@@ -3,6 +3,23 @@
   "title": "Soul / Project Timeline",
   "items": [
     {
+      "item_id": "track_software_storage_steward_a0_a1",
+      "title": "Review Software and Storage Steward A0–A1",
+      "area": "Administration + Host Stewardship",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Review bounded, read-only software, package-security, device, filesystem, NVMe, compression, and separately invoked I/O evidence in Host Stewardship.",
+      "implementation": "Software Steward runs foreground pacman, Flatpak, and arch-audit sources with bounded lists and no package mutation. Storage Steward runs foreground block-device, filesystem, NVMe, and configured compsize sources without exposing serials, paths, command lines, environment values, or contents. The I/O diagnostic remains a separate bounded request and does not elevate when iotop lacks authority.",
+      "technologies": "Ruby bounded services; pacman; Flatpak; arch-audit; lsblk/findmnt; nvme-cli; compsize; iotop-c; authenticated Dashboard HTML, CSS, and JavaScript.",
+      "interfaces": "Administration → Host Stewardship → Software Steward and Storage Steward; manual foreground refresh buttons; separate one-shot I/O sample.",
+      "commands": "make verify-software-storage-steward\nmake verify-host-stewardship-file-steward",
+      "references": "docs/soul/SOFTWARE_STORAGE_STEWARD_A0_A1_BRIEF.md\ndocs/assessments/SOFTWARE_STORAGE_STEWARD_A0_A1_REVIEW.md\ndocs/guides/HOST_STEWARDSHIP.md",
+      "acceptance": "Counts and bounded evidence are accurate and readable; external lookup is disclosed; unavailable sources remain honest; no package/storage mutation or privilege escalation exists; no serial, path, command line, environment, or content leaks; responsive presentation passes Operator review.",
+      "source": "Operator-approved Software and Storage Steward continuation, 2026-08-14",
+      "notes": "Candidate work is bounded to A0–A1 and remains pending live Operator review."
+    },
+    {
       "item_id": "track_wazuh_clamav_security",
       "title": "Roll out Wazuh and selective ClamAV security monitoring",
       "area": "Administration + Security",

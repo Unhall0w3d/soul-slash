@@ -268,7 +268,7 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - Guided Maintenance separates rich **SSH integrated** cards from compact
   **Status only** network-presence cards. Each surface lays out independently,
   preserving compact status-only rows as the fleet grows.
-- **Host Stewardship A0–A2** is candidate-complete for Operator review. Its
+- **Host Stewardship A0–A2** is Operator-approved and merged. Its
   static capability registry distinguishes availability from authority; Host
   Presence composes bounded current host/Core evidence with source-attributed
   persisted security and backup-automation status only when requested. File
@@ -277,6 +277,13 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   quarantine, and restore. Every mutation is digest-bound, revalidated, and
   receipt-backed. Overwrite, recursion, symlinks, hidden/secret-shaped paths,
   hard links, directory mutation, and permanent deletion remain unavailable.
+- **Software and Storage Steward A0–A1** is candidate-complete for Operator
+  review. Software inventory reports bounded pacman, foreign/AUR, orphan,
+  Flatpak, and public Arch security evidence without package mutation. Storage
+  inventory reports bounded device, filesystem, NVMe, and configured Btrfs
+  compression evidence without paths, serials, command lines, or storage
+  mutation. I/O diagnosis remains a separate one-shot request and does not
+  elevate when `iotop` is unavailable to the Dashboard process.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

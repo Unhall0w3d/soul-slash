@@ -4,15 +4,57 @@ Host Stewardship is Soul's owner-facing surface for understanding the local
 host before deciding whether any action is appropriate. Open it from
 **Administration → Host Stewardship**.
 
-This A0–A2 candidate contains three related but separate boundaries:
+This surface contains five related but separate boundaries:
 
 - the **Capability Registry** declares what exists, its maturity, evidence,
   privacy, mutation class, dependencies, and approval requirement;
 - **Host Presence** composes a bounded foreground snapshot of current host and
   Core evidence with source-attributed persisted Wazuh and backup-automation
   status; and
+- **Software Steward** reports bounded pacman, foreign/AUR, orphan, Flatpak,
+  and public Arch security evidence without changing installed software;
+- **Storage Steward** reports bounded device, filesystem, NVMe, and configured
+  Btrfs compression evidence, with a separate one-shot I/O diagnostic; and
 - **File Steward** inventories explicitly configured roots and stages exact,
   reversible regular-file operations.
+
+## Software Steward
+
+Select **Inspect installed software** to perform one foreground inventory. The
+result includes package counts, bounded foreign/AUR and orphan-candidate lists,
+Flatpak applications, and installed-package advisories reported by
+`arch-audit --json`. The security step may contact the public Arch security
+tracker; the Dashboard labels that external lookup before it is requested.
+
+Software Steward is read-only. It cannot install, upgrade, downgrade, remove,
+clean, or automatically remediate packages. A package appearing as foreign,
+orphaned, or affected is evidence for review, not an instruction to remove it.
+The Arch-oriented sources require `pacman` and optionally `flatpak` and
+`arch-audit`; absent tools remain explicitly unavailable.
+
+## Storage Steward
+
+Select **Inspect storage** for one foreground snapshot of block devices,
+mounted filesystems, NVMe inventory and unprivileged health evidence, plus any
+configured Btrfs compression roots. The public response excludes serial
+numbers, absolute paths, command lines, file contents, and environment values.
+
+Optional compression roots use a separate read-only allowlist:
+
+```dotenv
+SOUL_STORAGE_STEWARD_PATHS=home=/home/operator;projects=/home/operator/Projects
+```
+
+Only root IDs are returned by the API. At most eight roots are inspected with
+`compsize`; an inaccessible or unsupported root reports unavailable rather
+than being inferred as healthy.
+
+**Sample I/O once** is deliberately separate from storage inventory. It runs
+one bounded two-sample `iotop` observation only when the Dashboard process
+already has sufficient authority. Soul never invokes sudo, changes Linux
+capabilities, or requests elevation for this diagnostic. On a typical owner
+session it will honestly report unavailable. Storage Steward never formats,
+mounts, unmounts, trims, repairs, deletes, or changes a storage device.
 
 ## Configure File Steward roots
 
@@ -84,9 +126,13 @@ paths.
 
 ```bash
 make verify-host-stewardship-file-steward
+make verify-software-storage-steward
 ```
 
 This proves the public root boundary, bounded inventory, stale-preview and
 overwrite refusal, byte-verified copy, reversible quarantine/restore, absence
 of permanent-delete operations, capability declarations, foreground-only Host
 Presence, and Dashboard integration. It does not replace Operator review.
+The Software and Storage verifier additionally proves source bounds, response
+redaction, separate I/O invocation, absent mutation authority, and fail-closed
+behavior when optional tools or privileges are unavailable.
