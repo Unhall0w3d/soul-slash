@@ -297,6 +297,14 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   a deterministic newest-first chronology. Observations, cautious inference,
   and missing evidence remain distinct; raw alert descriptions, paths, command
   lines, credentials, model use, source refresh, and remediation are excluded.
+- **Fleet Historical Telemetry and Observability A0** is an architecture-only
+  candidate for Operator review. It selects Grafana Alloy, Prometheus, Loki,
+  and Grafana for a bounded private-LAN operational telemetry plane while
+  preserving Wazuh as the security authority. Metrics retain 30 days,
+  operational logs retain 14 days, stable Soul device identities replace
+  address-based labels, and raw telemetry stays outside Restic/DRS by default.
+  No collector, store, listener, service, schedule, automatic collection, Soul
+  summary adapter, or remediation authority is deployed by A0.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

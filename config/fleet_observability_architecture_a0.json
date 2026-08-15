@@ -1,0 +1,86 @@
+{
+  "schema_version": "soul.fleet-observability.architecture.a0.v1",
+  "state": "planned_not_deployed",
+  "purpose": "Bounded historical operational telemetry for the Operator and privacy-filtered Soul summaries.",
+  "stack": {
+    "endpoint_collector": "grafana_alloy",
+    "metrics_store": "prometheus_single_node",
+    "operational_log_store": "loki_single_binary",
+    "human_visualization": "grafana",
+    "security_authority": "wazuh",
+    "soul_access": "foreground_read_only_api_projection"
+  },
+  "deployment": {
+    "central_role": "dedicated_unprivileged_linux_guest",
+    "central_host_selection": "owner_private_configuration",
+    "network_scope": "private_lan_only",
+    "public_ingress": false,
+    "authentication_required": true,
+    "tls_required": true,
+    "persistent_deployment_authorized": false
+  },
+  "collection": {
+    "automatic_collection_authorized": false,
+    "metrics": [
+      "cpu_load_and_utilization",
+      "memory_and_swap",
+      "filesystem_capacity_and_inodes",
+      "disk_io",
+      "network_bytes_errors_and_drops",
+      "hardware_temperature_when_available",
+      "systemd_failed_unit_count",
+      "uptime_and_boot_identity"
+    ],
+    "operational_logs": [
+      "selected_systemd_service_lifecycle",
+      "kernel_hardware_and_link_events",
+      "bounded_maintenance_service_events"
+    ],
+    "excluded_logs": [
+      "authentication_and_authorization_logs",
+      "raw_wazuh_security_events",
+      "shell_history_and_command_lines",
+      "application_message_bodies",
+      "soul_chats_memory_and_creative_content",
+      "credentials_tokens_and_environment_values"
+    ]
+  },
+  "identity": {
+    "required_labels": ["device_id", "role", "platform", "environment"],
+    "forbidden_identity_labels": ["ip_address", "mac_address", "filesystem_path", "operator_name"],
+    "cardinality_policy": "bounded_allowlist_only"
+  },
+  "retention": {
+    "metrics_days": 30,
+    "operational_logs_days": 14,
+    "dedicated_volume_required": true,
+    "metrics_volume_max_percent": 80,
+    "size_limit_required_before_deployment": true,
+    "telemetry_backup_default": "exclude_raw_data",
+    "backup_scope": ["provisioned_dashboards", "scrape_and_collection_configuration", "recording_and_alert_rules"]
+  },
+  "rollout": [
+    {
+      "wave": "pilot",
+      "device_roles": ["operator_workstation", "primary_hypervisor", "secondary_hypervisor", "backup_target"],
+      "state": "not_deployed"
+    },
+    {
+      "wave": "infrastructure_extension",
+      "device_roles": ["dns_resolver", "security_sensor", "selected_linux_guest"],
+      "state": "deferred"
+    }
+  ],
+  "operator_views": ["fleet_overview", "host_resource_detail", "network_and_storage_health", "maintenance_and_reboot_correlation", "operational_log_explorer"],
+  "soul_contract": {
+    "future_operation": "observability.fleet.summary",
+    "implemented_in_a0": false,
+    "raw_query_results_persisted_by_soul": false,
+    "bounded_normalized_summary_only": true,
+    "incident_narrator_input": "normalized_signals_and_explicit_gaps",
+    "model_authored_facts": false,
+    "mutation_authority": "none",
+    "automatic_remediation": false
+  },
+  "deferred": ["central_guest_creation", "package_or_container_installation", "alloy_endpoint_enrollment", "listeners_and_firewall_rules", "automatic_collection", "alert_and_notification_routing", "soul_api_adapter", "incident_narrator_adapter", "proxmox_api_metrics", "snmp_collection", "long_term_telemetry_backup"]
+}
