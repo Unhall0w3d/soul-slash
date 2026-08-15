@@ -43,6 +43,7 @@ state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
 state.maintenanceFleetLoaded = false;
+state.maintenanceEvidence = null;
 state.maintenanceDeviceExpanded = new Set();
 state.wazuhSecurity = null;
 state.wazuhAlerts = null;
@@ -648,6 +649,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   if (host && state.authenticated && !state.hostStewardshipLoaded) loadHostStewardship();
   if (maintenance && state.authenticated) {
     if (!state.maintenanceFleetLoaded) loadMaintenanceFleetSnapshot();
+    else loadFleetOperationsEvidence();
     loadWazuhSecuritySnapshot();
     loadMaintenanceDiscovery();
     loadMaintenanceReceipts();
@@ -3406,6 +3408,7 @@ async function refreshMaintenanceDevice(deviceId, button) {
     const data = dataOf(envelope);
     if (envelope.lifecycle_state !== "complete" || !Array.isArray(data.devices)) throw new Error(envelope.errors?.[0]?.message || data.reason || "Device status refresh failed safely.");
     renderMaintenanceFleet(data);
+    await loadFleetOperationsEvidence();
     const refreshed = data.devices.find((device) => device.id === data.refreshed_device_id);
     status.textContent = `${refreshed?.label || deviceId} checked ${new Date(refreshed?.observed_at || data.collected_at).toLocaleString()} · only this device was probed.`;
     announce(`${refreshed?.label || "Device"} status refreshed`);
@@ -3536,6 +3539,42 @@ function renderMaintenanceFleet(data) {
   state.maintenanceFleetLoaded = true;
 }
 
+function renderFleetOperationsEvidence(data) {
+  state.maintenanceEvidence = data;
+  const summary = data.summary || {};
+  byId("maintenance-evidence-verified").textContent = String(summary.verified_count ?? 0);
+  byId("maintenance-evidence-pending").textContent = String(summary.awaiting_fresh_evidence_count ?? 0);
+  byId("maintenance-evidence-attention").textContent = String(summary.attention_count ?? 0);
+  const sources = data.sources || [];
+  const unavailable = sources.filter((source) => source.available === false).map((source) => source.source_id);
+  byId("maintenance-evidence-summary").textContent = unavailable.length
+    ? `Evidence gap · ${unavailable.join(", ")}`
+    : `${summary.transaction_count ?? 0} retained transaction${summary.transaction_count === 1 ? "" : "s"} · read only`;
+  const list = byId("maintenance-evidence-transactions"); list.replaceChildren();
+  (data.transactions || []).slice(0, 8).forEach((transaction) => {
+    const row = document.createElement("div"); row.className = "maintenance-operations-evidence-row"; row.dataset.state = transaction.reconciliation?.state || "unknown";
+    const identity = document.createElement("div");
+    const title = document.createElement("strong"); title.textContent = `${transaction.device_label || transaction.device_id} · ${transaction.action}`;
+    const time = document.createElement("small"); time.textContent = transaction.finished_at ? new Date(transaction.finished_at).toLocaleString() : "completion time unavailable";
+    identity.append(title, time);
+    const execution = document.createElement("code"); execution.textContent = `execution ${transaction.execution_state || "unknown"}`;
+    const reconciliation = document.createElement("span"); reconciliation.className = "maintenance-operations-evidence-state"; reconciliation.textContent = String(transaction.reconciliation?.state || "unknown").replaceAll("_", " ");
+    row.append(identity, execution, reconciliation); list.append(row);
+  });
+  if (!list.childElementCount) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No retained device operations are available."; list.append(empty); }
+}
+
+async function loadFleetOperationsEvidence() {
+  try {
+    const envelope = await callSoul("maintenance.fleet.evidence"); lifecycle(envelope);
+    const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || data.reason || "Operations evidence is unavailable.");
+    renderFleetOperationsEvidence(data);
+  } catch (error) {
+    byId("maintenance-evidence-summary").textContent = error.message;
+  }
+}
+
 async function loadMaintenanceFleetSnapshot({ statusId = "maintenance-fleet-status" } = {}) {
   const status = byId(statusId);
   try {
@@ -3546,6 +3585,7 @@ async function loadMaintenanceFleetSnapshot({ statusId = "maintenance-fleet-stat
       return;
     }
     renderMaintenanceFleet(data);
+    await loadFleetOperationsEvidence();
     status.textContent = `Persisted snapshot from ${new Date(data.collected_at).toLocaleString()} · collect now to replace it.`;
   } catch (error) {
     status.textContent = error.message;
@@ -3561,6 +3601,7 @@ async function loadMaintenanceFleet({ buttonId = "refresh-maintenance-fleet", st
     const data = dataOf(envelope);
     if (envelope.lifecycle_state !== "complete" || !Array.isArray(data.devices)) throw new Error(envelope.errors?.[0]?.message || data.reason || "Fleet status failed safely.");
     renderMaintenanceFleet(data);
+    await loadFleetOperationsEvidence();
     status.textContent = `Collected and persisted ${new Date(data.collected_at).toLocaleString()} · workstation pacman and remote APT counts use current cached metadata.`;
     announce("Maintenance fleet status ready");
   } catch (error) {
@@ -4166,6 +4207,7 @@ async function executeMaintenanceDeviceAction() {
       const data = dataOf(envelope); lifecycle(envelope);
       if (envelope.lifecycle_state !== "complete") throw new Error(presentMaintenanceReceiptFailure(data.receipt));
       if (data.fleet?.devices) renderMaintenanceFleet(data.fleet);
+      await loadFleetOperationsEvidence();
       status.textContent = data.receipt?.summary || "Device operation completed and fleet status was refreshed.";
     }
     state.maintenanceDevicePreview = null;

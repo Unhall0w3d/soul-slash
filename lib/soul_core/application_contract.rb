@@ -160,6 +160,7 @@ module SoulCore
       "maintenance.fleet.status" => [],
       "maintenance.fleet.device.refresh" => %w[device_id],
       "maintenance.fleet.snapshot" => [],
+      "maintenance.fleet.evidence" => [],
       "security.wazuh.status" => [],
       "security.wazuh.snapshot" => [],
       "security.wazuh.alerts.status" => [],

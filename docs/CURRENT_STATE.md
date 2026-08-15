@@ -268,6 +268,14 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
 - Guided Maintenance separates rich **SSH integrated** cards from compact
   **Status only** network-presence cards. Each surface lays out independently,
   preserving compact status-only rows as the fleet grows.
+- **Fleet Operations Evidence A0** is candidate-complete for Operator review.
+  Guided Maintenance now projects the latest retained transaction per control
+  target beside newer persisted fleet evidence. Execution and reconciliation
+  remain separate: newer assessed evidence can verify the narrow maintenance
+  or reboot goal, report attention, remain pending, or stay unknown without
+  turning command completion into a health claim. The projection is bounded,
+  deterministic, address-free, read-only, and introduces no collection,
+  schedule, agent, generic command, or fleet-wide authority.
 - **Host Stewardship A0–A2** is Operator-approved and merged. Its
   static capability registry distinguishes availability from authority; Host
   Presence composes bounded current host/Core evidence with source-attributed

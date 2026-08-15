@@ -88,6 +88,29 @@ small evidence row retains checked time, status-probe state, and network
 reachability. Firmware, WAN health, client inventory, and vendor-cloud state
 remain unasserted unless a separately reviewed adapter provides that evidence.
 
+### Execution and reconciliation evidence
+
+The **Execution & reconciliation** disclosure joins the latest retained
+device-operation receipt with the newest persisted observation for that exact
+control target. It intentionally presents two independent facts:
+
+- **execution** is the terminal state written by the bounded operation; and
+- **reconciliation** reports whether a newer observation verifies the narrow
+  goal, still requires attention, or has not arrived yet.
+
+A successful command is not displayed as verified merely because it exited
+zero. Maintenance requires newer reachable, assessed package evidence with no
+updates remaining. Reboot requires newer reachable evidence with no remaining
+reboot indication; the reboot receipt remains authoritative for its own boot
+identity and readiness checks. Unassessed package channels remain unknown.
+
+This A0 projection reads existing snapshots and receipts only. It collects
+nothing, changes nothing, and adds no action, schedule, polling loop, agent, or
+fleet-wide authority. Older receipts remain retained in their existing
+owner-private store; the current-state projection shows only the latest
+transaction per device so historical successes are not reinterpreted against
+today's package state.
+
 ### Optional managed-switch inventory
 
 The managed-switch A1 adapter adds the explicitly configured Netgear GS724Tv4

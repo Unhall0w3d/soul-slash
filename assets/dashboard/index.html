@@ -756,6 +756,18 @@
           <div><span>Kernel attention</span><strong id="maintenance-fleet-kernels">—</strong></div>
           <div><span>Reboots</span><strong id="maintenance-fleet-reboots">—</strong></div>
         </div>
+        <details class="maintenance-operations-evidence" open>
+          <summary><span><span class="eyebrow">Patch lifecycle evidence</span><strong>Execution &amp; reconciliation</strong></span><small id="maintenance-evidence-summary">Loading retained operation evidence…</small></summary>
+          <div class="maintenance-operations-evidence-body">
+            <div class="maintenance-operations-evidence-counts" aria-label="Operation reconciliation summary">
+              <span><strong id="maintenance-evidence-verified">—</strong> verified</span>
+              <span><strong id="maintenance-evidence-pending">—</strong> awaiting fresh evidence</span>
+              <span><strong id="maintenance-evidence-attention">—</strong> attention</span>
+            </div>
+            <div id="maintenance-evidence-transactions" class="maintenance-operations-evidence-list"><p class="muted">No retained operation evidence loaded.</p></div>
+            <p class="card-note">Execution success and post-run verification are separate facts. This view reads retained evidence only and grants no maintenance authority.</p>
+          </div>
+        </details>
         <section class="wazuh-security-summary" aria-labelledby="maintenance-security-heading">
           <div><p class="eyebrow">Read-only security posture</p><h3 id="maintenance-security-heading">Wazuh monitoring</h3><p id="maintenance-wazuh-summary">Loading the most recent Wazuh health snapshot…</p></div>
           <div class="wazuh-security-actions"><span id="maintenance-wazuh-state" class="maintenance-state-badge">Not loaded</span><button id="refresh-maintenance-wazuh" class="quiet-button" type="button">Refresh security health</button><a id="open-maintenance-wazuh" class="quiet-button" target="_blank" rel="noopener noreferrer" hidden>Open Wazuh</a></div>

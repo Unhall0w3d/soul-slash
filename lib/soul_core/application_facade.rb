@@ -43,6 +43,7 @@ require_relative "skill_studio_service"
 require_relative "self_improvement_service"
 require_relative "self_assessment_dev_synthesis_service"
 require_relative "maintenance_fleet_status_service"
+require_relative "fleet_operations_evidence_service"
 require_relative "wazuh_security_status_service"
 require_relative "wazuh_alert_evidence_service"
 require_relative "wazuh_alert_notification_service"
@@ -119,6 +120,7 @@ module SoulCore
       self_improvement_service: nil,
       self_assessment_dev_synthesis_service: nil,
       maintenance_fleet_status_service: nil,
+      fleet_operations_evidence_service: nil,
       wazuh_security_status_service: nil,
       wazuh_alert_evidence_service: nil,
       wazuh_alert_notification_service: nil,
@@ -192,6 +194,7 @@ module SoulCore
       @self_improvement_service = self_improvement_service
       @self_assessment_dev_synthesis_service = self_assessment_dev_synthesis_service
       @maintenance_fleet_status_service = maintenance_fleet_status_service
+      @fleet_operations_evidence_service = fleet_operations_evidence_service
       @wazuh_security_status_service = wazuh_security_status_service
       @wazuh_alert_evidence_service = wazuh_alert_evidence_service
       @wazuh_alert_notification_service = wazuh_alert_notification_service
@@ -444,6 +447,7 @@ module SoulCore
       when "maintenance.fleet.status" then domain(maintenance_fleet_status.collect)
       when "maintenance.fleet.device.refresh" then domain(maintenance_fleet_status.refresh(device_id: required(parameters, "device_id")))
       when "maintenance.fleet.snapshot" then domain(maintenance_fleet_status.snapshot)
+      when "maintenance.fleet.evidence" then domain(fleet_operations_evidence.compose)
       when "security.wazuh.status" then domain(wazuh_security_status.collect)
       when "security.wazuh.snapshot" then domain(wazuh_security_status.snapshot)
       when "security.wazuh.alerts.status" then domain(wazuh_alert_evidence.collect)
@@ -1048,6 +1052,14 @@ module SoulCore
         root: @root,
         clock: @clock,
         process_env: @process_env
+      )
+    end
+
+    def fleet_operations_evidence
+      @fleet_operations_evidence_service ||= FleetOperationsEvidenceService.new(
+        fleet_snapshot_source: -> { maintenance_fleet_status.snapshot },
+        device_receipt_source: -> { maintenance_device_control.retained_receipts(limit: FleetOperationsEvidenceService::MAX_TRANSACTIONS) },
+        clock: @clock
       )
     end
 
