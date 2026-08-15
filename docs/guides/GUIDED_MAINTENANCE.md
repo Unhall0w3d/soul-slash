@@ -326,11 +326,13 @@ See `docs/soul/FOUNDRY_PROXMOX_CONTROL_A6_BRIEF.md`.
 
 ### NixOS laboratory target
 
-Temper is the reproducible NixOS maintenance laboratory on Foundry. It is a
-full VM rather than a container so system generations, kernel activation,
-guest-agent readiness, and reboot semantics are exercised honestly. Its
-public deployment material lives in `deploy/nixos/temper/`; private addresses,
-SSH keys, host keys, and fleet records remain local.
+Temper was the reproducible NixOS maintenance laboratory used to validate this
+adapter. It ran as a full VM so system generations, kernel activation,
+guest-agent readiness, and reboot semantics were exercised honestly. The local
+lab VM was retired after acceptance; its reusable public deployment material
+remains in `deploy/nixos/temper/`. A future NixOS endpoint must be separately
+enrolled and qualified, with private addresses, SSH keys, host keys, and fleet
+records kept local.
 
 The deployment module installs one immutable
 `soul-nixos-maintenance` helper and grants the dedicated
@@ -349,8 +351,9 @@ NixOS still retains its prior system generations for ordinary rollback.
 There is no arbitrary command forwarding, unattended timer, automatic
 garbage collection, automatic upgrade, or automatic reboot.
 
-After enrolling the exact literal `temper` SSH alias, local deployment may
-enable the adapter with ignored environment settings:
+After enrolling one exact literal SSH alias, a local deployment may enable the
+adapter with ignored environment settings. The historical Temper names below
+are examples, not evidence that the retired lab still exists:
 
 ```text
 SOUL_FLEET_TEMPER_CONTROL_ENABLED=true
@@ -476,7 +479,7 @@ hiding evidence from the other devices.
 ## Device-scoped flow
 
 ```text
-choose exactly one mutable workstation, Forge, Pi-hole, qualified Crucible, qualified Foundry, or qualified Temper card
+choose exactly one mutable workstation, Forge, Pi-hole, qualified Crucible, qualified Foundry, or qualified NixOS card
 → choose Maintenance or Reboot
 → inspect the exact device, platform adapter, commands, confirmation, and dependency impact
 → authorize only that digest
@@ -494,9 +497,9 @@ and impact evidence:
 
 - `arch_pacman` for the configured workstation;
 - `proxmox_apt` for Forge and qualified Foundry nodes;
-- `debian_apt_pihole` for the Pi-hole appliance; and
+- `debian_apt_pihole` for the Pi-hole appliance;
 - `fedora_dnf5` for qualified Crucible hosts; and
-- `nixos_flake` for qualified Temper hosts.
+- `nixos_flake` for a separately qualified NixOS host.
 
 Adapter recognition never grants authority. Enrollment and monitoring remain
 read-only until the adapter's separately reviewed mutation prerequisites are
@@ -520,10 +523,12 @@ reboot readiness additionally requires SSH, the QEMU guest agent, DNF5,
 `/srv/soul-backup`, and the helper self-check. See
 [`CRUCIBLE_FEDORA.md`](CRUCIBLE_FEDORA.md).
 
-Temper likewise remains inventory-only until its declarative authority
+A NixOS target likewise remains inventory-only until its declarative authority
 self-check succeeds. Its update is one fixed flake-and-switch transaction.
 Reboot readiness requires SSH, the QEMU guest agent, the exact helper
-self-check, and matching active/booted generations.
+self-check, and matching active/booted generations. The validated Temper lab
+was retired after completing this qualification; it is not a current fleet
+member.
 
 Remote maintenance never reboots automatically. A remote reboot records the
 old boot identity, sends one reboot request, holds off, performs bounded
