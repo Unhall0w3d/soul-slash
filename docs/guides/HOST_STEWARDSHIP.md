@@ -21,6 +21,12 @@ This surface contains six related but separate boundaries:
 - **File Steward** inventories explicitly configured roots and stages exact,
   reversible regular-file operations.
 
+Each boundary is presented as a collapsed disclosure card. Its current state
+remains visible in the heading; select the heading to expand the full controls
+and evidence. Open sections expand to the full workspace width, and closing
+them does not discard evidence already collected during the current page
+session.
+
 ## Incident Narrator
 
 Select **Compose incident narrative** to read the already-retained Wazuh,
