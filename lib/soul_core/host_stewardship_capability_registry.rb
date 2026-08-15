@@ -118,6 +118,17 @@ module SoulCore
         "mutation" => "none",
         "approval" => "none",
         "required_commands" => []
+      },
+      {
+        "id" => "maintenance.fleet.evidence",
+        "label" => "Fleet operations evidence",
+        "maturity" => "A0",
+        "evidence" => "deterministic reconciliation over retained fleet observations and device-operation receipts",
+        "freshness" => "retained_sources_on_request",
+        "privacy" => "owner_private_normalized_summary",
+        "mutation" => "none",
+        "approval" => "none",
+        "required_commands" => []
       }
     ].freeze
 
