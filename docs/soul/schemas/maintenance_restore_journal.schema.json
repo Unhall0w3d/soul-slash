@@ -12,6 +12,8 @@
     "created_at",
     "resume_deadline_at",
     "source_boot_id",
+    "authority_mode",
+    "password_prompts",
     "current_state",
     "restore_registry_digest",
     "window_snapshot",
@@ -26,6 +28,8 @@
     "transaction_id": {"type": "string", "pattern": "^maintenance_tx_[a-f0-9]{16}$"},
     "plan_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "owner_uid": {"type": "integer", "minimum": 0},
+    "authority_mode": {"enum": ["native_prompt", "root_owned_passwordless"]},
+    "password_prompts": {"type": "integer", "minimum": 0, "maximum": 1},
     "current_state": {
       "enum": [
         "awaiting_login",

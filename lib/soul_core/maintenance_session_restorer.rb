@@ -16,6 +16,7 @@ module SoulCore
     MAX_RECORDS = 32
     SESSION_WAIT_SECONDS = 90
     WINDOW_WAIT_SECONDS = 20
+    PLACEMENT_SETTLE_SECONDS = 2
     MAX_RETRIES = 1
     RECEIPT_SCHEMA = "soul.maintenance.receipt.v1"
 
@@ -133,6 +134,10 @@ module SoulCore
         target = workspace["id"].to_i.positive? ? workspace["id"].to_i.to_s : workspace["name"].to_s
         return false if target.empty? || !target.match?(/\A(?:[1-9][0-9]{0,3}|[A-Za-z0-9_.-]{1,64})\z/)
         lua_dispatch("hl.dsp.focus({ workspace = #{JSON.generate(target)} })")
+      end
+
+      def settle(seconds)
+        @sleeper.call(Integer(seconds))
       end
 
       private
@@ -272,6 +277,7 @@ module SoulCore
       existing = @adapter.windows
       used_addresses = []
       results = []
+      placements = []
 
       windows.each do |record|
         entry = validated_entry(record, registry_by_id)
@@ -282,6 +288,18 @@ module SoulCore
           !used_addresses.include?(address) && (classes & identities).any?
         end
         window = existing_match
+        if entry.fetch("startup_policy") == "manual_after_login"
+          if window && @adapter.place_window(window, record)
+            used_addresses << window["address"].to_s
+            results << {"kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "complete"}
+          else
+            results << {
+              "kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "skipped",
+              "reason" => "reviewed manual post-login launch remains required"
+            }
+          end
+          next
+        end
         unless window
           excluded = existing.map { |item| item["address"].to_s }
           (MAX_RETRIES + 1).times do |attempt|
@@ -293,15 +311,25 @@ module SoulCore
         if window && @adapter.place_window(window, record)
           used_addresses << window["address"].to_s
           results << {"kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "complete"}
+          placements << [results.length - 1, record, entry]
         else
           results << {"kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "failed", "reason" => "window did not launch or place within the bound"}
         end
       end
 
+      reassert_window_placements(results, placements)
+
       backgrounds.each do |record|
         entry = validated_entry(record, registry_by_id)
         identity = record.fetch("process_identity").to_s
         raise "background process identity changed after review" unless Array(entry["process_identities"]).include?(identity)
+        if entry.fetch("startup_policy") == "manual_after_login"
+          results << {
+            "kind" => "background", "entry_id" => entry.fetch("entry_id"), "status" => "skipped",
+            "reason" => @adapter.process_running?(identity) ? "already running after login" : "reviewed manual post-login launch remains required"
+          }
+          next
+        end
         if @adapter.process_running?(identity)
           results << {"kind" => "background", "entry_id" => entry.fetch("entry_id"), "status" => "skipped", "reason" => "already running after login"}
           next
@@ -314,6 +342,33 @@ module SoulCore
         results << {"kind" => "background", "entry_id" => entry.fetch("entry_id"), "status" => launched ? "complete" : "failed", "reason" => launched ? "launched because absent" : "launch failed within retry bound"}
       end
       results
+    end
+
+    def reassert_window_placements(results, placements)
+      return if placements.empty?
+      @adapter.settle(PLACEMENT_SETTLE_SECONDS)
+      current = @adapter.windows
+      used_addresses = []
+      placements.each do |result_index, record, entry|
+        window = current.find do |candidate|
+          address = candidate["address"].to_s
+          classes = [candidate["initialClass"], candidate["class"]].map { |value| value.to_s.downcase }
+          !used_addresses.include?(address) && (classes & entry.fetch("identities")).any?
+        end
+        if window
+          used_addresses << window["address"].to_s
+          next if @adapter.place_window(window, record)
+          results[result_index] = {
+            "kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "failed",
+            "reason" => "final bounded workspace placement did not complete"
+          }
+        elsif entry.fetch("startup_policy") == "launch_window"
+          results[result_index] = {
+            "kind" => "window", "entry_id" => entry.fetch("entry_id"), "status" => "failed",
+            "reason" => "window did not remain available for final bounded placement"
+          }
+        end
+      end
     end
 
     def validated_entry(record, registry)
@@ -397,7 +452,8 @@ module SoulCore
         "finished_at" => journal.fetch("finished_at"),
         "lifecycle_state" => journal.fetch("current_state"),
         "terminal_exit_status" => journal.fetch("current_state") == "complete" ? 0 : 1,
-        "password_prompts" => 1,
+        "authority_mode" => journal.fetch("authority_mode", "native_prompt"),
+        "password_prompts" => Integer(journal.fetch("password_prompts", 1)),
         "commands" => Array(journal["update_commands"]).first(8).map { |item| item.to_h.slice("adapter", "exit_status", "status") },
         "sudo_ticket_invalidated" => true,
         "reboot_requested" => true,

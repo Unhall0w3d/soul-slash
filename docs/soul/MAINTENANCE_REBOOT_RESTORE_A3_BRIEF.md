@@ -2,7 +2,7 @@
 
 Status: human-approved for implementation and deterministic rehearsal on
 2026-07-27; amended by the Operator's separate Maintain/Reboot authority
-decision on 2026-07-29
+decision on 2026-07-29 and the accepted natural-reboot refinement on 2026-08-15
 
 ## Outcome
 
@@ -23,8 +23,9 @@ reboots, and restores.
 - Chat and Voice may explain A3 but cannot arm or authorize it.
 - One authenticated Dashboard click may authorize only the exact reviewed
   digest.
-- The visible desktop terminal remains the only place `sudo -v` may request the
-  administrator password.
+- Native-prompt mode may request the administrator password only through the
+  visible desktop terminal. The separately reviewed root-owned passwordless
+  authority records zero password prompts and exposes no credential surface.
 - Implementing, installing, or rehearsing A3 does not authorize a live reboot.
 - The first live reboot requires a later, explicit, human-supervised approval.
 
@@ -59,6 +60,10 @@ The reviewed setup flow may install and enable
 - skips an already-running allowlisted background application;
 - restores workspace and supported window-state hints with fixed `hyprctl`
   argument vectors;
+- performs one bounded two-second settle and final placement reassertion to
+  resolve known application/compositor startup races;
+- records reviewed manual-after-login applications as skipped rather than
+  launching them or failing the complete orchestration;
 - restores the previously active workspace last;
 - writes a terminal receipt and consumes the pending journal; and
 - exits `complete`, `failed`, or `blocked_for_human_review`.
@@ -109,7 +114,8 @@ Tests must prove:
   same-boot journals, stale journals, registry mismatch, and unavailable
   reboot permission cannot request reboot;
 - the reboot vector and every restored launch vector are fixed and shell-free;
-- only one password prompt is possible;
+- native-prompt mode permits at most one password prompt, while reviewed
+  root-owned passwordless mode truthfully records zero;
 - pending state is durably written before the reboot request;
 - restoration is one-shot, bounded, idempotent, and skips duplicates;
 - unsupported applications remain visible and unlaunched;

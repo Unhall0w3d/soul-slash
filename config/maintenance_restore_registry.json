@@ -39,7 +39,7 @@
     },
     {
       "entry_id": "notes.obsidian",
-      "identities": ["obsidian"],
+      "identities": ["obsidian", "md.obsidian.obsidian"],
       "process_identities": [],
       "argv": ["/usr/bin/obsidian"],
       "maximum_instances": 1,
@@ -47,10 +47,10 @@
       "startup_policy": "launch_window"
     },
     {
-      "entry_id": "development.codex_desktop",
-      "identities": ["codex-desktop"],
+      "entry_id": "development.chatgpt_desktop",
+      "identities": ["chatgpt"],
       "process_identities": [],
-      "argv": ["/usr/bin/codex-desktop"],
+      "argv": ["/usr/bin/chatgpt"],
       "maximum_instances": 1,
       "title_policy": "omit",
       "startup_policy": "launch_window"
@@ -71,7 +71,7 @@
       "argv": ["/usr/bin/env", "QT_QPA_PLATFORM=wayland", "/opt/Webex/bin/CiscoCollabHost"],
       "maximum_instances": 1,
       "title_policy": "omit",
-      "startup_policy": "launch_if_absent"
+      "startup_policy": "manual_after_login"
     },
     {
       "entry_id": "communication.teams_for_linux",
@@ -87,6 +87,15 @@
       "identities": ["steam"],
       "process_identities": ["steam"],
       "argv": ["/usr/bin/env", "NO_AT_BRIDGE=1", "/usr/bin/steam"],
+      "maximum_instances": 1,
+      "title_policy": "omit",
+      "startup_policy": "launch_if_absent"
+    },
+    {
+      "entry_id": "virtualization.winboat",
+      "identities": ["winboat"],
+      "process_identities": ["winboat"],
+      "argv": ["/opt/winboat/winboat"],
       "maximum_instances": 1,
       "title_policy": "omit",
       "startup_policy": "launch_if_absent"
