@@ -719,16 +719,20 @@ packages, or reboot. A valid post-reboot run waits at most 90 seconds for
 Hyprland, discovers the owner-controlled compositor socket without relying on
 inherited shell variables, revalidates the restore registry, launches only
 fixed allowlisted applications, skips already-running background entries,
-places supported windows through Hyprland's typed Lua dispatchers, restores the
-previously active workspace last, writes a terminal receipt, and consumes the
-journal. The unit and native handoff use the stable `/usr/bin/ruby` runtime.
-The workstation's reviewed registry includes Webex, Teams for Linux, and Steam
-as `launch_if_absent` entries: they are recorded only when their window or
-process exists before reboot, never launched merely because they are installed,
-and never duplicated if autologin already restored them. Steam uses the same
+places supported windows through Hyprland's typed Lua dispatchers, waits once
+for two seconds, reasserts the reviewed placements against the final window
+identities, restores the previously active workspace last, writes a terminal
+receipt, and consumes the journal. The unit and native handoff use the stable
+`/usr/bin/ruby` runtime. Native ChatGPT, Obsidian, and WinBoat use their current
+reviewed local classes and fixed launch vectors. Teams for Linux and Steam are
+`launch_if_absent` entries: they are recorded only when their window or process
+exists before reboot, never launched merely because they are installed, and
+never duplicated if autologin already restored them. Steam uses the same
 fixed `NO_AT_BRIDGE=1` client launcher as the Operator's desktop entry and does
 not include a game URI, so restoring the client cannot implicitly launch a
-game.
+game. Webex is retained as a `manual_after_login` snapshot record: the restorer
+reports it as skipped when absent and never treats its reviewed manual launch as
+an orchestration failure.
 
 Hosts that require a physical display-link retrain after autologin may provide
 one owner-controlled executable:
@@ -744,11 +748,15 @@ Failure is recorded for human review; it never broadens the application
 restore registry or gains reboot authority.
 
 The zero-prompt reboot-only path completed supervised live acceptance again on
-2026-08-09 with no package replay or password prompt. All three displays, the
-active workspace, Vesktop, Steam, Teams, Opera GX, and Codex Desktop restored;
-Steam launched no game. Webex remained the sole bounded application result and
-is an accepted manual post-login action. Its manual exception does not cause
-automatic retry or hold the accepted orchestration lifecycle open.
+2026-08-15 with no package replay or password prompt. All three displays and the
+active workspace restored. Steam, Opera GX, Vesktop, and Teams returned; Teams
+remained tray-only by design. The native ChatGPT client was reopened manually
+after that reboot because its old Codex identity was stale, while Obsidian and
+WinBoat exposed previously unsupported contracts. Those exact identities and
+launch vectors are now reviewed. Webex remains the accepted manual post-login
+exception. Receipts preserve the transaction authority mode and report `0`
+password prompts for root-owned passwordless A3 instead of a historical fixed
+count.
 
 Chat and Voice may explain the plan but cannot arm or authorize A3. Each live
 A3 reboot remains a separate supervised human gate even after deterministic

@@ -61,6 +61,8 @@ module SoulCore
       now = @clock.call
       source_boot_id = @boot_id_reader.call
       raise "boot identity changed after A3 review" unless source_boot_id == transaction.fetch("source_boot_id")
+      authority_mode = transaction.fetch("authority_mode", "native_prompt")
+      raise "A3 transaction authority mode is invalid" unless %w[native_prompt root_owned_passwordless].include?(authority_mode)
       basis = {
         "schema_version" => JOURNAL_SCHEMA,
         "journal_id" => "restore_#{transaction.fetch('transaction_id').delete_prefix('maintenance_tx_')}",
@@ -70,6 +72,8 @@ module SoulCore
         "created_at" => now.iso8601,
         "resume_deadline_at" => (now + RESUME_TTL_SECONDS).iso8601,
         "source_boot_id" => source_boot_id,
+        "authority_mode" => authority_mode,
+        "password_prompts" => authority_mode == "root_owned_passwordless" ? 0 : 1,
         "attempt_boot_id" => nil,
         "current_state" => "awaiting_login",
         "restore_registry_digest" => registry_digest,

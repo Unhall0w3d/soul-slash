@@ -89,17 +89,23 @@ class A3AdapterFixture
     @launches = []
     @placements = []
     @activations = []
+    @windows = []
   end
 
   def wait_ready(_seconds) = true
   def recover_displays = true
-  def windows = []
+  def windows = @windows
+  def settle(_seconds) = true
   def process_running?(_identity) = @background_running
   def launch(entry_id, argv, attempt)
     @launches << [entry_id, argv, attempt]
     true
   end
-  def wait_for_window(_identities, _excluded, _seconds) = {"address" => "0xabc", "initialClass" => "fixture-app", "class" => "fixture-app"}
+  def wait_for_window(_identities, _excluded, _seconds)
+    window = {"address" => "0xabc", "initialClass" => "fixture-app", "class" => "fixture-app"}
+    @windows << window unless @windows.any? { |item| item["address"] == window["address"] }
+    window
+  end
   def place_window(window, record)
     @placements << [window, record]
     true
@@ -137,12 +143,13 @@ class A3PartialAdapter < A3AdapterFixture
   def process_running?(_identity) = true
 end
 
-def transaction(root, clock, registry_digest, mode: "live_reboot")
+def transaction(root, clock, registry_digest, mode: "live_reboot", authority_mode: "native_prompt")
   id = "maintenance_tx_1111111111111111"
   {
     "schema_version" => "soul.maintenance.transaction.v1",
     "transaction_id" => id,
     "mode" => mode,
+    "authority_mode" => authority_mode,
     "owner_uid" => Process.uid,
     "created_at" => clock.call.iso8601,
     "deadline_at" => (clock.call + 600).iso8601,
@@ -168,6 +175,9 @@ tracked_entries = tracked_registry.fetch("entries").to_h { |entry| [entry.fetch(
 webex = tracked_entries["communication.webex"]
 teams = tracked_entries["communication.teams_for_linux"]
 steam = tracked_entries["games.steam"]
+obsidian = tracked_entries["notes.obsidian"]
+chatgpt = tracked_entries["development.chatgpt_desktop"]
+winboat = tracked_entries["virtualization.winboat"]
 check.call(
   "Webex, Teams, and Steam restore only when represented in the pre-reboot window or process snapshot",
   webex == {
@@ -177,7 +187,7 @@ check.call(
     "argv" => ["/usr/bin/env", "QT_QPA_PLATFORM=wayland", "/opt/Webex/bin/CiscoCollabHost"],
     "maximum_instances" => 1,
     "title_policy" => "omit",
-    "startup_policy" => "launch_if_absent"
+    "startup_policy" => "manual_after_login"
   } &&
     teams == {
       "entry_id" => "communication.teams_for_linux",
@@ -196,6 +206,24 @@ check.call(
       "maximum_instances" => 1,
       "title_policy" => "omit",
       "startup_policy" => "launch_if_absent"
+    }
+)
+check.call(
+  "native ChatGPT, Obsidian, and WinBoat identities use their reviewed local launch vectors",
+  obsidian == {
+    "entry_id" => "notes.obsidian", "identities" => ["obsidian", "md.obsidian.obsidian"],
+    "process_identities" => [], "argv" => ["/usr/bin/obsidian"], "maximum_instances" => 1,
+    "title_policy" => "omit", "startup_policy" => "launch_window"
+  } &&
+    chatgpt == {
+      "entry_id" => "development.chatgpt_desktop", "identities" => ["chatgpt"],
+      "process_identities" => [], "argv" => ["/usr/bin/chatgpt"], "maximum_instances" => 1,
+      "title_policy" => "omit", "startup_policy" => "launch_window"
+    } &&
+    winboat == {
+      "entry_id" => "virtualization.winboat", "identities" => ["winboat"],
+      "process_identities" => ["winboat"], "argv" => ["/opt/winboat/winboat"], "maximum_instances" => 1,
+      "title_policy" => "omit", "startup_policy" => "launch_if_absent"
     }
 )
 
@@ -282,6 +310,70 @@ Dir.mktmpdir("soul-a3-runner") do |root|
              restored.dig("data", "skipped") == 1 &&
              second.dig("data", "restored") == 0 &&
              !File.exist?(File.join(root, "Soul", "private", "host_maintenance", "pending_restore.json")))
+end
+
+Dir.mktmpdir("soul-a3-passwordless") do |root|
+  fixture = A3RehearsalFixture.new
+  registry_digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  journal = coordinator.prepare(transaction(root, clock, registry_digest, authority_mode: "root_owned_passwordless"))
+  coordinator.mark_reboot_requested
+  restored = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: A3AdapterFixture.new,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  receipt = restored.dig("data", "receipt")
+  check.call("root-owned maintenance authority records a truthful zero-prompt reboot receipt",
+             journal["authority_mode"] == "root_owned_passwordless" && journal["password_prompts"] == 0 &&
+             receipt["authority_mode"] == "root_owned_passwordless" && receipt["password_prompts"] == 0)
+end
+
+Dir.mktmpdir("soul-a3-manual-post-login") do |root|
+  fixture = A3RehearsalFixture.new
+  fixture.registry.fetch("entries") << {
+    "entry_id" => "fixture.manual", "identities" => ["fixture-manual"],
+    "process_identities" => ["fixture-manual"], "argv" => ["/usr/bin/true"],
+    "maximum_instances" => 1, "title_policy" => "omit",
+    "startup_policy" => "manual_after_login", "executable_available" => true
+  }
+  fixture.snapshot.fetch("windows") << {
+    "initial_class" => "fixture-manual", "class" => "fixture-manual",
+    "workspace" => {"id" => 3, "name" => "3"}, "monitor_id" => 0,
+    "floating" => false, "fullscreen" => 0, "pinned" => false,
+    "restore_status" => "restorable", "restore_entry_id" => "fixture.manual",
+    "launch_argv" => ["/usr/bin/true"], "title_stored" => false
+  }
+  fixture.snapshot.fetch("background_applications") << {
+    "process_identity" => "fixture-manual", "restore_status" => "restorable",
+    "restore_entry_id" => "fixture.manual", "launch_argv" => ["/usr/bin/true"],
+    "startup_policy" => "manual_after_login", "placement" => "background_no_window",
+    "raw_arguments_stored" => false
+  }
+  fixture.snapshot["restorable_count"] += 2
+  registry_digest = Digest::SHA256.hexdigest(JSON.generate(fixture.registry))
+  coordinator = SoulCore::MaintenanceRebootCoordinator.new(
+    root: root, clock: clock, rehearsal_service: fixture,
+    package_lock_probe: -> { false }, active_work_probe: -> { [] },
+    resume_unit_probe: -> { true }, reboot_permission_probe: -> { true },
+    boot_id_reader: -> { old_boot }
+  )
+  coordinator.prepare(transaction(root, clock, registry_digest))
+  coordinator.mark_reboot_requested
+  adapter = A3AdapterFixture.new
+  restored = SoulCore::MaintenanceSessionRestorer.new(
+    root: root, clock: clock, adapter: adapter,
+    rehearsal_service: fixture, boot_id_reader: -> { new_boot }
+  ).run
+  manual_attempt = restored.dig("data", "receipt", "restore_summary")
+  check.call("reviewed manual post-login applications do not fail or launch the bounded restore",
+             restored["lifecycle_state"] == "complete" &&
+             adapter.launches.none? { |entry_id, _argv, _attempt| entry_id == "fixture.manual" } &&
+             manual_attempt["skipped"] == 3 && manual_attempt["failed"] == 0)
 end
 
 [

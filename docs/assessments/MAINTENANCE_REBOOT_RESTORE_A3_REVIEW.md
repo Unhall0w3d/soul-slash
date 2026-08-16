@@ -43,6 +43,15 @@ non-blocking refinement; public live gates disabled
   snapshot and skipped if already running after autologin.
 - Corrected Webex restoration to use the same fixed Wayland environment as the
   Operator's successful desktop-menu entry.
+- Reclassified Webex as an explicit `manual_after_login` contract after
+  repeated bounded launches failed to retain its window; its absence is now a
+  visible skipped result rather than a false orchestration failure.
+- Updated the registry for the native `chatgpt` client, Obsidian's real
+  `md.obsidian.Obsidian` class, and WinBoat's fixed local executable.
+- Added one bounded final placement reassertion after application startup races
+  settle, without adding polling or a persistent process.
+- Bound authority mode and truthful password-prompt count into the journal and
+  terminal receipt.
 - Stabilized the A3 review digest by binding the already normalized A2 plan
   digest and exact A3 blockers instead of volatile raw free-space byte counts.
 - Preserved A2's package-only digest boundary while restoring the real A3
@@ -72,6 +81,7 @@ non-blocking refinement; public live gates disabled
 - `scripts/soul-maintenance-transaction`
 - `scripts/verify-maintenance-reboot-restore-a3.rb`
 - `docs/soul/schemas/maintenance_restore_journal.schema.json`
+- `docs/soul/schemas/maintenance_restore_registry.schema.json`
 - `docs/soul/schemas/maintenance_receipt.schema.json`
 - `docs/soul/schemas/maintenance_transaction.schema.json`
 - `docs/soul/schemas/maintenance_transaction_result.schema.json`
@@ -130,6 +140,13 @@ The focused verifier proves:
 - installation requires exact confirmation and never starts the resume unit;
   and
 - the unit contains no restart policy, timer, listener, watcher, or daemon.
+- native ChatGPT, Obsidian, and WinBoat use their current reviewed identities
+  and fixed local launch vectors;
+- manual-after-login records never launch automatically and do not convert an
+  otherwise complete restoration into failure;
+- root-owned passwordless transactions retain `authority_mode` and report zero
+  password prompts in both journal and receipt; and
+- successful window placements receive exactly one bounded final reassertion.
 
 The A1, A2, and A2B maintenance regressions continue to pass.
 
@@ -173,6 +190,17 @@ bounded application failure; it launched normally later under direct Operator
 control and is accepted as a manual post-login action. The pending journal was
 consumed, and the Operator accepted the orchestration as implemented.
 
+The 2026-08-15 natural supervised reboot used transaction
+`maintenance_tx_a5b70b47eb3cc2c5` and returned with boot identity
+`b1fcf66a-768c-4d42-9aee-e2fc4aa3b0cf`. All three displays and the active
+workspace restored. Steam, Opera GX, Vesktop, and Teams returned; Teams was
+correctly active without a window. The retained receipt reported six complete
+records and one Webex failure. Inspection then established the exact native
+ChatGPT, Obsidian, and WinBoat contracts and confirmed Webex remains a manual
+post-login exception. The deterministic repair makes that exception a skipped
+record, truthfully records the passwordless authority, and adds one final
+bounded placement pass for compositor timing.
+
 ## Local LLM eval results
 
 None. Reboot authority, fixed command vectors, journal integrity, application
@@ -184,8 +212,8 @@ delegated to a model.
 - The first live post-login attempt exposed and safely recorded compositor
   environment and dispatcher-version incompatibilities. Both are repaired and
   the complete path passed its supervised rerun.
-- Exact window placement continues to depend on application class stability
-  and compositor timing.
+- Exact window placement still depends on application class stability, but one
+  bounded final reassertion now covers the observed compositor timing race.
 - Individual application launchers can retain their own state or environment
   constraints. Their bounded failure does not invalidate an otherwise
   successful reboot, display recovery, or workspace lifecycle.
@@ -271,8 +299,9 @@ Live reboot performed on Maven: yes, two supervised requests
   absent qBittorrent remains unlaunched.
 - [x] Review Maven's exact Webex and Teams for Linux class/process identities
   and launch vectors.
-- [~] The 2026-07-29 reboot proved conditional Teams restoration. Webex was
-  present but its internal binary did not create a window without the
-  Operator's reviewed Wayland environment; the registry is corrected and will
-  be observed during a natural future reboot without blocking A3 acceptance.
+- [x] Confirm the 2026-08-15 natural reboot restores displays, active workspace,
+  Steam, Opera GX, Vesktop, and tray-only Teams while retaining exact evidence.
+- [x] Adopt Webex as a visible manual-after-login exception rather than an
+  automatically retried or failing restore record.
+- [x] Review native ChatGPT, Obsidian, and WinBoat identities and launch vectors.
 - [x] Accept the repaired candidate after supervised evidence.

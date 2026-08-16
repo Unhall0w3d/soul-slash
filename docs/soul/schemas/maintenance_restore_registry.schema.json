@@ -18,7 +18,7 @@
           "process_identities": {"type": "array", "maxItems": 16, "items": {"type": "string"}},
           "maximum_instances": {"type": "integer", "minimum": 1, "maximum": 8},
           "title_policy": {"const": "omit"},
-          "startup_policy": {"enum": ["launch_window", "launch_if_absent"]}
+          "startup_policy": {"enum": ["launch_window", "launch_if_absent", "manual_after_login"]}
         },
         "additionalProperties": false
       }

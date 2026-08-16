@@ -172,7 +172,7 @@ module SoulCore
       raise "restore registry argv contains an unsafe value" if argv.any? { |value| value.empty? || value.bytesize > 512 || value.include?("\0") }
       raise "restore registry maximum_instances is invalid" unless maximum.between?(1, 8)
       raise "restore registry title policy is invalid" unless entry.fetch("title_policy", "omit") == "omit"
-      raise "restore registry startup policy is invalid" unless %w[launch_window launch_if_absent].include?(startup_policy)
+      raise "restore registry startup policy is invalid" unless %w[launch_window launch_if_absent manual_after_login].include?(startup_policy)
 
       {
         "entry_id" => entry_id,
