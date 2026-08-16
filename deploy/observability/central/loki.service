@@ -1,0 +1,23 @@
+[Unit]
+Description=Soul Fleet Loki single-binary log store
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=loki
+Group=loki
+ExecStart=/usr/local/bin/loki -config.file=/etc/loki/loki.yml
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/loki
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

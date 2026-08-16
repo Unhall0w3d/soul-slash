@@ -1,0 +1,29 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+readonly VERSION="soul-debian-apt-maintenance-a1-v1"
+
+fail_closed() {
+  printf '%s\n' "$1" >&2
+  exit 64
+}
+
+[[ "$(id -u)" == "0" ]] || fail_closed "root authority is required"
+[[ "$#" == "1" ]] || fail_closed "argument count is invalid"
+
+case "$1" in
+  self-check)
+    printf '{"version":"%s","arbitrary_command_forwarding":false,"password_storage":false}\n' "$VERSION"
+    ;;
+  apt-upgrade)
+    /usr/bin/apt-get update
+    exec /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+      /usr/bin/apt-get -y -o Dpkg::Options::=--force-confold dist-upgrade
+    ;;
+  reboot)
+    exec /usr/bin/systemctl reboot
+    ;;
+  *)
+    fail_closed "operation is invalid"
+    ;;
+esac

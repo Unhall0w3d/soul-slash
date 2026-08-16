@@ -1,0 +1,23 @@
+[Unit]
+Description=Soul Fleet bounded Grafana Alloy collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=alloy
+Group=alloy
+EnvironmentFile=/etc/soul-observability/collector.env
+ExecStart=/usr/local/bin/alloy run --server.http.listen-addr=127.0.0.1:12345 --storage.path=/var/lib/alloy /etc/soul-observability/config.alloy
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/alloy
+CapabilityBoundingSet=
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

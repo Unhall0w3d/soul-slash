@@ -28,6 +28,8 @@ module SoulCore
     CRUCIBLE_AUTHORITY_VERSION = "soul-crucible-maintenance-d1-v1"
     WITNESS_HELPER_PATH = "/usr/local/libexec/soul-witness-maintenance"
     WITNESS_AUTHORITY_VERSION = "soul-witness-maintenance-a1-v1"
+    DEBIAN_APT_HELPER_PATH = "/usr/local/libexec/soul-debian-apt-maintenance"
+    DEBIAN_APT_AUTHORITY_VERSION = "soul-debian-apt-maintenance-a1-v1"
     NIXOS_HELPER_PATH = "/run/current-system/sw/bin/soul-nixos-maintenance"
     NIXOS_AUTHORITY_VERSION = "soul-nixos-maintenance-a1-v1"
     SSH_ALIAS_PATTERN = /\A[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\z/
@@ -248,8 +250,8 @@ module SoulCore
       basis = {
         "schema_version" => PLAN_SCHEMA,
         "device_id" => device_id,
-        "device_label" => target_display_label(device_id, target.fetch("label")),
-        "address" => target_display_address(device_id),
+        "device_label" => target.key?("display_label") ? target.fetch("display_label") : target_display_label(device_id, target.fetch("label")),
+        "address" => target.key?("display_address") ? target.fetch("display_address") : target_display_address(device_id),
         "action" => action,
         "maintenance_adapter" => target.fetch("maintenance_adapter"),
         "lifecycle_contract" => LIFECYCLE_CONTRACT,
@@ -688,11 +690,61 @@ module SoulCore
     def target!(device_id)
       return foundry_target! if device_id.to_s == "foundry"
 
-      target = TARGETS.fetch(device_id.to_s) { raise ArgumentError, "device is not available for remote maintenance" }
+      target = TARGETS[device_id.to_s]
+      return generic_debian_apt_target!(device_id.to_s) unless target
       return temper_target!(target) if device_id.to_s == "temper"
       return witness_target!(target) if device_id.to_s == "witness"
 
       target
+    end
+
+    def generic_debian_apt_target!(device_id)
+      snapshot = @fleet_status_service.snapshot
+      raise ArgumentError, "fleet status is unavailable; refresh fleet status" unless snapshot["ok"] == true && snapshot["lifecycle_state"] == "complete"
+
+      device = Array(snapshot.dig("data", "devices")).find { |entry| entry["id"].to_s == device_id }
+      facts = device.is_a?(Hash) && device["facts"].is_a?(Hash) ? device["facts"] : {}
+      valid = device.is_a?(Hash) &&
+        device["control"] == "maintenance" &&
+        facts["control_target_id"].to_s == device_id &&
+        facts["mutation_supported"] == true &&
+        facts["status_adapter"] == "debian_apt_fixed_maintenance" &&
+        facts["maintenance_adapter"] == "debian_apt" &&
+        facts["maintenance_lifecycle"] == LIFECYCLE_CONTRACT
+      raise ArgumentError, "enrolled Debian control evidence is unavailable; refresh fleet status" unless valid
+
+      ssh_alias = facts["ssh_alias"].to_s
+      raise ArgumentError, "enrolled Debian SSH alias is invalid" unless ssh_alias.match?(SSH_ALIAS_PATTERN)
+      configured_aliases = @process_env.fetch("SOUL_FLEET_DEBIAN_APT_CONTROL_ALIASES", "").split(",").map(&:strip).reject(&:empty?).uniq
+      raise ArgumentError, "enrolled Debian control alias is not enabled" unless configured_aliases.include?(ssh_alias)
+
+      {
+        "label" => device.fetch("label"),
+        "display_label" => device.fetch("label").to_s.byteslice(0, 80).to_s,
+        "display_address" => device.fetch("address").to_s.byteslice(0, 255).to_s,
+        "maintenance_adapter" => "debian_apt",
+        "ssh_alias" => ssh_alias,
+        "impact" => ["Services hosted by this Debian endpoint are interrupted while it reboots"],
+        "maintenance" => [["/usr/bin/sudo", "-n", DEBIAN_APT_HELPER_PATH, "apt-upgrade"]],
+        "reboot" => ["/usr/bin/sudo", "-n", DEBIAN_APT_HELPER_PATH, "reboot"],
+        "reboot_readiness" => [
+          {
+            "label" => "SSH service",
+            "argv" => ["/usr/bin/systemctl", "is-active", "ssh"],
+            "stdout_includes" => ["active"]
+          },
+          {
+            "label" => "APT package manager",
+            "argv" => ["/usr/bin/apt-get", "--version"],
+            "stdout_includes" => ["apt "]
+          },
+          {
+            "label" => "Fixed Debian APT authority",
+            "argv" => ["/usr/bin/sudo", "-n", DEBIAN_APT_HELPER_PATH, "self-check"],
+            "stdout_includes" => [DEBIAN_APT_AUTHORITY_VERSION]
+          }
+        ]
+      }
     end
 
     def witness_target!(target)

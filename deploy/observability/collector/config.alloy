@@ -1,0 +1,45 @@
+local.file "ingest_password" {
+  filename  = "/etc/soul-observability/ingest-password"
+  is_secret = true
+}
+
+prometheus.exporter.unix "host" {
+  include_exporter_metrics = false
+  set_collectors = [
+    "cpu", "diskstats", "filesystem", "hwmon", "loadavg", "meminfo",
+    "netclass", "netdev", "netstat", "os", "stat", "systemd", "time",
+    "uname", "vmstat",
+  ]
+  systemd {
+    task_metrics   = false
+    enable_restarts = true
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  scrape_interval = "15s"
+  forward_to      = [prometheus.remote_write.central.receiver]
+}
+
+prometheus.remote_write "central" {
+  external_labels = {
+    device_id   = sys.env("SOUL_DEVICE_ID"),
+    role        = sys.env("SOUL_DEVICE_ROLE"),
+    platform    = sys.env("SOUL_PLATFORM"),
+    environment = sys.env("SOUL_ENVIRONMENT"),
+  }
+
+  endpoint {
+    url = sys.env("OBSERVABILITY_URL") + "/api/v1/write"
+    basic_auth {
+      username = "ingest"
+      password = local.file.ingest_password.content
+    }
+    tls_config {
+      ca_file = "/etc/soul-observability/ca.crt"
+    }
+  }
+}
+
+// Raw journal ingestion is intentionally absent in A1.

@@ -54,6 +54,7 @@ These guides explain the product surfaces, intended workflows, and human gates:
 | Backup and Recovery | Run and verify the encrypted local snapshot workflow and stage restores without overwriting live state | [Backup and Recovery](docs/soul/BACKUP_AND_RECOVERY.md) |
 | Guided Maintenance | Maintain trusted repositories and Flatpak, review AUR updates separately, and operate the distinct reboot/Hyprland restoration flow | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md) |
 | Security Monitoring | Operate accepted Wazuh observability, selective ClamAV scanning, and privacy-filtered read-only Chat/Voice status | [Security Monitoring](docs/guides/SECURITY_MONITORING.md) |
+| Fleet Observability | Operate the private Prometheus, Loki, Grafana, Caddy, and metric-only Alloy fleet surface | [Fleet Observability](docs/soul/FLEET_OBSERVABILITY_A1_1_BRIEF.md) |
 | Crucible Fedora Guest | Add an optional off-device backup target and read-only DNF5 maintenance laboratory on Proxmox | [Crucible Fedora](docs/guides/CRUCIBLE_FEDORA.md) |
 | NixOS Maintenance Support | Reuse the validated declarative Nix flake, system-generation, and bounded reboot adapter for an explicitly enrolled NixOS guest | [Guided Maintenance](docs/guides/GUIDED_MAINTENANCE.md#nixos-laboratory-target) |
 | Invocation Guide | Inspect what Soul can do, required inputs, Core needs, outputs, and retained approval boundaries without invoking anything | [Invocation Guide](docs/guides/INVOCATION_GUIDE.md) |

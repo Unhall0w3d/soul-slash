@@ -297,14 +297,24 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   a deterministic newest-first chronology. Observations, cautious inference,
   and missing evidence remain distinct; raw alert descriptions, paths, command
   lines, credentials, model use, source refresh, and remediation are excluded.
-- **Fleet Historical Telemetry and Observability A0** is an architecture-only
-  candidate for Operator review. It selects Grafana Alloy, Prometheus, Loki,
-  and Grafana for a bounded private-LAN operational telemetry plane while
-  preserving Wazuh as the security authority. Metrics retain 30 days,
-  operational logs retain 14 days, stable Soul device identities replace
-  address-based labels, and raw telemetry stays outside Restic/DRS by default.
-  No collector, store, listener, service, schedule, automatic collection, Soul
-  summary adapter, or remediation authority is deployed by A0.
+- **Fleet Historical Telemetry and Observability A1** is deployed, technically
+  qualified, and Operator-approved. A dedicated
+  unprivileged guest runs Prometheus, Loki, Grafana, and Caddy; Caddy alone
+  exposes the private HTTPS 443 application surface while every datastore and
+  collector control surface remains on loopback. A key-only, non-root SSH
+  management plane exposes only digest-bound APT maintenance and reboot
+  operations to Soul. Four explicitly enrolled Linux roles deliver pinned
+  Alloy Unix metrics under stable low-cardinality identities. Prometheus keeps
+  at most 30 days and 28 GB, Loki keeps at most 14 days, and raw telemetry stays
+  outside Restic/DRS. Journal collection, alerts, Soul query integration, and
+  telemetry-driven mutation remain disabled; Wazuh is still the security
+  authority.
+- **Fleet Observability A1.1** is deployed, technically qualified, and
+  Operator-approved. It keeps
+  the approved collection topology unchanged while adding a compact freshness
+  and health overview, collapsed compute, storage, network, service, stability,
+  thermal, and power rows, and an owner-private approximate global-presence
+  marker. The public dashboard contains location placeholders only.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

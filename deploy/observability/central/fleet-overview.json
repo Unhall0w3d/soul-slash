@@ -1,0 +1,341 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Reporting endpoints",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"refId": "A", "expr": "count(count by (device_id) (node_uname_info))"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 4}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Endpoint sample age",
+      "description": "Seconds since each endpoint last supplied its stable identity sample.",
+      "gridPos": {"h": 4, "w": 8, "x": 4, "y": 0},
+      "targets": [{"refId": "A", "expr": "max by (device_id, role) (time() - timestamp(node_uname_info))", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 60}, {"color": "red", "value": 300}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "none", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed systemd units",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [{"refId": "A", "expr": "sum by (device_id, role) (node_systemd_unit_state{state=\"failed\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "none", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Maximum observed temperature",
+      "description": "Maximum hardware sensor reading per endpoint. Missing hosts do not expose a compatible hwmon sensor.",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [{"refId": "A", "expr": "max by (device_id, role) (node_hwmon_temp_celsius)", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "celsius", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 75}, {"color": "red", "value": 90}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+    },
+    {
+      "id": 5,
+      "type": "geomap",
+      "title": "Global presence",
+      "description": "Owner-local approximate site location. Coordinates are rendered from private deployment values and do not enter Git.",
+      "gridPos": {"h": 10, "w": 10, "x": 0, "y": 4},
+      "targets": [{
+        "refId": "A",
+        "expr": "label_replace(label_replace(label_replace(count(count by (device_id) (node_uname_info)), \"latitude\", \"__SOUL_SITE_LATITUDE__\", \"\", \".*\"), \"longitude\", \"__SOUL_SITE_LONGITUDE__\", \"\", \".*\"), \"site\", \"__SOUL_SITE_LABEL__\", \"\", \".*\")",
+        "format": "table",
+        "instant": true,
+        "range": false
+      }],
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#00E5FF"}}, "overrides": []},
+      "options": {
+        "basemap": {"config": {}, "name": "World", "type": "default"},
+        "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": true, "showZoom": true},
+        "layers": [{
+          "config": {"showLegend": false, "style": {"color": {"fixed": "#00E5FF"}, "opacity": 0.9, "rotation": {"fixed": 0, "max": 360, "min": -360, "mode": "mod"}, "size": {"fixed": 14, "max": 40, "min": 4}, "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}}},
+          "filterData": {"id": "byRefId", "options": "A"},
+          "location": {"latitude": "latitude", "longitude": "longitude", "mode": "coords"},
+          "name": "Soul private site",
+          "tooltip": true,
+          "type": "markers"
+        }],
+        "tooltip": {"mode": "details"},
+        "view": {"allLayers": true, "id": "coords", "lat": 20, "lon": 0, "zoom": 1.25}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "CPU busy by endpoint",
+      "gridPos": {"h": 10, "w": 14, "x": 10, "y": 4},
+      "targets": [{"refId": "A", "expr": "100 - (avg by (device_id, role) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+        {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+      ]}
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Memory used",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "targets": [{"refId": "A", "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+        {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+      ]}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Root filesystem used",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "targets": [{"refId": "A", "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+        {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+        {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+      ]}
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Compute and memory pressure",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+      "panels": [
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "Normalized 1-minute load",
+          "description": "One-minute runnable load normalized by logical CPU count. Values above 100% indicate more runnable work than logical CPUs.",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 23},
+          "targets": [{"refId": "A", "expr": "100 * node_load1 / on(device_id, role) count by (device_id, role) (node_cpu_seconds_total{mode=\"idle\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 22,
+          "type": "timeseries",
+          "title": "Swap used",
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 23},
+          "targets": [{"refId": "A", "expr": "100 * (node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / clamp_min(node_memory_SwapTotal_bytes, 1)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 23,
+          "type": "timeseries",
+          "title": "Swap activity",
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 23},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (rate(node_vmstat_pswpin[5m]) + rate(node_vmstat_pswpout[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "pps", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Storage behavior",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23},
+      "panels": [
+        {
+          "id": 31,
+          "type": "timeseries",
+          "title": "Disk throughput",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (rate(node_disk_read_bytes_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]) + rate(node_disk_written_bytes_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "Bps", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 32,
+          "type": "timeseries",
+          "title": "Disk I/O busy",
+          "description": "Aggregate physical-device busy time; multi-device hosts can exceed 100%.",
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 24},
+          "targets": [{"refId": "A", "expr": "100 * sum by (device_id, role) (rate(node_disk_io_time_seconds_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 33,
+          "type": "timeseries",
+          "title": "Average disk request latency",
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 24},
+          "targets": [{"refId": "A", "expr": "1000 * (sum by (device_id, role) (rate(node_disk_read_time_seconds_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]) + rate(node_disk_write_time_seconds_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]))) / clamp_min(sum by (device_id, role) (rate(node_disk_reads_completed_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m]) + rate(node_disk_writes_completed_total{device!~\"loop.*|ram.*|dm-.*|md.*|zram.*\"}[5m])), 0.001)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "ms", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "title": "Network health",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24},
+      "panels": [
+        {
+          "id": 41,
+          "type": "timeseries",
+          "title": "Physical-interface throughput",
+          "description": "Combined receive and transmit rate with common virtual-interface families excluded.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "Bps", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 42,
+          "type": "timeseries",
+          "title": "Network errors and drops",
+          "description": "Combined receive/transmit errors and packet drops on non-virtual interfaces.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (rate(node_network_receive_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_receive_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "pps", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "type": "row",
+      "title": "Services and stability",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 25},
+      "panels": [
+        {
+          "id": 51,
+          "type": "stat",
+          "title": "Failed units",
+          "gridPos": {"h": 7, "w": 6, "x": 0, "y": 26},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (node_systemd_unit_state{state=\"failed\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+        },
+        {
+          "id": 52,
+          "type": "stat",
+          "title": "Service restarts in range",
+          "gridPos": {"h": 7, "w": 6, "x": 6, "y": 26},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (increase(node_systemd_service_restart_total[$__range]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "area", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+        },
+        {
+          "id": 53,
+          "type": "stat",
+          "title": "Host uptime",
+          "gridPos": {"h": 7, "w": 6, "x": 12, "y": 26},
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) (time() - node_boot_time_seconds)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "continuous-GrYlRd"}}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+        },
+        {
+          "id": 54,
+          "type": "stat",
+          "title": "OOM kills in range",
+          "gridPos": {"h": 7, "w": 6, "x": 18, "y": 26},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (increase(node_vmstat_oom_kill[$__range]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "none", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "type": "row",
+      "title": "Thermal and power sensors",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 26},
+      "panels": [
+        {
+          "id": 61,
+          "type": "timeseries",
+          "title": "Maximum hardware temperature",
+          "description": "Hosts without compatible hwmon sensors remain absent rather than appearing healthy.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 27},
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) (node_hwmon_temp_celsius)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 62,
+          "type": "timeseries",
+          "title": "Reported hardware power",
+          "description": "Only sensors that expose hwmon power are shown.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 27},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (node_hwmon_power_average_watt)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "watt", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["soul", "fleet", "a1.1"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Soul Fleet Overview",
+  "uid": "soul-fleet-overview-a1",
+  "version": 2
+}
