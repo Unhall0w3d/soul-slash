@@ -5832,6 +5832,47 @@ async function composeIncidentNarrative() {
   } finally { button.disabled = false; }
 }
 
+function renderFleetObservability(report) {
+  const badge = byId("fleet-observability-state");
+  const reportState = String(report.state || "unavailable");
+  badge.textContent = reportState;
+  badge.dataset.state = reportState === "healthy" ? "healthy" : "attention";
+
+  const summary = byId("fleet-observability-summary"); summary.replaceChildren();
+  const endpoints = report.endpoints || {}; const network = report.network || {};
+  [
+    ["Endpoints", `${endpoints.reporting || 0} reporting · ${endpoints.stale || 0} stale`],
+    ["Switches", `${network.switches_reporting || 0} reporting · ${network.switches_unavailable || 0} unavailable`],
+    ["Bounded alerts", `${(report.alerts || []).length} firing`],
+    ["Evidence gaps", `${(report.gaps || []).length}`]
+  ].forEach(([label, value]) => stewardStat(summary, value, label));
+
+  const evidence = byId("fleet-observability-evidence"); evidence.replaceChildren();
+  (report.alerts || []).forEach((alert) => stewardEvidence(evidence, alert.alert || "Fleet alert", `${alert.device_id || "fleet"} · ${alert.severity || "attention"}`, "Prometheus dashboard-only alert", "attention"));
+  (network.host_errors || []).forEach((row) => stewardEvidence(evidence, "Host network errors", row.device_id || "unknown endpoint", `${row.value || 0} errors/sec`, "attention"));
+  (network.switch_interface_errors || []).forEach((row) => stewardEvidence(evidence, "Switch interface errors", `${row.device_id || "unknown switch"} · ${row.interface || "unknown interface"}`, `${row.value || 0} errors/sec`, "attention"));
+  (report.gaps || []).forEach((gap) => stewardEvidence(evidence, "Evidence gap", gap.source_id || "query", gap.reason || "Source unavailable", "gap"));
+  if (!evidence.childElementCount) stewardEmpty(evidence, "No current bounded alerts, network errors, or query gaps.");
+
+  const drilldown = byId("fleet-observability-drilldown");
+  if (report.grafana_url) { drilldown.href = report.grafana_url; drilldown.hidden = false; }
+  else { drilldown.removeAttribute("href"); drilldown.hidden = true; }
+}
+
+async function refreshFleetObservability() {
+  const status = byId("fleet-observability-status"); const button = byId("refresh-fleet-observability");
+  button.disabled = true; status.textContent = "Reading the fixed Observatory query registry…";
+  try {
+    const envelope = await callSoul("fleet_observability.summary");
+    if (envelope.lifecycle_state !== "complete") throw new Error(hostEnvelopeMessage(envelope, "Fleet observability stopped safely."));
+    const report = dataOf(envelope); renderFleetObservability(report);
+    status.textContent = `${report.query_ids?.length || 0} fixed queries · ${(report.gaps || []).length} gaps · foreground only · no mutation authority`;
+  } catch (error) {
+    byId("fleet-observability-state").textContent = "Unavailable";
+    status.textContent = error.message || "Fleet observability failed safely.";
+  } finally { button.disabled = false; }
+}
+
 function fillFileStewardRoots(roots) {
   state.fileStewardRoots = roots.filter((root) => root.available);
   ["file-steward-root", "file-steward-source-root", "file-steward-destination-root"].forEach((id) => {
@@ -6478,6 +6519,7 @@ byId("refresh-software-steward").addEventListener("click", refreshSoftwareStewar
 byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);
 byId("sample-storage-io").addEventListener("click", sampleStorageIo);
 byId("compose-incident-narrative").addEventListener("click", composeIncidentNarrative);
+byId("refresh-fleet-observability").addEventListener("click", refreshFleetObservability);
 byId("inspect-file-steward").addEventListener("click", loadFileStewardInventory);
 byId("preview-file-operation").addEventListener("click", previewFileStewardOperation);
 byId("execute-file-operation").addEventListener("click", executeFileStewardOperation);

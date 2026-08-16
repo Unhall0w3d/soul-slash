@@ -36,11 +36,11 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Maximum observed temperature",
-      "description": "Maximum hardware sensor reading per endpoint. Missing hosts do not expose a compatible hwmon sensor.",
+      "title": "CPU package temperature",
+      "description": "CPU package evidence selected through portable hwmon labels. Invalid and unavailable readings remain absent.",
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
-      "targets": [{"refId": "A", "expr": "max by (device_id, role) (node_hwmon_temp_celsius)", "legendFormat": "{{device_id}} · {{role}}"}],
-      "fieldConfig": {"defaults": {"unit": "celsius", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 75}, {"color": "red", "value": 90}]}}, "overrides": []},
+      "targets": [{"refId": "A", "expr": "max by (device_id, role) (((node_hwmon_temp_celsius >= 0) and (node_hwmon_temp_celsius < 125)) * on(device_id, role, chip, sensor) group_left(label) node_hwmon_sensor_label{label=~\"Package id [0-9]+|CPU Package|Tctl|Tdie\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+      "fieldConfig": {"defaults": {"unit": "celsius", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 85}, {"color": "red", "value": 95}]}}, "overrides": []},
       "options": {"colorMode": "value", "graphMode": "area", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
     },
     {
@@ -301,11 +301,11 @@
         {
           "id": 61,
           "type": "timeseries",
-          "title": "Maximum hardware temperature",
-          "description": "Hosts without compatible hwmon sensors remain absent rather than appearing healthy.",
+          "title": "CPU package temperature",
+          "description": "Portable CPU package labels only; readings outside 0–125°C and hosts without compatible evidence remain absent.",
           "gridPos": {"h": 8, "w": 12, "x": 0, "y": 27},
-          "targets": [{"refId": "A", "expr": "max by (device_id, role) (node_hwmon_temp_celsius)", "legendFormat": "{{device_id}} · {{role}}"}],
-          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0}, "overrides": [
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) (((node_hwmon_temp_celsius >= 0) and (node_hwmon_temp_celsius < 125)) * on(device_id, role, chip, sensor) group_left(label) node_hwmon_sensor_label{label=~\"Package id [0-9]+|CPU Package|Tctl|Tdie\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 85}, {"color": "red", "value": 95}]}}, "overrides": [
             {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
             {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
             {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
@@ -315,9 +315,51 @@
         {
           "id": 62,
           "type": "timeseries",
+          "title": "CPU busy beside temperature",
+          "description": "The matching five-minute CPU busy rate makes sustained thermal load visible without implying a fault.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 27},
+          "targets": [{"refId": "A", "expr": "100 - (avg by (device_id, role) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 63,
+          "type": "timeseries",
+          "title": "NVMe composite temperature",
+          "description": "Composite NVMe sensor labels only; invalid and unavailable values remain absent.",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 35},
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) (((node_hwmon_temp_celsius >= 0) and (node_hwmon_temp_celsius < 125)) * on(device_id, role, chip, sensor) group_left(label) node_hwmon_sensor_label{label=\"Composite\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 64,
+          "type": "timeseries",
+          "title": "Chipset temperature",
+          "description": "Portable PCH or equivalent thermal-zone evidence where the platform exports it.",
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 35},
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) ((node_hwmon_temp_celsius{chip=~\"platform_pch.*|thermal_thermal_zone2\"} >= 0) and (node_hwmon_temp_celsius{chip=~\"platform_pch.*|thermal_thermal_zone2\"} < 125))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 65,
+          "type": "timeseries",
           "title": "Reported hardware power",
           "description": "Only sensors that expose hwmon power are shown.",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 27},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 35},
           "targets": [{"refId": "A", "expr": "sum by (device_id, role) (node_hwmon_power_average_watt)", "legendFormat": "{{device_id}} · {{role}}"}],
           "fieldConfig": {"defaults": {"unit": "watt", "min": 0}, "overrides": [
             {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},

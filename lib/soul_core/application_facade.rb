@@ -19,6 +19,7 @@ require_relative "conversation_provider_registry"
 require_relative "conversation_provider_client"
 require_relative "conversation_runtime"
 require_relative "conversation_security_status_service"
+require_relative "conversation_fleet_observability_service"
 require_relative "conversation_creative_workflow_service"
 require_relative "conversation_maintenance_workflow_service"
 require_relative "conversation_core_workflow_service"
@@ -32,6 +33,7 @@ require_relative "file_steward_service"
 require_relative "software_steward_service"
 require_relative "storage_steward_service"
 require_relative "incident_narrator_service"
+require_relative "fleet_observability_summary_service"
 require_relative "backup_administration_service"
 require_relative "nightly_drs_deployment"
 require_relative "project_tracker_service"
@@ -105,6 +107,7 @@ module SoulCore
       software_steward_service: nil,
       storage_steward_service: nil,
       incident_narrator_service: nil,
+      fleet_observability_summary_service: nil,
       backup_administration_service: nil,
       operator_backup_administration_service: nil,
       nightly_drs_deployment: nil,
@@ -179,6 +182,7 @@ module SoulCore
       @software_steward_service = software_steward_service
       @storage_steward_service = storage_steward_service
       @incident_narrator_service = incident_narrator_service
+      @fleet_observability_summary_service = fleet_observability_summary_service
       @backup_administration_service = backup_administration_service
       @operator_backup_administration_service = operator_backup_administration_service
       @nightly_drs_deployment = nightly_drs_deployment
@@ -456,6 +460,7 @@ module SoulCore
       when "security.wazuh.posture.status" then domain(wazuh_compliance_posture.status)
       when "security.wazuh.posture.snapshot" then domain(wazuh_compliance_posture.snapshot)
       when "incident_narrator.compose" then domain(incident_narrator.compose)
+      when "fleet_observability.summary" then domain(fleet_observability_summary.summary)
       when "maintenance.discovery.status" then domain(maintenance_fleet_discovery.status)
       when "maintenance.discovery.scan" then domain(maintenance_fleet_discovery.discover(subnet: required(parameters, "subnet")))
       when "maintenance.discovery.registry" then domain(maintenance_fleet_discovery.registry)
@@ -892,6 +897,9 @@ module SoulCore
           alert_evidence_service: wazuh_alert_evidence,
           posture_service: wazuh_compliance_posture
         ),
+        fleet_observability_service: ConversationFleetObservabilityService.new(
+          summary_service: fleet_observability_summary
+        ),
         identity_compact_resolver: -> { %w[amd-free music].include?(core_orchestration.status.dig("data", "active_core_id")) })
     end
 
@@ -937,6 +945,15 @@ module SoulCore
         maintenance_device_receipt_source: -> { maintenance_device_control.retained_receipts(limit: 16) },
         maintenance_host_receipt_source: -> { maintenance_foreground_execution.retained_receipts(limit: 16) },
         backup_source: -> { backup_administration.retained_drs_status },
+        observability_source: -> { fleet_observability_summary.summary },
+        clock: @clock
+      )
+    end
+
+    def fleet_observability_summary
+      _report, resolver = resolved_configuration
+      @fleet_observability_summary_service ||= FleetObservabilitySummaryService.new(
+        process_env: resolver.effective_environment,
         clock: @clock
       )
     end

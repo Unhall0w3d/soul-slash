@@ -25,7 +25,7 @@ set +a
 for value in "${SOUL_DEVICE_ID}" "${SOUL_DEVICE_ROLE}" "${SOUL_PLATFORM}" "${SOUL_ENVIRONMENT}"; do
   [[ ${value} =~ ^[a-z0-9_-]+$ ]] || { echo "collector identity labels must be lowercase bounded identifiers" >&2; exit 1; }
 done
-for command in curl unzip sha256sum getent useradd install systemctl; do
+for command in curl unzip sha256sum getent useradd usermod install systemctl; do
   command -v "${command}" >/dev/null || { echo "required command is unavailable: ${command}" >&2; exit 1; }
 done
 
@@ -42,6 +42,7 @@ install -m 0755 "${tmpdir}/alloy-linux-amd64" /usr/local/bin/alloy
 
 getent group alloy >/dev/null || groupadd --system alloy
 id alloy >/dev/null 2>&1 || useradd --system --gid alloy --home-dir /var/lib/alloy --shell /usr/sbin/nologin alloy
+getent group systemd-journal >/dev/null && usermod -a -G systemd-journal alloy
 install -d -o root -g alloy -m 0750 /etc/soul-observability
 install -d -o alloy -g alloy -m 0750 /var/lib/alloy
 install -o root -g alloy -m 0640 "${SCRIPT_DIR}/config.alloy" /etc/soul-observability/config.alloy
@@ -66,4 +67,4 @@ systemctl enable alloy
 systemctl restart alloy
 systemctl is-active --quiet alloy
 rm -f "${ENV_FILE}" "${CA_FILE}"
-echo "bounded Alloy metrics collector installed; journal ingestion remains disabled"
+echo "bounded Alloy metrics and redacted maintenance-lifecycle collector installed"

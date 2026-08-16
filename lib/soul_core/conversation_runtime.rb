@@ -24,6 +24,7 @@ require_relative "conversation_provider_registry"
 require_relative "conversation_response_truth_guard"
 require_relative "conversation_research_reflection_service"
 require_relative "conversation_security_status_service"
+require_relative "conversation_fleet_observability_service"
 require_relative "conversation_state_store"
 require_relative "conversation_weather_service"
 require_relative "host_system_status_collector"
@@ -82,6 +83,7 @@ module SoulCore
       core_workflow_service: nil,
       maintenance_workflow_service: nil,
       security_status_service: nil,
+      fleet_observability_service: nil,
       identity_compact_resolver: nil
     )
       @root = File.expand_path(root)
@@ -117,6 +119,7 @@ module SoulCore
       @core_workflow_service = core_workflow_service
       @maintenance_workflow_service = maintenance_workflow_service
       @security_status_service = security_status_service
+      @fleet_observability_service = fleet_observability_service
       @identity_compact_resolver = identity_compact_resolver
       @weather_service = ConversationWeatherService.new(env: env)
       @response_truth_guard = ConversationResponseTruthGuard.new
@@ -724,7 +727,7 @@ module SoulCore
         message: text,
         weather_detail: decision.flags["weather_detail_followup"] == true
       )
-      content = weather_content(evidence) || security_content(evidence) || @grounding_policy.render_evidence(
+      content = weather_content(evidence) || security_content(evidence) || fleet_observability_content(evidence) || @grounding_policy.render_evidence(
         evidence,
         heading: "What Soul actually checked"
       )
@@ -1242,6 +1245,29 @@ module SoulCore
             next @evidence_store.append(evidence)
           end
 
+          if tool.id == "fleet.observability"
+            raise "fleet observability service is unavailable" unless @fleet_observability_service
+
+            outcome = @fleet_observability_service.report
+            evidence = EvidenceContract.build(
+              tool: tool,
+              chat_id: chat_id,
+              output: outcome.fetch("content"),
+              status: outcome["ok"] ? "ok" : outcome.fetch("lifecycle_state", "failed")
+            ).to_h
+            evidence["collected"]["conversation_response"] = outcome.fetch("content")
+            evidence["collected"]["fleet_observability_report"] = outcome.fetch("report")
+            evidence["not_collected"] = [
+              "raw Prometheus samples and arbitrary PromQL",
+              "raw journal messages and command output",
+              "addresses, credentials, and private filesystem paths",
+              "maintenance, reboot, switch mutation, alert mutation, or remediation authority"
+            ]
+            evidence["source"]["assessment"] = "bounded_fleet_observability_summary"
+            evidence["source"]["verification"] = {"read_only" => true, "remediation_authority" => false}
+            next @evidence_store.append(evidence)
+          end
+
           output = @deterministic_responder.respond(tool.canonical_message)
           evidence = EvidenceContract.build(
             tool: tool,
@@ -1276,6 +1302,13 @@ module SoulCore
     def security_content(evidence)
       return nil unless Array(evidence).length == 1
       return nil unless evidence.first["evidence_profile"] == "security_status"
+
+      evidence.first.dig("collected", "conversation_response")
+    end
+
+    def fleet_observability_content(evidence)
+      return nil unless Array(evidence).length == 1
+      return nil unless evidence.first["evidence_profile"] == "fleet_observability"
 
       evidence.first.dig("collected", "conversation_response")
     end

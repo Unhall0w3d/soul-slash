@@ -146,6 +146,21 @@ module SoulCore
         ]
       ),
       ToolDefinition.new(
+        id: "fleet.observability",
+        label: "Fleet observability summary",
+        risk_class: "read_only_network",
+        canonical_message: "summarize fleet observability",
+        synthesis_allowed: false,
+        scope: "Bounded read-only endpoint, resource, network, switch, alert, and boot evidence from Observatory",
+        evidence_profile: "fleet_observability",
+        patterns: [
+          /\A\s*(?:fleet|observatory|fleet observability)\s+(?:status|health|summary)\s*[?.!]*\z/i,
+          /\b(?:check|inspect|show|report|review|summari[sz]e)\b.{0,45}\b(?:fleet observability|observatory|fleet telemetry)\b/i,
+          /\bhow\b.{0,20}\b(?:the\s+)?fleet\b.{0,25}\b(?:look|looks|doing|health|status)\b/i,
+          /\b(?:fleet|server|switch)\b.{0,40}\b(?:resource pressure|telemetry|metrics|observability alerts?)\b/i
+        ]
+      ),
+      ToolDefinition.new(
         id: "execution.history.summary",
         label: "Execution history summary",
         risk_class: "read_only",

@@ -1,0 +1,77 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "name": "Reboots",
+        "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+        "enable": true,
+        "expr": "changes(node_boot_time_seconds[2m]) > 0",
+        "iconColor": "#A970FF",
+        "tagKeys": "device_id,role",
+        "titleFormat": "Reboot · {{device_id}}"
+      },
+      {
+        "name": "Maintenance lifecycle",
+        "datasource": {"type": "loki", "uid": "soul-loki"},
+        "enable": true,
+        "expr": "{job=\"soul-maintenance\"}",
+        "iconColor": "#00E5FF",
+        "tagKeys": "device_id,unit",
+        "titleFormat": "Maintenance · {{device_id}}"
+      }
+    ]
+  },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Firing bounded alerts", "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(ALERTS{alertstate=\"firing\",scope=~\"fleet|network\"})", "legendFormat": "alerts"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]}}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Reporting switches", "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(up{job=\"switch_interfaces\"} == 1)", "legendFormat": "switches"}]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Fleet resource pressure", "gridPos": {"h": 9, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "100 - avg by (device_id, role) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100", "legendFormat": "{{device_id}} · CPU"},
+        {"refId": "B", "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{device_id}} · memory"},
+        {"refId": "C", "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"})", "legendFormat": "{{device_id}} · root"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}}
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Host network errors and drops", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum by (device_id, role) (rate(node_network_receive_errs_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tailscale.*\"}[5m]) + rate(node_network_transmit_errs_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tailscale.*\"}[5m]))", "legendFormat": "{{device_id}} · errors"},
+        {"refId": "B", "expr": "sum by (device_id, role) (rate(node_network_receive_drop_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tailscale.*\"}[5m]) + rate(node_network_transmit_drop_total{device!~\"lo|veth.*|docker.*|br-.*|virbr.*|tailscale.*\"}[5m]))", "legendFormat": "{{device_id}} · drops"}
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Switch interface errors", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 9},
+      "datasource": {"type": "prometheus", "uid": "soul-prometheus"},
+      "targets": [{"refId": "A", "expr": "sum by (device_id, ifName) (rate(ifInErrors[5m]) + rate(ifOutErrors[5m]))", "legendFormat": "{{device_id}} · {{ifName}}"}]
+    },
+    {
+      "id": 6, "type": "logs", "title": "Redacted maintenance lifecycle", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17},
+      "datasource": {"type": "loki", "uid": "soul-loki"},
+      "targets": [{"refId": "A", "expr": "{job=\"soul-maintenance\"}", "queryType": "range"}],
+      "options": {"showTime": true, "showLabels": true, "wrapLogMessage": true}
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["soul", "fleet", "operations", "read-only"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timezone": "browser",
+  "title": "Soul Fleet Operations",
+  "uid": "soul-fleet-operations-a2",
+  "version": 1
+}

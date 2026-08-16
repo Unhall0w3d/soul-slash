@@ -27,7 +27,7 @@ LOKI_ZIP_SHA256=09d213427516581210bf39a5dca0b290722a3c17a623c5d6b654a85d6d5248ea
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl gpg unzip prometheus caddy apache2-utils
+apt-get install -y --no-install-recommends ca-certificates curl gpg unzip prometheus prometheus-snmp-exporter caddy apache2-utils
 
 install -d -m 0755 /etc/apt/keyrings
 curl -fsSL https://apt.grafana.com/gpg-full.key -o /etc/apt/keyrings/grafana.asc
@@ -51,7 +51,28 @@ install -o root -g loki -m 0640 "${SCRIPT_DIR}/loki.yml" /etc/loki/loki.yml
 install -o root -g root -m 0644 "${SCRIPT_DIR}/loki.service" /etc/systemd/system/loki.service
 
 install -o root -g prometheus -m 0640 "${SCRIPT_DIR}/prometheus.yml" /etc/prometheus/prometheus.yml
+install -d -o root -g prometheus -m 0750 /etc/prometheus/rules
+install -o root -g prometheus -m 0640 "${SCRIPT_DIR}/fleet-alerts.yml" /etc/prometheus/rules/soul-fleet-alerts.yml
+if [[ -f /root/soul-switch-targets.json && -f /root/soul-snmp.yml ]]; then
+  [[ $(stat -c '%a' /root/soul-switch-targets.json) == 600 ]] || { echo "switch targets must be mode 0600" >&2; exit 1; }
+  [[ $(stat -c '%a' /root/soul-snmp.yml) == 600 ]] || { echo "SNMP configuration must be mode 0600" >&2; exit 1; }
+  install -o root -g prometheus -m 0640 /root/soul-switch-targets.json /etc/prometheus/soul-switch-targets.json
+  install -o root -g prometheus -m 0640 /root/soul-snmp.yml /etc/prometheus/snmp.yml
+else
+  install -o root -g prometheus -m 0640 /dev/null /etc/prometheus/soul-switch-targets.json
+  printf '%s\n' '[]' > /etc/prometheus/soul-switch-targets.json
+fi
 install -d -o prometheus -g prometheus -m 0750 /var/lib/prometheus
+install -d -m 0755 /etc/systemd/system/prometheus-snmp-exporter.service.d
+cat > /etc/systemd/system/prometheus-snmp-exporter.service.d/soul-observability.conf <<'EOF'
+[Service]
+# Debian's packaged unit enables PrivateUsers, which cannot create its user
+# namespace inside the reviewed unprivileged LXC. Preserve every other package
+# hardening directive and disable only the incompatible namespace feature.
+PrivateUsers=false
+ExecStart=
+ExecStart=/usr/bin/prometheus-snmp-exporter --config.file=/etc/prometheus/snmp.yml --web.listen-address=127.0.0.1:9116
+EOF
 install -d -m 0755 /etc/systemd/system/prometheus.service.d
 cat > /etc/systemd/system/prometheus.service.d/soul-observability.conf <<'EOF'
 [Service]
@@ -68,6 +89,7 @@ install -d -o grafana -g grafana -m 0750 /var/lib/grafana/dashboards
 install -o root -g grafana -m 0640 "${SCRIPT_DIR}/grafana-datasources.yml" /etc/grafana/provisioning/datasources/soul.yml
 install -o root -g grafana -m 0640 "${SCRIPT_DIR}/grafana-dashboard-provider.yml" /etc/grafana/provisioning/dashboards/soul.yml
 "${SCRIPT_DIR}/render-dashboard.sh" "${ENV_FILE}" /var/lib/grafana/dashboards/fleet-overview.json
+install -o root -g grafana -m 0640 "${SCRIPT_DIR}/fleet-operations.json" /var/lib/grafana/dashboards/fleet-operations.json
 sed -i -E 's|^[; ]*http_addr *=.*|http_addr = 127.0.0.1|' /etc/grafana/grafana.ini
 sed -i -E 's|^[; ]*http_port *=.*|http_port = 3000|' /etc/grafana/grafana.ini
 sed -i -E 's|^[; ]*reporting_enabled *=.*|reporting_enabled = false|' /etc/grafana/grafana.ini
@@ -79,9 +101,9 @@ chown root:caddy /etc/caddy/Caddyfile
 chmod 0640 /etc/caddy/Caddyfile
 
 systemctl daemon-reload
-systemctl enable prometheus loki grafana-server caddy
-systemctl restart prometheus loki grafana-server caddy
-for unit in prometheus loki grafana-server caddy; do systemctl is-active --quiet "${unit}"; done
+systemctl enable prometheus prometheus-snmp-exporter loki grafana-server caddy
+systemctl restart prometheus prometheus-snmp-exporter loki grafana-server caddy
+for unit in prometheus prometheus-snmp-exporter loki grafana-server caddy; do systemctl is-active --quiet "${unit}"; done
 
 # Grafana's package may initialize its database before the reviewed config is
 # installed. Converge the database-backed admin credential explicitly.
@@ -101,7 +123,7 @@ chmod 0600 /var/lib/soul-observability/bootstrap-credentials.env
 rm -f "${ENV_FILE}"
 
 cat > /var/lib/soul-observability/install-receipt.json <<EOF
-{"schema_version":"soul.fleet-observability.central-install.a1.v1","loki_version":"${LOKI_VERSION}","metrics_retention":"30d","metrics_size":"28GB","logs_retention":"336h","journal_ingest":false,"mutation_authority":"none"}
+{"schema_version":"soul.fleet-observability.central-install.a2.v1","loki_version":"${LOKI_VERSION}","metrics_retention":"30d","metrics_size":"28GB","logs_retention":"336h","journal_ingest":"redacted_maintenance_units_only","snmp":"owner_private_optional","mutation_authority":"none"}
 EOF
 chmod 0600 /var/lib/soul-observability/install-receipt.json
 echo "central observability services installed; distribute Caddy's internal CA and owner-private ingest credential separately"

@@ -199,6 +199,24 @@ surfaces:
       operator_gesture_required: [investigation, acknowledgement, suppression, quarantine, remediation]
     completion: {progress: immediate, receipt: dated privacy-filtered conversation evidence}
 
+  - id: fleet_observability
+    label: Fleet Observability
+    aliases: [fleet health, fleet status, observatory, fleet telemetry]
+    summary: Read one bounded endpoint, resource, storage, network, switch, alert, and boot projection from Observatory.
+    inputs: Ask an explicit fleet-health or Observatory-status question; arbitrary PromQL is not accepted.
+    boundary: The summary is read-only, returns explicit gaps, and cannot maintain, reboot, change switches, mutate alerts, notify, or remediate.
+    skills: [fleet.observability]
+    invocations: [fleet-observability-summary]
+    operations: [fleet_observability.summary, incident_narrator.compose]
+    targets: [Observatory fixed query registry, provisioned Grafana drill-down]
+    interfaces: [dashboard, chat, voice_presence]
+    coverage: {dashboard: available, chat: available, voice: available}
+    authority:
+      default: read_only
+      conversational_confirmation: []
+      operator_gesture_required: [maintenance, reboot, switch mutation, alert mutation, remediation]
+    completion: {progress: immediate, receipt: bounded foreground evidence only}
+
   - id: skill_studio
     label: Skill Studio
     aliases: [skill studio, skills studio, capability workshop]

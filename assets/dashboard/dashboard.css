@@ -557,6 +557,7 @@ body.core-locked .app-header,body.core-locked main { filter:blur(7px) saturate(.
 .host-stewardship-disclosure-body { padding:20px 22px 22px; border-top:1px solid var(--line); }
 .host-stewardship-disclosure-body>.card-note:first-child { margin-top:0; }
 .incident-narrator-card>.host-stewardship-disclosure-body>.refresh-button { width:100%; min-height:42px; margin:13px 0; }
+.fleet-observability-card>.host-stewardship-disclosure-body>.refresh-button { display:flex; align-items:center; justify-content:center; width:100%; min-height:42px; margin:13px 0; }
 .incident-narrator-summary { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:start; margin:13px 0; padding:15px; border:1px solid rgba(58,174,223,.18); border-radius:2px 16px 2px 12px; background:rgba(5,15,22,.5); }
 .incident-narrator-summary strong { color:#C6E3E8; font:400 22px var(--serif); }
 .incident-narrator-summary span { color:#7E9DA6; font:11px/1.55 var(--mono); }

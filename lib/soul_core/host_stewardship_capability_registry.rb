@@ -120,6 +120,17 @@ module SoulCore
         "required_commands" => []
       },
       {
+        "id" => "fleet_observability.summary",
+        "label" => "Fleet observability summary",
+        "maturity" => "A3",
+        "evidence" => "fixed-query endpoint, resource, storage, network, switch, alert, and boot projection",
+        "freshness" => "foreground_on_request",
+        "privacy" => "owner_private_normalized_summary",
+        "mutation" => "none",
+        "approval" => "none",
+        "required_commands" => %w[ssh curl]
+      },
+      {
         "id" => "maintenance.fleet.evidence",
         "label" => "Fleet operations evidence",
         "maturity" => "A0",

@@ -32,6 +32,9 @@ alert, notification path, or operational authority.
 ## Known limits
 
 - Hardware temperatures and power are shown only where `hwmon` exports them.
+  The later A2 refinement distinguishes CPU package, NVMe composite, and
+  chipset evidence, rejects impossible readings, and places CPU busy beside
+  package temperature. Package attention/critical thresholds are 85/95°C.
 - Aggregate disk busy time can exceed 100 percent on multi-device hosts.
 - Portable interface filtering cannot infer every future virtual interface.
 - The region marker is deliberately approximate and owner-maintained.

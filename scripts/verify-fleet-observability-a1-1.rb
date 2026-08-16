@@ -34,7 +34,7 @@ check.call("manifest is a bounded dashboard-only A1 extension",
 
 overview_titles = [
   "Reporting endpoints", "Endpoint sample age", "Failed systemd units",
-  "Maximum observed temperature", "Global presence", "CPU busy by endpoint",
+  "CPU package temperature", "Global presence", "CPU busy by endpoint",
   "Memory used", "Root filesystem used"
 ]
 top_level = dashboard.fetch("panels").reject { |panel| panel["type"] == "row" }
@@ -57,7 +57,8 @@ metric_families = %w[
   node_disk_io_time_seconds_total node_disk_read_time_seconds_total
   node_network_receive_bytes_total node_network_receive_errs_total
   node_systemd_unit_state node_systemd_service_restart_total node_boot_time_seconds
-  node_vmstat_oom_kill node_hwmon_temp_celsius node_hwmon_power_average_watt
+  node_vmstat_oom_kill node_hwmon_temp_celsius node_hwmon_sensor_label
+  node_hwmon_power_average_watt
 ]
 check.call("queries cover the reviewed existing metric families",
   metric_families.all? { |metric| expressions.include?(metric) })
@@ -70,7 +71,7 @@ role_colors = {
 }
 time_series = panels.select { |panel| panel["type"] == "timeseries" }
 check.call("role colors remain stable across every time-series panel",
-  time_series.length == 13 && time_series.all? do |panel|
+  time_series.length == 16 && time_series.all? do |panel|
     overrides = panel.dig("fieldConfig", "overrides") || []
     actual = overrides.to_h do |override|
       [override.dig("matcher", "options"), override.dig("properties", 0, "value", "fixedColor")]
@@ -79,6 +80,22 @@ check.call("role colors remain stable across every time-series panel",
       overrides.all? { |override| override.dig("matcher", "id") == "byRegexp" } &&
       actual == role_colors
   end)
+
+thermal_panels = panels.select { |panel| ["CPU package temperature", "NVMe composite temperature", "Chipset temperature"].include?(panel["title"]) }
+thermal_expressions = thermal_panels.flat_map { |panel| panel.fetch("targets").map { |target| target.fetch("expr") } }.join("\n")
+check.call("thermal panels are sensor-specific and discard impossible readings",
+  thermal_panels.length == 4 &&
+    thermal_expressions.include?("node_hwmon_sensor_label") &&
+    thermal_expressions.include?("Package id [0-9]+|CPU Package|Tctl|Tdie") &&
+    thermal_expressions.include?('label="Composite"') &&
+    thermal_expressions.include?("thermal_thermal_zone2") &&
+    thermal_expressions.scan(">= 0").length == 4 &&
+    thermal_expressions.scan("< 125").length == 4)
+
+thermal_row = rows.find { |row| row["title"] == "Thermal and power sensors" }
+check.call("CPU activity is adjacent to package temperature",
+  thermal_row.fetch("panels").first(2).map { |panel| panel["title"] } ==
+    ["CPU package temperature", "CPU busy beside temperature"])
 
 map = panels.find { |panel| panel["type"] == "geomap" }
 map_expression = map&.dig("targets", 0, "expr").to_s

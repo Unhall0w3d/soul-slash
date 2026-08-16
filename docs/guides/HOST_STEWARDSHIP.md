@@ -4,7 +4,7 @@ Host Stewardship is Soul's owner-facing surface for understanding the local
 host before deciding whether any action is appropriate. Open it from
 **Administration → Host Stewardship**.
 
-This surface contains six related but separate boundaries:
+This surface contains seven related but separate boundaries:
 
 - the **Capability Registry** declares what exists, its maturity, evidence,
   privacy, mutation class, dependencies, and approval requirement;
@@ -15,6 +15,8 @@ This surface contains six related but separate boundaries:
   and public Arch security evidence without changing installed software;
 - **Storage Steward** reports bounded device, filesystem, NVMe, and configured
   Btrfs compression evidence, with a separate one-shot I/O diagnostic; and
+- **Observatory** performs one bounded, read-only summary of the private fleet
+  telemetry plane and links to its private Grafana evidence surface; and
 - **Incident Narrator** composes retained security, maintenance, and continuity
   evidence into a deterministic chronology with facts, cautious inference, and
   explicit evidence gaps; and
@@ -26,6 +28,22 @@ remains visible in the heading; select the heading to expand the full controls
 and evidence. Open sections expand to the full workspace width, and closing
 them does not discard evidence already collected during the current page
 session.
+
+## Observatory
+
+Select **Read fleet observability** to run one foreground summary through the
+reviewed owner SSH alias. Soul executes only its fixed query registry; the
+Dashboard cannot submit PromQL, a host, a credential, or a command. The result
+summarizes endpoint freshness, compute and storage pressure, host-network
+exceptions, switch/interface health, firing bounded alerts, boot age, and
+explicit source gaps.
+
+The optional **Open Grafana evidence** link uses an owner-configured private
+HTTPS URL. Grafana remains the detailed evidence surface. Observatory does not
+acknowledge alerts, run maintenance, reboot devices, change switches, or infer
+root cause. Chat and Voice accept explicit fleet-observability questions and
+use this same normalized projection; Incident Narrator may cite it as one
+additional read-only source.
 
 ## Incident Narrator
 
@@ -151,6 +169,8 @@ paths.
 make verify-host-stewardship-file-steward
 make verify-software-storage-steward
 make verify-incident-narrator
+make verify-fleet-observability-a2
+make verify-fleet-observability-a3
 ```
 
 This proves the public root boundary, bounded inventory, stale-preview and
@@ -163,3 +183,5 @@ behavior when optional tools or privileges are unavailable.
 The Incident Narrator verifier proves retained-source-only composition,
 chronology, explicit gaps, evidence attribution, privacy filtering, and absence
 of model or mutation authority.
+The Fleet Observability verifiers prove the closed alert, journal, SNMP, query,
+privacy, lifecycle, Dashboard, Chat/Voice, and Incident Narrator boundaries.

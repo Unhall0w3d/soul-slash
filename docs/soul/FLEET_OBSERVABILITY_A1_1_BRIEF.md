@@ -13,7 +13,7 @@ unchanged.
 ## Overview surface
 
 The always-visible surface shows reporting endpoint count, sample freshness,
-failed systemd units, maximum available temperature evidence, an approximate
+failed systemd units, labeled CPU-package temperature evidence, an approximate
 global-presence marker, CPU busy percentage, memory used percentage, and root
 filesystem use. Stable role colors remain identical across every time-series
 panel.
@@ -27,9 +27,12 @@ stays readable:
 - storage behavior: throughput, aggregate device busy time, and request latency;
 - network health: non-virtual-interface throughput, errors, and drops;
 - services and stability: failed units, restart counts, uptime, and OOM kills;
-- thermal and power sensors: maximum temperature and available power evidence.
+- thermal and power sensors: CPU-package temperature beside CPU activity,
+  separate NVMe composite and chipset temperature, and available power evidence.
 
 Missing sensor families remain absent rather than being rendered as healthy.
+Temperature evidence uses exported sensor labels where available and rejects
+impossible values below 0°C or at/above 125°C.
 Common virtual-interface and pseudo-device families are excluded from network
 and disk aggregation. These portable filters may need later refinement for a
 new platform, but they do not embed owner-local interface names.
