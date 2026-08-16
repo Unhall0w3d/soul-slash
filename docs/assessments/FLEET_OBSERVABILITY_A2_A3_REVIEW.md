@@ -50,6 +50,9 @@ remediation is introduced.
       existing Observatory guest; backend/exporter listeners remain loopback-only
 - [x] six bounded alert rules are loaded
 - [x] the A2 operations dashboard is provisioned
+- [x] the fleet overview now separates CPU package, NVMe composite, and chipset
+      temperature, rejects impossible sensor values, and places CPU busy beside
+      package temperature with reviewed 85/95°C thresholds
 - [x] all four enrolled Linux roles remain fresh in the central metric lane
 - [x] one reviewed switch reports successfully through the owner-private config
 - [x] A3 returns a complete response with four reporting endpoints, no stale

@@ -324,7 +324,9 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   authority. Four Linux endpoints and one reviewed switch are reporting; the
   second switch remains an explicit SNMP source gap. All four enrolled collectors now apply the exact
   redacted maintenance-unit journal filter. Operator visual and conversational
-  review is still required.
+  review is still required. The overview distinguishes labeled CPU-package,
+  NVMe-composite, and chipset temperatures, rejects impossible values, and
+  correlates package temperature directly with CPU activity.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.
