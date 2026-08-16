@@ -126,8 +126,13 @@ check.call(
   !serialized.match?(/\b(?:atelier|forge|foundry|warden|crucible|witness|temper)\b|192\.168\./i)
 )
 
-deployment_artifacts = Dir.glob(File.join(ROOT, "{systemd,deploy,containers}", "**", "*observab*"), File::FNM_EXTGLOB)
-check.call("A0 adds no observability deployment artifact", deployment_artifacts.empty?)
+deployment_artifacts = Dir.glob(File.join(ROOT, "deploy", "observability", "**", "*"))
+a1_manifest = File.join(ROOT, "config", "fleet_observability_deployment_a1.json")
+check.call(
+  "later deployment artifacts require the explicit A1 authority manifest",
+  deployment_artifacts.empty? ||
+    (File.file?(a1_manifest) && JSON.parse(File.read(a1_manifest))["persistent_deployment_authorized"] == true)
+)
 
 brief = File.read(brief_path)
 review = File.read(review_path)

@@ -1,0 +1,64 @@
+{
+  "schema_version": "soul.fleet-observability.deployment.a1.v1",
+  "state": "deployed_operator_approved",
+  "architecture_ref": "soul.fleet-observability.architecture.a0.v1",
+  "persistent_deployment_authorized": true,
+  "central_guest": {
+    "isolation": "dedicated_unprivileged_linux_container",
+    "cpu_cores": 2,
+    "memory_mib": 3072,
+    "swap_mib": 512,
+    "root_volume_gib": 8,
+    "metrics_volume_gib": 36,
+    "logs_volume_gib": 20,
+    "autostart": true,
+    "owner_private_identity_and_address": true
+  },
+  "components": {
+    "metrics": "prometheus_single_node",
+    "logs": "loki_single_binary",
+    "visualization": "grafana_oss",
+    "reverse_proxy": "caddy",
+    "collector": "grafana_alloy"
+  },
+  "network": {
+    "application_listener": "https_443_only",
+    "management_listener": "ssh_22_key_only_non_root_fixed_authority",
+    "backend_bind": "loopback_only",
+    "tls": "caddy_internal_ca",
+    "grafana_authentication": "required",
+    "ingest_authentication": "basic_auth_over_tls",
+    "public_ingress": false
+  },
+  "retention": {
+    "metrics_time": "30d",
+    "metrics_size": "28GB",
+    "metrics_volume_max_percent": 80,
+    "logs_time": "336h",
+    "raw_telemetry_backup": false,
+    "configuration_backup": true
+  },
+  "pilot": {
+    "roles": [
+      "operator_workstation",
+      "primary_hypervisor",
+      "secondary_hypervisor",
+      "backup_target"
+    ],
+    "metrics_enabled": true,
+    "journal_ingest_enabled": false,
+    "journal_reason": "deferred until exact privacy-safe per-platform selectors are reviewed"
+  },
+  "authority": {
+    "soul_query": "none_in_a1",
+    "remediation": "none",
+    "alert_mutation": "none",
+    "endpoint_mutation": "install_and_remove_reviewed_collector_only"
+  },
+  "rollback": {
+    "collectors": "disable_and_remove_alloy_unit_binary_configuration_and_credentials",
+    "central": "stop_then_remove_dedicated_guest_and_owned_volumes_only",
+    "preserve_wazuh": true,
+    "preserve_soul_runtime": true
+  }
+}

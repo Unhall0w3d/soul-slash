@@ -1,0 +1,26 @@
+{
+  auto_https disable_redirects
+}
+
+OBSERVABILITY_FQDN {
+  tls internal
+  encode zstd gzip
+
+  handle /api/v1/write {
+    basicauth {
+      ingest INGEST_PASSWORD_HASH
+    }
+    reverse_proxy 127.0.0.1:9090
+  }
+
+  handle /loki/api/v1/push {
+    basicauth {
+      ingest INGEST_PASSWORD_HASH
+    }
+    reverse_proxy 127.0.0.1:3100
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:3000
+  }
+}

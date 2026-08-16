@@ -1,0 +1,34 @@
+{
+  "schema_version": "soul.fleet-observability.dashboard.a1.1.v1",
+  "state": "deployed_operator_approved",
+  "extends": "soul.fleet-observability.deployment.a1.v1",
+  "dashboard_uid": "soul-fleet-overview-a1",
+  "dashboard_version": 2,
+  "overview": [
+    "reporting_endpoints",
+    "endpoint_sample_age",
+    "failed_systemd_units",
+    "maximum_observed_temperature",
+    "global_presence",
+    "cpu_busy",
+    "memory_used",
+    "root_filesystem_used"
+  ],
+  "collapsed_rows": [
+    "compute_and_memory_pressure",
+    "storage_behavior",
+    "network_health",
+    "services_and_stability",
+    "thermal_and_power_sensors"
+  ],
+  "location_privacy": {
+    "precision": "operator_selected_city_or_region",
+    "source": "owner_private_root_environment",
+    "public_template_contains_coordinates": false,
+    "repository_contains_site_identity": false
+  },
+  "collection_change": "none",
+  "journal_ingest": false,
+  "alerting": false,
+  "mutation_authority": "none"
+}
