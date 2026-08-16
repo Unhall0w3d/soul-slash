@@ -315,6 +315,16 @@ The operator-facing flows are documented in [`docs/guides/`](guides/).
   and health overview, collapsed compute, storage, network, service, stability,
   thermal, and power rows, and an owner-private approximate global-presence
   marker. The public dashboard contains location placeholders only.
+- **Fleet Observability A2/A3** is candidate-complete and partially
+  live-qualified. Observatory now has six dashboard-only operational alerts,
+  reboot and redacted maintenance overlays, host-network evidence, and an
+  owner-private SNMP lane. Soul exposes one fixed, foreground, read-only
+  summary through Host Stewardship, explicit Chat/Voice questions, and Incident
+  Narrator, with a private Grafana drill-down and no arbitrary query or mutation
+  authority. Four Linux endpoints and one reviewed switch are reporting; the
+  second switch remains an explicit SNMP source gap. All four enrolled collectors now apply the exact
+  redacted maintenance-unit journal filter. Operator visual and conversational
+  review is still required.
 - **Security Monitoring** is live and read-only. Wazuh remains the authoritative
   investigation console; Guided Maintenance and Local Topology show accepted
   manager, exact agent, alert, notification, and adapted-posture projections.

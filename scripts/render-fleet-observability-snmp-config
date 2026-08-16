@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+
+abort "usage: render-fleet-observability-snmp-config ENV_FILE UPSTREAM_SNMP_YML OUTPUT_DIRECTORY" unless ARGV.length == 3
+env_path, upstream_path, output_directory = ARGV.map { |value| File.expand_path(value) }
+abort "private environment file must be a regular mode-0600 file" unless File.file?(env_path) && !File.symlink?(env_path) && (File.stat(env_path).mode & 0o777) == 0o600
+abort "upstream SNMP configuration is unavailable" unless File.file?(upstream_path) && !File.symlink?(upstream_path)
+abort "output directory must exist and must not be a symlink" unless File.directory?(output_directory) && !File.symlink?(output_directory)
+
+environment = File.readlines(env_path, chomp: true).filter_map do |line|
+  next if line.empty? || line.start_with?("#")
+  key, value = line.split("=", 2)
+  [key, value] if key&.match?(/\A[A-Z0-9_]+\z/) && value
+end.to_h
+
+switches = (1..8).filter_map do |slot|
+  prefix = "SOUL_OBSERVABILITY_SWITCH_#{slot}"
+  device_id = environment.fetch("#{prefix}_ID", "")
+  address = environment.fetch("#{prefix}_ADDRESS", "")
+  community = environment.fetch("#{prefix}_SNMP_COMMUNITY", "")
+  next if [device_id, address, community].all?(&:empty?)
+  abort "switch slot #{slot} SNMP owner input is incomplete" if [device_id, address, community].any?(&:empty?)
+  abort "switch slot #{slot} identifier is invalid" unless device_id.match?(/\A[a-z0-9_.-]{1,80}\z/i)
+  abort "#{device_id} address is invalid" unless address.match?(/\A(?:[a-z0-9-]+\.)*[a-z0-9-]+\z|\A(?:\d{1,3}\.){3}\d{1,3}\z/i)
+  abort "#{device_id} community is invalid" unless community.bytesize.between?(8, 128) && !community.match?(/[\r\n]/)
+  {"device_id" => device_id, "address" => address, "auth" => "switch_#{slot}_v2", "community" => community}
+end
+abort "at least one complete owner-private switch slot is required" if switches.empty?
+
+upstream = YAML.safe_load_file(upstream_path, aliases: false)
+abort "upstream if_mib module is unavailable" unless upstream.is_a?(Hash) && upstream.dig("modules", "if_mib").is_a?(Hash)
+
+auths = switches.to_h do |switch|
+  [switch.fetch("auth"), {
+    "community" => switch.fetch("community"),
+    "security_level" => "noAuthNoPriv",
+    "auth_protocol" => "MD5",
+    "priv_protocol" => "DES",
+    "version" => 2
+  }]
+end
+snmp = {"auths" => auths, "modules" => {"if_mib" => upstream.fetch("modules").fetch("if_mib")}}
+targets = switches.map do |switch|
+  {
+    "targets" => [switch.fetch("address")],
+    "labels" => {"device_id" => switch.fetch("device_id"), "role" => "managed_switch", "snmp_auth" => switch.fetch("auth")}
+  }
+end
+
+snmp_path = File.join(output_directory, "soul-snmp.yml")
+targets_path = File.join(output_directory, "soul-switch-targets.json")
+File.open(snmp_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) { |file| file.write(YAML.dump(snmp)) }
+File.open(targets_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) { |file| file.write(JSON.pretty_generate(targets) << "\n") }
+File.chmod(0o600, snmp_path, targets_path)
+puts "Rendered #{switches.length} owner-private SNMP target(s) with the pinned upstream if_mib module; no credential was printed."

@@ -62,7 +62,7 @@ check.call("central binaries and retention are pinned",
     central.include?("LOKI_ZIP_SHA256=09d213") &&
     central.include?("--no-install-recommends") &&
     central.include?("PrivateUsers=false") &&
-    central.include?("systemctl restart prometheus loki grafana-server caddy") &&
+    central.include?("systemctl restart prometheus prometheus-snmp-exporter loki grafana-server caddy") &&
     central.include?("admin reset-admin-password") &&
     central.include?("--storage.tsdb.retention.time=30d") &&
     central.include?("--storage.tsdb.retention.size=28GB") &&
@@ -76,13 +76,16 @@ check.call("only Caddy is designed for application LAN exposure",
     caddy.include?("auto_https disable_redirects") &&
     caddy.include?("tls internal") && caddy.scan(/basicauth/).length == 2)
 
-check.call("collector uses stable labels and no journal source",
+approved_a2_journal = alloy.include?('regex         = "soul-maintenance-fleet-status.service|soul-maintenance-resume.service"') &&
+  alloy.include?('replace    = "bounded maintenance lifecycle event"') &&
+  alloy.scan(/loki\.source\.journal/).length == 1
+check.call("collector preserves stable labels and only the exact approved A2 journal extension",
   collector.include?("ALLOY_VERSION=v1.18.1") &&
     collector.include?("ALLOY_ZIP_SHA256=fac853") &&
     collector.include?("systemctl restart alloy") &&
     alloy.include?("enable_restarts = true") &&
     %w[device_id role platform environment].all? { |label| alloy.include?(label) } &&
-    !alloy.include?("loki.source.journal") &&
+    approved_a2_journal &&
     !alloy.match?(/ip_address|mac_address|operator_name/))
 
 check.call("credential handoff removes only the Grafana plaintext bootstrap",

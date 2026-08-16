@@ -1,0 +1,22 @@
+{
+  "schema_version": "soul.fleet-observability.a2-a3.v1",
+  "extends": "soul.fleet-observability.dashboard.a1.1.v1",
+  "state": "candidate_complete",
+  "a2": {
+    "snmp_exporter": "loopback_only_owner_private_auth",
+    "journal_scope": "reviewed_maintenance_units_redacted_message",
+    "alerts": "grafana_and_prometheus_only",
+    "notifications": false,
+    "remediation": false
+  },
+  "a3": {
+    "operation": "fleet_observability.summary",
+    "query_registry": "fixed_only",
+    "arbitrary_promql": false,
+    "interfaces": ["dashboard", "chat", "voice", "incident_narrator"],
+    "drilldown": "owner_configured_https_only",
+    "automatic_refresh": false,
+    "background_polling": false
+  },
+  "mutation_authority": "none"
+}

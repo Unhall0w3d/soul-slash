@@ -22,7 +22,22 @@ The central installer avoids package recommendations, binds Prometheus,
 Grafana, and both Loki protocols to loopback, disables Caddy's port-80 redirect,
 and converges Grafana's database-backed administrator credential. The collector
 installer validates a pinned Alloy binary before enabling its loopback-only
-service. Journal ingestion is intentionally absent.
+service. A2 replaces the former metric-only journal boundary with one exact
+maintenance-unit projection: original messages are replaced before they leave
+the endpoint. A2 also provisions a second operations dashboard,
+dashboard-only Prometheus alert rules, and a loopback SNMP exporter. Switch
+targets and SNMP authentication are owner-private inputs and remain absent by
+default. Existing deployments use `central/upgrade-central-a2.sh` and
+`collector/upgrade-collector-a2.sh`, preserving saved Grafana and ingest
+credentials instead of rerunning bootstrap.
+
+For the accepted owner deployment, `scripts/render-fleet-observability-snmp-config`
+can combine the pinned upstream exporter configuration with the existing
+owner-private indexed switch values. Slots 1 through 8 use
+`SOUL_OBSERVABILITY_SWITCH_N_ID`, `_ADDRESS`, and `_SNMP_COMMUNITY`; partial
+slots fail closed. The renderer emits mode-`0600` files outside Git and never
+prints a community. The central A2 upgrade accepts those two rendered files as
+optional exact inputs.
 
 After the Operator saves the initial Grafana credential, run the reviewed
 `central/finalize-credential-handoff.sh` inside the central guest. It removes

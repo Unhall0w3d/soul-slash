@@ -1,0 +1,10 @@
+[
+  {
+    "targets": ["switch.example.invalid"],
+    "labels": {
+      "device_id": "switch-id",
+      "role": "managed_switch",
+      "snmp_auth": "owner-private-auth-profile"
+    }
+  }
+]

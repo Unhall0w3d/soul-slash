@@ -262,6 +262,18 @@
           </div>
         </details>
 
+        <details class="improvement-card fleet-observability-card host-stewardship-disclosure" aria-labelledby="fleet-observability-heading">
+          <summary class="card-heading host-stewardship-disclosure-summary"><div><p class="eyebrow">Fleet evidence</p><h2 id="fleet-observability-heading">Observatory</h2></div><span id="fleet-observability-state" class="count-badge">Not read</span></summary>
+          <div class="host-stewardship-disclosure-body">
+          <p class="card-note">Runs one bounded, read-only summary over the fixed Observatory query registry. It cannot accept PromQL, change alerts, maintain a host, reboot a device, or remediate evidence.</p>
+          <button id="refresh-fleet-observability" class="refresh-button" type="button">Read fleet observability</button>
+          <div id="fleet-observability-summary" class="steward-summary"><p class="muted">No fleet telemetry requested.</p></div>
+          <div id="fleet-observability-evidence" class="steward-evidence-list"><p class="muted">Switch and alert evidence will remain honestly absent until configured and reporting.</p></div>
+          <a id="fleet-observability-drilldown" class="refresh-button" href="#" target="_blank" rel="noopener noreferrer" hidden>Open Grafana drill-down</a>
+          <p id="fleet-observability-status" class="dialog-status" role="status" aria-live="polite">Foreground summary only · no mutation authority.</p>
+          </div>
+        </details>
+
         <details class="improvement-card file-steward-card host-stewardship-disclosure" aria-labelledby="file-steward-heading">
           <summary class="card-heading host-stewardship-disclosure-summary"><div><p class="eyebrow">Bounded file work</p><h2 id="file-steward-heading">File Steward</h2></div><span class="count-badge">A0–A2</span></summary>
           <div class="host-stewardship-disclosure-body">

@@ -95,6 +95,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [ ] Operator review of Incident Narrator A0: deterministic retained-evidence
   chronology, cautious source-bound inference, explicit evidence gaps, and no
   source refresh, model use, diagnosis claim, or remediation authority.
+- [ ] Operator review of Fleet Observability A2/A3: bounded operational alerts,
+  reboot and redacted maintenance overlays, owner-private switch/interface
+  evidence, and one shared read-only Dashboard/Chat/Voice/Incident Narrator
+  summary. One reviewed switch's SNMP access remains open; all four collector
+  upgrades are live.
 
 - Track-aware new-song production has an accepted architecture candidate and is
   paused pending FL Studio installation and its A0 interchange proof. The

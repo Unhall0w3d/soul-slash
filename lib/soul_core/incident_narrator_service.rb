@@ -17,13 +17,15 @@ module SoulCore
       maintenance_device_receipts
       maintenance_host_receipts
       backup_drs
+      fleet_observability
     ].freeze
     FAILURE_STATES = %w[failed blocked blocked_for_human_review unavailable invalid].freeze
     SEVERITY_ORDER = {"critical" => 4, "high" => 3, "elevated" => 2, "informational" => 1}.freeze
     FRESHNESS_SECONDS = {
       "wazuh_alerts" => 24 * 60 * 60,
       "security_snapshot" => 24 * 60 * 60,
-      "backup_drs" => 36 * 60 * 60
+      "backup_drs" => 36 * 60 * 60,
+      "fleet_observability" => 15 * 60
     }.freeze
 
     def initialize(
@@ -32,6 +34,7 @@ module SoulCore
       maintenance_device_receipt_source:,
       maintenance_host_receipt_source:,
       backup_source:,
+      observability_source: nil,
       clock: -> { Time.now.utc }
     )
       @sources = {
@@ -39,7 +42,8 @@ module SoulCore
         "security_snapshot" => security_source,
         "maintenance_device_receipts" => maintenance_device_receipt_source,
         "maintenance_host_receipts" => maintenance_host_receipt_source,
-        "backup_drs" => backup_source
+        "backup_drs" => backup_source,
+        "fleet_observability" => observability_source
       }
       @clock = clock
     end
@@ -54,6 +58,7 @@ module SoulCore
       append_maintenance(events, findings, source_results.fetch("maintenance_device_receipts"), "maintenance_device_receipts")
       append_maintenance(events, findings, source_results.fetch("maintenance_host_receipts"), "maintenance_host_receipts")
       append_backup(events, findings, source_results.fetch("backup_drs"))
+      append_observability(events, findings, source_results.fetch("fleet_observability"))
 
       source_results.each_value { |result| findings << gap_finding(result) if !result.fetch("available") || result.dig("source", "stale") == true }
       events = sort_events(events).first(MAX_EVENTS)
@@ -261,6 +266,34 @@ module SoulCore
       )
       result.fetch("source")["event_count"] = 1
       findings << observation("backup-drs", statement, [evidence_id]) if FAILURE_STATES.include?(state)
+    end
+
+    def append_observability(events, findings, result)
+      return unless result.fetch("available")
+
+      payload = result.fetch("payload")
+      endpoints = payload["endpoints"].is_a?(Hash) ? payload.fetch("endpoints") : {}
+      network = payload["network"].is_a?(Hash) ? payload.fetch("network") : {}
+      alerts = Array(payload["alerts"])
+      gaps = Array(payload["gaps"])
+      state = safe_state(payload["state"] || "unknown")
+      statement = "Fleet observability reports #{safe_integer(endpoints['reporting'], 0)} reporting and #{safe_integer(endpoints['stale'], 0)} stale endpoints, #{safe_integer(network['switches_reporting'], 0)} reporting switches, and #{alerts.length} firing bounded alerts."
+      evidence_id = "observability:summary"
+      events << event(
+        evidence_id: evidence_id,
+        occurred_at: payload["collected_at"],
+        category: "fleet_observability",
+        severity: %w[attention unavailable].include?(state) ? "elevated" : "informational",
+        statement: statement
+      )
+      result.fetch("source")["event_count"] = 1
+      findings << observation("fleet-observability", statement, [evidence_id]) if state != "healthy"
+      findings << {
+        "kind" => "gap",
+        "finding_id" => "fleet-observability-query-gaps",
+        "statement" => "Fleet observability completed with #{gaps.length} bounded query gap#{gaps.length == 1 ? '' : 's'}; absent metrics were not treated as healthy.",
+        "supporting_evidence_ids" => [evidence_id]
+      } if gaps.any?
     end
 
     def append_cross_source_inference(findings, events)
