@@ -76,10 +76,19 @@ check.call("role colors remain stable across every time-series panel",
     actual = overrides.to_h do |override|
       [override.dig("matcher", "options"), override.dig("properties", 0, "value", "fixedColor")]
     end
-    panel.dig("targets", 0, "legendFormat") == "{{device_id}} · {{role}}" &&
+    panel.dig("targets", 0, "legendFormat").to_s.start_with?("{{device_id}} · {{role}}") &&
       overrides.all? { |override| override.dig("matcher", "id") == "byRegexp" } &&
       actual == role_colors
   end)
+
+network_panel = panels.find { |panel| panel["title"] == "Interface faults and receive discards" }
+check.call("network evidence separates actionable faults from informational receive discards",
+  network_panel&.fetch("targets", [])&.map { |target| target["legendFormat"] } == [
+    "{{device_id}} · {{role}} · faults (actionable)",
+    "{{device_id}} · {{role}} · receive discards (informational)"
+  ] &&
+    !network_panel.dig("targets", 0, "expr").include?("node_network_receive_drop_total") &&
+    network_panel.dig("targets", 1, "expr").include?("node_network_receive_drop_total"))
 
 thermal_panels = panels.select { |panel| ["CPU package temperature", "NVMe composite temperature", "Chipset temperature"].include?(panel["title"]) }
 thermal_expressions = thermal_panels.flat_map { |panel| panel.fetch("targets").map { |target| target.fetch("expr") } }.join("\n")
