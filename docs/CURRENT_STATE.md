@@ -103,6 +103,26 @@ phrase. Speech retains the ordinary utterance bounds; silence returns to
 “Hey Soul” listening without counting as a failure. The microphone remains
 closed while Soul thinks or speaks.
 
+Voice Presence A4 is a local-only latency candidate. It uses a bounded
+trailing-silence endpoint of 0.95 seconds so a natural mid-sentence pause is not
+mistaken for the end of the turn, calibrates `Hey Soul` at boost 3.5 and
+threshold 0.15, selects exact `base.en` for conversational transcription
+while retaining `small.en` for Music Studio analysis, and preloads Supertonic
+as a private-pipe child of the visible application. Content-free per-stage
+timings are visible for the active turn only. Narrow repeat requests replay the
+byte-identical latest session WAV without another model or synthesis call; the
+cache and warm child disappear on pause, restart, or close. Ordinary Voice
+Presence conversation also requests the local provider's reviewed no-reasoning
+mode under a 384-token spoken-response ceiling. Explicit deliberation phrases
+retain normal reasoning, and Dashboard text inference is unchanged. Live wake,
+false wake, latency, replay, and pronunciation review remains required.
+
+When a narrow stable-knowledge question produces no DuckDuckGo Instant Answer
+and no research backend is configured, Soul now falls back explicitly to the
+selected local model's general knowledge. It does not present that answer as
+retrieved or sourced. Requests requiring current, consequential, comparative,
+or cited evidence continue to use the bounded research path.
+
 The installed wake-sensitivity update, natural follow-up behavior, dashboard
 self-recognition map, notification cues, spoken notices, screen targeting, and
 Core-aware invocation handoff completed Operator live acceptance on

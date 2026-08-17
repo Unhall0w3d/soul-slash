@@ -43,7 +43,7 @@ MUSIC_TRANSCRIPTION_MANIFEST ?= $(PROJECT_ROOT)/config/music_transcription_model
 MUSIC_TRANSCRIPTION_MODEL ?= ggml-small.en.bin
 VOICE_TRANSCRIPTION_ROOT ?= $(MUSIC_ROOT)
 VOICE_TRANSCRIPTION_MANIFEST ?= $(MUSIC_TRANSCRIPTION_MANIFEST)
-VOICE_TRANSCRIPTION_MODEL ?= $(MUSIC_TRANSCRIPTION_MODEL)
+VOICE_TRANSCRIPTION_MODEL ?= ggml-base.en.bin
 VOICE_SYNTHESIS_ROOT ?= $(HOME)/.local/share/soul/voice/runtime
 VOICE_SYNTHESIS_MANIFEST ?= $(PROJECT_ROOT)/config/voice_synthesis_models.json
 VOICE_SYNTHESIS_REQUIREMENTS ?= $(PROJECT_ROOT)/config/voice_synthesis_requirements.txt
@@ -610,6 +610,7 @@ voice-presence-launch:
 verify-voice-presence:
 > @ruby scripts/verify-voice-presence-a2.rb
 > @ruby scripts/verify-voice-presence-a3.rb
+> @ruby scripts/verify-voice-presence-a4-local-latency.rb
 > @python3 scripts/verify-voice-presence-notification-observer-a3.py
 
 notification-audio-build:

@@ -35,8 +35,8 @@
   "keyword": {
     "phrase": "Hey Soul",
     "tokens": "HH EY1 S OW1 L",
-    "boosting_score": 2.0,
-    "trigger_threshold": 0.25,
+    "boosting_score": 3.5,
+    "trigger_threshold": 0.15,
     "symbol": "HEY_SOUL"
   },
   "capture": {
@@ -46,7 +46,8 @@
     "speech_start_timeout_seconds": 4.0,
     "followup_speech_start_timeout_seconds": 5.0,
     "maximum_utterance_seconds": 30.0,
-    "trailing_silence_seconds": 1.2,
+    "post_wake_capture_delay_seconds": 0.18,
+    "trailing_silence_seconds": 0.95,
     "minimum_utterance_seconds": 0.35,
     "speech_rms_threshold": 420
   }

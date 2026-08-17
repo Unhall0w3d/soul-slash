@@ -111,12 +111,16 @@ Required network controls:
 - `web.lookup` uses DuckDuckGo Instant Answer only for narrow orientation such
   as definitions, known entities, and simple factual explanations.
 - A successful request with no structured Instant Answer is a normal
-  `found: false` outcome. It must not be padded with unsupported model memory.
+  `found: false` outcome. When a local provider is available and no research
+  backend is configured, a stable general-knowledge question may fall back to
+  the local model only when the response is represented as general knowledge,
+  not retrieved or sourced evidence.
 - Time-sensitive, comparative, contested, technical, consequential, or
   artifact-producing requests bypass lookup and use `web.research`.
 - When lookup has no suitable answer and SearXNG is configured, the same
-  foreground turn escalates to bounded research. Otherwise Soul offers that
-  deeper pass and identifies the missing configuration.
+  foreground turn escalates to bounded research. Without SearXNG, stable
+  ordinary knowledge falls back to the selected local model; a missing model
+  still produces the honest configuration-oriented stop.
 - Lookup evidence is conversation-scoped and transient. It is never promoted
   to durable memory without the existing human review gate.
 
