@@ -28,6 +28,7 @@ class PresenceWindow(QMainWindow):
         os.chmod(self.session, 0o700)
         self.worker_buffer = ""
         self.bridge_buffer = ""
+        self.synthesis_buffer = ""
         self.notification_buffer = ""
         self.failure_count = 0
         self.current_state = "starting"
@@ -39,13 +40,19 @@ class PresenceWindow(QMainWindow):
         self.cue_player = None
         self.notification_player = None
         self.notification_observer = None
+        self.synthesis_worker = None
+        self.synthesis_ready = False
+        self.pending_speech = None
         self.notification_parser = NotificationMonitorParser()
         self.notification_last_spoken = {}
+        self.active_turn_started = None
+        self.last_latency_summary = ""
         self.setWindowTitle("Soul / Voice Presence")
         self.setWindowIcon(QIcon(args.icon))
         self.setMinimumSize(QSize(440, 620))
         self.resize(480, 680)
         self._build()
+        QTimer.singleShot(0, self.start_synthesis_worker)
         QTimer.singleShot(0, self.start_worker)
 
     def _build(self):
@@ -164,7 +171,12 @@ class PresenceWindow(QMainWindow):
         self.write_presence_state()
 
     def process_lines(self, which):
-        process = self.worker if which == "worker" else self.bridge
+        process = {
+            "worker": self.worker, "bridge": self.bridge,
+            "synthesis": self.synthesis_worker,
+        }[which]
+        if process is None:
+            return
         data = bytes(process.readAllStandardOutput()).decode("utf-8", "replace")
         attribute = f"{which}_buffer"
         buffer = getattr(self, attribute) + data
@@ -194,15 +206,39 @@ class PresenceWindow(QMainWindow):
             signal = "voice activity" if level >= 120 else ("room signal" if level >= 12 else "quiet")
             self.detail.setText(f'Say “Hey Soul,” then speak one request. · Microphone: {signal}')
         elif event_type == "utterance":
-            self.run_bridge(event["path"])
+            self.run_bridge(event["path"], event)
+        elif event_type == "timing":
+            self.update_latency(event.get("timings", {}))
+        elif event_type == "ready" and origin == "synthesis":
+            self.synthesis_ready = True
+        elif event_type == "speech_request":
+            self.request_warm_speech(event)
+        elif event_type == "failure" and origin == "synthesis":
+            self.pending_speech = None
+            self.turn_failed(event.get("error", "The local voice worker failed safely."))
+        elif event_type == "fatal" and origin == "synthesis":
+            self.synthesis_ready = False
+            self.detail.setText("Warm voice preload is unavailable; the bounded one-shot path remains available.")
         elif event_type in {"turn_failure", "fatal"}:
             self.turn_failed(event.get("summary", "The voice turn failed safely."))
         elif event_type == "followup_expired":
             self.set_state("listening", event.get("summary", 'Listening locally for “Hey Soul”.'))
         elif event_type == "result":
+            if origin == "synthesis":
+                pending = self.pending_speech or {}
+                timings = dict(pending.get("timings") or {})
+                timings["synthesis_ms"] = event.get("synthesis_ms", 0)
+                if self.active_turn_started is not None:
+                    timings["audio_ready_ms"] = round((time.monotonic() - self.active_turn_started) * 1000)
+                self.pending_speech = None
+                self.failure_count = 0
+                self.update_latency(timings)
+                self.play(event["audio_path"], replayed=False)
+                return
             if event.get("audio_path"):
                 self.failure_count = 0
-                self.play(event["audio_path"])
+                self.update_latency(event.get("timings", {}))
+                self.play(event["audio_path"], replayed=bool(event.get("replayed")))
             else:
                 self.turn_failed(event.get("error") or event.get("reply") or "The voice turn stopped safely.")
 
@@ -217,6 +253,52 @@ class PresenceWindow(QMainWindow):
         ])
         if self.notification_toggle.isChecked():
             self.start_notification_observer()
+
+    def start_synthesis_worker(self):
+        if self.synthesis_worker and self.synthesis_worker.state() == QProcess.Running:
+            return
+        self.synthesis_ready = False
+        self.synthesis_worker = QProcess(self)
+        self.synthesis_worker.setProcessChannelMode(QProcess.MergedChannels)
+        self.synthesis_worker.readyReadStandardOutput.connect(lambda: self.process_lines("synthesis"))
+        self.synthesis_worker.finished.connect(self.synthesis_worker_stopped)
+        self.synthesis_worker.start(self.args.synthesis_python, [
+            self.args.synthesis_worker,
+            "--model-dir", self.args.synthesis_model_dir,
+            "--manifest", self.args.synthesis_manifest,
+            "--session", str(self.session),
+        ])
+
+    def stop_synthesis_worker(self):
+        process = self.synthesis_worker
+        self.synthesis_worker = None
+        self.synthesis_ready = False
+        self.synthesis_buffer = ""
+        self.pending_speech = None
+        if process and process.state() != QProcess.NotRunning:
+            process.terminate()
+            if not process.waitForFinished(1800):
+                process.kill()
+                process.waitForFinished(1000)
+
+    def synthesis_worker_stopped(self, code, _status):
+        self.synthesis_ready = False
+        if code != 0 and self.pending_speech and self.isVisible():
+            self.pending_speech = None
+            self.turn_failed("The warm local voice path stopped safely.")
+
+    def request_warm_speech(self, event):
+        if not self.synthesis_ready or not self.synthesis_worker or self.synthesis_worker.state() != QProcess.Running:
+            self.turn_failed("The warm local voice path is unavailable; no hidden retry is running.")
+            return
+        self.pending_speech = event
+        request = {
+            "request_id": event["request_id"], "text": event["text"],
+            "voice": event["voice"], "speed": event["speed"],
+            "steps": event["steps"], "language": event["language"],
+            "output": str(self.session / "response.wav"),
+        }
+        self.synthesis_worker.write((json.dumps(request, separators=(",", ":")) + "\n").encode("utf-8"))
 
     def toggle_notification_observer(self, enabled):
         self.settings.setValue("observe_desktop_notifications", enabled)
@@ -294,16 +376,22 @@ class PresenceWindow(QMainWindow):
         self.notification_status.setText(f"{label} urgent communication notice played.")
         self.play_notification(observation.spoken_key)
 
-    def run_bridge(self, capture):
+    def run_bridge(self, capture, event):
         self.set_state("hearing", "Resolving your voice.")
         output = self.session / "response.wav"
         output.unlink(missing_ok=True)
+        self.active_turn_started = float(event.get("turn_started_monotonic") or time.monotonic())
+        timing = json.dumps(event.get("timing") or {}, separators=(",", ":"))
         self.bridge = QProcess(self)
         self.bridge.setWorkingDirectory(self.args.project_root)
         self.bridge.setProcessChannelMode(QProcess.MergedChannels)
         self.bridge.readyReadStandardOutput.connect(lambda: self.process_lines("bridge"))
         self.bridge.finished.connect(self.bridge_stopped)
-        self.bridge.start(self.args.bridge, [capture, str(output), self.selected_voice()])
+        mode = "warm" if self.synthesis_ready else "one_shot"
+        self.bridge.start(self.args.bridge, [
+            capture, str(output), self.selected_voice(), str(self.session / "last-response.wav"),
+            str(self.active_turn_started), timing, mode,
+        ])
 
     def selected_voice(self):
         return str(self.voice_selector.currentData() or "F3")
@@ -343,15 +431,36 @@ class PresenceWindow(QMainWindow):
         self.notification_player = QProcess(self)
         self.notification_player.start("pw-play", [str(path)])
 
-    def play(self, path):
+    def play(self, path, replayed=False):
+        source = Path(path)
+        cached = self.session / "last-response.wav"
+        if not replayed:
+            cached.unlink(missing_ok=True)
+            source.replace(cached)
+            source = cached
         self.set_state("speaking", "Soul is speaking.")
         self.player = QProcess(self)
+        self.player.started.connect(self.playback_started)
         self.player.finished.connect(self.turn_complete)
-        self.player.start("pw-play", [path])
+        self.player.start("pw-play", [str(source)])
+
+    def playback_started(self):
+        if self.active_turn_started is not None:
+            elapsed = round((time.monotonic() - self.active_turn_started) * 1000)
+            prefix = f"First audio {elapsed / 1000:.1f}s"
+            self.last_latency_summary = f"{prefix} · {self.last_latency_summary}" if self.last_latency_summary else prefix
+
+    def update_latency(self, timings):
+        if not isinstance(timings, dict):
+            return
+        labels = (("transcription_ms", "STT"), ("route_ms", "Soul"), ("synthesis_ms", "TTS"))
+        parts = [f"{label} {float(timings[key]) / 1000:.1f}s" for key, label in labels if key in timings]
+        self.last_latency_summary = " · ".join(parts)
 
     def turn_complete(self):
-        for path in self.session.glob("*.wav"):
+        for path in self.session.glob("utterance-*.wav"):
             path.unlink(missing_ok=True)
+        (self.session / "response.wav").unlink(missing_ok=True)
         self.open_followup()
 
     def bridge_stopped(self, code, _status):
@@ -381,6 +490,8 @@ class PresenceWindow(QMainWindow):
         if self.worker and self.worker.state() == QProcess.Running:
             self.worker.write(b"followup\n")
             self.set_state("followup", "Follow-up open for five seconds.")
+            if self.last_latency_summary:
+                self.detail.setText(f"Speak naturally within five seconds. · {self.last_latency_summary}")
 
     def toggle_pause(self):
         if not self.worker or self.worker.state() != QProcess.Running:
@@ -389,14 +500,17 @@ class PresenceWindow(QMainWindow):
             return
         if self.current_state in {"paused", "failed"}:
             self.failure_count = 0
+            self.start_synthesis_worker()
             self.resume_worker()
             self.pause.setText("Pause listening")
         else:
+            self.stop_synthesis_worker()
             self.worker.write(b"pause\n")
             self.pause.setText("Resume listening")
 
     def stop_children(self):
         self.stop_notification_observer()
+        self.stop_synthesis_worker()
         for process in (self.cue_player, self.notification_player, self.player, self.bridge, self.worker):
             if process and process.state() != QProcess.NotRunning:
                 process.terminate()
@@ -426,6 +540,10 @@ def main():
     parser.add_argument("--worker-python", required=True)
     parser.add_argument("--worker", required=True)
     parser.add_argument("--bridge", required=True)
+    parser.add_argument("--synthesis-python", required=True)
+    parser.add_argument("--synthesis-worker", required=True)
+    parser.add_argument("--synthesis-model-dir", required=True)
+    parser.add_argument("--synthesis-manifest", required=True)
     parser.add_argument("--masked", required=True)
     parser.add_argument("--unmasked", required=True)
     parser.add_argument("--icon", required=True)

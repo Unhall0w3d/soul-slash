@@ -53,6 +53,9 @@ remediation is introduced.
 - [x] the fleet overview now separates CPU package, NVMe composite, and chipset
       temperature, rejects impossible sensor values, and places CPU busy beside
       package temperature with reviewed 85/95°C thresholds
+- [x] host-interface errors and transmit drops remain actionable while receive
+      discards are separately labeled informational; stable link-local control
+      traffic no longer reads as an undifferentiated network fault
 - [x] all four enrolled Linux roles remain fresh in the central metric lane
 - [x] one reviewed switch reports successfully through the owner-private config
 - [x] A3 returns a complete response with four reporting endpoints, no stale

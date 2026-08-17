@@ -37,6 +37,9 @@ alert, notification path, or operational authority.
   package temperature. Package attention/critical thresholds are 85/95°C.
 - Aggregate disk busy time can exceed 100 percent on multi-device hosts.
 - Portable interface filtering cannot infer every future virtual interface.
+- Linux receive-discard counters can include expected link-local control frames,
+  not only congestion loss. The network panel therefore separates actionable
+  errors and transmit drops from explicitly informational receive discards.
 - The region marker is deliberately approximate and owner-maintained.
 
 ## Live qualification evidence

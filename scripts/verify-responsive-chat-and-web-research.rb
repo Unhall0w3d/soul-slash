@@ -320,6 +320,27 @@ Dir.mktmpdir("soul-web-runtime") do |root|
   result = runtime.respond(chat_id: chat.fetch("id"), message: "Tell me about Unknown Fixture")
   check.call("lookup miss without SearXNG does not hallucinate research", result.mode == "web_lookup_no_answer" && result.content.include?("did not fill that gap from model memory"))
 
+  general_knowledge_client = ArtifactDraftClient.new
+  general_knowledge_chat = store.create_chat
+  runtime = SoulCore::ConversationRuntime.new(
+    root: root, store: store,
+    env: { "SOUL_CONVERSATION_PROVIDER" => reflection_provider.id },
+    registry: RuntimeRegistryFixture.new(reflection_provider), provider_client: general_knowledge_client,
+    web_research_service: RuntimeWebFixture.new(configured: false, lookup: no_answer)
+  )
+  result = runtime.respond(
+    chat_id: general_knowledge_chat.fetch("id"),
+    message: "What is a computer?",
+    interface: "voice_presence"
+  )
+  check.call(
+    "Instant Answer miss falls back to low-latency local general knowledge",
+    result.mode == "model" &&
+      result.content.include?("Fixture claim") &&
+      result.metadata.dig("orchestration", "flags", "general_knowledge_fallback") == true &&
+      general_knowledge_client.request.reasoning_mode == "disabled"
+  )
+
   research_packet = {
     "ok" => true, "lifecycle_state" => "complete", "mutation" => "none",
     "data" => {

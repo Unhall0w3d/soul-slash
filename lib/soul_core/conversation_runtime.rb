@@ -27,6 +27,7 @@ require_relative "conversation_security_status_service"
 require_relative "conversation_fleet_observability_service"
 require_relative "conversation_state_store"
 require_relative "conversation_weather_service"
+require_relative "voice_conversation_inference_policy"
 require_relative "host_system_status_collector"
 require_relative "structured_capability_gap_classifier"
 require_relative "web_research_service"
@@ -138,7 +139,7 @@ module SoulCore
       )
     end
 
-    def respond(chat_id:, message:, progress: nil)
+    def respond(chat_id:, message:, interface: "internal", progress: nil)
       text = message.to_s.strip
       raise ArgumentError, "Conversation message must not be empty" if text.empty?
 
@@ -192,11 +193,11 @@ module SoulCore
       when "knowledge_reflection_control"
         knowledge_reflection_control(chat_id, text, decision)
       when "web_lookup"
-        web_lookup(chat_id, text, decision, provider, progress: progress)
+        web_lookup(chat_id, text, decision, provider, interface: interface, progress: progress)
       when "web_research"
         web_research(chat_id, text, decision, provider, progress: progress)
       when "direct_model"
-        direct_model(chat_id, text, decision, provider, progress: progress)
+        direct_model(chat_id, text, decision, provider, interface: interface, progress: progress)
       else
         deterministic_fallback(
           chat_id: chat_id,
@@ -251,7 +252,7 @@ module SoulCore
       end
     end
 
-    def web_lookup(chat_id, text, decision, provider, progress: nil)
+    def web_lookup(chat_id, text, decision, provider, interface:, progress: nil)
       emit_progress(progress, "inspecting", "Checking DuckDuckGo for a narrow structured Instant Answer.")
       outcome = @web_research_service.lookup(text)
       unless outcome["ok"]
@@ -266,6 +267,20 @@ module SoulCore
         if @web_research_service.configured?
           emit_progress(progress, "researching", "No suitable Instant Answer was returned; escalating to bounded SearXNG research.")
           return web_research(chat_id, text, decision, provider, progress: progress)
+        end
+
+        if provider
+          fallback_decision = ConversationOrchestrationContract::Decision.new(
+            kind: "direct_model",
+            reason: "the optional Instant Answer returned no result, so stable general knowledge falls back to the selected local model",
+            tools: [],
+            requires_model: true,
+            synthesize: false,
+            max_steps: 1,
+            flags: decision.flags.merge("web_lookup" => true, "instant_answer_miss" => true, "general_knowledge_fallback" => true)
+          )
+          emit_progress(progress, "synthesizing", "No structured Instant Answer was available; answering from the selected local model's general knowledge.")
+          return direct_model(chat_id, text, fallback_decision, provider, interface: interface, progress: progress)
         end
 
         content = "The instant-reference service returned no suitable structured answer. I did not fill that gap from model memory. Would you like a deeper research pass after a SearXNG endpoint is configured?"
@@ -997,7 +1012,7 @@ module SoulCore
       )
     end
 
-    def direct_model(chat_id, text, decision, provider, progress: nil)
+    def direct_model(chat_id, text, decision, provider, interface:, progress: nil)
       return deterministic_fallback(
         chat_id: chat_id,
         message: text,
@@ -1019,7 +1034,9 @@ module SoulCore
         chat_id: chat_id,
         provider: provider,
         context: context,
-        orchestration: decision
+        orchestration: decision,
+        interface: interface,
+        message: text
       )
       emit_progress(progress, "synthesizing", "The local model is shaping the response.")
       response, empty_response_retries = provider_response_with_empty_retry(provider, request, progress: progress)
@@ -1130,7 +1147,7 @@ module SoulCore
       fallback
     end
 
-    def build_request(chat_id:, provider:, context:, orchestration:, evidence: [])
+    def build_request(chat_id:, provider:, context:, orchestration:, evidence: [], interface: "internal", message: "")
       messages = context.fetch("messages").map(&:dup)
 
       unless evidence.empty?
@@ -1156,18 +1173,32 @@ module SoulCore
         end
       end
 
+      default_maximum = integer_env("SOUL_CONVERSATION_MAX_OUTPUT_TOKENS", 1_024)
+      inference = VoiceConversationInferencePolicy.new.decide(
+        interface: interface,
+        message: message,
+        provider_supports_reasoning_control: provider.supports?("reasoning_control"),
+        default_max_output_tokens: default_maximum
+      )
       Contract::RequestEnvelope.new(
         conversation_id: chat_id,
         messages: messages,
         model: provider.model,
         temperature: float_env("SOUL_CONVERSATION_TEMPERATURE", 0.65),
-        max_output_tokens: integer_env("SOUL_CONVERSATION_MAX_OUTPUT_TOKENS", 1_024),
+        max_output_tokens: inference.max_output_tokens,
+        reasoning_mode: inference.reasoning_mode,
         privacy_requirement: privacy_requirement(provider),
         metadata: {
           "runtime" => "conversational_soul_phase6",
           "orchestration" => orchestration.to_h,
           "evidence_ids" => evidence_ids(evidence),
-          "context" => context_stats(context)
+          "context" => context_stats(context),
+          "voice_inference" => {
+            "interface" => interface.to_s,
+            "reasoning_mode" => inference.reasoning_mode,
+            "max_output_tokens" => inference.max_output_tokens,
+            "reason" => inference.reason
+          }
         }
       )
     end

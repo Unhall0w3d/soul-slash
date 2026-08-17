@@ -50,7 +50,15 @@ panel_titles = dashboard.fetch("panels").map { |panel| panel["title"] }
 check.call("operational dashboard has reboot and maintenance overlays plus reviewed evidence panels",
   dashboard["uid"] == "soul-fleet-operations-a2" &&
     annotation_names == ["Reboots", "Maintenance lifecycle"] &&
-    ["Firing bounded alerts", "Reporting switches", "Fleet resource pressure", "Host network errors and drops", "Switch interface errors", "Redacted maintenance lifecycle"].all? { |title| panel_titles.include?(title) })
+    ["Firing bounded alerts", "Reporting switches", "Fleet resource pressure", "Host interface faults and receive discards", "Switch interface errors", "Redacted maintenance lifecycle"].all? { |title| panel_titles.include?(title) })
+
+host_network = dashboard.fetch("panels").find { |panel| panel["title"] == "Host interface faults and receive discards" }
+check.call("host interface panel separates errors, transmit drops, and informational receive discards",
+  host_network&.fetch("targets", [])&.map { |target| target["legendFormat"] } == [
+    "{{device_id}} · errors",
+    "{{device_id}} · transmit drops (attention)",
+    "{{device_id}} · receive discards (informational)"
+  ] && host_network["description"].include?("link-local control traffic"))
 
 check.call("journal source keeps exact units and replaces every retained message before Loki",
   alloy.include?('regex         = "soul-maintenance-fleet-status.service|soul-maintenance-resume.service"') &&

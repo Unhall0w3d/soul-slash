@@ -6,6 +6,8 @@ RUNTIME="${SOUL_VOICE_PRESENCE_ROOT:-$HOME/.local/share/soul/voice/presence}"
 MANIFEST="${SOUL_VOICE_PRESENCE_MANIFEST:-$PROJECT_ROOT/config/voice_presence_models.json}"
 SOURCE="${SOUL_VOICE_PRESENCE_SOURCE:-effect_output.soul-rnnoise}"
 STATE_ROOT="${SOUL_VOICE_PRESENCE_STATE_ROOT:-$HOME/.local/state/soul/voice-presence}"
+SYNTHESIS_ROOT="${SOUL_VOICE_SYNTHESIS_ROOT:-$HOME/.local/share/soul/voice/runtime}"
+SYNTHESIS_MANIFEST="${SOUL_VOICE_SYNTHESIS_MANIFEST:-$PROJECT_ROOT/config/voice_synthesis_models.json}"
 
 mkdir -p -m 700 "$STATE_ROOT"
 exec 9>"$STATE_ROOT/run.lock"
@@ -23,6 +25,10 @@ while true; do
     --worker-python "$RUNTIME/.venv/bin/python" \
     --worker "$PROJECT_ROOT/scripts/soul-voice-presence-worker.py" \
     --bridge "$PROJECT_ROOT/scripts/soul-voice-presence-bridge" \
+    --synthesis-python "$SYNTHESIS_ROOT/.venv/bin/python" \
+    --synthesis-worker "$PROJECT_ROOT/scripts/soul-voice-synthesis-worker.py" \
+    --synthesis-model-dir "$SYNTHESIS_ROOT/supertonic-3" \
+    --synthesis-manifest "$SYNTHESIS_MANIFEST" \
     --masked "$PROJECT_ROOT/assets/brand/character/soul-portrait-masked.png" \
     --unmasked "$PROJECT_ROOT/assets/brand/character/soul-portrait-unmasked.png" \
     --icon "$PROJECT_ROOT/assets/brand/soul-account-avatar-150.png" \

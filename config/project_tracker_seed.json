@@ -170,6 +170,23 @@
       "notes": "Deterministic verification and live status/preview evidence pass. Voice Presence launch from the configured plugin was accepted; the complete Core-picker activation and blocker checklist remains unrecorded."
     },
     {
+      "item_id": "track_voice_local_latency_a4",
+      "title": "Review local realtime Voice Presence optimization",
+      "area": "Voice + Perception",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Live-review the local-only wake, endpoint, low-latency transcription, warm responsive synthesis, exact replay, and per-stage timing candidate.",
+      "implementation": "The visible PySide application retains sole ownership of microphone and warm inference children. Hey Soul uses a reviewed 3.5/0.15 calibration candidate; trailing silence is 0.95 seconds to preserve natural mid-sentence pauses; exact base.en serves conversational transcription while Music Studio keeps small.en; Supertonic loads once over private stdin; repeat requests replay one owner-private active-session WAV without model or TTS regeneration. Ordinary Voice Presence conversation requests the local provider's reviewed no-reasoning mode under a 384-token ceiling, while explicit deliberation and Dashboard text retain normal inference. A missing optional Instant Answer now falls back explicitly to local general knowledge rather than blocking a stable ordinary question.",
+      "technologies": "PySide6 QProcess; PipeWire; sherpa-onnx keyword spotting; whisper.cpp base.en; Supertonic 3 ONNX; Ruby conversation bridge; private temporary WAV; content-free monotonic timing.",
+      "interfaces": "Soul Voice Presence desktop application and ordinary Chat/skill routing; the Dashboard remains launcher/status only.",
+      "commands": "make verify-voice-presence\nmake voice-transcription-check\nmake voice-synthesis-check",
+      "references": "docs/soul/VOICE_PRESENCE_A4_LOCAL_LATENCY_BRIEF.md\ndocs/assessments/VOICE_PRESENCE_A4_LOCAL_LATENCY_REVIEW.md\ndocs/guides/VOICE_PRESENCE.md",
+      "acceptance": "Natural Hey Soul attempts reliably trigger without intolerable false wakes; ordinary spoken conversation materially reduces model time; explicit deep-reasoning phrases retain deliberation; displayed timing improves; repeat is immediate and byte-identical; rephrase remains a new turn; closing Presence removes its warm child and response cache; authority boundaries remain unchanged.",
+      "source": "Voice Presence A4 local optimization candidate, 2026-08-16",
+      "notes": "Deterministic checks and isolated base.en/Supertonic timing samples pass. Qwen3 8B returned the same useful small-talk class in 0.83 seconds without hidden reasoning versus 6.28 seconds with default thinking; the full current context measured 2.72 seconds warm-cache and 7.33 seconds deliberately cold-cache versus the prior 17.35-second live model turn. The first post-change live Voice Presence turn completed the same visible response in 4.78 seconds of provider time and approximately 7.4 seconds from transcript submission to ready audio, versus 17.35 and 20.4 seconds previously. Live review exposed premature endpointing and an Instant Answer miss that bypassed Qwen; both have candidate repairs. Wake reliability and false wakes at 3.5/0.15, explicit deliberation, natural-pause capture, exact replay, and close cleanup remain open human checks. Warm streaming ASR and incremental sentence playback remain potential follow-up only if live timing still needs them."
+    },
+    {
       "item_id": "track_voice_live_validation",
       "title": "Validate Voice Presence, natural follow-up, and dashboard recognition",
       "area": "Voice + Perception",

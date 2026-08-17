@@ -15,14 +15,15 @@ MANIFEST_PATH = File.join(ROOT, "config", "voice_presence_models.json")
 manifest = JSON.parse(File.binread(MANIFEST_PATH, 256 * 1024))
 raise "manifest schema differs" unless manifest["schema_version"] == "soul.voice_presence.models.v1"
 raise "wake phrase differs" unless manifest.dig("keyword", "phrase") == "Hey Soul"
-raise "reviewed wake threshold differs" unless manifest.dig("keyword", "trigger_threshold") == 0.25
-raise "reviewed wake boosting differs" unless manifest.dig("keyword", "boosting_score") == 2.0
+raise "reviewed wake threshold differs" unless manifest.dig("keyword", "trigger_threshold") == 0.15
+raise "reviewed wake boosting differs" unless manifest.dig("keyword", "boosting_score") == 3.5
 raise "wake feed is too coarse" unless manifest.dig("capture", "wake_chunk_milliseconds") == 10
 raise "wake detector is not CPU bounded" unless File.binread(File.join(ROOT, "scripts", "soul-voice-presence-worker.py")).include?('provider="cpu"')
 raise "capture duration is unbounded" unless manifest.dig("capture", "maximum_utterance_seconds").to_f.between?(1, 30)
 raise "speech-start timeout is unbounded" unless manifest.dig("capture", "speech_start_timeout_seconds").to_f.between?(1, 4)
 raise "follow-up timeout differs" unless manifest.dig("capture", "followup_speech_start_timeout_seconds").to_f == 5.0
 raise "trailing silence is unbounded" unless manifest.dig("capture", "trailing_silence_seconds").to_f.between?(0.5, 2)
+raise "post-wake capture delay is unbounded" unless manifest.dig("capture", "post_wake_capture_delay_seconds").to_f.between?(0.16, 0.3)
 
 request = {
   "schema_version" => SoulCore::ApplicationContract::SCHEMA_VERSION,

@@ -57,7 +57,10 @@ def stop_recorder(recorder):
         recorder.wait(timeout=1)
 
 
-def capture_command(stream, output, capture, speech_start_timeout=None, no_speech_summary="No speech followed the wake phrase."):
+def capture_command(
+    stream, output, capture, speech_start_timeout=None,
+    no_speech_summary="No speech followed the wake phrase.", metrics=None,
+):
     rate = capture["sample_rate"]
     block_bytes = int(rate * 0.08) * 2
     threshold = int(capture["speech_rms_threshold"])
@@ -78,6 +81,8 @@ def capture_command(stream, output, capture, speech_start_timeout=None, no_speec
         if speech_at is None:
             if level >= threshold:
                 speech_at = time.monotonic()
+                if metrics is not None:
+                    metrics["speech_start_ms"] = round((speech_at - started_at) * 1000)
                 frames.append(chunk)
         else:
             frames.append(chunk)
@@ -91,6 +96,9 @@ def capture_command(stream, output, capture, speech_start_timeout=None, no_speec
     if duration < capture["minimum_utterance_seconds"]:
         return False, "The utterance was too short."
     write_wav(output, frames, rate)
+    if metrics is not None:
+        metrics["capture_elapsed_ms"] = round((time.monotonic() - started_at) * 1000)
+        metrics["captured_audio_ms"] = round(duration * 1000)
     return True, f"Captured {duration:.1f} seconds."
 
 
@@ -161,13 +169,18 @@ def main():
             result = spotter.get_result(stream)
             if not result:
                 continue
+            turn_started = time.monotonic()
             emit(type="state", state="awakened", summary="Wake phrase recognized.")
-            time.sleep(0.3)
+            time.sleep(float(capture.get("post_wake_capture_delay_seconds", 0.18)))
             output = session / f"utterance-{int(time.time() * 1000)}.wav"
-            ok, summary = capture_command(recorder.stdout, output, capture)
+            timing = {}
+            ok, summary = capture_command(recorder.stdout, output, capture, metrics=timing)
             if ok:
                 while ok and not STOP:
-                    emit(type="utterance", path=str(output), summary=summary)
+                    emit(
+                        type="utterance", path=str(output), summary=summary,
+                        turn_started_monotonic=turn_started, timing=timing,
+                    )
                     stop_recorder(recorder)
                     control = sys.stdin.readline().strip()
                     if control == "stop":
@@ -181,10 +194,13 @@ def main():
                         summary="Follow-up open for five seconds."
                     )
                     output = session / f"utterance-{int(time.time() * 1000)}.wav"
+                    turn_started = time.monotonic()
+                    timing = {}
                     ok, summary = capture_command(
                         recorder.stdout, output, capture,
                         speech_start_timeout=capture["followup_speech_start_timeout_seconds"],
                         no_speech_summary=followup_summary,
+                        metrics=timing,
                     )
                     if not ok:
                         if summary == followup_summary:

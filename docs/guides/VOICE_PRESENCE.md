@@ -9,7 +9,9 @@ service.
 ## Install
 
 Voice Presence reuses the reviewed whisper.cpp transcription runtime,
-Supertonic responsive voice, and optional RNNoise PipeWire source. Set those
+the exact low-latency `ggml-base.en.bin` voice model, Supertonic responsive
+voice, and optional RNNoise PipeWire source. Music Studio lyric analysis keeps
+its separate `ggml-small.en.bin` selection. Set those
 up first, then review and execute the wake-runtime plan:
 
 ```bash
@@ -49,7 +51,7 @@ natural-follow-up turn.
 
 1. Wait for **Listening locally for “Hey Soul”**.
 2. Say “Hey Soul,” wait for the cue, and speak one request.
-3. Soul captures at most 30 seconds and stops at 1.2 seconds of trailing
+3. Soul captures at most 30 seconds and stops at 0.95 seconds of trailing
    silence.
 4. The microphone process closes while the ordinary conversation, skill,
    Core, and approval policies handle the request.
@@ -66,11 +68,35 @@ The microphone remains closed while Soul is thinking or speaking. Follow-up
 silence is not treated as an error and does not count toward the three-failure
 pause.
 
+Ordinary spoken conversation requests the local provider's reviewed
+no-reasoning mode and uses a 384-token spoken-response ceiling to avoid spending
+most of a turn on hidden reasoning. Say `think carefully`, `reason through`,
+`analyze in depth`, or `take your time` when a spoken request genuinely needs
+the selected model's normal deliberation path. This optimization does not alter
+Dashboard text behavior or deterministic skill results.
+
 Wake detection uses the local sherpa-onnx keyword spotter rather than full
 transcription. Boosting and trigger threshold are manifest-controlled: a
 higher boost and lower threshold make activation easier but may increase false
-wakes. The reviewed default is 2.0 / 0.25. Pronounce “Hey Soul” as one natural
+wakes. The current calibration candidate is 3.5 / 0.15. Pronounce “Hey Soul” as one natural
 short phrase; no special theatrical pacing or inflection is intended.
+
+Voice Presence displays request-private stage timing after each completed
+turn. These measurements contain durations only and disappear with the visible
+application. They are used to distinguish capture, transcription, Soul routing,
+synthesis, and first-audio latency without retaining speech.
+
+While the visible application is open and listening, its responsive Supertonic
+engine is preloaded as one private-pipe child. It exposes no HTTP or Unix-socket
+listener and terminates on pause, restart, or close. If preload is unavailable,
+the next turn uses the existing bounded one-shot synthesis path rather than a
+cloud provider.
+
+An unambiguous `repeat that`, `say that again`, or `repeat your last response`
+replays the exact most recent response audio from the active visible session.
+It does not call Soul or regenerate speech. The private replay WAV is replaced
+by the next completed response and deleted when Voice Presence restarts or
+closes. `Rephrase that` and `regenerate the voice` remain new ordinary turns.
 
 ### Ask about the current screen
 
@@ -145,8 +171,10 @@ operations retain their existing preview or approval boundary. A voice request
 that needs another Core must explain the need and follow ordinary
 orchestration.
 
-Continuous audio, wake audio, command WAVs, and generated reply WAVs are not
-retained. Text exchanges are stored in the dedicated **Voice presence**
+Continuous audio, wake audio, and command WAVs are not retained. The latest
+generated reply WAV may exist only inside the active application's private
+temporary directory for exact replay; it is deleted on restart or close. Text
+exchanges are stored in the dedicated **Voice presence**
 transmission so they remain reviewable in the dashboard. The only additional
 durable state is its canonical chat ID.
 

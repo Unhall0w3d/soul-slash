@@ -48,6 +48,7 @@ module SoulCore
       )
       emit(progress_sink, "received", "Transmission received and written to local continuity.")
       runtime_options = { chat_id: chat_id, message: text }
+      runtime_options[:interface] = interface if runtime_accepts_interface?
       runtime_options[:progress] = progress_sink if runtime_accepts_progress?
       result = @runtime.respond(**runtime_options)
       emit(progress_sink, "finalizing", "Sealing the response into this transmission.")
@@ -105,6 +106,14 @@ module SoulCore
     def runtime_accepts_progress?
       @runtime.method(:respond).parameters.any? do |kind, name|
         kind == :keyrest || %i[key keyreq].include?(kind) && name == :progress
+      end
+    rescue NameError
+      false
+    end
+
+    def runtime_accepts_interface?
+      @runtime.method(:respond).parameters.any? do |kind, name|
+        kind == :keyrest || %i[key keyreq].include?(kind) && name == :interface
       end
     rescue NameError
       false

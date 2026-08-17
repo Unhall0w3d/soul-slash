@@ -233,10 +233,13 @@
         {
           "id": 42,
           "type": "timeseries",
-          "title": "Network errors and drops",
-          "description": "Combined receive/transmit errors and packet drops on non-virtual interfaces.",
+          "title": "Interface faults and receive discards",
+          "description": "Actionable receive/transmit errors and transmit drops are separated from informational receive discards. Stable receive discards can include expected link-local control traffic on virtual guests.",
           "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
-          "targets": [{"refId": "A", "expr": "sum by (device_id, role) (rate(node_network_receive_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_receive_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "targets": [
+            {"refId": "A", "expr": "sum by (device_id, role) (rate(node_network_receive_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_errs_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]) + rate(node_network_transmit_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}} · faults (actionable)"},
+            {"refId": "B", "expr": "sum by (device_id, role) (rate(node_network_receive_drop_total{device!~\"lo|veth.*|tap.*|fw.*|br.*|vmbr.*|docker.*\"}[5m]))", "legendFormat": "{{device_id}} · {{role}} · receive discards (informational)"}
+          ],
           "fieldConfig": {"defaults": {"unit": "pps", "min": 0}, "overrides": [
             {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
             {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},

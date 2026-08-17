@@ -33,12 +33,14 @@ begin
   runtime = manifest.fetch("runtime")
   model = manifest.fetch("models")[options.fetch(:model)]
   raise "unknown exact transcription model filename; available: #{manifest.fetch('models').keys.join(', ')}" unless model
+  raise "transcription model filename is unsafe" unless options.fetch(:model) == File.basename(options.fetch(:model)) && options.fetch(:model).match?(/\A[A-Za-z0-9_.-]+\z/)
   install_dir = File.join(File.expand_path(options.fetch(:root)), "transcription", runtime.fetch("release"))
   plan = {
     "operation" => "music_transcription_install",
     "install_dir" => install_dir,
     "runtime" => runtime.slice("name", "release", "archive_url", "archive_filename", "archive_bytes", "archive_sha256"),
     "model" => options.fetch(:model), "model_url" => model.fetch("url"), "model_bytes" => model.fetch("bytes"), "model_sha256" => model.fetch("sha256"),
+    "install_mode" => File.directory?(install_dir) ? "add_exact_model" : "install_runtime_and_model",
     "confirmation_phrase" => CONFIRMATION, "persistent_service" => false, "network_listener" => false, "resident_process" => false, "automatic_download" => false
   }
   plan["expected_digest"] = Digest::SHA256.hexdigest(JSON.generate(plan))
@@ -47,7 +49,25 @@ begin
   raise "review the current plan and provide its exact EXPECTED_DIGEST" unless options[:digest] == plan.fetch("expected_digest")
   raise "exact confirmation #{CONFIRMATION} is required" unless options[:confirmation] == CONFIRMATION
   raise "curl and tar are required" unless %w[curl tar].all? { |name| ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, name)) } }
-  raise "install directory already exists; inspect it rather than overwriting" if File.exist?(install_dir) || File.symlink?(install_dir)
+  if File.directory?(install_dir) && !File.symlink?(install_dir)
+    binary = File.join(install_dir, runtime.fetch("binary"))
+    raise "existing transcription runtime is not executable" unless File.executable?(binary) && !File.symlink?(binary)
+    destination = File.join(install_dir, options.fetch(:model))
+    if File.file?(destination) && !File.symlink?(destination)
+      exact = File.size(destination) == model.fetch("bytes") && Digest::SHA256.file(destination).hexdigest == model.fetch("sha256")
+      raise "existing transcription model differs; inspect it rather than overwriting" unless exact
+      emit("lifecycle_state" => "complete", "install_dir" => install_dir, "model" => options.fetch(:model), "already_valid" => true, "resident_process" => false)
+    end
+    raise "transcription model destination is unsafe" if File.exist?(destination) || File.symlink?(destination)
+    temporary_model = File.join(install_dir, ".#{options.fetch(:model)}.partial-#{Process.pid}")
+    system("curl", "--fail", "--location", "--proto", "=https", "--retry", "2", "--connect-timeout", "20", "--max-time", "900", "--output", temporary_model, model.fetch("url")) or raise "download failed for #{options.fetch(:model)}"
+    raise "byte count mismatch for #{options.fetch(:model)}" unless File.size(temporary_model) == model.fetch("bytes")
+    raise "SHA-256 mismatch for #{options.fetch(:model)}" unless Digest::SHA256.file(temporary_model).hexdigest == model.fetch("sha256")
+    File.chmod(0o600, temporary_model)
+    File.rename(temporary_model, destination)
+    emit("lifecycle_state" => "complete", "install_dir" => install_dir, "model" => options.fetch(:model), "added_to_existing_runtime" => true, "resident_process" => false)
+  end
+  raise "install path exists but is not a safe directory" if File.exist?(install_dir) || File.symlink?(install_dir)
   staging = "#{install_dir}.partial-#{Process.pid}-#{SecureRandom.hex(4)}"
   FileUtils.mkdir_p(staging, mode: 0o700)
   archive = File.join(staging, runtime.fetch("archive_filename"))
@@ -79,8 +99,10 @@ begin
   emit("lifecycle_state" => "complete", "install_dir" => install_dir, "model" => options.fetch(:model), "resident_process" => false)
 rescue Interrupt
   FileUtils.rm_rf(staging) if defined?(staging) && staging
+  FileUtils.rm_f(temporary_model) if defined?(temporary_model) && temporary_model
   emit({ "lifecycle_state" => "canceled", "error" => "installation canceled; partial files removed" }, 2)
 rescue StandardError => error
   FileUtils.rm_rf(staging) if defined?(staging) && staging
+  FileUtils.rm_f(temporary_model) if defined?(temporary_model) && temporary_model
   emit({ "lifecycle_state" => "failed", "error" => error.message }, 1)
 end

@@ -9,6 +9,7 @@ require_relative "../lib/soul_core/configuration_resolver"
 require_relative "../lib/soul_core/voice_transcription_service"
 require_relative "../lib/soul_core/voice_synthesis_service"
 require_relative "../lib/soul_core/voice_screen_understanding_service"
+require_relative "../lib/soul_core/voice_presence_turn_policy"
 
 ROOT = File.expand_path("..", __dir__)
 STATE_ROOT = File.expand_path(ENV.fetch("SOUL_VOICE_PRESENCE_STATE_ROOT", "~/.local/state/soul/voice-presence"))
@@ -51,6 +52,12 @@ begin
   audio_path = File.expand_path(ARGV.fetch(0))
   output_path = File.expand_path(ARGV.fetch(1))
   selected_voice = ARGV[2].to_s
+  replay_path = ARGV[3].to_s.empty? ? nil : File.expand_path(ARGV[3])
+  turn_started = Float(ARGV[4])
+  capture_timing = JSON.parse(ARGV[5].to_s.empty? ? "{}" : ARGV[5])
+  synthesis_mode = ARGV[6].to_s == "warm" ? "warm" : "one_shot"
+  stage_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  timings = capture_timing.transform_keys(&:to_s)
   selected_voice = nil unless %w[F3 M3].include?(selected_voice)
   raise "capture is unavailable" unless File.file?(audio_path) && !File.symlink?(audio_path)
   raise "output path already exists" if File.exist?(output_path) || File.symlink?(output_path)
@@ -69,8 +76,25 @@ begin
   )
   raise transcription.dig("data", "message").to_s.empty? ? "transcription failed" : transcription.dig("data", "message") unless transcription["ok"]
   transcript = transcription.dig("data", "transcript").to_s.strip
+  now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  timings["transcription_ms"] = ((now - stage_started) * 1_000).round
   emit("type" => "transcript", "text" => transcript)
 
+  repeat_request = SoulCore::VoicePresenceTurnPolicy.new.repeat_request?(transcript)
+  if repeat_request && replay_path && File.file?(replay_path) && !File.symlink?(replay_path)
+    timings["route_ms"] = 0
+    timings["synthesis_ms"] = 0
+    timings["audio_ready_ms"] = ((now - turn_started) * 1_000).round
+    emit("type" => "timing", "timings" => timings)
+    emit(
+      "type" => "result", "lifecycle_state" => "complete", "transcript" => transcript,
+      "reply" => "Replaying Soul's exact previous response.", "audio_path" => replay_path,
+      "replayed" => true, "timings" => timings
+    )
+    exit 0
+  end
+
+  stage_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
   facade = SoulCore::ApplicationFacade.new(root: ROOT, process_env: environment)
   chat_id = voice_chat_id(facade)
   speech_context = "general"
@@ -98,6 +122,8 @@ begin
     end
   end
   raise "Soul returned no eligible spoken reply" if assistant.strip.empty?
+  now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  timings["route_ms"] = ((now - stage_started) * 1_000).round
 
   synthesis_options = { root: ROOT, process_env: environment }
   {
@@ -111,12 +137,35 @@ begin
     synthesis_options[option] = environment[key] unless environment[key].to_s.empty?
   end
   emit("type" => "state", "state" => "speaking", "summary" => "Preparing Soul's voice.")
+  if synthesis_mode == "warm"
+    presentation = SoulCore::SpeechPresentationService.new.prepare(assistant, context: speech_context)
+    synthesis_manifest_path = environment["SOUL_VOICE_SYNTHESIS_MANIFEST"].to_s
+    synthesis_manifest_path = File.join(ROOT, "config", "voice_synthesis_models.json") if synthesis_manifest_path.empty?
+    synthesis_manifest = JSON.parse(File.binread(synthesis_manifest_path, 256 * 1024))
+    defaults = synthesis_manifest.fetch("defaults")
+    base_speed = environment["SOUL_VOICE_SYNTHESIS_SPEED"].to_s.empty? ? Float(defaults.fetch("speed")) : Float(environment["SOUL_VOICE_SYNTHESIS_SPEED"])
+    timings["synthesis_ms"] = 0
+    emit(
+      "type" => "speech_request", "request_id" => "speech-#{SecureRandom.uuid}",
+      "text" => presentation.fetch("text"), "voice" => selected_voice || defaults.fetch("voice"),
+      "language" => defaults.fetch("language"), "steps" => defaults.fetch("steps"),
+      "speed" => (base_speed * presentation.fetch("speed_factor")).clamp(0.7, 2.0).round(3),
+      "timings" => timings, "lifecycle_state" => lifecycle, "reply" => assistant,
+      "chat_id" => chat_id
+    )
+    exit 0
+  end
+  stage_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
   speech = SoulCore::VoiceSynthesisService.new(**synthesis_options).synthesize(
     text: assistant, voice_name: selected_voice, quality: "responsive", speech_context: speech_context
   )
   raise speech.fetch("message", "speech synthesis failed") unless speech["ok"]
+  now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  timings["synthesis_ms"] = ((now - stage_started) * 1_000).round
+  timings["audio_ready_ms"] = ((now - turn_started) * 1_000).round
   File.binwrite(output_path, speech.fetch("audio"), mode: "wx", perm: 0o600)
-  emit("type" => "result", "lifecycle_state" => lifecycle, "transcript" => transcript, "reply" => assistant, "chat_id" => chat_id, "audio_path" => output_path)
+  emit("type" => "timing", "timings" => timings)
+  emit("type" => "result", "lifecycle_state" => lifecycle, "transcript" => transcript, "reply" => assistant, "chat_id" => chat_id, "audio_path" => output_path, "replayed" => false, "timings" => timings)
 rescue Interrupt
   emit("type" => "result", "lifecycle_state" => "canceled", "error" => "voice turn canceled")
   exit 130
