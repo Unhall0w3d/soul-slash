@@ -18,7 +18,7 @@ def expect_rejected_by_both(raw)
   begin
     SoulCore::BlenderSceneManifest.new(copy(raw))
   rescue SoulCore::BlenderSceneManifest::ValidationError
-    # Expected: the Ruby boundary rejected the candidate.
+    # Rejection here is required before checking equivalent adapter behavior.
   else
     raise "Ruby manifest validation accepted invalid organics"
   end

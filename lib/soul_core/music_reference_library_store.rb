@@ -69,8 +69,8 @@ module SoulCore
       read_record(File.join(@directory, kind, "#{id}.json"), id, schema)
     end
 
-    # Future bounded analyzers use this exact persistence seam. A5.1 deliberately
-    # exposes no application mutation that calls it.
+    # All track creation passes through the same normalization and validation
+    # boundary before the immutable initial record is written.
     def write_track(record)
       data = stringify_keys(record)
       prepare_root!

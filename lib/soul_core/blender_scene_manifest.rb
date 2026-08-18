@@ -5,7 +5,8 @@ require "digest"
 require "json"
 
 module SoulCore
-  # Strict closed JSON manifest parser used by Blender Scene A1.
+  # Enforces the closed, versioned JSON contract accepted by the Blender scene
+  # adapter.
   class BlenderSceneManifest
     class ValidationError < StandardError; end
 

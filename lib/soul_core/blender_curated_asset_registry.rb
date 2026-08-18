@@ -11,7 +11,8 @@ require "tmpdir"
 require "uri"
 
 module SoulCore
-  # A deliberately small, closed registry for the A8 Poly Haven study assets.
+  # Limits curated Poly Haven downloads to the reviewed asset registry and
+  # validates their identities and digests before installation.
   class BlenderCuratedAssetRegistry
     CONFIRMATION = "INSTALL_BLENDER_CURATED_ASSETS"
     HOST = "dl.polyhaven.org"

@@ -48,6 +48,23 @@ Codex must:
 - Stop and report a blocked state if the brief is incomplete, contradictory, unsafe, or requires violating these rules.
 - Produce or update a human review artifact for each skill candidate.
 
+## Code comment standard
+
+Code comments must explain a non-obvious constraint, invariant, compatibility
+requirement, safety boundary, or design reason. They must describe the current
+behavior in language that remains understandable without the working session
+that introduced it.
+
+Codex must not add comments that merely restate the following code, narrate an
+implementation step, preserve obsolete construction history, make an untracked
+future promise, or add editorial humor. Phase and gate identifiers belong in
+historical review artifacts, versioned schemas, and compatibility boundaries;
+live operational comments should name the behavior or authority directly.
+
+When nearby code changes, Codex must update or remove comments that no longer
+describe it accurately. Generated-file notices and tool directives such as
+shellcheck annotations are retained when they carry operational meaning.
+
 ## Skill lifecycle requirement
 
 A skill must terminate as one of:

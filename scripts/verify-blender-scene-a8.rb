@@ -19,7 +19,7 @@ def reject_by_both(raw)
   begin
     SoulCore::BlenderSceneManifest.new(copy(raw))
   rescue SoulCore::BlenderSceneManifest::ValidationError
-    # Expected.
+    # Rejection here is required before checking equivalent adapter behavior.
   else
     raise "Ruby manifest accepted invalid A8 input"
   end

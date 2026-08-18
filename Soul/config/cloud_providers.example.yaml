@@ -1,10 +1,7 @@
 # Soul/ cloud provider example configuration.
 #
-# This file is an example only. Copy or adapt later when provider config loading exists.
+# Copy this example to cloud_providers.yaml and enable only reviewed providers.
 # Do not put API keys in this file.
-#
-# Mistral setup/account/API-key documentation is intentionally deferred until
-# the cloud.providers.test overlay.
 
 cloud_llm:
   enabled: false
