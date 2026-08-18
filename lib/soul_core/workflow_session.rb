@@ -217,7 +217,8 @@ module SoulCore
       { ok: result[:ok], message: result[:ok] ? @renderer.render_weather_detailed(state, report) : @renderer.render_weather_failed(state, report), state: state }
     end
 
-    # Existing generic cleanup/restore implementation
+    # Cleanup and restore share selection parsing but advance to distinct review
+    # states and renderers.
     def handle_cleanup_selection(state, text)
       handle_selection(state, text, next_status: "waiting_for_final_confirmation", renderer: :render_selection, empty_message: "No items selected. Workflow cancelled. Nothing was moved.")
     end

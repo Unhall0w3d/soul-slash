@@ -206,7 +206,8 @@ def validate_manifest(manifest):
 
     require_string(manifest["schema_version"], "schema_version", 1, 64)
 
-    # Look migration + strict map validation (A1 manifests are compatible via defaults).
+    # Defaults preserve compatibility with manifests that predate the look map;
+    # unknown look keys remain invalid.
     look = dict(LOOK_DEFAULTS, **(look if isinstance(look, dict) else {}))
     reject_unknown(look, LOOK_DEFAULTS.keys(), "look")
     if look["surface"] not in LOOK_SURFACES:

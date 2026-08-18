@@ -5,9 +5,8 @@ require "fileutils"
 require "time"
 
 module SoulCore
-  # CloudAssistArtifact provides a small, boring, review-only landing zone for
-  # cloud-assisted outputs. Cloud models should draft artifacts, not mutate repo
-  # code or approve their own work. Yes, apparently this needs a class.
+  # Stores cloud-assisted output as review-only artifacts. Cloud models may
+  # draft these artifacts but cannot mutate repository code or approve work.
   class CloudAssistArtifact
     DEFAULT_ARTIFACT_ROOT = "Soul/artifacts/cloud_assist"
     DEFAULT_SKILL_PROPOSAL_ROOT = "Soul/proposals/skills"

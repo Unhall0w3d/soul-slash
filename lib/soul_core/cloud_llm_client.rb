@@ -6,9 +6,8 @@ require "uri"
 require "time"
 
 module SoulCore
-  # CloudLLMClient is intentionally small. It supports the first serious
-  # provider path for cloud-assisted artifacts without pretending to be a
-  # universal AI abstraction. Such restraint. In software. Imagine.
+  # Supports the bounded provider contract used by cloud-assisted review
+  # artifacts; it is not a general-purpose model-provider abstraction.
   class CloudLLMClient
     DEFAULT_TIMEOUT_SECONDS = 60
 

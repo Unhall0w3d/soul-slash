@@ -125,8 +125,8 @@ module SoulCore
       )
     end
 
-    # A3 captures this again only after every update leg succeeds. Keeping the
-    # collector here preserves the A1 privacy and allowlist boundary.
+    # Reuse the allowlisted, privacy-bounded collector for both rehearsal and
+    # post-update snapshots so restoration evidence has the same shape.
     def capture_window_snapshot
       window_snapshot(load_registry)
     end

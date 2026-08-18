@@ -51,9 +51,8 @@ puts "- skill proposal path: #{Dir.exist?(proposal.path) ? 'ok' : 'missing'}"
 puts "- cloud metadata: #{File.exist?(File.join(artifact.path, 'metadata.json')) ? 'ok' : 'missing'}"
 puts "- proposal metadata: #{File.exist?(File.join(proposal.path, 'metadata.json')) ? 'ok' : 'missing'}"
 
-# Clean generated verification fixtures so the verifier does not leave runtime
-# junk around. Generated folders are ignored, but leaving less junk is still a
-# wholesome novelty.
+# Remove generated verification fixtures even though their directories are
+# ignored, so repeated verifier runs do not accumulate runtime artifacts.
 FileUtils.rm_rf(artifact.path)
 FileUtils.rm_rf(proposal.path)
 

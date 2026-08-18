@@ -146,8 +146,8 @@ module SoulCore
       lines.join("\n")
     end
 
-    # Existing Downloads renderers retained from current project by requiring older methods.
-    # This file intentionally includes all renderers used by current workflows.
+    # Cleanup and restore workflows share this renderer family so their plans,
+    # selections, and terminal results use one output contract.
     def render_plan(state, plan)
       lines = []
       candidates = state.fetch("candidates", [])

@@ -485,7 +485,7 @@ module SoulCore
     end
 
     def claimed_transaction_path(id)
-      # The root-owned A4 helper accepts only this canonical, ID-derived path.
+      # The root-owned helper accepts only this canonical, ID-derived path.
       # Reservation state remains visibly suffixed until the single-use URI
       # atomically claims it here.
       File.join(@transactions_root, "#{id}.json")
