@@ -391,8 +391,8 @@
       "item_id": "track_music_variable_duration",
       "title": "Qualify and review variable-duration Music Studio",
       "area": "Music Studio",
-      "horizon": "now",
-      "status": "in_progress",
+      "horizon": "archive",
+      "status": "done",
       "priority": "high",
       "summary": "Review exact whole-second composition support from 30 through 300 seconds plus the fixed 600-second option, using the five-piece liminal sequence.",
       "acceptance": "Short and long pilot audio is musically acceptable; 43-, 57-, 71-, 144-, and 248-second projects display and generate through ordinary exact gates; 301–599 seconds remain rejected.",
@@ -402,14 +402,14 @@
       "interfaces": "Music Studio duration field and Duration & finishing ledger; local retained generation and review evidence.",
       "commands": "make verify-music-qualification\nruby scripts/verify-music-core-vulkan-feasibility.rb\nruby scripts/verify-music-studio-a2.rb\nruby scripts/verify-music-studio-a3.rb",
       "references": "docs/soul/MUSIC_VARIABLE_DURATION_QUALIFICATION_A0_BRIEF.md\ndocs/assessments/MUSIC_VARIABLE_DURATION_AND_LIMINAL_SEQUENCE_A0_REVIEW.md\ndocs/soul/CREATIVE_QUALIFICATION_PROGRAM_A1_BRIEF.md\ndocs/assessments/CREATIVE_QUALIFICATION_PROGRAM_A1_REVIEW.md",
-      "notes": "Technical production support is implemented. Human musical qualification remains in progress over the retained five-duration cohort."
+      "notes": "Variable-duration qualification completed with Operator approval on 2026-08-09. Exact 43-, 57-, 71-, 144-, and 248-second projects generated through ordinary gates; 301-599 seconds remain rejected and 600 seconds remains separately supported. Failed or low-adherence candidates remain quality evidence rather than duration failures."
     },
     {
       "item_id": "track_music_finishing_refinement",
       "title": "Continue Music Studio adherence, revision, and finishing refinement",
       "area": "Music Studio",
-      "horizon": "now",
-      "status": "in_progress",
+      "horizon": "archive",
+      "status": "done",
       "priority": "medium",
       "summary": "Use real generations to refine prompt translation, collapse recovery, vocal adherence, revision targeting, natural endings, and lightweight source-preserving trim.",
       "acceptance": "Common revision feedback reliably changes the intended musical property; failures remain diagnosable; kept exports preserve exact reviewed lineage.",
@@ -419,7 +419,7 @@
       "interfaces": "Music Studio vocal feasibility card, candidate review, Soul Revision Draft, retry, trim, export, Chat creative workflow, and Duration & finishing ledger.",
       "commands": "make verify-music-qualification\nmake verify-music-vocal-diagnostics\nmake verify-music-a2\nmake verify-music-vocal-analysis\nmake verify-music-lite-edit\nruby scripts/verify-music-revision-draft.rb",
       "references": "docs/guides/MUSIC_STUDIO.md\ndocs/soul/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_BRIEF.md\ndocs/assessments/MUSIC_VOCAL_FEASIBILITY_AND_FAILURE_DIAGNOSTICS_A1_REVIEW.md\ndocs/soul/CREATIVE_QUALIFICATION_PROGRAM_A1_BRIEF.md\ndocs/assessments/CREATIVE_QUALIFICATION_PROGRAM_A1_REVIEW.md\ndocs/soul/MUSIC_STUDIO_REVISION_PIPELINE_BRIEF.md\ndocs/assessments/MUSIC_STUDIO_REVISION_PIPELINE_REVIEW.md",
-      "notes": "Diagnostic implementation is candidate-complete. Active work remains human review of adherence, useful revisions, endings, and source-preserving finishing across real retained generations."
+      "notes": "This bounded refinement milestone completed with Operator approval on 2026-08-09. Revision lineage, machine-heard evidence, vocal feasibility and failure diagnostics, source-preserving trim, export integrity, and retained failure evidence are available. Future model-quality refinement should use a new scoped item."
     },
     {
       "item_id": "track_cleanup_retention",
