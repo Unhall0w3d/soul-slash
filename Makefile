@@ -1243,6 +1243,11 @@ verify-fleet-observability-a2:
 verify-fleet-observability-a3:
 > @ruby scripts/verify-fleet-observability-a3.rb
 
+.PHONY: verify-e1000e-hardware-hang-recovery
+
+verify-e1000e-hardware-hang-recovery:
+> @scripts/verify-e1000e-hardware-hang-recovery-a0.sh
+
 .PHONY: verify-conversation-maintenance-workflow verify-operator-capability-catalog verify-skill-studio-conversation verify-fundamental-files-inspect verify-fundamental-network-diagnose verify-fundamental-repository-inspect verify-fundamental-workspace-artifact-compose verify-fundamental-web-research verify-invocation-catalog
 
 verify-conversation-maintenance-workflow:

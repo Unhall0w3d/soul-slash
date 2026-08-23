@@ -1,0 +1,69 @@
+#!/usr/bin/bash
+set -euo pipefail
+
+readonly INTERFACE="nic0"
+readonly DRIVER="e1000e"
+readonly EVENT="e1000e 0000:00:1f.6 nic0: Detected Hardware Unit Hang:"
+readonly COOLDOWN_SECONDS=60
+readonly LOG_TAG="soul-e1000e-recovery"
+
+log() {
+  /usr/bin/logger --priority "daemon.$1" --tag "$LOG_TAG" -- "$2"
+}
+
+validate_target() {
+  local driver_path="/sys/class/net/${INTERFACE}/device/driver"
+  [[ -e "/sys/class/net/${INTERFACE}" ]] || return 1
+  [[ -L "$driver_path" ]] || return 1
+  [[ "$(/usr/bin/basename "$(/usr/bin/readlink -f "$driver_path")")" == "$DRIVER" ]]
+}
+
+if [[ "${1:-}" == "--validate" ]]; then
+  if validate_target; then
+    printf '%s\n' "${DRIVER}:${INTERFACE}:ready"
+    exit 0
+  fi
+  printf '%s\n' "${DRIVER}:${INTERFACE}:unavailable" >&2
+  exit 1
+fi
+
+[[ $# -eq 0 ]] || {
+  printf '%s\n' "usage: soul-e1000e-recovery [--validate]" >&2
+  exit 64
+}
+
+validate_target || {
+  log err "fixed target ${DRIVER}:${INTERFACE} is unavailable; recovery observer stopped"
+  exit 1
+}
+
+last_recovery=0
+while IFS= read -r line; do
+  [[ "$line" == *"$EVENT"* ]] || continue
+
+  now="$(/usr/bin/date +%s)"
+  if (( now - last_recovery < COOLDOWN_SECONDS )); then
+    continue
+  fi
+  last_recovery="$now"
+
+  if ! validate_target; then
+    log err "hardware-hang event observed but fixed target ${DRIVER}:${INTERFACE} no longer validates"
+    exit 1
+  fi
+
+  log warning "hardware-hang event observed; cycling ${INTERFACE}"
+  if ! /usr/sbin/ip link set dev "$INTERFACE" down; then
+    log err "failed to lower ${INTERFACE}; recovery observer stopped"
+    exit 1
+  fi
+  /usr/bin/sleep 2
+  if ! /usr/sbin/ip link set dev "$INTERFACE" up; then
+    log err "failed to restore ${INTERFACE}; recovery observer stopped"
+    exit 1
+  fi
+  log notice "restored ${INTERFACE} after hardware-hang event"
+done < <(/usr/bin/journalctl --dmesg --follow --lines=0 --output=cat)
+
+log err "kernel journal stream ended; recovery observer stopped"
+exit 1
