@@ -20,6 +20,7 @@ check.call("A0 harness completes", evaluation["lifecycle_state"] == "complete")
 check.call("A0 corpus demonstrates semantic recall gain", evaluation.dig("hybrid_gain", "recall").to_f.positive?)
 check.call("A0 hybrid precision does not regress", evaluation.dig("hybrid_gain", "precision").to_f >= 0.0)
 check.call("A0 reports per-query evidence", evaluation.fetch("queries").all? { |query| query.key?("score_components") && query.key?("latency_ms") })
+check.call("expanded corpus covers paraphrases and hard negatives", evaluation["corpus"] == "synthetic-memory-retrieval-a4-v2" && evaluation["query_count"] == 11 && evaluation["correct_abstentions"] == 3)
 
 class FailingEmbeddingClient
   attr_reader :profile, :dimensions
@@ -47,13 +48,57 @@ Dir.mktmpdir("soul-memory-retrieval-verifier") do |directory|
   check.call("index exposes source and payload digests", envelope["source_digest"].to_s.length == 64 && envelope["payload_digest"].to_s.length == 64)
 
   retrieval = ApprovedMemoryRetrievalService.new(memory_store: store, index_service: index, embedding_client: client)
-  hybrid = retrieval.query(query: "spacecraft flight", limit: 5)
+  hybrid = retrieval.query(query: "how does the spacecraft change coordinate systems in motion", limit: 5)
   check.call("hybrid result exposes bounded explainable components", hybrid.dig("data", "results", 0, "score_components").values.all? { |value| value.to_f.between?(0.0, 1.0) })
   check.call("hybrid result names approved source memory", hybrid.dig("data", "results", 0, "memory_id") == "mem_vehicle")
+  check.call("hybrid ranking profile is explicit", hybrid.dig("data", "ranking_profile") == "hybrid-a4-v1")
+
+  instructed_client = Class.new do
+    attr_reader :profile, :dimensions, :inputs
+
+    def initialize(delegate)
+      @delegate = delegate
+      @profile = delegate.profile
+      @dimensions = delegate.dimensions
+      @inputs = []
+    end
+
+    def embed(texts)
+      @inputs << Array(texts)
+      @delegate.embed(texts)
+    end
+  end.new(client)
+  instructed_index = ApprovedMemoryIndexService.new(
+    memory_store: store,
+    index_path: File.join(directory, "instructed-index.json"),
+    embedding_client: instructed_client
+  )
+  instructed_index.rebuild
+  instructed = ApprovedMemoryRetrievalService.new(
+    memory_store: store,
+    index_service: instructed_index,
+    embedding_client: instructed_client,
+    query_instruction: "Retrieve relevant approved operator memory"
+  ).query(query: "spacecraft flight", limit: 5)
+  check.call("query instruction is applied only to the query", instructed_client.inputs.first.none? { |text| text.start_with?("Instruct:") } && instructed_client.inputs.last == ["Instruct: Retrieve relevant approved operator memory\nQuery:spacecraft flight"])
+  check.call("query instruction configuration is observable", instructed.dig("data", "query_instruction_configured") == true)
+
+  begin
+    ApprovedMemoryRetrievalService.new(
+      memory_store: store,
+      index_service: index,
+      embedding_client: client,
+      query_instruction: "invalid\nsecond line"
+    )
+    errors << "multi-line query instruction was accepted"
+  rescue ArgumentError
+    # expected
+  end
 
   File.write(index_path, "not json")
   fallback = retrieval.query(query: "rotating frame conversion", limit: 5)
   check.call("malformed index falls back to lexical retrieval", fallback.dig("data", "retrieval_mode") == "lexical_fallback" && fallback.dig("data", "results", 0, "memory_id") == "mem_vehicle")
+  check.call("lexical fallback keeps its independent ranking profile", fallback.dig("data", "ranking_profile") == "lexical-a1-v1")
 
   index.rebuild
   stale_clock = -> { Time.utc(2026, 8, 25) }

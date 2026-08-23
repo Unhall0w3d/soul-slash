@@ -297,6 +297,13 @@ from the canonical ledger in its current approved state. The adapter preserves
 always-include and same-chat context and returns the original lexical result
 unchanged for every unavailable, stale, fallback, or failed path.
 
+The A4 ranker separates hybrid and lexical scoring. Hybrid ranking favors
+model similarity after a compatible vector is available; lexical fallback
+retains the established overlap-heavy profile. An optional single-line query
+instruction is applied only to query embeddings, never to indexed documents.
+The locally qualified profile is `qwen3-embedding:0.6b-q8_0`; retrieval does
+not make its runtime persistent.
+
 ### Optional external knowledge surface
 
 `SOUL_KNOWLEDGE_VAULT_PATH` may point to an external directory of ordinary

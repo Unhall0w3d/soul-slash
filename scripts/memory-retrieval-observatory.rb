@@ -18,7 +18,10 @@ module SoulMemoryRetrievalCLI
     if %w[evaluate evaluate-live].include?(command)
       client = command == "evaluate-live" ? embedding_client(env) : nil
       raise ArgumentError, "live evaluation requires local embedding configuration" if command == "evaluate-live" && client.nil?
-      puts JSON.pretty_generate(SoulCore::MemoryRetrievalEvaluationHarness.new(embedding_client: client).run)
+      puts JSON.pretty_generate(SoulCore::MemoryRetrievalEvaluationHarness.new(
+        embedding_client: client,
+        query_instruction: env["SOUL_MEMORY_EMBEDDING_QUERY_INSTRUCTION"]
+      ).run)
       return 0
     end
 
@@ -41,7 +44,8 @@ module SoulMemoryRetrievalCLI
                SoulCore::ApprovedMemoryRetrievalService.new(
                  memory_store: store,
                  index_service: index,
-                 embedding_client: client
+                 embedding_client: client,
+                 query_instruction: env["SOUL_MEMORY_EMBEDDING_QUERY_INSTRUCTION"]
                ).query(query: query, limit: 8)
              end
     puts JSON.pretty_generate(result)
