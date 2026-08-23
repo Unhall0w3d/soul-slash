@@ -57,11 +57,15 @@ or contact a cloud provider.
 
 ```bash
 export SOUL_MEMORY_EMBEDDING_ENDPOINT=http://127.0.0.1:11434/api/embed
-export SOUL_MEMORY_EMBEDDING_PROFILE=qwen3-embedding:0.6b
+export SOUL_MEMORY_EMBEDDING_PROFILE=qwen3-embedding:0.6b-q8_0
 export SOUL_MEMORY_EMBEDDING_DIMENSIONS=1024
 export SOUL_MEMORY_EMBEDDING_PROTOCOL=ollama
+export SOUL_MEMORY_EMBEDDING_QUERY_INSTRUCTION='Given an operator question, retrieve relevant approved memory that helps answer it'
 make memory-retrieval-rebuild
 ```
+
+The optional instruction is applied only to queries. Approved memory documents
+remain unprompted when indexed. It must be one line and at most 500 characters.
 
 The endpoint must be loopback HTTP, inputs are capped at 8,000 characters,
 batches at 64, dimensions at 1,024, and responses and timeouts are bounded.
@@ -88,9 +92,29 @@ back, or any local request fails, Chat receives the same approved-only lexical
 context it used before A3. Chat does not rebuild the index or start the embedding
 runtime automatically.
 
+## Live profile qualification
+
+`qwen3-embedding:0.6b-q8_0` was evaluated locally through Ollama on the public
+11-query A4 corpus. With the reviewed query instruction and `hybrid-a4-v1`
+ranking it produced recall `1.0`, precision `0.954545`, reciprocal rank `1.0`,
+correct abstention for all `3/3` absent queries, mean latency `35.294 ms`, and
+maximum latency `44.108 ms`. The lexical baseline measured recall `0.909091`,
+precision `0.677273`, and reciprocal rank `0.78125`.
+
+The first live run used the prior lexical-heavy ranking and an ambiguous
+`spacecraft flight` fixture. It showed no gain over lexical retrieval. An
+instruction-only experiment also showed no gain. Component inspection showed
+that the shared weighting made semantic-only admission impractical while also
+protecting lexical fallback. A4 therefore uses separate profiles:
+`hybrid-a4-v1` favors semantic evidence when a compatible vector is present,
+while `lexical-a1-v1` preserves the existing fallback. One terrain paraphrase
+also admitted a related vehicle-flight memory, so the non-perfect precision is
+reported rather than hidden.
+
 ## Current qualification boundary
 
-The deterministic A0 corpus and A1-A3 mechanics qualify ranking, abstention,
-fallback, privacy, application-facade, Dashboard behavior, and safe Chat-context
-admission. Choosing and operating a production embedding profile still requires
-a controlled live comparison and Operator review.
+A4 qualifies the local model, query format, ranking, abstention, and safe Chat
+admission mechanics. It does not install an always-on Ollama service,
+automatically load a model, rebuild an index, or alter Core lifecycle. Without
+an available compatible endpoint, Chat continues to fail safely to
+approved-only lexical context.

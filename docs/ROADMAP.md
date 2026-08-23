@@ -148,9 +148,10 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] project-aware and local-document lexical search A2 is accepted after
   matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
   remain separately qualified
-- [~] optional semantic memory retrieval has bounded explainable A0-A3 mechanics
-  and fail-safe ordinary Chat admission; live local profile comparison and
-  runtime-lifecycle qualification remain open
+- [~] optional semantic memory retrieval has bounded explainable A0-A3 mechanics,
+  fail-safe ordinary Chat admission, and an A4-qualified local
+  `qwen3-embedding:0.6b-q8_0` query/ranking profile; embedding runtime lifecycle
+  and supervised private-corpus review remain open
 - [x] bounded cleanup A3 is accepted for allowlisted old temporary residue, old
   regular project logs, and failed partial Music quarantine only; broader
   lifecycle-owned or capacity-bounded cleanup remains unavailable

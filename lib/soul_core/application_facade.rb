@@ -1073,6 +1073,7 @@ module SoulCore
         memory_store: conversation_memory,
         index_service: memory_retrieval_index,
         embedding_client: memory_embedding_client,
+        query_instruction: @process_env["SOUL_MEMORY_EMBEDDING_QUERY_INSTRUCTION"],
         clock: @clock
       )
     end

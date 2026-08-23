@@ -6,9 +6,10 @@ require_relative "memory_retrieval_index"
 require_relative "memory_retrieval_service"
 
 module SoulCore
-  # Deterministic A0 harness. Its vectors are synthetic acceptance fixtures,
+  # Deterministic retrieval harness. Its vectors are synthetic acceptance fixtures,
   # not a production model recommendation or an approval decision.
   class MemoryRetrievalEvaluationHarness
+    CORPUS = "synthetic-memory-retrieval-a4-v2"
     class FixtureStore
       def initialize(records)
         @records = records
@@ -28,10 +29,18 @@ module SoulCore
         "ship" => 0,
         "craft" => 0,
         "spacecraft" => 0,
+        "rotating" => 0,
+        "frame" => 0,
+        "conversion" => 0,
+        "coordinate" => 0,
+        "motion" => 0,
         "planetary" => 1,
         "terrain" => 1,
         "ground" => 1,
         "surface" => 1,
+        "aligned" => 1,
+        "world" => 1,
+        "below" => 1,
         "compact" => 2,
         "concise" => 2,
         "brief" => 2,
@@ -40,9 +49,14 @@ module SoulCore
         "archived" => 3,
         "history" => 3,
         "previous" => 3,
+        "old" => 3,
+        "records" => 3,
+        "rename" => 3,
         "privacy" => 4,
         "private" => 4,
-        "owner" => 4
+        "owner" => 4,
+        "display" => 4,
+        "theme" => 4
       }.freeze
 
       def initialize
@@ -64,13 +78,16 @@ module SoulCore
 
     QUERIES = [
       { "id" => "exact", "query" => "rotating frame conversion", "expected" => ["mem_vehicle"] },
-      { "id" => "paraphrase", "query" => "spacecraft flight", "expected" => ["mem_vehicle"] },
+      { "id" => "paraphrase", "query" => "how does the spacecraft change coordinate systems in motion", "expected" => ["mem_vehicle"] },
       { "id" => "renamed", "query" => "planetary ground surface", "expected" => ["mem_terrain"] },
       { "id" => "temporal", "query" => "previous archived history", "expected" => ["mem_archive"] },
       { "id" => "preference", "query" => "concise technical explanations", "expected" => ["mem_preference"] },
       { "id" => "absent", "query" => "quantum gardening recipes", "expected" => [] },
       { "id" => "conflict", "query" => "preferred display theme", "expected" => ["mem_conflict"] },
-      { "id" => "distractor", "query" => "quantum gardening", "expected" => [] }
+      { "id" => "distractor", "query" => "quantum gardening", "expected" => [] },
+      { "id" => "terrain_paraphrase", "query" => "how does the craft stay aligned with the world below", "expected" => ["mem_terrain"] },
+      { "id" => "archive_paraphrase", "query" => "old project records from before the rename", "expected" => ["mem_archive"] },
+      { "id" => "hard_negative", "query" => "favorite recipe for tomato soup", "expected" => [] }
     ].freeze
 
     def self.synthetic_records
@@ -86,9 +103,10 @@ module SoulCore
       ]
     end
 
-    def initialize(clock: -> { Time.now.utc }, embedding_client: nil)
+    def initialize(clock: -> { Time.now.utc }, embedding_client: nil, query_instruction: nil)
       @clock = clock
       @embedding_client = embedding_client
+      @query_instruction = query_instruction
     end
 
     def run
@@ -106,7 +124,13 @@ module SoulCore
         )
         rebuilt = index.rebuild
         raise "synthetic index rebuild failed" unless rebuilt["lifecycle_state"] == "complete"
-        hybrid = ApprovedMemoryRetrievalService.new(memory_store: store, index_service: index, embedding_client: client, clock: @clock)
+        hybrid = ApprovedMemoryRetrievalService.new(
+          memory_store: store,
+          index_service: index,
+          embedding_client: client,
+          query_instruction: @query_instruction,
+          clock: @clock
+        )
         query_results = QUERIES.map do |fixture|
           started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
           lexical_results = lexical.rank(records.select { |record| record["status"] == "approved" }, fixture.fetch("query"), limit: 5)
@@ -132,7 +156,7 @@ module SoulCore
         end
         summarize(query_results).merge(
           "lifecycle_state" => "complete",
-          "corpus" => "synthetic-memory-retrieval-a0-v1",
+          "corpus" => CORPUS,
           "embedding_profile" => client.profile,
           "index" => rebuilt.fetch("data"),
           "queries" => query_results,

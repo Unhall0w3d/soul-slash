@@ -11,12 +11,19 @@ module SoulCore
     MAX_QUERY_TOKENS = 20
     MAX_RESULTS = 20
     MIN_ADMISSION_SCORE = 0.40
-    WEIGHTS = {
+    LEXICAL_WEIGHTS = {
       "lexical" => 0.55,
       "semantic" => 0.30,
       "confidence" => 0.10,
       "layer" => 0.05
     }.freeze
+    HYBRID_WEIGHTS = {
+      "lexical" => 0.20,
+      "semantic" => 0.65,
+      "confidence" => 0.10,
+      "layer" => 0.05
+    }.freeze
+    MAX_QUERY_INSTRUCTION_CHARACTERS = 500
     LAYER_WEIGHTS = {
       "preference" => 1.0,
       "project" => 0.75,
@@ -25,12 +32,16 @@ module SoulCore
     }.freeze
 
     def initialize(memory_store:, index_service:, embedding_client: nil, min_admission_score: MIN_ADMISSION_SCORE,
-                   clock: -> { Time.now.utc })
+                   query_instruction: nil, clock: -> { Time.now.utc })
       @memory_store = memory_store
       @index_service = index_service
       @embedding_client = embedding_client
       @min_admission_score = Float(min_admission_score)
       raise ArgumentError, "admission threshold must be between 0.0 and 1.0" unless @min_admission_score.between?(0.0, 1.0)
+      @query_instruction = query_instruction.to_s.strip
+      if @query_instruction.length > MAX_QUERY_INSTRUCTION_CHARACTERS || @query_instruction.match?(/[\r\n]/)
+        raise ArgumentError, "query instruction must be one line and at most #{MAX_QUERY_INSTRUCTION_CHARACTERS} characters"
+      end
       @clock = clock
     end
 
@@ -64,6 +75,8 @@ module SoulCore
                             else
                               "lexical_fallback"
                             end,
+        "ranking_profile" => semantic_available ? "hybrid-a4-v1" : "lexical-a1-v1",
+        "query_instruction_configured" => semantic_available && !@query_instruction.empty?,
         "index_available" => index_available,
         "index_reason" => index_reason,
         "authority" => "approved_memory_context",
@@ -98,6 +111,8 @@ module SoulCore
         "limit" => wanted,
         "abstained" => selected.empty?,
         "retrieval_mode" => "lexical_fallback",
+        "ranking_profile" => "lexical-a1-v1",
+        "query_instruction_configured" => false,
         "index_available" => false,
         "index_reason" => reason,
         "authority" => "approved_memory_context",
@@ -126,19 +141,25 @@ module SoulCore
     def embed_query(text)
       return nil unless @embedding_client
 
-      vectors = @embedding_client.embed([text])
+      input = if @query_instruction.empty?
+                text
+              else
+                "Instruct: #{@query_instruction}\nQuery:#{text}"
+              end
+      vectors = @embedding_client.embed([input])
       vector = Array(vectors).fetch(0)
       vector
     end
 
     def rank(records, query_tokens, query_vector, limit)
+      weights = query_vector ? HYBRID_WEIGHTS : LEXICAL_WEIGHTS
       records.filter_map do |record|
         lexical = lexical_component(record.fetch("lexical_terms"), query_tokens)
         semantic = query_vector && record["embedding"] ? semantic_component(query_vector, record.fetch("embedding")) : 0.0
         confidence = [[Float(record.fetch("confidence")), 0.0].max, 1.0].min
         layer = LAYER_WEIGHTS.fetch(record.fetch("layer").to_s, 0.0)
-        score = (WEIGHTS["lexical"] * lexical) + (WEIGHTS["semantic"] * semantic) +
-          (WEIGHTS["confidence"] * confidence) + (WEIGHTS["layer"] * layer)
+        score = (weights["lexical"] * lexical) + (weights["semantic"] * semantic) +
+          (weights["confidence"] * confidence) + (weights["layer"] * layer)
         next unless score.positive?
 
         components = {
