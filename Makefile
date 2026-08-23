@@ -478,7 +478,7 @@ blender-curated-assets-check:
 verify-blender-curated-assets-a8:
 > @ruby scripts/verify-blender-curated-assets-a8.rb
 
-.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a6 verify-blender-scene-a7 verify-blender-scene-a8 verify-blender-scene-a1-a5 verify-blender-scene-a1-a6 verify-blender-scene-a1-a7 verify-blender-scene-a1-a8
+.PHONY: verify-blender-scene-a1 verify-blender-scene-a2 verify-blender-scene-a3 verify-blender-scene-a4 verify-blender-scene-a5 verify-blender-scene-a6 verify-blender-scene-a7 verify-blender-scene-a8 verify-blender-scene-a1-a5 verify-blender-scene-a1-a6 verify-blender-scene-a1-a7 verify-blender-scene-a1-a8 verify-blender-generated-asset-fidelity-a9
 verify-blender-scene-a1:
 > @ruby scripts/verify-blender-scene-a1.rb
 
@@ -513,6 +513,9 @@ verify-blender-scene-a8:
 > @ruby scripts/verify-blender-scene-a8.rb
 
 verify-blender-scene-a1-a8: verify-blender-scene-a1-a7 verify-blender-curated-assets-a8 verify-blender-scene-a8
+
+verify-blender-generated-asset-fidelity-a9:
+> @python3 scripts/verify-blender-generated-asset-fidelity-a9.py
 
 verify-music-publication-package:
 > @ruby scripts/verify-music-publication-package.rb
