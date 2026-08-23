@@ -138,6 +138,12 @@ help:
 > @echo "  make voice-presence-launch  Open visible persistent voice (close window to stop)"
 > @echo "  make verify-notification-cues  Verify static cues and Presence-aware spoken notices"
 > @echo "  make verify-project-timeline  Verify the shared Dashboard/Chat implementation ledger"
+> @echo "  make memory-retrieval-evaluate  Run the deterministic approved-memory retrieval corpus"
+> @echo "  make memory-retrieval-evaluate-live  Run the corpus against one configured loopback embedding model"
+> @echo "  make memory-retrieval-status  Inspect the disposable approved-memory index"
+> @echo "  make memory-retrieval-rebuild  Rebuild the index once in the foreground"
+> @echo "  make memory-retrieval-query MEMORY_QUERY='...'  Run one bounded diagnostic query"
+> @echo "  make verify-memory-retrieval-observatory  Verify retrieval, fallback, facade, and Dashboard boundaries"
 > @echo "  make clamav-check       Inspect the optional selective ClamAV runtime"
 > @echo "  make clamav-scan-downloads  Run one bounded foreground Downloads scan"
 > @echo "  make verify-clamav-bounded-scan  Verify limits, receipts, and fail-closed behavior"
@@ -899,6 +905,27 @@ verify-local-search:
 
 verify-knowledge-reflection:
 > @ruby scripts/verify-knowledge-reflection-a2.rb
+
+memory-retrieval-evaluate:
+> @ruby scripts/memory-retrieval-observatory.rb evaluate
+
+memory-retrieval-evaluate-live:
+> @ruby scripts/memory-retrieval-observatory.rb evaluate-live
+
+memory-retrieval-status:
+> @ruby scripts/memory-retrieval-observatory.rb status
+
+memory-retrieval-rebuild:
+> @ruby scripts/memory-retrieval-observatory.rb rebuild
+
+memory-retrieval-query:
+> @test -n "$(MEMORY_QUERY)" || { echo "MEMORY_QUERY is required."; exit 2; }
+> @ruby scripts/memory-retrieval-observatory.rb query "$(MEMORY_QUERY)"
+
+verify-memory-retrieval-observatory:
+> @ruby scripts/verify-memory-retrieval-observatory-a0-a1.rb
+> @ruby scripts/verify-memory-observatory-facade-a2.rb
+> @ruby scripts/verify-memory-observatory-dashboard-a2.rb
 
 verify-model-runtime-controls:
 > @ruby scripts/verify-model-runtime-portability.rb

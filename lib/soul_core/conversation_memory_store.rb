@@ -18,6 +18,7 @@ module SoulCore
     def initialize(
       root: Dir.pwd,
       path: nil,
+      create: true,
       clock: -> { Time.now },
       id_generator: -> { SecureRandom.hex(5) }
     )
@@ -26,8 +27,10 @@ module SoulCore
       @path = File.expand_path(resolved_path, @root)
       @clock = clock
       @id_generator = id_generator
-      FileUtils.mkdir_p(File.dirname(@path))
-      FileUtils.touch(@path)
+      if create
+        FileUtils.mkdir_p(File.dirname(@path))
+        FileUtils.touch(@path)
+      end
     end
 
     def propose(layer:, content:, source:, confidence:, chat_id: nil, tags: [], metadata: {})
@@ -170,6 +173,7 @@ module SoulCore
     def append_event(event)
       raise ArgumentError, "Unknown memory event" unless EVENTS.include?(event["event"].to_s)
 
+      FileUtils.mkdir_p(File.dirname(@path))
       File.open(@path, "a") do |file|
         file.flock(File::LOCK_EX)
         file.puts(JSON.generate(event))

@@ -118,6 +118,8 @@ module SoulCore
       "knowledge_vault.reflection.preview" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags],
       "knowledge_vault.reflection.execute" => %w[title body knowledge_kind evidence_status source_reference target_relative_path tags confirmation expected_digest],
       "local_search.search" => %w[query limit sources],
+      "memory.observatory.summary" => [],
+      "memory.observatory.query" => %w[query limit],
       "files.roots" => [],
       "files.list" => %w[root_id relative_path],
       "files.stat" => %w[root_id relative_path],
