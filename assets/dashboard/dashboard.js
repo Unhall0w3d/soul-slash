@@ -13,7 +13,8 @@ const TAB_LOCATIONS = Object.freeze({
   mix: "#mix-panel",
   maintenance: "#maintenance-panel",
   topology: "#local-topology-panel",
-  backup: "#backup-panel"
+  backup: "#backup-panel",
+  "memory-observatory": "#memory-observatory-panel"
 });
 const CORE_LABELS = Object.freeze({
   daily: "Soul Core",
@@ -39,6 +40,7 @@ Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTime
 Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, incidentNarrative: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
+Object.assign(state, { memoryObservatoryLoaded: false, memoryObservatorySummary: null, memoryObservatoryQueryBusy: false });
 state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
@@ -587,9 +589,10 @@ function switchTab(name, { updateLocation = true } = {}) {
   const maintenance = name === "maintenance";
   const topology = name === "topology";
   const backup = name === "backup";
+  const memoryObservatory = name === "memory-observatory";
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual || mix;
-  const administration = host || timeline || maintenance || topology || backup;
+  const administration = host || timeline || maintenance || topology || backup || memoryObservatory;
   byId("chat-panel").hidden = !chat;
   byId("host-stewardship-panel").hidden = !host;
   byId("timeline-panel").hidden = !timeline;
@@ -602,6 +605,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("maintenance-panel").hidden = !maintenance;
   byId("local-topology-panel").hidden = !topology;
   byId("backup-panel").hidden = !backup;
+  byId("memory-observatory-panel").hidden = !memoryObservatory;
   byId("chat-tab").classList.toggle("is-active", chat);
   byId("host-stewardship-tab").classList.toggle("is-active", host);
   byId("timeline-tab").classList.toggle("is-active", timeline);
@@ -616,6 +620,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("administration-tab").classList.toggle("is-active", administration);
   byId("maintenance-tab").classList.toggle("is-active", maintenance);
   byId("backup-tab").classList.toggle("is-active", backup);
+  byId("memory-observatory-tab").classList.toggle("is-active", memoryObservatory);
   byId("local-topology-tab").classList.toggle("is-active", topology);
   byId("chat-tab").setAttribute("aria-selected", String(chat));
   byId("host-stewardship-tab").setAttribute("aria-current", host ? "page" : "false");
@@ -635,6 +640,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("maintenance-tab").setAttribute("aria-current", maintenance ? "page" : "false");
   byId("local-topology-tab").setAttribute("aria-current", topology ? "page" : "false");
   byId("backup-tab").setAttribute("aria-current", backup ? "page" : "false");
+  byId("memory-observatory-tab").setAttribute("aria-current", memoryObservatory ? "page" : "false");
   setSelfImprovementMenu(false);
   setCreativeMenu(false);
   setAdministrationMenu(false);
@@ -656,6 +662,7 @@ function switchTab(name, { updateLocation = true } = {}) {
     loadMaintenanceRebootStatus();
   }
   if (backup && state.authenticated && !state.backupLoaded) loadBackupAdministration();
+  if (memoryObservatory && state.authenticated && !state.memoryObservatoryLoaded) loadMemoryObservatory();
   if (topology && state.authenticated && !state.maintenanceFleetLoaded) {
     loadMaintenanceFleetSnapshot({ statusId: "local-topology-status" });
   }
@@ -678,6 +685,175 @@ function setAdministrationMenu(open) {
   byId("administration-menu").hidden = !open;
   byId("administration-tab").setAttribute("aria-expanded", String(open));
   byId("administration-navigation").classList.toggle("is-open", open);
+}
+
+function observatoryText(value, fallback = "unavailable") {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : fallback;
+  return String(value).slice(0, 512);
+}
+
+function observatoryList(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).map(([label, count]) => ({ label, count }));
+}
+
+function observatoryEntries(value) {
+  return observatoryList(value).map((entry) => {
+    if (Array.isArray(entry)) return { label: entry[0], count: entry[1] };
+    if (entry && typeof entry === "object") return { label: entry.label ?? entry.name ?? entry.key ?? entry.id, count: entry.count ?? entry.total ?? entry.value ?? entry.number };
+    return { label: entry, count: "—" };
+  }).filter((entry) => entry.label !== undefined && entry.label !== null);
+}
+
+function renderObservatoryCountList(listId, totalId, value) {
+  const list = byId(listId); const entries = observatoryEntries(value);
+  list.replaceChildren();
+  let total = 0;
+  entries.forEach((entry) => {
+    const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
+    dt.textContent = observatoryText(entry.label); dd.textContent = observatoryText(entry.count, "0"); row.append(dt, dd); list.append(row);
+    const count = Number(entry.count); if (Number.isFinite(count)) total += count;
+  });
+  if (!entries.length) {
+    const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
+    dt.textContent = "No retained counts"; dd.textContent = "0"; row.append(dt, dd); list.append(row);
+  }
+  byId(totalId).textContent = String(total);
+}
+
+function observatoryDefinitionList(container, entries) {
+  container.replaceChildren();
+  const normalized = observatoryEntries(entries);
+  normalized.forEach((entry) => {
+    const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
+    dt.textContent = observatoryText(entry.label); dd.textContent = observatoryText(entry.count); row.append(dt, dd); container.append(row);
+  });
+  if (!normalized.length) {
+    const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd");
+    dt.textContent = "Evidence"; dd.textContent = "unavailable"; row.append(dt, dd); container.append(row);
+  }
+}
+
+function observatoryField(record, ...keys) {
+  if (!record || typeof record !== "object") return undefined;
+  for (const key of keys) if (record[key] !== undefined && record[key] !== null && record[key] !== "") return record[key];
+  return undefined;
+}
+
+function renderMemoryObservatoryIndex(index) {
+  const value = index && typeof index === "object" ? index : {};
+  const available = observatoryField(value, "available", "availability", "state");
+  const profile = observatoryField(value, "profile", "embedding_profile");
+  byId("memory-observatory-index-state").textContent = observatoryText(available, "unavailable");
+  observatoryDefinitionList(byId("memory-observatory-index-details"), [
+    { label: "Availability", count: observatoryField(value, "available", "availability", "state") },
+    { label: "Freshness", count: observatoryField(value, "freshness", "freshness_state", "fresh", "reason") },
+    { label: "Source digest", count: observatoryField(value, "source_digest", "digest") },
+    { label: "Embedding profile", count: typeof profile === "object" ? observatoryField(profile, "name", "id", "profile") || "configured" : profile },
+    { label: "Last rebuild", count: observatoryField(value, "last_rebuild_at", "rebuilt_at", "generated_at") },
+    { label: "Entries / dimensions", count: `${observatoryText(observatoryField(value, "entry_count", "entries", "count"), "0")} / ${observatoryText(observatoryField(value, "dimension", "dimensions"), "—")}` }
+  ]);
+}
+
+function observatoryRecordLine(record, fields) {
+  return fields.map(([label, keys]) => `${label}: ${observatoryText(observatoryField(record, ...keys), "—")}`).join(" · ");
+}
+
+function renderMemoryObservatoryEvents(events) {
+  const container = byId("memory-observatory-events"); const rows = Array.isArray(events) ? events.slice(0, 100) : [];
+  container.replaceChildren(); byId("memory-observatory-events-summary").textContent = `${rows.length} event${rows.length === 1 ? "" : "s"} shown`;
+  if (!rows.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No lifecycle events retained in this bounded snapshot."; container.append(empty); return; }
+  rows.forEach((record) => {
+    const item = document.createElement("article"); item.className = "memory-observatory-event";
+    const title = document.createElement("strong"); title.textContent = observatoryText(observatoryField(record, "event", "action", "operation", "type"), "lifecycle event");
+    const meta = document.createElement("span"); meta.textContent = observatoryRecordLine(record, [["Memory", ["memory_id", "id"]], ["State", ["state", "status"]], ["At", ["at", "created_at", "timestamp"]]]);
+    const detail = document.createElement("small"); detail.textContent = observatoryText(observatoryField(record, "reason", "summary", "description"), "Append-only evidence");
+    item.append(title, meta, detail); container.append(item);
+  });
+}
+
+function renderMemoryObservatoryRelationships(duplicates, supersessions) {
+  const container = byId("memory-observatory-relationships"); const duplicateRows = Array.isArray(duplicates) ? duplicates.slice(0, 100) : []; const supersessionRows = Array.isArray(supersessions) ? supersessions.slice(0, 100) : [];
+  container.replaceChildren(); byId("memory-observatory-relationships-summary").textContent = `${duplicateRows.length} duplicate · ${supersessionRows.length} supersession`;
+  if (!duplicateRows.length && !supersessionRows.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "No duplicate or supersession observations retained in this snapshot."; container.append(empty); return; }
+  duplicateRows.forEach((record) => {
+    const item = document.createElement("article"); item.className = "memory-observatory-event";
+    const title = document.createElement("strong"); title.textContent = "Possible exact-content duplicate";
+    const meta = document.createElement("span"); meta.textContent = observatoryText(observatoryField(record, "memory_ids", "ids", "record_ids", "content_digest"), "IDs withheld by response");
+    const detail = document.createElement("small"); detail.textContent = observatoryText(observatoryField(record, "summary", "reason", "content_digest"), "Observation only; no record was changed.");
+    item.append(title, meta, detail); container.append(item);
+  });
+  supersessionRows.forEach((record) => {
+    const item = document.createElement("article"); item.className = "memory-observatory-event";
+    const title = document.createElement("strong"); title.textContent = "Explicit supersession link";
+    const meta = document.createElement("span"); meta.textContent = observatoryRecordLine(record, [["Replaced", ["superseded_id", "old_id", "prior_id"]], ["Replacement", ["replacement_id", "new_id"]], ["At", ["at", "created_at", "timestamp"]]]);
+    const detail = document.createElement("small"); detail.textContent = observatoryText(observatoryField(record, "reason", "summary", "description"), "Append-only relationship; no mutation is available here.");
+    item.append(title, meta, detail); container.append(item);
+  });
+}
+
+function renderMemoryObservatoryGuidance(guidance) {
+  const container = byId("memory-observatory-review-guidance"); container.replaceChildren();
+  const rows = Array.isArray(guidance) ? guidance.slice(0, 20) : observatoryEntries(guidance);
+  if (!rows.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "Use Chat's existing reviewed memory commands; no command catalog was returned."; container.append(empty); return; }
+  rows.forEach((record) => { const item = document.createElement("div"); item.className = "memory-observatory-guidance-item"; item.textContent = typeof record === "object" ? observatoryText(observatoryField(record, "label", "command", "title", "name"), "Chat review command") : observatoryText(record); container.append(item); });
+}
+
+function renderMemoryObservatorySummary(data) {
+  const value = data && typeof data === "object" ? data : {};
+  const counts = value.counts && typeof value.counts === "object" ? value.counts : {};
+  renderObservatoryCountList("memory-observatory-state-counts", "memory-observatory-state-total", observatoryField(counts, "states", "status", "memory_states") || observatoryField(value, "states", "status_counts", "memory_states"));
+  renderObservatoryCountList("memory-observatory-layer-counts", "memory-observatory-layer-total", observatoryField(counts, "layers", "memory_layers") || observatoryField(value, "layers", "layer_counts"));
+  renderObservatoryCountList("memory-observatory-source-counts", "memory-observatory-source-total", observatoryField(counts, "sources", "memory_sources") || observatoryField(value, "sources", "source_counts"));
+  renderMemoryObservatoryIndex(observatoryField(value, "index", "index_availability", "retrieval_index", "approved_memory_index"));
+  renderMemoryObservatoryEvents(observatoryField(value, "lifecycle_events", "recent_lifecycle_events", "lifecycle", "events") || []);
+  renderMemoryObservatoryRelationships(observatoryField(value, "duplicates", "duplicate_observations") || [], observatoryField(value, "supersessions", "supersession_observations") || []);
+  renderMemoryObservatoryGuidance(observatoryField(value, "review_guidance", "chat_review_commands", "chat_commands", "guidance") || []);
+}
+
+async function loadMemoryObservatory() {
+  const status = byId("memory-observatory-status"); status.textContent = "Inspecting the bounded authenticated summary…";
+  try {
+    const envelope = await callSoul("memory.observatory.summary"); lifecycle(envelope);
+    if (envelope.lifecycle_state && envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Memory Observatory summary is unavailable");
+    state.memoryObservatorySummary = dataOf(envelope); state.memoryObservatoryLoaded = true; renderMemoryObservatorySummary(state.memoryObservatorySummary);
+    status.textContent = "Read-only summary refreshed. Mutation authority: none.";
+  } catch (error) { status.textContent = error.message || "Memory Observatory summary failed safely."; }
+}
+
+function renderMemoryObservatoryResults(data) {
+  const container = byId("memory-observatory-results"); const value = data && typeof data === "object" ? data : {}; const results = Array.isArray(value.results) ? value.results.slice(0, 20) : (Array.isArray(value.matches) ? value.matches.slice(0, 20) : []);
+  container.replaceChildren();
+  if (!results.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = observatoryText(observatoryField(value, "abstention_reason", "message", "reason"), "No approved memory matched this diagnostic query; retrieval abstained."); container.append(empty); return; }
+  results.forEach((record, index) => {
+    const item = document.createElement("article"); item.className = "memory-observatory-result";
+    const heading = document.createElement("div"); heading.className = "memory-observatory-result-heading";
+    const title = document.createElement("strong"); title.textContent = `Result ${index + 1} · ${observatoryText(observatoryField(record, "memory_id", "id"), "unknown memory")}`;
+    const score = document.createElement("span"); score.textContent = `score ${observatoryText(observatoryField(record, "final_score", "score"), "—")}`; heading.append(title, score);
+    const excerpt = document.createElement("p"); excerpt.textContent = observatoryText(observatoryField(record, "excerpt", "content", "text", "summary"), "No excerpt returned.");
+    const explanation = document.createElement("p"); explanation.className = "card-note"; explanation.textContent = observatoryText(observatoryField(record, "why_recalled"), "No recall explanation returned.");
+    const why = document.createElement("dl"); why.className = "memory-observatory-score-list";
+    const components = observatoryField(record, "score_components", "components") || {};
+    observatoryEntries(components).forEach((component) => { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = observatoryText(component.label); dd.textContent = observatoryText(component.count); row.append(dt, dd); why.append(row); });
+    if (!why.children.length) { const row = document.createElement("div"); const dt = document.createElement("dt"); const dd = document.createElement("dd"); dt.textContent = "Why recalled"; dd.textContent = "No component breakdown returned"; row.append(dt, dd); why.append(row); }
+    item.append(heading, excerpt, explanation, why); container.append(item);
+  });
+}
+
+async function queryMemoryObservatory(event) {
+  event.preventDefault(); if (state.memoryObservatoryQueryBusy) return;
+  const input = byId("memory-observatory-query"); const query = input.value.trim().slice(0, 200); const status = byId("memory-observatory-query-status");
+  if (!query) { status.textContent = "Enter a diagnostic query before inspecting recall."; input.focus(); return; }
+  state.memoryObservatoryQueryBusy = true; byId("memory-observatory-query-submit").disabled = true; status.textContent = "Running one explicit bounded diagnostic query…";
+  try {
+    const envelope = await callSoul("memory.observatory.query", { query, limit: 20 }); lifecycle(envelope);
+    if (envelope.lifecycle_state && envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Memory Observatory query is unavailable");
+    renderMemoryObservatoryResults(dataOf(envelope)); status.textContent = "Diagnostic evidence returned. No memory was changed.";
+  } catch (error) { status.textContent = error.message || "Memory Observatory query failed safely."; }
+  finally { state.memoryObservatoryQueryBusy = false; byId("memory-observatory-query-submit").disabled = false; }
 }
 
 const TIMELINE_HORIZONS = ["now", "next", "later", "backlog"];
@@ -6514,6 +6690,9 @@ byId("export-mix-handoff").addEventListener("click", exportMixHandoff);
 byId("maintenance-tab").addEventListener("click", () => switchTab("maintenance"));
 byId("local-topology-tab").addEventListener("click", () => switchTab("topology"));
 byId("backup-tab").addEventListener("click", () => switchTab("backup"));
+byId("memory-observatory-tab").addEventListener("click", () => switchTab("memory-observatory"));
+byId("refresh-memory-observatory").addEventListener("click", loadMemoryObservatory);
+byId("memory-observatory-query-form").addEventListener("submit", queryMemoryObservatory);
 byId("refresh-host-presence").addEventListener("click", () => loadHostStewardship({ refresh: true }));
 byId("refresh-software-steward").addEventListener("click", refreshSoftwareSteward);
 byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);

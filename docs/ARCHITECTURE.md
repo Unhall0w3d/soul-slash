@@ -281,6 +281,22 @@ those neutral defaults while directing every mutable write to private storage.
 
 Future durable memory must retain provenance, confidence, editability, and promotion status.
 
+An optional owner-private approved-memory index is disposable derived state,
+not another authority. It is bound to the current approved-ledger digest,
+embedding profile, vector dimensions, and payload digest. One explicit bounded
+foreground rebuild atomically replaces it. Missing, stale, malformed,
+symlinked, or incompatible state fails closed to the existing approved-only
+lexical path. Administration's Memory Observatory projects bounded lifecycle,
+relationship, freshness, and diagnostic-ranking evidence without providing a
+write operation. Local embeddings are loopback-only and cannot start a runtime,
+download a model, switch a Core, or promote memory.
+
+Ordinary Chat consumes semantic retrieval through a narrow adapter. Only a
+fresh compatible hybrid result can nominate record IDs, and each ID is re-read
+from the canonical ledger in its current approved state. The adapter preserves
+always-include and same-chat context and returns the original lexical result
+unchanged for every unavailable, stale, fallback, or failed path.
+
 ### Optional external knowledge surface
 
 `SOUL_KNOWLEDGE_VAULT_PATH` may point to an external directory of ordinary

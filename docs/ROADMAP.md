@@ -26,6 +26,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] read-only motion qualification ledger over retained runtime receipts and human reviews
 - [x] shared owner-local Project Timeline with explicit Dashboard and Chat edits
 - [x] curated read-only Invocation Guide across Dashboard and Chat
+- [~] Memory Retrieval and Observatory A0–A2: deterministic hybrid-recall
+  evaluation, disposable approved-only index mechanics, fail-closed lexical
+  fallback, and a read-only Administration surface are candidate-complete;
+  production embedding-profile and ordinary Chat-context adoption remain
+  Operator qualification decisions
 
 ## Near-term refinement
 
@@ -143,7 +148,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [x] project-aware and local-document lexical search A2 is accepted after
   matched 15/15 Qwen and Gemma evaluation; broader roots and vector retrieval
   remain separately qualified
-- [ ] optional vector retrieval where it improves evidence without becoming an opaque memory authority
+- [~] optional semantic memory retrieval has bounded explainable A0-A3 mechanics
+  and fail-safe ordinary Chat admission; live local profile comparison and
+  runtime-lifecycle qualification remain open
 - [x] bounded cleanup A3 is accepted for allowlisted old temporary residue, old
   regular project logs, and failed partial Music quarantine only; broader
   lifecycle-owned or capacity-bounded cleanup remains unavailable

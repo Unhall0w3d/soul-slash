@@ -11,6 +11,11 @@ require_relative "chat_store"
 require_relative "configuration_resolver"
 require_relative "knowledge_vault_service"
 require_relative "local_search_service"
+require_relative "conversation_memory_store"
+require_relative "memory_retrieval_index"
+require_relative "memory_retrieval_service"
+require_relative "memory_observatory_service"
+require_relative "semantic_conversation_memory_context"
 require_relative "file_inspection_service"
 require_relative "network_diagnostic_service"
 require_relative "repository_inspection_service"
@@ -161,6 +166,10 @@ module SoulCore
       blender_scene_service: nil,
       knowledge_vault_service: nil,
       local_search_service: nil,
+      memory_observatory_service: nil,
+      memory_retrieval_service: nil,
+      memory_retrieval_index_service: nil,
+      conversation_memory_store: nil,
       file_inspection_service: nil,
       network_diagnostic_service: nil,
       repository_inspection_service: nil,
@@ -236,6 +245,10 @@ module SoulCore
       @blender_scene_service = blender_scene_service
       @knowledge_vault_service = knowledge_vault_service
       @local_search_service = local_search_service
+      @memory_observatory_service = memory_observatory_service
+      @memory_retrieval_service = memory_retrieval_service
+      @memory_retrieval_index_service = memory_retrieval_index_service
+      @conversation_memory_store = conversation_memory_store
       @file_inspection_service = file_inspection_service
       @network_diagnostic_service = network_diagnostic_service
       @repository_inspection_service = repository_inspection_service
@@ -409,6 +422,8 @@ module SoulCore
           limit: parameters["limit"],
           sources: parameters["sources"]
         ))
+      when "memory.observatory.summary" then domain(memory_observatory.summary)
+      when "memory.observatory.query" then domain(memory_observatory.query(query: required(parameters, "query"), limit: parameters["limit"]))
       when "files.roots" then domain(file_inspection.roots)
       when "files.list" then domain(file_inspection.list(root_id: required(parameters, "root_id"), relative_path: parameters["relative_path"] || "."))
       when "files.stat" then domain(file_inspection.stat(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path")))
@@ -889,6 +904,7 @@ module SoulCore
       report, resolver = resolved_configuration
       raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
       @conversation_runtime ||= ConversationRuntime.new(root: @root, store: chat_store, env: resolver.effective_environment,
+        memory_store: semantic_conversation_memory_context,
         creative_workflow_service: conversation_creative_workflow,
         core_workflow_service: conversation_core_workflow,
         maintenance_workflow_service: conversation_maintenance_workflow,
@@ -1042,6 +1058,66 @@ module SoulCore
         root: @root,
         process_env: resolver.effective_environment
       )
+    end
+
+    def memory_observatory
+      @memory_observatory_service ||= MemoryObservatoryService.new(
+        memory_store: conversation_memory,
+        index_service: memory_retrieval_index,
+        retrieval_service: memory_retrieval
+      )
+    end
+
+    def memory_retrieval
+      @memory_retrieval_service ||= ApprovedMemoryRetrievalService.new(
+        memory_store: conversation_memory,
+        index_service: memory_retrieval_index,
+        embedding_client: memory_embedding_client,
+        clock: @clock
+      )
+    end
+
+    def memory_retrieval_index
+      memory_paths = MemoryPaths.new(root: @root)
+      @memory_retrieval_index_service ||= ApprovedMemoryIndexService.new(
+        memory_store: conversation_memory,
+        index_path: memory_paths.write_path("derived/approved-memory-index.json"),
+        allowed_root: memory_paths.private_root,
+        embedding_client: memory_embedding_client,
+        clock: @clock
+      )
+    end
+
+    def conversation_memory
+      @conversation_memory_store ||= ConversationMemoryStore.new(root: @root, create: false, clock: @clock)
+    end
+
+    def semantic_conversation_memory_context
+      @semantic_conversation_memory_context ||= SemanticConversationMemoryContext.new(
+        memory_store: conversation_memory,
+        retrieval_service: memory_retrieval
+      )
+    end
+
+    def memory_embedding_client
+      return @memory_embedding_client if defined?(@memory_embedding_client)
+
+      endpoint = @process_env["SOUL_MEMORY_EMBEDDING_ENDPOINT"].to_s.strip
+      profile = @process_env["SOUL_MEMORY_EMBEDDING_PROFILE"].to_s.strip
+      dimensions = @process_env["SOUL_MEMORY_EMBEDDING_DIMENSIONS"].to_s.strip
+      configured = [endpoint, profile, dimensions]
+      raise RuntimeError, "memory embedding configuration is incomplete" if configured.any?(&:empty?) && !configured.all?(&:empty?)
+      @memory_embedding_client = if configured.all?(&:empty?)
+                                   nil
+                                 else
+                                   LocalLoopbackEmbeddingClient.new(
+                                     endpoint: endpoint,
+                                     profile: { "name" => profile, "dimensions" => Integer(dimensions) },
+                                     protocol: @process_env.fetch("SOUL_MEMORY_EMBEDDING_PROTOCOL", "ollama")
+                                   )
+                                 end
+    rescue ArgumentError => error
+      raise RuntimeError, "memory embedding configuration is invalid: #{error.message}"
     end
 
     def skill_studio

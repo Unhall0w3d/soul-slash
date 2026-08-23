@@ -254,8 +254,10 @@ module SoulCore
         "memory" => {
           "record_ids" => memory.fetch("record_ids", []),
           "layers" => memory.fetch("layers", []),
-          "count" => memory.fetch("count", 0)
-        },
+          "count" => memory.fetch("count", 0),
+          "retrieval_mode" => memory["retrieval_mode"],
+          "semantic_record_ids" => memory.fetch("semantic_record_ids", [])
+        }.reject { |_key, value| value.nil? },
         "total_message_count" => all_messages.length,
         "included_message_count" => trimmed.count { |message| message["role"] != "system" },
         "truncated_message_count" => all_messages.length - trimmed.count { |message| message["role"] != "system" },

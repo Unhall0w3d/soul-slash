@@ -71,6 +71,7 @@
           <button id="timeline-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="timeline-panel"><strong>Project Timeline</strong><span>Implementation state, priorities, deferred work, and completed inventory</span></button>
           <button id="local-topology-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="local-topology-panel"><strong>Local Topology</strong><span>Read-only network topology evidence and route links</span></button>
           <button id="backup-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="backup-panel"><strong>Backup &amp; Recovery</strong><span>Verified snapshots, deletion holds, retention, and staged restore</span></button>
+          <button id="memory-observatory-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="memory-observatory-panel"><strong>Memory Observatory</strong><span>Approved-memory retrieval evidence, freshness, and review guidance</span></button>
           <button id="maintenance-tab" class="self-improvement-menu-item" type="button" role="menuitem" aria-controls="maintenance-panel"><strong>Guided Maintenance</strong><span>Update, reboot, and workspace-restore planning</span></button>
         </div>
       </div>
@@ -750,6 +751,48 @@
       </div>
       <section class="improvement-card augmentation-draft" aria-labelledby="augmentation-draft-heading"><div><p class="eyebrow">Proposal gate</p><h2 id="augmentation-draft-heading">Describe a core-system change</h2><p class="card-note">A skill performs a bounded capability. Use this surface only when the architecture itself must change.</p></div><label for="augmentation-objective">Objective</label><textarea id="augmentation-objective" rows="4" maxlength="1000" placeholder="Describe the architectural capability or limitation to change…"></textarea><label for="augmentation-why-not-skill">Why this cannot be a bounded skill</label><textarea id="augmentation-why-not-skill" rows="4" maxlength="1000" placeholder="Explain why shared orchestration, contracts, or core infrastructure must change…"></textarea><button id="preview-augmentation-proposal" class="gate-button" type="button">Preview proposal packet</button><div id="augmentation-proposal-preview" class="gate-card" hidden><div id="augmentation-proposal-preview-details" class="recommendation-list"></div><label for="augmentation-confirmation">Type <code>CREATE_SELF_AUGMENTATION_PROPOSAL</code></label><input id="augmentation-confirmation" type="text" autocomplete="off" spellcheck="false"><button id="create-augmentation-proposal" class="gate-button gate-button--gold" type="button" disabled>Create review packet</button></div><p id="augmentation-status" class="dialog-status" role="status"></p></section>
       <aside class="unavailable-boundary"><div><p class="eyebrow">Augmentation boundary</p><h2>Implementation and integration remain external</h2></div><p>Gate A1 may create one detached worktree and handoff; Gate A2 may approve one exact committed candidate for consideration. Soul never invokes Codex, creates a branch, merges, pushes, deploys, or force-removes a dirty worktree.</p></aside>
+    </section>
+
+    <section id="memory-observatory-panel" class="tab-panel memory-observatory-panel" role="tabpanel" aria-labelledby="administration-tab memory-observatory-tab" hidden>
+      <header class="improvement-header memory-observatory-header">
+        <div><p class="eyebrow">Owner-private retrieval evidence</p><h1>Memory Observatory</h1><p>Inspect the approved-memory ledger and its disposable retrieval index. This surface observes only; existing reviewed Chat controls remain the sole memory mutation path.</p></div>
+        <div class="improvement-boundary"><strong>Read-only observatory</strong><span>Authenticated summary → explicit diagnostic query</span><small>Mutation authority: none · no polling · no automatic indexing</small></div>
+      </header>
+      <section class="memory-observatory-toolbar" aria-labelledby="memory-observatory-status-heading">
+        <div><p class="eyebrow">Bounded snapshot</p><h2 id="memory-observatory-status-heading">Ledger and index status</h2><p id="memory-observatory-status" class="dialog-status" role="status" aria-live="polite">Open this surface to inspect the latest retained evidence.</p></div>
+        <button id="refresh-memory-observatory" class="quiet-button" type="button">Refresh evidence</button>
+      </section>
+      <div class="memory-observatory-summary-grid" aria-label="Memory counts">
+        <section class="memory-observatory-card"><div class="card-heading"><div><p class="eyebrow">Ledger state</p><h2>Memory states</h2></div><span id="memory-observatory-state-total" class="count-badge">—</span></div><dl id="memory-observatory-state-counts" class="memory-observatory-count-list"><div><dt>Not loaded</dt><dd>—</dd></div></dl></section>
+        <section class="memory-observatory-card"><div class="card-heading"><div><p class="eyebrow">Layer distribution</p><h2>Memory layers</h2></div><span id="memory-observatory-layer-total" class="count-badge">—</span></div><dl id="memory-observatory-layer-counts" class="memory-observatory-count-list"><div><dt>Not loaded</dt><dd>—</dd></div></dl></section>
+        <section class="memory-observatory-card"><div class="card-heading"><div><p class="eyebrow">Provenance</p><h2>Memory sources</h2></div><span id="memory-observatory-source-total" class="count-badge">—</span></div><dl id="memory-observatory-source-counts" class="memory-observatory-count-list"><div><dt>Not loaded</dt><dd>—</dd></div></dl></section>
+      </div>
+      <section class="memory-observatory-card memory-observatory-index-card" aria-labelledby="memory-observatory-index-heading">
+        <div class="card-heading"><div><p class="eyebrow">Disposable derived state</p><h2 id="memory-observatory-index-heading">Approved-memory index</h2></div><span id="memory-observatory-index-state" class="count-badge">Not loaded</span></div>
+        <dl id="memory-observatory-index-details" class="memory-observatory-details"><div><dt>Availability</dt><dd>Not loaded</dd></div></dl>
+        <p class="card-note">The index is rebuildable evidence, never a second memory authority. Missing, stale, malformed, or profile-mismatched state must fall back to approved-only lexical retrieval.</p>
+      </section>
+      <div class="memory-observatory-columns">
+        <details class="memory-observatory-card memory-observatory-disclosure" open>
+          <summary><span><span class="eyebrow">Append-only history</span><strong>Recent lifecycle events</strong></span><small id="memory-observatory-events-summary">No events loaded.</small></summary>
+          <div id="memory-observatory-events" class="memory-observatory-event-list"><p class="muted">No lifecycle events loaded.</p></div>
+        </details>
+        <details class="memory-observatory-card memory-observatory-disclosure" open>
+          <summary><span><span class="eyebrow">Ledger relationships</span><strong>Duplicates and supersession</strong></span><small id="memory-observatory-relationships-summary">No observations loaded.</small></summary>
+          <div id="memory-observatory-relationships" class="memory-observatory-event-list"><p class="muted">No duplicate or supersession observations loaded.</p></div>
+        </details>
+      </div>
+      <section class="memory-observatory-card memory-observatory-query-card" aria-labelledby="memory-observatory-query-heading">
+        <div class="card-heading"><div><p class="eyebrow">Explicit diagnostic query</p><h2 id="memory-observatory-query-heading">Why was this memory recalled?</h2></div><span class="count-badge">read only</span></div>
+        <p class="card-note">Enter one bounded diagnostic question and submit deliberately. Results are context evidence, not approval, truth, authorization, or a write operation.</p>
+        <form id="memory-observatory-query-form" class="memory-observatory-query-form">
+          <label for="memory-observatory-query">Diagnostic query<input id="memory-observatory-query" name="query" type="search" maxlength="200" autocomplete="off" placeholder="e.g. What are my approved retrieval preferences?" required></label>
+          <button id="memory-observatory-query-submit" class="gate-button" type="submit">Inspect recall</button>
+        </form>
+        <p id="memory-observatory-query-status" class="dialog-status" role="status" aria-live="polite">No diagnostic query submitted.</p>
+        <div id="memory-observatory-results" class="memory-observatory-results"><p class="muted">Results appear after an explicit query.</p></div>
+      </section>
+      <aside class="unavailable-boundary memory-observatory-guidance"><div><p class="eyebrow">Reviewed Chat path</p><h2>Review memory in Chat</h2></div><p>Use the existing Chat memory review commands to inspect, propose, approve, supersede, or forget records. Observatory search and refresh never replace those confirmation gates.</p><div id="memory-observatory-review-guidance" class="memory-observatory-guidance-list"><p class="muted">Existing Chat review guidance will appear with the authenticated summary.</p></div></aside>
     </section>
 
     <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
