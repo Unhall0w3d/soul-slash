@@ -767,11 +767,39 @@
         <section class="memory-observatory-card"><div class="card-heading"><div><p class="eyebrow">Layer distribution</p><h2>Memory layers</h2></div><span id="memory-observatory-layer-total" class="count-badge">—</span></div><dl id="memory-observatory-layer-counts" class="memory-observatory-count-list"><div><dt>Not loaded</dt><dd>—</dd></div></dl></section>
         <section class="memory-observatory-card"><div class="card-heading"><div><p class="eyebrow">Provenance</p><h2>Memory sources</h2></div><span id="memory-observatory-source-total" class="count-badge">—</span></div><dl id="memory-observatory-source-counts" class="memory-observatory-count-list"><div><dt>Not loaded</dt><dd>—</dd></div></dl></section>
       </div>
+      <section class="memory-observatory-card memory-constellation-card" aria-labelledby="memory-constellation-heading">
+        <div class="card-heading"><div><p class="eyebrow">Privacy-safe relationship map</p><h2 id="memory-constellation-heading">Memory constellation</h2></div><span id="memory-constellation-state" class="count-badge">Not loaded</span></div>
+        <div class="memory-constellation-toolbar" role="group" aria-label="Memory visualization layout"><button id="memory-constellation-layout" class="quiet-button is-active" type="button">Constellation</button><button id="memory-lifecycle-layout" class="quiet-button" type="button">Lifecycle</button></div>
+        <div class="memory-constellation-stage">
+          <svg id="memory-constellation" viewBox="0 0 1200 520" role="img" aria-labelledby="memory-constellation-heading memory-constellation-description"></svg>
+          <p id="memory-constellation-description" class="sr-only">A read-only map of bounded memory identifiers, lifecycle states, layers, provenance kinds, and explicit ledger relationships.</p>
+          <div id="memory-constellation-inspector" class="memory-constellation-inspector" aria-live="polite">Select a node to inspect privacy-safe metadata.</div>
+        </div>
+        <div class="memory-constellation-legend" aria-label="Memory lifecycle legend"><span data-state="approved">Approved</span><span data-state="candidate">Candidate</span><span data-state="superseded">Superseded</span><span data-state="deleted">Deleted</span><span data-state="other">Other</span></div>
+        <p class="card-note">Positions are deterministic presentation only. Lines represent exact duplicates or explicit supersession—not inferred truth, semantic similarity, or authority.</p>
+      </section>
       <section class="memory-observatory-card memory-observatory-index-card" aria-labelledby="memory-observatory-index-heading">
         <div class="card-heading"><div><p class="eyebrow">Disposable derived state</p><h2 id="memory-observatory-index-heading">Approved-memory index</h2></div><span id="memory-observatory-index-state" class="count-badge">Not loaded</span></div>
         <dl id="memory-observatory-index-details" class="memory-observatory-details"><div><dt>Availability</dt><dd>Not loaded</dd></div></dl>
         <p class="card-note">The index is rebuildable evidence, never a second memory authority. Missing, stale, malformed, or profile-mismatched state must fall back to approved-only lexical retrieval.</p>
       </section>
+      <div class="memory-observatory-columns">
+        <section class="memory-observatory-card" aria-labelledby="memory-observatory-runtime-heading">
+          <div class="card-heading"><div><p class="eyebrow">Foreground lifecycle evidence</p><h2 id="memory-observatory-runtime-heading">Embedding runtime</h2></div><span id="memory-observatory-runtime-state" class="count-badge">Not inspected</span></div>
+          <p class="card-note">Reads bounded loopback Ollama inventory only. This action cannot load a model, change Cores, or invoke a service manager.</p>
+          <button id="refresh-memory-observatory-runtime" class="quiet-button" type="button">Refresh runtime evidence</button>
+          <dl id="memory-observatory-runtime-details" class="memory-observatory-details"><div><dt>Evidence</dt><dd>Not requested</dd></div></dl>
+          <p id="memory-observatory-runtime-status" class="dialog-status" role="status" aria-live="polite">Core coexistence remains unqualified until inspected and reviewed.</p>
+        </section>
+        <section class="memory-observatory-card" aria-labelledby="memory-observatory-private-review-heading">
+          <div class="card-heading"><div><p class="eyebrow">Owner-supervised qualification</p><h2 id="memory-observatory-private-review-heading">Private retrieval review</h2></div><span id="memory-observatory-private-review-state" class="count-badge">Not run</span></div>
+          <p class="card-note">Runs the fixed owner-private review set once in the foreground. Results expose digests, memory IDs, and metrics—not queries or memory content.</p>
+          <button id="run-memory-observatory-private-review" class="gate-button" type="button">Run supervised private review</button>
+          <dl id="memory-observatory-private-review-summary" class="memory-observatory-details"><div><dt>Evidence</dt><dd>Not requested</dd></div></dl>
+          <div id="memory-observatory-private-review-results" class="memory-observatory-event-list"><p class="muted">No owner-private review has run in this session.</p></div>
+          <p id="memory-observatory-private-review-status" class="dialog-status" role="status" aria-live="polite">No memory mutation or automatic winner selection is available.</p>
+        </section>
+      </div>
       <div class="memory-observatory-columns">
         <details class="memory-observatory-card memory-observatory-disclosure" open>
           <summary><span><span class="eyebrow">Append-only history</span><strong>Recent lifecycle events</strong></span><small id="memory-observatory-events-summary">No events loaded.</small></summary>

@@ -40,7 +40,7 @@ Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTime
 Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, incidentNarrative: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
-Object.assign(state, { memoryObservatoryLoaded: false, memoryObservatorySummary: null, memoryObservatoryQueryBusy: false });
+Object.assign(state, { memoryObservatoryLoaded: false, memoryObservatorySummary: null, memoryObservatoryQueryBusy: false, memoryObservatoryRuntimeBusy: false, memoryObservatoryPrivateReviewBusy: false, memoryObservatoryVisualizationMode: "constellation" });
 state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
@@ -802,6 +802,48 @@ function renderMemoryObservatoryGuidance(guidance) {
   rows.forEach((record) => { const item = document.createElement("div"); item.className = "memory-observatory-guidance-item"; item.textContent = typeof record === "object" ? observatoryText(observatoryField(record, "label", "command", "title", "name"), "Chat review command") : observatoryText(record); container.append(item); });
 }
 
+function memoryHash(value) {
+  let hash = 2166136261;
+  for (const character of String(value)) { hash ^= character.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  return hash >>> 0;
+}
+
+function memoryNodePosition(node, index, nodes, mode) {
+  if (mode === "lifecycle") {
+    const times = nodes.map((item) => Date.parse(item.created_at)).filter(Number.isFinite);
+    const timestamp = Date.parse(node.created_at); const minimum = times.length ? Math.min(...times) : 0; const maximum = times.length ? Math.max(...times) : 1;
+    const states = ["candidate", "approved", "superseded", "deleted"]; const lane = Math.max(0, states.indexOf(node.state));
+    return { x: 80 + (Number.isFinite(timestamp) ? ((timestamp - minimum) / Math.max(1, maximum - minimum)) * 1040 : (index / Math.max(1, nodes.length - 1)) * 1040), y: 100 + lane * 105 + (memoryHash(node.id) % 35) };
+  }
+  const layers = [...new Set(nodes.map((item) => item.layer || "unspecified"))].sort(); const layerIndex = Math.max(0, layers.indexOf(node.layer || "unspecified"));
+  const angle = ((memoryHash(node.id) % 3600) / 3600) * Math.PI * 2; const radius = 34 + (memoryHash(`${node.id}:radius`) % 135);
+  const centerX = ((layerIndex + 1) / (layers.length + 1)) * 1200; const centerY = 260 + ((layerIndex % 2) ? 34 : -34);
+  return { x: Math.max(35, Math.min(1165, centerX + Math.cos(angle) * radius)), y: Math.max(35, Math.min(485, centerY + Math.sin(angle) * radius)) };
+}
+
+function renderMemoryConstellation(data) {
+  const value = data && typeof data === "object" ? data : {}; const nodes = Array.isArray(value.nodes) ? value.nodes.slice(0, 240) : []; const edges = Array.isArray(value.edges) ? value.edges.slice(0, 400) : [];
+  const svg = byId("memory-constellation"); svg.replaceChildren(); const positions = new Map(); const namespace = "http://www.w3.org/2000/svg";
+  nodes.forEach((node, index) => positions.set(node.id, memoryNodePosition(node, index, nodes, state.memoryObservatoryVisualizationMode)));
+  edges.forEach((edge) => { const source = positions.get(edge.source); const target = positions.get(edge.target); if (!source || !target) return; const line = document.createElementNS(namespace, "line"); line.setAttribute("x1", source.x); line.setAttribute("y1", source.y); line.setAttribute("x2", target.x); line.setAttribute("y2", target.y); line.setAttribute("class", `memory-constellation-edge memory-constellation-edge--${edge.relation || "related"}`); svg.append(line); });
+  nodes.forEach((node) => {
+    const position = positions.get(node.id); const group = document.createElementNS(namespace, "g"); group.setAttribute("class", "memory-constellation-node"); group.setAttribute("tabindex", "0"); group.setAttribute("role", "button"); group.setAttribute("aria-label", `${node.id}, ${node.state || "unknown"}, ${node.layer || "unspecified"}`);
+    const halo = document.createElementNS(namespace, "circle"); halo.setAttribute("cx", position.x); halo.setAttribute("cy", position.y); halo.setAttribute("r", "10"); halo.setAttribute("class", `memory-constellation-halo memory-constellation-halo--${node.state || "other"}`);
+    const circle = document.createElementNS(namespace, "circle"); circle.setAttribute("cx", position.x); circle.setAttribute("cy", position.y); circle.setAttribute("r", node.state === "approved" ? "4.8" : "4"); circle.setAttribute("class", `memory-constellation-dot memory-constellation-dot--${node.state || "other"}`);
+    const inspect = () => { byId("memory-constellation-inspector").textContent = `${node.id} · ${node.state || "unspecified"} · ${node.layer || "unspecified layer"} · ${node.source_kind || "unspecified source"} · ${node.created_at || "time unavailable"}`; };
+    group.addEventListener("mouseenter", inspect); group.addEventListener("focus", inspect); group.addEventListener("click", inspect); group.append(halo, circle); svg.append(group);
+  });
+  byId("memory-constellation-state").textContent = `${nodes.length} nodes · ${edges.length} links${value.truncated ? " · bounded" : ""}`;
+  if (!nodes.length) { const empty = document.createElementNS(namespace, "text"); empty.setAttribute("x", "600"); empty.setAttribute("y", "260"); empty.setAttribute("text-anchor", "middle"); empty.setAttribute("class", "memory-constellation-empty"); empty.textContent = "No bounded memory metadata is available."; svg.append(empty); }
+}
+
+function setMemoryVisualizationMode(mode) {
+  state.memoryObservatoryVisualizationMode = mode === "lifecycle" ? "lifecycle" : "constellation";
+  byId("memory-constellation-layout").classList.toggle("is-active", state.memoryObservatoryVisualizationMode === "constellation");
+  byId("memory-lifecycle-layout").classList.toggle("is-active", state.memoryObservatoryVisualizationMode === "lifecycle");
+  renderMemoryConstellation(state.memoryObservatorySummary?.visualization || {});
+}
+
 function renderMemoryObservatorySummary(data) {
   const value = data && typeof data === "object" ? data : {};
   const counts = value.counts && typeof value.counts === "object" ? value.counts : {};
@@ -811,6 +853,7 @@ function renderMemoryObservatorySummary(data) {
   renderMemoryObservatoryIndex(observatoryField(value, "index", "index_availability", "retrieval_index", "approved_memory_index"));
   renderMemoryObservatoryEvents(observatoryField(value, "lifecycle_events", "recent_lifecycle_events", "lifecycle", "events") || []);
   renderMemoryObservatoryRelationships(observatoryField(value, "duplicates", "duplicate_observations") || [], observatoryField(value, "supersessions", "supersession_observations") || []);
+  renderMemoryConstellation(observatoryField(value, "visualization", "constellation", "memory_graph") || {});
   renderMemoryObservatoryGuidance(observatoryField(value, "review_guidance", "chat_review_commands", "chat_commands", "guidance") || []);
 }
 
@@ -854,6 +897,61 @@ async function queryMemoryObservatory(event) {
     renderMemoryObservatoryResults(dataOf(envelope)); status.textContent = "Diagnostic evidence returned. No memory was changed.";
   } catch (error) { status.textContent = error.message || "Memory Observatory query failed safely."; }
   finally { state.memoryObservatoryQueryBusy = false; byId("memory-observatory-query-submit").disabled = false; }
+}
+
+function renderMemoryRuntimeEvidence(data) {
+  const value = data && typeof data === "object" ? data : {};
+  const core = value.selected_core && typeof value.selected_core === "object" ? value.selected_core : {};
+  const profile = value.embedding_profile && typeof value.embedding_profile === "object" ? value.embedding_profile : {};
+  const badge = byId("memory-observatory-runtime-state");
+  const disposition = observatoryText(observatoryField(value, "compatibility", "disposition", "state"), "unavailable");
+  badge.textContent = disposition.replaceAll("_", " ");
+  const details = byId("memory-observatory-runtime-details"); details.replaceChildren();
+  const rows = [
+    ["Core", observatoryField(core, "label", "id")],
+    ["Profile", observatoryField(profile, "name")],
+    ["Dimensions", observatoryField(value, "dimensions")],
+    ["Endpoint", observatoryField(value, "endpoint_reachability", "endpoint_reachable")],
+    ["Installed", observatoryField(value, "model_installed", "installed")],
+    ["Loaded", observatoryField(value, "model_loaded", "loaded")]
+  ];
+  rows.forEach(([labelText, raw]) => { const row = document.createElement("div"); const label = document.createElement("dt"); const result = document.createElement("dd"); label.textContent = labelText; result.textContent = observatoryText(raw, "—"); row.append(label, result); details.append(row); });
+}
+
+async function refreshMemoryRuntimeEvidence() {
+  if (state.memoryObservatoryRuntimeBusy) return;
+  state.memoryObservatoryRuntimeBusy = true; const button = byId("refresh-memory-observatory-runtime"); const status = byId("memory-observatory-runtime-status"); button.disabled = true;
+  status.textContent = "Inspecting configured loopback runtime evidence without loading a model…";
+  try {
+    const envelope = await callSoul("memory.observatory.runtime"); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.message || "Runtime evidence is unavailable");
+    const data = dataOf(envelope); renderMemoryRuntimeEvidence(data); status.textContent = observatoryText(data.review_guidance, "Runtime evidence refreshed; coexistence still requires human review.");
+  } catch (error) { byId("memory-observatory-runtime-state").textContent = "Unavailable"; status.textContent = error.message || "Runtime inspection failed safely."; }
+  finally { state.memoryObservatoryRuntimeBusy = false; button.disabled = false; }
+}
+
+function renderMemoryPrivateReview(data) {
+  const value = data && typeof data === "object" ? data : {}; const aggregate = value.aggregate || value.metrics || {};
+  byId("memory-observatory-private-review-state").textContent = `${Number(value.case_count || value.cases?.length || 0)} cases`;
+  const summary = byId("memory-observatory-private-review-summary"); summary.replaceChildren();
+  [["Case digest", value.case_file_digest], ["Source digest", value.approved_memory_source_digest], ["Recall", aggregate.recall], ["MRR", aggregate.reciprocal_rank || aggregate.mrr], ["Forbidden hits", aggregate.forbidden_hit_count], ["Abstentions", aggregate.abstention_count]].forEach(([labelText, raw]) => {
+    const row = document.createElement("div"); const label = document.createElement("dt"); const result = document.createElement("dd"); label.textContent = labelText; result.textContent = observatoryText(raw, "—"); row.append(label, result); summary.append(row);
+  });
+  const target = byId("memory-observatory-private-review-results"); target.replaceChildren(); const cases = Array.isArray(value.cases) ? value.cases.slice(0, 32) : [];
+  if (!cases.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "The bounded review returned no case evidence."; target.append(empty); return; }
+  cases.forEach((record) => { const item = document.createElement("article"); item.className = "memory-observatory-event"; const title = document.createElement("strong"); title.textContent = observatoryText(record.case_id, "review case"); const meta = document.createElement("span"); meta.textContent = `hit ${observatoryText(record.hit, "—")} · reciprocal rank ${observatoryText(record.reciprocal_rank, "—")} · abstained ${observatoryText(record.abstained, "—")}`; const detail = document.createElement("small"); detail.textContent = `query ${observatoryText(record.query_sha256, "—")} · returned IDs ${Array.isArray(record.returned_memory_ids) ? record.returned_memory_ids.join(", ") : "none"}`; item.append(title, meta, detail); target.append(item); });
+}
+
+async function runMemoryPrivateReview() {
+  if (state.memoryObservatoryPrivateReviewBusy) return;
+  state.memoryObservatoryPrivateReviewBusy = true; const button = byId("run-memory-observatory-private-review"); const status = byId("memory-observatory-private-review-status"); button.disabled = true;
+  status.textContent = "Running the fixed owner-private review set in the foreground…";
+  try {
+    const envelope = await callSoul("memory.observatory.private_review"); lifecycle(envelope);
+    if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || envelope.message || "Private review stopped safely");
+    renderMemoryPrivateReview(dataOf(envelope)); status.textContent = "Supervised evidence returned. Queries and memory content were withheld; no memory changed.";
+  } catch (error) { byId("memory-observatory-private-review-state").textContent = "Unavailable"; status.textContent = error.message || "Private review failed safely."; }
+  finally { state.memoryObservatoryPrivateReviewBusy = false; button.disabled = false; }
 }
 
 const TIMELINE_HORIZONS = ["now", "next", "later", "backlog"];
@@ -6693,6 +6791,10 @@ byId("backup-tab").addEventListener("click", () => switchTab("backup"));
 byId("memory-observatory-tab").addEventListener("click", () => switchTab("memory-observatory"));
 byId("refresh-memory-observatory").addEventListener("click", loadMemoryObservatory);
 byId("memory-observatory-query-form").addEventListener("submit", queryMemoryObservatory);
+byId("refresh-memory-observatory-runtime").addEventListener("click", refreshMemoryRuntimeEvidence);
+byId("run-memory-observatory-private-review").addEventListener("click", runMemoryPrivateReview);
+byId("memory-constellation-layout").addEventListener("click", () => setMemoryVisualizationMode("constellation"));
+byId("memory-lifecycle-layout").addEventListener("click", () => setMemoryVisualizationMode("lifecycle"));
 byId("refresh-host-presence").addEventListener("click", () => loadHostStewardship({ refresh: true }));
 byId("refresh-software-steward").addEventListener("click", refreshSoftwareSteward);
 byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);

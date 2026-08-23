@@ -51,6 +51,10 @@ Dir.mktmpdir("soul-memory-observatory-a2") do |root|
   check.call("summary exposes exact duplicate observations", summary.dig("data", "duplicates").length == 0)
   check.call("summary exposes explicit supersession links", summary.dig("data", "supersessions", 0, "replacement_id") == replacement.fetch("id"))
   check.call("summary does not expose memory content in lifecycle evidence", summary.dig("data", "lifecycle_events").none? { |event| event.key?("content") })
+  visualization = summary.dig("data", "visualization")
+  check.call("summary exposes a bounded visualization projection", visualization["node_count"] == 3 && visualization["nodes"].length <= 240 && visualization["edges"].length <= 400)
+  check.call("visualization exposes explicit supersession relationships", visualization["edges"].any? { |edge| edge["relation"] == "supersession" && edge["target"] == replacement.fetch("id") })
+  check.call("visualization withholds memory content", visualization["content_included"] == false && !JSON.generate(visualization).include?("Memory diagnostics should explain"))
 
   query = facade.call(request.call("memory.observatory.query", "query" => "explain recalled record", "limit" => 8))
   check.call("facade query returns approved-memory evidence", query["lifecycle_state"] == "complete" && query.dig("data", "results", 0, "memory_id") == replacement.fetch("id"))
@@ -73,4 +77,4 @@ Dir.mktmpdir("soul-memory-observatory-read-only") do |root|
 end
 
 abort "Memory Observatory facade verification failed: #{errors.join(', ')}" unless errors.empty?
-puts "Memory Observatory facade verification passed (#{12 - errors.length} checks)."
+puts "Memory Observatory facade verification passed (#{15 - errors.length} checks)."
