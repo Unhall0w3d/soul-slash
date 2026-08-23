@@ -1,0 +1,34 @@
+[Unit]
+Description=Soul fixed e1000e hardware-hang recovery observer
+Documentation=file:///usr/local/share/doc/soul/E1000E_HARDWARE_HANG_RECOVERY_A0_BRIEF.md
+After=network.target systemd-journald.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/libexec/soul-e1000e-recovery --validate
+ExecStart=/usr/local/libexec/soul-e1000e-recovery
+Restart=on-failure
+RestartSec=5
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelLogs=no
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_ADMIN
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

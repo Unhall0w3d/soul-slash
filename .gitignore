@@ -145,3 +145,7 @@ Soul/artifacts/conversation_artifacts.jsonl
 
 # Durable owner-private memory. Public repositories retain neutral defaults only.
 Soul/private/
+
+# Owner-private generated visual sources, meshes, frames, and renders.
+# Public adapters and review evidence remain tracked outside this directory.
+/visual/assets/generated/
