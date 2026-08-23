@@ -15,6 +15,7 @@ require_relative "conversation_memory_store"
 require_relative "memory_retrieval_index"
 require_relative "memory_retrieval_service"
 require_relative "memory_observatory_service"
+require_relative "memory_runtime_private_review_service"
 require_relative "semantic_conversation_memory_context"
 require_relative "file_inspection_service"
 require_relative "network_diagnostic_service"
@@ -167,6 +168,7 @@ module SoulCore
       knowledge_vault_service: nil,
       local_search_service: nil,
       memory_observatory_service: nil,
+      memory_runtime_private_review_service: nil,
       memory_retrieval_service: nil,
       memory_retrieval_index_service: nil,
       conversation_memory_store: nil,
@@ -246,6 +248,7 @@ module SoulCore
       @knowledge_vault_service = knowledge_vault_service
       @local_search_service = local_search_service
       @memory_observatory_service = memory_observatory_service
+      @memory_runtime_private_review_service = memory_runtime_private_review_service
       @memory_retrieval_service = memory_retrieval_service
       @memory_retrieval_index_service = memory_retrieval_index_service
       @conversation_memory_store = conversation_memory_store
@@ -424,6 +427,8 @@ module SoulCore
         ))
       when "memory.observatory.summary" then domain(memory_observatory.summary)
       when "memory.observatory.query" then domain(memory_observatory.query(query: required(parameters, "query"), limit: parameters["limit"]))
+      when "memory.observatory.runtime" then domain(memory_runtime_private_review.runtime)
+      when "memory.observatory.private_review" then domain(memory_runtime_private_review.private_review)
       when "files.roots" then domain(file_inspection.roots)
       when "files.list" then domain(file_inspection.list(root_id: required(parameters, "root_id"), relative_path: parameters["relative_path"] || "."))
       when "files.stat" then domain(file_inspection.stat(root_id: required(parameters, "root_id"), relative_path: required(parameters, "relative_path")))
@@ -1065,6 +1070,23 @@ module SoulCore
         memory_store: conversation_memory,
         index_service: memory_retrieval_index,
         retrieval_service: memory_retrieval
+      )
+    end
+
+    def memory_runtime_private_review
+      @memory_runtime_private_review_service ||= MemoryRuntimePrivateReviewService.new(
+        root: @root,
+        memory_store: conversation_memory,
+        retrieval_service: memory_retrieval,
+        embedding_endpoint: @process_env["SOUL_MEMORY_EMBEDDING_ENDPOINT"],
+        embedding_profile: @process_env["SOUL_MEMORY_EMBEDDING_PROFILE"],
+        embedding_dimensions: @process_env["SOUL_MEMORY_EMBEDDING_DIMENSIONS"],
+        embedding_protocol: @process_env.fetch("SOUL_MEMORY_EMBEDDING_PROTOCOL", "ollama"),
+        selected_core: lambda {
+          envelope = core_orchestration.status
+          envelope["lifecycle_state"] == "complete" ? envelope.fetch("data", {}) : {}
+        },
+        clock: @clock
       )
     end
 

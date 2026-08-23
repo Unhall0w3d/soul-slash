@@ -120,6 +120,8 @@ module SoulCore
       "local_search.search" => %w[query limit sources],
       "memory.observatory.summary" => [],
       "memory.observatory.query" => %w[query limit],
+      "memory.observatory.runtime" => [],
+      "memory.observatory.private_review" => [],
       "files.roots" => [],
       "files.list" => %w[root_id relative_path],
       "files.stat" => %w[root_id relative_path],

@@ -12,6 +12,8 @@ module SoulCore
     MAX_RECORDS = 10_000
     MAX_EVENTS = 100
     MAX_RELATIONSHIPS = 100
+    MAX_VISUALIZATION_NODES = 240
+    MAX_VISUALIZATION_EDGES = 400
     REVIEW_GUIDANCE = [
       "Show pending memory proposals",
       "Show approved memory",
@@ -29,6 +31,8 @@ module SoulCore
     def summary
       records = bounded_records
       events = bounded_events
+      duplicates = duplicate_projection(records)
+      supersessions = supersession_projection(records)
       complete(
         "counts" => {
           "states" => counts(records, "status"),
@@ -37,8 +41,9 @@ module SoulCore
         },
         "index" => @index_service.availability,
         "lifecycle_events" => lifecycle_projection(events),
-        "duplicates" => duplicate_projection(records),
-        "supersessions" => supersession_projection(records),
+        "duplicates" => duplicates,
+        "supersessions" => supersessions,
+        "visualization" => visualization_projection(records, duplicates, supersessions),
         "review_guidance" => REVIEW_GUIDANCE,
         "authority" => "conversation_memory_ledger",
         "content_trusted" => false,
@@ -120,6 +125,43 @@ module SoulCore
           "reason" => record["supersession_reason"]
         }.compact
       end.first(MAX_RELATIONSHIPS)
+    end
+
+    def visualization_projection(records, duplicates, supersessions)
+      selected = records.last(MAX_VISUALIZATION_NODES)
+      selected_ids = selected.map { |record| record["id"].to_s }.to_h { |id| [id, true] }
+      nodes = selected.map do |record|
+        {
+          "id" => record["id"].to_s,
+          "state" => record["status"].to_s,
+          "layer" => record["layer"].to_s,
+          "source_kind" => record.fetch("source", {})["kind"].to_s,
+          "created_at" => record["created_at"].to_s
+        }
+      end
+      edges = supersessions.filter_map do |record|
+        source = record["superseded_id"].to_s
+        target = record["replacement_id"].to_s
+        next unless selected_ids[source] && selected_ids[target]
+
+        { "source" => source, "target" => target, "relation" => "supersession" }
+      end
+      duplicates.each do |record|
+        ids = Array(record["memory_ids"]).select { |id| selected_ids[id.to_s] }.map(&:to_s)
+        ids.drop(1).each do |target|
+          break if edges.length >= MAX_VISUALIZATION_EDGES
+
+          edges << { "source" => ids.first, "target" => target, "relation" => "exact_duplicate" }
+        end
+      end
+      {
+        "nodes" => nodes,
+        "edges" => edges.first(MAX_VISUALIZATION_EDGES),
+        "node_count" => nodes.length,
+        "edge_count" => [edges.length, MAX_VISUALIZATION_EDGES].min,
+        "truncated" => records.length > MAX_VISUALIZATION_NODES,
+        "content_included" => false
+      }
     end
 
     def normalized_content(value)

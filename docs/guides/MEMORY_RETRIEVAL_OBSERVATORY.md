@@ -12,6 +12,7 @@ Open **Administration → Memory Observatory** to inspect:
 - record counts by lifecycle state, layer, and source kind;
 - up to 100 recent append-only lifecycle events;
 - exact-content duplicate observations and explicit supersession links;
+- a bounded content-free constellation and lifecycle map of memory metadata;
 - the retrieval index profile, digest binding, dimensions, freshness, and
   availability;
 - one explicit diagnostic query with bounded result excerpts and score
@@ -20,6 +21,13 @@ Open **Administration → Memory Observatory** to inspect:
 Refresh and diagnostic query are authenticated foreground reads. They do not
 poll, start a worker, or change memory. Use the existing reviewed Chat memory
 commands for proposals, approval, supersession, and forgetting.
+
+The constellation projects at most 240 memory nodes and 400 explicit duplicate
+or supersession links. Node placement is deterministic and may be switched
+between layer-oriented constellation and lifecycle layouts. Hover or keyboard
+focus reveals only the memory ID, lifecycle state, layer, provenance kind, and
+timestamp. The graph does not expose memory content, infer new relationships,
+or grant authority.
 
 ## Retrieval authority
 
@@ -42,6 +50,7 @@ make memory-retrieval-status
 make memory-retrieval-rebuild
 make memory-retrieval-query MEMORY_QUERY='approved retrieval preferences'
 make verify-memory-retrieval-observatory
+make verify-memory-runtime-private-review
 ```
 
 `memory-retrieval-evaluate` uses only a synthetic public corpus and
@@ -118,3 +127,36 @@ admission mechanics. It does not install an always-on Ollama service,
 automatically load a model, rebuild an index, or alter Core lifecycle. Without
 an available compatible endpoint, Chat continues to fail safely to
 approved-only lexical context.
+
+## Supervised private review
+
+Memory Observatory also exposes two explicit A5 controls:
+
+- **Refresh runtime evidence** reads only the configured loopback Ollama
+  `/api/tags` and `/api/ps` endpoints. It can report installation and residency,
+  but it cannot load a model or approve Core coexistence.
+- **Run supervised private review** evaluates the fixed owner-private case file
+  `Soul/private/memory/retrieval_review_cases.json` once in the foreground.
+
+The case document is closed and versioned. It accepts no Dashboard-supplied
+path, endpoint, model, or query:
+
+```json
+{
+  "schema_version": "soul.memory_retrieval.private_review.v1",
+  "cases": [
+    {
+      "id": "opaque_case_id",
+      "query": "An owner-authored retrieval question",
+      "expected_approved_memory_ids": ["memory_id"],
+      "forbidden_approved_memory_ids": [],
+      "result_limit": 5
+    }
+  ]
+}
+```
+
+Results disclose case IDs, memory IDs, digests, and aggregate quality metrics;
+they withhold query and memory content and are not written back to memory. A5
+does not install a service, switch Cores, download a model, rebuild the index,
+or declare a runtime placement safe.
