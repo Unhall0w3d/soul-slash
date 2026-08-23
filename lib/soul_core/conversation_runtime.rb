@@ -65,6 +65,7 @@ module SoulCore
       provider_client: nil,
       deterministic_responder: nil,
       context_builder: nil,
+      memory_store: nil,
       state_store: nil,
       evidence_store: nil,
       capability_registry: nil,
@@ -126,6 +127,7 @@ module SoulCore
       @response_truth_guard = ConversationResponseTruthGuard.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
+        memory_store: memory_store,
         evidence_store: @evidence_store,
         max_messages: env.fetch("SOUL_CONVERSATION_MAX_MESSAGES", ConversationContextBuilder::DEFAULT_MAX_MESSAGES),
         max_characters: env.fetch("SOUL_CONVERSATION_MAX_CHARACTERS", ConversationContextBuilder::DEFAULT_MAX_CHARACTERS)

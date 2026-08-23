@@ -414,15 +414,17 @@ disaster-recovery rehearsal remain separate review gates.
 
 Mutable owner memory lives under ignored `Soul/private/memory/`; tracked memory files are neutral public seeds. Durable promotion remains human-reviewed.
 
-Memory Retrieval and Observatory A0–A2 is candidate-complete for review. A
+Memory Retrieval and Observatory A0–A3 is candidate-complete for review. A
 synthetic deterministic corpus compares lexical and hybrid recall, an optional
 owner-private index is source- and payload-digest bound, and Administration
 exposes a read-only ledger/index summary plus one explicit diagnostic query.
 Only active approved records are eligible. Invalid or stale derived state falls
 back to approved-only lexical retrieval, and the Observatory has no mutation
 controls, polling, service installation, automatic model download, or Core
-switch authority. A real local embedding profile and use of semantic results in
-ordinary Chat context remain separate qualification decisions.
+switch authority. Ordinary Chat now admits fresh hybrid results by canonical
+memory ID, re-reads approved content from the ledger, and otherwise preserves
+the prior lexical context exactly. A real local embedding profile and its
+operational lifecycle remain separate qualification decisions.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground

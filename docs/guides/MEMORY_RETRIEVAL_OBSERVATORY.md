@@ -74,9 +74,23 @@ memory-retrieval-evaluate-live` runs the same public synthetic query corpus
 against that one foreground endpoint. It does not inspect private memory or
 select a winner automatically.
 
+## Ordinary Chat context
+
+Ordinary Chat now has a fail-safe semantic admission path. It uses semantic
+results only when retrieval reports a fresh compatible `hybrid` index. The
+index contributes IDs only: Soul re-reads each record from the canonical ledger
+and requires its current state to remain `approved` before including its content
+in the system prompt. Existing always-include and same-conversation memories
+remain preferred.
+
+If the endpoint is absent, the index is stale or incompatible, the query falls
+back, or any local request fails, Chat receives the same approved-only lexical
+context it used before A3. Chat does not rebuild the index or start the embedding
+runtime automatically.
+
 ## Current qualification boundary
 
-The deterministic A0 corpus and A1/A2 mechanics qualify ranking, abstention,
-fallback, privacy, application-facade, and Dashboard behavior. Choosing a
-production embedding profile and allowing derived semantic results into normal
-Chat context require a separate controlled live comparison and Operator review.
+The deterministic A0 corpus and A1-A3 mechanics qualify ranking, abstention,
+fallback, privacy, application-facade, Dashboard behavior, and safe Chat-context
+admission. Choosing and operating a production embedding profile still requires
+a controlled live comparison and Operator review.

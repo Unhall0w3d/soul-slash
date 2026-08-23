@@ -15,6 +15,7 @@ require_relative "conversation_memory_store"
 require_relative "memory_retrieval_index"
 require_relative "memory_retrieval_service"
 require_relative "memory_observatory_service"
+require_relative "semantic_conversation_memory_context"
 require_relative "file_inspection_service"
 require_relative "network_diagnostic_service"
 require_relative "repository_inspection_service"
@@ -903,6 +904,7 @@ module SoulCore
       report, resolver = resolved_configuration
       raise RuntimeError, "configuration is invalid" unless report.fetch("ok")
       @conversation_runtime ||= ConversationRuntime.new(root: @root, store: chat_store, env: resolver.effective_environment,
+        memory_store: semantic_conversation_memory_context,
         creative_workflow_service: conversation_creative_workflow,
         core_workflow_service: conversation_core_workflow,
         maintenance_workflow_service: conversation_maintenance_workflow,
@@ -1088,6 +1090,13 @@ module SoulCore
 
     def conversation_memory
       @conversation_memory_store ||= ConversationMemoryStore.new(root: @root, create: false, clock: @clock)
+    end
+
+    def semantic_conversation_memory_context
+      @semantic_conversation_memory_context ||= SemanticConversationMemoryContext.new(
+        memory_store: conversation_memory,
+        retrieval_service: memory_retrieval
+      )
     end
 
     def memory_embedding_client
