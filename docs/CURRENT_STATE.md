@@ -426,6 +426,14 @@ memory ID, re-reads approved content from the ledger, and otherwise preserves
 the prior lexical context exactly. A real local embedding profile and its
 operational lifecycle remain separate qualification decisions.
 
+The A5 surface adds bounded runtime inventory and a fixed owner-private review
+without loading a model or changing memory. A6 provides a separately gated,
+one-time bootstrap for installations whose canonical ledger is empty: only
+top-level bullets from the existing owner-reviewed rules and lessons files may
+be projected through append-only creation and approval events. The projection
+is content-free at its response boundary, idempotent, and does not include
+private YAML, draft lessons, index rebuilding, or runtime lifecycle changes.
+
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
 operations, project approved memory into a generated index, and import one
