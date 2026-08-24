@@ -48,8 +48,13 @@ explicit A17 persistence authority before implementation.
 
 The first owner-private live invocation on 2026-08-24 failed safely before
 derivation or canonical-memory mutation because the selected Core did not
-permit development work. The existing runtime requested Soul Core, Soul-Lite
-Core, or Dev Core. A16 intentionally did not switch Cores on its own. Live
-qualification therefore remains a human test after selecting an eligible Core;
-the failed request created no completed cycle-journal entry and is safe to
-retry with the same request identifier.
+permit development work. A16 intentionally did not switch Cores on its own.
+After the Operator selected Dev Core, the exact same request identifier
+completed one `derive_and_admit` cycle over the historical observation batch.
+One proposal was admitted as active ordinary memory. Exact replay returned the
+same cycle, packet, decision counts, and digest with `idempotent: true`.
+
+Post-run integrity verified 38 observation events, 2 derivation packets, 2
+admission decisions, 70 canonical audit events, and 1 A16 cycle. Every chain
+was valid and every receipt remained content-free. The live qualification is
+complete; no second packet was processed during this review.

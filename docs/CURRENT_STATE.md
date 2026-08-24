@@ -500,7 +500,7 @@ two chats, then reached `no_work` with a valid 38-event observation chain. It ne
 manufactures incomplete turns, invokes a model, mutates canonical memory, or
 continues in the background.
 
-Memory Autonomous Lifecycle A16 is candidate-complete. One explicit foreground
+Memory Autonomous Lifecycle A16 is live-qualified. One explicit foreground
 cycle drains one older verified derivation packet when present; otherwise it
 derives one bounded packet and immediately passes that exact packet through the
 A13 deterministic admission policy. Stable sub-request identities and a
@@ -508,7 +508,10 @@ content-free hash-chained cycle journal make interrupted retries reconcilable
 without duplicate proposals or canonical records. Protected proposals remain
 blocked for human review. The Core-aware scheduled worker, the 3D Observatory,
 and Foundry-hosted Qdrant/FalkorDB projections remain subsequent reviewed
-slices. Redis is not required for this program stage.
+slices. The first live Dev Core cycle admitted one active ordinary memory from
+the historical observation batch; exact replay was idempotent and all audit,
+observation, derivation, admission, and cycle chains remained valid. Redis is
+not required for this program stage.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
