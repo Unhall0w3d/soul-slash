@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require "digest"
+require "json"
+require "open3"
+
+root = File.expand_path("..", __dir__)
+directory = File.join(root, "Soul", "private", "memory", "projection")
+required = %w[TARGET_ALIAS VMID GUEST_HOSTNAME FQDN IPV4 GATEWAY CLIENT_IPV4 NAMESERVER TEMPLATE]
+missing = required.reject { |key| ENV[key].to_s.match?(/\S/) }
+abort "missing private deployment parameters: #{missing.join(', ')}" unless missing.empty?
+abort "private deployment state already exists" if File.exist?(File.join(directory, "deployment.json"))
+
+FileUtils.mkdir_p(directory, mode: 0o700)
+File.chmod(0o700, directory)
+run = lambda do |command|
+  _stdout, stderr, status = Open3.capture3(*command)
+  abort "private bootstrap command failed safely: #{stderr.to_s.byteslice(0, 512)}" unless status.success?
+end
+paths = {
+  "ca_key" => File.join(directory, "ca.key"), "ca_cert" => File.join(directory, "ca.crt"),
+  "server_key" => File.join(directory, "server.key"), "server_csr" => File.join(directory, "server.csr"),
+  "server_cert" => File.join(directory, "server.crt"), "ssh_key" => File.join(directory, "id_ed25519"),
+  "qdrant_key" => File.join(directory, "qdrant-api-key"), "falkordb_key" => File.join(directory, "falkordb-password"),
+  "qdrant_deb" => File.join(directory, "qdrant_1.19.0-1_amd64.deb"),
+  "falkordb_so" => File.join(directory, "falkordb-x64-4.20.4.so"), "extension" => File.join(directory, "server.ext")
+}
+
+run.call(["openssl", "genpkey", "-algorithm", "ED25519", "-out", paths.fetch("ca_key")])
+run.call(["openssl", "req", "-x509", "-new", "-key", paths.fetch("ca_key"), "-out", paths.fetch("ca_cert"), "-days", "3650", "-subj", "/CN=Soul Memory Projection Local CA"])
+run.call(["openssl", "genpkey", "-algorithm", "ED25519", "-out", paths.fetch("server_key")])
+run.call(["openssl", "req", "-new", "-key", paths.fetch("server_key"), "-out", paths.fetch("server_csr"), "-subj", "/CN=#{ENV.fetch('FQDN')}"])
+File.write(paths.fetch("extension"), "subjectAltName=DNS:#{ENV.fetch('FQDN')},IP:#{ENV.fetch('IPV4')}\nextendedKeyUsage=serverAuth\n", mode: "wb")
+File.chmod(0o600, paths.fetch("extension"))
+run.call(["openssl", "x509", "-req", "-in", paths.fetch("server_csr"), "-CA", paths.fetch("ca_cert"), "-CAkey", paths.fetch("ca_key"), "-CAcreateserial", "-out", paths.fetch("server_cert"), "-days", "825", "-extfile", paths.fetch("extension")])
+run.call(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "soul-memory-projection", "-f", paths.fetch("ssh_key")])
+File.write(paths.fetch("qdrant_key"), Open3.capture2("openssl", "rand", "-hex", "32").first, mode: "wb")
+File.write(paths.fetch("falkordb_key"), Open3.capture2("openssl", "rand", "-hex", "32").first, mode: "wb")
+run.call(["curl", "--fail", "--location", "--silent", "--show-error", "--output", paths.fetch("qdrant_deb"), "https://github.com/qdrant/qdrant/releases/download/v1.19.0/qdrant_1.19.0-1_amd64.deb"])
+run.call(["curl", "--fail", "--location", "--silent", "--show-error", "--output", paths.fetch("falkordb_so"), "https://github.com/FalkorDB/FalkorDB/releases/download/v4.20.4/falkordb-x64.so"])
+abort "Qdrant artifact digest mismatch" unless Digest::SHA256.file(paths.fetch("qdrant_deb")).hexdigest == "2c73614176642aeb8da5127fb583b4a63398e89c05c87eb2dc12faf1ad9c19ea"
+abort "FalkorDB artifact digest mismatch" unless Digest::SHA256.file(paths.fetch("falkordb_so")).hexdigest == "81ea6b989dc2fd4c9ad905e246018b220b02f0e40c406255f9da4768c1684555"
+
+config = {
+  "schema_version" => "soul.memory-projection.private.a20.v1",
+  "target_alias" => ENV.fetch("TARGET_ALIAS"), "vmid" => Integer(ENV.fetch("VMID")),
+  "guest_hostname" => ENV.fetch("GUEST_HOSTNAME"), "fqdn" => ENV.fetch("FQDN"), "ipv4" => ENV.fetch("IPV4"),
+  "gateway" => ENV.fetch("GATEWAY"), "client_ipv4" => ENV.fetch("CLIENT_IPV4"), "nameserver" => ENV.fetch("NAMESERVER"),
+  "template" => ENV.fetch("TEMPLATE"), "preflight_evidence_path" => File.join(directory, "preflight.json"),
+  "ca_certificate_path" => paths.fetch("ca_cert"), "server_certificate_path" => paths.fetch("server_cert"),
+  "server_key_path" => paths.fetch("server_key"), "ssh_public_key_path" => "#{paths.fetch('ssh_key')}.pub",
+  "qdrant_api_key_path" => paths.fetch("qdrant_key"), "falkordb_password_path" => paths.fetch("falkordb_key"),
+  "qdrant_artifact_path" => paths.fetch("qdrant_deb"), "falkordb_artifact_path" => paths.fetch("falkordb_so")
+}
+config_path = File.join(directory, "deployment.json")
+File.write(config_path, JSON.pretty_generate(config) + "\n", mode: "wb")
+Dir.children(directory).each { |name| File.chmod(0o600, File.join(directory, name)) if File.file?(File.join(directory, name)) }
+File.delete(paths.fetch("server_csr"))
+File.delete(paths.fetch("extension"))
+puts "Owner-private memory projection identity and verified artifacts are ready. No guest was created."

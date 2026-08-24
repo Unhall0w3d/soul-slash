@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/memory_projection_remote_installer"
+
+root = File.expand_path("..", __dir__)
+private_config = ENV.fetch("SOUL_MEMORY_PROJECTION_PRIVATE_CONFIG", File.join(root, "Soul", "private", "memory", "projection", "deployment.json"))
+installer = SoulCore::MemoryProjectionRemoteInstaller.new(
+  root: root,
+  manifest_path: File.join(root, "config", "memory_projection_deployment_a19.json"),
+  private_config_path: private_config
+)
+
+result = case ARGV.shift.to_s
+         when "plan" then installer.plan
+         when "install" then installer.install(confirmation: ARGV.shift.to_s, expected_digest: ARGV.shift.to_s)
+         when "repair" then installer.repair
+         when "remove" then installer.remove(confirmation: ARGV.shift.to_s)
+         else
+           {"ok" => false, "lifecycle_state" => "awaiting_input", "reason" => "Usage: soul-memory-projection-deployment plan|install CONFIRM DIGEST|repair|remove CONFIRM", "mutation" => "none"}
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)
