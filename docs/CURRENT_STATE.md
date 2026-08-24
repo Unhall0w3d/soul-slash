@@ -427,7 +427,12 @@ the prior lexical context exactly. A7 qualifies the local Qwen3 0.6B Q8_0
 embedding profile at a 1024-token ceiling and adds a reviewed inactive,
 unenabled endpoint whose lifecycle follows explicit Core selection. Non-Free
 Cores may start it; Free Core stops it. The model remains demand-loaded and
-semantic failure still preserves lexical retrieval.
+semantic failure still preserves lexical retrieval. Live preview/execute
+acceptance has exercised every Core and restored Soul-Lite successfully. The
+Dashboard performs at most two delayed read-only status checks after a
+successful Core activation so short runtime-readiness or lease-settlement
+windows do not masquerade as a failed transition; it never retries the
+mutation.
 
 The A5 surface adds bounded runtime inventory and a fixed owner-private review.
 A6 provides a separately gated,

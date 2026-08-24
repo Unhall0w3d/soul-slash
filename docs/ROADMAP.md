@@ -29,8 +29,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] Memory Retrieval and Observatory A0–A2: deterministic hybrid-recall
   evaluation, disposable approved-only index mechanics, fail-closed lexical
   fallback, and a read-only Administration surface are candidate-complete;
-  production embedding-profile and ordinary Chat-context adoption remain
-  Operator qualification decisions
+  the production embedding profile, ordinary Chat-context admission, and
+  Core-owned lifecycle are now live-qualified; visual interaction review and
+  future memory-governance expansion remain separate decisions
 
 ## Near-term refinement
 
@@ -155,7 +156,9 @@ This roadmap tracks product bodies rather than the repository's historical phase
   imported 32 owner-reviewed rules and lessons through a digest-bound one-time
   projection. A7 qualifies 1024-token NVIDIA coexistence and implements an
   inactive, unenabled Core-aware endpoint with mandatory Free Core teardown;
-  exact unit installation and cross-Core live review remain open
+  exact unit installation and cross-Core live review passed. A8 adds bounded
+  read-only Dashboard reconciliation for post-transition readiness evidence
+  without retrying a Core mutation
 - [x] bounded cleanup A3 is accepted for allowlisted old temporary residue, old
   regular project logs, and failed partial Music quarantine only; broader
   lifecycle-owned or capacity-bounded cleanup remains unavailable

@@ -313,7 +313,10 @@ brief = File.read(File.join(__dir__, "../docs/soul/CORE_ORCHESTRATION_A0_A1_BRIE
 check.call("top bar exposes an explicit Core selector beside Local", html.include?('id="connection-label"') && html.include?('id="core-selector"') && html.index('id="connection-label"') < html.index('id="core-selector"'))
 check.call("dashboard uses the Core application gate rather than direct service control", js.include?('core.activate.preview') && js.include?('core.activate.execute') && js.include?('prefillApprovalGate("model-runtime-confirmation"'))
 core_ui = js[/function renderCores\(.*?(?=function renderModelRuntime)/m].to_s
-check.call("Core interface remains event-driven without polling", !core_ui.match?(/setInterval|setTimeout|requestAnimationFrame/))
+bounded_settlement = core_ui[/async function reconcileCoreTransitionSurfaces\(\) \{.*?^\}/m].to_s
+event_driven_core_ui = core_ui.sub(bounded_settlement, "")
+check.call("Core interface remains event-driven outside exact bounded settlement", !event_driven_core_ui.match?(/setInterval|setTimeout|requestAnimationFrame/))
+check.call("Core settlement cannot become an interval or animation loop", !bounded_settlement.match?(/setInterval|requestAnimationFrame/) && bounded_settlement.include?("CORE_TRANSITION_SETTLE_DELAYS_MS"))
 check.call("brief preserves Qwen and ACE-Step mutual exclusion", brief.include?("Qwen fallback and\nACE-Step share the NVIDIA lane") && brief.include?("No attempt is made to run Qwen and ACE-Step concurrently"))
 
 abort(errors.map { |error| "- #{error}" }.join("\n")) unless errors.empty?

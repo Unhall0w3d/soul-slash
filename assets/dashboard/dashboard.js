@@ -1404,7 +1404,7 @@ function renderMessageActions(article, actions) {
           const envelope = await callSoul(action.operation, { core_id: action.core_id, target_profile_id: action.target_profile_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest });
           lifecycle(envelope); status.textContent = envelope.errors?.[0]?.message || dataOf(envelope).reason || "Core activation complete.";
           if (envelope.lifecycle_state !== "complete") { button.disabled = false; return; }
-          await refreshCores({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshStatus({ automatic: true });
+          await reconcileCoreTransitionSurfaces();
           return;
         }
         const envelope = await callNdjson("/api/v1/music-job-stream", action.operation, { chat_id: action.chat_id, flow_id: action.flow_id, action_id: action.action_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest }, { current_chat_id: action.chat_id }, (event) => { status.textContent = event.message || "Bounded creative work in progress…"; });
@@ -2677,6 +2677,25 @@ async function refreshCores({ automatic = false } = {}) {
     byId("core-menu").replaceChildren(Object.assign(document.createElement("p"), { textContent: error.message || "Core status failed safely." }));
   }
 }
+const CORE_TRANSITION_SETTLE_DELAYS_MS = Object.freeze([350, 1200]);
+async function reconcileCoreTransitionSurfaces() {
+  let lastError = null;
+  for (const delayMs of CORE_TRANSITION_SETTLE_DELAYS_MS) {
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs));
+    try {
+      const envelope = await callSoul("core.status");
+      if (envelope.lifecycle_state !== "complete") throw new Error(envelope.errors?.[0]?.message || "Core status is settling");
+      renderCores(dataOf(envelope));
+      await refreshModelRuntime({ automatic: true });
+      await refreshStatus({ automatic: true });
+      return true;
+    } catch (error) { lastError = error; }
+  }
+  setCoreLockState(null);
+  byId("core-label").textContent = "Core status settling";
+  byId("core-menu").replaceChildren(Object.assign(document.createElement("p"), { textContent: lastError?.message || "Refresh Core status when the runtime finishes settling." }));
+  return false;
+}
 async function previewCore(coreId) {
   setCoreMenu(false); byId("core-label").textContent = "Checking Core…";
   try {
@@ -2770,7 +2789,9 @@ async function executeModelRuntime() {
     const parameters = { confirmation: preview.confirmation, expected_digest: preview.digest }; let operation = `model_runtime.${preview.action}.execute`; if (preview.kind === "core") { operation = "core.activate.execute"; parameters.core_id = preview.coreId; parameters.target_profile_id = preview.targetProfileId; } else if (preview.profileId) parameters.profile_id = preview.profileId;
     const envelope = await callSoul(operation, parameters); const runtime = dataOf(envelope); renderModelRuntime(runtime);
     if (envelope.lifecycle_state !== "complete") { status.textContent = envelope.errors?.[0]?.message || "Runtime change was blocked safely."; state.modelRuntimePreview = null; return; }
-    state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(preview.kind === "core" ? "Core activation complete" : `Model runtime ${preview.action} complete`); await refreshModelRuntime(); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true });
+    state.modelRuntimePreview = null; byId("model-runtime-dialog").close(); announce(preview.kind === "core" ? "Core activation complete" : `Model runtime ${preview.action} complete`);
+    if (preview.kind === "core") await reconcileCoreTransitionSurfaces();
+    else { await refreshModelRuntime(); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); }
   } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }
 }
 
