@@ -78,9 +78,13 @@ remain unprompted when indexed. It must be one line and at most 500 characters.
 
 The endpoint must be loopback HTTP, inputs are capped at 8,000 characters,
 batches at 64, dimensions at 1,024, and responses and timeouts are bounded.
-The embedding runtime must be started and stopped separately in the foreground
-for the approved task; this feature does not install or enable persistent
-runtime infrastructure.
+Installations that have not adopted A7 must start and stop the embedding
+runtime separately in the foreground. A7 provides an optional exact inactive,
+unenabled `soul-memory-embedding.service`; the selected-Core startup path and
+confirmed Core transitions are its only lifecycle owners. The endpoint is
+available on non-Free Cores, is stopped before Free Core activation, and keeps
+the model demand-loaded for at most five idle minutes. Endpoint failure still
+falls back to lexical retrieval.
 
 With the four local embedding variables set, `make
 memory-retrieval-evaluate-live` runs the same public synthetic query corpus
@@ -123,9 +127,9 @@ reported rather than hidden.
 ## Current qualification boundary
 
 A4 qualifies the local model, query format, ranking, abstention, and safe Chat
-admission mechanics. It does not install an always-on Ollama service,
-automatically load a model, rebuild an index, or alter Core lifecycle. Without
-an available compatible endpoint, Chat continues to fail safely to
+admission mechanics. A7 qualifies a 1024-token NVIDIA coexistence ceiling and
+adds reviewed Core-aware endpoint lifecycle without automatic index rebuilding.
+Without an available compatible endpoint, Chat continues to fail safely to
 approved-only lexical context.
 
 ## Supervised private review
