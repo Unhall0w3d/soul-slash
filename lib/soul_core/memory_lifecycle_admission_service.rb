@@ -89,6 +89,15 @@ module SoulCore
       failure(error.message)
     end
 
+    # Internal supervised consumers receive verified, content-free decisions.
+    def decision_batch(limit: 8)
+      requested = Integer(limit)
+      raise ArgumentError, "memory lifecycle decision limit is invalid" unless requested.between?(1, 8)
+      ensure_safe_path!
+      entries = File.file?(@path) ? parse_and_verify(File.binread(@path)) : []
+      JSON.parse(JSON.generate(entries.last(requested)))
+    end
+
     private
 
     def admit(proposal, source, evidence)
@@ -216,6 +225,9 @@ module SoulCore
       { "ok" => true, "lifecycle_state" => "complete", "idempotent" => idempotent,
         "decision_id" => item["decision_id"], "source_packet_id" => item["source_packet_id"],
         "proposal_count" => outcomes.length, "decision_counts" => counts,
+        "rollback_references" => outcomes.filter_map do |outcome|
+          outcome["rollback_reference"] if %w[admitted_active admitted_candidate].include?(outcome["decision"])
+        end.uniq,
         "decision_sha256" => item["decision_sha256"], "content_included" => false }
     end
 
