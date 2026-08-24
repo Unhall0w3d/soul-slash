@@ -55,6 +55,7 @@ Dir.mktmpdir("soul-a13-") do |root|
   expected = { "admitted_active" => 1, "admitted_candidate" => 1, "blocked_for_human_review" => 1,
                "rejected_no_user_evidence" => 1, "rejected_low_confidence" => 1 }
   assert.call(receipt["decision_counts"] == expected, "deterministic decisions")
+  assert.call(receipt["rollback_references"].length == 2 && receipt["rollback_references"].all? { |item| item.start_with?("memory-admit:mpr_") }, "content-free rollback references")
   records = memories.records(include_deleted: true)
   assert.call(records.length == 2, "only supported ordinary proposals stored")
   assert.call(records.count { |record| record["status"] == "approved" } == 1, "high confidence active")
