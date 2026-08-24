@@ -151,10 +151,11 @@ This roadmap tracks product bodies rather than the repository's historical phase
 - [~] optional semantic memory retrieval has bounded explainable A0-A3 mechanics,
   fail-safe ordinary Chat admission, an A4-qualified local
   `qwen3-embedding:0.6b-q8_0` query/ranking profile, and A5 read-only runtime
-  evidence plus a fixed supervised private-corpus review surface. A6 adds a
-  digest-bound one-time projection of only owner-reviewed rules and lessons
-  into an empty canonical ledger; its live gate, private case authoring, Core
-  coexistence, residency policy, and Operator acceptance remain open
+  evidence plus a fixed supervised private-corpus review surface. A6 live-
+  imported 32 owner-reviewed rules and lessons through a digest-bound one-time
+  projection. A7 qualifies 1024-token NVIDIA coexistence and implements an
+  inactive, unenabled Core-aware endpoint with mandatory Free Core teardown;
+  exact unit installation and cross-Core live review remain open
 - [x] bounded cleanup A3 is accepted for allowlisted old temporary residue, old
   regular project logs, and failed partial Music quarantine only; broader
   lifecycle-owned or capacity-bounded cleanup remains unavailable

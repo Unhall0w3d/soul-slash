@@ -46,6 +46,7 @@ require_relative "project_tracker_service"
 require_relative "project_release_service"
 require_relative "model_runtime_control_service"
 require_relative "core_orchestration_service"
+require_relative "memory_embedding_runtime_coordinator"
 require_relative "skill_registry"
 require_relative "skill_studio_service"
 require_relative "self_improvement_service"
@@ -1030,7 +1031,19 @@ module SoulCore
       return @core_orchestration_service if @core_orchestration_service
 
       _report, resolver = resolved_configuration
-      @core_orchestration_service ||= CoreOrchestrationService.new(root: @root, env: resolver.effective_environment, runtime_control: model_runtime_control)
+      @core_orchestration_service ||= CoreOrchestrationService.new(
+        root: @root,
+        env: resolver.effective_environment,
+        runtime_control: model_runtime_control,
+        memory_runtime: configured_memory_embedding_runtime(resolver.effective_environment)
+      )
+    end
+
+    def configured_memory_embedding_runtime(environment)
+      values = %w[SOUL_MEMORY_EMBEDDING_ENDPOINT SOUL_MEMORY_EMBEDDING_PROFILE SOUL_MEMORY_EMBEDDING_DIMENSIONS].map do |key|
+        environment[key].to_s.strip
+      end
+      values.all? { |value| !value.empty? && value != "0" } ? MemoryEmbeddingRuntimeCoordinator.new : nil
     end
 
     def approval_store

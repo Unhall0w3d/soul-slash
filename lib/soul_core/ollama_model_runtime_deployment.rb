@@ -22,7 +22,7 @@ module SoulCore
 
     def initialize(home: Dir.home, ollama_path: nil, systemctl_path: nil, systemd_analyze_path: nil, runner: BoundedCommandRunner.new,
                    unit_name: UNIT_NAME, marker: MARKER, confirm_install: CONFIRM_INSTALL, confirm_uninstall: CONFIRM_UNINSTALL,
-                   display_name: "Gemma", description: "Soul Gemma AMD Vulkan Ollama runtime", keep_alive: "5m")
+                   display_name: "Gemma", description: "Soul Gemma AMD Vulkan Ollama runtime", keep_alive: "5m", context_length: 16_384)
       @home = File.expand_path(home)
       @ollama_path = ollama_path || find_executable("ollama")
       @systemctl_path = systemctl_path || find_executable("systemctl")
@@ -35,12 +35,14 @@ module SoulCore
       @display_name = display_name.to_s
       @description = description.to_s
       @keep_alive = keep_alive.to_s
-      raise ArgumentError, "unit name is invalid" unless @unit_name.match?(/\Asoul-model-[a-z0-9-]+\.service\z/)
+      @context_length = Integer(context_length)
+      raise ArgumentError, "unit name is invalid" unless @unit_name.match?(/\Asoul-(?:model-[a-z0-9-]+|memory-embedding)\.service\z/)
       raise ArgumentError, "deployment marker is invalid" unless @marker.start_with?("# Managed by Soul ")
       raise ArgumentError, "confirmation phrase is invalid" unless [@confirm_install, @confirm_uninstall].all? { |value| value.match?(/\A[A-Z0-9_]{8,80}\z/) }
       raise ArgumentError, "display name is invalid" unless @display_name.match?(/\A[A-Za-z0-9 -]{2,40}\z/)
       raise ArgumentError, "service description is invalid" unless @description.match?(/\A[A-Za-z0-9 .\/-]{4,100}\z/)
       raise ArgumentError, "keep-alive is invalid" unless @keep_alive.match?(/\A(?:-1|\d+[smh])\z/)
+      raise ArgumentError, "context length is invalid" unless @context_length.between?(128, 131_072)
     end
 
     def plan(expected_ollama_sha256:, source_model:, api_model:, expected_model_digest:, host: "127.0.0.1", port: 8082, device: "0")
@@ -151,7 +153,7 @@ module SoulCore
       env = {
         "OLLAMA_HOST" => "#{inputs.fetch('host')}:#{inputs.fetch('port')}", "OLLAMA_VULKAN" => "1",
         "GGML_VK_VISIBLE_DEVICES" => inputs.fetch("device"), "OLLAMA_NO_CLOUD" => "1", "OLLAMA_NOHISTORY" => "1",
-        "OLLAMA_MAX_LOADED_MODELS" => "1", "OLLAMA_NUM_PARALLEL" => "1", "OLLAMA_CONTEXT_LENGTH" => "16384",
+        "OLLAMA_MAX_LOADED_MODELS" => "1", "OLLAMA_NUM_PARALLEL" => "1", "OLLAMA_CONTEXT_LENGTH" => @context_length.to_s,
         "OLLAMA_KEEP_ALIVE" => @keep_alive
       }
       <<~UNIT

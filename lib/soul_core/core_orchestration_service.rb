@@ -6,6 +6,7 @@ require "json"
 require "securerandom"
 require_relative "model_runtime_control_service"
 require_relative "dev_model_runtime_coordinator"
+require_relative "memory_embedding_runtime_coordinator"
 
 module SoulCore
   class CoreOrchestrationService
@@ -25,10 +26,11 @@ module SoulCore
     CORE_ID = /\A[a-z][a-z0-9-]{0,39}\z/
     SHARED_INTENT_CORE_IDS = %w[amd-free music dev].freeze
 
-    def initialize(root: Dir.pwd, runtime_control: nil, dev_runtime: nil, env: ENV)
+    def initialize(root: Dir.pwd, runtime_control: nil, dev_runtime: nil, memory_runtime: nil, env: ENV)
       @root = File.expand_path(root)
       @runtime_control = runtime_control || ModelRuntimeControlService.new(root: @root, env: env)
       @dev_runtime = dev_runtime || DevModelRuntimeCoordinator.new(root: @root, env: env)
+      @memory_runtime = memory_runtime
       @selection_path = File.expand_path(SELECTION_PATH, @root)
       raise ArgumentError, "Core selection path must remain inside the project root" unless within?(@selection_path, @root)
     end
@@ -108,9 +110,11 @@ module SoulCore
       return result unless result["ok"]
 
       remember_successful_profiles(before, result.fetch("data"), target, core.fetch("id"))
+      memory = reconcile_memory_runtime(core.fetch("id"))
       success(project(result.fetch("data")).merge(
         "core_action" => "activate",
         "activated_core_id" => core.fetch("id"),
+        "memory_embedding_reconciliation" => memory,
         "mutation" => "core_activated"
       ), mutation: "core_activated")
     rescue IntegrityError => error
@@ -135,6 +139,7 @@ module SoulCore
         "core_mode" => current&.fetch("id", nil) || "unloaded",
         "music_lane" => music_lane(current),
         "development_lane" => development_lane(current, status: dev),
+        "memory_embedding_lane" => memory_runtime_status,
         "automatic_core_switch" => false
       )
     end
@@ -285,10 +290,12 @@ module SoulCore
         preferences[source.fetch("id")] = target.fetch("id")
         preferences[core.fetch("id")] = target.fetch("id")
         write_selection({ "active_core_id" => core.fetch("id"), "profiles" => preferences }, profiles: before.fetch("profiles"))
+        memory = reconcile_memory_runtime(core.fetch("id"))
         success(project(before, dev: dev).merge(
           "core_action" => "activate",
           "activated_core_id" => core.fetch("id"),
-          "service_mutation_required" => false,
+          "service_mutation_required" => memory.fetch("changed", false),
+          "memory_embedding_reconciliation" => memory,
           "mutation" => "core_intent_changed"
         ), mutation: "core_intent_changed")
       end
@@ -388,6 +395,11 @@ module SoulCore
       scope = virtual_transition_scope(before, source_id, target_id, target_profile)
       return blocked("Core state changed; preview again") unless secure_compare(expected_digest, digest(scope))
 
+      if target_id == "free" && @memory_runtime
+        memory = @memory_runtime.reconcile(core_id: "free")
+        return memory unless memory["ok"]
+      end
+
       source_profile_id = before["active_profile_id"]
       dev_stopped = false
       runtime_changed = false
@@ -423,15 +435,37 @@ module SoulCore
       write_selection({ "active_core_id" => target_id, "profiles" => preferences }, profiles: profiles)
       current = @runtime_control.status
       return current unless current["ok"]
+      memory = target_id == "free" ? memory_runtime_status : reconcile_memory_runtime(target_id)
       success(project(current.fetch("data")).merge(
         "core_action" => "activate",
         "activated_core_id" => target_id,
         "source_core_id" => source_id,
         "service_mutation_required" => scope.fetch("runtime_action") != "none" || source_id == "dev" || target_id == "dev",
+        "memory_embedding_reconciliation" => memory,
         "mutation" => "core_composite_changed"
       ), mutation: "core_composite_changed")
     rescue IntegrityError => error
       blocked(error.message)
+    end
+
+    def memory_runtime_status
+      return { "available" => false, "service_state" => "unmanaged", "resident" => false, "context_length" => 1_024 } unless @memory_runtime
+
+      result = @memory_runtime.status
+      result.fetch("data", {}).merge("available" => result["ok"] == true, "message" => result["message"])
+    rescue StandardError => error
+      { "available" => false, "service_state" => "unknown", "resident" => false, "context_length" => 1_024,
+        "message" => "Embedding runtime status failed safely: #{error.class}" }
+    end
+
+    def reconcile_memory_runtime(core_id)
+      return memory_runtime_status unless @memory_runtime
+
+      result = @memory_runtime.reconcile(core_id: core_id)
+      result.fetch("data", {}).merge("available" => result["ok"] == true, "message" => result["message"])
+    rescue StandardError => error
+      { "available" => false, "service_state" => "unknown", "changed" => false,
+        "message" => "Embedding runtime reconciliation failed safely: #{error.class}" }
     end
 
     def virtual_transition_blocker(observation, source_id, target_id)

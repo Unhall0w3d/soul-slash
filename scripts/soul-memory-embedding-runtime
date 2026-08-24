@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/ollama_model_runtime_deployment"
+
+options = { command: nil, confirmation: nil }
+OptionParser.new do |parser|
+  parser.banner = "Usage: scripts/soul-memory-embedding-runtime COMMAND [--confirmation PHRASE]"
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!(ARGV)
+options[:command] = ARGV.shift
+
+ollama = ENV.fetch("SOUL_OLLAMA_PATH", "/usr/bin/ollama")
+ollama_sha256 = ENV.fetch("SOUL_OLLAMA_EXPECTED_SHA256", "")
+model = ENV.fetch("SOUL_MEMORY_EMBEDDING_PROFILE", "qwen3-embedding:0.6b-q8_0")
+digest = ENV.fetch("SOUL_MEMORY_EMBEDDING_MODEL_DIGEST", "ac6da0dfba84a81fdbfbaf330198c33cd77c4cdfc53e8bc50eb581914a15621d")
+deployment = SoulCore::OllamaModelRuntimeDeployment.new(
+  ollama_path: ollama,
+  unit_name: "soul-memory-embedding.service",
+  marker: "# Managed by Soul Memory Embedding Runtime Deployment",
+  confirm_install: "INSTALL_MEMORY_EMBEDDING_RUNTIME",
+  confirm_uninstall: "REMOVE_MEMORY_EMBEDDING_RUNTIME",
+  display_name: "Memory Embedding",
+  description: "Soul memory embedding NVIDIA Vulkan Ollama runtime",
+  keep_alive: "5m",
+  context_length: 1_024
+)
+arguments = {
+  expected_ollama_sha256: ollama_sha256,
+  source_model: model,
+  api_model: model,
+  expected_model_digest: digest,
+  port: 11_434,
+  device: "1"
+}
+result = case options[:command]
+         when "plan" then deployment.plan(**arguments)
+         when "install" then deployment.install(**arguments, confirmation: options[:confirmation])
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else abort("command must be plan, install, status, or uninstall")
+         end
+puts JSON.pretty_generate(result.to_h)
+exit(result.ok ? 0 : (result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))

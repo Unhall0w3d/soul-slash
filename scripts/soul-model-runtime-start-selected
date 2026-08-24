@@ -5,6 +5,7 @@ require "json"
 require "optparse"
 require_relative "../lib/soul_core/configuration_resolver"
 require_relative "../lib/soul_core/model_runtime_selected_starter"
+require_relative "../lib/soul_core/memory_embedding_runtime_coordinator"
 
 options = { root: File.expand_path("..", __dir__) }
 OptionParser.new do |parser|
@@ -21,5 +22,32 @@ unless configuration.fetch("ok")
 end
 
 result = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: resolver.effective_environment).run
+embedding_configured = %w[SOUL_MEMORY_EMBEDDING_ENDPOINT SOUL_MEMORY_EMBEDDING_PROFILE SOUL_MEMORY_EMBEDDING_DIMENSIONS].all? do |key|
+  value = resolver.effective_environment[key].to_s.strip
+  !value.empty? && value != "0"
+end
+if result.ok && embedding_configured
+  selection_path = File.join(root, "Soul/runtime/model_runtime/core_selection.json")
+  core_id = begin
+    if File.file?(selection_path) && !File.symlink?(selection_path) && File.size(selection_path) <= 4 * 1024
+      JSON.parse(File.binread(selection_path, 4 * 1024))["active_core_id"].to_s
+    else
+      "daily"
+    end
+  rescue JSON::ParserError, SystemCallError
+    "free"
+  end
+  core_id = "daily" unless %w[daily amd-free music free dev].include?(core_id)
+  embedding = SoulCore::MemoryEmbeddingRuntimeCoordinator.new.reconcile(core_id: core_id)
+  result.details["memory_embedding_reconciliation"] = embedding
+  unless embedding["ok"]
+    result = SoulCore::ModelRuntimeSelectedStarter::Result.new(
+      ok: false,
+      lifecycle_state: embedding["lifecycle_state"],
+      message: "Selected chat runtime started, but memory embedding reconciliation failed safely.",
+      details: result.details
+    )
+  end
+end
 puts JSON.pretty_generate(result.to_h)
 exit(result.ok ? 0 : (result.lifecycle_state == "blocked_for_human_review" ? 2 : 1))
