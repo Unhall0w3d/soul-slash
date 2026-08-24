@@ -169,6 +169,21 @@ module SoulCore
       JSON.parse(JSON.generate(selected))
     end
 
+    # Foreground reconciliation may ask which bounded source-message identities
+    # are already represented without exposing the corresponding observations.
+    def captured_message_ids(ids:)
+      requested = Array(ids).map(&:to_s)
+      raise ArgumentError, "conversation observation identity request is invalid" unless requested.length.between?(1, 20_000) && requested.uniq.length == requested.length
+      prepare_store!
+      retained = File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
+        lock.flock(File::LOCK_SH)
+        verified_events.to_h { |event| [event.fetch("message_id"), true] }
+      end
+      requested.select { |id| retained[id] }
+    rescue JSON::ParserError
+      raise ArgumentError, "conversation observation ledger contains malformed JSON"
+    end
+
     private
 
     def verified_events
