@@ -45,12 +45,14 @@ git diff --check
 The live foreground preview completed without mutation on 2026-08-24. It found
 15 uncaptured complete exchanges across 2 chats (30 messages), dated from
 2026-08-05 through 2026-08-17. The receipt exposed only counts, timestamps, the
-scope digest, and the exact confirmation requirement. Execute remains pending
-the explicit `BACKFILL_HISTORICAL_CONVERSATIONS` gate.
+scope digest, and the exact confirmation requirement. The Operator then supplied
+the explicit `BACKFILL_HISTORICAL_CONVERSATIONS` gate. Execute captured all 15
+exchanges with zero idempotent replays; the next preview reported `no_work`.
+The resulting observation chain contains 38 valid events in one segment, and
+A12/A13 compatibility checks remain green.
 
 ## Known weakness and human gate
 
 The candidate fails closed if the retained corpus exceeds 500 chats or 20,000
 messages and would then require a future narrowing control rather than silently
-skipping history. Owner-private live preview and execution remain a separate
-human review step.
+skipping history. The current owner-private corpus is fully reconciled.
