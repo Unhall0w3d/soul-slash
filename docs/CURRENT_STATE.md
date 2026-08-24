@@ -459,10 +459,14 @@ ledger adoption has not run.
 
 Conversation Observation Capture A11 is candidate-complete for human review.
 Every successfully completed application chat turn is mirrored as an ordered,
-hash-chained pair of exact user and assistant source observations in ignored
-owner-private storage. Capture and integrity receipts remain content-free,
-request replay is idempotent, and a capture failure does not erase the already
-persisted chat response. Observations do not enter ordinary retrieval.
+cross-segment hash-chained pair of exact user and assistant source observations
+in ignored owner-private storage. Canonical history rotates through bounded
+32-MiB segments without a lifetime retention ceiling; normal capture validates
+only the active segment and uses a rebuildable, content-free sharded index for
+historical idempotency. Explicit integrity verification walks the entire
+history. Capture and integrity receipts remain content-free, request replay is
+idempotent, and a capture failure does not erase the already persisted chat
+response. Observations do not enter ordinary retrieval.
 Historical-chat backfill, autonomous lifecycle processing, the Core-aware
 background worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB
 projections remain subsequent approved slices. Redis is not required for this

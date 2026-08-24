@@ -270,7 +270,7 @@ Current approved rule files include:
 ```text
 Soul/private/memory/approved_rules.md
 Soul/private/memory/approved_lessons.md
-Soul/private/memory/conversation_observations.jsonl
+Soul/private/memory/conversation_observations/segment_000001.jsonl
 ```
 
 Older installations may retain compatibility sources under `Soul/memory/`

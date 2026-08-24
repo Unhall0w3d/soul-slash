@@ -1,18 +1,24 @@
 # Memory Conversation Observation Capture A11 Review
 
-Status: candidate-complete; merge and live acceptance remain unapproved
+Status: candidate-complete and approved for merge; live acceptance remains
+pending
 
 ## What was implemented
 
-- A shared owner-private, append-only conversation observation ledger.
+- A shared owner-private, append-only segmented conversation observation
+  ledger with no lifetime event or byte ceiling.
 - Automatic foreground capture of the exact persisted user and assistant
   messages after each successful application chat turn.
 - Ordered two-message batch capture with SHA-256 content and event chaining.
 - Deterministic observation identities and idempotent application-request
   replay.
 - Content-free capture and integrity receipts.
-- Bounded ledger size/event count, UTF-8 and timestamp validation, path and
-  symlink protection, duplicate/conflict rejection, flush, and `fsync`.
+- Bounded 32-MiB / 25,000-event segments, cross-segment digest continuity,
+  UTF-8 and timestamp validation, path and symlink protection,
+  duplicate/conflict rejection, flush, and `fsync`.
+- A content-free sharded identity index used for bounded historical
+  idempotency lookup, plus explicit foreground full-history verification and
+  index reconstruction.
 - Safe degradation: an observation dependency failure is reported without
   erasing or hiding the already-persisted chat response. Replaying the same
   completed application request retries the missing capture idempotently.
@@ -32,7 +38,7 @@ Status: candidate-complete; merge and live acceptance remain unapproved
 ## Validation
 
 - `make verify-memory-conversation-observation-capture`
-  - PASS, 20 checks.
+  - PASS, 26 checks.
 - `ruby scripts/verify-chat-progress-summaries-a1.rb`
   - PASS.
 - `ruby scripts/verify-voice-presence-a4-local-latency.rb`
@@ -66,9 +72,11 @@ behavior.
   backfill belongs to a later bounded projection/backfill slice.
 - Failed or interrupted turns without an assistant message remain only in the
   operational chat store.
-- The ledger is bounded to 200,000 events or 256 MiB. A later segmentation or
-  archival design must be approved before that ceiling becomes operationally
-  relevant.
+- Segments are retained indefinitely by default. Physical retention limits,
+  archival tiers, or purge remain later protected policy decisions.
+- Full-history integrity verification and index rebuilding become
+  progressively more expensive as retained history grows, but are explicit
+  foreground maintenance rather than part of normal chat capture.
 - This slice does not classify, summarize, embed, promote, retrieve, export, or
   physically purge observations.
 
@@ -88,12 +96,13 @@ bounded, content-isolated from receipts, and excluded from retrieval.
 
 ## Human review checklist
 
-- [ ] Confirm exact successful-turn capture is the desired source boundary.
-- [ ] Confirm observations must not enter retrieval automatically.
-- [ ] Confirm physical purge remains a separate protected operation.
-- [ ] Confirm a failed capture should preserve the completed chat response and
+- [x] Confirm exact successful-turn capture is the desired source boundary.
+- [x] Confirm observations must not enter retrieval automatically.
+- [x] Confirm physical purge remains a separate protected operation.
+- [x] Confirm a failed capture should preserve the completed chat response and
       be repairable by exact request replay.
-- [ ] Accept the temporary 200,000-event / 256-MiB ledger ceiling.
-- [ ] Approve candidate publication; merge remains a separate decision.
+- [x] Accept bounded 32-MiB segments with indefinite default retention and no
+      lifetime ledger ceiling.
+- [x] Approve candidate publication and merge.
 - [ ] Perform one live chat turn after merge and verify the content-free capture
       receipt and private ledger integrity.

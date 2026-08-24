@@ -12,8 +12,8 @@ chat context merely because they were captured.
 ## Authority and storage
 
 - Capture is local-only standing authority.
-- The ignored owner-private memory root contains an append-only conversation
-  observation ledger separate from operational chat files.
+- The ignored owner-private memory root contains an append-only, segmented
+  conversation observation ledger separate from operational chat files.
 - Each successful exchange appends the exact persisted user and assistant
   messages as one bounded batch.
 - The ledger records message, chat, request, role, interface, timestamp, content
@@ -22,6 +22,13 @@ chat context merely because they were captured.
   different content fails closed.
 - Observation content is never returned by status, integrity, or capture
   receipts.
+- Canonical segments rotate at 32 MiB or 25,000 events and remain retained by
+  default. The first event in each new segment continues the prior segment's
+  digest chain; the segment limits are foreground execution bounds, not a
+  lifetime retention ceiling.
+- A content-free, sharded message-identity index accelerates historical
+  idempotency checks. It is derived state and may be rebuilt from canonical
+  segments through an explicit foreground operation.
 
 The operational chat store remains the immediate conversation surface. The
 canonical memory ledger remains the authority for derived lifecycle memory.
@@ -37,8 +44,11 @@ slice may derive candidates from observations without rewriting them.
   receipt so a later foreground reconciliation can repair the missing mirror.
 - No retry, worker, watcher, timer, service, or background continuation is
   introduced.
-- The operation is bounded to exactly two messages and a size-limited local
-  ledger scan.
+- Normal capture is bounded to exactly two messages, validation of the active
+  segment, and at most the indexed historical segment for either identity. It
+  does not rescan the complete retained history.
+- Full-history chain verification and index reconstruction are explicit,
+  bounded foreground operations; neither runs automatically during chat.
 
 ## Privacy and deletion
 
@@ -70,7 +80,9 @@ slice may derive candidates from observations without rewriting them.
 - Capture receipts and integrity summaries expose counts and digests but no
   message content.
 - Malformed, oversized, symlinked, escaped, duplicate-conflicting, or
-  hash-invalid ledgers fail closed.
+  hash-invalid segments or indexes fail closed.
+- Segment rotation preserves one digest chain, and full-history verification
+  crosses every segment boundary.
 - Chat completion remains readable if capture fails after chat persistence.
 - Existing chat, voice, memory retrieval, and private-memory tests remain
   compatible.
