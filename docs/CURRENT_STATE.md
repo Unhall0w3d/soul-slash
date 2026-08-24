@@ -467,6 +467,15 @@ historical idempotency. Explicit integrity verification walks the entire
 history. Capture and integrity receipts remain content-free, request replay is
 idempotent, and a capture failure does not erase the already persisted chat
 response. Observations do not enter ordinary retrieval.
+Memory Observation Derivation A12 is candidate-complete. One explicit
+foreground invocation can verify and consume at most twelve newly captured
+exchanges, make one bounded local-model synthesis request, and append a strict
+private proposal packet. The append-only packet is evidence for the later
+deterministic lifecycle engine: it does not write canonical memory or enter
+retrieval. Empty valid results advance the packet-derived cursor; failures do
+not. Deterministic protection classification cannot be downgraded by model
+output, and public receipts remain content-free.
+
 Historical-chat backfill, autonomous lifecycle processing, the Core-aware
 background worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB
 projections remain subsequent approved slices. Redis is not required for this

@@ -124,6 +124,43 @@ module SoulCore
       failure(error.message)
     end
 
+    # Internal foreground consumers receive exact observations only after the
+    # complete retained chain has been verified.
+    def batch(after_event_sha256: nil, limit: 24, max_content_bytes: 48 * 1024)
+      requested = Integer(limit)
+      raise ArgumentError, "conversation observation batch limit is invalid" unless requested.between?(1, 24)
+      byte_limit = Integer(max_content_bytes)
+      raise ArgumentError, "conversation observation content limit is invalid" unless byte_limit.between?(1, 48 * 1024)
+      prepare_store!
+      File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
+        lock.flock(File::LOCK_SH)
+        previous = nil
+        events = segment_paths.flat_map do |segment|
+          values = read_segment(segment, expected_previous: previous)
+          previous = values.last&.fetch("event_sha256", nil) || previous
+          values
+        end
+        start = 0
+        unless after_event_sha256.to_s.empty?
+          index = events.index { |event| event["event_sha256"] == after_event_sha256.to_s }
+          raise ArgumentError, "conversation observation cursor is unknown" unless index
+          start = index + 1
+        end
+        selected = []
+        bytes = 0
+        events.drop(start).first(requested).each_slice(2) do |exchange|
+          raise ArgumentError, "conversation observation exchange is incomplete" unless exchange.length == 2 && exchange.map { |event| event["role"] } == %w[user assistant]
+          raise ArgumentError, "conversation observation exchange chat identity is inconsistent" unless exchange.map { |event| event["chat_id"] }.uniq.length == 1
+          next_bytes = bytes + exchange.sum { |event| event.fetch("content").bytesize }
+          raise ArgumentError, "conversation observation exchange exceeds derivation content limit" if selected.empty? && next_bytes > byte_limit
+          break if next_bytes > byte_limit
+          selected.concat(JSON.parse(JSON.generate(exchange)))
+          bytes = next_bytes
+        end
+        selected
+      end
+    end
+
     private
 
     def prepare_store!

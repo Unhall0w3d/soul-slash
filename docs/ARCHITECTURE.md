@@ -271,6 +271,7 @@ Current approved rule files include:
 Soul/private/memory/approved_rules.md
 Soul/private/memory/approved_lessons.md
 Soul/private/memory/conversation_observations/segment_000001.jsonl
+Soul/private/memory/observation_derivations.jsonl
 ```
 
 Older installations may retain compatibility sources under `Soul/memory/`
