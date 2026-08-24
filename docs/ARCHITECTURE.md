@@ -279,7 +279,20 @@ marker is written. Public defaults contain no owner-specific state.
 The tracked `Soul/memory/.public_seed_v1` marker tells a clean clone to read
 those neutral defaults while directing every mutable write to private storage.
 
-Future durable memory must retain provenance, confidence, editability, and promotion status.
+Durable memory retains provenance, confidence, editability, lifecycle state,
+and audit history. Ordinary memory may move through its lifecycle
+autonomously under the reviewed deterministic policy when the operation is
+local, attributable, reversible, and recoverable. Protected authority,
+security, identity, credential, export, physical-purge, and broad-retention
+changes remain human decisions.
+
+The canonical JSONL ledger and human-readable Soul Vault remain authoritative.
+Audit adoption records the exact digest of the pre-existing ledger without
+rewriting it; subsequent events are hash chained. Historical reconstruction
+replays an immutable prefix, while rollback appends compensating events rather
+than modifying old evidence. Future Qdrant and FalkorDB services on Foundry are
+rebuildable semantic and graph projections, never replacement authorities.
+Redis is not part of the approved foundation.
 
 An optional owner-private approved-memory index is disposable derived state,
 not another authority. It is bound to the current approved-ledger digest,

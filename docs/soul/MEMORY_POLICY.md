@@ -2,7 +2,10 @@
 
 Soul memory exists to make repeated use more useful without making behavior mysterious.
 
-Memory should be explicit, shared, reviewable, and reversible where appropriate.
+Memory should be shared, attributable, inspectable, and recoverable. Ordinary
+memory lifecycle work may be autonomous when it is local, policy-bounded,
+reversible, and fully audited; protected authority and irreversible loss remain
+human decisions.
 
 ## Memory classes
 
@@ -16,7 +19,8 @@ Saved progress for an incomplete multi-turn task. Task state enables clean exits
 
 ### Durable memory
 
-Reusable facts, preferences, defaults, locations, providers, paths, or other user-approved context that may be used across future skills.
+Reusable facts, preferences, defaults, locations, providers, paths, or other
+context admitted by an approved deterministic policy or explicit human action.
 
 ### Reflection
 
@@ -37,7 +41,7 @@ Durable memory keys should be:
 - Named clearly
 - Scoped appropriately
 - Documented in the skill review artifact
-- Updated only when the user provides or approves the context
+- Backed by attributable observations or reviewed deterministic derivation
 - Forgettable or replaceable where appropriate
 - Reused by other skills when semantically appropriate
 
@@ -71,7 +75,8 @@ skills/weather/weather_location.json
 
 When a skill requires durable context that does not exist, it should ask for the missing information and enter `awaiting_input`.
 
-It should not guess durable context from unrelated signals unless explicitly approved.
+It should not promote unsupported guesses. Ambiguous ordinary claims may remain
+as conflicting candidates until later evidence resolves them.
 
 It should not keep a process alive while waiting.
 
@@ -85,12 +90,36 @@ Forget my weather location.
 Use Syracuse as my default location.
 ```
 
-The memory layer should make those changes explicit and reviewable.
+The memory layer should apply ordinary corrections promptly and make every
+change inspectable and reversible through its audit history.
+
+## Standing autonomous authority
+
+Soul may autonomously capture local conversation observations and create,
+classify, consolidate, promote, demote, supersede, reactivate, or logically
+tombstone ordinary memory when a reviewed deterministic policy authorizes the
+operation. Autonomous changes must record their actor, trigger, evidence,
+reason, policy version, before/after digests, and rollback reference.
+
+Soul must retain source observations and use compensating lifecycle events
+instead of rewriting historical evidence. Routine uncertainty should produce a
+candidate or conflict, not an item-by-item human approval queue.
+
+The following remain protected and require an explicit human decision:
+
+- credentials, secrets, and authentication material;
+- permission or authority grants;
+- destructive-operation authorization;
+- safety and security policy;
+- operator identity and protected persona rules;
+- physical purge of irreplaceable source observations;
+- export beyond the approved local or private-infrastructure boundary;
+- broad retention-policy changes and irreversible bulk operations.
 
 ## LLM limits
 
-LLMs may help identify that a user is providing, updating, or forgetting context.
-
-LLMs must not silently create durable memory without an approved flow.
+LLMs may identify, summarize, relate, or propose lifecycle changes for ordinary
+memory. Admission and mutation authority belongs to the reviewed deterministic
+policy, not to the model or agreement among several models.
 
 LLMs must not authorize risky behavior based on remembered context alone.
