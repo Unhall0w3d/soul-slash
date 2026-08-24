@@ -114,12 +114,19 @@ Dir.mktmpdir("soul-memory-a16-pending-") do |root|
   clock, observations, _memories, _audit, synth, derivations, admissions = build.call(root, "Stable project label is Cinder Relay.")
   capture.call(observations, clock, "pending")
   derived = derivations.derive(request_id: "prior-derive")
+  capture.call(observations, clock, "pending-second")
+  second = derivations.derive(request_id: "prior-derive-second")
   service = SoulCore::MemoryAutonomousLifecycleService.new(
     root: root, derivation_service: derivations, admission_service: admissions, clock: clock
   )
+  before = service.work_status
   result = service.run(request_id: "a16-cycle-pending")
   assert.call(result["ok"] && result["mode"] == "admit_pending", "older derived packet is drained first")
-  assert.call(result["packet_id"] == derived["packet_id"] && synth.calls == 1, "pending path does not invoke the model again")
+  assert.call(result["packet_id"] == derived["packet_id"] && synth.calls == 2, "pending path does not invoke the model again")
+  after = service.work_status
+  assert.call(before["pending_packet_sha256"] == derived["packet_sha256"] &&
+    after["pending_packet_sha256"] == second["packet_sha256"] && before["work_digest"] != after["work_digest"],
+    "each queued packet has a distinct stable work identity: #{before.inspect} -> #{after.inspect}")
 end
 
 Dir.mktmpdir("soul-memory-a16-protected-") do |root|

@@ -87,6 +87,20 @@ module SoulCore
       failure(error.message)
     end
 
+    def pending_work
+      ensure_safe_path!
+      packets = File.file?(@path) ? parse_and_verify(File.binread(@path)) : []
+      cursor = packets.last && packets.last["last_observation_event_sha256"]
+      observations = @observations.batch(after_event_sha256: cursor)
+      { "ok" => true, "lifecycle_state" => "complete", "schema" => SCHEMA,
+        "pending_observation_count" => observations.length,
+        "cursor_sha256" => cursor, "content_included" => false }.compact
+    rescue JSON::ParserError
+      failure("memory derivation data contains malformed JSON")
+    rescue ArgumentError, Errno::EACCES, Errno::EISDIR => error
+      failure(error.message)
+    end
+
     # Internal foreground consumers receive verified packets. Content is never
     # exposed through the Dashboard receipt surface.
     def packet_batch(after_packet_sha256: nil, limit: 1)
