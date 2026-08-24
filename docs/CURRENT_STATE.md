@@ -513,8 +513,8 @@ the historical observation batch; exact replay was idempotent and all audit,
 observation, derivation, admission, and cycle chains remained valid. Redis is
 not required for this program stage.
 
-Memory Core-Aware Worker A17 is candidate-complete but not installed. Its
-optional systemd user timer runs a hardened oneshot activation only after a
+Memory Core-Aware Worker A17 is installed and live-qualified. Its systemd user
+timer runs a hardened oneshot activation only after a
 verified pending-work check. It skips Free and Creative Cores, abstains from
 model loading when no work exists, and processes at most one A16 cycle per
 activation. Soul Core may use the existing reviewed temporary Soul-Lite handoff;
@@ -525,7 +525,20 @@ The exact worker entry point is foreground-live-qualified under Dev Core: it
 processed the remaining historical batch, correctly rejected one proposal that
 lacked cited user evidence, then returned `no_work` on the next invocation
 without model use or canonical mutation. All underlying evidence chains remain
-valid. The timer itself is still absent pending its exact installation gate.
+valid. The exact reviewed timer was installed and enabled on 2026-08-24; its
+first scheduled activation detected Dev Core and returned `no_work` with no
+model invocation or mutation, then terminated successfully.
+
+Memory Rebuildable Projection A18 is candidate-complete at the architecture and
+contract boundary. It deterministically maps the authoritative ledger and its
+verified approved-memory embedding index into a private Qdrant vector bundle
+and a content-free FalkorDB relationship graph. Raw memory text remains on
+Atelier: Qdrant receives vectors plus minimal metadata and returns canonical
+memory identifiers for a local join; FalkorDB receives lifecycle/provenance
+metadata and only explicit supersession or exact-duplicate edges. Both stores
+are disposable, non-authoritative, and fail back to local retrieval. No remote
+service or Foundry container is deployed; that requires the separate reviewed
+A19 deployment gate.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
