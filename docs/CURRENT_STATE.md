@@ -490,10 +490,18 @@ exact audited compensation, direct retrieval abstention, and fresh-chat
 non-recall. The canonical audit and all derived ledgers remained valid after
 compensation.
 
-Historical-chat backfill, autonomous lifecycle processing, the Core-aware
-background worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB
-projections remain subsequent approved slices. Redis is not required for this
-program stage.
+Historical Chat Backfill A15 is live-qualified. A content-free,
+digest-bound foreground preview selects at most 50 complete uncaptured
+exchanges from at most 25 persisted active or archived chats after a bounded
+500-chat/20,000-message scan; exact execute
+appends them through the existing A11 identity and chain protections. The live
+owner-private pass captured all 15 outstanding exchanges (30 messages) across
+two chats, then reached `no_work` with a valid 38-event observation chain. It never
+manufactures incomplete turns, invokes a model, mutates canonical memory, or
+continues in the background. Autonomous lifecycle processing, the Core-aware background
+worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB projections
+remain subsequent approved slices. Redis is not required for this program
+stage.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground

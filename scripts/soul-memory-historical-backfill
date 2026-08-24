@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/memory_historical_chat_backfill_service"
+
+service = SoulCore::MemoryHistoricalChatBackfillService.new(root: File.expand_path("..", __dir__))
+result = case ARGV.shift.to_s
+         when "preview" then service.preview
+         when "execute" then service.execute(confirmation: ARGV.shift.to_s, expected_digest: ARGV.shift.to_s)
+         else
+           { "ok" => false, "lifecycle_state" => "awaiting_input",
+             "reason" => "Usage: soul-memory-historical-backfill preview|execute CONFIRMATION EXPECTED_DIGEST",
+             "content_included" => false }
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)
