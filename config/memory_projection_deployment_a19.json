@@ -1,0 +1,80 @@
+{
+  "schema_version": "soul.memory-projection.deployment.a19.v1",
+  "state": "candidate_review_required",
+  "architecture_ref": "soul.memory_projection_contract.a18.v1",
+  "persistent_deployment_authorized": false,
+  "central_guest": {
+    "isolation": "dedicated_unprivileged_debian_13_lxc",
+    "cpu_cores": 2,
+    "memory_mib": 2048,
+    "swap_mib": 512,
+    "root_volume_gib": 24,
+    "autostart": true,
+    "nested_container_runtime": false,
+    "owner_private_identity_and_address": true
+  },
+  "components": {
+    "qdrant": {
+      "version": "1.19.0",
+      "artifact": "qdrant_1.19.0-1_amd64.deb",
+      "url": "https://github.com/qdrant/qdrant/releases/download/v1.19.0/qdrant_1.19.0-1_amd64.deb",
+      "sha256": "2c73614176642aeb8da5127fb583b4a63398e89c05c87eb2dc12faf1ad9c19ea",
+      "license": "Apache-2.0",
+      "installation": "official_release_deb"
+    },
+    "redis": {
+      "minimum_version": "8.0.0",
+      "source": "signed_debian_13_repository",
+      "package": "redis-server",
+      "installation": "apt_signature_verified"
+    },
+    "falkordb": {
+      "version": "4.20.4",
+      "artifact": "falkordb-x64.so",
+      "url": "https://github.com/FalkorDB/FalkorDB/releases/download/v4.20.4/falkordb-x64.so",
+      "sha256": "81ea6b989dc2fd4c9ad905e246018b220b02f0e40c406255f9da4768c1684555",
+      "license": "SSPL-1.0",
+      "installation": "official_release_module"
+    }
+  },
+  "network": {
+    "qdrant_listener": "tls_6333_fixed_client_only",
+    "qdrant_grpc_listener": "blocked",
+    "falkordb_listener": "tls_6379_fixed_client_only",
+    "management_listener": "ssh_22_key_only_fixed_authority",
+    "public_ingress": false,
+    "browser_ui": false,
+    "plaintext_database_ports": false,
+    "database_authentication": "required",
+    "tls": "owner_private_ca_signed"
+  },
+  "projection": {
+    "authority": "conversation_memory_ledger",
+    "raw_memory_text_remote": false,
+    "qdrant_payload": "embeddings_and_content_free_metadata",
+    "falkordb_payload": "content_free_lifecycle_and_explicit_relationships",
+    "generation_activation": "build_verify_atomic_select",
+    "reverse_synchronization": false,
+    "local_fallback": "required"
+  },
+  "durability": {
+    "qdrant_local_block_storage": true,
+    "falkordb_appendonly": true,
+    "projection_data_backup": false,
+    "configuration_and_credentials_backup": true,
+    "rebuild_from_canonical": true
+  },
+  "authority": {
+    "query": "read_only_after_later_integration",
+    "projection_rebuild": "exact_generation_only",
+    "canonical_memory_mutation": "none",
+    "remote_to_canonical_sync": "prohibited",
+    "model_authority": "none"
+  },
+  "rollback": {
+    "application": "select_previous_verified_generation",
+    "projection": "delete_and_rebuild_from_canonical",
+    "guest": "stop_then_remove_exact_owned_guest_only",
+    "canonical_memory": "unchanged"
+  }
+}
