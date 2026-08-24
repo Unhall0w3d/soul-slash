@@ -498,10 +498,20 @@ appends them through the existing A11 identity and chain protections. The live
 owner-private pass captured all 15 outstanding exchanges (30 messages) across
 two chats, then reached `no_work` with a valid 38-event observation chain. It never
 manufactures incomplete turns, invokes a model, mutates canonical memory, or
-continues in the background. Autonomous lifecycle processing, the Core-aware background
-worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB projections
-remain subsequent approved slices. Redis is not required for this program
-stage.
+continues in the background.
+
+Memory Autonomous Lifecycle A16 is live-qualified. One explicit foreground
+cycle drains one older verified derivation packet when present; otherwise it
+derives one bounded packet and immediately passes that exact packet through the
+A13 deterministic admission policy. Stable sub-request identities and a
+content-free hash-chained cycle journal make interrupted retries reconcilable
+without duplicate proposals or canonical records. Protected proposals remain
+blocked for human review. The Core-aware scheduled worker, the 3D Observatory,
+and Foundry-hosted Qdrant/FalkorDB projections remain subsequent reviewed
+slices. The first live Dev Core cycle admitted one active ordinary memory from
+the historical observation batch; exact replay was idempotent and all audit,
+observation, derivation, admission, and cycle chains remained valid. Redis is
+not required for this program stage.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
@@ -580,7 +590,7 @@ registration, host mutation, provider/privacy exceptions, service installation,
 merge, release, upload, and publication. Verified ordinary memory may move
 through the separately reviewed deterministic lifecycle policy.
 
-### Deterministic memory lifecycle admission (A13 candidate)
+### Deterministic memory lifecycle admission and foreground cycle
 
 Verified A12 proposal packets can now be processed one packet at a time by a
 foreground deterministic policy. Protected, assistant-only, and weakly
@@ -588,8 +598,10 @@ supported proposals are excluded; medium-confidence ordinary proposals remain
 candidates; high-confidence ordinary proposals can become active. Canonical
 writes use the A10 audit chain and compensatable transaction references, while
 a separate content-free hash-chained decision journal records why each proposal
-was handled. No background execution, live chat trigger, consolidation, or
-external vector/graph projection is enabled in this slice.
+was handled. A16 can now run derivation and admission as one explicit bounded
+foreground cycle with interruption-safe replay. No background execution,
+automatic chat trigger, consolidation, or external vector/graph projection is
+enabled in this slice.
 
 ## Current development focus
 

@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/conversation_memory_store"
+require_relative "../lib/soul_core/conversation_observation_store"
+require_relative "../lib/soul_core/env_loader"
+require_relative "../lib/soul_core/memory_audit_journal_service"
+require_relative "../lib/soul_core/memory_autonomous_lifecycle_service"
+require_relative "../lib/soul_core/memory_lifecycle_admission_service"
+require_relative "../lib/soul_core/memory_local_proposal_synthesizer"
+require_relative "../lib/soul_core/memory_observation_derivation_service"
+
+root = File.expand_path("..", __dir__)
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+request_id = ARGV.shift.to_s
+
+observations = SoulCore::ConversationObservationStore.new(root: root)
+memories = SoulCore::ConversationMemoryStore.new(root: root, create: false)
+audit = SoulCore::MemoryAuditJournalService.new(root: root, memory_store: memories)
+synthesizer = SoulCore::MemoryLocalProposalSynthesizer.new(root: root, env: ENV)
+derivations = SoulCore::MemoryObservationDerivationService.new(
+  root: root, observation_store: observations, synthesizer: synthesizer,
+  model_identity: { "provider" => "local", "model" => SoulCore::LocalDevelopmentModelClient::MODEL, "core" => "dev" }
+)
+admissions = SoulCore::MemoryLifecycleAdmissionService.new(
+  root: root, derivation_service: derivations, observation_store: observations,
+  memory_store: memories, audit_service: audit
+)
+service = SoulCore::MemoryAutonomousLifecycleService.new(
+  root: root, derivation_service: derivations, admission_service: admissions
+)
+
+result = service.run(request_id: request_id)
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)
