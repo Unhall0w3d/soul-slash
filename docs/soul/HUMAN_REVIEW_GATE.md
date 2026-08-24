@@ -1,6 +1,8 @@
 # Human Review Gate
 
-Human review is the authority boundary for Soul/.
+Human review is the authority boundary for consequential or protected Soul/
+changes. Ordinary memory lifecycle work may proceed under the separately
+approved, audited, reversible memory policy.
 
 Candidate-complete work is not approved work.
 
@@ -63,11 +65,17 @@ Only the human may approve:
 
 ```text
 merge readiness
-memory/rule promotion
+protected memory, authority, safety, identity, or retention-policy changes
 safety classification
 persistence/background architecture
 private-content sharing
 credential setup
 ```
 
-Soul/ may stage candidates. It may not self-certify them.
+Ordinary memory promotion, demotion, consolidation, supersession, and logical
+tombstoning do not require per-record approval when the reviewed deterministic
+policy authorizes them and the audit/rollback contract is satisfied. Model
+agreement alone does not confer that authority.
+
+Soul/ may stage other candidates. It may not self-certify merge, release,
+protected-memory, or persistence decisions.

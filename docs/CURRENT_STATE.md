@@ -412,7 +412,13 @@ disaster-recovery rehearsal remain separate review gates.
 
 ## Memory, artifacts, and deletion
 
-Mutable owner memory lives under ignored `Soul/private/memory/`; tracked memory files are neutral public seeds. Durable promotion remains human-reviewed.
+Mutable owner memory lives under ignored `Soul/private/memory/`; tracked memory
+files are neutral public seeds. The Operator has approved a transition from
+per-record review to standing autonomous authority for ordinary memory when
+changes are local, attributable, reversible, recoverable, and governed by a
+reviewed deterministic policy. Protected authority, security, identity,
+credential, export, physical-purge, and broad-retention changes remain explicit
+human decisions.
 
 Memory Retrieval and Observatory A0–A3 is candidate-complete for review. A
 synthetic deterministic corpus compares lexical and hybrid recall, an optional
@@ -444,6 +450,15 @@ private YAML, draft lessons, index rebuilding, or runtime lifecycle changes.
 The live A6 bootstrap imported 32 reviewed rules and lessons through 64 valid
 append-only lifecycle events; owner-private review fixtures and derived vectors
 remain ignored local state.
+
+Memory Automation Governance A9-A10 is candidate-complete for human review. It
+can adopt the existing canonical ledger in place, add a tamper-evident event
+chain, reconstruct point-in-time lifecycle state, and append compensating
+rollback without changing ordinary retrieval or migrating the Soul Vault. Live
+owner-private ledger adoption has not run. Automatic conversation capture,
+autonomous lifecycle processing, the Core-aware background worker, the 3D
+Observatory, and Foundry-hosted Qdrant/FalkorDB projections remain subsequent
+approved slices. Redis is not required for this program stage.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
