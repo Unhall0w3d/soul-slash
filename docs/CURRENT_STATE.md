@@ -552,7 +552,22 @@ Conversations, skill candidates, music projects, visual projects, reference prof
 
 Soul may inspect, explain, draft, research, stage, generate, test, and produce evidence. It may not treat model output, passing tests, successful generation, or a machine-heard result as authorization.
 
-Human approval remains required for risky or destructive execution, durable memory/rule promotion, skill and augmentation gates, production registration, host mutation, provider/privacy exceptions, service installation, merge, release, upload, and publication.
+Human approval remains required for risky or destructive execution, protected
+memory or rule promotion, skill and augmentation gates, production
+registration, host mutation, provider/privacy exceptions, service installation,
+merge, release, upload, and publication. Verified ordinary memory may move
+through the separately reviewed deterministic lifecycle policy.
+
+### Deterministic memory lifecycle admission (A13 candidate)
+
+Verified A12 proposal packets can now be processed one packet at a time by a
+foreground deterministic policy. Protected, assistant-only, and weakly
+supported proposals are excluded; medium-confidence ordinary proposals remain
+candidates; high-confidence ordinary proposals can become active. Canonical
+writes use the A10 audit chain and compensatable transaction references, while
+a separate content-free hash-chained decision journal records why each proposal
+was handled. No background execution, live chat trigger, consolidation, or
+external vector/graph projection is enabled in this slice.
 
 ## Current development focus
 

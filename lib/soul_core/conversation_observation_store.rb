@@ -134,12 +134,7 @@ module SoulCore
       prepare_store!
       File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
         lock.flock(File::LOCK_SH)
-        previous = nil
-        events = segment_paths.flat_map do |segment|
-          values = read_segment(segment, expected_previous: previous)
-          previous = values.last&.fetch("event_sha256", nil) || previous
-          values
-        end
+        events = verified_events
         start = 0
         unless after_event_sha256.to_s.empty?
           index = events.index { |event| event["event_sha256"] == after_event_sha256.to_s }
@@ -161,7 +156,29 @@ module SoulCore
       end
     end
 
+    def find_by_ids(ids:)
+      requested = Array(ids).map(&:to_s)
+      raise ArgumentError, "conversation observation identity request is invalid" unless requested.length.between?(1, 24) && requested.uniq.length == requested.length
+      prepare_store!
+      events = File.open(lock_path, File::RDWR | File::CREAT, 0o600) do |lock|
+        lock.flock(File::LOCK_SH)
+        verified_events
+      end
+      selected = requested.filter_map { |id| events.find { |event| event["observation_id"] == id } }
+      raise ArgumentError, "conversation observation evidence is unavailable" unless selected.length == requested.length
+      JSON.parse(JSON.generate(selected))
+    end
+
     private
+
+    def verified_events
+      previous = nil
+      segment_paths.flat_map do |segment|
+        values = read_segment(segment, expected_previous: previous)
+        previous = values.last&.fetch("event_sha256", nil) || previous
+        values
+      end
+    end
 
     def prepare_store!
       ensure_safe_path!(@path)

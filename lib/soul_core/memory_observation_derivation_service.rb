@@ -5,6 +5,7 @@ require "fileutils"
 require "json"
 require "time"
 require_relative "conversation_observation_store"
+require_relative "memory_protection_policy"
 require_relative "memory_paths"
 
 module SoulCore
@@ -28,14 +29,6 @@ module SoulCore
       previous_packet_sha256 proposals request_id schema
     ].freeze
     HEX_DIGEST = /\A[0-9a-f]{64}\z/
-    PROTECTED_PATTERNS = [
-      /\b(?:password|passphrase|credential|secret|api[ _-]?key|private key|token)\b/i,
-      /\b(?:permission|authority|authorization|sudo|root access|access grant)\b/i,
-      /\b(?:delete permanently|destructive|wipe|purge|empty trash|format disk)\b/i,
-      /\b(?:safety policy|security policy|firewall rule|protection boundary)\b/i,
-      /\b(?:operator identity|owner identity|persona rule|system prompt)\b/i,
-      /\b(?:export externally|publish private|retention policy|irreversible|bulk delete)\b/i
-    ].freeze
 
     def initialize(root: Dir.pwd, observation_store: nil, synthesizer:, model_identity:, path: nil, clock: -> { Time.now })
       @root = File.expand_path(root)
@@ -94,6 +87,22 @@ module SoulCore
       failure(error.message)
     end
 
+    # Internal foreground consumers receive verified packets. Content is never
+    # exposed through the Dashboard receipt surface.
+    def packet_batch(after_packet_sha256: nil, limit: 1)
+      requested = Integer(limit)
+      raise ArgumentError, "memory derivation packet limit is invalid" unless requested.between?(1, 8)
+      ensure_safe_path!
+      packets = File.file?(@path) ? parse_and_verify(File.binread(@path)) : []
+      start = 0
+      unless after_packet_sha256.to_s.empty?
+        index = packets.index { |packet| packet["packet_sha256"] == after_packet_sha256.to_s }
+        raise ArgumentError, "memory derivation cursor is unknown" unless index
+        start = index + 1
+      end
+      JSON.parse(JSON.generate(packets.drop(start).first(requested)))
+    end
+
     private
 
     def synthesis_input(observations)
@@ -134,7 +143,7 @@ module SoulCore
         { "proposal_id" => proposal_id_for(layer, content, evidence),
           "layer" => layer, "content" => content, "confidence" => confidence.round(3),
           "evidence_observation_ids" => evidence,
-          "protection_class" => protected_content?(content) ? "protected_review_required" : "ordinary_candidate" }
+          "protection_class" => MemoryProtectionPolicy.classify(content) }
       rescue ArgumentError, TypeError
         raise ArgumentError, "local memory synthesis proposal is invalid"
       end
@@ -204,7 +213,7 @@ module SoulCore
         confidence = Float(proposal["confidence"])
         evidence = proposal["evidence_observation_ids"]
         raise ArgumentError, "memory derivation stored proposal is invalid" unless confidence.between?(0.0, 1.0) && evidence.is_a?(Array) && evidence.length.between?(1, 8) && evidence.uniq.length == evidence.length && (evidence - observation_ids).empty?
-        expected_class = protected_content?(proposal["content"]) ? "protected_review_required" : "ordinary_candidate"
+        expected_class = MemoryProtectionPolicy.classify(proposal["content"])
         expected_id = proposal_id_for(proposal["layer"], proposal["content"], evidence)
         raise ArgumentError, "memory derivation protection classification is invalid" unless proposal["protection_class"] == expected_class
         raise ArgumentError, "memory derivation proposal identity is invalid" unless proposal["proposal_id"] == expected_id
@@ -221,10 +230,6 @@ module SoulCore
       model = bounded_identity(value["model"], "model identity")
       core = bounded_identity(value["core"], "Core identity")
       { "provider" => "local", "model" => model, "core" => core }
-    end
-
-    def protected_content?(content)
-      PROTECTED_PATTERNS.any? { |pattern| content.match?(pattern) }
     end
 
     def proposal_id_for(layer, content, evidence)
