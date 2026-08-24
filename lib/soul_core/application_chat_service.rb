@@ -4,14 +4,16 @@ require "digest"
 require "json"
 require_relative "application_contract"
 require_relative "application_request_receipt_store"
+require_relative "conversation_observation_store"
 
 module SoulCore
   class ApplicationChatService
-    def initialize(root:, store:, runtime:, receipt_store: nil)
+    def initialize(root:, store:, runtime:, receipt_store: nil, observation_store: nil)
       @root = File.expand_path(root)
       @store = store
       @runtime = runtime
       @receipt_store = receipt_store || ApplicationRequestReceiptStore.new(root: @root)
+      @observation_store = observation_store || ConversationObservationStore.new(root: @root)
     end
 
     def send(chat_id:, message:, request_id:, interface: "internal", progress: nil)
@@ -64,13 +66,19 @@ module SoulCore
           "runtime" => result.metadata
         ).reject { |_key, value| value.nil? }
       )
+      observation_capture = capture_observations(
+        user_message: user_message,
+        assistant_message: assistant_message,
+        request_id: request_id,
+        interface: interface
+      )
       @receipt_store.complete(
         request_id: request_id,
         user_message_id: user_message.fetch("id"),
         assistant_message_id: assistant_message.fetch("id")
       )
       emit(progress_sink, "complete", "Response complete.")
-      success(user_message, assistant_message, result, replay: false)
+      success(user_message, assistant_message, result, replay: false, observation_capture: observation_capture)
     rescue ArgumentError => error
       safe_fail(request_id, "invalid_input")
       failure(error.message)
@@ -153,18 +161,25 @@ module SoulCore
         "user_message" => user_message,
         "assistant_message" => assistant_message,
         "result" => result_projection(assistant_message),
+        "observation_capture" => capture_observations(
+          user_message: user_message,
+          assistant_message: assistant_message,
+          request_id: receipt.fetch("request_id"),
+          interface: user_message.dig("metadata", "interface") || "internal"
+        ),
         "idempotent_replay" => true,
         "mutation" => "none"
       }
     end
 
-    def success(user_message, assistant_message, result, replay:)
+    def success(user_message, assistant_message, result, replay:, observation_capture:)
       {
         "ok" => true,
         "lifecycle_state" => "complete",
         "user_message" => user_message,
         "assistant_message" => assistant_message,
         "result" => result.respond_to?(:to_h) ? result.to_h : result,
+        "observation_capture" => observation_capture,
         "idempotent_replay" => replay,
         "mutation" => "chat_exchange_appended"
       }
@@ -179,6 +194,22 @@ module SoulCore
         "fallback_reason" => metadata["fallback_reason"],
         "metadata" => metadata["runtime"] || {}
       }.compact
+    end
+
+    def capture_observations(user_message:, assistant_message:, request_id:, interface:)
+      @observation_store.capture_exchange(
+        user_message: user_message,
+        assistant_message: assistant_message,
+        request_id: request_id,
+        interface: interface
+      )
+    rescue StandardError => error
+      {
+        "ok" => false,
+        "lifecycle_state" => "failed",
+        "reason" => "conversation observation capture failed safely: #{error.class}",
+        "content_included" => false
+      }
     end
 
     def application_metadata(request_id, interface)
