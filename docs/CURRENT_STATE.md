@@ -451,14 +451,22 @@ The live A6 bootstrap imported 32 reviewed rules and lessons through 64 valid
 append-only lifecycle events; owner-private review fixtures and derived vectors
 remain ignored local state.
 
-Memory Automation Governance A9-A10 is candidate-complete for human review. It
-can adopt the existing canonical ledger in place, add a tamper-evident event
-chain, reconstruct point-in-time lifecycle state, and append compensating
-rollback without changing ordinary retrieval or migrating the Soul Vault. Live
-owner-private ledger adoption has not run. Automatic conversation capture,
-autonomous lifecycle processing, the Core-aware background worker, the 3D
-Observatory, and Foundry-hosted Qdrant/FalkorDB projections remain subsequent
-approved slices. Redis is not required for this program stage.
+Memory Automation Governance A9-A10 is implemented. It can adopt the existing
+canonical ledger in place, add a tamper-evident event chain, reconstruct
+point-in-time lifecycle state, and append compensating rollback without
+changing ordinary retrieval or migrating the Soul Vault. Live owner-private
+ledger adoption has not run.
+
+Conversation Observation Capture A11 is candidate-complete for human review.
+Every successfully completed application chat turn is mirrored as an ordered,
+hash-chained pair of exact user and assistant source observations in ignored
+owner-private storage. Capture and integrity receipts remain content-free,
+request replay is idempotent, and a capture failure does not erase the already
+persisted chat response. Observations do not enter ordinary retrieval.
+Historical-chat backfill, autonomous lifecycle processing, the Core-aware
+background worker, the 3D Observatory, and Foundry-hosted Qdrant/FalkorDB
+projections remain subsequent approved slices. Redis is not required for this
+program stage.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground

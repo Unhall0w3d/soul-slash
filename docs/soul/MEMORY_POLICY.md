@@ -26,6 +26,13 @@ context admitted by an approved deterministic policy or explicit human action.
 
 Post-task notes describing what happened, what worked, what failed, and what should improve.
 
+### Source observations
+
+Exact locally retained conversation messages and later approved evidence
+sources. Capture does not imply truth, agreement, importance, or eligibility
+for ordinary retrieval. Observations remain immutable provenance from which
+candidate memory may later be derived.
+
 ## Shared infrastructure rule
 
 Memory is shared infrastructure, not skill-private storage.
@@ -104,6 +111,11 @@ reason, policy version, before/after digests, and rollback reference.
 Soul must retain source observations and use compensating lifecycle events
 instead of rewriting historical evidence. Routine uncertainty should produce a
 candidate or conflict, not an item-by-item human approval queue.
+
+Successful conversation turns are captured automatically in the shared
+owner-private observation ledger. Operational chat deletion does not silently
+rewrite that immutable evidence. Physical purge remains a separate protected
+operation.
 
 The following remain protected and require an explicit human decision:
 

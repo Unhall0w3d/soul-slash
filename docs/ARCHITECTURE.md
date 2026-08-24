@@ -270,6 +270,7 @@ Current approved rule files include:
 ```text
 Soul/private/memory/approved_rules.md
 Soul/private/memory/approved_lessons.md
+Soul/private/memory/conversation_observations.jsonl
 ```
 
 Older installations may retain compatibility sources under `Soul/memory/`
@@ -287,6 +288,9 @@ security, identity, credential, export, physical-purge, and broad-retention
 changes remain human decisions.
 
 The canonical JSONL ledger and human-readable Soul Vault remain authoritative.
+The separate owner-private conversation-observation ledger retains exact source
+messages as immutable evidence. Observations do not enter retrieval merely
+because they were captured; derived memory must still pass the lifecycle policy.
 Audit adoption records the exact digest of the pre-existing ledger without
 rewriting it; subsequent events are hash chained. Historical reconstruction
 replays an immutable prefix, while rollback appends compensating events rather
