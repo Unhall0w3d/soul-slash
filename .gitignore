@@ -34,6 +34,7 @@ Soul/reflection/knowledge_pending/
 Soul/memory/conversation_memory.jsonl
 Soul/memory/conversation_observations.jsonl
 Soul/memory/conversation_observations/
+Soul/memory/observation_derivations.jsonl
 Soul/memory/exports/*.json
 
 # Keep directory sentinels
