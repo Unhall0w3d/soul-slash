@@ -90,7 +90,10 @@ Qwen, touch Gemma, or load the foreground music engine.
 ## Hard boundaries
 
 - No reboot, automatic switching, failover, preemption, idle unload, queue,
-  watcher, scheduler, polling loop, or background continuation.
+  watcher, scheduler, interval polling, or background continuation. The
+  separately authorized A8 settlement extension permits exactly two delayed,
+  read-only `core.status` observations inside the foreground interaction after
+  a successful Core mutation; it cannot retry the mutation.
 - No new service, unit, listener, package, model, model download, or provider.
 - No Core becomes the default and Gemma is not promoted by this slice.
 - No transition is performed merely by opening the dashboard or selecting a
@@ -107,7 +110,7 @@ Qwen, touch Gemma, or load the foreground music engine.
 - unchanged runtime confirmation and digest delegated through the Core gate;
 - active lease, unavailable activity probe, stale digest, and conflict blockers;
 - application contract and authenticated dashboard selector behavior;
-- event-driven UI with no timer or polling primitive;
+- event-driven UI outside the exact A8 bounded post-transition settlement;
 - System Status and Music Studio accurately disclose NVIDIA contention;
 - no live Core transition during candidate implementation;
 - completed review artifact following `docs/soul/HUMAN_REVIEW_GATE.md`.

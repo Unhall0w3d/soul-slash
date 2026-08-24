@@ -1,8 +1,8 @@
 # Memory Embedding Core Lifecycle A7 Review
 
-## Candidate outcome
+## Outcome
 
-A7 is candidate-complete for installation review. It fixes the qualified
+A7 is merged, installed, and live-qualified. It fixes the qualified
 `qwen3-embedding:0.6b-q8_0` endpoint at a 1024-token ceiling, reuses the existing
 Core controller, and preserves lexical retrieval when the endpoint fails.
 
@@ -20,8 +20,8 @@ Core controller, and preserves lexical retrieval when the endpoint fails.
 
 ## Deterministic evidence
 
-`make verify-memory-embedding-core-lifecycle` passed 15 checks. Existing Core
-orchestration passed 27 checks. Retrieval Observatory, semantic Chat context,
+`make verify-memory-embedding-core-lifecycle` passed 16 checks. Existing Core
+orchestration passed 28 checks. Retrieval Observatory, semantic Chat context,
 private runtime review, and reviewed-ledger bootstrap suites all passed.
 `git diff --check` passed.
 
@@ -32,6 +32,12 @@ The 1024-token pilot processed 1,023 embedding tokens. The embedding runner used
 1,475 MiB free. Simultaneous embedding and Chat completed successfully. Ten
 warm short embeddings averaged 56.7 ms. Teardown closed port 11434 and returned
 GPU usage to the exact 5,306 MiB baseline.
+
+After installation, exact preview/execute transitions exercised Soul Core,
+Creative Core, Dev Core, Free Core, and restoration to Soul-Lite Core. The
+embedding endpoint remained active in every non-Free Core, stopped before Free
+Core completed, and restarted on restoration. Dev Core also reported its
+GPT-OSS lane resident while the embedding endpoint remained available.
 
 ## Lifecycle and risk
 
@@ -45,8 +51,10 @@ path rather than blocking Chat.
 ## Known weaknesses
 
 - The 1,475 MiB Soul-Lite margin is viable but tighter than the 512-token pilot.
-- Only Soul-Lite coexistence has direct live load evidence; other non-Free Cores
-  still require observation after installation.
+- Rapid scripted transitions exposed bounded settling windows: one immediate
+  preview correctly blocked until Qwen idle telemetry became observable, and
+  one immediate post-Dev status read collided with the model-runtime lease lock.
+  Both recovered without an unsafe transition or incorrect final Core state.
 - Index rebuilding remains an explicit foreground operation.
 
 ## Human review checklist
@@ -56,5 +64,5 @@ path rather than blocking Chat.
 - [x] Review the exact unit plan and Ollama binary digest.
 - [x] Install the inactive, unenabled unit.
 - [x] Observe Soul-Lite startup and live hybrid retrieval.
-- [ ] Observe one transition for each remaining applicable Core.
-- [ ] Approve merge after live review.
+- [x] Observe one transition for each remaining applicable Core.
+- [x] Approve and merge after live review.
