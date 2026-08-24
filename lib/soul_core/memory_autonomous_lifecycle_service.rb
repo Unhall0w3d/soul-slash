@@ -70,10 +70,30 @@ module SoulCore
       failure(error.message)
     end
 
+    def work_status
+      verify_sources!
+      packet = pending_packet
+      observations = @derivations.pending_work
+      raise ArgumentError, "memory observation work evidence is unavailable" unless observations["ok"]
+      { "ok" => true, "lifecycle_state" => "complete", "schema" => SCHEMA,
+        "pending_derivation_packet" => !packet.nil?,
+        "pending_packet_sha256" => packet && packet["packet_sha256"],
+        "pending_observation_count" => observations.fetch("pending_observation_count"),
+        "work_available" => !packet.nil? || observations.fetch("pending_observation_count").positive?,
+        "work_digest" => Digest::SHA256.hexdigest(JSON.generate(
+          "pending_packet_sha256" => packet && packet["packet_sha256"],
+          "pending_observation_count" => observations.fetch("pending_observation_count"),
+          "cursor_sha256" => observations["cursor_sha256"]
+        ) + "\n"),
+        "content_included" => false }
+    rescue ArgumentError, Errno::EACCES, Errno::EISDIR, Errno::ENOENT, IOError => error
+      failure(error.message)
+    end
+
     private
 
     def execute_cycle(request, prior)
-      pending = pending_packet?
+      pending = pending_packet
       if pending
         admission = checked(@admissions.apply(request_id: "#{request}:admit-pending"), "memory admission")
         return build_entry(request, "admit_pending", nil, admission, prior)
@@ -90,10 +110,10 @@ module SoulCore
       build_entry(request, "derive_and_admit", derivation, admission, prior)
     end
 
-    def pending_packet?
+    def pending_packet
       latest = @admissions.decision_batch(limit: 1).last
       cursor = latest && latest["source_packet_sha256"]
-      !@derivations.packet_batch(after_packet_sha256: cursor, limit: 1).empty?
+      @derivations.packet_batch(after_packet_sha256: cursor, limit: 1).first
     end
 
     def verify_sources!

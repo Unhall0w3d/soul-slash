@@ -513,6 +513,20 @@ the historical observation batch; exact replay was idempotent and all audit,
 observation, derivation, admission, and cycle chains remained valid. Redis is
 not required for this program stage.
 
+Memory Core-Aware Worker A17 is candidate-complete but not installed. Its
+optional systemd user timer runs a hardened oneshot activation only after a
+verified pending-work check. It skips Free and Creative Cores, abstains from
+model loading when no work exists, and processes at most one A16 cycle per
+activation. Soul Core may use the existing reviewed temporary Soul-Lite handoff;
+Soul-Lite and Dev Core can run directly. Installation remains behind an exact
+fresh-plan digest and confirmation phrase, and live timer cadence, Core
+restoration, and busy-lane behavior remain human acceptance tests.
+The exact worker entry point is foreground-live-qualified under Dev Core: it
+processed the remaining historical batch, correctly rejected one proposal that
+lacked cited user evidence, then returned `no_work` on the next invocation
+without model use or canonical mutation. All underlying evidence chains remain
+valid. The timer itself is still absent pending its exact installation gate.
+
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
 operations, project approved memory into a generated index, and import one
