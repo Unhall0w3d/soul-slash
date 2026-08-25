@@ -646,6 +646,14 @@ all returned content from the canonical local ledger. It rejects stale or
 malformed projection evidence and falls back to the existing local retrieval
 service. This path is live-qualified but intentionally not routed into Chat or
 Voice until comparative ranking and abstention behavior are reviewed.
+A24 adds a content-withholding foreground qualification harness over a fixed
+owner-private positive/negative corpus. It compares the existing local path
+with A23 projection candidates across a closed 0.50..0.80 threshold sweep, but
+cannot select a winner, change production behavior, or route Chat/Voice.
+The first private live run covered 11 positive and 5 negative cases. A `0.65`
+remote threshold preserved full positive recall and rejected every negative
+case while improving precision, but ranked expected results below the local
+path. The next gate is hybrid-fusion qualification, not direct remote routing.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 
