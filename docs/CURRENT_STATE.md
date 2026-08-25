@@ -633,10 +633,12 @@ through the separately reviewed deterministic lifecycle policy.
 The deployed owner-private Qdrant and FalkorDB services remain disposable,
 content-free projections. A21 defines a bounded generation coordinator: both
 generation-specific stores must verify before one owner-local selector can
-activate their exact pair. Failure leaves local authoritative retrieval and the
-previous selector intact. TLS transports, selector persistence, live
-population, remote retrieval, rollback, and retirement remain later reviewed
-gates.
+activate their exact pair. A22 adds verified TLS transports, exact bounded
+readback, owner-private atomic selector persistence, and one foreground
+preview/execute command. Failure leaves local authoritative retrieval and the
+previous selector intact. The first live preview is currently blocked by a
+stale reviewed embedding index; live population, remote retrieval, rollback,
+and retirement remain later reviewed gates.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 
