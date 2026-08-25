@@ -638,8 +638,14 @@ readback, owner-private atomic selector persistence, and one foreground
 preview/execute command. Failure leaves local authoritative retrieval and the
 previous selector intact. The first exact generation is now live-qualified and
 active after verified population of 33 Qdrant vectors, 34 FalkorDB nodes, and 5
-explicit edges. Local retrieval remains authoritative; remote retrieval,
-rollback, and retirement remain later reviewed gates.
+explicit edges. Local retrieval remains authoritative; automatic projection
+routing, rollback, and retirement remain later reviewed gates. A23 adds a separate
+foreground diagnostic query that can rank identifiers through the active
+Qdrant generation and inspect only explicit FalkorDB relationships, then joins
+all returned content from the canonical local ledger. It rejects stale or
+malformed projection evidence and falls back to the existing local retrieval
+service. This path is live-qualified but intentionally not routed into Chat or
+Voice until comparative ranking and abstention behavior are reviewed.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 
