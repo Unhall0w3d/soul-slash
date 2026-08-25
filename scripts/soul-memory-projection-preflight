@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+require "time"
+
+root = File.expand_path("..", __dir__)
+config_path = ENV.fetch("SOUL_MEMORY_PROJECTION_PRIVATE_CONFIG", File.join(root, "Soul", "private", "memory", "projection", "deployment.json"))
+abort "private deployment configuration is unavailable" unless File.file?(config_path) && !File.symlink?(config_path) && (File.stat(config_path).mode & 0o077).zero?
+config = JSON.parse(File.binread(config_path))
+abort "private deployment configuration schema mismatch" unless config["schema_version"] == "soul.memory-projection.private.a20.v1"
+
+vmid = Integer(config.fetch("vmid"))
+ipv4 = config.fetch("ipv4")
+target = config.fetch("target_alias")
+remote = <<~SH
+  set -eu
+  node=$(hostname)
+  memory=$(pvesh get /nodes/$node/status --output-format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["memory"]["available"])')
+  storage=$(pvesm status --content rootdir | awk '$1 == "local-lvm" {print $6 * 1024}')
+  if pct status #{vmid} >/dev/null 2>&1 || qm status #{vmid} >/dev/null 2>&1; then vmid_free=false; else vmid_free=true; fi
+  if ping -c 1 -W 1 #{ipv4} >/dev/null 2>&1 || ip neigh show #{ipv4} | grep -Eq 'lladdr|REACHABLE|STALE|DELAY|PROBE'; then address_free=false; else address_free=true; fi
+  printf '{"available_memory_bytes":%s,"available_storage_bytes":%s,"vmid_free":%s,"address_free":%s}\n' "$memory" "$storage" "$vmid_free" "$address_free"
+SH
+stdout, stderr, status = Open3.capture3("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", target, remote)
+abort "Foundry preflight failed: #{stderr.to_s.byteslice(0, 512)}" unless status.success?
+facts = JSON.parse(stdout)
+receipt = {
+  "schema_version" => "soul.memory-projection.preflight.a20.v1",
+  "observed_at" => Time.now.utc.iso8601,
+  "target_alias" => target,
+  "vmid_free" => facts.fetch("vmid_free"),
+  "address_free" => facts.fetch("address_free"),
+  "available_memory_bytes" => Integer(facts.fetch("available_memory_bytes")),
+  "available_storage_bytes" => Integer(facts.fetch("available_storage_bytes"))
+}
+path = File.expand_path(config.fetch("preflight_evidence_path"))
+abort "preflight path must remain below the private projection directory" unless path.start_with?(File.dirname(File.expand_path(config_path)) + File::SEPARATOR)
+temporary = "#{path}.tmp-#{Process.pid}"
+at_exit { File.delete(temporary) if File.exist?(temporary) }
+File.open(temporary, File::WRONLY | File::CREAT | File::EXCL, 0o600) { |file| file.write(JSON.pretty_generate(receipt) + "\n"); file.flush; file.fsync }
+File.rename(temporary, path)
+File.chmod(0o600, path)
+puts JSON.pretty_generate(receipt)

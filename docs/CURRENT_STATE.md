@@ -540,6 +540,19 @@ are disposable, non-authoritative, and fail back to local retrieval. No remote
 service or Foundry container is deployed; that requires the separate reviewed
 A19 deployment gate.
 
+Memory Projection Deployment A19 is candidate-complete at its exact-plan
+boundary. The public manifest selects a dedicated unprivileged Debian 13 LXC,
+2 vCPUs, 2 GiB RAM, 512 MiB swap, and 24 GiB local storage. It deliberately
+avoids nested Docker: Qdrant uses the checksum-pinned official 1.19.0 Debian
+asset, Debian supplies signed Redis 8, and FalkorDB uses its checksum-pinned
+4.20.4 module. Only authenticated TLS database ports from one fixed private
+client are allowed; plaintext ports, browser UIs, public ingress, raw remote
+memory content, reverse synchronization, and canonical mutation are prohibited.
+The deterministic planner validates owner-private deployment evidence and
+produces a content-free digest-bound plan. It performs no deployment. Guest and
+service installation require explicit adoption of the A19 brief plus a fresh
+`INSTALL_SOUL_MEMORY_PROJECTION` confirmation and plan digest.
+
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
 operations, project approved memory into a generated index, and import one
