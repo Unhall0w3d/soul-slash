@@ -123,7 +123,14 @@ content.
 make memory-retrieval-policy-status
 make memory-production-qualify
 make verify-memory-production-closure
+make memory-consolidate-exact-preview
+make verify-memory-exact-duplicate-consolidation
 ```
+
+The A30 preview is content-free and read-only. Its separately invoked run can
+supersede at most one same-layer, whitespace-normalized exact duplicate under
+the canonical audit and compensation policy. It does not merge near-duplicates,
+rewrite content, touch protected memory, or reconcile the remote projection.
 
 ## Live profile qualification
 

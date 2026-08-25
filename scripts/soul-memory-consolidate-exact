@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/conversation_memory_store"
+require_relative "../lib/soul_core/memory_audit_journal_service"
+require_relative "../lib/soul_core/memory_exact_duplicate_consolidation_service"
+
+root = File.expand_path("..", __dir__)
+store = SoulCore::ConversationMemoryStore.new(root: root)
+audit = SoulCore::MemoryAuditJournalService.new(root: root, memory_store: store)
+service = SoulCore::MemoryExactDuplicateConsolidationService.new(memory_store: store, audit_service: audit)
+
+result = case ARGV
+         when ["preview"]
+           service.preview
+         else
+           if ARGV.length == 2 && ARGV.first == "run"
+             service.run(request_id: ARGV.last)
+           else
+             warn "Usage: soul-memory-consolidate-exact preview | run REQUEST_ID"
+             exit 2
+           end
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)
