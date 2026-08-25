@@ -54,6 +54,20 @@ Dir.mktmpdir("soul-memory-a29-") do |root|
   assert.call(!JSON.generate(result).include?("known fixture") && result.dig("data", "content_included") == false, "receipt withholds query and memory content")
   assert.call(retrieval.calls.length == 2, "qualification is bounded by corpus")
 
+  aliased_cases = JSON.parse(JSON.generate(cases))
+  aliased_cases.fetch("cases").first["expected_memory_ids"] = ["mem_superseded"]
+  File.write(path, JSON.generate(aliased_cases))
+  File.chmod(0o600, path)
+  aliased = SoulCore::MemoryProductionQualificationService.new(
+    case_path: path, allowed_root: private_root, approved_memory_ids: %w[mem_expected mem_other mem_forbidden],
+    retrieval: retrieval, policy_store: policy,
+    memory_id_resolver: ->(id) { id == "mem_superseded" ? "mem_expected" : id }
+  ).qualify
+  assert.call(aliased["lifecycle_state"] == "complete" && aliased.dig("data", "positive_hit_count") == 1,
+    "qualification follows canonical supersession aliases")
+  File.write(path, JSON.generate(cases))
+  File.chmod(0o600, path)
+
   local_policy = FixturePolicy.new({"profile" => "local_hybrid_a4", "projection_threshold" => nil})
   blocked = SoulCore::MemoryProductionQualificationService.new(case_path: path, allowed_root: private_root, approved_memory_ids: %w[mem_expected mem_other mem_forbidden], retrieval: retrieval, policy_store: local_policy).qualify
   assert.call(blocked["lifecycle_state"] == "failed", "unqualified policy fails closed")
@@ -73,5 +87,6 @@ assert.call(!source.match?(/Thread\.new|systemd|setInterval|setTimeout|File\.(?:
 
 cli_source = File.read(File.join(__dir__, "soul-memory-production-qualify"))
 assert.call(cli_source.include?("SoulCore::ApplicationFacade.new") && cli_source.include?('"memory.observatory.query"'), "live qualification traverses the public production facade route")
+assert.call(cli_source.include?("memory supersession cycle detected") && cli_source.include?("64.times"), "live qualification resolves bounded canonical supersession chains")
 
 puts "Memory production qualification A29 passed (#{checks} checks)."

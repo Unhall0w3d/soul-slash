@@ -44,11 +44,24 @@ module SoulMemoryProductionQualificationCLI
     _local, _projection, store = SoulMemoryProjectionQueryCLI.build_services(env: env, root: root)
     policy = SoulCore::MemoryRetrievalPolicyStore.new(private_root: paths.private_root, path: File.join(paths.private_root, "retrieval", "active-policy.json"))
     retrieval = FacadeRetrievalAdapter.new(SoulCore::ApplicationFacade.new(root: root, process_env: env))
+    resolver = lambda do |memory_id|
+      current = memory_id.to_s
+      visited = {}
+      64.times do
+        raise "memory supersession cycle detected" if visited[current]
+        visited[current] = true
+        record = store.find(current)
+        break unless record && record["status"] == "superseded" && !record["superseded_by"].to_s.empty?
+        current = record.fetch("superseded_by")
+      end
+      raise "memory supersession chain exceeds bound" if store.find(current)&.dig("status") == "superseded"
+      current
+    end
     result = SoulCore::MemoryProductionQualificationService.new(
       case_path: File.join(paths.private_root, "projection", "qualification-cases.json"),
       allowed_root: paths.private_root,
       approved_memory_ids: store.records(status: "approved").map { |record| record.fetch("id") },
-      retrieval: retrieval,
+      retrieval: retrieval, memory_id_resolver: resolver,
       policy_store: policy
     ).qualify
     puts JSON.pretty_generate(result)
