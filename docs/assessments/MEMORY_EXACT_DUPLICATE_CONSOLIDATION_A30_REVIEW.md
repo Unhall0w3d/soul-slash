@@ -1,7 +1,8 @@
 # Memory Exact-Duplicate Consolidation A30 Review
 
-Status: implementation candidate; live ordinary-memory execution is not part of
-this slice.
+Status: approved and integrated through the A31 Core-aware lifecycle worker.
+The first bounded owner-private consolidation completed under the reviewed
+policy, and the disposable projection was rebuilt separately afterward.
 
 ## Implemented
 
@@ -43,13 +44,14 @@ identifiers and content are intentionally not recorded in this public artifact.
 ## Known limits and next gate
 
 A30 does not perform semantic consolidation, conflict resolution, content
-rewriting, projection reconciliation, or timer integration. The next reviewed
-slice may add this operation to the existing Core-aware one-shot lifecycle
-worker after live preview evidence confirms the ordinary duplicate scope.
+rewriting, physical deletion, or projection reconciliation. A31 integrated the
+operation into the existing Core-aware one-shot lifecycle worker while
+preserving the one-mutation bound. Projection reconciliation remains a
+separate consequence and authority.
 
 Risk: medium canonical lifecycle mutation, reversible through the existing
-compensating audit contract. Human review remains required for merge and the
-first live owner-private invocation.
+compensating audit contract. Merge and the first live owner-private invocation
+were approved and completed.
 
 Memory keys added: none. Shared canonical memory state touched by synthetic
 tests: `approved` to `superseded`; live preview touched no lifecycle state.
@@ -59,8 +61,8 @@ narrow equality rule and deferred timer/projection reconciliation.
 
 ## Human review checklist
 
-- [ ] Confirm exact equality remains case-sensitive and same-layer only.
-- [ ] Confirm protected groups are excluded as a whole.
-- [ ] Confirm survivor ordering and one-supersession bound.
-- [ ] Confirm canonical audit metadata and rollback reference are sufficient.
-- [ ] Approve merge separately from the first live owner-private run.
+- [x] Confirm exact equality remains case-sensitive and same-layer only.
+- [x] Confirm protected groups are excluded as a whole.
+- [x] Confirm survivor ordering and one-supersession bound.
+- [x] Confirm canonical audit metadata and rollback reference are sufficient.
+- [x] Approve merge separately from the first live owner-private run.
