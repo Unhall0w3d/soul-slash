@@ -15,6 +15,7 @@ starmap = start && finish ? javascript[start...finish] : ""
 
 check.call("3D starmap is the default visual mode", javascript.include?('memoryObservatoryVisualizationMode: "3d"') && index.include?('id="memory-3d-layout" class="quiet-button is-active"'))
 check.call("rotation reset and fullscreen controls are present", %w[memory-3d-rotation memory-3d-reset memory-3d-fullscreen].all? { |id| index.include?(%Q[id="#{id}"]) })
+check.call("SVG fallback uses reflected attribute switching", starmap.include?('byId("memory-constellation").toggleAttribute("hidden"'))
 check.call("layout is deterministic and layer centered", starmap.include?("memory3dLayerAnchor") && starmap.include?("memoryHash(node.id)") && starmap.include?("memory-star-x:") && starmap.include?(".sort()"))
 check.call("visualization retains strict caps", starmap.include?("slice(0, 240)") && starmap.include?("slice(0, 400)"))
 check.call("only supplied explicit edges are rendered", starmap.include?("edge.source") && starmap.include?("edge.target") && starmap.include?('edge.relation === "supersession"') && !starmap.match?(/similarity|semantic|inferred/i))

@@ -979,7 +979,7 @@ function setMemoryVisualizationMode(mode) {
   byId("memory-3d-reset").disabled = state.memoryObservatoryVisualizationMode !== "3d";
   byId("memory-3d-fullscreen").disabled = state.memoryObservatoryVisualizationMode !== "3d";
   updateMemory3dRotationButton();
-  byId("memory-constellation").hidden = state.memoryObservatoryVisualizationMode === "3d";
+  byId("memory-constellation").toggleAttribute("hidden", state.memoryObservatoryVisualizationMode === "3d");
   byId("memory-constellation-3d").hidden = state.memoryObservatoryVisualizationMode !== "3d";
   byId("memory-3d-metadata").hidden = state.memoryObservatoryVisualizationMode !== "3d";
   if (state.memoryObservatoryVisualizationMode === "3d") { drawMemory3d(state.memoryObservatorySummary?.visualization || {}); renderMemory3dMetadata(Array.isArray(state.memoryObservatorySummary?.visualization?.nodes) ? state.memoryObservatorySummary.visualization.nodes.slice(0, 240) : []); attachMemory3dControls(); }

@@ -42,3 +42,4 @@ Layer placement is deterministic presentation, not semantic clustering. Sparse e
 - `make verify-memory-production-closure` — passed; 12 production-closure checks.
 - `git diff --check` — passed.
 - Live authenticated Dashboard review — 34 nodes and 5 explicit links rendered in default 3D mode; 2D SVG remained hidden; adaptive layer scaling, rotation control, metadata fallback, and uncached asset delivery were confirmed.
+- Live mode-switch repair — SVG `hidden` state now uses reflected attribute switching because `SVGElement.hidden` does not remove the markup attribute; 2D constellation and lifecycle rendering were rechecked after repair.
