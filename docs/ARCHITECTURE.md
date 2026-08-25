@@ -301,7 +301,8 @@ rewriting it; subsequent events are hash chained. Historical reconstruction
 replays an immutable prefix, while rollback appends compensating events rather
 than modifying old evidence. Future Qdrant and FalkorDB services on Foundry are
 rebuildable semantic and graph projections, never replacement authorities.
-Redis is not part of the approved foundation.
+Redis is used only as the reviewed transport required by the disposable
+FalkorDB projection; it is neither canonical memory nor an application cache.
 
 An optional owner-private approved-memory index is disposable derived state,
 not another authority. It is bound to the current approved-ledger digest,
@@ -310,14 +311,17 @@ foreground rebuild atomically replaces it. Missing, stale, malformed,
 symlinked, or incompatible state fails closed to the existing approved-only
 lexical path. Administration's Memory Observatory projects bounded lifecycle,
 relationship, freshness, and diagnostic-ranking evidence without providing a
-write operation. Local embeddings are loopback-only and cannot start a runtime,
-download a model, switch a Core, or promote memory.
+write operation. Its 2D constellation, lifecycle, and Canvas depth views all
+consume the same capped content-free metadata; depth is visual presentation,
+not inferred meaning. Local embeddings are loopback-only and cannot start a
+runtime, download a model, switch a Core, or promote memory.
 
-Ordinary Chat consumes semantic retrieval through a narrow adapter. Only a
-fresh compatible hybrid result can nominate record IDs, and each ID is re-read
-from the canonical ledger in its current approved state. The adapter preserves
-always-include and same-chat context and returns the original lexical result
-unchanged for every unavailable, stale, fallback, or failed path.
+Ordinary Chat and Voice Presence consume the same policy-controlled adapter.
+The active A29 route uses projection similarity as a fixed gate, preserves
+local ordering, and permits only opaque IDs to cross the projection boundary.
+Each ID is re-read from the canonical ledger in its current approved state.
+Unavailable, stale, fallback, or failed projection paths return to local hybrid
+or lexical retrieval without changing memory or policy.
 
 The A4 ranker separates hybrid and lexical scoring. Hybrid ranking favors
 model similarity after a compatible vector is available; lexical fallback

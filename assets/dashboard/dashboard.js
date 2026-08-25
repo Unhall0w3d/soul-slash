@@ -40,7 +40,7 @@ Object.assign(state, { timelineLoaded: false, projectTracker: null, selectedTime
 Object.assign(state, { hostStewardshipLoaded: false, hostPresence: null, hostCapabilities: [], softwareSteward: null, storageSteward: null, storageIoDiagnostic: null, incidentNarrative: null, fileStewardRoots: [], fileStewardOperationPreview: null, fileStewardQuarantinePreview: null, fileStewardRestorePreview: null, fileStewardQuarantine: [] });
 Object.assign(state, { invocationRecords: [], invocationCategories: [], selectedInvocation: null, invocationOpener: null });
 Object.assign(state, { backupLoaded: false, backupProfile: "soul", backupProfileLabel: "Soul", backupSnapshots: [], backupManifestPreview: null, backupCreatePreview: null, backupRetentionPreview: null, backupRestorePreview: null, backupReplicaPreview: null, backupDrsPreview: null, backupBusy: false });
-Object.assign(state, { memoryObservatoryLoaded: false, memoryObservatorySummary: null, memoryObservatoryQueryBusy: false, memoryObservatoryRuntimeBusy: false, memoryObservatoryPrivateReviewBusy: false, memoryObservatoryVisualizationMode: "constellation" });
+Object.assign(state, { memoryObservatoryLoaded: false, memoryObservatorySummary: null, memoryObservatoryQueryBusy: false, memoryObservatoryRuntimeBusy: false, memoryObservatoryPrivateReviewBusy: false, memoryObservatoryVisualizationMode: "constellation", memoryObservatory3d: { rotationX: -0.18, rotationY: 0.42, points: [], drag: null, cleanup: null } });
 state.storageCleanupPreview = null;
 state.maintenancePreview = null;
 state.maintenanceFleet = null;
@@ -590,6 +590,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   const topology = name === "topology";
   const backup = name === "backup";
   const memoryObservatory = name === "memory-observatory";
+  if (!memoryObservatory) detachMemory3dControls();
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual || mix;
   const administration = host || timeline || maintenance || topology || backup || memoryObservatory;
@@ -837,11 +838,81 @@ function renderMemoryConstellation(data) {
   if (!nodes.length) { const empty = document.createElementNS(namespace, "text"); empty.setAttribute("x", "600"); empty.setAttribute("y", "260"); empty.setAttribute("text-anchor", "middle"); empty.setAttribute("class", "memory-constellation-empty"); empty.textContent = "No bounded memory metadata is available."; svg.append(empty); }
 }
 
+function memory3dCoordinates(node, index) {
+  const seed = memoryHash(node.id); const secondary = memoryHash(`${node.id}:depth`);
+  const angle = (seed % 3600) / 3600 * Math.PI * 2; const ring = 0.28 + (memoryHash(`${node.id}:ring`) % 690) / 1000;
+  const layerBias = ((memoryHash(node.layer || "unspecified") % 400) / 1000) - 0.2;
+  return { x: Math.cos(angle) * ring, y: Math.sin(angle) * ring, z: Math.max(-0.92, Math.min(0.92, ((secondary % 1800) / 900) - 1 + layerBias)), index };
+}
+
+function memory3dColor(stateName) {
+  return { approved: "#42E3D1", candidate: "#D5AD65", superseded: "#9D85D8", deleted: "#D85C72" }[stateName] || "#8AA4AE";
+}
+
+function memory3dInspect(node) {
+  byId("memory-constellation-inspector").textContent = `${node.id} · ${node.state || "unspecified"} · ${node.layer || "unspecified layer"} · ${node.source_kind || "unspecified source"} · ${node.created_at || "time unavailable"}`;
+}
+
+function memory3dProject(point, width, height) {
+  const view = state.memoryObservatory3d; const cy = Math.cos(view.rotationY); const sy = Math.sin(view.rotationY); const cx = Math.cos(view.rotationX); const sx = Math.sin(view.rotationX);
+  const rotatedX = point.x * cy - point.z * sy; const depth = point.x * sy + point.z * cy; const rotatedY = point.y * cx - depth * sx; const rotatedDepth = point.y * sx + depth * cx;
+  const perspective = 1 / (1.34 - rotatedDepth * 0.42); const radius = Math.min(width, height) * 0.38;
+  return { x: width / 2 + rotatedX * radius * perspective, y: height / 2 + rotatedY * radius * perspective, depth: rotatedDepth, scale: perspective };
+}
+
+function memory3dCanvasSize(canvas) {
+  const width = Math.max(320, Math.round(canvas.clientWidth || 900)); const height = Math.max(300, Math.round(canvas.clientHeight || 360)); const ratio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(width * ratio); canvas.height = Math.round(height * ratio); return { width, height, ratio };
+}
+
+function renderMemory3dMetadata(nodes) {
+  const list = byId("memory-3d-node-list"); list.replaceChildren();
+  nodes.forEach((node) => { const button = document.createElement("button"); button.type = "button"; button.className = "memory-3d-node"; button.textContent = `${node.id} · ${node.state || "unspecified"} · ${node.layer || "unspecified layer"}`; button.addEventListener("click", () => memory3dInspect(node)); list.append(button); });
+  byId("memory-3d-metadata").hidden = state.memoryObservatoryVisualizationMode !== "3d";
+}
+
+function drawMemory3d(data) {
+  const value = data && typeof data === "object" ? data : {}; const nodes = Array.isArray(value.nodes) ? value.nodes.slice(0, 240) : []; const edges = Array.isArray(value.edges) ? value.edges.slice(0, 400) : [];
+  const canvas = byId("memory-constellation-3d"); const size = memory3dCanvasSize(canvas); const context = canvas.getContext("2d"); if (!context) return;
+  context.setTransform(size.ratio, 0, 0, size.ratio, 0, 0); context.clearRect(0, 0, size.width, size.height); context.fillStyle = "rgba(3,10,16,.96)"; context.fillRect(0, 0, size.width, size.height);
+  const positions = new Map(); const points = nodes.map((node, index) => { const projected = memory3dProject(memory3dCoordinates(node, index), size.width, size.height); const point = { node, projected }; positions.set(node.id, projected); return point; }); state.memoryObservatory3d.points = points;
+  context.lineWidth = 1;
+  edges.forEach((edge) => { const source = positions.get(edge.source); const target = positions.get(edge.target); if (!source || !target) return; const alpha = 0.12 + ((source.depth + target.depth + 2) / 4) * 0.28; context.strokeStyle = edge.relation === "supersession" ? `rgba(196,161,98,${alpha + 0.12})` : `rgba(129,110,188,${alpha})`; context.setLineDash(edge.relation === "supersession" ? [5, 4] : []); context.beginPath(); context.moveTo(source.x, source.y); context.lineTo(target.x, target.y); context.stroke(); });
+  context.setLineDash([]); points.slice().sort((a, b) => a.projected.depth - b.projected.depth).forEach(({ node, projected }) => { const depth = (projected.depth + 1) / 2; const radius = (node.state === "approved" ? 4.8 : 4) * (0.72 + projected.scale * 0.28); context.globalAlpha = 0.28 + depth * 0.72; context.fillStyle = memory3dColor(node.state); context.beginPath(); context.arc(projected.x, projected.y, radius * 2.4, 0, Math.PI * 2); context.globalAlpha = 0.12 + depth * 0.22; context.fill(); context.globalAlpha = 0.42 + depth * 0.58; context.beginPath(); context.arc(projected.x, projected.y, radius, 0, Math.PI * 2); context.fill(); });
+  context.globalAlpha = 1; context.fillStyle = "#7F9AA4"; context.font = "12px sans-serif"; if (!nodes.length) { context.textAlign = "center"; context.fillText("No bounded memory metadata is available.", size.width / 2, size.height / 2); }
+  byId("memory-constellation-state").textContent = `${nodes.length} nodes · ${edges.length} links${value.truncated ? " · bounded" : ""}`;
+}
+
+function memory3dHit(x, y) {
+  const hit = state.memoryObservatory3d.points.reduce((closest, point) => { const distance = Math.hypot(point.projected.x - x, point.projected.y - y); return distance <= Math.max(12, (closest?.distance ?? Infinity)) ? { point, distance } : closest; }, null);
+  return hit && hit.distance <= 18 ? hit.point.node : undefined;
+}
+
+function resetMemory3dView() { state.memoryObservatory3d.rotationX = -0.18; state.memoryObservatory3d.rotationY = 0.42; drawMemory3d(state.memoryObservatorySummary?.visualization || {}); }
+
+function detachMemory3dControls() { if (state.memoryObservatory3d.cleanup) state.memoryObservatory3d.cleanup(); state.memoryObservatory3d.cleanup = null; state.memoryObservatory3d.drag = null; }
+
+function attachMemory3dControls() {
+  detachMemory3dControls(); const canvas = byId("memory-constellation-3d"); const onPointerDown = (event) => { state.memoryObservatory3d.drag = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false }; canvas.setPointerCapture?.(event.pointerId); };
+  const onPointerMove = (event) => { const drag = state.memoryObservatory3d.drag; if (!drag || drag.pointerId !== event.pointerId) return; const dx = event.clientX - drag.x; const dy = event.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 1) drag.moved = true; drag.x = event.clientX; drag.y = event.clientY; state.memoryObservatory3d.rotationY += dx * 0.009; state.memoryObservatory3d.rotationX = Math.max(-1.35, Math.min(1.35, state.memoryObservatory3d.rotationX + dy * 0.009)); drawMemory3d(state.memoryObservatorySummary?.visualization || {}); };
+  const onPointerUp = (event) => { const drag = state.memoryObservatory3d.drag; if (!drag || drag.pointerId !== event.pointerId) return; if (!drag.moved) { const rect = canvas.getBoundingClientRect(); const node = memory3dHit(event.clientX - rect.left, event.clientY - rect.top); if (node) memory3dInspect(node); } state.memoryObservatory3d.drag = null; canvas.releasePointerCapture?.(event.pointerId); };
+  const onKeyDown = (event) => { const amount = event.shiftKey ? 0.16 : 0.08; if (event.key.toLowerCase() === "r") { event.preventDefault(); resetMemory3dView(); return; } if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return; event.preventDefault(); if (event.key === "ArrowLeft") state.memoryObservatory3d.rotationY -= amount; if (event.key === "ArrowRight") state.memoryObservatory3d.rotationY += amount; if (event.key === "ArrowUp") state.memoryObservatory3d.rotationX = Math.max(-1.35, state.memoryObservatory3d.rotationX - amount); if (event.key === "ArrowDown") state.memoryObservatory3d.rotationX = Math.min(1.35, state.memoryObservatory3d.rotationX + amount); drawMemory3d(state.memoryObservatorySummary?.visualization || {}); };
+  canvas.addEventListener("pointerdown", onPointerDown); canvas.addEventListener("pointermove", onPointerMove); canvas.addEventListener("pointerup", onPointerUp); canvas.addEventListener("pointercancel", onPointerUp); canvas.addEventListener("keydown", onKeyDown);
+  state.memoryObservatory3d.cleanup = () => { canvas.removeEventListener("pointerdown", onPointerDown); canvas.removeEventListener("pointermove", onPointerMove); canvas.removeEventListener("pointerup", onPointerUp); canvas.removeEventListener("pointercancel", onPointerUp); canvas.removeEventListener("keydown", onKeyDown); };
+}
+
 function setMemoryVisualizationMode(mode) {
-  state.memoryObservatoryVisualizationMode = mode === "lifecycle" ? "lifecycle" : "constellation";
+  state.memoryObservatoryVisualizationMode = ["lifecycle", "3d"].includes(mode) ? mode : "constellation";
+  detachMemory3dControls();
   byId("memory-constellation-layout").classList.toggle("is-active", state.memoryObservatoryVisualizationMode === "constellation");
   byId("memory-lifecycle-layout").classList.toggle("is-active", state.memoryObservatoryVisualizationMode === "lifecycle");
-  renderMemoryConstellation(state.memoryObservatorySummary?.visualization || {});
+  byId("memory-3d-layout").classList.toggle("is-active", state.memoryObservatoryVisualizationMode === "3d");
+  byId("memory-3d-reset").disabled = state.memoryObservatoryVisualizationMode !== "3d";
+  byId("memory-constellation").hidden = state.memoryObservatoryVisualizationMode === "3d";
+  byId("memory-constellation-3d").hidden = state.memoryObservatoryVisualizationMode !== "3d";
+  byId("memory-3d-metadata").hidden = state.memoryObservatoryVisualizationMode !== "3d";
+  if (state.memoryObservatoryVisualizationMode === "3d") { drawMemory3d(state.memoryObservatorySummary?.visualization || {}); renderMemory3dMetadata(Array.isArray(state.memoryObservatorySummary?.visualization?.nodes) ? state.memoryObservatorySummary.visualization.nodes.slice(0, 240) : []); attachMemory3dControls(); }
+  else renderMemoryConstellation(state.memoryObservatorySummary?.visualization || {});
 }
 
 function renderMemoryObservatorySummary(data) {
@@ -853,7 +924,9 @@ function renderMemoryObservatorySummary(data) {
   renderMemoryObservatoryIndex(observatoryField(value, "index", "index_availability", "retrieval_index", "approved_memory_index"));
   renderMemoryObservatoryEvents(observatoryField(value, "lifecycle_events", "recent_lifecycle_events", "lifecycle", "events") || []);
   renderMemoryObservatoryRelationships(observatoryField(value, "duplicates", "duplicate_observations") || [], observatoryField(value, "supersessions", "supersession_observations") || []);
-  renderMemoryConstellation(observatoryField(value, "visualization", "constellation", "memory_graph") || {});
+  const visualization = observatoryField(value, "visualization", "constellation", "memory_graph") || {};
+  if (state.memoryObservatoryVisualizationMode === "3d") { drawMemory3d(visualization); renderMemory3dMetadata(Array.isArray(visualization.nodes) ? visualization.nodes.slice(0, 240) : []); }
+  else renderMemoryConstellation(visualization);
   renderMemoryObservatoryGuidance(observatoryField(value, "review_guidance", "chat_review_commands", "chat_commands", "guidance") || []);
 }
 
@@ -6816,6 +6889,8 @@ byId("refresh-memory-observatory-runtime").addEventListener("click", refreshMemo
 byId("run-memory-observatory-private-review").addEventListener("click", runMemoryPrivateReview);
 byId("memory-constellation-layout").addEventListener("click", () => setMemoryVisualizationMode("constellation"));
 byId("memory-lifecycle-layout").addEventListener("click", () => setMemoryVisualizationMode("lifecycle"));
+byId("memory-3d-layout").addEventListener("click", () => setMemoryVisualizationMode("3d"));
+byId("memory-3d-reset").addEventListener("click", resetMemory3dView);
 byId("refresh-host-presence").addEventListener("click", () => loadHostStewardship({ refresh: true }));
 byId("refresh-software-steward").addEventListener("click", refreshSoftwareSteward);
 byId("refresh-storage-steward").addEventListener("click", refreshStorageSteward);

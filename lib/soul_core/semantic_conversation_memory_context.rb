@@ -19,7 +19,7 @@ module SoulCore
       return baseline unless retrieval["lifecycle_state"] == "complete"
 
       data = retrieval.fetch("data", {})
-      return baseline unless data["retrieval_mode"] == "hybrid"
+      return baseline unless %w[hybrid projection_gate_local_order].include?(data["retrieval_mode"])
 
       approved = @memory_store.records(status: "approved").to_h { |record| [record.fetch("id").to_s, record] }
       baseline_records = Array(baseline["records"]).select { |record| approved.key?(record["id"].to_s) }
@@ -62,7 +62,9 @@ module SoulCore
         "layers" => chosen.map { |record| record["layer"] }.compact.uniq,
         "count" => chosen.length,
         "rendered" => @memory_store.render_context(chosen),
-        "retrieval_mode" => "hybrid",
+        "retrieval_mode" => retrieval_data.fetch("retrieval_mode"),
+        "ranking_profile" => retrieval_data["ranking_profile"],
+        "projection_available" => retrieval_data["projection_available"] == true,
         "semantic_record_ids" => semantic_ids,
         "index_available" => retrieval_data["index_available"] == true,
         "authority" => "canonical_approved_memory_ledger"

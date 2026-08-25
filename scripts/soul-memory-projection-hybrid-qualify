@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/memory_paths"
+require_relative "../lib/soul_core/memory_projection_hybrid_fusion_qualification_service"
+
+module SoulMemoryProjectionHybridQualificationCLI
+  module_function
+
+  def run(argv, root: File.expand_path("..", __dir__))
+    return usage unless argv.length <= 1
+
+    paths = SoulCore::MemoryPaths.new(root: root)
+    envelope_path = argv.first || File.join(paths.private_root, "projection", "qualification-result.json")
+    result = SoulCore::MemoryProjectionHybridFusionQualificationService.new(
+      envelope_path: envelope_path,
+      allowed_root: paths.private_root
+    ).qualify
+    puts JSON.pretty_generate(result)
+    result["lifecycle_state"] == "complete" ? 0 : 1
+  rescue StandardError => error
+    warn JSON.generate("lifecycle_state" => "failed", "message" => "Memory projection hybrid qualification failed safely: #{error.class}", "mutation" => "none")
+    1
+  end
+
+  def usage
+    warn "Usage: ruby scripts/soul-memory-projection-hybrid-qualify [A24_ENVELOPE_PATH]"
+    2
+  end
+end
+
+exit SoulMemoryProjectionHybridQualificationCLI.run(ARGV) if $PROGRAM_NAME == __FILE__

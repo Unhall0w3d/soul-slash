@@ -3,6 +3,7 @@
 
 require "json"
 load File.expand_path("soul-memory-projection-reconcile", __dir__)
+require_relative "../lib/soul_core/env_loader"
 require_relative "../lib/soul_core/memory_projection_query_service"
 require_relative "../lib/soul_core/memory_retrieval_service"
 
@@ -19,6 +20,7 @@ module SoulMemoryProjectionQueryCLI
     limit = argv.empty? ? 8 : Integer(argv.shift)
     return usage unless argv.empty? && !query.strip.empty?
 
+    SoulCore::EnvLoader.load(File.join(root, ".env"))
     _local, projection = build_services(env: env, root: root)
     result = projection.query(query: query, limit: limit)
     puts JSON.pretty_generate(result)

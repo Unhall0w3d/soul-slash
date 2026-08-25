@@ -3,6 +3,7 @@
 
 require "json"
 load File.expand_path("soul-memory-projection-query", __dir__)
+require_relative "../lib/soul_core/env_loader"
 require_relative "../lib/soul_core/memory_projection_qualification_service"
 
 module SoulMemoryProjectionQualificationCLI
@@ -10,6 +11,7 @@ module SoulMemoryProjectionQualificationCLI
 
   def run(argv, env: ENV, root: File.expand_path("..", __dir__))
     return usage unless argv.empty?
+    SoulCore::EnvLoader.load(File.join(root, ".env"))
     paths = SoulCore::MemoryPaths.new(root: root)
     local, projection, store = SoulMemoryProjectionQueryCLI.build_services(env: env, root: root)
     service = SoulCore::MemoryProjectionQualificationService.new(

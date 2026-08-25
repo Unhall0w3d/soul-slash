@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/memory_paths"
+require_relative "../lib/soul_core/memory_retrieval_policy_store"
+require_relative "../lib/soul_core/memory_retrieval_policy_service"
+
+module SoulMemoryRetrievalPolicyCLI
+  module_function
+
+  def run(argv, root: File.expand_path("..", __dir__))
+    command = argv.shift.to_s
+    paths = SoulCore::MemoryPaths.new(root: root)
+    store = SoulCore::MemoryRetrievalPolicyStore.new(
+      private_root: paths.private_root,
+      path: File.join(paths.private_root, "retrieval", "active-policy.json")
+    )
+    service = SoulCore::MemoryRetrievalPolicyService.new(store: store)
+    result = case command
+             when "status"
+               return usage unless argv.empty?
+               service.status
+             when "preview"
+               return usage unless argv.length == 2
+               service.preview(profile: argv.shift, reason: argv.shift)
+             when "execute"
+               return usage unless argv.length == 4
+               service.execute(profile: argv.shift, reason: argv.shift, confirmation: argv.shift, expected_digest: argv.shift)
+             when "rollback-preview"
+               return usage unless argv.length == 1
+               service.rollback_preview(reason: argv.shift)
+             when "rollback-execute"
+               return usage unless argv.length == 3
+               service.rollback_execute(reason: argv.shift, confirmation: argv.shift, expected_digest: argv.shift)
+             else
+               return usage
+             end
+    puts JSON.pretty_generate(result)
+    result["lifecycle_state"] == "complete" ? 0 : 1
+  rescue StandardError => error
+    warn JSON.generate("lifecycle_state" => "failed", "message" => "Memory retrieval policy command failed safely: #{error.class}", "mutation" => "none")
+    1
+  end
+
+  def usage
+    warn "Usage: soul-memory-retrieval-policy status|preview PROFILE REASON|execute PROFILE REASON CONFIRMATION DIGEST|rollback-preview REASON|rollback-execute REASON CONFIRMATION DIGEST"
+    2
+  end
+end
+
+exit SoulMemoryRetrievalPolicyCLI.run(ARGV) if $PROGRAM_NAME == __FILE__

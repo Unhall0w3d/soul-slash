@@ -14,6 +14,9 @@ require_relative "local_search_service"
 require_relative "conversation_memory_store"
 require_relative "memory_retrieval_index"
 require_relative "memory_retrieval_service"
+require_relative "memory_fusion_retrieval_service"
+require_relative "memory_projection_runtime_factory"
+require_relative "memory_retrieval_policy_store"
 require_relative "memory_observatory_service"
 require_relative "memory_runtime_private_review_service"
 require_relative "semantic_conversation_memory_context"
@@ -1104,11 +1107,34 @@ module SoulCore
     end
 
     def memory_retrieval
-      @memory_retrieval_service ||= ApprovedMemoryRetrievalService.new(
+      return @memory_retrieval_service if @memory_retrieval_service
+
+      local = ApprovedMemoryRetrievalService.new(
         memory_store: conversation_memory,
         index_service: memory_retrieval_index,
         embedding_client: memory_embedding_client,
         query_instruction: @process_env["SOUL_MEMORY_EMBEDDING_QUERY_INSTRUCTION"],
+        clock: @clock
+      )
+      paths = MemoryPaths.new(root: @root)
+      projection = MemoryProjectionRuntimeFactory.new(
+        root: @root,
+        process_env: @process_env,
+        paths: paths,
+        memory_store: conversation_memory,
+        index_service: memory_retrieval_index,
+        embedding_client: memory_embedding_client,
+        local_retrieval: local
+      ).build
+      policy = MemoryRetrievalPolicyStore.new(
+        private_root: paths.private_root,
+        path: File.join(paths.private_root, "retrieval", "active-policy.json"),
+        clock: @clock
+      )
+      @memory_retrieval_service = MemoryFusionRetrievalService.new(
+        local_retrieval: local,
+        projection_retrieval: projection,
+        policy_store: policy,
         clock: @clock
       )
     end

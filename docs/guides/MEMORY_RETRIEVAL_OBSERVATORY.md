@@ -12,7 +12,8 @@ Open **Administration → Memory Observatory** to inspect:
 - record counts by lifecycle state, layer, and source kind;
 - up to 100 recent append-only lifecycle events;
 - exact-content duplicate observations and explicit supersession links;
-- a bounded content-free constellation and lifecycle map of memory metadata;
+- bounded content-free 2D constellation, 3D depth, and lifecycle views of
+  memory metadata;
 - the retrieval index profile, digest binding, dimensions, freshness, and
   availability;
 - one explicit diagnostic query with bounded result excerpts and score
@@ -22,12 +23,13 @@ Refresh and diagnostic query are authenticated foreground reads. They do not
 poll, start a worker, or change memory. Use the existing reviewed Chat memory
 commands for proposals, approval, supersession, and forgetting.
 
-The constellation projects at most 240 memory nodes and 400 explicit duplicate
-or supersession links. Node placement is deterministic and may be switched
-between layer-oriented constellation and lifecycle layouts. Hover or keyboard
-focus reveals only the memory ID, lifecycle state, layer, provenance kind, and
-timestamp. The graph does not expose memory content, infer new relationships,
-or grant authority.
+The visualizer projects at most 240 memory nodes and 400 explicit duplicate or
+supersession links. Placement is deterministic and may be switched among a
+layer-oriented constellation, a lifecycle layout, and a rotatable Canvas depth
+view. The 3D coordinates are presentation only: they do not claim semantic
+distance or infer relationships. Hover or keyboard focus reveals only the
+memory ID, lifecycle state, layer, provenance kind, and timestamp. The graph
+does not expose memory content or grant authority.
 
 ## Retrieval authority
 
@@ -93,17 +95,35 @@ select a winner automatically.
 
 ## Ordinary Chat context
 
-Ordinary Chat now has a fail-safe semantic admission path. It uses semantic
-results only when retrieval reports a fresh compatible `hybrid` index. The
-index contributes IDs only: Soul re-reads each record from the canonical ledger
-and requires its current state to remain `approved` before including its content
-in the system prompt. Existing always-include and same-conversation memories
-remain preferred.
+Ordinary Chat and Voice Presence share a fail-safe semantic admission path.
+The active production policy uses projection evidence only as a gate and then
+preserves canonical local ordering. Projection contributes IDs only: Soul
+re-reads each record from the canonical ledger and requires its current state
+to remain `approved` before including its content in the system prompt.
+Existing always-include and same-conversation memories remain preferred.
 
-If the endpoint is absent, the index is stale or incompatible, the query falls
-back, or any local request fails, Chat receives the same approved-only lexical
-context it used before A3. Chat does not rebuild the index or start the embedding
-runtime automatically.
+If the endpoint or remote projection is absent, stale, incompatible, or fails,
+the route returns to local hybrid or approved-only lexical retrieval. Chat does
+not rebuild an index, rebuild a projection, or start an embedding runtime as
+part of the query.
+
+## Production route qualification
+
+The active owner-private selector is
+`projection_gate_local_order_a29` with a fixed projection threshold of `0.55`.
+The earlier A25 `0.65` policy remains an immutable rollback target and retained
+historical evidence. A29 corrected an environment-parity defect in the earlier
+diagnostic command, then qualified the public `ApplicationFacade`
+`memory.observatory.query` route against the reviewed private corpus: 11/11
+positive hits, 5/5 negative abstentions, zero forbidden hits, and mean positive
+reciprocal rank `0.881818` across 16 cases. Receipts withhold query and memory
+content.
+
+```bash
+make memory-retrieval-policy-status
+make memory-production-qualify
+make verify-memory-production-closure
+```
 
 ## Live profile qualification
 
