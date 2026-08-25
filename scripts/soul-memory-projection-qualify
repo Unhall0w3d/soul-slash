@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+load File.expand_path("soul-memory-projection-query", __dir__)
+require_relative "../lib/soul_core/memory_projection_qualification_service"
+
+module SoulMemoryProjectionQualificationCLI
+  module_function
+
+  def run(argv, env: ENV, root: File.expand_path("..", __dir__))
+    return usage unless argv.empty?
+    paths = SoulCore::MemoryPaths.new(root: root)
+    local, projection, store = SoulMemoryProjectionQueryCLI.build_services(env: env, root: root)
+    service = SoulCore::MemoryProjectionQualificationService.new(
+      case_path: File.join(paths.private_root, "projection", "qualification-cases.json"),
+      allowed_root: paths.private_root,
+      approved_memory_ids: Array(store.records(status: "approved")).map { |record| record.fetch("id") },
+      local_retrieval: local,
+      projection_retrieval: projection
+    )
+    result = service.qualify
+    puts JSON.pretty_generate(result)
+    result["lifecycle_state"] == "complete" ? 0 : 1
+  rescue StandardError => error
+    warn JSON.generate("lifecycle_state" => "failed", "message" => "Memory projection qualification failed safely: #{error.class}", "mutation" => "none")
+    1
+  end
+
+  def usage
+    warn "Usage: ruby scripts/soul-memory-projection-qualify"
+    2
+  end
+end
+
+exit SoulMemoryProjectionQualificationCLI.run(ARGV) if $PROGRAM_NAME == __FILE__
