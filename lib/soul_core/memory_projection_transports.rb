@@ -178,6 +178,29 @@ module SoulCore
       true
     end
 
+    def query(name:, vector:, limit:)
+      validate_name!(name)
+      values = Array(vector).map { |value| Float(value) }
+      raise "Qdrant query vector is invalid" unless values.length.between?(1, 1_024) && values.all?(&:finite?)
+      wanted = Integer(limit)
+      raise "Qdrant query limit is invalid" unless wanted.between?(1, 20)
+
+      response = @transport.request(
+        "POST",
+        "/collections/#{name}/points/query",
+        body: {"query" => values, "limit" => wanted, "with_payload" => true, "with_vector" => false}
+      )
+      raise "Qdrant query failed" unless success?(response)
+      parsed = parse(response)
+      points = parsed.fetch("result").fetch("points")
+      raise "Qdrant query response is invalid" unless points.is_a?(Array)
+      raise "Qdrant query exceeded result bound" if points.length > wanted
+
+      points
+    rescue KeyError, JSON::ParserError, ArgumentError, TypeError
+      raise "Qdrant query response is invalid"
+    end
+
     private
 
     def validate_name!(name)
@@ -299,10 +322,31 @@ module SoulCore
       true
     end
 
+    def relationships(name:, memory_ids:)
+      validate_name!(name)
+      ids = Array(memory_ids).map(&:to_s).uniq.sort
+      raise "FalkorDB relationship query is invalid" unless ids.length.between?(1, 20)
+      raise "FalkorDB relationship identifier is invalid" unless ids.all? { |id| id.match?(/\A[a-zA-Z0-9_-]{1,200}\z/) }
+
+      literals = ids.map { |id| literal(id) }.join(", ")
+      query = "MATCH (a:Memory)-[r]->(b:Memory) WHERE a.id IN [#{literals}] OR b.id IN [#{literals}] RETURN a.id, b.id, type(r) ORDER BY type(r), a.id, b.id"
+      relationships = rows(@client.call("GRAPH.RO_QUERY", name, query, "--compact"), require_row_block: true).map do |source, target, relation|
+        raise "FalkorDB relationship response is invalid" unless [source, target].all? { |id| id.to_s.match?(/\A[a-zA-Z0-9_-]{1,200}\z/) }
+        raise "FalkorDB relationship response is invalid" unless %w[SUPERSEDED_BY EXACT_DUPLICATE].include?(relation)
+        raise "FalkorDB relationship response is outside query scope" unless ids.include?(source.to_s) || ids.include?(target.to_s)
+
+        {"source" => source, "target" => target, "relation" => relation}
+      end
+      relationships
+    end
+
     private
 
-    def rows(response)
-      Array(response).fetch(1, []).map { |row| Array(row).map { |value| decode_compact(value) } }
+    def rows(response, require_row_block: false)
+      raise "FalkorDB response is invalid" unless response.is_a?(Array)
+      row_block = response[1]
+      raise "FalkorDB response is invalid" if require_row_block && !row_block.is_a?(Array)
+      Array(row_block).map { |row| Array(row).map { |value| decode_compact(value) } }
     end
     def decode_compact(value)
       return value unless value.is_a?(Array) && value.length == 2 && value.first.is_a?(Integer)
