@@ -1,6 +1,6 @@
 # Memory Projection Transport A22 Review
 
-Status: candidate implementation; no remote projection generation executed.
+Status: implemented and live-qualified; first exact generation active.
 
 ## Implemented
 
@@ -35,20 +35,28 @@ verification, wait-for-commit Qdrant writes, read-only FalkorDB verification,
 bounded TLS work, exact confirmation syntax, private-file protections, and the
 absence of shell/background/retry behavior.
 
-The foreground live preview was also invoked. It failed closed before network
-access because the reviewed local embedding index source digest no longer
-matches the canonical approved-memory set. No remote or selector mutation
-occurred. A fresh reviewed index rebuild is therefore a prerequisite to the
-next projection preview.
+The foreground live preview initially failed closed before network access
+because the reviewed local embedding index source digest no longer matched the
+canonical approved-memory set. The bounded embedding workflow rebuilt a fresh
+33-entry index and produced an exact A22 plan. The Operator confirmed that plan
+with `REBUILD_MEMORY_PROJECTION` and its digest.
+
+Live qualification exposed two transport defects. Atelier did not resolve the
+archive FQDN, so transport now uses the reviewed private IPv4 address and
+verifies the certificate's exact IP SAN. FalkorDB compact replies wrap returned
+values in typed cells, so the adapter now decodes that bounded response shape
+before exact comparison. Each failed attempt compensated only the generation
+it had created and left the selector absent. After both repairs, Qdrant verified
+33 1024-dimensional points, FalkorDB verified 34 nodes and 5 explicit edges,
+and selector activation completed for `generation_1ccc750e83aa93068398`.
 
 ## Known weaknesses and next gate
 
-- The exact deployed FalkorDB compact response shape and Qdrant TLS operations
-  remain unqualified until the first digest-bound execution.
-- A fresh approved-memory index must be built with the reviewed local embedding
-  profile before an A22 plan digest can be produced.
-- Live population still requires review of that fresh plan and its exact
-  `REBUILD_MEMORY_PROJECTION` confirmation.
+- The deployed Qdrant TLS path, FalkorDB RESP/TLS compact response path,
+  dual-store exact verification, compensation, and initial selector activation
+  are live-qualified.
+- Future canonical-memory changes still require a fresh approved-memory index,
+  a fresh projection preview, and a new exact confirmation.
 - Remote retrieval routing, generation rollback/retirement, timers, retries,
   and automatic Core transitions remain outside this slice.
 
@@ -64,7 +72,7 @@ next projection preview.
 
 ## Human review checklist
 
-- [ ] Approve the A22 transport, selector, and foreground command boundary.
-- [ ] Refresh and review the approved-memory embedding index.
-- [ ] Review the resulting A22 projection plan and exact digest.
-- [ ] Authorize the first live immutable-generation population separately.
+- [x] Approve the A22 transport, selector, and foreground command boundary.
+- [x] Refresh and review the approved-memory embedding index.
+- [x] Review the resulting A22 projection plan and exact digest.
+- [x] Authorize the first live immutable-generation population separately.

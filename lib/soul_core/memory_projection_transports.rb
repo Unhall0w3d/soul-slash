@@ -205,6 +205,8 @@ module SoulCore
 
     def pipeline(commands)
       raise "Redis pipeline exceeds batch bound" if commands.length > 128
+      tcp = nil
+      ssl = nil
       Timeout.timeout(@read_timeout) do
         tcp = Socket.tcp(@host, @port, connect_timeout: @connect_timeout)
         context = OpenSSL::SSL::SSLContext.new
@@ -212,9 +214,10 @@ module SoulCore
         context.ca_file = @ca_path
         ssl = OpenSSL::SSL::SSLSocket.new(tcp, context)
         ssl.hostname = @host
-        ssl.sync_close = true
-        ssl.connect
-        ssl.write(frame(["AUTH", @password]))
+      ssl.sync_close = true
+      ssl.connect
+      ssl.post_connection_check(@host)
+      ssl.write(frame(["AUTH", @password]))
         raise "FalkorDB authentication failed" unless read_response(ssl) == "OK"
         ssl.write(commands.map { |command| frame(command) }.join)
         commands.map { read_response(ssl) }
@@ -298,7 +301,15 @@ module SoulCore
 
     private
 
-    def rows(response) = Array(response).fetch(1, [])
+    def rows(response)
+      Array(response).fetch(1, []).map { |row| Array(row).map { |value| decode_compact(value) } }
+    end
+    def decode_compact(value)
+      return value unless value.is_a?(Array) && value.length == 2 && value.first.is_a?(Integer)
+
+      type, payload = value
+      type == 6 ? Array(payload).map { |item| decode_compact(item) } : payload
+    end
     def validate_name!(name)
       raise "FalkorDB generation name is invalid" unless name.to_s.match?(/\ASoulMemory_[0-9a-f]{20}\z/)
     end

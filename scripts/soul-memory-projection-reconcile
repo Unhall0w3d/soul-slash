@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "ipaddr"
 require "pathname"
 require_relative "../lib/soul_core/conversation_memory_store"
 require_relative "../lib/soul_core/memory_paths"
@@ -40,7 +41,7 @@ module SoulMemoryProjectionReconcileCLI
     qdrant_key = read_private_text(config.fetch("qdrant_api_key_path"), allowed_root: projection_root)
     falkor_password = read_private_text(config.fetch("falkordb_password_path"), allowed_root: projection_root)
     ca_path = private_regular_path(config.fetch("ca_certificate_path"), allowed_root: projection_root)
-    host = config.fetch("fqdn")
+    host = config.fetch("ipv4")
     qdrant_transport = SoulCore::BoundedJsonTlsTransport.new(
       endpoint: "https://#{host}:6333",
       ca_path: ca_path,
@@ -121,6 +122,8 @@ module SoulMemoryProjectionReconcileCLI
     raise "private deployment configuration schema mismatch" unless config["schema_version"] == "soul.memory-projection.private.a20.v1"
     host = config.fetch("fqdn").to_s
     raise "private projection host is invalid" unless host.match?(/\A[a-z0-9][a-z0-9.-]{1,252}[a-z0-9]\z/)
+    address = IPAddr.new(config.fetch("ipv4").to_s)
+    raise "private projection address is invalid" unless address.ipv4? && address.private?
     %w[ca_certificate_path qdrant_api_key_path falkordb_password_path].each do |key|
       private_regular_path(config.fetch(key), allowed_root: projection_root)
     end
