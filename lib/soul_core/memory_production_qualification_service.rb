@@ -19,7 +19,7 @@ module SoulCore
     MAX_OPERATION_SECONDS = 300
     CASE_KEYS = %w[expected_memory_ids forbidden_memory_ids id query result_limit].freeze
 
-    def initialize(case_path:, allowed_root:, approved_memory_ids:, retrieval:, policy_store:,
+    def initialize(case_path:, allowed_root:, approved_memory_ids:, retrieval:, policy_store:, memory_id_resolver: ->(id) { id },
                    clock: -> { Time.now.utc }, operation_timeout: 180)
       @case_path = File.expand_path(case_path)
       @allowed_root = File.realpath(allowed_root)
@@ -27,6 +27,7 @@ module SoulCore
       raise ArgumentError, "approved memory identifiers exceed bound" if @approved_ids.length > 10_000
       @retrieval = retrieval
       @policy_store = policy_store
+      @memory_id_resolver = memory_id_resolver
       @clock = clock
       @operation_timeout = Float(operation_timeout)
       raise ArgumentError, "qualification timeout is invalid" unless @operation_timeout.between?(1, MAX_OPERATION_SECONDS)
@@ -122,8 +123,8 @@ module SoulCore
       raise "qualification case is invalid" unless item.is_a?(Hash) && item.keys.sort == CASE_KEYS
       query = item.fetch("query").to_s
       raise "qualification query is invalid" if query.empty? || query.length > MAX_QUERY_CHARACTERS || query.match?(/[\r\n]/)
-      expected = bounded_ids(item.fetch("expected_memory_ids"))
-      forbidden = bounded_ids(item.fetch("forbidden_memory_ids"))
+      expected = resolve_ids(bounded_ids(item.fetch("expected_memory_ids")))
+      forbidden = resolve_ids(bounded_ids(item.fetch("forbidden_memory_ids")))
       raise "qualification identifiers overlap" unless (expected & forbidden).empty?
       raise "qualification references non-approved memory" unless (expected + forbidden).all? { |id| @approved_ids.key?(id) }
       limit = Integer(item.fetch("result_limit"))
@@ -136,6 +137,12 @@ module SoulCore
     def bounded_ids(value)
       raise "qualification identifiers are invalid" unless value.is_a?(Array) && value.length <= MAX_IDS
       value.map { |id| bounded_id(id) }.tap { |ids| raise "qualification identifiers repeat" unless ids.uniq.length == ids.length }
+    end
+
+    def resolve_ids(ids)
+      ids.map { |id| bounded_id(@memory_id_resolver.call(id)) }.uniq
+    rescue StandardError
+      raise "qualification memory identifier resolution failed"
     end
 
     def bounded_id(value)
