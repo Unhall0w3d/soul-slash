@@ -28,7 +28,7 @@ check.call("panel has no mutation buttons", panel.scan(/<button\b[^>]*>(.*?)<\/b
 check.call("observatory operations use the authenticated callSoul path", observatory_javascript.include?('callSoul("memory.observatory.summary")') && observatory_javascript.include?('callSoul("memory.observatory.query"'))
 check.call("diagnostic query is explicitly bounded", observatory_javascript.include?("slice(0, 200)") && observatory_javascript.include?("limit: 20"))
 check.call("dynamic Observatory output uses safe text nodes", !observatory_javascript.match?(/innerHTML|insertAdjacentHTML|outerHTML/) && observatory_javascript.scan(/\.textContent\s*=/).length >= 12)
-check.call("no Observatory polling or background continuation", !observatory_javascript.match?(/setInterval|setTimeout|requestAnimationFrame|while\s*\(\s*true/))
+check.call("no Observatory polling or unbounded continuation", !observatory_javascript.match?(/setInterval|setTimeout|while\s*\(\s*true/) && observatory_javascript.include?("cancelAnimationFrame"))
 check.call("navigation maps and toggles the panel", javascript.include?('"memory-observatory": "#memory-observatory-panel"') && javascript.include?('const memoryObservatory = name === "memory-observatory"') && javascript.include?('byId("memory-observatory-panel").hidden = !memoryObservatory'))
 check.call("existing navigation remains present", %w[chat-tab host-stewardship-tab timeline-tab maintenance-tab local-topology-tab backup-tab].all? { |id| index.include?(%Q[id="#{id}"]) })
 check.call("responsive collapsible styling exists", stylesheet.include?(".memory-observatory-disclosure") && stylesheet.include?("@media (max-width:820px)") && stylesheet.include?(".memory-observatory-columns { grid-template-columns:1fr"))
