@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/env_loader"
+require_relative "../lib/soul_core/application_facade"
+load File.expand_path("soul-memory-projection-query", __dir__)
+require_relative "../lib/soul_core/memory_production_qualification_service"
+require_relative "../lib/soul_core/memory_retrieval_policy_store"
+
+module SoulMemoryProductionQualificationCLI
+  class FacadeRetrievalAdapter
+    def initialize(facade)
+      @facade = facade
+      @sequence = 0
+    end
+
+    def query(query:, limit:)
+      @sequence += 1
+      envelope = @facade.call({
+        "schema_version" => "soul.application.v1",
+        "request_id" => format("memory-production-qualification-%03d", @sequence),
+        "operation" => "memory.observatory.query",
+        "parameters" => { "query" => query, "limit" => limit },
+        "context" => { "interface" => "internal" }
+      })
+      return envelope unless envelope["lifecycle_state"] == "complete"
+
+      {
+        "lifecycle_state" => "complete",
+        "schema" => SoulCore::MemoryFusionRetrievalService::SCHEMA,
+        "data" => envelope.fetch("data"),
+        "mutation" => envelope.dig("meta", "mutation")
+      }
+    end
+  end
+
+  module_function
+
+  def run(argv, env: ENV, root: File.expand_path("..", __dir__))
+    return usage unless argv.empty?
+    SoulCore::EnvLoader.load(File.join(root, ".env"))
+    paths = SoulCore::MemoryPaths.new(root: root)
+    _local, _projection, store = SoulMemoryProjectionQueryCLI.build_services(env: env, root: root)
+    policy = SoulCore::MemoryRetrievalPolicyStore.new(private_root: paths.private_root, path: File.join(paths.private_root, "retrieval", "active-policy.json"))
+    retrieval = FacadeRetrievalAdapter.new(SoulCore::ApplicationFacade.new(root: root, process_env: env))
+    result = SoulCore::MemoryProductionQualificationService.new(
+      case_path: File.join(paths.private_root, "projection", "qualification-cases.json"),
+      allowed_root: paths.private_root,
+      approved_memory_ids: store.records(status: "approved").map { |record| record.fetch("id") },
+      retrieval: retrieval,
+      policy_store: policy
+    ).qualify
+    puts JSON.pretty_generate(result)
+    result["lifecycle_state"] == "complete" ? 0 : 1
+  rescue StandardError => error
+    warn JSON.generate("lifecycle_state" => "failed", "message" => "Memory production qualification failed safely: #{error.class}", "mutation" => "none")
+    1
+  end
+
+  def usage
+    warn "Usage: soul-memory-production-qualify"
+    2
+  end
+end
+
+exit SoulMemoryProductionQualificationCLI.run(ARGV) if $PROGRAM_NAME == __FILE__

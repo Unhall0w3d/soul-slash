@@ -650,10 +650,29 @@ A24 adds a content-withholding foreground qualification harness over a fixed
 owner-private positive/negative corpus. It compares the existing local path
 with A23 projection candidates across a closed 0.50..0.80 threshold sweep, but
 cannot select a winner, change production behavior, or route Chat/Voice.
-The first private live run covered 11 positive and 5 negative cases. A `0.65`
-remote threshold preserved full positive recall and rejected every negative
-case while improving precision, but ranked expected results below the local
-path. The next gate is hybrid-fusion qualification, not direct remote routing.
+The first private live run covered 11 positive and 5 negative cases. Its
+diagnostic command later proved not to load the production `.env`, so its
+`0.65` result is retained as historical A24/A25 evidence rather than current
+production proof.
+
+A25 compared three fixed hybrid strategies without changing routing. A26 adds
+an owner-private, atomic, audited, reversible selector. A27 routes both ordinary
+Chat and Voice Presence through one adapter that uses projection evidence as a
+gate, preserves local ordering, and re-reads approved content from the canonical
+ledger. A29 corrected the diagnostic environment, retained A25 unchanged for
+audit and rollback, and activated the distinctly named
+`projection_gate_local_order_a29` profile at `0.55`. The production-facade
+qualification completed all 16 reviewed cases with 11/11 positive hits, 5/5
+negative abstentions, zero forbidden hits, and mean positive reciprocal rank
+`0.881818`. Projection failure returns to local retrieval without changing the
+active selector or canonical memory.
+
+A28 adds a deterministic rotatable Canvas depth view to Memory Observatory
+alongside the existing 2D constellation and lifecycle layouts. All modes retain
+the 240-node/400-explicit-edge caps and expose metadata only; depth is visual
+presentation, not inferred semantic topology. Deterministic closure through
+A29 passes. Human review remains required for Voice experience and final 3D
+interaction/aesthetics before production closure is approved.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 
