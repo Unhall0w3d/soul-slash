@@ -630,6 +630,14 @@ registration, host mutation, provider/privacy exceptions, service installation,
 merge, release, upload, and publication. Verified ordinary memory may move
 through the separately reviewed deterministic lifecycle policy.
 
+The deployed owner-private Qdrant and FalkorDB services remain disposable,
+content-free projections. A21 defines a bounded generation coordinator: both
+generation-specific stores must verify before one owner-local selector can
+activate their exact pair. Failure leaves local authoritative retrieval and the
+previous selector intact. TLS transports, selector persistence, live
+population, remote retrieval, rollback, and retirement remain later reviewed
+gates.
+
 ### Deterministic memory lifecycle admission and foreground cycle
 
 Verified A12 proposal packets can now be processed one packet at a time by a
