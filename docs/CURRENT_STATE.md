@@ -674,6 +674,16 @@ presentation, not inferred semantic topology. Deterministic closure through
 A29 passes. Human review remains required for Voice experience and final 3D
 interaction/aesthetics before production closure is approved.
 
+Memory Exact-Duplicate Consolidation A30 is an implementation candidate. One
+foreground invocation can supersede at most one same-layer approved ordinary
+memory whose content differs only in surrounding or repeated whitespace. It
+uses deterministic confidence/age/identifier survivor ordering, excludes any
+protected group, emits canonical audit and rollback evidence, and exposes no
+memory content. It does not perform semantic similarity, conflict resolution,
+rewriting, physical deletion, projection mutation, or timer integration. A live
+read-only preview found one eligible pair among 33 approved records; no live
+memory was changed.
+
 ### Deterministic memory lifecycle admission and foreground cycle
 
 Verified A12 proposal packets can now be processed one packet at a time by a
