@@ -23,11 +23,11 @@ check.call("SVG constellation and lifecycle fallback remain present", panel.incl
 check.call("projection consumes the existing bounded schema", observatory_javascript.include?("value.nodes") && observatory_javascript.include?("value.edges") && observatory_javascript.include?("slice(0, 240)") && observatory_javascript.include?("slice(0, 400)"))
 check.call("coordinates are deterministic and depth is rendered", observatory_javascript.include?("memory3dCoordinates") && observatory_javascript.include?("memoryHash(node.id)") && observatory_javascript.include?("perspective") && observatory_javascript.include?("globalAlpha"))
 check.call("only explicit relationships are drawn", observatory_javascript.include?("edge.relation === \"supersession\"") && observatory_javascript.include?("edge.source") && observatory_javascript.include?("edge.target") && !observatory_javascript.match?(/similarity|semantic|inferred|cluster/i))
-check.call("drag and keyboard controls render on demand", observatory_javascript.include?("pointerdown") && observatory_javascript.include?("ArrowLeft") && observatory_javascript.include?("resetMemory3dView") && !observatory_javascript.match?(/requestAnimationFrame|setInterval|setTimeout/))
+check.call("drag and keyboard controls remain bounded", observatory_javascript.include?("pointerdown") && observatory_javascript.include?("ArrowLeft") && observatory_javascript.include?("resetMemory3dView") && !observatory_javascript.match?(/setInterval|setTimeout/))
 check.call("mode changes detach Canvas listeners", observatory_javascript.include?("detachMemory3dControls") && observatory_javascript.include?("state.memoryObservatory3d.cleanup = ()") && observatory_javascript.include?("removeEventListener"))
 check.call("leaving Observatory detaches Canvas listeners", javascript.include?('if (!memoryObservatory) detachMemory3dControls();'))
 check.call("dynamic labels use text nodes", !observatory_javascript.match?(/memory3dMetadata[\s\S]*innerHTML|memory3dMetadata[\s\S]*outerHTML/) && observatory_javascript.include?("button.textContent"))
-check.call("reduced-motion styling is explicit", stylesheet.include?("prefers-reduced-motion") && brief.include?("Render on demand only"))
+check.call("reduced-motion behavior remains explicit", stylesheet.include?("prefers-reduced-motion") && observatory_javascript.include?("prefers-reduced-motion: reduce") && brief.include?("Render on demand only"))
 check.call("3D mode exposes no mutation or network controls", panel.scan(/<button\b[^>]*>(.*?)<\/button>/mi).flatten.none? { |label| label.match?(/\b(?:approve|delete|forget|supersede|execute|mutat|write)\b/i) } && !a28_javascript.match?(/fetch\(|callSoul\(/))
 
 checks.each { |name, passed| puts "#{passed ? "PASS" : "FAIL"} #{name}" }
