@@ -10,7 +10,9 @@ require_relative "../lib/soul_core/memory_audit_journal_service"
 require_relative "../lib/soul_core/memory_autonomous_lifecycle_service"
 require_relative "../lib/soul_core/memory_core_aware_worker"
 require_relative "../lib/soul_core/memory_core_aware_worker_deployment"
+require_relative "../lib/soul_core/memory_exact_duplicate_consolidation_service"
 require_relative "../lib/soul_core/memory_lifecycle_admission_service"
+require_relative "../lib/soul_core/memory_lifecycle_maintenance_service"
 require_relative "../lib/soul_core/memory_local_proposal_synthesizer"
 require_relative "../lib/soul_core/memory_observation_derivation_service"
 
@@ -42,9 +44,15 @@ else
   lifecycle = SoulCore::MemoryAutonomousLifecycleService.new(
     root: root, derivation_service: derivations, admission_service: admissions
   )
+  consolidation = SoulCore::MemoryExactDuplicateConsolidationService.new(
+    memory_store: memories, audit_service: audit
+  )
+  maintenance = SoulCore::MemoryLifecycleMaintenanceService.new(
+    lifecycle_service: lifecycle, consolidation_service: consolidation
+  )
   cores = SoulCore::CoreOrchestrationService.new(root: root, env: ENV)
   worker = SoulCore::MemoryCoreAwareWorker.new(
-    root: root, lifecycle_service: lifecycle, core_status: -> { cores.status }
+    root: root, lifecycle_service: maintenance, core_status: -> { cores.status }
   )
   result = case command
            when "run" then worker.run

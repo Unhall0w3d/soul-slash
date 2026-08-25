@@ -3,6 +3,7 @@
 
 require "json"
 require_relative "../lib/soul_core/conversation_memory_store"
+require_relative "../lib/soul_core/env_loader"
 require_relative "../lib/soul_core/memory_paths"
 require_relative "../lib/soul_core/memory_retrieval_evaluator"
 require_relative "../lib/soul_core/memory_retrieval_index"
@@ -12,6 +13,7 @@ module SoulMemoryRetrievalCLI
   module_function
 
   def run(argv, env: ENV, root: File.expand_path("..", __dir__))
+    SoulCore::EnvLoader.load(File.join(root, ".env")) if env.equal?(ENV)
     command = argv.shift.to_s
     return usage unless %w[evaluate evaluate-live status rebuild query].include?(command)
 
