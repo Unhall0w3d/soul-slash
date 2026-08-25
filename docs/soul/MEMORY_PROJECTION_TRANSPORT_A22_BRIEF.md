@@ -1,7 +1,7 @@
 # Memory Projection Transport A22 Brief
 
-Status: implementation candidate. Live population remains unauthorized until a
-fresh A22 preview and exact digest are reviewed and confirmed.
+Status: implemented and live-qualified. The first generation was populated only
+after its fresh A22 preview and exact digest were reviewed and confirmed.
 
 ## Objective
 

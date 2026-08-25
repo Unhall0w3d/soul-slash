@@ -77,7 +77,9 @@ f_client.define_singleton_method(:call) do |*parts|
   query = parts[2].to_s
   if query.include?("RETURN n.id")
     node = falkor_payload.fetch("nodes").first
-    [[], [[node.fetch("id"), node.fetch("labels"), *SoulCore::FalkorProjectionClient::NODE_FIELDS.map { |field| node.fetch("properties").fetch(field) }]], []]
+    typed = lambda { |value| value.is_a?(Array) ? [6, value.map { |item| [2, item] }] : [2, value] }
+    row = [node.fetch("id"), node.fetch("labels"), *SoulCore::FalkorProjectionClient::NODE_FIELDS.map { |field| node.fetch("properties").fetch(field) }]
+    [[], [row.map { |value| typed.call(value) }], []]
   elsif query.include?("RETURN a.id")
     [[], [], []]
   else
@@ -90,6 +92,7 @@ f_name = "SoulMemory_#{'a' * 20}"
 check.call("FalkorDB generation is created", falkor.prepare(name: f_name, payload: falkor_payload) == "created")
 check.call("FalkorDB uses bounded command batches", f_commands.length <= 128)
 check.call("FalkorDB verifies exact payload", falkor.verify(name: f_name).fetch("payload_digest").match?(/\A[0-9a-f]{64}\z/))
+check.call("FalkorDB decodes compact typed values", f_commands.any? { |command| command.first == "GRAPH.RO_QUERY" })
 check.call("FalkorDB readback uses read-only queries", f_commands.any? { |command| command.first == "GRAPH.RO_QUERY" })
 
 source = File.binread(File.expand_path("../lib/soul_core/memory_projection_transports.rb", __dir__))
@@ -97,10 +100,13 @@ cli_source = File.binread(File.expand_path("soul-memory-projection-reconcile", _
 check.call("transport does not use shell commands", !source.match?(/Open3|Kernel\.system|Process\.spawn|IO\.popen|`/))
 check.call("Redis password is sent only through RESP AUTH", source.include?('frame(["AUTH", @password])'))
 check.call("Redis TLS work has a bounded read timeout", source.include?("Timeout.timeout(@read_timeout)"))
+check.call("Redis TLS cleanup state exists before bounded execution", source.include?("tcp = nil\n      ssl = nil\n      Timeout.timeout"))
+check.call("Redis TLS verifies the configured peer identity", source.include?("ssl.post_connection_check(@host)"))
 check.call("no background or retry loop exists", ![source, cli_source].join.match?(/Thread\.new|setInterval|systemd|retry/))
 check.call("CLI requires a fresh exact execute gate", cli_source.include?('command == "execute" && argv.length == 2') && cli_source.include?("expected_digest: argv.shift.to_s"))
 check.call("CLI rejects symlinked or broadly readable private files", cli_source.include?("private path contains a symlink component") && cli_source.include?("private path permissions are too broad"))
 check.call("CLI retains local authoritative fallback", cli_source.include?("local_authoritative_retrieval"))
+check.call("CLI uses the reviewed private address with TLS verification", cli_source.include?('host = config.fetch("ipv4")') && cli_source.include?("address.private?"))
 
 abort "Memory projection transport A22 verification failed: #{errors.join(', ')}" unless errors.empty?
 puts "Memory projection transport A22 verification passed (#{checks} checks)."

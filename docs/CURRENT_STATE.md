@@ -636,9 +636,10 @@ generation-specific stores must verify before one owner-local selector can
 activate their exact pair. A22 adds verified TLS transports, exact bounded
 readback, owner-private atomic selector persistence, and one foreground
 preview/execute command. Failure leaves local authoritative retrieval and the
-previous selector intact. The first live preview is currently blocked by a
-stale reviewed embedding index; live population, remote retrieval, rollback,
-and retirement remain later reviewed gates.
+previous selector intact. The first exact generation is now live-qualified and
+active after verified population of 33 Qdrant vectors, 34 FalkorDB nodes, and 5
+explicit edges. Local retrieval remains authoritative; remote retrieval,
+rollback, and retirement remain later reviewed gates.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 
