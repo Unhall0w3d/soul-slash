@@ -40,7 +40,8 @@ module SoulCore
         "cycle_sha256" => cycle["cycle_sha256"], "mode" => cycle["mode"],
         "decision_counts" => cycle["decision_counts"],
         "rollback_references" => cycle["rollback_references"],
-        "idempotent" => cycle["idempotent"]
+        "idempotent" => cycle["idempotent"],
+        "projection_reconciliation_required" => cycle["projection_reconciliation_required"]
       }.compact))
     rescue ArgumentError, Errno::EACCES, Errno::EISDIR, Errno::ENOENT, IOError => error
       record(failed(error.message, nil))

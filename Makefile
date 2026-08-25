@@ -1112,6 +1112,9 @@ verify-memory-production-closure:
 verify-memory-exact-duplicate-consolidation:
 > @ruby scripts/verify-memory-exact-duplicate-consolidation-a30.rb
 
+verify-memory-lifecycle-maintenance:
+> @ruby scripts/verify-memory-lifecycle-maintenance-a31.rb
+
 memory-consolidate-exact-preview:
 > @ruby scripts/soul-memory-consolidate-exact preview
 
