@@ -93,6 +93,7 @@ require_relative "alpha_promotion_gate"
 require_relative "repo_curation_assessor"
 require_relative "feature_direction_assessor"
 require_relative "dev_worker_command"
+require_relative "dev_worker_vault_context_command"
 require_relative "response_renderer"
 require_relative "workflow_session"
 
@@ -114,6 +115,8 @@ module SoulCore
         DashboardCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
       when "dev-worker"
         DevWorkerCommand.new(argv: @argv, root: Dir.pwd, env: ENV).run
+      when "dev-worker-vault"
+        DevWorkerVaultContextCommand.new(argv: @argv, root: Dir.pwd, env: ENV).run
       when "config", "configuration"
         ConfigurationCommand.new(argv: @argv, root: Dir.pwd, process_env: @process_env).run
       when "skills" then puts JSON.pretty_generate(SkillRegistry.new.to_h); 0
@@ -732,6 +735,8 @@ when "documentation-registry", "doc-registry", "docs-registry"
       puts "  ruby bin/soul config show [--json]"
       puts "  ruby bin/soul config explain <canonical.key> [--json]"
       puts "  ruby bin/soul config validate [--json]"
+      puts "  ruby bin/soul dev-worker preview --request-file <path>"
+      puts "  ruby bin/soul dev-worker-vault preview --request-file <path>"
       puts "  ruby bin/soul assess capabilities"
       puts "  ruby bin/soul assess models"
       puts "  ruby bin/soul assess model-suitability"
