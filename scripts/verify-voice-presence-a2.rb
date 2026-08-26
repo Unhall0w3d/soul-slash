@@ -15,8 +15,17 @@ MANIFEST_PATH = File.join(ROOT, "config", "voice_presence_models.json")
 manifest = JSON.parse(File.binread(MANIFEST_PATH, 256 * 1024))
 raise "manifest schema differs" unless manifest["schema_version"] == "soul.voice_presence.models.v1"
 raise "wake phrase differs" unless manifest.dig("keyword", "phrase") == "Hey Soul"
-raise "reviewed wake threshold differs" unless manifest.dig("keyword", "trigger_threshold") == 0.15
-raise "reviewed wake boosting differs" unless manifest.dig("keyword", "boosting_score") == 3.5
+raise "wake alias differs" unless manifest.fetch("keyword_aliases") == [{
+  "phrase" => "Hey Slash", "tokens" => "HH EY1 S L AE1 SH", "boosting_score" => 4.0,
+  "trigger_threshold" => 0.12, "symbol" => "HEY_SLASH"
+}]
+raise "wake pronunciation variants differ" unless manifest.fetch("keyword_variants") == [
+  { "phrase" => "Hey Soul", "tokens" => "HH EY1 S OW0 L", "boosting_score" => 3.5, "trigger_threshold" => 0.12, "symbol" => "HEY_SOUL_UNSTRESSED" },
+  { "phrase" => "Hey Soul", "tokens" => "HH EY1 S OW1", "boosting_score" => 3.0, "trigger_threshold" => 0.18, "symbol" => "HEY_SOUL_REDUCED_CODA" },
+  { "phrase" => "Hey Slash", "tokens" => "HH EY1 S L AE0 SH", "boosting_score" => 3.5, "trigger_threshold" => 0.12, "symbol" => "HEY_SLASH_UNSTRESSED" }
+]
+raise "reviewed wake threshold differs" unless manifest.dig("keyword", "trigger_threshold") == 0.12
+raise "reviewed wake boosting differs" unless manifest.dig("keyword", "boosting_score") == 4.0
 raise "wake feed is too coarse" unless manifest.dig("capture", "wake_chunk_milliseconds") == 10
 raise "wake detector is not CPU bounded" unless File.binread(File.join(ROOT, "scripts", "soul-voice-presence-worker.py")).include?('provider="cpu"')
 raise "capture duration is unbounded" unless manifest.dig("capture", "maximum_utterance_seconds").to_f.between?(1, 30)
@@ -123,8 +132,8 @@ raise "runtime plan digest differs" unless plan["expected_digest"] == Digest::SH
 
 puts JSON.pretty_generate(
   "lifecycle_state" => "complete",
-  "deterministic_tests" => 34,
-  "wake_phrase" => manifest.dig("keyword", "phrase"),
+  "deterministic_tests" => 35,
+  "wake_phrases" => [manifest.dig("keyword", "phrase"), *manifest.fetch("keyword_aliases").map { |entry| entry.fetch("phrase") }],
   "ordinary_chat_interface" => true,
   "system_service" => false,
   "window_controls_residency" => true

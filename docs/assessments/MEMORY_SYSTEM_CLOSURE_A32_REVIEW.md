@@ -1,8 +1,8 @@
 # Memory System Closure A32 Review
 
 Status: implementation, production retrieval, autonomous bounded lifecycle,
-projection, and Observatory review are complete. Final human Voice semantic
-recall acceptance remains open.
+projection, Observatory review, and human Voice semantic recall acceptance are
+complete. General wake reliability remains a separate Voice Presence concern.
 
 ## Closure scope
 
@@ -39,15 +39,27 @@ ordinary-memory lifecycle scope.
   view switching, fallback, accessibility, privacy, and bounded animation
   behavior accepted.
 
-## Remaining human acceptance
+## Human Voice acceptance
 
-- [ ] In a fresh Voice Presence context, recall one approved durable fact that
+- [x] In a fresh Voice Presence context, recall one approved durable fact that
   is absent from the immediate transcript.
-- [ ] Ask a paraphrased follow-up and confirm conversationally useful recall.
-- [ ] Ask about a fabricated or unsupported fact and confirm abstention rather
+- [x] Ask a paraphrased follow-up and confirm conversationally useful recall.
+- [x] Ask about a fabricated or unsupported fact and confirm abstention rather
   than invention.
-- [ ] Review spoken latency, pronunciation, and response usefulness.
-- [ ] Confirm the test performs no memory mutation or projection rebuild.
+- [x] Review spoken latency, pronunciation, and response usefulness.
+- [x] Confirm canonical memory and the active projection remain unchanged.
+
+The live 2026-08-25 test recalled the reviewed Trash-restore safeguards,
+preserved the refusal to overwrite an occupied original path through a
+paraphrased follow-up, and declined to invent a backup-enclosure color. The
+Operator declined the offered memory capture. Canonical audit remained at 75
+events with chain head `9ea97c8333bfe43e7f4a18a9d963d0215542d972edae98652570232f60cd2f2f`,
+and projection generation `generation_07438fc2d13522f90c9b` did not change.
+Approved automatic conversation observation advanced normally; its lifecycle
+proposal was rejected for lacking durable user evidence. One response
+speculated about rename or alternate-location choices after correctly stating
+the no-overwrite rule; that unsupported elaboration remains a response-quality
+defect, not a memory-retrieval failure.
 
 ## Follow-on automation boundary
 

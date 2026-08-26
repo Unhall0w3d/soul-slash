@@ -49,8 +49,8 @@ The masked portrait means Soul is idle or listening. The brighter unmasked
 portrait and cyan pulse identify an awakened, hearing, thinking, speaking, or
 natural-follow-up turn.
 
-1. Wait for **Listening locally for “Hey Soul”**.
-2. Say “Hey Soul,” wait for the cue, and speak one request.
+1. Wait for **Listening locally for “Hey Soul” or “Hey Slash”**.
+2. Say “Hey Soul” or “Hey Slash,” wait for the cue, and speak one request.
 3. Soul captures at most 30 seconds and stops at 0.95 seconds of trailing
    silence.
 4. The microphone process closes while the ordinary conversation, skill,
@@ -58,7 +58,7 @@ natural-follow-up turn.
 5. Soul speaks the eligible response, then opens a visible five-second
    follow-up window.
 6. Begin speaking within those five seconds to continue naturally without
-   repeating “Hey Soul.” The normal 30-second utterance and trailing-silence
+   repeating a wake phrase. The normal 30-second utterance and trailing-silence
    bounds still apply, and each completed reply opens one fresh bounded
    follow-up window.
 7. Stay silent for five seconds to close the follow-up normally and return to
@@ -78,8 +78,12 @@ Dashboard text behavior or deterministic skill results.
 Wake detection uses the local sherpa-onnx keyword spotter rather than full
 transcription. Boosting and trigger threshold are manifest-controlled: a
 higher boost and lower threshold make activation easier but may increase false
-wakes. The current calibration candidate is 3.5 / 0.15. Pronounce “Hey Soul” as one natural
-short phrase; no special theatrical pacing or inflection is intended.
+wakes. The current public phrases use 4.0 / 0.12. Bounded phoneme variants cover
+unstressed vowels and the Operator's reduced final L in “Hey Soul”; the reduced
+coda uses a more conservative 3.0 / 0.18. Pronounce either as one natural short
+phrase; no special theatrical pacing or inflection is intended. These remain
+fixed local keyword-token sequences rather than general transcription or broad
+fuzzy matching.
 
 Voice Presence displays request-private stage timing after each completed
 turn. These measurements contain durations only and disappear with the visible

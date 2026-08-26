@@ -50,9 +50,10 @@ def validate(root, manifest)
     problems << "wake asset digest differs: #{relative}" unless Digest::SHA256.file(path).hexdigest == receipt.fetch("sha256")
   end
   keyword_path = File.join(model, "keywords.txt")
-  expected_keyword = manifest.fetch("keyword")
-  keyword_line = "#{expected_keyword.fetch('tokens')} :#{expected_keyword.fetch('boosting_score')} ##{expected_keyword.fetch('trigger_threshold')} @#{expected_keyword.fetch('symbol')}\n"
-  problems << "reviewed wake phrase file differs" unless File.file?(keyword_path) && File.binread(keyword_path) == keyword_line
+  keyword_lines = [manifest.fetch("keyword"), *manifest.fetch("keyword_aliases", []), *manifest.fetch("keyword_variants", [])].map do |keyword|
+    "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n"
+  end.join
+  problems << "reviewed wake phrase file differs" unless File.file?(keyword_path) && File.binread(keyword_path) == keyword_lines
   if File.executable?(python)
     output, status = Open3.capture2e(python, "-c", "from importlib.metadata import version; print(version('sherpa-onnx'))")
     problems << "sherpa-onnx version differs" unless status.success? && output.strip == manifest.dig("runtime", "package_version")
@@ -81,7 +82,7 @@ begin
     "runtime" => manifest.fetch("runtime"),
     "asset_count" => manifest.fetch("assets").length,
     "requirements_sha256" => Digest::SHA256.file(requirements).hexdigest,
-    "keyword" => manifest.fetch("keyword"),
+    "keywords" => [manifest.fetch("keyword"), *manifest.fetch("keyword_aliases", []), *manifest.fetch("keyword_variants", [])],
     "host_missing" => host_missing,
     "confirmation_phrase" => CONFIRMATION,
     "persistent_while_window_open" => true,
@@ -110,12 +111,14 @@ begin
     emit("lifecycle_state" => "complete", "available" => true, "already_valid" => true, "install_dir" => root)
   end
   if File.directory?(root) && problems == ["reviewed wake phrase file differs"]
-    keyword = manifest.fetch("keyword")
     keyword_path = File.join(root, "model", "keywords.txt")
     temporary_keyword = "#{keyword_path}.#{Process.pid}.tmp"
+    keyword_lines = [manifest.fetch("keyword"), *manifest.fetch("keyword_aliases", []), *manifest.fetch("keyword_variants", [])].map do |keyword|
+      "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n"
+    end.join
     File.binwrite(
       temporary_keyword,
-      "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n",
+      keyword_lines,
       mode: "wx", perm: 0o600
     )
     File.rename(temporary_keyword, keyword_path)
@@ -143,10 +146,12 @@ begin
   manifest.fetch("assets").each do |relative, receipt|
     FileUtils.cp(File.join(source_root, receipt.fetch("source")), File.join(model_root, relative))
   end
-  keyword = manifest.fetch("keyword")
+  keyword_lines = [manifest.fetch("keyword"), *manifest.fetch("keyword_aliases", []), *manifest.fetch("keyword_variants", [])].map do |keyword|
+    "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n"
+  end.join
   File.binwrite(
     File.join(model_root, "keywords.txt"),
-    "#{keyword.fetch('tokens')} :#{keyword.fetch('boosting_score')} ##{keyword.fetch('trigger_threshold')} @#{keyword.fetch('symbol')}\n",
+    keyword_lines,
     mode: "wx", perm: 0o600
   )
   FileUtils.rm_rf(extracted)

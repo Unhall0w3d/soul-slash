@@ -421,7 +421,7 @@ credential, export, physical-purge, and broad-retention changes remain explicit
 human decisions.
 
 Memory Retrieval and Observatory A0–A32 is implemented and production-qualified,
-with final human Voice experience acceptance still pending. A
+including final human Voice semantic-recall acceptance. A
 synthetic deterministic corpus compares lexical and hybrid recall, an optional
 owner-private index is source- and payload-digest bound, and Administration
 exposes a read-only ledger/index summary plus one explicit diagnostic query.
