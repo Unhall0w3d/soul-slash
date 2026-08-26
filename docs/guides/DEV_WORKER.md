@@ -12,6 +12,12 @@ tool-using implementation. Spark, Luna, and Terra routing is defined in
 privileged or destructive work, final edits, tests, Git, and merge decisions
 with primary Sol.
 
+For projects with a reviewed Knowledge Vault corpus, the Codex-facing skill
+prefers `dev-worker-vault` so Soul can assemble at most three complete notes
+within 48 KiB. AletheiaUC is the first qualified corpus. Manual parent-supplied
+context remains the fallback when no qualified corpus exists or the task needs
+more exact repository excerpts.
+
 ## Authority boundary
 
 Soul receives only the exact `parent_supplied_context` in the request. Path
@@ -62,6 +68,25 @@ bin/soul dev-worker execute \
 The result is a JSON envelope. `data.candidate` remains untrusted candidate
 material. Primary Sol must verify its claims against source, decide whether
 to reproduce any edit, and run the normal tests.
+
+## Reviewed vault context
+
+Create a request matching
+`docs/soul/schemas/dev_worker_vault_request.schema.json`, then use:
+
+```bash
+bin/soul dev-worker-vault preview --request-file /tmp/soul-dev-worker-vault-request.json
+bin/soul dev-worker-vault execute \
+  --request-file /tmp/soul-dev-worker-vault-request.json \
+  --confirmation "RUN_SOUL_DEV_WORKER <request_id>" \
+  --expected-digest <preview_digest>
+```
+
+Preview exposes only the selected note-relative paths, sizes, hashes, and
+aggregate digest—not note content. Review those facts before execution. Notes
+remain untrusted evidence: verify all proposed paths, commands, tests, and
+implementation claims against the current repository. `awaiting_input` is a
+stopping condition, not permission to broaden retrieval or research online.
 
 ## Assemble context from the local Knowledge Vault
 
