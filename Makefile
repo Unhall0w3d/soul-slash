@@ -88,7 +88,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
 .PHONY: atelier-cis-hardening-plan atelier-cis-hardening-status atelier-cis-hardening-install atelier-cis-hardening-remove verify-atelier-cis-hardening
-.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
+.PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-dev-worker-vault-context verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
 
 help:
 > @echo "Soul/ public setup Makefile"
@@ -1197,6 +1197,9 @@ model-runtime-dev-uninstall:
 
 verify-codex-soul-dev-worker:
 > @ruby scripts/verify-codex-soul-dev-worker.rb
+
+verify-dev-worker-vault-context:
+> @ruby scripts/verify-dev-worker-vault-context-a5.rb
 
 verify-self-assessment-dev-synthesis:
 > @ruby scripts/verify-self-assessment-dev-synthesis-a1.rb

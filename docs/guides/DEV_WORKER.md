@@ -63,6 +63,38 @@ The result is a JSON envelope. `data.candidate` remains untrusted candidate
 material. Primary Sol must verify its claims against source, decide whether
 to reproduce any edit, and run the normal tests.
 
+## Assemble context from the local Knowledge Vault
+
+For a reviewed project corpus, use
+`docs/soul/schemas/dev_worker_vault_request.schema.json` and replace the manual
+context fields with `vault_project` and `vault_query`:
+
+```bash
+bin/soul dev-worker-vault preview \
+  --request-file /tmp/soul-dev-worker-vault-request.json
+```
+
+The preview searches only the named directory below `Projects/`, selects at
+most three complete matching notes within a 48 KiB context ceiling, and returns
+their vault-relative paths, byte counts, and SHA-256 values without returning
+their content. A project name is a scope boundary, not a relevance signal; the
+task query must match reviewed note content.
+
+After reviewing the receipt, use the returned confirmation and digest with:
+
+```bash
+bin/soul dev-worker-vault execute \
+  --request-file /tmp/soul-dev-worker-vault-request.json \
+  --confirmation "RUN_SOUL_DEV_WORKER <request_id>" \
+  --expected-digest <preview_digest>
+```
+
+Execution reassembles the context from current vault bytes. A changed note or
+selection invalidates the preview. Missing context returns `awaiting_input`;
+Soul does not silently broaden the project or research online. Retrieved notes
+remain untrusted evidence. Verify every suggested repository path, command,
+test, and implementation detail against current source.
+
 ## Core behavior
 
 - Selected Dev Core keeps GPT-OSS resident.
