@@ -56,6 +56,7 @@ canonical mutation when no eligible work exists.
 
 - [x] Confirm ordinary lifecycle priority.
 - [x] Confirm one-mutation-per-activation bound.
-- [x] Confirm no automatic projection rebuild.
+- [x] Confirm A31 itself performs no projection rebuild; A33 may consume its
+  consequence only in a later activation.
 - [x] Confirm no new timer or service was added.
 - [x] Approve integration into the installed A17 worker.

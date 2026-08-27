@@ -7,14 +7,20 @@ require_relative "../lib/soul_core/conversation_observation_store"
 require_relative "../lib/soul_core/core_orchestration_service"
 require_relative "../lib/soul_core/env_loader"
 require_relative "../lib/soul_core/memory_audit_journal_service"
+require_relative "../lib/soul_core/memory_automatic_projection_reconciliation_service"
 require_relative "../lib/soul_core/memory_autonomous_lifecycle_service"
 require_relative "../lib/soul_core/memory_core_aware_worker"
 require_relative "../lib/soul_core/memory_core_aware_worker_deployment"
 require_relative "../lib/soul_core/memory_exact_duplicate_consolidation_service"
 require_relative "../lib/soul_core/memory_lifecycle_admission_service"
 require_relative "../lib/soul_core/memory_lifecycle_maintenance_service"
+require_relative "../lib/soul_core/memory_lifecycle_projection_coordinator"
 require_relative "../lib/soul_core/memory_local_proposal_synthesizer"
 require_relative "../lib/soul_core/memory_observation_derivation_service"
+require_relative "../lib/soul_core/memory_paths"
+require_relative "../lib/soul_core/memory_projection_reconciliation_request_store"
+require_relative "../lib/soul_core/memory_projection_runtime_factory"
+require_relative "../lib/soul_core/memory_retrieval_index"
 
 root = File.expand_path("..", __dir__)
 SoulCore::EnvLoader.load(File.join(root, ".env"))
@@ -50,9 +56,38 @@ else
   maintenance = SoulCore::MemoryLifecycleMaintenanceService.new(
     lifecycle_service: lifecycle, consolidation_service: consolidation
   )
+  coordinated = SoulCore::MemoryLifecycleProjectionCoordinator.new(
+    maintenance_service: maintenance,
+    reconciliation_factory: lambda do
+      paths = SoulCore::MemoryPaths.new(root: root)
+      endpoint = ENV["SOUL_MEMORY_EMBEDDING_ENDPOINT"].to_s.strip
+      profile = ENV["SOUL_MEMORY_EMBEDDING_PROFILE"].to_s.strip
+      dimensions = ENV["SOUL_MEMORY_EMBEDDING_DIMENSIONS"].to_s.strip
+      raise "memory embedding configuration is incomplete" if [endpoint, profile, dimensions].any?(&:empty?)
+      embedding = SoulCore::LocalLoopbackEmbeddingClient.new(
+        endpoint: endpoint,
+        profile: { "name" => profile, "dimensions" => Integer(dimensions) },
+        protocol: ENV.fetch("SOUL_MEMORY_EMBEDDING_PROTOCOL", "ollama")
+      )
+      index = SoulCore::ApprovedMemoryIndexService.new(
+        memory_store: memories, index_path: paths.write_path("derived/approved-memory-index.json"),
+        allowed_root: paths.private_root, embedding_client: embedding
+      )
+      runtime = SoulCore::MemoryProjectionRuntimeFactory.new(
+        root: root, process_env: ENV, paths: paths, memory_store: memories,
+        index_service: index, embedding_client: embedding, local_retrieval: nil
+      )
+      reconciler, selector = runtime.build_reconciler
+      SoulCore::MemoryAutomaticProjectionReconciliationService.new(
+        memory_store: memories, audit_service: audit, index_service: index,
+        reconciler: reconciler, selector_store: selector,
+        request_store: SoulCore::MemoryProjectionReconciliationRequestStore.new(root: root)
+      )
+    end
+  )
   cores = SoulCore::CoreOrchestrationService.new(root: root, env: ENV)
   worker = SoulCore::MemoryCoreAwareWorker.new(
-    root: root, lifecycle_service: maintenance, core_status: -> { cores.status }
+    root: root, lifecycle_service: coordinated, core_status: -> { cores.status }
   )
   result = case command
            when "run" then worker.run

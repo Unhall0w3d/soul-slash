@@ -91,7 +91,7 @@ source = File.read(File.join(__dir__, "../lib/soul_core/memory_lifecycle_mainten
 assert.call(!source.match?(/Thread|sleep|loop\s+do|Net::HTTP|TCPSocket|UDPSocket/), "integration adds no loop or network authority")
 worker = File.read(File.join(__dir__, "soul-memory-lifecycle-worker"))
 assert.call(worker.include?("MemoryLifecycleMaintenanceService") && worker.include?("MemoryExactDuplicateConsolidationService"), "existing Core-aware worker owns the integration")
-assert.call(!worker.match?(/projection.*(reconcile|execute)/i), "worker never rebuilds the remote projection")
+assert.call(worker.include?("MemoryLifecycleProjectionCoordinator"), "A33 layers later-activation projection work around A31")
 retrieval_cli = File.read(File.join(__dir__, "memory-retrieval-observatory.rb"))
 assert.call(retrieval_cli.include?("EnvLoader.load") && retrieval_cli.include?("env.equal?(ENV)"), "manual index rebuild loads configured local embedding profile")
 assert.call(!JSON.generate(cycle).match?(/content.*secret/i), "receipt is content-free")

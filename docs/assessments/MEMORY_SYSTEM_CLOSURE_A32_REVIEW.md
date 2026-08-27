@@ -63,9 +63,10 @@ defect, not a memory-retrieval failure.
 
 ## Follow-on automation boundary
 
-Automatic projection reconciliation is not part of A32. The next reviewed
-slice may consume the explicit stale-projection consequence after a canonical
-lifecycle mutation and perform one bounded, auditable, Core-aware
-reconciliation. It must preserve the canonical ledger, fail closed, expose
-retry and cancellation boundaries, avoid unbounded polling, and record exactly
-what generation changed and why.
+Automatic projection reconciliation remains outside A32 itself. A33 now
+implements that follow-on boundary as a candidate: it consumes the explicit
+stale-projection consequence, uses a later activation of the existing A17
+timer, preserves the canonical ledger, fails closed, caps automatic attempts,
+and records content-free request and generation evidence. See
+`docs/assessments/MEMORY_AUTOMATIC_PROJECTION_RECONCILIATION_A33_REVIEW.md`;
+live supervised acceptance remains pending.

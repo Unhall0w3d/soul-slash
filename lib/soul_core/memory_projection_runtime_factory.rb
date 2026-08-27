@@ -5,6 +5,7 @@ require "json"
 require "pathname"
 require_relative "memory_projection_contract"
 require_relative "memory_projection_query_service"
+require_relative "memory_projection_reconciler"
 require_relative "memory_projection_transports"
 
 module SoulCore
@@ -30,6 +31,27 @@ module SoulCore
     end
 
     def build
+      qdrant, falkor, projection_root = projection_dependencies
+      query_service(qdrant, falkor, projection_root)
+    rescue StandardError
+      unavailable = UnavailableDependency.new
+      query_service(unavailable, unavailable, File.join(@paths.private_root, "projection"))
+    end
+
+    # A33 uses the same private transport construction as read-only queries but
+    # fails closed instead of silently substituting unavailable dependencies.
+    def build_reconciler
+      qdrant, falkor, projection_root = projection_dependencies
+      selector = selector_store(projection_root)
+      [MemoryProjectionReconciler.new(
+        contract: MemoryProjectionContract.new(memory_store: @memory_store, index_service: @index_service),
+        qdrant_client: qdrant, falkor_client: falkor, selector_store: selector
+      ), selector]
+    end
+
+    private
+
+    def projection_dependencies
       projection_root = File.join(@paths.private_root, "projection")
       config_path = @env.fetch("SOUL_MEMORY_PROJECTION_PRIVATE_CONFIG", File.join(projection_root, "deployment.json"))
       config = read_private_json(config_path, allowed_root: projection_root)
@@ -43,16 +65,16 @@ module SoulCore
         host: config.fetch("ipv4"), port: 6379, ca_path: ca_path,
         password: read_private_text(config.fetch("falkordb_password_path"), allowed_root: projection_root)
       ))
-      query_service(qdrant, falkor, projection_root)
-    rescue StandardError
-      unavailable = UnavailableDependency.new
-      query_service(unavailable, unavailable, File.join(@paths.private_root, "projection"))
+      [qdrant, falkor, projection_root]
     end
 
-    private
+    def selector_store(projection_root)
+      MemoryProjectionSelectorStore.new(private_root: @paths.private_root,
+        path: File.join(projection_root, "active-generation.json"))
+    end
 
     def query_service(qdrant, falkor, projection_root)
-      selector = MemoryProjectionSelectorStore.new(private_root: @paths.private_root, path: File.join(projection_root, "active-generation.json"))
+      selector = selector_store(projection_root)
       MemoryProjectionQueryService.new(
         memory_store: @memory_store,
         embedding_client: @embedding_client || UnavailableDependency.new,
