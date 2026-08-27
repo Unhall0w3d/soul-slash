@@ -3,7 +3,7 @@
 ## Candidate status
 
 ```text
-candidate_complete
+accepted_and_merged
 ```
 
 ## Implementation summary
@@ -106,4 +106,4 @@ Mutation: none
 - [x] No service, watcher, timer, listener, queue, or retry loop was added.
 - [x] Existing and focused deterministic checks pass.
 - [x] Review one live AletheiaUC vault preview.
-- [ ] Approve merge.
+- [x] Approved and merged through PR #205.
