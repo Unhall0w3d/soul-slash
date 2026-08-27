@@ -674,7 +674,10 @@ the 240-node/400-explicit-edge caps and expose metadata only; depth is visual
 presentation, not inferred semantic topology. Deterministic closure through
 A32 passes. Authenticated human review approved the 3D interaction, fallback
 modes, accessibility, privacy, and aesthetics. Final Voice experience
-acceptance remains the only open interface review.
+acceptance passed on 2026-08-25 through durable-fact recall, paraphrased
+follow-up, unsupported-fact abstention, and verification that canonical memory
+and the active projection remained unchanged. Residual wake-phrase misses are
+a separate Voice Presence tuning concern rather than a memory-closure blocker.
 
 Memory Exact-Duplicate Consolidation A30 and Lifecycle Maintenance A31 are
 approved, integrated, and live-qualified. One Core-aware worker activation can
