@@ -134,7 +134,7 @@ def main():
     rate = capture["sample_rate"]
     chunk_bytes = int(rate * capture["wake_chunk_milliseconds"] / 1000) * 2
     last_level_emit = 0.0
-    emit(type="state", state="listening", summary='Listening locally for “Hey Soul”.')
+    emit(type="state", state="listening", summary='Listening locally for “Hey Soul” or “Hey Slash”.')
     try:
         while not STOP:
             ready, _, _ = select.select([sys.stdin, recorder.stdout], [], [], 0.2)
@@ -151,7 +151,7 @@ def main():
                             if line == "stop":
                                 return
                             recorder = start_recorder(command)
-                            emit(type="state", state="listening", summary='Listening locally for “Hey Soul”.')
+                            emit(type="state", state="listening", summary='Listening locally for “Hey Soul” or “Hey Slash”.')
                             break
             if recorder.stdout not in ready:
                 continue
@@ -211,7 +211,7 @@ def main():
             else:
                 emit(type="turn_failure", summary=summary)
             stream = spotter.create_stream()
-            emit(type="state", state="listening", summary='Listening locally for “Hey Soul”.')
+            emit(type="state", state="listening", summary='Listening locally for “Hey Soul” or “Hey Slash”.')
     finally:
         stop_recorder(recorder)
 

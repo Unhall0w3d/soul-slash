@@ -1,5 +1,9 @@
 # Memory Lifecycle Maintenance A31 Review
 
+Status: approved, integrated, and live-qualified. The installed A17 timer uses
+the A31 coordinator and currently reaches `no_work` without model invocation or
+canonical mutation when no eligible work exists.
+
 ## Implemented
 
 - Added a bounded maintenance coordinator over the reviewed A16 and A30
@@ -50,8 +54,8 @@
 
 ## Human review checklist
 
-- [ ] Confirm ordinary lifecycle priority.
-- [ ] Confirm one-mutation-per-activation bound.
-- [ ] Confirm no automatic projection rebuild.
-- [ ] Confirm no new timer or service was added.
-- [ ] Approve or reject integration into the installed A17 worker.
+- [x] Confirm ordinary lifecycle priority.
+- [x] Confirm one-mutation-per-activation bound.
+- [x] Confirm no automatic projection rebuild.
+- [x] Confirm no new timer or service was added.
+- [x] Approve integration into the installed A17 worker.

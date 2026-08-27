@@ -1,5 +1,8 @@
 # Memory Observatory Starmap A32 Review
 
+Status: approved and merged in PR #203 after authenticated live review of all
+three visualization modes.
+
 ## Candidate summary
 
 The Memory Observatory now opens to a deterministic star-system presentation. Memory layers receive stable visual centers, nodes retain lifecycle colors and depth-aware glow, supplied relationships remain the only links, and a fixed background starfield and orbit guides improve spatial legibility.
@@ -24,12 +27,12 @@ Lifecycle states touched: none. This is a Dashboard renderer over the existing b
 
 ## Human review checklist
 
-- Confirm the default view reads as a layered star system rather than a flat circle.
-- Confirm rotation is subtle, pauses reliably, and respects reduced motion.
-- Drag, zoom, arrow keys, Space, R, reset, and fullscreen behave predictably.
-- Selecting a star exposes only identifier and existing lifecycle metadata.
-- 2D constellation and lifecycle fallbacks remain usable.
-- Leaving the Observatory produces no ongoing animation or visible resource use.
+- [x] Confirm the default view reads as a layered star system rather than a flat circle.
+- [x] Confirm rotation is subtle, pauses reliably, and respects reduced motion.
+- [x] Drag, zoom, arrow keys, Space, R, reset, and fullscreen behave predictably.
+- [x] Selecting a star exposes only identifier and existing lifecycle metadata.
+- [x] 2D constellation and lifecycle fallbacks remain usable.
+- [x] Leaving the Observatory produces no ongoing animation or visible resource use.
 
 ## Known limitations
 
@@ -38,7 +41,7 @@ Layer placement is deterministic presentation, not semantic clustering. Sparse e
 ## Validation evidence
 
 - `node --check assets/dashboard/dashboard.js` — passed.
-- `make verify-memory-observatory-starmap verify-memory-observatory-3d verify-memory-retrieval-observatory` — passed; 12 A32 checks, 11 A28 checks, 15 facade checks, and 14 Dashboard checks.
+- `make verify-memory-observatory-starmap verify-memory-observatory-3d verify-memory-retrieval-observatory` — passed; 13 A32 checks, 11 A28 checks, 15 facade checks, and 14 Dashboard checks.
 - `make verify-memory-production-closure` — passed; 12 production-closure checks.
 - `git diff --check` — passed.
 - Live authenticated Dashboard review — 34 nodes and 5 explicit links rendered in default 3D mode; 2D SVG remained hidden; adaptive layer scaling, rotation control, metadata fallback, and uncached asset delivery were confirmed.

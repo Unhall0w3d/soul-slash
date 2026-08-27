@@ -29,7 +29,7 @@ module SoulCore
       outcome("complete", true, running? ? "Voice Presence is open" : "Voice Presence is closed", {
         "running" => running?,
         "visible_window_required" => true,
-        "wake_phrase" => "Hey Soul",
+        "wake_phrases" => ["Hey Soul", "Hey Slash"],
         "survives_window_close" => false,
         "presence_state" => presence["state"],
         "notification_voice" => presence["notification_voice"]

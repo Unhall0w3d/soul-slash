@@ -420,7 +420,8 @@ reviewed deterministic policy. Protected authority, security, identity,
 credential, export, physical-purge, and broad-retention changes remain explicit
 human decisions.
 
-Memory Retrieval and Observatory A0–A3 is candidate-complete for review. A
+Memory Retrieval and Observatory A0–A32 is implemented and production-qualified,
+including final human Voice semantic-recall acceptance. A
 synthetic deterministic corpus compares lexical and hybrid recall, an optional
 owner-private index is source- and payload-digest bound, and Administration
 exposes a read-only ledger/index summary plus one explicit diagnostic query.
@@ -529,19 +530,19 @@ valid. The exact reviewed timer was installed and enabled on 2026-08-24; its
 first scheduled activation detected Dev Core and returned `no_work` with no
 model invocation or mutation, then terminated successfully.
 
-Memory Rebuildable Projection A18 is candidate-complete at the architecture and
-contract boundary. It deterministically maps the authoritative ledger and its
+Memory Rebuildable Projection A18–A29 is deployed and production-qualified. It
+deterministically maps the authoritative ledger and its
 verified approved-memory embedding index into a private Qdrant vector bundle
 and a content-free FalkorDB relationship graph. Raw memory text remains on
 Atelier: Qdrant receives vectors plus minimal metadata and returns canonical
 memory identifiers for a local join; FalkorDB receives lifecycle/provenance
 metadata and only explicit supersession or exact-duplicate edges. Both stores
-are disposable, non-authoritative, and fail back to local retrieval. No remote
-service or Foundry container is deployed; that requires the separate reviewed
-A19 deployment gate.
+are disposable, non-authoritative, and fail back to local retrieval. The
+owner-private Foundry deployment is active behind authenticated TLS, while
+Atelier retains canonical content and local join authority.
 
-Memory Projection Deployment A19 is candidate-complete at its exact-plan
-boundary. The public manifest selects a dedicated unprivileged Debian 13 LXC,
+Memory Projection Deployment A19 is installed and live-qualified in a dedicated
+unprivileged Debian 13 LXC,
 2 vCPUs, 2 GiB RAM, 512 MiB swap, and 24 GiB local storage. It deliberately
 avoids nested Docker: Qdrant uses the checksum-pinned official 1.19.0 Debian
 asset, Debian supplies signed Redis 8, and FalkorDB uses its checksum-pinned
@@ -549,9 +550,9 @@ asset, Debian supplies signed Redis 8, and FalkorDB uses its checksum-pinned
 client are allowed; plaintext ports, browser UIs, public ingress, raw remote
 memory content, reverse synchronization, and canonical mutation are prohibited.
 The deterministic planner validates owner-private deployment evidence and
-produces a content-free digest-bound plan. It performs no deployment. Guest and
-service installation require explicit adoption of the A19 brief plus a fresh
-`INSTALL_SOUL_MEMORY_PROJECTION` confirmation and plan digest.
+produces a content-free digest-bound plan. Installation required explicit
+adoption of the A19 brief and its exact confirmation; later rebuilds remain
+bounded, digest-bound foreground operations.
 
 An optional external Knowledge Vault may supplement these canonical stores with
 portable Markdown notes. Soul can inspect and search it in bounded foreground
@@ -667,22 +668,31 @@ negative abstentions, zero forbidden hits, and mean positive reciprocal rank
 `0.881818`. Projection failure returns to local retrieval without changing the
 active selector or canonical memory.
 
-A28 adds a deterministic rotatable Canvas depth view to Memory Observatory
+A28 and A32 provide a deterministic rotatable Canvas starmap in Memory Observatory
 alongside the existing 2D constellation and lifecycle layouts. All modes retain
 the 240-node/400-explicit-edge caps and expose metadata only; depth is visual
 presentation, not inferred semantic topology. Deterministic closure through
-A29 passes. Human review remains required for Voice experience and final 3D
-interaction/aesthetics before production closure is approved.
+A32 passes. Authenticated human review approved the 3D interaction, fallback
+modes, accessibility, privacy, and aesthetics. Final Voice experience
+acceptance passed on 2026-08-25 through durable-fact recall, paraphrased
+follow-up, unsupported-fact abstention, and verification that canonical memory
+and the active projection remained unchanged. Residual wake-phrase misses are
+a separate Voice Presence tuning concern rather than a memory-closure blocker.
 
-Memory Exact-Duplicate Consolidation A30 is an implementation candidate. One
-foreground invocation can supersede at most one same-layer approved ordinary
+Memory Exact-Duplicate Consolidation A30 and Lifecycle Maintenance A31 are
+approved, integrated, and live-qualified. One Core-aware worker activation can
+supersede at most one same-layer approved ordinary
 memory whose content differs only in surrounding or repeated whitespace. It
 uses deterministic confidence/age/identifier survivor ordering, excludes any
 protected group, emits canonical audit and rollback evidence, and exposes no
 memory content. It does not perform semantic similarity, conflict resolution,
-rewriting, physical deletion, projection mutation, or timer integration. A live
-read-only preview found one eligible pair among 33 approved records; no live
-memory was changed.
+rewriting, physical deletion, or projection mutation. The approved A31
+coordinator gives ordinary observation lifecycle work priority, integrates the
+exact-duplicate operation into the existing A17 one-shot timer, and reports a
+stale projection as a separate reconciliation consequence. It never rebuilds
+the projection implicitly. The first bounded owner-private consolidation and
+its separately confirmed projection rebuild completed successfully; current
+worker evidence returns `no_work` without model use or mutation.
 
 ### Deterministic memory lifecycle admission and foreground cycle
 

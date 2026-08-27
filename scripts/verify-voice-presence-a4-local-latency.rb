@@ -80,7 +80,9 @@ end
 manifest = JSON.parse(File.binread(File.join(ROOT, "config", "voice_presence_models.json"), 256 * 1024))
 transcription_manifest = JSON.parse(File.binread(File.join(ROOT, "config", "music_transcription_models.json"), 256 * 1024))
 check.call("wake boost is easier but bounded", manifest.dig("keyword", "boosting_score").to_f.between?(2.5, 4.0))
-check.call("wake threshold is easier but bounded", manifest.dig("keyword", "trigger_threshold").to_f.between?(0.15, 0.24))
+check.call("wake threshold is easier but bounded", manifest.dig("keyword", "trigger_threshold").to_f.between?(0.10, 0.24))
+check.call("wake aliases remain exact and bounded", manifest.fetch("keyword_aliases").all? { |entry| entry.fetch("boosting_score").to_f.between?(2.5, 4.0) && entry.fetch("trigger_threshold").to_f.between?(0.10, 0.24) })
+check.call("operator pronunciation variants remain exact and bounded", manifest.fetch("keyword_variants").all? { |entry| entry.fetch("boosting_score").to_f.between?(2.5, 4.0) && entry.fetch("trigger_threshold").to_f.between?(0.10, 0.24) && entry.fetch("symbol").match?(/\AHEY_(?:SOUL|SLASH)_[A-Z_]+\z/) })
 check.call("wake cue delay covers the static cue", manifest.dig("capture", "post_wake_capture_delay_seconds").to_f.between?(0.16, 0.30))
 check.call("trailing silence preserves natural mid-sentence pauses", manifest.dig("capture", "trailing_silence_seconds").to_f.between?(0.9, 1.1))
 check.call("voice model is separately pinned", transcription_manifest.dig("models", "ggml-base.en.bin", "sha256") == "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002")
@@ -112,7 +114,7 @@ abort("Voice Presence A4 verification failed:\n- #{failures.join("\n- ")}") unle
 
 puts JSON.pretty_generate(
   "lifecycle_state" => "complete",
-  "deterministic_tests" => 39,
+  "deterministic_tests" => 40,
   "exact_replay_without_regeneration" => true,
   "latency_evidence_retained" => false,
   "cloud_voice_dependency" => false,

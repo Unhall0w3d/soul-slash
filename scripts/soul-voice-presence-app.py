@@ -156,7 +156,7 @@ class PresenceWindow(QMainWindow):
             self.portrait.setPixmap(pixmap)
         self.status.setText(summary)
         self.detail.setText({
-            "listening": 'Say “Hey Soul,” then speak one request.',
+            "listening": 'Say “Hey Soul” or “Hey Slash,” then speak one request.',
             "paused": "The microphone path is paused. Resume when ready.",
             "thinking": "The ordinary Soul conversation and skill policies remain active.",
             "speaking": "Soul is responding through the selected local voice.",
@@ -204,7 +204,7 @@ class PresenceWindow(QMainWindow):
         elif event_type == "level" and self.current_state == "listening":
             level = float(event.get("rms", 0))
             signal = "voice activity" if level >= 120 else ("room signal" if level >= 12 else "quiet")
-            self.detail.setText(f'Say “Hey Soul,” then speak one request. · Microphone: {signal}')
+            self.detail.setText(f'Say “Hey Soul” or “Hey Slash,” then speak one request. · Microphone: {signal}')
         elif event_type == "utterance":
             self.run_bridge(event["path"], event)
         elif event_type == "timing":
@@ -222,7 +222,7 @@ class PresenceWindow(QMainWindow):
         elif event_type in {"turn_failure", "fatal"}:
             self.turn_failed(event.get("summary", "The voice turn failed safely."))
         elif event_type == "followup_expired":
-            self.set_state("listening", event.get("summary", 'Listening locally for “Hey Soul”.'))
+            self.set_state("listening", event.get("summary", 'Listening locally for “Hey Soul” or “Hey Slash”.'))
         elif event_type == "result":
             if origin == "synthesis":
                 pending = self.pending_speech or {}
@@ -484,7 +484,7 @@ class PresenceWindow(QMainWindow):
     def resume_worker(self):
         if self.worker and self.worker.state() == QProcess.Running:
             self.worker.write(b"resume\n")
-            self.set_state("listening", 'Listening locally for “Hey Soul”.')
+            self.set_state("listening", 'Listening locally for “Hey Soul” or “Hey Slash”.')
 
     def open_followup(self):
         if self.worker and self.worker.state() == QProcess.Running:
