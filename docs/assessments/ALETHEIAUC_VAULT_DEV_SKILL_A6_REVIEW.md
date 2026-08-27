@@ -3,7 +3,7 @@
 ## Candidate status
 
 ```text
-candidate_complete
+accepted_and_merged
 ```
 
 ## Outcome
@@ -28,13 +28,13 @@ Makefile
 docs/assessments/ALETHEIAUC_VAULT_DEV_SKILL_A6_REVIEW.md
 ```
 
-## Required review
+## Human review outcome
 
-- Confirm vault context is preferred only for a reviewed corpus.
-- Confirm manual context remains available.
-- Confirm note and model claims require current-repository verification.
-- Confirm insufficient context does not authorize broader retrieval or research.
-- Confirm no execution or mutation authority was added.
+- [x] Vault context is preferred only for a reviewed corpus.
+- [x] Manual context remains available.
+- [x] Note and model claims require current-repository verification.
+- [x] Insufficient context does not authorize broader retrieval or research.
+- [x] No execution or mutation authority was added.
 
 ## Deterministic validation
 
@@ -63,5 +63,5 @@ No new runtime lifecycle or memory store is introduced. The skill invokes only
 the previously approved foreground A5 path and accepts its existing terminal
 states.
 
-Risk classification: low-risk, reversible procedural integration. Human merge
-review remains required.
+Risk classification: low-risk, reversible procedural integration. Human review
+completed and the candidate merged through PR #206.
