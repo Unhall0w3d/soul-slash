@@ -690,7 +690,13 @@ rewriting, physical deletion, or projection mutation. The approved A31
 coordinator gives ordinary observation lifecycle work priority, integrates the
 exact-duplicate operation into the existing A17 one-shot timer, and reports a
 stale projection as a separate reconciliation consequence. It never rebuilds
-the projection implicitly. The first bounded owner-private consolidation and
+the projection within that canonical activation. A33 is candidate-complete:
+it records a durable content-free request after a canonical mutation, and only
+a later eligible A17 activation may rebuild the local index and activate one
+dual-verified remote generation. Missing requests recover from digest drift,
+work is bound to the canonical audit head, and automatic retries block after
+three failures. Live timer-driven A33 acceptance remains pending. The first
+bounded owner-private consolidation and
 its separately confirmed projection rebuild completed successfully; current
 worker evidence returns `no_work` without model use or mutation.
 

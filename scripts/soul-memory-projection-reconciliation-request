@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "digest"
+require "json"
+require_relative "../lib/soul_core/memory_projection_reconciliation_request_store"
+
+CONFIRMATION = "CANCEL_MEMORY_PROJECTION_RECONCILIATION"
+root = File.expand_path("..", __dir__)
+store = SoulCore::MemoryProjectionReconciliationRequestStore.new(root: root)
+command = ARGV.shift.to_s
+
+begin
+  request = store.current
+  raise "projection reconciliation request is absent" unless request
+  plan = {
+    "schema" => "soul.memory_projection_reconciliation_cancel.a33.v1",
+    "request_id" => request.fetch("request_id"), "state" => request.fetch("state"),
+    "source_digest" => request.fetch("source_digest"), "attempts" => request.fetch("attempts"),
+    "canonical_state_digest" => request.fetch("canonical_state_digest"),
+    "content_included" => false
+  }
+  digest = Digest::SHA256.hexdigest(JSON.generate(plan.sort.to_h))
+  result = case command
+           when "cancel-preview"
+             {"ok" => false, "lifecycle_state" => "blocked_for_human_review",
+               "reason" => "Review the exact pending reconciliation cancellation.",
+               "data" => plan.merge("confirmation_phrase" => CONFIRMATION, "expected_digest" => digest)}
+           when "cancel"
+             confirmation, expected = ARGV
+             unless confirmation == CONFIRMATION && expected == digest
+               raise "projection reconciliation cancellation confirmation or digest is stale"
+             end
+             canceled = store.cancel
+             {"ok" => true, "lifecycle_state" => "complete", "mutation" => "derived_reconciliation_request_canceled",
+               "data" => plan.merge("state" => canceled.fetch("state"), "content_included" => false)}
+           else
+             raise "Usage: soul-memory-projection-reconciliation-request cancel-preview|cancel CONFIRM DIGEST"
+           end
+  puts JSON.pretty_generate(result)
+  exit(result["ok"] ? 0 : 2)
+rescue StandardError => error
+  warn JSON.generate("ok" => false, "lifecycle_state" => "failed",
+    "reason" => "Projection reconciliation request command failed safely: #{error.message.to_s[0, 240]}",
+    "mutation" => "none", "content_included" => false)
+  exit 1
+end

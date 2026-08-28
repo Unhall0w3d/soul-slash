@@ -55,6 +55,15 @@ module SoulCore
       value
     end
 
+    def deactivate
+      validate_path!
+      return false unless File.exist?(@path)
+      raise "selector is not a regular file" unless File.file?(@path) && !File.symlink?(@path)
+      File.delete(@path)
+      File.open(File.dirname(@path), File::RDONLY) { |directory| directory.fsync }
+      true
+    end
+
     private
 
     def validate_path!
