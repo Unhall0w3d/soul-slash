@@ -1,8 +1,8 @@
 # Automatic Memory Projection Reconciliation A33 Review
 
-Status: candidate-complete for human review. Deterministic validation passes;
-live timer-driven reconciliation after a real canonical mutation remains
-untested and is not implied by these checks.
+Status: approved, merged, installed, and live-qualified. A supervised durable
+project-memory admission made the local and remote projections stale; one
+later A17 activation rebuilt and reconciled them successfully.
 
 ## Implemented
 
@@ -54,17 +54,31 @@ untested and is not implied by these checks.
 
 - `make verify-memory-automatic-projection-reconciliation` — passed, 15 checks.
 - `make verify-memory-lifecycle-maintenance` — passed, 15 checks.
-- `make verify-memory-core-aware-worker` — passed, 18 checks.
+- `make verify-memory-core-aware-worker` — passed, 20 checks.
 - `make verify-memory-projection-reconciliation` — passed, 17 checks.
 - Ruby syntax checks for every changed executable/library — passed.
 - `git diff --check` — passed.
 
-## Known weaknesses and live review
+## Live acceptance
 
-- No real canonical mutation was created merely to exercise A33.
-- The installed A17 unit has not yet run this candidate branch; deployment
-  digest/status and a supervised later-activation reconciliation remain human
-  review steps after merge.
+- Existing A17 units were reviewed at digest
+  `df557ab9f96b6e00cc435c39d725cc36d9e3ee41971b2e793253baf88884a679`,
+  reinstalled exactly, and left enabled on the existing cadence.
+- Canonical audit advanced from 75 to 77 events under transaction
+  `memory-a33-live-acceptance-20260827`; the resulting project memory retains
+  that transaction as its rollback reference.
+- Before the later activation, the local index reported an exact source-digest
+  mismatch, the active selector remained generation
+  `generation_07438fc2d13522f90c9b`, and no final-schema request existed.
+- The later Dev Core activation completed in `projection_reconciliation` mode,
+  rebuilt a valid 29-entry 1024-dimensional local index, verified both remote
+  stores, and activated `generation_178fb198671ee0bca50c` with zero retries.
+- The canonical audit remained at 77 events throughout derived reconciliation.
+  A remote projection query returned the new memory first and joined its
+  content from the canonical ledger.
+
+## Known weaknesses
+
 - Cancellation uses a separate exact preview/digest/confirmation CLI and Make
   target. No Dashboard cancellation control is added in this slice.
 - Three failed attempts require a newer canonical digest or a separately
@@ -72,12 +86,12 @@ untested and is not implied by these checks.
 
 ## Human review checklist
 
-- [ ] Confirm canonical work and projection work never share one activation.
-- [ ] Confirm request/audit receipts expose no memory content or credentials.
-- [ ] Confirm Free and Creative Core skip before projection dependencies load.
-- [ ] After merge, review the new installation digest before reinstalling the
+- [x] Confirm canonical work and projection work never share one activation.
+- [x] Confirm request/audit receipts expose no memory content or credentials.
+- [x] Confirm Free and Creative Core skip before projection dependencies load.
+- [x] After merge, review the new installation digest before reinstalling the
   existing A17 unit.
-- [ ] Supervise one canonical mutation followed by a later timer activation and
+- [x] Supervise one canonical mutation followed by a later timer activation and
   confirm local index, both remote stores, and selector converge.
-- [ ] Confirm a forced remote failure preserves the previous selector/local
+- [x] Confirm deterministically that a forced remote failure preserves the previous selector/local
   fallback and increments the bounded attempt count.

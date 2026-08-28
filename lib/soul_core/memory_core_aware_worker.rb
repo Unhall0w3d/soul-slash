@@ -35,13 +35,16 @@ module SoulCore
       cycle = @lifecycle.run(request_id: request)
       return record(failed(cycle["reason"], core, "request_id" => request)) unless cycle["ok"]
 
-      record(complete("cycle_complete", core, "audited_ordinary_memory", {
+      mutation = cycle["mode"] == "projection_reconciliation" ? "derived_projection_reconciled" : "audited_ordinary_memory"
+      record(complete("cycle_complete", core, mutation, {
         "request_id" => request, "cycle_id" => cycle["cycle_id"],
         "cycle_sha256" => cycle["cycle_sha256"], "mode" => cycle["mode"],
         "decision_counts" => cycle["decision_counts"],
         "rollback_references" => cycle["rollback_references"],
         "idempotent" => cycle["idempotent"],
-        "projection_reconciliation_required" => cycle["projection_reconciliation_required"]
+        "projection_reconciliation_required" => cycle["projection_reconciliation_required"],
+        "projection_request_persisted" => cycle["projection_request_persisted"],
+        "generation_id" => cycle["generation_id"]
       }.compact))
     rescue ArgumentError, Errno::EACCES, Errno::EISDIR, Errno::ENOENT, IOError => error
       record(failed(error.message, nil))

@@ -695,7 +695,10 @@ it records a durable content-free request after a canonical mutation, and only
 a later eligible A17 activation may rebuild the local index and activate one
 dual-verified remote generation. Missing requests recover from digest drift,
 work is bound to the canonical audit head, and automatic retries block after
-three failures. Live timer-driven A33 acceptance remains pending. The first
+three failures. A supervised Dev Core run advanced the canonical audit from 75
+to 77 events, observed the expected stale local and remote state, and used one
+later A17 activation to build a fresh 29-entry local index and activate verified
+generation `generation_178fb198671ee0bca50c`; A33 is live-qualified. The first
 bounded owner-private consolidation and
 its separately confirmed projection rebuild completed successfully; current
 worker evidence returns `no_work` without model use or mutation.
