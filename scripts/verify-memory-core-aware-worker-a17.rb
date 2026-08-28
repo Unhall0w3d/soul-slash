@@ -71,6 +71,22 @@ Dir.mktmpdir("soul-memory-a17-worker-") do |root|
   assert.call(File.stat(status_path).mode & 0o077 == 0, "last-run status is owner-private")
   assert.call(worker.status == result && !JSON.generate(result).match?(/text|content.*Amber/i), "status is bounded and content-free")
 
+  projection = FixtureLifecycle.new(cycle: {
+    "ok" => true, "lifecycle_state" => "complete", "cycle_id" => "mprc_fixture",
+    "cycle_sha256" => "c" * 64, "mode" => "projection_reconciliation",
+    "decision_counts" => { "projection_generations_activated" => 1 },
+    "rollback_references" => [], "idempotent" => false,
+    "projection_reconciliation_required" => false,
+    "generation_id" => "generation_1234567890abcdefabcd", "content_included" => false
+  })
+  projected = SoulCore::MemoryCoreAwareWorker.new(
+    root: root, lifecycle_service: projection,
+    core_status: -> { { "ok" => true, "data" => { "active_core_id" => "dev" } } },
+    status_path: File.join(root, "projection.json"), clock: clock
+  ).run
+  assert.call(projected["mutation"] == "derived_projection_reconciled", "projection cycle reports derived mutation authority")
+  assert.call(projected.dig("details", "generation_id") == "generation_1234567890abcdefabcd", "projection cycle retains generation evidence")
+
   empty = FixtureLifecycle.new(work_available: false)
   no_work = SoulCore::MemoryCoreAwareWorker.new(root: root, lifecycle_service: empty,
     core_status: -> { { "ok" => true, "data" => { "active_core_id" => "daily" } } },
