@@ -1,6 +1,6 @@
 # Operator DRS Stream Reconciliation A0 Review
 
-Status: candidate-complete; human merge and live reconciliation remain pending
+Status: implemented and live-qualified on 2026-08-29
 
 ## Scope
 
@@ -44,12 +44,21 @@ credential change, source-scope change, or installed persistence.
 - Live read-only streaming qualification against one affected snapshot:
   passed; 46,911 projected paths, 4,548,889 retained path bytes, no truncation,
   and 93.5 MiB transient-unit peak memory. No path content was emitted.
+- The exact digest-bound reconciliation recorded all 11 previously unrecorded
+  Operator snapshots, advanced the local retention ledger, and left zero
+  reconciliation candidates. It created no snapshot, performed no replication,
+  and executed no deletion or retention action.
+- A subsequent ordinary Operator DRS transaction completed successfully. The
+  local and Crucible repositories each reported 31 distinct snapshot lineages,
+  with zero local lineages missing from Crucible. The installed timer remained
+  active and waiting for its next 02:00 run.
 
 ## Known weaknesses
 
-- Reconciliation records local evidence only; a later ordinary DRS transaction
-  must copy absent lineage to Crucible.
-- Live reconciliation and the recovery DRS run have not yet been performed.
+- Reconciliation records local evidence only; replication remains the
+  responsibility of a subsequent ordinary DRS transaction. The supervised
+  qualification performed that transaction and verified complete lineage
+  coverage, but this separation remains an intentional operational boundary.
 - The first live reconciliation attempt failed before mutation because the
   older 16 MiB raw path-inventory capture ended within a JSON record. The
   follow-up streams each record, retains only bounded path projections, and
@@ -66,8 +75,8 @@ credential change, source-scope change, or installed persistence.
 ## Risk classification
 
 High operational importance, additive backup metadata mutation, and no backup
-content deletion. Primary-agent independent validation and human merge review
-remain required.
+content deletion. Primary-agent independent validation, human merge review,
+and supervised live qualification were completed.
 
 ## Human review checklist
 
@@ -75,4 +84,4 @@ remain required.
 - [x] Successful-but-unreceipted snapshots are never described as no mutation.
 - [x] Reconciliation is exact, additive, bounded, and idempotent.
 - [x] Existing timers, credentials, and repositories remain unchanged by the candidate.
-- [ ] Local and Crucible lineage are verified after supervised recovery.
+- [x] Local and Crucible lineage are verified after supervised recovery.
