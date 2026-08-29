@@ -334,6 +334,32 @@ the shared cross-profile mutation lock. It cannot modify or replace Soul's
 3:00 AM units or credential. Qualification must prove a fresh local Operator
 snapshot and its exact Crucible lineage before permanent activation.
 
+Operator automation status distinguishes installed timer readiness from
+operational health. A permanent timer can remain installed exactly while its
+last successful DRS transaction is stale or missing. Success evidence older
+than 36 hours is reported as degraded so an armed timer is never mistaken for
+a healthy backup flow.
+
+If Restic creates a local Operator snapshot but its terminal JSON summary
+cannot be parsed, the run is classified as indeterminate rather than as a
+no-mutation failure. The bounded reconciliation command can then preview and
+record only the existing unrecorded local snapshots, in repository order:
+
+```sh
+scripts/soul-backup-snapshot-reconcile --root "$PWD" --profile operator --preview
+scripts/soul-backup-snapshot-reconcile \
+  --root "$PWD" \
+  --profile operator \
+  --execute \
+  --expected-digest DIGEST_FROM_PREVIEW \
+  --confirmation RECONCILE_OPERATOR_SNAPSHOT_EVIDENCE
+```
+
+The command consumes the already delivered encrypted systemd credential. It
+does not create snapshots, replicate data, apply retention, delete content, or
+change credentials. After local evidence is reconciled, an ordinary reviewed
+DRS transaction is responsible for copying any missing lineage to Crucible.
+
 ## Deletion-aware retention
 
 Deleted source files remain recoverable for **30 full days after Soul first

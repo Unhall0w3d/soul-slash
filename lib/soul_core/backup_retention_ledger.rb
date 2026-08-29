@@ -89,6 +89,24 @@ module SoulCore
       blocked("retention observation failed safely: #{error.message}")
     end
 
+    def checkpoint
+      ledger = read_ledger
+      return complete("retention ledger has no verified snapshot", {
+        "snapshot_id" => nil,
+        "verified_at" => nil,
+        "ledger_digest" => nil
+      }) unless ledger
+
+      snapshot = ledger.fetch("last_verified_snapshot")
+      complete("retention ledger checkpoint collected", {
+        "snapshot_id" => snapshot.fetch("snapshot_id"),
+        "verified_at" => snapshot.fetch("verified_at"),
+        "ledger_digest" => digest(ledger)
+      })
+    rescue StandardError => error
+      blocked("retention checkpoint failed safely: #{error.message}")
+    end
+
     def retention_preview(candidate_snapshot_ids:)
       ledger = read_ledger
       return blocked("retention ledger does not exist; pruning must remain disabled") unless ledger
