@@ -12,7 +12,8 @@ credential change, source-scope change, or installed persistence.
 ## Files changed
 
 - `lib/soul_core/bounded_command_runner.rb`: adds closed, bounded
-  `complete_line_tail` capture while preserving prefix capture as the default.
+  `complete_line_tail` capture and streaming JSON-line projection while
+  preserving prefix capture as the default.
 - `lib/soul_core/backup_administration_service.rb`: uses complete-line capture
   for backup NDJSON, reports successful unreceipted mutation as indeterminate,
   and adds additive digest-bound Operator evidence reconciliation.
@@ -31,8 +32,8 @@ credential change, source-scope change, or installed persistence.
 ## Commands and results
 
 - Ruby syntax checks: passed.
-- `ruby scripts/verify-bounded-command-runner.rb`: passed, 8 checks including
-  NDJSON output larger than two MiB.
+- `ruby scripts/verify-bounded-command-runner.rb`: passed, 11 checks including
+  NDJSON output larger than two MiB and raw-output-independent JSON projection.
 - `ruby scripts/verify-operator-drs-stream-reconciliation-a0.rb`: passed, 10
   checks, including shared-lock and absent-checkpoint failure paths.
 - `ruby scripts/verify-nightly-drs-automation-a2-a3.rb`: passed, including
@@ -40,12 +41,19 @@ credential change, source-scope change, or installed persistence.
 - Full Backup Administration, Operator Backup, nightly DRS transaction and
   automation, storage/retention census, manifest reconciliation, and Crucible
   replication regression suite: passed.
+- Live read-only streaming qualification against one affected snapshot:
+  passed; 46,911 projected paths, 4,548,889 retained path bytes, no truncation,
+  and 93.5 MiB transient-unit peak memory. No path content was emitted.
 
 ## Known weaknesses
 
 - Reconciliation records local evidence only; a later ordinary DRS transaction
   must copy absent lineage to Crucible.
 - Live reconciliation and the recovery DRS run have not yet been performed.
+- The first live reconciliation attempt failed before mutation because the
+  older 16 MiB raw path-inventory capture ended within a JSON record. The
+  follow-up streams each record, retains only bounded path projections, and
+  fails closed on invalid, oversized, or excessive records.
 - Storage-heavy Unreal and cache exclusions remain a separate scope review.
 
 ## Lifecycle and memory

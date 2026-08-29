@@ -1127,11 +1127,14 @@ module SoulCore
       raise "Crucible repository inventory is invalid"
     end
 
-    def replica_restic(password, *args, timeout:, output: 256 * 1024, extra_env: {})
+    def replica_restic(password, *args, timeout:, output: 256 * 1024, extra_env: {}, capture_mode: :prefix, max_records: 100_000, &record_transform)
       @runner.run(
         "restic", "-o", "sftp.command=ssh -F #{@replica_ssh_config} #{@replica_ssh_alias} -s sftp", "--repo", @replica_repository, *args,
         timeout_seconds: timeout, max_output_bytes: output,
-        env: { "RESTIC_PASSWORD" => password }.merge(extra_env)
+        capture_mode: capture_mode,
+        max_records: max_records,
+        env: { "RESTIC_PASSWORD" => password }.merge(extra_env),
+        &record_transform
       )
     end
 
@@ -1209,18 +1212,28 @@ module SoulCore
     end
 
     def snapshot_paths(password, snapshot_id)
-      result = restic(password, "ls", "--json", snapshot_id, timeout: CHECK_TIMEOUT, output: 16 * 1024 * 1024)
+      result = restic(
+        password, "ls", "--json", snapshot_id,
+        timeout: CHECK_TIMEOUT, output: 24 * 1024 * 1024,
+        capture_mode: :json_lines, max_records: MAX_INVENTORY_PATHS
+      ) { |item| item["path"].to_s if item["struct_type"] == "node" }
       raise "snapshot path inventory failed#{restic_failure_suffix(result)}" unless result.success?
-      paths = json_lines(result.stdout).filter_map { |item| item["path"].to_s if item["struct_type"] == "node" }
+      raise "snapshot path inventory is too large" if result.truncated
+      paths = result.records || json_lines(result.stdout).filter_map { |item| item["path"].to_s if item["struct_type"] == "node" }
       paths = paths.map { |path| File.expand_path(path) }.uniq.sort
       raise "snapshot path inventory is empty or too large" if paths.empty? || paths.length > MAX_INVENTORY_PATHS
       paths
     end
 
     def replica_snapshot_paths(password, snapshot_id)
-      result = replica_restic(password, "ls", "--json", snapshot_id, timeout: CHECK_TIMEOUT, output: 16 * 1024 * 1024)
+      result = replica_restic(
+        password, "ls", "--json", snapshot_id,
+        timeout: CHECK_TIMEOUT, output: 24 * 1024 * 1024,
+        capture_mode: :json_lines, max_records: MAX_INVENTORY_PATHS
+      ) { |item| item["path"].to_s if item["struct_type"] == "node" }
       raise "Crucible snapshot path inventory failed#{restic_failure_suffix(result)}" unless result.success?
-      paths = json_lines(result.stdout).filter_map { |item| item["path"].to_s if item["struct_type"] == "node" }
+      raise "Crucible snapshot path inventory is too large" if result.truncated
+      paths = result.records || json_lines(result.stdout).filter_map { |item| item["path"].to_s if item["struct_type"] == "node" }
       paths = paths.map { |path| File.expand_path(path) }.uniq.sort
       raise "Crucible snapshot path inventory is empty or too large" if paths.empty? || paths.length > MAX_INVENTORY_PATHS
       paths
@@ -1232,12 +1245,14 @@ module SoulCore
       true
     end
 
-    def restic(password, *args, timeout:, output: 256 * 1024, capture_mode: :prefix)
+    def restic(password, *args, timeout:, output: 256 * 1024, capture_mode: :prefix, max_records: 100_000, &record_transform)
       @runner.run(
         "restic", "--repo", @repository, *args,
         timeout_seconds: timeout, max_output_bytes: output,
         capture_mode: capture_mode,
-        env: { "RESTIC_PASSWORD" => password }
+        max_records: max_records,
+        env: { "RESTIC_PASSWORD" => password },
+        &record_transform
       )
     end
 
