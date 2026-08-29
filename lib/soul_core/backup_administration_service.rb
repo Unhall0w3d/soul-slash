@@ -26,6 +26,7 @@ module SoulCore
     OPERATOR_REPLICA_CONFIRMATION = "COPY_VERIFIED_OPERATOR_BACKUP_TO_CRUCIBLE"
     OPERATOR_DRS_CONFIRMATION = "CREATE_AND_REPLICATE_VERIFIED_OPERATOR_DRS_BACKUP"
     OPERATOR_MANIFEST_RECONCILIATION_CONFIRMATION = "RECONCILE_OPERATOR_BACKUP_MANIFESTS"
+    OPERATOR_SNAPSHOT_EVIDENCE_RECONCILIATION_CONFIRMATION = "RECONCILE_OPERATOR_SNAPSHOT_EVIDENCE"
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
     MAX_PASSWORD_BYTES = 1024
     MAX_SNAPSHOTS = 100
@@ -328,11 +329,23 @@ module SoulCore
       return blocked("backup preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
 
       progress&.call("stage" => "capture", "message" => "Capturing the approved #{@profile_label} sources…")
-      result = restic(password, "backup", "--json", "--quiet", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024)
+      result = restic(password, "backup", "--json", "--quiet", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024, capture_mode: :complete_line_tail)
       raise "restic backup failed#{restic_failure_suffix(result)}" unless result.success?
       summary = json_lines(result.stdout).reverse.find { |item| item["message_type"] == "summary" }
       snapshot_id = summary.to_h["snapshot_id"].to_s
-      raise "restic did not return one full snapshot ID" unless snapshot_id.match?(SNAPSHOT_ID)
+      unless snapshot_id.match?(SNAPSHOT_ID)
+        receipt = write_receipt("backup_indeterminate", {
+          "process_state" => "complete",
+          "snapshot_state" => "indeterminate_requires_reconciliation",
+          "output_truncated" => result.truncated == true,
+          "verification" => "not_attempted"
+        })
+        return failed(
+          "backup process completed but snapshot evidence requires reconciliation",
+          receipt.merge("reconciliation_required" => true),
+          "backup_snapshot_indeterminate_requires_reconciliation"
+        )
+      end
 
       progress&.call("stage" => "verify", "message" => "Verifying repository metadata before recording deletion evidence…")
       verify_repository!(password)
@@ -361,6 +374,120 @@ module SoulCore
       awaiting(error.message)
     rescue StandardError => error
       failed("backup failed safely: #{safe_error(error)}")
+    ensure
+      release_operation_lock(operation_lock)
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
+    end
+
+    def snapshot_evidence_reconciliation_preview(password:)
+      raise ArgumentError, "snapshot evidence reconciliation is available only for the Operator profile" unless @profile_id == "operator"
+      password = validate_password(password)
+      preflight = backup_preflight(password)
+      verify_repository!(password)
+      checkpoint = retention_checkpoint!
+      candidates = unrecorded_snapshot_candidates(password, checkpoint)
+      scope = {
+        "operation" => "operator_snapshot_evidence_reconciliation",
+        "profile_id" => @profile_id,
+        "repository_id" => repository_fingerprint,
+        "snapshot_tag" => @snapshot_tag,
+        "candidate_snapshot_ids" => candidates.map { |item| item.fetch("id") },
+        "candidate_snapshot_times" => candidates.map { |item| item.fetch("time") },
+        "candidate_count" => candidates.length,
+        "source_manifest_digest" => Digest::SHA256.file(@sources_path).hexdigest,
+        "exclusion_manifest_digest" => Digest::SHA256.file(@excludes_path).hexdigest,
+        "ledger_digest" => checkpoint["ledger_digest"],
+        "source_count" => preflight.fetch("sources").length,
+        "evidence_only" => true,
+        "snapshot_creation" => false,
+        "replication" => false,
+        "retention_execution" => false,
+        "automatic_retry" => false
+      }
+      complete("unrecorded Operator snapshot evidence prepared for exact reconciliation", scope.merge(
+        "expected_digest" => digest(scope),
+        "confirmation_phrase" => OPERATOR_SNAPSHOT_EVIDENCE_RECONCILIATION_CONFIRMATION,
+        "password_retained" => false
+      ))
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("snapshot evidence reconciliation preview failed safely: #{safe_error(error)}")
+    ensure
+      password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
+    end
+
+    def snapshot_evidence_reconciliation_execute(password:, confirmation:, expected_digest:, progress: nil)
+      password = validate_password(password)
+      return awaiting("exact Operator snapshot evidence reconciliation confirmation is required") unless confirmation.to_s == OPERATOR_SNAPSHOT_EVIDENCE_RECONCILIATION_CONFIRMATION
+      operation_lock = acquire_operation_lock
+      return blocked("another backup administration operation is already active") unless operation_lock
+
+      reviewed = snapshot_evidence_reconciliation_preview(password: password)
+      return reviewed unless reviewed["ok"]
+      reviewed_scope = reviewed.fetch("data").reject { |key, _value| %w[expected_digest confirmation_phrase password_retained].include?(key) }
+      return blocked("snapshot evidence reconciliation preview digest is stale or invalid") unless secure_equal?(expected_digest, digest(reviewed_scope))
+
+      candidate_ids = reviewed_scope.fetch("candidate_snapshot_ids")
+      candidate_times = reviewed_scope.fetch("candidate_snapshot_times")
+      recorded_ids = []
+      return complete("Operator snapshot evidence is already reconciled", {
+        "candidate_count" => 0, "recorded_snapshot_ids" => [], "password_retained" => false
+      }) if candidate_ids.empty?
+
+      verify_repository!(password)
+      base_time = @clock.call.utc
+      candidate_ids.zip(candidate_times).each_with_index do |(snapshot_id, _snapshot_time), index|
+        progress&.call("stage" => "reconcile", "message" => "Verifying Operator snapshot evidence #{index + 1} of #{candidate_ids.length}…")
+        manifest_path = File.join(@manifest_root, "#{snapshot_id}.json")
+        manifest = if File.exist?(manifest_path) || File.symlink?(manifest_path)
+          load_snapshot_manifest(manifest_path, snapshot_id)
+        else
+          build_snapshot_manifest(password, snapshot_id, verified_at: (base_time + index).iso8601)
+        end
+        FileUtils.mkdir_p(@manifest_root, mode: 0o700)
+        atomic_json(manifest_path, manifest) unless File.exist?(manifest_path)
+        observation = @ledger.observe_preview(manifest: manifest)
+        raise observation["reason"] unless observation["ok"]
+        recorded = @ledger.observe_execute(
+          manifest: manifest,
+          confirmation: BackupRetentionLedger::OBSERVE_CONFIRMATION,
+          expected_digest: observation.dig("data", "expected_digest")
+        )
+        raise recorded["reason"] unless recorded["ok"]
+        recorded_ids << snapshot_id
+      end
+      receipt = write_receipt("snapshot_evidence_reconciliation", {
+        "candidate_count" => candidate_ids.length,
+        "recorded_snapshot_ids" => recorded_ids,
+        "remaining_snapshot_ids" => [],
+        "ledger_digest" => retention_checkpoint!.fetch("ledger_digest"),
+        "verification" => "passed",
+        "deletion" => false,
+        "replication" => false
+      })
+      complete("Operator snapshot evidence reconciled", receipt.merge(
+        "recorded_snapshot_ids" => recorded_ids,
+        "password_retained" => false
+      ), "operator_snapshot_evidence_reconciled")
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      remaining_ids = defined?(candidate_ids) ? candidate_ids - Array(recorded_ids) : []
+      receipt = write_receipt("snapshot_evidence_reconciliation", {
+        "candidate_count" => defined?(candidate_ids) ? candidate_ids.length : 0,
+        "recorded_snapshot_ids" => Array(recorded_ids),
+        "remaining_snapshot_ids" => remaining_ids,
+        "verification" => "incomplete",
+        "deletion" => false,
+        "replication" => false,
+        "reason" => safe_error(error)
+      }) rescue {}
+      failed("snapshot evidence reconciliation failed safely: #{safe_error(error)}", receipt.merge(
+        "recorded_snapshot_ids" => Array(recorded_ids),
+        "remaining_snapshot_ids" => remaining_ids,
+        "review_required" => true
+      ), Array(recorded_ids).empty? ? "none" : "operator_snapshot_evidence_partially_reconciled")
     ensure
       release_operation_lock(operation_lock)
       password&.replace("\0" * password.bytesize) if password.is_a?(String) && !password.frozen?
@@ -1062,7 +1189,7 @@ module SoulCore
       { "id" => id, "original_id" => original_id, "lineage_id" => original_id || id }
     end
 
-    def build_snapshot_manifest(password, snapshot_id)
+    def build_snapshot_manifest(password, snapshot_id, verified_at: nil)
       paths = snapshot_paths(password, snapshot_id)
       configured = safe_manifest_lines(@sources_path)
       missing = configured.reject { |source| paths.include?(source) || paths.any? { |path| path.start_with?("#{source}/") } }
@@ -1073,7 +1200,7 @@ module SoulCore
       {
         "schema_version" => BackupRetentionLedger::MANIFEST_SCHEMA_VERSION,
         "snapshot_id" => snapshot_id,
-        "verified_at" => @clock.call.utc.iso8601,
+        "verified_at" => verified_at || @clock.call.utc.iso8601,
         "repository_id" => repository_fingerprint,
         "source_roots" => roots.sort,
         "paths" => paths,
@@ -1105,8 +1232,52 @@ module SoulCore
       true
     end
 
-    def restic(password, *args, timeout:, output: 256 * 1024)
-      @runner.run("restic", "--repo", @repository, *args, timeout_seconds: timeout, max_output_bytes: output, env: { "RESTIC_PASSWORD" => password })
+    def restic(password, *args, timeout:, output: 256 * 1024, capture_mode: :prefix)
+      @runner.run(
+        "restic", "--repo", @repository, *args,
+        timeout_seconds: timeout, max_output_bytes: output,
+        capture_mode: capture_mode,
+        env: { "RESTIC_PASSWORD" => password }
+      )
+    end
+
+    def retention_checkpoint!
+      checkpoint = @ledger.checkpoint
+      raise checkpoint["reason"] unless checkpoint["ok"]
+      checkpoint.fetch("data")
+    end
+
+    def unrecorded_snapshot_candidates(password, checkpoint)
+      snapshots = snapshot_inventory(password).sort_by { |item| [item.fetch("time"), item.fetch("id")] }
+      checkpoint_id = checkpoint["snapshot_id"].to_s
+      candidates = if checkpoint_id.empty?
+        snapshots
+      else
+        checkpoint_index = snapshots.index { |item| item.fetch("id") == checkpoint_id }
+        raise "retention checkpoint snapshot is absent from the repository inventory" unless checkpoint_index
+        snapshots.drop(checkpoint_index + 1)
+      end
+      raise "snapshot evidence reconciliation exceeds the #{MAX_SNAPSHOTS}-snapshot bound" if candidates.length > MAX_SNAPSHOTS
+      candidates
+    rescue ArgumentError
+      raise "snapshot evidence reconciliation inventory is invalid"
+    end
+
+    def regular_snapshot_manifest?(path)
+      return false unless File.exist?(path) || File.symlink?(path)
+      stat = File.lstat(path)
+      stat.file? && !stat.symlink? && stat.size.between?(1, BackupRetentionLedger::MAX_LEDGER_BYTES)
+    rescue SystemCallError
+      false
+    end
+
+    def load_snapshot_manifest(path, expected_snapshot_id)
+      raise "snapshot manifest path is unsafe" unless regular_snapshot_manifest?(path)
+      manifest = JSON.parse(File.binread(path, BackupRetentionLedger::MAX_LEDGER_BYTES))
+      raise "snapshot manifest identity is invalid" unless manifest["snapshot_id"] == expected_snapshot_id
+      manifest
+    rescue JSON::ParserError, SystemCallError
+      raise "snapshot manifest is invalid"
     end
 
     def mount_status

@@ -273,6 +273,17 @@ Dir.mktmpdir("soul-nightly-drs-automation-") do |sandbox|
              permanent["ok"] &&
                File.read(timer_path).include?("OnCalendar=*-*-* 03:00:00") &&
                File.read(service_path).include?("--schedule-mode permanent"))
+  fresh_status = deployment.status
+  check.call("recent successful evidence reports healthy permanent operation",
+             fresh_status.dig("data", "operational_health") == "healthy" &&
+               fresh_status.dig("data", "last_success_health") == "healthy" &&
+               fresh_status.dig("data", "last_success_stale") == false)
+  now += SoulCore::NightlyDrsDeployment::SUCCESS_STALE_SECONDS + 1
+  stale_status = deployment.status
+  check.call("success evidence older than 36 hours reports degraded operation",
+             stale_status.dig("data", "operational_health") == "degraded" &&
+               stale_status.dig("data", "last_success_health") == "stale" &&
+               stale_status.dig("data", "last_success_stale") == true)
 
   partial_root = File.join(sandbox, "partial", "Soul", "private", "backup")
   FileUtils.mkdir_p(partial_root, mode: 0o700)
@@ -298,7 +309,8 @@ dashboard = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir
 check.call("automation source contains no retention, pruning, remote deletion, or restart authority",
            !deployment_source.match?(/\\b(?:forget|prune)\\b/) &&
              deployment_source.include?("Restart=no") &&
-             dashboard.include?('automation.ready ? `Nightly · ${scheduleLabel}`'))
+             dashboard.include?('automation.ready ? `Nightly · ${scheduleLabel}`') &&
+             dashboard.include?('automation.operational_health === "degraded" ? "ATTENTION"'))
 check.call("runner has one terminal state file and no retry loop",
            runner_source.include?("nightly-drs-state.json") &&
              !runner_source.match?(/\b(?:sleep|retry)\b/) &&

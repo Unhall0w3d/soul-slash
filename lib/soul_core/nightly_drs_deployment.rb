@@ -54,6 +54,7 @@ module SoulCore
     }.freeze
     MIN_TEST_DELAY = 60
     MAX_TEST_DELAY = 300
+    SUCCESS_STALE_SECONDS = 36 * 60 * 60
 
     def initialize(
       root: Dir.pwd,
@@ -206,6 +207,14 @@ module SoulCore
       end
       armed = credential_ready? && exact && timer["ActiveState"] == "active" && timer["UnitFileState"] == "enabled"
       ready = armed && unit_mode == "permanent"
+      success_health = last_success_health(visible_run_state["last_success_at"], required: ready)
+      run_health = if !ready
+        "not_armed"
+      elsif %w[failed partial interrupted].include?(visible_run_state["state"]) || success_health != "healthy"
+        "degraded"
+      else
+        "healthy"
+      end
       result(true, "complete", "Nightly DRS automation status collected.", {
         "profile_id" => @profile_id,
         "profile_label" => @profile_label,
@@ -223,6 +232,10 @@ module SoulCore
         "last_run" => visible_run_state,
         "qualification_verified" => qualification_verified?,
         "ready" => ready,
+        "operational_health" => run_health,
+        "last_success_health" => success_health,
+        "last_success_stale" => success_health == "stale",
+        "last_success_max_age_seconds" => SUCCESS_STALE_SECONDS,
         "automatic_retry" => false,
         "automatic_retention" => false,
         "remote_deletion" => false
@@ -445,6 +458,16 @@ module SoulCore
       %w[run_id state trigger schedule_mode started_at completed_at last_success_at reason mutation snapshot_id drs_receipt_id local_state replica_state].to_h do |key|
         [key, state[key]]
       end.compact
+    end
+
+    def last_success_health(value, required:)
+      return "not_applicable" unless required
+      text = value.to_s.strip
+      return "missing" if text.empty?
+      elapsed = @clock.call.utc - Time.iso8601(text).utc
+      elapsed > SUCCESS_STALE_SECONDS ? "stale" : "healthy"
+    rescue ArgumentError
+      "missing"
     end
 
     def installed_mode_and_calendar

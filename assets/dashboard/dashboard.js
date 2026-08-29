@@ -5751,8 +5751,10 @@ function renderBackupStatus(payload) {
   const scheduleLabel = calendarTime
     ? `${Number(calendarTime[1])}:${calendarTime[2]} ${Number(calendarTime[1]) >= 12 ? "PM" : "AM"}`
     : (state.backupProfile === "operator" ? "2:00 AM" : "3:00 AM");
-  byId("backup-drs-state").textContent = automation.ready ? "NIGHTLY" : automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
+  byId("backup-drs-state").textContent = automation.operational_health === "degraded" ? "ATTENTION" : automation.ready ? "NIGHTLY" : automation.mode === "qualification" ? "QUALIFYING" : drs.state === "complete" ? "VERIFIED" : drs.state === "partial" || drs.state === "failed" || drs.state === "invalid" ? "ATTENTION" : "NOT RUN";
   renderBackupFacts(byId("backup-drs-details"), {
+    "Health": automation.operational_health || (automation.ready ? "unknown" : "not armed"),
+    "Last success": automation.last_success_health || "not assessed",
     "Last result": lastAutomated.state || drs.state || "not run",
     "Local": lastAutomated.local_state || drs.local_state || "not run",
     "Crucible": lastAutomated.replica_state || drs.replica_state || "not run",

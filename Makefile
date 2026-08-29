@@ -83,7 +83,7 @@ FLEET_SUBNET ?=
 .PHONY: memory-retrieval-evaluate memory-retrieval-evaluate-live memory-retrieval-status memory-retrieval-rebuild memory-retrieval-query memory-reviewed-ledger-preview memory-reviewed-ledger-execute memory-embedding-runtime-plan memory-embedding-runtime-install memory-embedding-runtime-status memory-live-status memory-live-derive memory-live-admit memory-live-retrieve memory-live-rollback memory-backfill-preview memory-backfill-execute memory-lifecycle-cycle memory-lifecycle-worker-run memory-lifecycle-worker-status memory-lifecycle-worker-plan memory-lifecycle-worker-install memory-lifecycle-worker-deployment-status memory-lifecycle-worker-uninstall memory-consolidate-exact-preview memory-consolidate-exact-run memory-projection-reconciliation-cancel-preview memory-projection-reconciliation-cancel memory-projection-preview memory-projection-execute memory-projection-query memory-projection-qualify memory-projection-hybrid-qualify memory-retrieval-policy-status memory-production-qualify verify-memory-retrieval-observatory verify-semantic-memory-chat-context verify-memory-runtime-private-review verify-memory-reviewed-ledger-bootstrap verify-memory-embedding-core-lifecycle verify-memory-audit-reconstruction verify-memory-conversation-observation-capture verify-memory-observation-derivation verify-memory-lifecycle-admission verify-memory-live-qualification verify-memory-historical-chat-backfill verify-memory-autonomous-lifecycle verify-memory-core-aware-worker verify-memory-rebuildable-projection verify-memory-projection-deployment verify-memory-projection-reconciliation verify-memory-projection-transport verify-memory-projection-query verify-memory-projection-qualification verify-memory-projection-hybrid-qualification verify-memory-retrieval-policy verify-memory-fusion-chat-voice verify-memory-observatory-3d verify-memory-observatory-starmap verify-memory-production-qualification verify-memory-production-closure verify-memory-exact-duplicate-consolidation verify-memory-automatic-projection-reconciliation verify-core-transition-settlement
 .PHONY: verify-host-stewardship-file-steward verify-software-storage-steward verify-incident-narrator verify-patchmon-concept-adaptation verify-fleet-observability verify-fleet-observability-a1 verify-fleet-observability-a1-1 verify-fleet-observability-a2 verify-fleet-observability-a3
 .PHONY: verify-long-form-mix verify-long-form-mix-render verify-long-form-mix-finalization
-.PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup
+.PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup verify-operator-drs-stream-reconciliation
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
@@ -696,6 +696,10 @@ operator-backup-configure:
 
 verify-operator-backup:
 > @ruby scripts/verify-operator-backup-a0.rb
+
+verify-operator-drs-stream-reconciliation:
+> @ruby scripts/verify-bounded-command-runner.rb
+> @ruby scripts/verify-operator-drs-stream-reconciliation-a0.rb
 
 verify-backup-administration:
 > @ruby scripts/verify-backup-administration-a2.rb
