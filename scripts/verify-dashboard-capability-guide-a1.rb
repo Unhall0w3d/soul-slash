@@ -63,9 +63,9 @@ checks["timeline_guide_uses_shared_ledger_contract"] =
 maintenance = guide.respond("What can I ask you to do in Guided Maintenance?")
 checks["maintenance_guide_exposes_routine_and_protected_authority"] =
   maintenance.include?("`maintenance.device` (available)") &&
-  maintenance.include?("conversational confirmation for device package maintenance") &&
-  maintenance.include?("Operator gesture required for reboot, workstation maintenance") &&
-  maintenance.include?("device maintenance receipt and refreshed fleet evidence")
+  maintenance.include?("conversational confirmation for device package maintenance, separate non-workstation reboot") &&
+  maintenance.include?("Operator gesture required for workstation maintenance, workstation reboot") &&
+  maintenance.include?("device maintenance or reboot receipt and refreshed fleet evidence")
 
 studio = guide.respond("What can I ask you to do in Skill Studio?")
 checks["skill_studio_guide_exposes_read_only_inventory_and_protected_gates"] =

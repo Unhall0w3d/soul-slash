@@ -6,6 +6,7 @@ require "time"
 
 require_relative "../lib/soul_core/conversation_capability_action_store"
 require_relative "../lib/soul_core/conversation_maintenance_workflow_service"
+require_relative "../lib/soul_core/conversation_orchestration_contract"
 
 checks = {}
 check = ->(name, value) { checks[name] = value == true }
@@ -44,7 +45,13 @@ class MaintenanceControlFixture
   end
 
   def preview(device_id:, action:)
-    digest = device_id == "crucible" ? "a" * 64 : "b" * 64
+    digest = if action == "reboot"
+               "c" * 64
+             elsif device_id == "crucible"
+               "a" * 64
+             else
+               "b" * 64
+             end
     {
       "ok" => true, "lifecycle_state" => "complete", "reason" => "preview ready",
       "data" => {
@@ -52,7 +59,8 @@ class MaintenanceControlFixture
           "device_id" => device_id, "device_label" => device_id.capitalize,
           "address" => "192.0.2.22", "action" => action,
           "maintenance_adapter" => device_id == "crucible" ? "fedora_dnf5" : "proxmox_apt",
-          "confirmation" => "MAINTAIN_#{device_id.upcase}",
+          "impact" => action == "reboot" ? ["fixture guest interruption"] : [],
+          "confirmation" => "#{action == 'reboot' ? 'REBOOT' : 'MAINTAIN'}_#{device_id.upcase}",
           "expected_digest" => digest
         }
       }
@@ -67,12 +75,20 @@ class MaintenanceControlFixture
     progress.call({"stage" => "maintaining", "message" => "Fixed maintenance step active."})
     {
       "ok" => true, "lifecycle_state" => "complete",
-      "reason" => "Crucible maintenance completed.",
+      "reason" => action == "reboot" ? "Forge rebooted and passed readiness checks." : "Crucible maintenance completed.",
       "data" => {
         "receipt" => {
           "receipt_id" => "device_receipt_fixture",
           "summary" => "Crucible maintenance completed.",
-          "evidence" => [{"adapter" => "maintenance.1", "status" => "ok"}]
+          "evidence" => if action == "reboot"
+                          [
+                            {"adapter" => "reboot.reconnect.1", "status" => "failed"},
+                            {"adapter" => "reboot.reconnect.2", "status" => "ok"},
+                            {"adapter" => "reboot.readiness.2.1", "status" => "ok"}
+                          ]
+                        else
+                          [{"adapter" => "maintenance.1", "status" => "ok"}]
+                        end
         },
         "fleet" => {
           "devices" => [{
@@ -105,6 +121,8 @@ Dir.mktmpdir("soul-maintenance-conversation-") do |root|
              !service.candidate_message?(chat_id: "chat_discussion", message: "I was reading about maintenance today"))
   check.call("status question is not mistaken for maintenance authority",
              !service.candidate_message?(chat_id: "chat_status", message: "Does Crucible need maintenance?"))
+  check.call("explicit no-reboot maintenance is not mistaken for a reboot",
+             service.candidate_message?(chat_id: "chat_no_reboot", message: "Run maintenance on Atelier, but do not reboot it"))
 
   prepared = service.plan(chat_id: chat_id, message: "Run maintenance on Crucible")
   check.call("exact target produces short-lived conversational confirmation",
@@ -154,6 +172,22 @@ Dir.mktmpdir("soul-maintenance-conversation-") do |root|
   expired = service.plan(chat_id: expired_chat, message: "Yes")
   check.call("expired confirmation executes nothing",
              expired["mode"] == "maintenance_expired" && control.executions.length == 1)
+
+  reboot_chat = "chat_remote_reboot_fixture"
+  reboot_prepared = service.plan(chat_id: reboot_chat, message: "Reboot Forge")
+  check.call("exact non-workstation reboot gets a short-lived impact preview",
+             reboot_prepared["mode"] == "reboot_confirmation_required" &&
+               reboot_prepared["metadata"]["lifecycle_state"] == "awaiting_input" &&
+               reboot_prepared["content"].include?("one fixed reboot request") &&
+               reboot_prepared["content"].include?("fixture guest interruption"))
+  rebooted = service.plan(chat_id: reboot_chat, message: "Yes", progress: ->(_event) {})
+  check.call("affirmative executes only the retained remote reboot plan",
+             control.executions.last == {
+               "device_id" => "forge", "action" => "reboot",
+               "confirmation" => "REBOOT_FORGE", "expected_digest" => "c" * 64
+             } && rebooted["mode"] == "reboot_complete" &&
+               rebooted["content"].include?("Transient boot checks before readiness: 1") &&
+               rebooted["content"].include?("Issues: none reported"))
 end
 
 runtime_source = File.read(File.expand_path("../lib/soul_core/conversation_runtime.rb", __dir__))
@@ -166,6 +200,8 @@ check.call("ordinary chat and voice share the maintenance workflow injection",
              facade_source.include?("conversation_maintenance_workflow") &&
              voice_bridge.include?('request("chats.send"') &&
              registry.include?("maintenance.device:"))
+check.call("maintenance workflow is a valid orchestration decision",
+           SoulCore::ConversationOrchestrationContract::KINDS.include?("maintenance_workflow"))
 check.call("skill metadata defines positive and negative trigger boundaries",
            skill.include?("explicitly asks to maintain") &&
              skill.include?("Do not trigger for casual maintenance discussion"))

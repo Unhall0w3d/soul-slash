@@ -9,8 +9,9 @@ self-recognition consume that catalog, registers a bounded
 `maintenance.device` skill, and routes explicit Chat or Voice Presence
 maintenance requests through the existing fixed device-control service.
 Routine non-workstation package maintenance uses a ten-minute digest-bound
-conversational confirmation. Reboot and workstation maintenance return a
-protected handoff and do not execute.
+conversational confirmation. A later reviewed policy refinement applies the
+same bounded confirmation to a separately requested non-workstation reboot;
+workstation maintenance and reboot still return a protected handoff.
 
 ## Files changed
 
@@ -91,8 +92,9 @@ inactive at a terminal lifecycle state.
 
 ## Risk classification
 
-Routine local/remote package mutation using an existing fixed controller.
-Protected actions remain outside conversational execution.
+Routine local/remote package mutation and separate non-workstation reboot
+using an existing fixed controller. Workstation and other protected actions
+remain outside conversational execution.
 
 ## Human review checklist
 
@@ -102,7 +104,9 @@ Protected actions remain outside conversational execution.
 - [ ] Yes runs only the retained digest-bound plan; no and expiry run nothing.
 - [ ] Completion reports progress, receipt, refreshed status, remaining
       updates, reboot state, and issues.
-- [ ] Reboot and Atelier maintenance require an Operator-controlled interface.
+- [ ] Non-workstation reboot requires its own digest-bound preview and never
+      chains from maintenance.
+- [ ] Atelier maintenance and reboot require an Operator-controlled interface.
 - [ ] Capability Guide accurately reports mapped, partial, and unmapped
       surfaces.
 - [ ] No persistence, background continuation, safety weakening, or new

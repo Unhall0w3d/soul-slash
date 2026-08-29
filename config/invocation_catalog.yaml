@@ -261,13 +261,14 @@ entries:
   - id: device-maintenance
     label: Device maintenance
     category: Administration
-    summary: Preview and run one fixed package-maintenance adapter against one exact managed device.
+    summary: Preview and run one fixed package-maintenance or reboot adapter against one exact managed device.
     skill_ids: [maintenance.device]
     required_inputs: [An explicit maintenance request and exact managed device]
     optional_inputs: []
     core: Any Core; routing and authority are deterministic and model-independent.
-    approval: One short-lived conversational confirmation may authorize routine package maintenance on a non-workstation device.
-    output: Live progress, a device-scoped maintenance receipt, refreshed fleet evidence, remaining updates, reboot state, and any bounded failure.
-    boundary: Reboot, workstation maintenance, deletion, credentials, and other protected actions require an Operator-controlled Dashboard, terminal, or Noctalia gesture; model output and spoken or typed affirmation are not authority.
+    approval: One short-lived conversational confirmation may authorize routine package maintenance or a separately prepared reboot on a non-workstation device.
+    output: Live progress, a device-scoped maintenance or reboot receipt, refreshed fleet evidence, remaining updates, reboot state, and any bounded failure.
+    boundary: Workstation maintenance and reboot, deletion, credentials, and other protected actions require an Operator-controlled Dashboard, terminal, or Noctalia gesture; non-workstation reboot remains separate from maintenance and never chains automatically.
     examples:
       - Run maintenance on Crucible.
+      - Reboot Crucible.

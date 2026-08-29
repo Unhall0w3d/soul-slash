@@ -1,6 +1,6 @@
 interface:
   display_name: "Maintain Device"
-  short_description: "Run reviewed maintenance on one managed device"
-  default_prompt: "Use $maintain-device to prepare maintenance for one exact managed device."
+  short_description: "Run reviewed maintenance or reboot one managed device"
+  default_prompt: "Use $maintain-device to prepare maintenance or a separate reboot for one exact managed device."
 policy:
   allow_implicit_invocation: true

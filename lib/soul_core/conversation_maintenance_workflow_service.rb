@@ -15,6 +15,7 @@ module SoulCore
       )
     /ix
     EXPLICIT_REBOOT = /\b(?:reboot|restart)\s+(?:the\s+)?(?:device|host|server|vm|container)?\s*/i
+    NEGATED_REBOOT = /\b(?:do\s+not|don't|without)\s+(?:a\s+)?(?:reboot(?:ing)?|restart(?:ing)?)\b/i
     AFFIRMATIVE = /\A\s*(?:yes|yes please|correct|confirmed|confirm|proceed|go ahead|do it)\s*[.!]*\s*\z/i
     NEGATIVE = /\A\s*(?:no|no thanks|cancel|stop|never mind|nevermind)\s*[.!]*\s*\z/i
 
@@ -56,7 +57,7 @@ module SoulCore
       end
 
       return confirm_pending(pending, progress) if pending && text.match?(AFFIRMATIVE)
-      return protected_reboot(chat_id, text) if text.match?(EXPLICIT_REBOOT)
+      return prepare_reboot(chat_id, text) if reboot_request?(text)
       return nil unless text.match?(EXPLICIT_MAINTENANCE)
 
       prepare_maintenance(chat_id, text)
@@ -77,7 +78,7 @@ module SoulCore
     private
 
     def explicit_request?(text)
-      text.match?(EXPLICIT_MAINTENANCE) || text.match?(EXPLICIT_REBOOT)
+      text.match?(EXPLICIT_MAINTENANCE) || reboot_request?(text)
     end
 
     def prepare_maintenance(chat_id, text)
@@ -91,10 +92,28 @@ module SoulCore
         )
       end
 
-      preview = @device_control_service.preview(device_id: target.fetch("control_target_id"), action: "maintenance")
+      prepare_action(chat_id, target, "maintenance")
+    end
+
+    def prepare_reboot(chat_id, text)
+      fleet = fleet_snapshot
+      target = resolve_target(fleet, text)
+      raise ArgumentError, available_target_prompt(fleet) unless target
+      if target.fetch("protected", false)
+        return protected_handoff(
+          "Rebooting #{target.fetch('label')} is an availability-impacting protected action.",
+          target
+        )
+      end
+
+      prepare_action(chat_id, target, "reboot")
+    end
+
+    def prepare_action(chat_id, target, operation)
+      preview = @device_control_service.preview(device_id: target.fetch("control_target_id"), action: operation)
       unless preview["ok"] && preview["lifecycle_state"] == "complete"
         return result(
-          "I could not prepare maintenance for #{target.fetch('label')}: #{preview['reason']}. No command was run.",
+          "I could not prepare #{operation} for #{target.fetch('label')}: #{preview['reason']}. No command was run.",
           "maintenance_blocked",
           lifecycle: preview["lifecycle_state"] || "blocked_for_human_review"
         )
@@ -111,20 +130,26 @@ module SoulCore
         "stage" => "confirmation",
         "authority_class" => "routine_mutation",
         "target" => target,
-        "operation" => "maintenance",
+        "operation" => operation,
         "confirmation" => plan.fetch("confirmation"),
         "expected_digest" => plan.fetch("expected_digest"),
         "created_at" => now.iso8601,
         "expires_at" => (now + CONFIRMATION_TTL_SECONDS).iso8601
       )
 
+      lines = ["I found #{target.fetch('label')} at #{target.fetch('address')}."]
+      if operation == "maintenance"
+        lines << "Run its fixed #{plan.fetch('maintenance_adapter')} maintenance workflow, without rebooting—correct?"
+        lines << "This can change installed packages. Reply yes to authorize this exact reviewed plan, or no to cancel. The confirmation expires in 10 minutes."
+      else
+        impacts = Array(plan["impact"]).reject(&:empty?)
+        lines << "Send one fixed reboot request and verify a new boot identity plus reviewed readiness checks—correct?"
+        lines << "Availability impact: #{impacts.empty? ? 'the target will be temporarily unavailable' : impacts.join('; ')}."
+        lines << "Reply yes to authorize this exact reviewed plan, or no to cancel. The confirmation expires in 10 minutes."
+      end
       result(
-        [
-          "I found #{target.fetch('label')} at #{target.fetch('address')}.",
-          "Run its fixed #{plan.fetch('maintenance_adapter')} maintenance workflow, without rebooting—correct?",
-          "This can change installed packages. Reply yes to authorize this exact reviewed plan, or no to cancel. The confirmation expires in 10 minutes."
-        ].join("\n"),
-        "maintenance_confirmation_required",
+        lines.join("\n"),
+        operation == "maintenance" ? "maintenance_confirmation_required" : "reboot_confirmation_required",
         lifecycle: "awaiting_input",
         action: public_action(action)
       )
@@ -134,10 +159,14 @@ module SoulCore
       return expired(action) if expired?(action)
       return protected_handoff("This action requires an Operator-controlled interface.", action.fetch("target")) unless action["authority_class"] == "routine_mutation"
 
-      progress&.call({"state" => "maintaining", "summary" => "Running the fixed maintenance workflow on #{action.dig('target', 'label')}."})
+      operation = action.fetch("operation")
+      progress&.call({
+        "state" => operation == "reboot" ? "rebooting" : "maintaining",
+        "summary" => "Running the fixed #{operation} workflow on #{action.dig('target', 'label')}."
+      })
       outcome = @device_control_service.execute(
         device_id: action.dig("target", "control_target_id"),
-        action: "maintenance",
+        action: operation,
         confirmation: action.fetch("confirmation"),
         expected_digest: action.fetch("expected_digest"),
         progress: lambda do |event|
@@ -157,16 +186,8 @@ module SoulCore
       render_outcome(outcome, updated)
     end
 
-    def protected_reboot(chat_id, text)
-      fleet = fleet_snapshot
-      target = resolve_target(fleet, text)
-      raise ArgumentError, available_target_prompt(fleet) unless target
-
-      @store.cancel(chat_id) if @store.active(chat_id)
-      protected_handoff(
-        "Rebooting #{target.fetch('label')} is an availability-impacting protected action.",
-        target
-      )
+    def reboot_request?(text)
+      text.match?(EXPLICIT_REBOOT) && !text.match?(NEGATED_REBOOT)
     end
 
     def protected_handoff(prefix, target)
@@ -207,12 +228,24 @@ module SoulCore
         lines << "Updates remaining: #{fleet_device.dig('updates', 'total')}" unless fleet_device.dig("updates", "total").nil?
         lines << "Reboot required: #{fleet_device.dig('reboot', 'required') == true ? 'yes' : 'no'}"
       end
+      operation = action.fetch("operation", "maintenance")
       evidence = Array(receipt["evidence"])
-      failed = evidence.count { |entry| entry["status"] != "ok" }
-      lines << "Issues: #{failed.zero? ? 'none reported by the fixed workflow' : "#{failed} fixed step(s) require review"}"
+      unsuccessful = evidence.reject { |entry| entry["status"] == "ok" }
+      transient = if outcome["lifecycle_state"] == "complete" && operation == "reboot"
+                    unsuccessful.select { |entry| entry["adapter"].to_s.match?(/\Areboot\.(?:reconnect|readiness)\./) }
+                  else
+                    []
+                  end
+      failed = unsuccessful - transient
+      lines << "Transient boot checks before readiness: #{transient.length}" unless transient.empty?
+      lines << "Issues: #{failed.empty? ? 'none reported by the fixed workflow' : "#{failed.length} fixed step(s) require review"}"
       result(
         lines.join("\n"),
-        outcome["lifecycle_state"] == "complete" ? "maintenance_complete" : "maintenance_failed",
+        if outcome["lifecycle_state"] == "complete"
+          operation == "reboot" ? "reboot_complete" : "maintenance_complete"
+        else
+          operation == "reboot" ? "reboot_failed" : "maintenance_failed"
+        end,
         lifecycle: outcome["lifecycle_state"] || "failed",
         action: public_action(action).merge("receipt_id" => receipt["receipt_id"])
       )

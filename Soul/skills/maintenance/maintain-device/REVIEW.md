@@ -20,15 +20,18 @@ human_review_required
 ## Implementation summary
 
 The skill resolves one exact managed fleet device, obtains the existing
-server-authored maintenance preview, repeats the target and no-reboot scope,
-and retains its digest-bound confirmation for at most ten minutes. A short
-affirmative response may execute routine package maintenance on a
-non-workstation device. Completion reports live progress, receipt, refreshed
-fleet status, remaining updates, reboot state, and fixed-step issues.
+server-authored maintenance or reboot preview, repeats the target and bounded
+impact, and retains its digest-bound confirmation for at most ten minutes. A
+short affirmative response may execute routine package maintenance or one
+fixed reboot of a non-workstation device. Completion reports live progress,
+receipt, refreshed fleet status, remaining updates, reboot state, and
+fixed-step or readiness issues.
 
-Reboot and workstation maintenance cannot execute through Chat or Voice
-Presence affirmation. They return a protected handoff to an
-Operator-controlled Dashboard, terminal, or Noctalia action.
+Atelier reboot and workstation maintenance cannot execute through Chat or
+Voice Presence affirmation. They return a protected handoff to an
+Operator-controlled Dashboard, terminal, or Noctalia action. Non-workstation
+reboots use one request, bounded reconnect checks, boot-identity evidence, and
+reviewed readiness checks from the existing fixed controller.
 
 ## Files changed
 
@@ -87,7 +90,7 @@ Skill-private durable memory added: no
 - Voice phrasing variability requires live acceptance.
 - Maintenance can remain foreground for the fixed controller's bounded
   45-minute timeout.
-- Other Dashboard surfaces remain separate later skill slices.
+- Atelier package maintenance remains in its separate protected workflow.
 
 ## Human review checklist
 
@@ -97,7 +100,8 @@ Skill-private durable memory added: no
 [ ] Yes executes only the retained fresh plan
 [ ] No and expired confirmation execute nothing
 [ ] Receipt and refreshed fleet evidence are useful
-[ ] Reboot and workstation maintenance require an Operator gesture
+[ ] Non-workstation reboot requires a fresh exact confirmation and passes readiness
+[ ] Atelier reboot and workstation maintenance require an Operator gesture
 [ ] Voice and text behavior are acceptably consistent
 [ ] Known weaknesses are acceptable
 [ ] Candidate is approved for merge
@@ -109,6 +113,6 @@ Skill-private durable memory added: no
 Outcome: approved
 Reviewer: human owner
 Date: 2026-07-31
-Decision summary: Capability catalog foundation, bounded device-maintenance workflow, and protected-action boundary approved for merge.
-Required changes: none
+Decision summary: Capability catalog foundation and bounded device-maintenance workflow approved for merge. On 2026-08-29, the human owner explicitly approved exercising updates and required reboots through Soul Chat while excluding Atelier reboot; the candidate now permits only exact non-workstation reboots through the existing bounded controller.
+Required changes: Live acceptance of remote reboot from Chat; Atelier remains protected.
 ```
