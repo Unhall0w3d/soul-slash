@@ -50,11 +50,37 @@ oversized_records = oversized.stdout.lines.map { |line| JSON.parse(line) }
 check.call("oversized lines are dropped as whole records", oversized.truncated && oversized_records == [{ "id" => "kept" }])
 check.call("oversized-line handling never emits partial UTF-8", oversized.stdout.valid_encoding? && oversized.stdout.bytesize <= 64)
 
+streamed = runner.run(
+  RbConfig.ruby, "-e", fixture,
+  max_output_bytes: 64 * 1024,
+  capture_mode: :json_lines,
+  max_records: 3_000
+) { |item| item.fetch("id").to_s }
+check.call("JSON-line projection drains large raw output without retaining it",
+           streamed.success? && streamed.stdout.empty? && streamed.records.length == 2_501 &&
+             streamed.records.first == "0" && streamed.records.last == "eof" && !streamed.truncated)
+
+bounded_records = runner.run(
+  RbConfig.ruby, "-rjson", "-e", '10.times { |id| puts({"id" => id}.to_json) }',
+  max_output_bytes: 3,
+  capture_mode: :json_lines,
+  max_records: 10
+) { |item| item.fetch("id").to_s }
+check.call("JSON-line projection fails closed when retained records exceed bounds",
+           bounded_records.success? && bounded_records.truncated && bounded_records.records == %w[0 1 2])
+
+invalid_json = runner.run(
+  RbConfig.ruby, "-e", 'puts "not-json"',
+  capture_mode: :json_lines
+) { |item| item.to_s }
+check.call("JSON-line projection reports invalid records without exposing content",
+           !invalid_json.success? && invalid_json.stderr == "JSON line could not be projected safely")
+
 invalid_mode = runner.run(RbConfig.ruby, "-e", "print 'must not run'", capture_mode: :untrusted)
 check.call("capture mode is closed and rejects unknown values", invalid_mode.status == "failed" && invalid_mode.stderr.include?("ArgumentError"))
 
 if errors.empty?
-  puts "PASS: 8 checks"
+  puts "PASS: 11 checks"
   exit 0
 end
 
