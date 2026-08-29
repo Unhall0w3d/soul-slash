@@ -1,0 +1,54 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+
+options = {"profile" => "operator", "mode" => nil}
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options["root"] = value }
+  parser.on("--profile PROFILE") { |value| options["profile"] = value }
+  parser.on("--preview") { options["mode"] = "preview" }
+  parser.on("--execute") { options["mode"] = "execute" }
+  parser.on("--expected-digest DIGEST") { |value| options["expected_digest"] = value }
+  parser.on("--confirmation PHRASE") { |value| options["confirmation"] = value }
+end.parse!
+
+abort "root is required" if options["root"].to_s.empty? || !ARGV.empty?
+abort "only the operator profile is supported" unless options["profile"] == "operator"
+abort "exactly one mode is required" unless %w[preview execute].include?(options["mode"])
+
+root = File.expand_path(options.fetch("root"))
+$LOAD_PATH.unshift(File.join(root, "lib"))
+require "soul_core/backup_administration_service"
+require "soul_core/env_loader"
+require "soul_core/nightly_drs_runner"
+
+SoulCore::EnvLoader.load(File.join(root, ".env"))
+credential_directory = ENV.fetch("CREDENTIALS_DIRECTORY", "").to_s
+abort "systemd credential directory is unavailable" if credential_directory.empty?
+credential_directory = File.expand_path(credential_directory)
+abort "systemd credential directory is unsafe" unless File.directory?(credential_directory) && !File.symlink?(credential_directory)
+credential_path = File.join(credential_directory, SoulCore::NightlyDrsRunner::OPERATOR_CREDENTIAL_NAME)
+abort "operator backup credential was not delivered" unless File.file?(credential_path) && !File.symlink?(credential_path)
+abort "operator backup credential exceeds size limit" if File.size(credential_path) > SoulCore::BackupAdministrationService::MAX_PASSWORD_BYTES
+
+password = nil
+begin
+  password = File.binread(credential_path, SoulCore::BackupAdministrationService::MAX_PASSWORD_BYTES + 1)
+  abort "operator backup credential is empty or invalid" if password.empty? || password.include?("\0")
+  service = SoulCore::BackupAdministrationService.new(root: root, profile_id: "operator")
+  result = if options.fetch("mode") == "preview"
+    service.snapshot_evidence_reconciliation_preview(password: password)
+  else
+    service.snapshot_evidence_reconciliation_execute(
+      password: password,
+      confirmation: options["confirmation"],
+      expected_digest: options["expected_digest"]
+    )
+  end
+  puts JSON.pretty_generate(result)
+  exit(result["ok"] ? 0 : 1)
+ensure
+  password&.replace("\0" * password.bytesize) if defined?(password) && password.is_a?(String) && !password.frozen?
+end
