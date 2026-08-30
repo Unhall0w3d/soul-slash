@@ -20,6 +20,18 @@ skills:
     write_scope: owner_private_wazuh_status_caches_only
     expected_output: conversation_result
     verifier: conversation_security_status_a4e
+  fleet.observability:
+    internal_handler: fleet_observability_summary
+    instruction_path: Soul/skills/administration/inspect-fleet-observability/SKILL.md
+    category: administration
+    status: available
+    description: Read one bounded, privacy-filtered Observatory summary for endpoint freshness, resource pressure, storage, network, switch, alert, and boot evidence without accepting arbitrary queries or mutation authority.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: conversation_result
+    verifier: fleet_observability_a3
   project.timeline.inspect:
     internal_handler: project_tracker
     category: project_coordination
@@ -76,12 +88,13 @@ skills:
     instruction_path: Soul/skills/maintenance/maintain-device/SKILL.md
     category: administration
     status: available
-    description: Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+    description: Resolve one exact managed device, prepare its fixed package-maintenance or separate reboot plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
     risk: routine_mutation
     requires_approval: true
     confirmation_mode: short_lived_conversational
     protected_actions:
-      - reboot
+      - workstation_maintenance
+      - workstation_reboot
       - deletion
       - credential_change
       - external_publication

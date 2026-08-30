@@ -2,15 +2,16 @@
 
 ## Implementation summary
 
-Candidate-complete for Operator review.
+Implemented, merged, and live-accepted by the Operator.
 
 This slice adds a normalized Operator capability catalog, makes Dashboard
 self-recognition consume that catalog, registers a bounded
 `maintenance.device` skill, and routes explicit Chat or Voice Presence
 maintenance requests through the existing fixed device-control service.
 Routine non-workstation package maintenance uses a ten-minute digest-bound
-conversational confirmation. Reboot and workstation maintenance return a
-protected handoff and do not execute.
+conversational confirmation. A later reviewed policy refinement applies the
+same bounded confirmation to a separately requested non-workstation reboot;
+workstation maintenance and reboot still return a protected handoff.
 
 ## Files changed
 
@@ -73,8 +74,9 @@ Operator review step after merge candidate inspection.
   conversational skill.
 - Dashboard-only or partially mapped surfaces remain explicitly labeled in
   the catalog and require later vertical slices.
-- Live remote maintenance must be tested only when the Operator selects a
-  suitable device and approves the candidate.
+- Live remote maintenance and the separately confirmed reboot path were
+  accepted through exact managed non-workstation devices. Future adapters
+  still require their own reviewed enrollment and controller evidence.
 - Voice Presence shares the Chat runtime, but natural spoken target variation
   needs live acceptance.
 
@@ -91,30 +93,32 @@ inactive at a terminal lifecycle state.
 
 ## Risk classification
 
-Routine local/remote package mutation using an existing fixed controller.
-Protected actions remain outside conversational execution.
+Routine local/remote package mutation and separate non-workstation reboot
+using an existing fixed controller. Workstation and other protected actions
+remain outside conversational execution.
 
 ## Human review checklist
 
-- [ ] Explicit maintenance wording selects the exact intended device.
-- [ ] Ordinary maintenance conversation and status questions do not invoke it.
-- [ ] The confirmation repeats device, address, adapter, and no-reboot scope.
-- [ ] Yes runs only the retained digest-bound plan; no and expiry run nothing.
-- [ ] Completion reports progress, receipt, refreshed status, remaining
+- [x] Explicit maintenance wording selects the exact intended device.
+- [x] Ordinary maintenance conversation and status questions do not invoke it.
+- [x] The confirmation repeats device, address, adapter, and no-reboot scope.
+- [x] Yes runs only the retained digest-bound plan; no and expiry run nothing.
+- [x] Completion reports progress, receipt, refreshed status, remaining
       updates, reboot state, and issues.
-- [ ] Reboot and Atelier maintenance require an Operator-controlled interface.
-- [ ] Capability Guide accurately reports mapped, partial, and unmapped
+- [x] Non-workstation reboot requires its own digest-bound preview and never
+      chains from maintenance.
+- [x] Atelier maintenance and reboot require an Operator-controlled interface.
+- [x] Capability Guide accurately reports mapped, partial, and unmapped
       surfaces.
-- [ ] No persistence, background continuation, safety weakening, or new
+- [x] No persistence, background continuation, safety weakening, or new
       private memory layer was introduced.
 
 ## Human review outcome
 
 ```text
-Outcome: approved for merge
+Outcome: approved, merged, and live-accepted
 Reviewer: human owner
-Date: 2026-07-31
-Decision summary: Foundation, authority separation, and first maintenance skill accepted.
-Live acceptance: text and Voice Presence maintenance remain deferred until the Operator selects a suitable device.
+Date: 2026-08-30
+Decision summary: Foundation and authority separation accepted. Soul Chat completed package maintenance and separately confirmed reboot workflows for Forge, Foundry, and Crucible; retained receipts and refreshed fleet evidence reached terminal states. Atelier remained protected and was not rebooted through conversation.
 Required changes: none
 ```

@@ -130,9 +130,9 @@ surfaces:
   - id: guided_maintenance
     label: Guided Maintenance
     aliases: [guided maintenance, maintenance, maintain device, update device]
-    summary: Inspect fleet evidence and run one fixed package-maintenance workflow on an exact managed device.
+    summary: Inspect fleet evidence and run one fixed package-maintenance or reboot workflow on an exact managed device.
     inputs: Name one exact managed device and distinguish maintenance from reboot.
-    boundary: Routine device maintenance accepts one short-lived conversational confirmation; reboot and workstation maintenance remain protected Operator actions.
+    boundary: Routine non-workstation maintenance or a separately prepared non-workstation reboot accepts one short-lived conversational confirmation; workstation maintenance and reboot remain protected Operator actions.
     skills: [maintenance.device]
     invocations: [device-maintenance]
     operations: [maintenance.fleet.snapshot, maintenance.fleet.device.refresh, maintenance.device.preview, maintenance.device.execute, maintenance.device.receipts]
@@ -141,9 +141,9 @@ surfaces:
     coverage: {dashboard: available, chat: available, voice: available}
     authority:
       default: routine_mutation
-      conversational_confirmation: [device package maintenance]
-      operator_gesture_required: [reboot, workstation maintenance]
-    completion: {progress: streamed, receipt: device maintenance receipt and refreshed fleet evidence}
+      conversational_confirmation: [device package maintenance, separate non-workstation reboot]
+      operator_gesture_required: [workstation maintenance, workstation reboot]
+    completion: {progress: streamed, receipt: device maintenance or reboot receipt and refreshed fleet evidence}
 
   - id: fleet_and_topology
     label: Fleet and Operations Topology

@@ -32,9 +32,9 @@ maintenance = catalog.find("guided_maintenance")
 check.call("routine maintenance is mapped to the existing fixed controller",
            maintenance["skills"] == ["maintenance.device"] &&
              maintenance["operations"].include?("maintenance.device.execute") &&
-             maintenance.dig("authority", "conversational_confirmation") == ["device package maintenance"])
-check.call("maintenance reboot and workstation mutation remain protected",
-           maintenance.dig("authority", "operator_gesture_required").sort == ["reboot", "workstation maintenance"].sort)
+             maintenance.dig("authority", "conversational_confirmation") == ["device package maintenance", "separate non-workstation reboot"])
+check.call("workstation maintenance and reboot remain protected",
+           maintenance.dig("authority", "operator_gesture_required").sort == ["workstation maintenance", "workstation reboot"].sort)
 
 backups = catalog.find("backup_and_recovery")
 publication = catalog.find("youtube_publication")

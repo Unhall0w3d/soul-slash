@@ -29,10 +29,14 @@ returns streamed progress, the device receipt, refreshed fleet evidence,
 remaining update count, reboot state, and bounded failure evidence. There is
 no automatic retry and no background continuation after the request returns.
 
-Reboot and workstation maintenance are protected actions. Soul may explain
-and prepare them, but typed or spoken affirmation is not execution authority.
-The Operator must use the Dashboard, a reviewed terminal command, or Noctalia
-for the final gesture. Permanent deletion, backup-snapshot deletion,
+Reboot remains separate from maintenance and is never inferred or chained.
+For a non-workstation managed device, Soul may prepare one fixed reboot plan
+and accept a fresh short-lived conversational confirmation bound to its exact
+digest. The controller sends one reboot request, waits for a changed boot
+identity, and runs bounded reviewed readiness checks without automatic retry.
+Workstation maintenance and reboot remain protected actions: the Operator must
+use the Dashboard, a reviewed terminal command, or Noctalia for the final
+gesture. Permanent deletion, backup-snapshot deletion,
 credential or permission changes, and external publication follow the same
 protected-action principle in their owning workflows.
 

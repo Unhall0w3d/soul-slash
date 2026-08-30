@@ -9,11 +9,19 @@
 - `protected_action`: prepare and explain the operation, then stop for an
   Operator gesture in the owning Dashboard, terminal, or Noctalia surface.
 
+## Availability operations
+
+A reboot of one exact non-workstation managed device may use
+`routine_mutation` only when the fixed controller provides a digest-bound
+preview, one short-lived authenticated confirmation, one reboot request,
+bounded reconnect attempts, boot-identity change evidence, and reviewed
+readiness checks. No conversational fleet-wide reboot exists.
+
 ## Protected operations
 
-Reboot, permanent deletion, backup-snapshot deletion, credential or permission
-changes, and external publication cannot use conversational affirmation as
-execution authority.
+Atelier maintenance or reboot, permanent deletion, backup-snapshot deletion,
+credential or permission changes, and external publication cannot use
+conversational affirmation as execution authority.
 
 ## Lifecycle
 

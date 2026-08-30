@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fleet Observability"
+  short_description: "Read one bounded fleet telemetry summary"
+  default_prompt: "Use $inspect-fleet-observability to summarize current fleet health without mutation."

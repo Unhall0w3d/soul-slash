@@ -11,7 +11,7 @@ This document is a deterministic projection of the registered skill records. Reg
 ## Summary
 
 ```text
-skill_count: 38
+skill_count: 39
 registry_path: Soul/skills/registry.yaml
 ```
 
@@ -75,7 +75,7 @@ category: creative_studios
 status: available
 ```
 
-Coordinate supported reviewed music, still, and native-motion work through exact generation, lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
+Coordinate supported reviewed music, still, native-motion, and exact Blender-scene work through lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; Blender construction remains Dashboard-gated, while image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
 
 ### `creative.music_production`
 
@@ -95,7 +95,7 @@ category: creative_studios
 status: available
 ```
 
-Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, and continue a kept visual context into exact native text-to-video generation or a review-led native revision.
+Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, continue a kept visual context into exact native text-to-video generation or a review-led native revision, and explain the reviewed Blender Scene lane without implying that conversation text silently rewrites or renders its closed templates.
 
 ### `dashboard.capabilities.inspect`
 
@@ -166,6 +166,16 @@ status: available
 ```
 
 List one directory, stat one path, or read one bounded text file beneath an explicitly configured approved local root without mutation.
+
+### `fleet.observability`
+
+```text
+name: not declared
+category: administration
+status: available
+```
+
+Read one bounded, privacy-filtered Observatory summary for endpoint freshness, resource pressure, storage, network, switch, alert, and boot evidence without accepting arbitrary queries or mutation authority.
 
 ### `knowledge.vault.conversation_reflect`
 
@@ -245,7 +255,7 @@ category: administration
 status: available
 ```
 
-Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+Resolve one exact managed device, prepare its fixed package-maintenance or separate reboot plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
 
 ### `network.diagnose`
 
