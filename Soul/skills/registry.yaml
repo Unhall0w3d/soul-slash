@@ -20,6 +20,18 @@ skills:
     write_scope: owner_private_wazuh_status_caches_only
     expected_output: conversation_result
     verifier: conversation_security_status_a4e
+  fleet.observability:
+    internal_handler: fleet_observability_summary
+    instruction_path: Soul/skills/administration/inspect-fleet-observability/SKILL.md
+    category: administration
+    status: available
+    description: Read one bounded, privacy-filtered Observatory summary for endpoint freshness, resource pressure, storage, network, switch, alert, and boot evidence without accepting arbitrary queries or mutation authority.
+    risk: read_only_network
+    requires_approval: false
+    writes_files: false
+    network_access: true
+    expected_output: conversation_result
+    verifier: fleet_observability_a3
   project.timeline.inspect:
     internal_handler: project_tracker
     category: project_coordination

@@ -147,6 +147,20 @@ suppression, quarantine, Active Response, or remediation authority. Wazuh
 remains the authoritative investigation console. See
 `docs/guides/SECURITY_MONITORING.md`.
 
+### Fleet observability
+
+```text
+fleet.observability
+```
+
+This deterministic read-only invocation runs one bounded foreground summary
+from Observatory's fixed query registry for endpoint freshness, resource
+pressure, storage, network, switch, alert, and boot evidence. It reports
+unavailable sources as explicit gaps and may offer the configured Grafana
+drill-down. It does not accept arbitrary PromQL or grant maintenance, reboot,
+switch, alert, notification, or remediation authority. See
+`docs/guides/HOST_STEWARDSHIP.md`.
+
 ### Conversation lifecycle skills
 
 ```text

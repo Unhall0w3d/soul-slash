@@ -41,6 +41,20 @@ entries:
     examples:
       - How does security look?
       - Are there recent security alerts?
+  - id: fleet-observability-summary
+    label: Fleet observability summary
+    category: Everyday
+    summary: Read one bounded endpoint, resource, storage, network, switch, alert, and boot projection from Observatory.
+    skill_ids: [fleet.observability]
+    required_inputs: [An explicit fleet-health or Observatory-status question]
+    optional_inputs: []
+    core: Any conversational Core; collection is deterministic, foreground, and read-only.
+    approval: No approval for this bounded read.
+    output: A privacy-filtered summary with explicit gaps and an owner-configured Grafana drill-down when available.
+    boundary: Arbitrary PromQL, raw metrics, maintenance, reboot, switch mutation, alert mutation, notification, and remediation are unavailable.
+    examples:
+      - How does the fleet look?
+      - Summarize fleet observability.
   - id: web-research
     label: Web research
     category: Knowledge

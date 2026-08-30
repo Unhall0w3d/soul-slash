@@ -34,12 +34,13 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
                (File.stat(state_path).mode & 0o777) == 0o600)
 
   reconciled = first.dig("data", "items").to_h { |record| [record.fetch("item_id"), record] }
-  check.call("public seed preserves reviewed completion and pending human gates",
+  check.call("public seed preserves reviewed completion and current human gates",
              reconciled.dig("track_managed_switch_snmp_inventory", "status") == "validated" &&
                reconciled.dig("track_managed_switch_snmp_inventory", "horizon") == "archive" &&
-               reconciled.dig("track_youtube_description_sync", "status") == "needs_review" &&
-               reconciled.dig("track_winboat_windows_inventory", "status") == "needs_review" &&
-               reconciled.dig("track_noctalia_core_control", "status") == "needs_review")
+               reconciled.dig("track_youtube_description_sync", "status") == "validated" &&
+               reconciled.dig("track_winboat_windows_inventory", "status") == "validated" &&
+               reconciled.dig("track_noctalia_core_control", "status") == "validated" &&
+               reconciled.dig("track_host_stewardship_file_steward_a0_a2", "status") == "in_progress")
   check.call("public seed inventories accepted companion and completed hardening scope",
              reconciled.dig("track_noctalia_companion", "status") == "validated" &&
                reconciled.dig("track_noctalia_companion", "horizon") == "archive" &&
@@ -52,13 +53,15 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
              reconciled.dig("track_wazuh_clamav_security", "notes").include?("PR #137") &&
                reconciled.dig("track_wazuh_clamav_security", "notes").include?("without inventing a fleet compliance score"))
   check.call("creative qualification work is grouped without prematurely expanding long-form support",
-             reconciled.dig("track_music_variable_duration", "horizon") == "now" &&
-               reconciled.dig("track_music_variable_duration", "status") == "in_progress" &&
-               reconciled.dig("track_music_finishing_refinement", "horizon") == "now" &&
+             reconciled.dig("track_music_variable_duration", "horizon") == "archive" &&
+               reconciled.dig("track_music_variable_duration", "status") == "done" &&
+               reconciled.dig("track_music_finishing_refinement", "horizon") == "archive" &&
+               reconciled.dig("track_music_finishing_refinement", "status") == "done" &&
                reconciled.dig("track_visual_motion_quality", "horizon") == "archive" &&
                reconciled.dig("track_visual_motion_quality", "status") == "validated" &&
                reconciled.dig("track_music_long_form", "horizon") == "next" &&
-               reconciled.dig("track_music_long_form", "status") == "planned")
+               reconciled.dig("track_music_long_form", "status") == "planned" &&
+               reconciled.dig("track_structured_creative_exports", "status") == "deferred")
 
   item = {
     "title" => "Timeline verifier",

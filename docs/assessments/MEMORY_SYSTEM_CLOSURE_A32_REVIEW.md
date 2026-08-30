@@ -63,10 +63,9 @@ defect, not a memory-retrieval failure.
 
 ## Follow-on automation boundary
 
-Automatic projection reconciliation remains outside A32 itself. A33 now
-implements that follow-on boundary as a candidate: it consumes the explicit
-stale-projection consequence, uses a later activation of the existing A17
-timer, preserves the canonical ledger, fails closed, caps automatic attempts,
-and records content-free request and generation evidence. See
-`docs/assessments/MEMORY_AUTOMATIC_PROJECTION_RECONCILIATION_A33_REVIEW.md`;
-live supervised acceptance remains pending.
+Automatic projection reconciliation remains outside A32 itself. A33 implements
+that follow-on boundary: it consumes the explicit stale-projection consequence,
+uses a later activation of the existing A17 timer, preserves the canonical
+ledger, fails closed, caps automatic attempts, and records content-free request
+and generation evidence. Its supervised live reconciliation is complete; see
+`docs/assessments/MEMORY_AUTOMATIC_PROJECTION_RECONCILIATION_A33_REVIEW.md`.

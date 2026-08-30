@@ -1,6 +1,6 @@
 # Assistant Skill Catalog
 
-Generated: 2026-08-02T20:59:52-04:00
+Generated: 2026-08-30T03:06:35-04:00
 
 Source registry:
 
@@ -15,7 +15,7 @@ It does not activate, disable, or modify any skill.
 ## Skill count
 
 ```text
-37
+39
 ```
 
 ## Skills
@@ -130,7 +130,7 @@ required_core: dynamic_by_generation_operation
 core_transition_authority: exact_action_click
 ```
 
-Coordinate supported reviewed music, still, and native-motion work through exact generation, lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
+Coordinate supported reviewed music, still, native-motion, and exact Blender-scene work through lineage binding, static presentation when needed, full-duration rendering, kept-song export, and local upload-package export; Blender construction remains Dashboard-gated, while image-guided motion, destructive visual actions, and external publication retain their dedicated boundaries.
 
 Example ways the owner might ask for this:
 
@@ -170,7 +170,7 @@ required_core: amd-free
 core_transition_authority: exact_action_click
 ```
 
-Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, and continue a kept visual context into exact native text-to-video generation or a review-led native revision.
+Gather or draft a visual brief through chat, generate and review a local still, translate a recorded revise review into one guided edit, continue a kept visual context into exact native text-to-video generation or a review-led native revision, and explain the reviewed Blender Scene lane without implying that conversation text silently rewrites or renders its closed templates.
 
 Example ways the owner might ask for this:
 
@@ -312,6 +312,25 @@ Example ways the owner might ask for this:
 
 - use files inspect
 - run files.inspect
+
+### Fleet Observability
+
+```text
+id: fleet.observability
+category: administration
+status: available
+risk: network_or_provider_check
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Read one bounded, privacy-filtered Observatory summary for endpoint freshness, resource pressure, storage, network, switch, alert, and boot evidence without accepting arbitrary queries or mutation authority.
+
+Example ways the owner might ask for this:
+
+- use fleet observability
+- run fleet.observability
 
 ### Knowledge Vault Conversation Reflect
 
@@ -463,7 +482,7 @@ required_core: none
 core_transition_authority: not_applicable
 ```
 
-Resolve one exact managed device, prepare its fixed package-maintenance plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
+Resolve one exact managed device, prepare its fixed package-maintenance or separate reboot plan, accept one short-lived authenticated conversational confirmation, execute through the existing device controller, and report refreshed evidence and receipt.
 
 Example ways the owner might ask for this:
 
@@ -546,6 +565,25 @@ Example ways the owner might ask for this:
 
 - use repository inspect
 - run repository.inspect
+
+### Security Status
+
+```text
+id: security.status
+category: administration
+status: available
+risk: read_only_network
+confirmation_required: false
+required_core: none
+core_transition_authority: not_applicable
+```
+
+Collect one privacy-filtered Wazuh manager, agent, recent-alert, and adapted-posture aggregate for Chat or Voice without returning raw events or remediation authority.
+
+Example ways the owner might ask for this:
+
+- use security status
+- run security.status
 
 ### Skill Brief Draft
 

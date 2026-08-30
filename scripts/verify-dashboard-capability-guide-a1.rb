@@ -51,7 +51,7 @@ checks["visual_guide_discloses_available_bounded_motion_boundary"] =
   visual.include?("Availability: available") &&
   visual.include?("clear visual intent") &&
   visual.include?("supported duration") &&
-  visual.include?("still or native-motion candidates") &&
+  visual.include?("still, generated-motion, or reviewed procedural Blender scene candidates") &&
   visual.include?("external publication retain their owning human gates")
 
 tracker = guide.respond("What can I ask you to do in Project Timeline?")
