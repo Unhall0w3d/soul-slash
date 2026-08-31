@@ -932,10 +932,16 @@ module SoulCore
         "mac_address" => mac,
         "subnet" => subnet,
         "address_history" => history,
-        "inventory_adapter" => record["inventory_adapter"] == "apple_mobile" ? "apple_mobile" : ""
+        "inventory_adapter" => normalized_inventory_adapter(record["inventory_adapter"])
       )
     rescue ArgumentError
       nil
+    end
+
+    def normalized_inventory_adapter(value)
+      return value if %w[apple_mobile asuswrt_merlin].include?(value.to_s)
+
+      ""
     end
 
     def persist_registry(records)

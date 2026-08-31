@@ -10,6 +10,7 @@ require "time"
 
 require_relative "bounded_command_runner"
 require_relative "apple_mobile_inventory_adapter"
+require_relative "asuswrt_merlin_inventory_adapter"
 require_relative "managed_switch_snmp_inventory_adapter"
 require_relative "winboat_inventory_adapter"
 
@@ -60,6 +61,7 @@ module SoulCore
       ruby_path: RbConfig.ruby,
       recovery_scheduler: nil,
       apple_mobile_inventory_adapter: nil,
+      asuswrt_merlin_inventory_adapter: nil,
       managed_switch_snmp_inventory_adapter: nil,
       winboat_inventory_adapter: nil
     )
@@ -77,6 +79,7 @@ module SoulCore
       @ruby_path = File.expand_path(ruby_path)
       @recovery_scheduler = recovery_scheduler
       @apple_mobile_inventory_adapter = apple_mobile_inventory_adapter || AppleMobileInventoryAdapter.new(runner: @runner)
+      @asuswrt_merlin_inventory_adapter = asuswrt_merlin_inventory_adapter || AsuswrtMerlinInventoryAdapter.new(runner: @runner, ssh_config: @ssh_config)
       @managed_switch_snmp_inventory_adapter = managed_switch_snmp_inventory_adapter || ManagedSwitchSnmpInventoryAdapter.new(runner: @runner)
       @winboat_inventory_adapter = winboat_inventory_adapter || WinboatInventoryAdapter.new(runner: @runner)
       @addresses = {
@@ -756,6 +759,9 @@ module SoulCore
         "enrollment_id" => record.fetch("id"),
         "address_policy" => record.fetch("address_policy", "fixed")
       )
+      if record["inventory_adapter"] == "asuswrt_merlin" && record["connection_mode"] == "ssh"
+        return collect_asuswrt_merlin_device(record, facts)
+      end
       recovery = nil
       if record["address_policy"] == "dhcp_tracked"
         record, result, recovery = resolve_dhcp_record(record, schedule_recovery: schedule_recovery)
@@ -842,6 +848,64 @@ module SoulCore
         facts: facts.merge("reachability" => "reachable", "package_managers" => package_managers),
         control: "inventory_only",
         status: "reachable"
+      )
+    end
+
+    def collect_asuswrt_merlin_device(record, facts)
+      inventory = @asuswrt_merlin_inventory_adapter.collect(ssh_alias: record.fetch("ssh_alias"))
+      enriched = facts.merge(
+        "platform" => "asuswrt_merlin",
+        "management_channel" => "ssh_inventory",
+        "status_adapter" => "asuswrt_merlin_read_only",
+        "control_capability" => "inventory_only",
+        "mutation_supported" => false,
+        "hostname" => inventory["hostname"],
+        "firmware_version" => inventory["firmware_version"],
+        "bootloader_version" => inventory["bootloader_version"],
+        "uptime_seconds" => inventory["uptime_seconds"],
+        "load_average" => inventory["load_average"],
+        "memory" => inventory["memory"],
+        "jffs" => inventory["jffs"],
+        "temperatures" => inventory["temperatures"],
+        "qos" => inventory["qos"],
+        "ctf" => inventory["ctf"],
+        "custom_scripts_enabled" => inventory["custom_scripts_enabled"],
+        "custom_scripts_configured" => inventory["custom_scripts_configured"]
+      )
+      @evidence << {
+        "adapter" => "asuswrt_merlin.read_only",
+        "status" => inventory["state"],
+        "bounded" => true,
+        "mutation_authority" => false,
+        "credential_exposed" => false
+      }
+      unless inventory["available"]
+        unavailable = SoulCore::BoundedCommandRunner::Result.new(
+          stdout: "", stderr: inventory["reason"].to_s, exit_status: nil,
+          status: inventory["state"] || "unavailable", truncated: false
+        )
+        return offline_device(record.fetch("id"), record.fetch("label"), record.fetch("role"), record.fetch("address"), unavailable, control: "inventory_only", facts: enriched)
+      end
+
+      services = [
+        {"id" => "ssh_inventory", "label" => "SSH inventory", "state" => "active"},
+        {"id" => "asuswrt_merlin_inventory", "label" => "Asuswrt-Merlin read-only inventory", "state" => "active"}
+      ]
+      device(
+        id: record.fetch("id"),
+        label: record.fetch("label"),
+        role: record.fetch("role"),
+        address: record.fetch("address"),
+        reachable: true,
+        os: "ASUSWRT-Merlin",
+        version: inventory["firmware_version"],
+        kernel: {"running" => inventory["kernel"], "available" => "not_assessed", "update_required" => false},
+        updates: update_summary(freshness: "not_queried"),
+        reboot: {"required" => false, "reason" => "not assessed · inventory only"},
+        services: services,
+        facts: enriched.merge("reachability" => "reachable"),
+        control: "inventory_only",
+        status: "healthy"
       )
     end
 
@@ -1952,7 +2016,7 @@ module SoulCore
           "address_policy" => policy,
           "mac_address" => policy == "dhcp_tracked" ? mac : "",
           "subnet" => policy == "dhcp_tracked" ? subnet : "",
-          "inventory_adapter" => record["inventory_adapter"] == "apple_mobile" ? "apple_mobile" : "",
+          "inventory_adapter" => %w[apple_mobile asuswrt_merlin].include?(record["inventory_adapter"].to_s) ? record["inventory_adapter"].to_s : "",
           "address_history" => history
         )
       end
