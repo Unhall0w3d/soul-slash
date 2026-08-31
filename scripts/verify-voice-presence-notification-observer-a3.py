@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic checks for the Voice Presence metadata-only notification observer."""
+"""Deterministic checks for the shared metadata-only notification classifier."""
 
 import importlib.util
 from pathlib import Path
@@ -48,4 +48,4 @@ unknown = parsed(notification("Browser", "Facebook message", "never retain this 
 assert unknown == [observer.NotificationObservation("unknown", "unclassified", "visual_only")]
 assert not any("private" in repr(item) or "retain" in repr(item) for item in discord + urgent + steam + social + unknown)
 
-print("Voice Presence Notification Observer A3 verification complete: 6 deterministic checks.")
+print("Desktop Notification Classifier A3 verification complete: 6 deterministic checks.")

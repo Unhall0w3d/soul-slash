@@ -9,6 +9,7 @@ require_relative "dashboard_music_job_manager"
 require_relative "voice_transcription_service"
 require_relative "voice_synthesis_service"
 require_relative "voice_presence_launch_service"
+require_relative "notification_center_service"
 require_relative "picture_understanding_service"
 require_relative "screen_capture_service"
 
@@ -68,7 +69,7 @@ module SoulCore
 
     attr_reader :csrf_token, :authentication
 
-    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil, music_jobs: nil, voice_transcription: nil, voice_synthesis: nil, voice_presence: nil, picture_understanding: nil, screen_capture: nil)
+    def initialize(root:, facade:, bind_host:, port:, csrf_token: SecureRandom.hex(32), authentication: nil, public_origin: nil, music_jobs: nil, voice_transcription: nil, voice_synthesis: nil, voice_presence: nil, notification_center: nil, picture_understanding: nil, screen_capture: nil)
       @root = File.expand_path(root)
       @facade = facade
       @bind_host = bind_host
@@ -80,6 +81,7 @@ module SoulCore
       @voice_transcription = voice_transcription
       @voice_synthesis = voice_synthesis
       @voice_presence = voice_presence
+      @notification_center = notification_center
       @picture_understanding = picture_understanding
       @screen_capture = screen_capture
     end
@@ -143,6 +145,12 @@ module SoulCore
       return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/voice/presence/status"
       return voice_presence_launch(normalized_headers, body) if target == "/api/v1/voice/presence/launch" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/voice/presence/launch"
+      return notification_center_status(normalized_headers) if target == "/api/v1/notifications/status" && method == "GET"
+      return response(405, "Method Not Allowed", "Allow" => "GET") if target == "/api/v1/notifications/status"
+      return notification_center_settings(normalized_headers, body) if target == "/api/v1/notifications/settings" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/notifications/settings"
+      return notification_center_deliver(normalized_headers, body) if target == "/api/v1/notifications/deliver" && method == "POST"
+      return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/notifications/deliver"
       return picture_stream(normalized_headers, body) if target == "/api/v1/perception/picture-stream" && method == "POST"
       return response(405, "Method Not Allowed", "Allow" => "POST") if target == "/api/v1/perception/picture-stream"
       return screen_capture(normalized_headers, body) if target == "/api/v1/perception/screen-capture" && method == "POST"
@@ -441,6 +449,39 @@ module SoulCore
 
     def voice_presence
       @voice_presence ||= VoicePresenceLaunchService.new(root: @root)
+    end
+
+    def notification_center_status(headers)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      json_response(200, notification_center.status)
+    end
+
+    def notification_center_settings(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      request = JSON.parse(body)
+      result = notification_center.update_settings(mode: request["mode"], voice: request["voice"])
+      json_response(result["ok"] ? 200 : 422, result)
+    end
+
+    def notification_center_deliver(headers, body)
+      boundary_error = mutation_boundary_error(headers, body)
+      return boundary_error if boundary_error
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+
+      request = JSON.parse(body)
+      result = notification_center.deliver(event_name: request["event_name"], unique_key: request["unique_key"])
+      json_response(result["ok"] ? 200 : 422, result)
+    end
+
+    def notification_center
+      @notification_center ||= NotificationCenterService.new(root: @root, presence_service: voice_presence)
     end
 
     def picture_stream(headers, body)

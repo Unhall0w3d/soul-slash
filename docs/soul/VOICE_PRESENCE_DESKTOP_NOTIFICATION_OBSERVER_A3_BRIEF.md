@@ -1,5 +1,9 @@
 # Voice Presence Desktop Notification Observer A3 Brief
 
+> Historical contract: independent Notification Center A4-A6 moves this
+> metadata-only classifier into a graphical-session service. Voice Presence no
+> longer owns the observer; the privacy and no-action boundaries remain.
+
 ```text
 date: 2026-08-09
 human_authorization: explicitly approved in the active development conversation

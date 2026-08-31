@@ -1,5 +1,9 @@
 # Notification Cues A1 Brief
 
+> Historical contract: independent Notification Center A4-A6 supersedes the
+> Voice-Presence-open delivery dependency. Static assets and no-action
+> authority remain unchanged.
+
 ## Human direction
 
 Provide consistent notification sounds for Chat, wake listening, music

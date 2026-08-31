@@ -1,5 +1,10 @@
 # Wazuh Durable Notifications A4c Review
 
+> Current integration note: independent Notification Center A4-A6 now owns
+> static delivery. The Wazuh cursor, threshold, cooldown, privacy, and
+> no-remediation contracts remain unchanged; Voice Presence is no longer a
+> prerequisite.
+
 Status: accepted. Deterministic verification, live baseline seeding, exact timer
 installation, and the controlled Operator listening test pass.
 

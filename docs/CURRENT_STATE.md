@@ -130,26 +130,27 @@ Core-aware invocation handoff completed Operator live acceptance on
 2026-07-27. Minor refinements remain ordinary follow-up work rather than open
 release gates.
 
-Dashboard notification delivery now has full voice, priority voice, cues-only,
+Dashboard notification delivery has full voice, priority voice, cues-only,
 and muted modes. Submission, wake, completion, and attention cues are static
 local assets. Priority Voice limits speech to material attention such as a
 fleet degradation, reboot requirement, or backup verification issue; a first
 fleet snapshot is deliberately silent. Review-ready music, visual, lyric,
 improvement, and recovery events remain visible in the exact Dashboard record.
-When Voice Presence is visibly open and idle-listening, Chat, music, visual,
-lyric-analysis, improvement, and recovery completions may additionally use a
-pre-generated notice in the selected F3 or M3 voice. Each event performs one
-point-in-time status check; there is no polling or event-time synthesis.
+The candidate independent Notification Center owns notification mode, F3/M3
+voice, persistent hashed deduplication, and static playback. Voice Presence is
+not required for delivery and supplies only a point-in-time collision signal:
+while it is hearing, thinking, speaking, paused, failed, or holding a follow-up
+window, cues remain eligible but spoken notices are suppressed. There is no
+event-time synthesis or model/Core dependency.
 
-Voice Presence can also opt into observing the standard desktop-notification
-D-Bus method while its own visible window remains open. It does not replace or
-control Noctalia. The first reviewed cohort classifies Discord, Webex, Teams,
-and Steam from application metadata only; notification titles, bodies, images,
-actions, and history are never retained. Normal items remain visual-only. A
-recognized high-urgency communication may use one cooldown-limited static
-notice while Soul is idle-listening. Browser-originated sites and native popup
-windows remain outside this narrow observer and are never guessed from screen
-content.
+The candidate session service observes the standard desktop-notification D-Bus
+method without replacing or controlling Noctalia. The first reviewed cohort
+classifies Discord, Webex, Teams, and Steam from application metadata only;
+notification titles, bodies, images, actions, and history are never retained.
+Normal items remain visual-only. A recognized high-urgency communication may
+use one static notice. Browser-originated sites and native popup windows remain
+outside this narrow observer and are never guessed from screen content. Exact
+digest installation and live listening acceptance remain pending.
 
 Voice screen requests also resolve fresh explicit targets for the active
 Hyprland window, focused monitor, all monitors, left/right or numbered monitor,

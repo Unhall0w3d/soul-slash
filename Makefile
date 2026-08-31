@@ -137,7 +137,11 @@ help:
 > @echo "  make voice-presence-plan  Preview the local Hey Soul wake runtime and app entry"
 > @echo "  make voice-presence-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_VOICE_PRESENCE"
 > @echo "  make voice-presence-launch  Open visible persistent voice (close window to stop)"
-> @echo "  make verify-notification-cues  Verify static cues and Presence-aware spoken notices"
+> @echo "  make notification-center-plan  Review the independent local Notification Center unit"
+> @echo "  make notification-center-install EXPECTED_DIGEST=... CONFIRM=INSTALL_SOUL_NOTIFICATION_CENTER"
+> @echo "  make notification-center-status  Inspect the independent Notification Center service"
+> @echo "  make verify-notification-center  Verify delivery, privacy, collision, and deployment boundaries"
+> @echo "  make verify-notification-cues  Verify static cues and independent spoken notices"
 > @echo "  make verify-project-timeline  Verify the shared Dashboard/Chat implementation ledger"
 > @echo "  make memory-retrieval-evaluate  Run the deterministic approved-memory retrieval corpus"
 > @echo "  make memory-retrieval-evaluate-live  Run the corpus against one configured loopback embedding model"
@@ -651,6 +655,26 @@ notification-audio-build:
 
 verify-notification-cues:
 > @ruby scripts/verify-notification-cues-a1.rb
+
+.PHONY: notification-center-plan notification-center-install notification-center-status notification-center-uninstall verify-notification-center
+
+notification-center-plan:
+> @ruby scripts/soul-notification-center-runtime plan
+
+notification-center-install:
+> @test -n "$(EXPECTED_DIGEST)" || { echo "Run notification-center-plan first, then provide its EXPECTED_DIGEST."; exit 2; }
+> @test "$(CONFIRM)" = "INSTALL_SOUL_NOTIFICATION_CENTER" || { echo "Exact confirmation INSTALL_SOUL_NOTIFICATION_CENTER is required."; exit 2; }
+> @ruby scripts/soul-notification-center-runtime install --expected-digest "$(EXPECTED_DIGEST)" --confirmation "$(CONFIRM)"
+
+notification-center-status:
+> @ruby scripts/soul-notification-center-runtime status
+
+notification-center-uninstall:
+> @test "$(CONFIRM)" = "REMOVE_SOUL_NOTIFICATION_CENTER" || { echo "Exact confirmation REMOVE_SOUL_NOTIFICATION_CENTER is required."; exit 2; }
+> @ruby scripts/soul-notification-center-runtime uninstall --confirmation "$(CONFIRM)"
+
+verify-notification-center:
+> @ruby scripts/verify-independent-notification-center-a4-a6.rb
 
 verify-project-timeline:
 > @ruby scripts/verify-project-timeline-a1.rb

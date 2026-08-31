@@ -1,5 +1,9 @@
 # Unified Notification Lane A2 Brief
 
+> Historical contract: independent Notification Center A4-A6 supersedes the
+> browser-only delivery and Voice-Presence-open constraints while preserving
+> this allowlisted vocabulary and no-mutation boundary.
+
 ## Human direction
 
 Extend Dashboard notifications so completed creative work, material improvement
