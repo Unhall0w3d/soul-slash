@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Ephemeral, metadata-only parser for Voice Presence desktop notifications.
+"""Metadata-only parser for Soul desktop notifications.
 
-The visible Voice Presence application owns the dbus-monitor child.  This
-module deliberately retains neither the notification summary nor its body:
-only a reviewed application class, delivery posture, and static phrase key are
-returned to the application.
+The independent Notification Center owns the dbus-monitor child. This module
+deliberately retains neither the notification summary nor its body: only a
+reviewed application class, delivery posture, and static phrase key are
+returned to the caller.
 """
 
 from __future__ import annotations

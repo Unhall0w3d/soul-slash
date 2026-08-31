@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "digest"
 require "json"
 require "time"
-require_relative "voice_presence_launch_service"
+require_relative "notification_center_service"
 require_relative "wazuh_alert_evidence_service"
 
 module SoulCore
@@ -14,22 +15,18 @@ module SoulCore
     MAX_SEEN_EVENTS = 2048
     MAX_PENDING_EVENTS = 128
     PENDING_TTL_SECONDS = 24 * 60 * 60
-    PLAYER_TIMEOUT_SECONDS = 20
-
     def initialize(
       root: Dir.pwd,
       process_env: ENV,
       clock: -> { Time.now.utc },
       alert_service: nil,
-      presence_service: nil,
-      audio_player: nil
+      notification_center: nil
     )
       @root = File.expand_path(root)
       @process_env = process_env.to_h.transform_keys(&:to_s)
       @clock = clock
       @alert_service = alert_service || WazuhAlertEvidenceService.new(root: @root, process_env: @process_env, clock: @clock)
-      @presence_service = presence_service || VoicePresenceLaunchService.new(root: @root, process_env: @process_env)
-      @audio_player = audio_player || method(:play_audio)
+      @notification_center = notification_center || NotificationCenterService.new(root: @root)
       @state_root = File.join(@root, "Soul", "private", "security", "wazuh")
       @state_path = File.join(@state_root, "notification-state.json")
       @receipt_path = File.join(@state_root, "notification-last-run.json")
@@ -83,20 +80,26 @@ module SoulCore
       delivery = {"attempted" => false, "played" => false, "voice" => nil, "batched_alerts" => 0}
       if policy.fetch("enabled") && pending.any?
         if cooldown_ready?(state["last_voice_attempt_at"], policy.fetch("cooldown_seconds"), now)
-          presence = @presence_service.status.fetch("data", {})
-          if presence["running"] == true && presence["presence_state"] == "listening"
-            voice = presence["notification_voice"] == "M3" ? "M3" : "F3"
-            batch = pending.dup
-            state["pending_alerts"] = []
+          batch = pending.dup
+          batch_digest = Digest::SHA256.hexdigest(batch.map { |record| record.fetch("event_id") }.sort.join("\0"))
+          notification = @notification_center.deliver(event_name: "security_alert", unique_key: "wazuh:#{batch_digest}")
+          center_state = notification.dig("data", "delivery_state").to_s
+          if notification["ok"] == true
             state["last_voice_attempt_at"] = now.iso8601
-            persist_state(state)
-            played = @audio_player.call(notification_asset(voice))
-            state["last_voice_result"] = played ? "played" : "failed_safely"
+            state["pending_alerts"] = []
+            state["last_voice_result"] = center_state
             state["last_voice_completed_at"] = now.iso8601
-            delivery = {"attempted" => true, "played" => played, "voice" => voice, "batched_alerts" => batch.length}
-            delivery_state = played ? "voice_delivered" : "voice_failed_safely"
+            delivery = {
+              "attempted" => true,
+              "played" => notification.dig("data", "spoken_played") == true || notification.dig("data", "cue_played") == true,
+              "voice" => notification.dig("data", "voice"),
+              "batched_alerts" => batch.length
+            }
+            delivery_state = center_state
           else
-            delivery_state = "deferred_until_presence_idle"
+            state["last_voice_attempt_at"] = now.iso8601
+            state["last_voice_result"] = "failed_safely"
+            delivery_state = "notification_center_failed_safely"
           end
         else
           delivery_state = "cooldown"
@@ -104,7 +107,8 @@ module SoulCore
       end
 
       persist_state(state)
-      finish(delivery_state != "voice_failed_safely", delivery_state == "voice_failed_safely" ? "failed" : "complete", "Wazuh alert notification poll complete", now, {
+      failed = delivery_state == "notification_center_failed_safely"
+      finish(!failed, failed ? "failed" : "complete", "Wazuh alert notification poll complete", now, {
         "delivery_state" => delivery_state,
         "new_alerts" => new_alerts.length,
         "high_priority_new_alerts" => high_new.length,
@@ -199,30 +203,6 @@ module SoulCore
       return true if last_attempt.to_s.empty?
       time = parse_time(last_attempt)
       time.nil? || now - time >= cooldown
-    end
-
-    def notification_asset(voice)
-      path = File.join(@root, "assets", "notifications", "#{voice.downcase}-security-alert.wav")
-      raise "security notification audio is unavailable" unless File.file?(path) && !File.symlink?(path) && File.size(path).between?(1_000, 2_000_000) && File.binread(path, 4) == "RIFF"
-      path
-    end
-
-    def play_audio(path)
-      player = "/usr/bin/pw-play"
-      raise "PipeWire audio player is unavailable" unless File.executable?(player)
-      pid = Process.spawn(player, path, in: :close, out: File::NULL, err: File::NULL)
-      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + PLAYER_TIMEOUT_SECONDS
-      loop do
-        waited = Process.waitpid(pid, Process::WNOHANG)
-        return $?.success? if waited
-        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-        sleep(0.05)
-      end
-      Process.kill("TERM", pid)
-      Process.waitpid(pid)
-      false
-    rescue SystemCallError
-      false
     end
 
     def persist_state(state)

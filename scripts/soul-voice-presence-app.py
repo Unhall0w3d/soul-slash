@@ -15,9 +15,8 @@ from PySide6.QtCore import QEasingCurve, QProcess, QPropertyAnimation, QSettings
 from PySide6.QtGui import QColor, QCloseEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QMainWindow,
-    QCheckBox, QComboBox, QPushButton, QVBoxLayout, QWidget
+    QComboBox, QPushButton, QVBoxLayout, QWidget
 )
-from soul_voice_notification_observer import NotificationMonitorParser
 
 
 class PresenceWindow(QMainWindow):
@@ -29,7 +28,6 @@ class PresenceWindow(QMainWindow):
         self.worker_buffer = ""
         self.bridge_buffer = ""
         self.synthesis_buffer = ""
-        self.notification_buffer = ""
         self.failure_count = 0
         self.current_state = "starting"
         self.restart_requested = False
@@ -38,13 +36,9 @@ class PresenceWindow(QMainWindow):
         self.bridge = None
         self.player = None
         self.cue_player = None
-        self.notification_player = None
-        self.notification_observer = None
         self.synthesis_worker = None
         self.synthesis_ready = False
         self.pending_speech = None
-        self.notification_parser = NotificationMonitorParser()
-        self.notification_last_spoken = {}
         self.active_turn_started = None
         self.last_latency_summary = ""
         self.setWindowTitle("Soul / Voice Presence")
@@ -97,16 +91,6 @@ class PresenceWindow(QMainWindow):
         voice_row.addWidget(voice_label)
         voice_row.addWidget(self.voice_selector)
         voice_row.addStretch(1)
-        notification_row = QHBoxLayout()
-        self.notification_toggle = QCheckBox("Observe desktop notifications", objectName="notificationToggle")
-        self.notification_toggle.setChecked(self.settings.value("observe_desktop_notifications", False, type=bool))
-        self.notification_toggle.toggled.connect(self.toggle_notification_observer)
-        self.notification_status = QLabel("Notification observer off", objectName="notificationStatus")
-        self.notification_status.setAlignment(Qt.AlignCenter)
-        self.notification_status.setWordWrap(True)
-        notification_row.addStretch(1)
-        notification_row.addWidget(self.notification_toggle)
-        notification_row.addStretch(1)
         buttons = QHBoxLayout()
         self.pause = QPushButton("Pause listening", objectName="pause")
         self.pause.clicked.connect(self.toggle_pause)
@@ -123,8 +107,6 @@ class PresenceWindow(QMainWindow):
         layout.addWidget(self.status)
         layout.addWidget(self.detail)
         layout.addLayout(voice_row)
-        layout.addLayout(notification_row)
-        layout.addWidget(self.notification_status)
         layout.addLayout(buttons)
         self.setCentralWidget(root)
         self.setStyleSheet("""
@@ -134,8 +116,6 @@ class PresenceWindow(QMainWindow):
           #status { color: #d7f8fb; font: 600 17px "Inter", sans-serif; }
           #detail { color: #86a9b2; font: 13px "Inter", sans-serif; }
           #voiceLabel { color: #749da7; font: 11px monospace; letter-spacing: 1px; }
-          #notificationToggle { color: #b9f4fa; font: 12px "Inter", sans-serif; }
-          #notificationStatus { color: #749da7; font: 11px "Inter", sans-serif; }
           #voiceSelector { min-width: 155px; padding: 7px 28px 7px 10px; color: #b9f4fa;
                            background: #0b2530; border: 1px solid #287f8d; border-radius: 10px 2px 10px 2px;
                            font: 12px "Inter", sans-serif; }
@@ -251,8 +231,6 @@ class PresenceWindow(QMainWindow):
             self.args.worker, "--runtime", self.args.runtime, "--manifest", self.args.manifest,
             "--source", self.args.source, "--session", str(self.session)
         ])
-        if self.notification_toggle.isChecked():
-            self.start_notification_observer()
 
     def start_synthesis_worker(self):
         if self.synthesis_worker and self.synthesis_worker.state() == QProcess.Running:
@@ -300,82 +278,6 @@ class PresenceWindow(QMainWindow):
         }
         self.synthesis_worker.write((json.dumps(request, separators=(",", ":")) + "\n").encode("utf-8"))
 
-    def toggle_notification_observer(self, enabled):
-        self.settings.setValue("observe_desktop_notifications", enabled)
-        self.settings.sync()
-        if enabled:
-            self.start_notification_observer()
-        else:
-            self.stop_notification_observer()
-
-    def start_notification_observer(self):
-        if self.notification_observer and self.notification_observer.state() == QProcess.Running:
-            return
-        self.notification_parser = NotificationMonitorParser()
-        self.notification_observer = QProcess(self)
-        self.notification_observer.setProcessChannelMode(QProcess.SeparateChannels)
-        self.notification_observer.readyReadStandardOutput.connect(self.process_notification_lines)
-        self.notification_observer.finished.connect(self.notification_observer_stopped)
-        self.notification_observer.start("dbus-monitor", [
-            "--session",
-            "type='method_call',interface='org.freedesktop.Notifications',member='Notify'",
-        ])
-        if not self.notification_observer.waitForStarted(1200):
-            self.notification_status.setText("Notification observer unavailable; Noctalia remains unchanged.")
-            self.notification_toggle.blockSignals(True)
-            self.notification_toggle.setChecked(False)
-            self.notification_toggle.blockSignals(False)
-            self.settings.setValue("observe_desktop_notifications", False)
-            self.settings.sync()
-            return
-        self.notification_status.setText("Observing standard desktop notifications; contents are never retained.")
-
-    def stop_notification_observer(self):
-        process = self.notification_observer
-        self.notification_observer = None
-        self.notification_buffer = ""
-        self.notification_parser = NotificationMonitorParser()
-        if process and process.state() != QProcess.NotRunning:
-            process.terminate()
-            if not process.waitForFinished(1200):
-                process.kill()
-                process.waitForFinished(600)
-        self.notification_status.setText("Notification observer off")
-
-    def notification_observer_stopped(self, _code, _status):
-        if self.notification_observer and self.notification_toggle.isChecked():
-            self.notification_status.setText("Notification observer stopped safely; re-enable it to try again.")
-
-    def process_notification_lines(self):
-        if not self.notification_observer:
-            return
-        data = bytes(self.notification_observer.readAllStandardOutput()).decode("utf-8", "replace")
-        lines = (self.notification_buffer + data).split("\n")
-        self.notification_buffer = lines.pop()
-        for line in lines:
-            for observation in self.notification_parser.feed(line):
-                self.handle_notification_observation(observation)
-
-    def handle_notification_observation(self, observation):
-        label = observation.source.replace("_", " ").title()
-        if observation.delivery == "suppressed":
-            self.notification_status.setText(f"{label} classified as social; voice suppressed.")
-            return
-        if observation.delivery != "spoken":
-            self.notification_status.setText(f"{label} classified as {observation.category.replace('_', ' ')}; visual only.")
-            return
-        if self.current_state != "listening":
-            self.notification_status.setText(f"{label} needs attention; voice deferred while Soul is active.")
-            return
-        now = time.monotonic()
-        prior = self.notification_last_spoken.get(observation.source, now - 90.0)
-        if now - prior < 90.0:
-            self.notification_status.setText(f"{label} urgent notice deduplicated locally.")
-            return
-        self.notification_last_spoken[observation.source] = now
-        self.notification_status.setText(f"{label} urgent communication notice played.")
-        self.play_notification(observation.spoken_key)
-
     def run_bridge(self, capture, event):
         self.set_state("hearing", "Resolving your voice.")
         output = self.session / "response.wav"
@@ -420,16 +322,6 @@ class PresenceWindow(QMainWindow):
             return
         self.cue_player = QProcess(self)
         self.cue_player.start("pw-play", [self.args.notification_wake])
-
-    def play_notification(self, key):
-        if not key:
-            return
-        voice = self.selected_voice().lower()
-        path = Path(self.args.project_root) / "assets" / "notifications" / f"{voice}-{key}.wav"
-        if not path.is_file():
-            return
-        self.notification_player = QProcess(self)
-        self.notification_player.start("pw-play", [str(path)])
 
     def play(self, path, replayed=False):
         source = Path(path)
@@ -509,9 +401,8 @@ class PresenceWindow(QMainWindow):
             self.pause.setText("Resume listening")
 
     def stop_children(self):
-        self.stop_notification_observer()
         self.stop_synthesis_worker()
-        for process in (self.cue_player, self.notification_player, self.player, self.bridge, self.worker):
+        for process in (self.cue_player, self.player, self.bridge, self.worker):
             if process and process.state() != QProcess.NotRunning:
                 process.terminate()
                 if not process.waitForFinished(1800):

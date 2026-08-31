@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/notification_center_deployment"
+
+options = { root: File.expand_path("..", __dir__), home: Dir.home }
+command = ARGV.shift.to_s
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--home PATH") { |value| options[:home] = value }
+  parser.on("--expected-digest DIGEST") { |value| options[:digest] = value }
+  parser.on("--confirmation PHRASE") { |value| options[:confirmation] = value }
+end.parse!(ARGV)
+
+deployment = SoulCore::NotificationCenterDeployment.new(root: options[:root], home: options[:home])
+result = case command
+         when "plan" then deployment.plan
+         when "install" then deployment.install(expected_digest: options[:digest], confirmation: options[:confirmation])
+         when "status" then deployment.status
+         when "uninstall" then deployment.uninstall(confirmation: options[:confirmation])
+         else { "ok" => false, "lifecycle_state" => "awaiting_input", "message" => "use plan, install, status, or uninstall", "mutation" => "none" }
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : (result["lifecycle_state"] == "blocked_for_human_review" ? 0 : 1))

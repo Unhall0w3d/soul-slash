@@ -79,7 +79,7 @@ const NOTIFICATION_EVENTS = Object.freeze({
 try { const storedVoice = localStorage.getItem("soul.voice.output.profile"); state.voiceOutputProfile = VOICE_OUTPUT_PROFILES.has(storedVoice) ? storedVoice : "F3"; } catch (_error) { state.voiceOutputProfile = "F3"; }
 try { const storedQuality = localStorage.getItem("soul.voice.output.quality"); state.voiceOutputQuality = VOICE_OUTPUT_QUALITIES.has(storedQuality) ? storedQuality : "responsive"; } catch (_error) { state.voiceOutputQuality = "responsive"; }
 try { const storedMode = localStorage.getItem("soul.notifications.mode"); state.notificationMode = NOTIFICATION_MODES.includes(storedMode) ? storedMode : "priority"; } catch (_error) { state.notificationMode = "priority"; }
-state.notificationPlayback = null;
+state.notificationVoice = "F3";
 state.notificationKeys = new Set();
 state.notificationQueue = Promise.resolve();
 state.maintenanceNotificationStates = new Map();
@@ -90,55 +90,59 @@ function renderNotificationMode() {
   button.querySelector("span").textContent = labels[state.notificationMode];
   button.dataset.mode = state.notificationMode;
   button.title = state.notificationMode === "voice"
-    ? "Cues plus all pre-generated speech while Voice Presence is open and idle · click to change"
+    ? "Cues plus all pre-generated speech from the independent Notification Center · click to change"
     : (state.notificationMode === "priority"
-      ? "Cues plus priority speech while Voice Presence is open and idle · click to change"
+      ? "Cues plus priority speech from the independent Notification Center · click to change"
       : (state.notificationMode === "cues" ? "Nonverbal notification cues only · click to change" : "Local notifications muted · click to change"));
 }
 
-function cycleNotificationMode() {
+async function persistNotificationSettings() {
+  const response = await fetch("/api/v1/notifications/settings", {
+    method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+    body: JSON.stringify({ mode: state.notificationMode, voice: state.notificationVoice })
+  });
+  const result = await response.json();
+  if (!response.ok || result.lifecycle_state !== "complete") throw new Error(result.message || "Notification settings failed safely");
+}
+
+async function refreshNotificationCenter() {
+  try {
+    const response = await fetch("/api/v1/notifications/status", { credentials: "same-origin", cache: "no-store" });
+    const result = await response.json(); const data = result.data || {};
+    if (!response.ok || result.lifecycle_state !== "complete") return;
+    if (NOTIFICATION_MODES.includes(data.mode)) state.notificationMode = data.mode;
+    if (VOICE_OUTPUT_PROFILES.has(data.voice)) state.notificationVoice = data.voice;
+    renderNotificationMode();
+  } catch (_error) { /* the local default remains available for this page */ }
+}
+
+async function cycleNotificationMode() {
   const index = NOTIFICATION_MODES.indexOf(state.notificationMode);
   state.notificationMode = NOTIFICATION_MODES[(index + 1) % NOTIFICATION_MODES.length];
-  try { localStorage.setItem("soul.notifications.mode", state.notificationMode); } catch (_error) { /* session preference remains */ }
   renderNotificationMode();
-  announce(`${byId("notification-mode").querySelector("span").textContent} selected`);
-}
-
-function playNotificationFile(path, volume) {
-  return new Promise((resolve) => {
-    if (state.notificationPlayback) {
-      state.notificationPlayback.pause();
-      state.notificationPlayback.src = "";
-    }
-    const audio = new Audio(path); state.notificationPlayback = audio; audio.volume = volume;
-    const finish = () => { if (state.notificationPlayback === audio) state.notificationPlayback = null; resolve(); };
-    audio.addEventListener("ended", finish, { once: true });
-    audio.addEventListener("error", finish, { once: true });
-    audio.play().catch(finish);
-  });
-}
-
-async function voicePresenceReceipt() {
   try {
-    const response = await fetch("/api/v1/voice/presence/status", { credentials: "same-origin", cache: "no-store" });
-    const result = await response.json();
-    return response.ok ? result.data || {} : {};
-  } catch (_error) { return {}; }
+    await persistNotificationSettings();
+    announce(`${byId("notification-mode").querySelector("span").textContent} selected`);
+  } catch (error) { showError(error); await refreshNotificationCenter(); }
 }
 
 async function deliverSoulNotification(eventName, uniqueKey = null) {
-  const event = NOTIFICATION_EVENTS[eventName]; if (!event || state.notificationMode === "muted") return;
+  const event = NOTIFICATION_EVENTS[eventName]; if (!event) return;
   if (uniqueKey && state.notificationKeys.has(uniqueKey)) return;
+  const response = await fetch("/api/v1/notifications/deliver", {
+    method: "POST", credentials: "same-origin", cache: "no-store",
+    headers: { "Content-Type": "application/json", "X-Soul-CSRF": csrf },
+    body: JSON.stringify({ event_name: eventName, unique_key: uniqueKey })
+  });
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(result.message || "Notification delivery failed safely");
+  }
   if (uniqueKey) {
     state.notificationKeys.add(uniqueKey);
     if (state.notificationKeys.size > 100) state.notificationKeys.delete(state.notificationKeys.values().next().value);
   }
-  await playNotificationFile(`/notifications/cue-${event.cue}.wav`, 0.48);
-  if ((state.notificationMode !== "voice" && !(state.notificationMode === "priority" && event.priority === true)) || !event.spoken) return;
-  const presence = await voicePresenceReceipt();
-  if (presence.running !== true || presence.presence_state !== "listening") return;
-  const voice = presence.notification_voice === "M3" ? "m3" : "f3";
-  await playNotificationFile(`/notifications/${voice}-${event.spoken}.wav`, 0.78);
 }
 
 function emitSoulNotification(eventName, uniqueKey = null) {
@@ -6461,7 +6465,7 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence();
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence(); await refreshNotificationCenter();
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
@@ -7229,6 +7233,7 @@ byId("voice-output-profile").addEventListener("change", (event) => {
   const voice = event.target.value;
   if (!VOICE_OUTPUT_PROFILES.has(voice)) { event.target.value = state.voiceOutputProfile; return; }
   stopVoicePlayback(); state.voiceOutputProfile = voice;
+  state.notificationVoice = voice; persistNotificationSettings().catch(showError);
   try { localStorage.setItem("soul.voice.output.profile", voice); } catch (_error) { /* browser preference remains session-local */ }
   announce(`${event.target.selectedOptions[0].textContent} selected for the next spoken response`);
 });

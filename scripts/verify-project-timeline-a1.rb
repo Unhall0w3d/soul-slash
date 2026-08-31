@@ -49,6 +49,10 @@ Dir.mktmpdir("soul-project-timeline-") do |root|
                reconciled.dig("track_host_cis_hardening", "horizon") == "archive" &&
                reconciled.dig("track_portable_fleet_discovery", "status") == "validated" &&
                reconciled.dig("track_portable_fleet_discovery", "horizon") == "archive")
+  check.call("independent Notification Center remains a candidate until live service review",
+             reconciled.dig("track_independent_notification_center_a4_a6", "status") == "needs_review" &&
+               reconciled.dig("track_independent_notification_center_a4_a6", "horizon") == "now" &&
+               reconciled.dig("track_independent_notification_center_a4_a6", "notes").include?("pending exact digest installation"))
   check.call("multi-endpoint Wazuh acceptance is recorded without a fleet score",
              reconciled.dig("track_wazuh_clamav_security", "notes").include?("PR #137") &&
                reconciled.dig("track_wazuh_clamav_security", "notes").include?("without inventing a fleet compliance score"))

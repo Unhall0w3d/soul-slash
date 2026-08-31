@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "../lib/soul_core/notification_center_service"
+
+options = { root: File.expand_path("..", __dir__), unique_key: nil }
+command = ARGV.shift.to_s
+OptionParser.new do |parser|
+  parser.on("--root PATH") { |value| options[:root] = File.expand_path(value) }
+  parser.on("--event NAME") { |value| options[:event] = value }
+  parser.on("--unique-key KEY") { |value| options[:unique_key] = value }
+  parser.on("--mode MODE") { |value| options[:mode] = value }
+  parser.on("--voice VOICE") { |value| options[:voice] = value }
+end.parse!(ARGV)
+
+service = SoulCore::NotificationCenterService.new(root: options.fetch(:root))
+result = case command
+         when "status"
+           service.status
+         when "deliver"
+           service.deliver(event_name: options[:event], unique_key: options[:unique_key])
+         when "settings"
+           service.update_settings(mode: options[:mode], voice: options[:voice])
+         else
+           { "ok" => false, "lifecycle_state" => "awaiting_input", "message" => "use status, deliver, or settings", "mutation" => "none" }
+         end
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

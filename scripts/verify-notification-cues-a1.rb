@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/soul_core/voice_presence_launch_service"
 
 ROOT = File.expand_path("..", __dir__)
 
@@ -34,19 +33,21 @@ html = File.read(File.join(ROOT, "assets", "dashboard", "index.html"))
 http = File.read(File.join(ROOT, "lib", "soul_core", "dashboard_http_application.rb"))
 presence = File.read(File.join(ROOT, "scripts", "soul-voice-presence-app.py"))
 observer = File.read(File.join(ROOT, "scripts", "soul_voice_notification_observer.py"))
+center = File.read(File.join(ROOT, "lib", "soul_core", "notification_center_service.rb"))
+desktop_observer = File.read(File.join(ROOT, "scripts", "soul-notification-center-observer.py"))
 
 check("Dashboard exposes full voice, priority voice, cues, and muted preferences", html.include?('id="notification-mode"') && %w[voice priority cues muted].all? { |mode| javascript.include?(mode) })
-notification_source = javascript[/function emitSoulNotification.*?^}/m].to_s
-check("notifications use static assets rather than synthesis", javascript.include?("/notifications/") && !notification_source.include?("voice/synthesize"))
-check("spoken notice requires fresh idle Presence receipt", javascript.include?('presence.presence_state !== "listening"') && javascript.include?("/api/v1/voice/presence/status"))
+notification_source = javascript[/async function deliverSoulNotification.*?^}/m].to_s
+check("notifications use the independent center rather than synthesis", notification_source.include?("/api/v1/notifications/deliver") && !notification_source.include?("voice/synthesize"))
+check("spoken notices do not require Voice Presence to be open", center.include?('"voice_presence_required" => false') && !notification_source.include?("/api/v1/voice/presence/status"))
 check("terminal notices are session-deduplicated", javascript.include?("state.notificationKeys") && javascript.include?("uniqueKey"))
-check("terminal notices serialize playback and priority mode limits speech", javascript.include?("state.notificationQueue") && javascript.include?("event.priority === true"))
+check("terminal notices serialize delivery and priority mode is enforced centrally", javascript.include?("state.notificationQueue") && center.include?("spoken_eligible?") && center.include?('event["priority"] == true'))
 check("fleet notices establish a silent baseline and report later degradations", javascript.include?("state.maintenanceNotificationStates") && javascript.include?("if (!prior || prior === next) return") && javascript.include?("emitMaintenanceTransitions"))
 check("improvement and recovery notices remain review-only", javascript.include?("improvement_ready") && javascript.include?("backup_ready") && javascript.include?("backup_attention"))
-check("notification cannot authorize application operations", !notification_source.match?(/callSoul|confirmation|execute/))
+check("notification cannot authorize application operations", !notification_source.match?(/callSoul|confirmation|execute/) && center.include?('"execution_authority" => false'))
 check("all notification assets are explicit static routes", assets.all? { |name| http.include?("/notifications/#{name}.wav") })
-check("Presence publishes state and selected voice without an IPC or network listener", presence.include?("presence.json") && presence.include?("notification_voice") && !presence.match?(/QTcpServer|QLocalServer|AF_UNIX|TCPServer|\.bind\(|\.listen\(/))
+check("Presence publishes collision state without owning notification delivery", presence.include?("presence.json") && !presence.include?("dbus-monitor") && !presence.include?("play_notification"))
 check("wake uses a distinct static cue", presence.include?("play_wake_cue") && presence.include?("notification_wake"))
-check("Voice Presence desktop urgency uses a reviewed static notice", observer.include?("communication-urgent") && presence.include?("play_notification"))
+check("standalone desktop observer reuses the reviewed metadata classifier", observer.include?("communication-urgent") && desktop_observer.include?("NotificationMonitorParser") && desktop_observer.include?("communication_urgent"))
 
 puts "Notification Cues A1 verification complete."

@@ -32,16 +32,27 @@ class AlertFixture
   end
 end
 
-class PresenceFixture
-  attr_accessor :state, :voice
+class NotificationCenterFixture
+  attr_accessor :delivery_state, :voice
+  attr_reader :events
 
   def initialize
-    @state = "paused"
+    @delivery_state = "voice_suppressed_active_presence"
     @voice = "F3"
+    @events = []
   end
 
-  def status
-    {"data" => {"running" => true, "presence_state" => @state, "notification_voice" => @voice}}
+  def deliver(event_name:, unique_key:)
+    @events << [event_name, unique_key]
+    {
+      "ok" => true,
+      "data" => {
+        "delivery_state" => @delivery_state,
+        "cue_played" => @delivery_state != "voice_suppressed_active_presence",
+        "spoken_played" => @delivery_state == "voice_delivered",
+        "voice" => @voice
+      }
+    }
   end
 end
 
@@ -66,49 +77,48 @@ Dir.mktmpdir("soul-wazuh-alert-a4c-") do |root|
   now = Time.utc(2026, 8, 2, 20, 0, 0)
   baseline = [alert("a", "2026-08-02T19:58:00Z", 7), alert("b", "2026-08-02T19:59:00Z", 10)]
   alert_fixture = AlertFixture.new(baseline)
-  presence = PresenceFixture.new
-  plays = []
+  notification_center = NotificationCenterFixture.new
   service = SoulCore::WazuhAlertNotificationService.new(
     root: root,
     process_env: {"SOUL_WAZUH_ALERTS_INTEGRATION_FILE" => "/private/fixture.json"},
     clock: -> { now },
     alert_service: alert_fixture,
-    presence_service: presence,
-    audio_player: ->(path) { plays << File.basename(path); true }
+    notification_center: notification_center
   )
 
   seeded = service.poll
-  check("first poll seeds a durable baseline without speaking old alerts", seeded.dig("data", "delivery_state") == "baseline_seeded" && plays.empty?)
+  check("first poll seeds a durable baseline without speaking old alerts", seeded.dig("data", "delivery_state") == "baseline_seeded" && notification_center.events.empty?)
 
   now += 60
   alert_fixture.alerts = [alert("c", "2026-08-02T20:00:30Z", 13)] + baseline
   deferred = service.poll
-  check("new high alert defers while Presence is not idle", deferred.dig("data", "delivery_state") == "deferred_until_presence_idle" && deferred.dig("data", "pending_alerts") == 1 && plays.empty?)
+  check("active Voice Presence suppresses speech but the independent cue completes delivery", deferred.dig("data", "delivery_state") == "voice_suppressed_active_presence" && deferred.dig("data", "pending_alerts") == 0 && notification_center.events.length == 1)
 
-  now += 60
-  presence.state = "listening"
+  now += 901
+  notification_center.delivery_state = "voice_delivered"
+  alert_fixture.alerts = [alert("f", "2026-08-02T20:15:30Z", 13)] + alert_fixture.alerts
   delivered = service.poll
-  check("idle Presence receives one static privacy-safe notice", delivered.dig("data", "delivery_state") == "voice_delivered" && delivered.dig("data", "delivery", "batched_alerts") == 1 && plays == ["f3-security-alert.wav"])
+  check("independent Notification Center receives one static privacy-safe notice", delivered.dig("data", "delivery_state") == "voice_delivered" && delivered.dig("data", "delivery", "batched_alerts") == 1 && notification_center.events.length == 2)
 
   now += 60
   unchanged = service.poll
-  check("durable event IDs prevent duplicate playback", unchanged.dig("data", "new_alerts") == 0 && plays.length == 1)
+  check("durable event IDs prevent duplicate playback", unchanged.dig("data", "new_alerts") == 0 && notification_center.events.length == 2)
 
   now += 60
-  presence.voice = "M3"
+  notification_center.voice = "M3"
   alert_fixture.alerts = [alert("d", "2026-08-02T20:03:30Z", 10)] + alert_fixture.alerts
   cooled = service.poll
-  check("cooldown retains rather than replays a new alert", cooled.dig("data", "delivery_state") == "cooldown" && cooled.dig("data", "pending_alerts") == 1 && plays.length == 1)
+  check("cooldown retains rather than replays a new alert", cooled.dig("data", "delivery_state") == "cooldown" && cooled.dig("data", "pending_alerts") == 1 && notification_center.events.length == 2)
 
   now += 901
   delivered_after_cooldown = service.poll
-  check("pending batch delivers once after cooldown", delivered_after_cooldown.dig("data", "delivery_state") == "voice_delivered" && plays == ["f3-security-alert.wav", "m3-security-alert.wav"])
+  check("pending batch delivers once after cooldown", delivered_after_cooldown.dig("data", "delivery_state") == "voice_delivered" && notification_center.events.length == 3)
 
   now += 60
   alert_fixture.enabled = false
   alert_fixture.alerts = [alert("e", "2026-08-02T20:20:00Z", 15)] + alert_fixture.alerts
   disabled = service.poll
-  check("explicit disable suppresses and does not backlog alerts", disabled.dig("data", "delivery_state") == "disabled" && disabled.dig("data", "pending_alerts") == 0 && plays.length == 2)
+  check("explicit disable suppresses and does not backlog alerts", disabled.dig("data", "delivery_state") == "disabled" && disabled.dig("data", "pending_alerts") == 0 && notification_center.events.length == 3)
 
   state_path = File.join(root, "Soul", "private", "security", "wazuh", "notification-state.json")
   receipt_path = File.join(root, "Soul", "private", "security", "wazuh", "notification-last-run.json")

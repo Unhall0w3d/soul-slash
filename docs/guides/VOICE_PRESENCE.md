@@ -154,22 +154,26 @@ The wake phrase authorizes one conversational turn, not a gated action.
 
 ## Notification cues
 
-The Dashboard header exposes one local notification preference:
-**Alerts Voice**, **Alerts Cues**, or **Alerts Muted**. The preference is stored
-only in that browser profile. Submission, completion, and attention cues are
-small tracked WAV assets and require no model.
+Notification Center is separate from Voice Presence. The Dashboard header
+exposes **Alerts Voice**, **Alerts Priority**, **Alerts Cues**, and **Alerts
+Muted**; the owner-private selection and F3/M3 notification voice persist on
+the host rather than in one browser profile. Submission, completion, and
+attention cues are small tracked WAV assets and require no model.
 
-With **Alerts Voice** selected, completion events may add one pre-generated F3
-or M3 notice only when an authenticated point-in-time check reports that the
-visible Voice Presence window is open and idle-listening. The notice follows
-the voice selected inside Voice Presence. It is suppressed while Presence is
+Voice Presence is optional for delivery. When it is closed, eligible completion
+or priority events can use one pre-generated F3 or M3 notice. When it is
 hearing, thinking, speaking, paused, failed, or holding the natural follow-up
-window. Chat voice round-trips do not receive a second spoken-ready notice.
+window, Notification Center preserves an eligible cue but suppresses speech to
+avoid overlap. Chat voice round-trips do not receive a second spoken-ready
+notice.
 
-Music candidates, visual candidates, and lyric analyses use reusable phrases;
-no synthesis runtime is started for notifications. The wake cue is similarly
-pre-generated and distinct from Dashboard submission and completion cues.
-There is no polling, notification watcher, IPC listener, or new service.
+Music candidates, visual candidates, lyric analyses, fleet attention, backup
+state, and generic Wazuh attention use allowlisted reusable phrases; no
+synthesis runtime is started for notifications. A separate local graphical-
+session service may observe reviewed desktop-notification metadata while
+Noctalia remains the visual authority. It retains no title, body, image,
+action, or history and has no network, Core, model, reply, or system-mutation
+authority. See `docs/soul/INDEPENDENT_NOTIFICATION_CENTER_A4_A6_BRIEF.md`.
 Destructive work, Core mutation, publication, generation, and privileged
 operations retain their existing preview or approval boundary. A voice request
 that needs another Core must explain the need and follow ordinary

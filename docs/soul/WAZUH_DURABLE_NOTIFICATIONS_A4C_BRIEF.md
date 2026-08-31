@@ -22,8 +22,10 @@ or remediation authority.
 ## Delivery contract
 
 - Voice notification is disabled by default in the private manifest.
-- Delivery requires the visible Voice Presence window to be running and in
-  idle `listening` state.
+- A4-A6 supersedes the original delivery dependency: the independent
+  Notification Center accepts the generic event while Voice Presence is
+  closed. Active Voice Presence suppresses only overlapping speech; the static
+  cue remains eligible.
 - A 15-minute cooldown batches new events and prevents alert storms from
   repeatedly speaking.
 - F3 and M3 use static tracked WAV files saying only that Soul detected a

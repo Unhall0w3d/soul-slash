@@ -34,7 +34,9 @@ on-access scanner. Official signatures update once daily through the packaged
 4. ClamAV A3 — bounded manual ingress scan and Wazuh log collection.
 5. Soul A4a — least-privilege server-API health on Maintenance cards and Local Topology.
 6. Soul A4b — bounded read-only indexer alert evidence through a restricted tunnel.
-7. Soul A4c — durable high-priority cursor and optional static voice notification.
+7. Soul A4c — durable high-priority cursor routed through the independent
+   static Notification Center; Voice Presence is not required and grants no
+   remediation authority.
 8. Soul A4d — owner-reviewed workstation interpretation beside the unchanged raw Wazuh SCA result.
 9. Soul A4e — privacy-filtered read-only Chat/Voice status invocation over the accepted projections.
 

@@ -122,6 +122,23 @@
       "notes": "Production retrieval, visual review, human Voice semantic recall, negative abstention, no canonical/projection mutation, and automatic projection reconciliation are complete. General wake reliability remains a separate Voice Presence concern."
     },
     {
+      "item_id": "track_independent_notification_center_a4_a6",
+      "title": "Independent local Notification Center A4-A6",
+      "area": "Conversation + Desktop Integration + Security",
+      "horizon": "now",
+      "status": "needs_review",
+      "priority": "high",
+      "summary": "Separate static notification delivery and desktop metadata observation from whether Voice Presence is open.",
+      "acceptance": "Exact service installation, closed-Presence Dashboard delivery, active-Presence speech-collision suppression, urgent desktop metadata delivery, mode/voice persistence, deduplication, and Operator audio review pass without changing Noctalia or granting action authority.",
+      "source": "Operator-approved notification separation, 2026-08-31",
+      "implementation": "One local graphical-session Notification Center owns allowlisted static playback, mode and voice settings, hashed deduplication, and the metadata-only D-Bus observer. Dashboard and Wazuh share the service; Voice Presence publishes only collision state.",
+      "technologies": "Ruby; Python; systemd user service; D-Bus monitor; PipeWire pw-play; authenticated Dashboard JavaScript; owner-private JSON state",
+      "interfaces": "Dashboard notification selector and events; generic Wazuh alert timer; Noctalia-compatible desktop notifications; exact Make deployment targets",
+      "commands": "make verify-notification-center\nmake verify-notification-cues\nmake notification-center-plan",
+      "references": "docs/soul/INDEPENDENT_NOTIFICATION_CENTER_A4_A6_BRIEF.md\ndocs/assessments/INDEPENDENT_NOTIFICATION_CENTER_A4_A6_REVIEW.md\ndocs/guides/VOICE_PRESENCE.md",
+      "notes": "Candidate-complete repository work is pending exact digest installation and live Operator listening acceptance. Dynamic content, remote push, reply actions, and notification-triggered mutation remain excluded."
+    },
+    {
       "item_id": "track_wazuh_clamav_security",
       "title": "Roll out Wazuh and selective ClamAV security monitoring",
       "area": "Administration + Security",
