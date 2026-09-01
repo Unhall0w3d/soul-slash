@@ -36,6 +36,17 @@ module SoulCore
       printf '\n__SOUL_MERLIN__lsmod\n'; /sbin/lsmod
       printf '\n__SOUL_MERLIN__jffs_script_count\n'; /usr/bin/find /jffs/scripts -mindepth 1 -maxdepth 1 -type f -print 2>/dev/null | /usr/bin/wc -l
       printf '\n__SOUL_MERLIN__jffs_config_count\n'; /usr/bin/find /jffs/configs -mindepth 1 -maxdepth 1 -type f -print 2>/dev/null | /usr/bin/wc -l
+      printf '\n__SOUL_MERLIN__entware_present\n'; if [ -x /opt/bin/opkg ]; then printf '1\n'; else printf '0\n'; fi
+      printf '\n__SOUL_MERLIN__entware_version\n'; if [ -x /opt/bin/opkg ]; then /opt/bin/opkg --version 2>/dev/null | /usr/bin/head -n 1; fi
+      printf '\n__SOUL_MERLIN__entware_installed_count\n'; if [ -x /opt/bin/opkg ]; then /opt/bin/opkg list-installed 2>/dev/null | /usr/bin/wc -l; else printf '0\n'; fi
+      printf '\n__SOUL_MERLIN__entware_upgradable_count\n'; if [ -x /opt/bin/opkg ]; then /opt/bin/opkg list-upgradable 2>/dev/null | /usr/bin/wc -l; else printf '0\n'; fi
+      printf '\n__SOUL_MERLIN__swap_summary\n'; /usr/bin/awk 'NR > 1 { count++; total += $3; used += $4 } END { print count + 0, total + 0, used + 0 }' /proc/swaps
+      printf '\n__SOUL_MERLIN__usb_storage_summary\n'; /bin/df -Pk 2>/dev/null | /usr/bin/awk '$6 ~ /^\/tmp\/mnt\// { count++; total += $2; used += $3; available += $4 } END { print count + 0, total + 0, used + 0, available + 0 }'
+      printf '\n__SOUL_MERLIN__firmware_state_flag\n'; /usr/sbin/nvram get webs_state_flag
+      printf '\n__SOUL_MERLIN__firmware_state_update\n'; /usr/sbin/nvram get webs_state_update
+      printf '\n__SOUL_MERLIN__firmware_state_error\n'; /usr/sbin/nvram get webs_state_error
+      printf '\n__SOUL_MERLIN__firmware_state_info\n'; /usr/sbin/nvram get webs_state_info
+      for tool in jq dig tcpdump htop iperf3 bash tmux; do printf '\n__SOUL_MERLIN__tool_%s\n' "$tool"; if [ -x "/opt/bin/$tool" ]; then printf '1\n'; else printf '0\n'; fi; done
       printf '\n__SOUL_MERLIN__complete\n1\n'; exit 0
     SH
     REMOTE_COMMAND = "/bin/sh -c #{Shellwords.escape(REMOTE_SCRIPT)}".freeze
@@ -75,6 +86,19 @@ module SoulCore
       temperatures = parse_temperatures(fields["temperatures"])
       scripts = integer(fields["jffs_script_count"])
       configs = integer(fields["jffs_config_count"])
+      entware = parse_entware(fields)
+      swap = parse_swap(fields["swap_summary"])
+      usb_storage = parse_usb_storage(fields["usb_storage_summary"])
+      firmware_check = parse_firmware_check(fields)
+      toolbox = %w[jq dig tcpdump htop iperf3 bash tmux].to_h { |tool| [tool, fields["tool_#{tool}"] == "1"] }
+      diagnostic_health = diagnostics(
+        memory: memory,
+        jffs: jffs,
+        temperatures: temperatures,
+        entware: entware,
+        swap: swap,
+        firmware_check: firmware_check
+      )
       qos = {
         "enabled" => fields["qos_enable"] == "1",
         "type" => safe_text(fields["qos_type"], 32),
@@ -88,7 +112,7 @@ module SoulCore
         "available" => true,
         "state" => "available",
         "reachable" => true,
-        "healthy" => true,
+        "healthy" => diagnostic_health.fetch("state") == "healthy",
         "model" => safe_text(product, 80),
         "firmware_version" => firmware,
         "bootloader_version" => safe_text(fields["bl_version"], 40),
@@ -103,6 +127,12 @@ module SoulCore
         "ctf" => {"disabled" => ctf_disabled, "module_loaded" => ctf_loaded, "active" => !ctf_disabled && ctf_loaded},
         "custom_scripts_enabled" => fields["jffs2_scripts"] == "1",
         "custom_scripts_configured" => fields["jffs2_scripts"] == "1",
+        "entware" => entware,
+        "swap" => swap,
+        "usb_storage" => usb_storage,
+        "firmware_check" => firmware_check,
+        "toolbox" => toolbox,
+        "diagnostics" => diagnostic_health,
         "evidence" => {"status" => result.status, "exit_status" => result.exit_status, "truncated" => result.truncated == true}
       }
     rescue StandardError => error
@@ -162,6 +192,55 @@ module SoulCore
         match = line.match(/\A\s*([^:]+):\s*(-?\d+(?:\.\d+)?)\s*[^0-9\r\n]*C/i)
         {"sensor" => safe_text(match[1], 40), "celsius" => match[2].to_f} if match
       end.first(8)
+    end
+
+    def parse_entware(fields)
+      {
+        "available" => fields["entware_present"] == "1",
+        "version" => safe_text(fields["entware_version"], 120),
+        "installed_count" => integer(fields["entware_installed_count"]),
+        "upgradable_count" => integer(fields["entware_upgradable_count"]),
+        "metadata_freshness" => "cached_local_lists"
+      }
+    end
+
+    def parse_swap(raw)
+      count, total, used = raw.to_s.split.first(3).map { |value| integer(value) }
+      {"device_count" => count, "total_kb" => total, "used_kb" => used, "available_kb" => [total - used, 0].max}
+    end
+
+    def parse_usb_storage(raw)
+      count, total, used, available = raw.to_s.split.first(4).map { |value| integer(value) }
+      {"filesystem_count" => count, "total_kb" => total, "used_kb" => used, "available_kb" => available}
+    end
+
+    def parse_firmware_check(fields)
+      {
+        "flag" => safe_text(fields["firmware_state_flag"], 32),
+        "update_signal" => safe_text(fields["firmware_state_update"], 32),
+        "error_code" => safe_text(fields["firmware_state_error"], 32),
+        "reported_identity" => safe_text(fields["firmware_state_info"], 80),
+        "update_available" => nil,
+        "interpretation" => "raw_vendor_state_only"
+      }
+    end
+
+    def diagnostics(memory:, jffs:, temperatures:, entware:, swap:, firmware_check:)
+      findings = []
+      total_memory = memory["total_kb"].to_i
+      findings << finding("memory_pressure", "Available memory is at or below 10 percent.") if total_memory.positive? && memory["available_kb"].to_i * 10 <= total_memory
+      findings << finding("jffs_capacity", "JFFS use is at or above 90 percent.") if jffs["use_percent"].to_i >= 90
+      findings << finding("temperature", "A reported temperature is at or above 85 C.") if temperatures.any? { |sensor| sensor["celsius"].to_f >= 85.0 }
+      findings << finding("entware_updates", "Cached Entware metadata reports upgrades.") if entware["upgradable_count"].to_i.positive?
+      total_swap = swap["total_kb"].to_i
+      findings << finding("swap_pressure", "Swap use is at or above 90 percent.") if total_swap.positive? && swap["used_kb"].to_i * 10 >= total_swap * 9
+      error_code = firmware_check["error_code"].to_s
+      findings << finding("firmware_check_error", "The router reports a nonzero firmware-check error code.") unless error_code.empty? || error_code == "0"
+      {"state" => findings.empty? ? "healthy" : "attention", "findings" => findings, "finding_count" => findings.length}
+    end
+
+    def finding(code, summary)
+      {"code" => code, "summary" => summary}
     end
 
     def integer(value)

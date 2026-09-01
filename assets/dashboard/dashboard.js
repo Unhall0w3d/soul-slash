@@ -3735,6 +3735,13 @@ function renderMaintenanceDevice(device) {
   const packageManagers = Array.isArray(device.facts?.package_managers) ? device.facts.package_managers : [];
   const readOnlyStatus = inventoryOnly && ["dnf5_read_only", "proxmox_read_only"].includes(device.facts?.status_adapter);
   const snmpSwitch = device.facts?.status_adapter === "managed_switch_snmp_read_only";
+  const merlinGateway = device.facts?.status_adapter === "asuswrt_merlin_read_only";
+  const merlinEntware = device.facts?.entware || {};
+  const merlinSwap = device.facts?.swap || {};
+  const merlinStorage = device.facts?.usb_storage || {};
+  const merlinFirmware = device.facts?.firmware_check || {};
+  const merlinDiagnostics = device.facts?.diagnostics || {};
+  const formatKib = (value) => Number.isFinite(Number(value)) ? `${(Number(value) / 1024 / 1024).toFixed(1)} GiB` : "unavailable";
   const facts = [
     ...(device.facts?.fqdn ? [["Identity", device.facts.fqdn]] : []),
     ...(snmpSwitch && device.facts?.system_name ? [["SNMP identity", device.facts.system_name]] : []),
@@ -3751,6 +3758,14 @@ function renderMaintenanceDevice(device) {
       ["Physical ports", `${device.facts?.active_port_count || 0} active · ${device.facts?.port_count || 0} inventoried`],
       ["Interface counters", `${device.facts?.error_port_count || 0} ports report cumulative errors`],
       ["Event path", "bounded polling · traps not ingested"]
+    ] : []),
+    ...(merlinGateway ? [
+      ["Firmware check", `${merlinFirmware.reported_identity || "unavailable"} · flag ${merlinFirmware.flag || "—"} · update signal ${merlinFirmware.update_signal || "—"} · error ${merlinFirmware.error_code || "—"} · raw vendor state`],
+      ["Entware", merlinEntware.available === true ? `${merlinEntware.installed_count ?? 0} installed · ${merlinEntware.upgradable_count ?? 0} cached upgrades · ${merlinEntware.version || "version unavailable"}` : "not present"],
+      ["Swap", `${merlinSwap.device_count ?? 0} device${merlinSwap.device_count === 1 ? "" : "s"} · ${formatKib(merlinSwap.used_kb)} used of ${formatKib(merlinSwap.total_kb)}`],
+      ["USB storage", `${merlinStorage.filesystem_count ?? 0} filesystem${merlinStorage.filesystem_count === 1 ? "" : "s"} · ${formatKib(merlinStorage.used_kb)} used of ${formatKib(merlinStorage.total_kb)}`],
+      ["Diagnostic health", `${String(merlinDiagnostics.state || "unavailable").replaceAll("_", " ")} · ${merlinDiagnostics.finding_count ?? 0} bounded findings`],
+      ["Toolbox", Object.entries(device.facts?.toolbox || {}).filter(([, available]) => available === true).map(([tool]) => tool).join(" · ") || "none detected"]
     ] : []),
     ["Checked", observedLabel]
   ];
@@ -3804,7 +3819,9 @@ function renderMaintenanceDevice(device) {
         ? `${device.facts?.status_adapter === "proxmox_read_only" ? "Proxmox" : "DNF5"} evidence only · maintenance and reboot authority remain disabled`
         : (device.facts?.management_channel === "host_local_inventory"
           ? "Host-local inventory only · no guest mutation or LAN authority"
-          : "Inventory only · discovered capabilities grant no mutation authority"));
+          : (merlinGateway
+            ? "ASUSWRT-Merlin evidence only · package, firmware, configuration, maintenance, and reboot authority remain disabled"
+            : "Inventory only · discovered capabilities grant no mutation authority")));
     actions.append(notice);
     if (snmpSwitch && device.facts?.management_url) {
       const management = document.createElement("a"); management.className = "quiet-button maintenance-management-link";

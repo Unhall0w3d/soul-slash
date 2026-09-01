@@ -870,7 +870,13 @@ module SoulCore
         "qos" => inventory["qos"],
         "ctf" => inventory["ctf"],
         "custom_scripts_enabled" => inventory["custom_scripts_enabled"],
-        "custom_scripts_configured" => inventory["custom_scripts_configured"]
+        "custom_scripts_configured" => inventory["custom_scripts_configured"],
+        "entware" => inventory["entware"],
+        "swap" => inventory["swap"],
+        "usb_storage" => inventory["usb_storage"],
+        "firmware_check" => inventory["firmware_check"],
+        "toolbox" => inventory["toolbox"],
+        "diagnostics" => inventory["diagnostics"]
       )
       @evidence << {
         "adapter" => "asuswrt_merlin.read_only",
@@ -891,6 +897,14 @@ module SoulCore
         {"id" => "ssh_inventory", "label" => "SSH inventory", "state" => "active"},
         {"id" => "asuswrt_merlin_inventory", "label" => "Asuswrt-Merlin read-only inventory", "state" => "active"}
       ]
+      if inventory.dig("entware", "available")
+        services << {"id" => "entware_inventory", "label" => "Entware cached inventory", "state" => "active"}
+      end
+      upgrade_count = inventory.dig("entware", "upgradable_count").to_i
+      update_channels = inventory.dig("entware", "available") ? [
+        {"id" => "entware", "label" => "Entware", "manager" => "opkg", "status" => "complete", "count" => upgrade_count}
+      ] : []
+      health_state = inventory.dig("diagnostics", "state") == "attention" || upgrade_count.positive? ? "updates_available" : "healthy"
       device(
         id: record.fetch("id"),
         label: record.fetch("label"),
@@ -900,12 +914,12 @@ module SoulCore
         os: "ASUSWRT-Merlin",
         version: inventory["firmware_version"],
         kernel: {"running" => inventory["kernel"], "available" => "not_assessed", "update_required" => false},
-        updates: update_summary(freshness: "not_queried"),
+        updates: update_summary(channels: update_channels, freshness: update_channels.empty? ? "not_queried" : "cached_entware_metadata"),
         reboot: {"required" => false, "reason" => "not assessed · inventory only"},
         services: services,
         facts: enriched.merge("reachability" => "reachable"),
         control: "inventory_only",
-        status: "healthy"
+        status: health_state
       )
     end
 
