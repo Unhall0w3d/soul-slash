@@ -104,13 +104,16 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
 
   %w[
     Documents Music Pictures Videos Servers Tools Projects ComSource
-    Anbernic OneDrive Scripts Templates
+    Anbernic Applications Cisco OneDrive Scripts Templates
   ].each do |directory|
     path = File.join(home, directory)
     FileUtils.mkdir_p(path)
     File.write(File.join(path, "fixture.txt"), "#{directory}\n")
   end
-  %w[hypr noctalia fastfetch kitty systemd].each do |directory|
+  %w[
+    JetBrains blender codex-desktop corectrl fastfetch gpu-screen-recorder
+    hypr kate kitty noctalia opera-gx soul systemd
+  ].each do |directory|
     path = File.join(home, ".config", directory)
     FileUtils.mkdir_p(path)
     File.write(File.join(path, "fixture.conf"), "#{directory}\n")
@@ -118,7 +121,13 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
   [
     File.join(home, ".config", "gtk-3.0", "settings.ini"),
     File.join(home, ".config", "MangoHud", "MangoHud.conf"),
+    File.join(home, ".config", "Epic", "UnrealEngine", "5.8", "Config", "DefaultEngine.ini"),
+    File.join(home, ".config", "Raspberry Pi", "settings.conf"),
+    File.join(home, ".config", "Unreal Engine", "settings.conf"),
     File.join(home, ".config", "dolphinrc"),
+    File.join(home, ".local", "share", "lutris", "games", "fixture.yml"),
+    File.join(home, ".local", "share", "lutris", "lutris.conf"),
+    File.join(home, ".local", "share", "lutris", "pga.db"),
     File.join(home, ".local", "share", "Steam", "userdata", "fixture", "save.dat"),
     File.join(home, ".local", "share", "Larian Studios", "fixture", "save.dat")
   ].each do |path|
@@ -132,6 +141,13 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
     File.join(home, ".config", "gh", "hosts.yml"),
     File.join(home, ".config", "credstore.encrypted", "fixture.cred"),
     File.join(home, ".codex", "auth.json"),
+    File.join(home, ".codex", "archived_sessions", "fixture.jsonl"),
+    File.join(home, ".codex", "generated_images", "fixture.png"),
+    File.join(home, ".codex", "memories", "MEMORY.md"),
+    File.join(home, ".ollama", "history"),
+    File.join(home, ".ollama", "id_ed25519"),
+    File.join(home, ".ollama", "id_ed25519.pub"),
+    File.join(home, ".ollama", "models", "manifests", "registry.ollama.ai", "fixture"),
     File.join(home, ".pki", "fixture.pem"),
     File.join(home, ".zshrc")
   ].each do |path|
@@ -144,6 +160,15 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
   File.write(File.join(home, "Projects", "application", "target", "generated.bin"), "generated\n")
   FileUtils.mkdir_p(File.join(home, "Projects", "soul"))
   File.write(File.join(home, "Projects", "soul", "private.txt"), "separate continuity\n")
+  [
+    File.join(home, "Games", "ascension-wow", "drive_c", "Program Files", "Ascension Launcher", "resources", "ascension-live", "Interface", "AddOns", "fixture.lua"),
+    File.join(home, "Games", "ascension-wow", "drive_c", "Program Files", "Ascension Launcher", "resources", "ascension-live", "WTF", "fixture.lua")
+  ].each do |path|
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, "fixture\n")
+  end
+  FileUtils.mkdir_p(File.join(home, ".config", "opera-gx", "Default", "Cache"))
+  File.write(File.join(home, ".config", "opera-gx", "Default", "Cache", "cache.bin"), "reproducible\n")
 
   [
     "boot/limine.conf",
@@ -171,7 +196,7 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
   summary = policy.summary
 
   check.call("personal media and requested workstation folders are selected",
-             %w[Music Pictures Videos Documents Servers Tools Projects].all? do |name|
+             %w[Applications Cisco Music Pictures Videos Documents Servers Tools Projects].all? do |name|
                sources.include?(File.join(home, name))
              end)
   check.call("Hyprland Noctalia shell and private recovery state are selected",
@@ -188,6 +213,18 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                sources.include?(File.join(home, ".local", "share", "Steam", "userdata")) &&
                sources.include?(File.join(home, ".local", "share", "Larian Studios")) &&
                !sources.include?(File.join(home, ".local", "share", "Steam")))
+  check.call("migration-specific Codex browser creator and game state are selected selectively",
+             %w[archived_sessions generated_images memories].all? do |name|
+               sources.include?(File.join(home, ".codex", name))
+             end &&
+               sources.include?(File.join(home, ".config", "opera-gx")) &&
+               sources.include?(File.join(home, ".config", "soul")) &&
+               sources.include?(File.join(home, ".config", "Epic", "UnrealEngine", "5.8", "Config", "DefaultEngine.ini")) &&
+               sources.include?(File.join(home, ".local", "share", "lutris", "pga.db")) &&
+               sources.include?(File.join(home, ".ollama", "models", "manifests")) &&
+               %w[Interface/AddOns WTF].all? do |suffix|
+                 sources.any? { |path| path.end_with?("ascension-live/#{suffix}") }
+               end)
   check.call("readable host rebuild evidence is selected",
              sources.include?(File.join(system_root, "etc", "fstab")) &&
                sources.include?(File.join(system_root, "etc", "lact", "config.yaml")) &&
@@ -207,8 +244,13 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                exclusions.include?(File.join(home, ".config", "qBittorrent", "ipc-socket")) &&
                exclusions.include?(File.join(home, "Projects", "soul", "**")) &&
                exclusions.include?(File.join(home, "Knowledge", "soul-vault", "**")))
+  check.call("Opera GX transient caches and active Codex sessions remain excluded",
+             exclusions.include?(File.join(home, ".codex", "sessions", "**")) &&
+               exclusions.include?(File.join(home, ".config", "opera-gx", "**", "Cache", "**")) &&
+               exclusions.include?(File.join(home, ".config", "opera-gx", "**", "Service Worker", "CacheStorage", "**")) &&
+               exclusions.include?(File.join(home, ".config", "opera-gx", "SingletonSocket")))
   check.call("ambiguous and privileged gaps remain explicit",
-             summary["explicit_manual_review_gaps"].include?("browser profiles and session stores") &&
+             summary["explicit_manual_review_gaps"].include?("browser profiles other than selected Opera GX state and active Codex session stores") &&
                summary["explicit_manual_review_gaps"].include?("root-only NetworkManager connection profiles"))
 
   script = File.expand_path("soul-backup-config", __dir__)

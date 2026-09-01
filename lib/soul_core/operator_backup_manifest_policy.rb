@@ -10,6 +10,8 @@ module SoulCore
 
     USER_DATA_DIRECTORIES = %w[
       Anbernic
+      Applications
+      Cisco
       ComSource
       Desktop
       Documents
@@ -30,20 +32,26 @@ module SoulCore
     ].freeze
 
     CONFIG_DIRECTORIES = %w[
+      JetBrains
       MangoHud
       SoulSlash
       alacritty
       autostart
+      blender
       btop
       cachyos
+      codex-desktop
+      corectrl
       dconf
       fastfetch
       fish
       gh
+      gpu-screen-recorder
       goverlay
       gtk-3.0
       gtk-4.0
       hypr
+      kate
       kitty
       lact
       libfm
@@ -51,11 +59,13 @@ module SoulCore
       mpv
       noctalia
       obsidian
+      opera-gx
       pcmanfm
       pipewire
       qBittorrent
       qt5ct
       qt6ct
+      soul
       systemd
       uwsm
       vkSumi
@@ -116,6 +126,21 @@ module SoulCore
         File.join(@home, "Music", "soul-music", "**"),
         File.join(@home, "Projects", "soul", "**"),
         File.join(@home, ".codex", "sessions", "**"),
+        File.join(@home, ".config", "opera-gx", "**", "Cache", "**"),
+        File.join(@home, ".config", "opera-gx", "**", "Code Cache", "**"),
+        File.join(@home, ".config", "opera-gx", "**", "GPUCache", "**"),
+        File.join(@home, ".config", "opera-gx", "**", "Service Worker", "CacheStorage", "**"),
+        File.join(@home, ".config", "opera-gx", "Crash Reports", "**"),
+        File.join(@home, ".config", "opera-gx", "GPUPersistentCache", "**"),
+        File.join(@home, ".config", "opera-gx", "GraphiteDawnCache", "**"),
+        File.join(@home, ".config", "opera-gx", "GrShaderCache", "**"),
+        File.join(@home, ".config", "opera-gx", "ShaderCache", "**"),
+        File.join(@home, ".config", "opera-gx", "Safe Browsing", "**"),
+        File.join(@home, ".config", "opera-gx", "component_crx_cache", "**"),
+        File.join(@home, ".config", "opera-gx", "SingletonCookie"),
+        File.join(@home, ".config", "opera-gx", "SingletonLock"),
+        File.join(@home, ".config", "opera-gx", "SingletonSocket"),
+        File.join(@home, ".config", "opera-gx", "oauc_pipe"),
         File.join(@home, ".local", "state", "noctalia", "clipboard", "**"),
         File.join(@home, ".local", "state", "noctalia", "notification_history_assets", "**"),
         File.join(@home, ".local", "state", "noctalia", "plugin-cache", "**"),
@@ -143,7 +168,7 @@ module SoulCore
           {"label" => label, "path" => path, "selected" => sources.include?(path)}
         end,
         "explicit_manual_review_gaps" => [
-          "browser profiles and session stores",
+          "browser profiles other than selected Opera GX state and active Codex session stores",
           "Downloads and recovered-file holding areas",
           "WinBoat container disk images",
           "root-only NetworkManager connection profiles",
@@ -176,8 +201,14 @@ module SoulCore
         File.join(@home, ".codex", "auth.json"),
         File.join(@home, ".codex", "config.toml"),
         File.join(@home, ".codex", "agents"),
+        File.join(@home, ".codex", "archived_sessions"),
+        File.join(@home, ".codex", "generated_images"),
+        File.join(@home, ".codex", "memories"),
         File.join(@home, ".codex", "rules"),
         File.join(@home, ".codex", "skills"),
+        File.join(@home, ".config", "Epic", "UnrealEngine", "5.8", "Config", "DefaultEngine.ini"),
+        File.join(@home, ".config", "Raspberry Pi"),
+        File.join(@home, ".config", "Unreal Engine"),
         File.join(@home, ".config", "VSCodium", "User"),
         File.join(@home, ".config", "credstore.encrypted"),
         File.join(@home, ".config", "vkBasalt", "vkBasalt.conf"),
@@ -198,6 +229,9 @@ module SoulCore
         File.join(@home, ".local", "share", "icons"),
         File.join(@home, ".local", "share", "keyrings"),
         File.join(@home, ".local", "share", "Larian Studios"),
+        File.join(@home, ".local", "share", "lutris", "games"),
+        File.join(@home, ".local", "share", "lutris", "lutris.conf"),
+        File.join(@home, ".local", "share", "lutris", "pga.db"),
         File.join(@home, ".local", "share", "qBittorrent", "BT_backup"),
         File.join(@home, ".local", "share", "qalculate"),
         File.join(@home, ".local", "share", "Steam", "userdata"),
@@ -206,6 +240,12 @@ module SoulCore
         File.join(@home, ".local", "state", "noctalia"),
         File.join(@home, ".local", "state", "soul"),
         File.join(@home, ".local", "state", "wireplumber"),
+        File.join(@home, ".ollama", "history"),
+        File.join(@home, ".ollama", "id_ed25519"),
+        File.join(@home, ".ollama", "id_ed25519.pub"),
+        File.join(@home, ".ollama", "models", "manifests"),
+        File.join(@home, "Games", "ascension-wow", "drive_c", "Program Files", "Ascension Launcher", "resources", "ascension-live", "Interface", "AddOns"),
+        File.join(@home, "Games", "ascension-wow", "drive_c", "Program Files", "Ascension Launcher", "resources", "ascension-live", "WTF"),
         File.join(@home, ".var", "app", "dev.vencord.Vesktop", "config"),
         system_path("boot/limine.conf"),
         system_path("etc/fstab"),

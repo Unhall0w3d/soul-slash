@@ -118,7 +118,9 @@ other named home folders; selected application configuration under
 `~/.config`; shell, Git, terminal, SSH, GnuPG, keyring, Codex, Noctalia,
 desktop/theming, gaming-overlay, and WinBoat state needed to recreate this
 workstation; selected local game-save/userdata and qBittorrent resume state;
-and readable host-rebuild evidence such as package inventory, boot
+Codex memories, archived sessions, and generated images; the selected Opera GX
+profile with transient caches and live singleton artifacts excluded; and
+readable host-rebuild evidence such as package inventory, boot
 configuration, systemd units, udev rules, and the LACT fan curve. Large
 reproducible build trees, caches, virtual environments, `node_modules`, Rust
 `target` trees, Steam game installations, Soul's separately protected
@@ -153,10 +155,11 @@ or password-vault recovery path; storing it only inside its own encrypted
 backup would be circular and unusable.
 
 The following remain explicit manual-review gaps rather than silent coverage:
-browser profiles/session stores, Downloads and recovered-file holding areas,
-WinBoat disk images, root-only NetworkManager profiles, and cloud-synchronized
-password-vault contents. The plan lists only paths that exist, are readable,
-and are not symlinks; review it before configuration.
+browser profiles other than the selected Opera GX state, active Codex sessions,
+Downloads and recovered-file holding areas, WinBoat disk images, root-only
+NetworkManager profiles, and cloud-synchronized password-vault contents. The
+plan lists only paths that exist, are readable, and are not symlinks; review it
+before configuration.
 
 The source file is an allow-list, not a whole-home backup. The default
 exclusions omit session state, approval tokens, temporary files, and staged
@@ -179,6 +182,9 @@ absent from the public repository:
   `~/Knowledge/soul-vault`;
 - durable application receipts, artifact inbox state, executions, exports,
   creative-flow continuity, and YouTube authorization/description-sync state.
+- retained Blender Visual, Vulkan music-pilot, and Visual Motion run outputs
+  under `~/.local/share/soul`; model weights, helper environments, source
+  checkouts, and build trees beside them remain reproducible and excluded.
 
 The Knowledge Vault's private Git repository is supplementary version history.
 It does not replace inclusion of the local Vault in encrypted Restic snapshots.
