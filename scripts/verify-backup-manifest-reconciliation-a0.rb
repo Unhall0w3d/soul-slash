@@ -44,13 +44,24 @@ Dir.mktmpdir("soul-backup-manifest-reconciliation-") do |root|
     File.join(root, "Soul", "runtime", "creative_flows", "state.json"),
     File.join(root, "Soul", "runtime", "youtube_auth", "state.json"),
     File.join(root, "Soul", "runtime", "youtube_description_sync", "state.json"),
-    File.join(root, "Knowledge", "soul-vault", "README.md")
+    File.join(root, "Knowledge", "soul-vault", "README.md"),
+    File.join(root, ".local", "share", "soul", "blender-visual", "runs", "fixture.json"),
+    File.join(root, ".local", "share", "soul", "music", "vulkan-pilot-runs", "fixture.json"),
+    File.join(root, ".local", "share", "soul", "visual-motion", "runs", "fixture.json")
   ].each do |path|
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, "{}\n")
   end
 
   policy = SoulCore::BackupManifestPolicy.new(root: root, home: root)
+  durable_local_run_roots = [
+    File.join(root, ".local", "share", "soul", "blender-visual", "runs"),
+    File.join(root, ".local", "share", "soul", "music", "vulkan-pilot-runs"),
+    File.join(root, ".local", "share", "soul", "visual-motion", "runs")
+  ]
+  check.call("durable local Soul run outputs are selected without whole runtime trees",
+             durable_local_run_roots.all? { |path| policy.sources.include?(path) } &&
+               !policy.sources.include?(File.join(root, ".local", "share", "soul")))
   new_sources = %w[creative_flows youtube_auth youtube_description_sync].map { |name| File.join(root, "Soul", "runtime", name) }
   initial_sources = policy.sources - new_sources
   dynamic_exclusions = policy.exclusions.select { |line| line.start_with?(root) } -

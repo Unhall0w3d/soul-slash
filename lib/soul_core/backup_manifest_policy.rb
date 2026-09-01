@@ -51,6 +51,9 @@ module SoulCore
         File.join(@home, "Music", "soul-music"),
         File.join(@home, "Knowledge", "soul-vault"),
         File.join(@home, ".config", "soul"),
+        File.join(@home, ".local", "share", "soul", "blender-visual", "runs"),
+        File.join(@home, ".local", "share", "soul", "music", "vulkan-pilot-runs"),
+        File.join(@home, ".local", "share", "soul", "visual-motion", "runs"),
         *Dir.glob(File.join(@home, ".config", "systemd", "user", "soul-*.service")).sort,
         File.join(@home, ".local", "share", "caddy")
       ]

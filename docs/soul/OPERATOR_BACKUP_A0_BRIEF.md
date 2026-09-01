@@ -29,6 +29,14 @@ without changing the approved Soul nightly DRS schedule.
 - Preserve outbound recovery material including SSH configuration, known-host
   evidence, private/public client keys, GnuPG, keyrings, GitHub CLI state, and
   encrypted credential stores inside the encrypted snapshot.
+- Preserve selected migration-critical workstation state: Codex memories,
+  archived sessions and generated images; the Opera GX profile without caches
+  or live singleton artifacts; selected creator-tool settings; Lutris state;
+  Ollama identity, history, and model manifests without model blobs; and the
+  named non-Steam game configuration paths.
+- Keep Downloads, recovered-file holding areas, WinBoat disks, Unreal project
+  and engine bulk data, and Trellis bulk data outside the automatic Operator
+  allow-list until separately reviewed or copied to migration media.
 
 ## Human review boundary
 
@@ -36,3 +44,7 @@ Manifest configuration is candidate-complete only after the generated exact
 source and exclusion lists are reviewed. Backup coverage is not proven until a
 fresh Operator snapshot and its exact Crucible lineage both verify. Staged
 restore never promotes files into the live home or system tree.
+
+The 2026-09-01 migration-readiness extension was explicitly authorized by the
+Operator. It changes tracked policy only; it does not authorize live manifest
+reconciliation, a backup capture, retention, restore, or deletion.
