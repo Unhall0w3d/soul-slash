@@ -1431,6 +1431,10 @@ verify-winboat-inventory:
 verify-managed-switch-snmp-inventory:
 > @ruby scripts/verify-managed-switch-snmp-inventory-a1.rb
 
+.PHONY: verify-asuswrt-merlin-gateway
+verify-asuswrt-merlin-gateway:
+> @ruby scripts/verify-asuswrt-merlin-gateway-a2.rb
+
 lattice-snmp-check:
 > @ruby scripts/soul-lattice-snmp-check
 

@@ -85,6 +85,40 @@ class MerlinFakeRunner
       #{@include_optional ? "1\n" : "0\n"}
       __SOUL_MERLIN__jffs_config_count
       #{@include_optional ? "1\n" : "0\n"}
+      __SOUL_MERLIN__entware_present
+      1
+      __SOUL_MERLIN__entware_version
+      opkg version fixture
+      __SOUL_MERLIN__entware_installed_count
+      39
+      __SOUL_MERLIN__entware_upgradable_count
+      0
+      __SOUL_MERLIN__swap_summary
+      1 1048572 0
+      __SOUL_MERLIN__usb_storage_summary
+      1 15480816 1177788 13516648
+      __SOUL_MERLIN__firmware_state_flag
+      0
+      __SOUL_MERLIN__firmware_state_update
+      1
+      __SOUL_MERLIN__firmware_state_error
+      0
+      __SOUL_MERLIN__firmware_state_info
+      3004_388_TEST
+      __SOUL_MERLIN__tool_jq
+      1
+      __SOUL_MERLIN__tool_dig
+      1
+      __SOUL_MERLIN__tool_tcpdump
+      1
+      __SOUL_MERLIN__tool_htop
+      1
+      __SOUL_MERLIN__tool_iperf3
+      1
+      __SOUL_MERLIN__tool_bash
+      1
+      __SOUL_MERLIN__tool_tmux
+      1
       __SOUL_MERLIN__complete
       1
     OUTPUT
@@ -120,7 +154,8 @@ Dir.mktmpdir("soul-merlin-inventory-") do |root|
   check.call("reviewed registry alias is collected through bounded SSH", inventory["available"] && call["argv"].include?("router-fixture") && call["argv"].last == SoulCore::AsuswrtMerlinInventoryAdapter::REMOTE_COMMAND && call.dig("options", :timeout_seconds) == 8 && call.dig("options", :max_output_bytes) == 32 * 1024)
   check.call("inventory facts are sanitized and useful", inventory["model"] == "RT-AX-TEST" && inventory["firmware_version"] == "3.0.0.4 · 388 · TEST" && inventory["kernel"] == "4.1.52" && inventory["hostname"] == "merlin-router-fixture" && inventory["uptime_seconds"] == 12345)
   check.call("memory, JFFS, temperatures, QoS, and acceleration are parsed", inventory.dig("memory", "total_kb") == 512000 && inventory.dig("jffs", "available_kb") == 61952 && inventory.dig("jffs", "custom_scripts") == 1 && inventory.dig("temperatures", 0, "celsius") == 73.0 && inventory.dig("qos", "configured_upload_kbps") == 50000 && inventory.dig("qos", "configured_download_kbps") == 500000 && inventory.dig("ctf", "active") == true && inventory["custom_scripts_configured"] == true)
-  check.call("no secrets, filenames, or unbounded NVRAM data are requested", !SoulCore::AsuswrtMerlinInventoryAdapter::REMOTE_SCRIPT.match?(/nvram\s+(show|dump)|wan_ip|wl.*(key|pass)|ssh.*key/i) && SoulCore::AsuswrtMerlinInventoryAdapter::REMOTE_SCRIPT.match?(/find .*\| \/usr\/bin\/wc -l/) && call["argv"].none? { |part| part.match?(/nvram\s+(show|dump)/i) })
+  check.call("Entware, swap, storage, firmware signals, toolbox, and diagnostics are bounded", inventory.dig("entware", "installed_count") == 39 && inventory.dig("entware", "upgradable_count") == 0 && inventory.dig("swap", "total_kb") == 1048572 && inventory.dig("usb_storage", "filesystem_count") == 1 && inventory.dig("firmware_check", "update_available").nil? && inventory.dig("firmware_check", "interpretation") == "raw_vendor_state_only" && inventory.dig("toolbox", "tcpdump") == true && inventory.dig("diagnostics", "state") == "healthy")
+  check.call("no secrets, filenames, package names, paths, or unbounded NVRAM data are requested", !SoulCore::AsuswrtMerlinInventoryAdapter::REMOTE_SCRIPT.match?(/nvram\s+(show|dump)|wan_ip|wl.*(key|pass)|ssh.*key|opkg\s+update/i) && SoulCore::AsuswrtMerlinInventoryAdapter::REMOTE_SCRIPT.match?(/find .*\| \/usr\/bin\/wc -l/) && call["argv"].none? { |part| part.match?(/nvram\s+(show|dump)/i) })
   before = runner.calls.length
   rejected = adapter.collect(ssh_alias: "-oProxyCommand=fixture")
   check.call("unsafe aliases are rejected without a probe", !rejected["available"] && rejected["reason"] == "invalid_ssh_alias" && runner.calls.length == before)
@@ -151,7 +186,7 @@ Dir.mktmpdir("soul-merlin-inventory-") do |root|
     "ssh_alias" => "router-fixture", "facts" => {}, "inventory_adapter" => "asuswrt_merlin"
   }
   projected = status_service.send(:collect_enrolled_device, record, schedule_recovery: false)
-  check.call("SSH inventory projection remains inventory-only", projected["control"] == "inventory_only" && projected.dig("facts", "mutation_supported") == false && projected.dig("facts", "status_adapter") == "asuswrt_merlin_read_only" && projected.dig("reboot", "required") == false && projected.dig("updates", "freshness") == "not_queried")
+  check.call("SSH inventory projection remains inventory-only", projected["control"] == "inventory_only" && projected.dig("facts", "mutation_supported") == false && projected.dig("facts", "status_adapter") == "asuswrt_merlin_read_only" && projected.dig("reboot", "required") == false && projected.dig("updates", "freshness") == "cached_entware_metadata" && projected.dig("updates", "total") == 0)
 end
 
 if errors.empty?
