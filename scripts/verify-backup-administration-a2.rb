@@ -20,13 +20,14 @@ end
 
 class BackupAdministrationFakeRunner
   attr_reader :calls
-  attr_accessor :mount_options, :mount_target
+  attr_accessor :mount_options, :mount_target, :du_bytes
 
   def initialize(mount:, source_root:)
     @mount = mount
     @source_root = source_root
     @mount_target = mount
     @mount_options = "rw,nosuid,nodev,noatime"
+    @du_bytes = 4096
     @calls = []
     @snapshots = %w[a b c].map.with_index do |letter, index|
       {
@@ -48,7 +49,7 @@ class BackupAdministrationFakeRunner
     captured_env = options[:env]&.transform_values { |value| value&.dup }
     @calls << { "argv" => argv, "env" => captured_env, "timeout" => options[:timeout_seconds] }
     return ok(JSON.generate("filesystems" => [{ "target" => @mount_target, "source" => "/dev/test1", "fstype" => "ext4", "options" => @mount_options }])) if argv.first == "findmnt"
-    return ok("4096 #{@source_root}\n") if argv.first == "du"
+    return ok("#{@du_bytes} #{@source_root}\n") if argv.first == "du"
     return ok("directory,souladmin,700\n") if argv.first == "ssh"
     return failed("unexpected command") unless argv.first == "restic"
 
@@ -222,6 +223,19 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
                preview.dig("data", "source_count") == 1 &&
                preview.dig("data", "prior_snapshot_id") == "c" * 64 &&
                preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/))
+
+  runner.du_bytes = 8192
+  resized_preview = service.backup_preview(password: password)
+  resized_drs = service.drs_preview(password: password)
+  runner.du_bytes = 16_384
+  resized_drs_again = service.drs_preview(password: password)
+  check.call("volatile size estimates remain visible without invalidating backup or DRS authority",
+             resized_preview.dig("data", "estimated_bytes") == 8192 &&
+               resized_preview.dig("data", "expected_digest") == preview.dig("data", "expected_digest") &&
+               resized_drs.dig("data", "local_capture", "data", "estimated_bytes") == 8192 &&
+               resized_drs_again.dig("data", "local_capture", "data", "estimated_bytes") == 16_384 &&
+               resized_drs.dig("data", "expected_digest") == resized_drs_again.dig("data", "expected_digest"))
+  runner.du_bytes = 4096
 
   wrong_gate = service.backup_execute(
     password: password, confirmation: "yes",

@@ -308,7 +308,7 @@ module SoulCore
         "automatic_retry" => false
       }
       complete("exact backup transaction prepared", scope.merge(
-        "expected_digest" => digest(scope), "confirmation_phrase" => @confirmations.fetch(:backup),
+        "expected_digest" => digest(confirmation_scope(scope)), "confirmation_phrase" => @confirmations.fetch(:backup),
         "password_retained" => false
       ))
     rescue ArgumentError => error
@@ -515,7 +515,7 @@ module SoulCore
         "password_retained" => false
       }
       complete("exact supervised DRS transaction prepared", scope.merge(
-        "expected_digest" => digest(scope),
+        "expected_digest" => digest(confirmation_scope(scope)),
         "confirmation_phrase" => @confirmations.fetch(:drs)
       ))
     rescue ArgumentError => error
@@ -533,7 +533,7 @@ module SoulCore
       reviewed = drs_preview(password: password)
       return reviewed unless reviewed["ok"]
       reviewed_scope = reviewed.fetch("data").reject { |key, _value| %w[expected_digest confirmation_phrase].include?(key) }
-      return blocked("DRS preview digest is stale or invalid") unless secure_equal?(expected_digest, digest(reviewed_scope))
+      return blocked("DRS preview digest is stale or invalid") unless secure_equal?(expected_digest, digest(confirmation_scope(reviewed_scope)))
 
       progress&.call("stage" => "local_preview", "message" => "Revalidating the exact local capture scope…")
       local_preview = backup_preview(password: password)
@@ -832,6 +832,19 @@ module SoulCore
     end
 
     private
+
+    def confirmation_scope(value)
+      case value
+      when Hash
+        value.each_with_object({}) do |(key, item), scoped|
+          scoped[key] = confirmation_scope(item) unless key == "estimated_bytes"
+        end
+      when Array
+        value.map { |item| confirmation_scope(item) }
+      else
+        value
+      end
+    end
 
     def component_scope(outcome)
       {
