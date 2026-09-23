@@ -50,7 +50,7 @@ json_ok =
   json.dig("policy_tiers", "local_only", "cloud_allowed") == false &&
   json.dig("task_policy", "speech_to_text", "tier") == "local_only" &&
   json.dig("task_policy", "coding", "tier") == "approval_required" &&
-  json.dig("codex_boundary", "recommended_model") == "gpt-5.5 medium" &&
+  json.dig("codex_boundary", "recommended_model") == "gpt-6-astra medium" &&
   json.dig("verification", "no_cloud_routing_enabled") == true
 
 puts "- JSON model policy assessment: #{json_ok ? 'ok' : 'missing'}"
@@ -85,7 +85,7 @@ text_ok =
   status.success? &&
   stdout.include?("Soul Model Suitability Policy Assessment") &&
   stdout.include?("Codex boundary") &&
-  stdout.include?("gpt-5.5 medium")
+  stdout.include?("gpt-6-astra medium")
 
 puts "- text model policy assessment: #{text_ok ? 'ok' : 'missing'}"
 errors << "text model policy failed: #{stderr} #{stdout}" unless text_ok

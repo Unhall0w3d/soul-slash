@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://soul.local/schemas/skill_lifecycle_receipt.schema.json",
+  "title": "Soul Skill Lifecycle Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "subject",
+    "lifecycle_state",
+    "started_at",
+    "ended_at",
+    "message",
+    "continuation",
+    "evidence_paths"
+  ],
+  "properties": {
+    "schema_version": { "const": "soul.skill.lifecycle_receipt.v1" },
+    "receipt_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,95}$" },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "lifecycle_state": {
+      "enum": ["complete", "failed", "awaiting_input", "canceled", "blocked_for_human_review"]
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "message": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "continuation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "processes_remaining",
+        "authorization_reference",
+        "inspect_command",
+        "stop_command",
+        "recovery_notes"
+      ],
+      "properties": {
+        "kind": { "enum": ["none", "approved_persistent", "bounded_development_job"] },
+        "processes_remaining": { "type": "integer", "minimum": 0 },
+        "authorization_reference": { "type": ["string", "null"], "maxLength": 512 },
+        "inspect_command": { "type": ["string", "null"], "maxLength": 2048 },
+        "stop_command": { "type": ["string", "null"], "maxLength": 2048 },
+        "recovery_notes": { "type": ["string", "null"], "maxLength": 2048 }
+      }
+    },
+    "evidence_paths": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    }
+  }
+}

@@ -8,6 +8,9 @@ require "pathname"
 
 module SoulCore
   class AlphaImplementationTaskPackGenerator
+    RECOMMENDED_MODEL = "gpt-6-luna high".freeze
+    MODEL_ROLE = "Luna is the bounded implementation worker for this proposal-local task pack; deterministic verification, human review, and explicit promotion approval remain required.".freeze
+
     REQUIRED_FILES = [
       "implementation_task_pack.json",
       "implementation_task_pack.md",
@@ -149,14 +152,14 @@ module SoulCore
           "proposal_path" => proposal_path,
           "status" => "implementation_task_pack_only",
           "generated_at" => generated_at,
-          "model_recommendation" => "gpt-5.5 medium"
+          "model_recommendation" => RECOMMENDED_MODEL
         },
         "codex_handoff_contract" => {
           "task" => {
             "id" => task_id,
             "title" => task_id.split(/[-_]/).map(&:capitalize).join(" "),
             "summary" => "Produce a bounded implementation proposal for #{task_id}.",
-            "model_recommendation" => "gpt-5.5 medium",
+            "model_recommendation" => RECOMMENDED_MODEL,
             "status" => "handoff_contract_only"
           },
           "repo_context" => {
@@ -235,6 +238,8 @@ module SoulCore
       lines << "## Model Recommendation"
       lines << ""
       lines << "`#{pack.dig('task', 'model_recommendation')}`"
+      lines << ""
+      lines << "Model role: #{MODEL_ROLE}"
       lines << ""
       lines << "## Allowed Files"
       pack.fetch("allowed_files").each { |item| lines << "- `#{item}`" }

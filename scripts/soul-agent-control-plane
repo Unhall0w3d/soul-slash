@@ -1,0 +1,42 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/agent_execution_control_plane"
+
+root = File.expand_path("..", __dir__)
+control = SoulCore::AgentExecutionControlPlane.new(root: root)
+command = ARGV.shift.to_s
+
+result = case command
+         when "assignment"
+           control.validate_assignment_file(ARGV.shift)
+         when "review"
+           control.validate_review_file(ARGV.shift)
+         when "lifecycle"
+           control.validate_lifecycle_file(ARGV.shift)
+         when "approval-link"
+           control.validate_approval_link_file(ARGV.shift)
+         when "required-checks"
+           if ARGV.empty?
+             { "ok" => false, "operation" => command, "errors" => ["at least one changed path is required"], "data" => {} }
+           else
+             control.required_checks(ARGV)
+           end
+         when "persistence"
+           if ARGV.empty?
+             { "ok" => false, "operation" => command, "errors" => ["at least one repository file is required"], "data" => {} }
+           else
+             control.classify_persistence(ARGV)
+           end
+         else
+           {
+             "ok" => false,
+             "operation" => "help",
+             "errors" => ["usage: soul-agent-control-plane assignment FILE | review FILE | lifecycle FILE | approval-link FILE | required-checks PATH... | persistence PATH..."],
+             "data" => {}
+           }
+         end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

@@ -78,8 +78,11 @@ non-sensitive long-context notes
 Recommended Codex model:
 
 ```text
-gpt-5.5 medium
+gpt-6-astra medium
 ```
+
+This is the primary orchestration boundary, not a replacement for workload-specific
+local models or delegated workers. See `guides/CODEX_SUBAGENTS.md` for routing.
 
 Allowed uses:
 

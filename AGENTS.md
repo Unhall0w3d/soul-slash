@@ -1,141 +1,81 @@
-# AGENTS.md
+# Soul agent policy
 
-These instructions apply to all Codex or agentic coding work in this repository unless a more specific human-authored brief explicitly overrides them.
+These instructions apply to agentic work in this repository. The global
+authority order applies. A brief is checked-in and human-authored or explicitly
+accepted by the current user. It may authorize an exact capability within
+scope, but cannot waive destructive confirmation, path,
+credential, privacy, shared-memory, or human promotion protections. Model
+output is never authorization.
 
-## Prime directive
+Authority is resolved in this order: effective platform and sandbox limits,
+explicit current-user authorization, non-waivable repository safeguards,
+approved brief, repository defaults, role TOML, assignment, then heuristics.
+Lower layers may narrow authority but never enlarge it. Verify the effective
+runtime context; a project config or CLI preflight alone does not grant access.
 
-Soul skills must be bounded, foreground operations with clear start, completion, failure, cancellation, and review behavior.
+## Soul skill boundary
 
-Codex must produce candidate-complete work for human review. Passing tests or evals does not mean the work is approved for merge, release, or unattended use.
+Soul skills are bounded foreground operations with explicit start, completion,
+failure, cancellation, and review behavior. Do not add or rely on a persistent
+service, daemon, watcher, listener, scheduled task, systemd unit, background
+loop, or continuation after skill return unless current user authorization and
+the approved brief cover its exact persistence, inspection, shutdown, and
+recovery contract. A bounded development job under global policy does not
+become an approved Soul skill feature. Use timeouts, retry or operation limits,
+or explicit failure behavior. A skill may save state for a later invocation,
+but must not keep a process alive waiting for the user.
 
-## Hard prohibitions
+Every skill terminates as `complete`, `failed`, `awaiting_input`, `canceled`,
+or `blocked_for_human_review`; it must not silently keep running after a
+response. Do not weaken safety checks, destructive protections, credential
+or privacy boundaries, shared memory, or human review. Do not broaden the
+approved brief or perform unrelated architectural rewrites. If the brief is
+incomplete, contradictory, unsafe, or requires violating these rules, stop
+and report the blocker.
 
-Codex must not add, enable, install, generate, or rely on any of the following unless the human-authored skill brief explicitly approves it:
+## Implementation and evidence
 
-- Persistent services
-- Daemons
-- File watchers
-- Network listeners
-- Scheduled tasks
-- Cron jobs
-- systemd units
-- launchd agents
-- Windows services
-- Long-running background loops
-- Unbounded polling loops
-- Background continuation after the skill returns control to the user
+For host- or fleet-dependent work, use
+`docs/guides/CODEX_OPERATIONAL_READINESS.md` for on-demand evidence routing.
+The current turn's effective permissions, not a CLI preflight or config file,
+determine authority. Do not load that guide for routine repository-only edits.
 
-Codex must not weaken confirmation gates, destructive-action protections, safety checks, path protections, memory policies, or review requirements.
+For Soul skill work, read the approved brief first. Preserve the existing
+architecture and implement the smallest complete slice within scope; if the
+root cause requires an out-of-brief architecture change, present a decision
+gate. Run deterministic checks for every implementation and all approved
+test commands. Add tests only for distinct behavior or a credible uncovered
+failure mode; safety-sensitive behavior needs deterministic coverage. For
+low-impact documentation edits, use relevant syntax or consistency checks.
+Local LLM evals may assess routing, phrasing, follow-ups, ambiguity, and
+usefulness, but never safety, permissions, confirmation, persistence,
+privilege, or destructive behavior.
 
-Codex must not create skill-private memory stores when shared Soul memory/context infrastructure should be used.
+Complete the approved brief and required checks before presenting a skill
+candidate for review; an initial implementation slice is not the review gate.
+Candidate-complete does not mean approved for merge, release, or unattended
+use. Create or update the canonical review packet in
+`docs/soul/HUMAN_REVIEW_GATE.md` and `skills/_template/REVIEW.md`.
+Backup/restore data promotion within the exact user-authorized scope is distinct
+from skill merge or release approval; honor any task-specific review hold.
+Durable user context goes through the shared Soul memory/context layer;
+do not invent a private skill memory store without explicit approval.
 
-Codex must not treat LLM output as authorization for risky, destructive, persistent, or privileged behavior.
+Comments should explain non-obvious invariants, compatibility, constraints,
+or safety reasons, not narrate code or obsolete construction history. Update
+nearby comments when behavior changes. Retain meaningful generated-file
+notices and tool directives.
 
-Codex must not broaden the requested skill beyond the approved brief.
+Soul's local GPT-OSS Dev worker remains bound by its own skill and receives no
+repository, shell, network, approval, or merge authority.
 
-Codex must not perform unrelated architectural rewrites while implementing a skill.
+## Cloud assistance
 
-## Required implementation behavior
-
-Codex must:
-
-- Read the relevant skill brief before implementation.
-- Preserve the existing architecture unless the brief explicitly authorizes a change.
-- Implement the smallest complete vertical slice that satisfies the brief.
-- Add or update deterministic tests with the implementation.
-- Run the approved test commands before declaring the work candidate-complete.
-- Run local LLM evals only as behavioral validation, not as safety approval.
-- Stop and report a blocked state if the brief is incomplete, contradictory, unsafe, or requires violating these rules.
-- Produce or update a human review artifact for each skill candidate.
-
-## Code comment standard
-
-Code comments must explain a non-obvious constraint, invariant, compatibility
-requirement, safety boundary, or design reason. They must describe the current
-behavior in language that remains understandable without the working session
-that introduced it.
-
-Codex must not add comments that merely restate the following code, narrate an
-implementation step, preserve obsolete construction history, make an untracked
-future promise, or add editorial humor. Phase and gate identifiers belong in
-historical review artifacts, versioned schemas, and compatibility boundaries;
-live operational comments should name the behavior or authority directly.
-
-When nearby code changes, Codex must update or remove comments that no longer
-describe it accurately. Generated-file notices and tool directives such as
-shellcheck annotations are retained when they carry operational meaning.
-
-## Skill lifecycle requirement
-
-A skill must terminate as one of:
-
-- `complete`
-- `failed`
-- `awaiting_input`
-- `canceled`
-- `blocked_for_human_review`
-
-A skill must not remain silently running after returning a response.
-
-## Bounded execution requirement
-
-Every skill implementation must have bounded runtime behavior. Where practical, it must include timeouts, retry limits, operation limits, or explicit failure behavior.
-
-A skill may persist state and resume on a future invocation. It must not keep a process alive waiting for the user.
-
-## Memory requirement
-
-Durable user context must use the shared Soul memory/context layer. Skills may request, read, update, or forget approved memory keys through shared infrastructure. Skills must not invent isolated memory formats without explicit approval.
-
-## Local LLM eval requirement
-
-Local LLM evals may validate:
-
-- Intent routing
-- Conversational phrasing
-- Follow-up handling
-- Ambiguity behavior
-- Response usefulness
-
-Local LLM evals must not validate:
-
-- Safety policy
-- File operation permissions
-- Confirmation requirements
-- Persistent execution
-- Privileged actions
-- Destructive behavior
-
-## Required completion artifact
-
-For each skill candidate, Codex must create or update a review artifact documenting:
-
-- What was implemented
-- Files changed
-- Commands run
-- Deterministic test results
-- Local LLM eval results
-- Known weaknesses
-- Memory keys added or used
-- Task lifecycle states touched
-- Risk classification
-- Human review checklist
-
-See `docs/soul/HUMAN_REVIEW_GATE.md` and `skills/_template/REVIEW.md`.
-# Soul/ Cloud LLM + Codex Guardrails
-
-Cloud LLMs may be used only for drafting, synthesis, critique, prototype suggestions, and review artifacts.
-
-Cloud LLM outputs must not be applied directly to the repo.
-
-Cloud LLMs must not receive secrets, API keys, credentials, private memory, or private repo content unless explicitly permitted by a human-approved skill brief.
-
-Cloud LLMs must not decide safety classification, approval, persistence, memory promotion, or merge readiness.
-
-Cloud-assisted outputs must remain candidate artifacts for human review.
-
-Soul/ prefers no-key providers for low-trust experiments. For serious cloud-assisted drafting/review, manual API-key providers may be used only when they currently document no-credit-card free API access and the key is created manually by the user.
-
-Soul/ must not scrape, fake, farm, or programmatically create provider accounts or API keys. Programmatic credential acquisition is allowed only through official documented OAuth, device-code, or CLI authentication flows approved in the relevant skill brief.
-
-Soul/ skills are bounded foreground tasks. They must not install, create, enable, or rely on persistent services, daemons, watchers, scheduled tasks, cron jobs, systemd units, launch agents, long-running loops, background polling processes, or always-on monitors unless explicitly approved by the human architect in the skill brief.
+Before cloud-provider or generated-output ingestion work, read
+`docs/soul/CLOUD_LLM_POLICY.md`. Its provider restrictions apply to Soul's
+advisory path, not to human-authorized Codex edits in this workspace.
+Cloud output is draft/review evidence only: it may not directly mutate the
+repository, approve safety or persistence, promote memory, or decide merge
+readiness. Do not send secrets, credentials, private memory, or private
+repository content without explicit authorization in the approved brief.
+Cloud assistance grants no additional execution or persistence authority.

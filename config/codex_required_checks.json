@@ -1,0 +1,33 @@
+{
+  "schema_version": "soul.codex.required_checks.v1",
+  "default_checks": ["targeted_behavior"],
+  "check_definitions": {
+    "agent_control_plane": "make verify-agent-execution-control-plane",
+    "agent_operational_readiness": "make verify-agent-operational-readiness",
+    "json_parse": "Parse each changed JSON file with the standard JSON parser.",
+    "ruby_syntax": "Run ruby -c for each changed Ruby source or Ruby executable.",
+    "targeted_behavior": "Run the smallest existing verifier that exercises the changed behavior.",
+    "review_packet": "Validate the applicable review artifact with scripts/soul-agent-control-plane review FILE.",
+    "persistence_advisory": "Run scripts/soul-agent-control-plane persistence PATH... and review every signal.",
+    "shell_syntax": "Run bash -n for each changed Bash script.",
+    "toml_parse": "Parse each changed TOML file with an available standard TOML parser."
+  },
+  "rules": [
+    { "pattern": "AGENTS.md", "checks": ["agent_control_plane", "review_packet"] },
+    { "pattern": "docs/soul/schemas/codex_approval_link.schema.json", "checks": ["json_parse", "agent_operational_readiness"] },
+    { "pattern": "config/codex_policy_scenarios.json", "checks": ["json_parse", "agent_operational_readiness"] },
+    { "pattern": "scripts/soul-codex-preflight", "checks": ["agent_operational_readiness"] },
+    { "pattern": "scripts/codex-policy-eval", "checks": ["agent_operational_readiness"] },
+    { "pattern": "scripts/soul-amd-workload", "checks": ["agent_operational_readiness"] },
+    { "pattern": "lib/soul_core/external_amd_workload_gate.rb", "checks": ["ruby_syntax", "agent_operational_readiness"] },
+    { "pattern": ".codex/agents/*.toml", "checks": ["toml_parse", "agent_control_plane", "review_packet"] },
+    { "pattern": "docs/soul/schemas/*.json", "checks": ["json_parse", "agent_control_plane", "review_packet"] },
+    { "pattern": "config/*.json", "checks": ["json_parse", "targeted_behavior"] },
+    { "pattern": "lib/soul_core/*.rb", "checks": ["ruby_syntax", "targeted_behavior", "review_packet"] },
+    { "pattern": "scripts/*.rb", "checks": ["ruby_syntax", "targeted_behavior"] },
+    { "pattern": "scripts/*", "checks": ["targeted_behavior"] },
+    { "pattern": "**/*.service", "checks": ["persistence_advisory", "targeted_behavior", "review_packet"] },
+    { "pattern": "**/*.timer", "checks": ["persistence_advisory", "targeted_behavior", "review_packet"] },
+    { "pattern": "deploy/systemd/**", "checks": ["persistence_advisory", "targeted_behavior", "review_packet"] }
+  ]
+}

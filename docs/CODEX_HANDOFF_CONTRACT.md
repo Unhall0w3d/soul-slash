@@ -38,8 +38,12 @@ rollback_notes
 ## Codex model recommendation
 
 ```text
-gpt-5.5 medium
+gpt-6-astra medium
 ```
+
+This generic recommendation names the primary orchestrator. Task-specific packs
+use the bounded worker appropriate to their scope; see `guides/CODEX_SUBAGENTS.md`.
+It does not invoke a model or grant execution authority.
 
 ## Boundaries
 

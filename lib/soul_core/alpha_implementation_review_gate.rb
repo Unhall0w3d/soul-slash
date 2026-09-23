@@ -7,6 +7,13 @@ require "pathname"
 
 module SoulCore
   class AlphaImplementationReviewGate
+    # Model advice is not execution authority; legacy handoffs remain reviewable.
+    RECOGNIZED_MODEL_RECOMMENDATIONS = [
+      "gpt-6-astra medium", "gpt-6-luna low", "gpt-6-luna high",
+      "gpt-5.6-sol medium", "gpt-5.6-sol high",
+      "gpt-5.6-terra medium", "gpt-5.6-luna low", "gpt-5.6-luna high",
+      "gpt-5.5 medium"
+    ].freeze
     REQUIRED_TASK_PACK_FILES = [
       "implementation_task_pack.json",
       "implementation_task_pack.md",
@@ -91,7 +98,9 @@ module SoulCore
         warnings << "Codex handoff contract has no security boundaries." if Array(contract["security_boundaries"]).empty?
 
         model = contract.dig("task", "model_recommendation")
-        warnings << "Codex handoff contract does not recommend gpt-5.5 medium." unless model == "gpt-5.5 medium"
+        unless RECOGNIZED_MODEL_RECOMMENDATIONS.include?(model)
+          warnings << "Codex handoff model recommendation needs review against the current workload routing policy."
+        end
       end
 
       checklist_path = File.join(alpha_path, "human_review_checklist.md")

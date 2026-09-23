@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/soul_core/external_amd_workload_gate"
+
+root = File.expand_path("..", __dir__)
+gate = SoulCore::ExternalAmdWorkloadGate.new(root: root)
+mode = ARGV.shift
+
+case mode
+when "status"
+  minimum_gib = ARGV.empty? ? 0 : Float(ARGV.shift)
+  abort "usage: soul-amd-workload status [MIN_FREE_GIB]" unless ARGV.empty? && minimum_gib.between?(0, 16)
+  result = gate.status(min_free_bytes: (minimum_gib * 1024**3).to_i)
+when "run"
+  timeout = Integer(ARGV.shift)
+  minimum_gib = Float(ARGV.shift)
+  abort "usage: soul-amd-workload run TIMEOUT_SECONDS MIN_FREE_GIB -- COMMAND [ARGS...]" unless ARGV.shift == "--" && !ARGV.empty? && minimum_gib.between?(0, 16)
+  result = gate.run(command: ARGV, timeout_seconds: timeout, min_free_bytes: (minimum_gib * 1024**3).to_i)
+else
+  abort "usage: soul-amd-workload status [MIN_FREE_GIB] | run TIMEOUT_SECONDS MIN_FREE_GIB -- COMMAND [ARGS...]"
+end
+
+puts JSON.pretty_generate(result)
+exit(result["ok"] ? 0 : 1)

@@ -9,6 +9,8 @@ require "pathname"
 module SoulCore
   class FirstBoundedCodexTask
     TASK_ROOT = File.join("Soul", "codex", "tasks", "phase33_first_bounded_task").freeze
+    RECOMMENDED_MODEL = "gpt-6-luna low".freeze
+    MODEL_ROLE = "Luna is the bounded documentation worker for this low-risk task; local review and human approval remain required.".freeze
 
     def initialize(root: Dir.pwd)
       @root = File.expand_path(root)
@@ -43,9 +45,9 @@ module SoulCore
         "generated_at" => generated_at,
         "root" => @root,
         "task_root" => TASK_ROOT,
-        "recommended_model" => "gpt-5.5 medium",
+        "recommended_model" => RECOMMENDED_MODEL,
         "written_files" => written,
-        "next_manual_step" => "Paste codex_prompt.md into Codex using gpt-5.5 medium, save the response JSON locally, then run codex-dry-run-review.",
+        "next_manual_step" => "Paste codex_prompt.md into Codex using #{RECOMMENDED_MODEL}, save the response JSON locally, then run codex-dry-run-review.",
         "review_command_template" => "ruby bin/soul assess codex-dry-run-review --contract #{File.join(TASK_ROOT, 'contract.json')} --response <response.json> --json",
         "verification" => {
           "task_package_only" => true,
@@ -64,6 +66,7 @@ module SoulCore
       lines << "Generated: #{report['generated_at']}"
       lines << "Task root: #{report['task_root']}"
       lines << "Recommended model: #{report['recommended_model']}"
+      lines << "Model role: #{MODEL_ROLE}"
       lines << ""
       lines << "Written files"
       report.fetch("written_files").each { |path| lines << "- #{path}" }
@@ -87,7 +90,7 @@ module SoulCore
           "id" => "phase33_fixture_doc_review",
           "title" => "Phase 33 Fixture Documentation Review",
           "summary" => "Review the Codex dry-run fixture documentation and propose a bounded documentation-only improvement with concrete proposed wording.",
-          "model_recommendation" => "gpt-5.5 medium",
+          "model_recommendation" => RECOMMENDED_MODEL,
           "status" => "first_bounded_codex_task_package",
           "generated_at" => generated_at
         },
@@ -209,7 +212,9 @@ module SoulCore
 
         Generated: #{generated_at}
 
-        Use model: **gpt-5.5 medium**.
+        Use model: **#{RECOMMENDED_MODEL}**.
+
+        Model role: #{MODEL_ROLE}
 
         You are being given a bounded documentation-only task for the Soul repository.
 
@@ -284,7 +289,7 @@ module SoulCore
         Open Codex and use:
 
         ```text
-        gpt-5.5 medium
+        #{RECOMMENDED_MODEL}
         ```
 
         Paste the contents of:
@@ -351,7 +356,7 @@ module SoulCore
         ## Intended flow
 
         ```text
-        1. Paste codex_prompt.md into Codex using gpt-5.5 medium.
+        1. Paste codex_prompt.md into Codex using #{RECOMMENDED_MODEL}.
         2. Save the returned JSON locally.
         3. Run codex-dry-run-review against contract.json and the saved response.
         4. Inspect proposed_documentation_change for concrete proposed wording.

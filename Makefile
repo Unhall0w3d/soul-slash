@@ -102,6 +102,7 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup verify-operator-drs-stream-reconciliation
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
+.PHONY: verify-agent-execution-control-plane verify-agent-operational-readiness
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
 .PHONY: atelier-cis-hardening-plan atelier-cis-hardening-status atelier-cis-hardening-install atelier-cis-hardening-remove verify-atelier-cis-hardening
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-dev-worker-vault-context verify-dev-worker-vault-skill verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
@@ -1608,3 +1609,11 @@ maintenance-resume-uninstall:
 
 verify-noctalia-companion:
 > @ruby scripts/verify-noctalia-companion-a0.rb
+
+verify-agent-execution-control-plane:
+> @ruby scripts/verify-agent-execution-control-plane-a0.rb
+
+verify-agent-operational-readiness:
+> @ruby scripts/verify-agent-operational-readiness-a1.rb
+> @ruby scripts/verify-external-amd-workload-gate.rb
+> @ruby scripts/codex-policy-eval
