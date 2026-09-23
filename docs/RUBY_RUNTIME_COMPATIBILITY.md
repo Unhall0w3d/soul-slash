@@ -6,15 +6,15 @@ Soul expects Ruby to be selected per project rather than by replacing the operat
 ## Command
 
 ```bash
-ruby bin/soul assess ruby-runtime
-ruby bin/soul assess ruby-runtime --json
+rbenv exec ruby bin/soul assess ruby-runtime
+rbenv exec ruby bin/soul assess ruby-runtime --json
 ```
 
 Aliases:
 
 ```bash
-ruby bin/soul assess runtime-compatibility
-ruby bin/soul assess ruby-compatibility
+rbenv exec ruby bin/soul assess runtime-compatibility
+rbenv exec ruby bin/soul assess ruby-compatibility
 ```
 
 ## Strategy
@@ -22,7 +22,7 @@ ruby bin/soul assess ruby-compatibility
 Use a project-scoped Ruby runtime, such as rbenv:
 
 ```bash
-rbenv local 4.0.5
+rbenv local 4.0.7
 ```
 
 This creates:
@@ -31,7 +31,7 @@ This creates:
 .ruby-version
 ```
 
-Do not replace the system Ruby just to run Soul.
+Do not replace the system Ruby just to run Soul. `uv` manages Soul's Python environments, not Ruby. The Makefile selects the installed rbenv version when present; direct CLI calls should use `rbenv exec ruby bin/soul ...` or an activated rbenv shell. The project assessment requires the pinned version and the Prism parser. User services should launch the exact private Ruby path from the approved installation; privileged host-maintenance helpers remain on the OS interpreter until their authority boundary is separately reviewed.
 
 ## What the assessment checks
 
@@ -59,6 +59,4 @@ promote generated files
 
 ## Compatibility rule
 
-The assessment treats Ruby 3.4+ as acceptable.
-
-Ruby 4.x is considered compatible when syntax checks and core CLI smoke checks pass.
+The assessment requires the active interpreter to match `.ruby-version` and report the Prism parser. It runs syntax and core CLI smoke checks with that same interpreter. Ruby 4.0.7 is the current Soul pin; update the pin deliberately after qualifying a newer stable Ruby.

@@ -55,7 +55,10 @@ module SoulCore
       failed_syntax = syntax_results.reject { |item| item["ok"] }
       failed_commands = command_results.reject { |item| item["ok"] }
 
-      blockers << "Ruby version is older than 3.4.0: #{runtime['ruby_version']}" if version_status == "too_old"
+      pin = runtime["ruby_version_file"]
+      blockers << "Project Ruby pin is missing or invalid" unless pin.to_s.match?(/\A\d+\.\d+\.\d+\z/)
+      blockers << "Active Ruby #{runtime['ruby_version']} does not match project pin #{pin}" if pin && runtime["ruby_version"] != pin
+      blockers << "Prism is unavailable or not the active Ruby parser" unless runtime["prism_version"] && runtime["ruby_description"].include?("+PRISM")
       blockers << "Ruby syntax failure(s): #{failed_syntax.map { |item| item['path'] }.join(', ')}" unless failed_syntax.empty?
       blockers << "Core CLI smoke check failure(s): #{failed_commands.map { |item| item['id'] }.join(', ')}" unless failed_commands.empty?
 
@@ -75,7 +78,8 @@ module SoulCore
           "note" => "Ruby should be selected per project instead of replacing the OS Ruby."
         },
         "compatibility_expectations" => {
-          "minimum_supported_ruby" => "3.4.0",
+          "active_project_pin_required" => true,
+          "prism_parser_required" => true,
           "ruby_4_supported_when_checks_pass" => true,
           "stdlib_only_assessment" => true,
           "bundler_required_for_assessment" => false,
@@ -104,6 +108,7 @@ module SoulCore
       lines << "Status: #{report['status']}"
       lines << "Ruby: #{report.dig('runtime', 'ruby_description')}"
       lines << "Ruby executable: #{report.dig('runtime', 'ruby_executable')}"
+      lines << "Prism: #{report.dig('runtime', 'prism_version') || 'unavailable'}"
       lines << "RubyGems: #{report.dig('runtime', 'rubygems_version')}"
       lines << "Bundler: #{report.dig('runtime', 'bundler_version')}"
       lines << "Version status: #{report['version_status']}"
@@ -152,15 +157,23 @@ module SoulCore
         "ruby_platform" => RUBY_PLATFORM,
         "ruby_patchlevel" => RUBY_PATCHLEVEL,
         "ruby_executable" => RbConfig.ruby,
+        "prism_version" => prism_version,
         "ruby_bindir" => RbConfig::CONFIG["bindir"],
         "rubygems_version" => rubygems_version,
         "bundler_version" => bundler_version,
-        "gem_home" => safe_capture("gem", "env", "home"),
-        "gem_path" => safe_capture("gem", "env", "path"),
+        "gem_home" => Gem.dir,
+        "gem_path" => Gem.path.join(File::PATH_SEPARATOR),
         "rbenv_version" => safe_capture("rbenv", "version"),
         "rbenv_which_ruby" => safe_capture("rbenv", "which", "ruby"),
         "ruby_version_file" => ruby_version_file
       }
+    end
+
+    def prism_version
+      require "prism"
+      Prism::VERSION
+    rescue LoadError
+      nil
     end
 
     def rubygems_version
@@ -205,7 +218,7 @@ module SoulCore
 
     def syntax_check(paths)
       paths.map do |path|
-        stdout, stderr, status = Open3.capture3("ruby", "-c", path, chdir: @root)
+        stdout, stderr, status = Open3.capture3(RbConfig.ruby, "-c", path, chdir: @root)
         {
           "path" => path,
           "ok" => status.success?,
@@ -218,7 +231,9 @@ module SoulCore
 
     def run_core_commands
       CORE_COMMANDS.map do |item|
-        stdout, stderr, status = Open3.capture3(*item.fetch("command"), chdir: @root)
+        command = item.fetch("command").dup
+        command[0] = RbConfig.ruby
+        stdout, stderr, status = Open3.capture3(*command, chdir: @root)
         ok = status.success?
         note = ""
 
@@ -237,7 +252,7 @@ module SoulCore
 
         {
           "id" => item.fetch("id"),
-          "command" => item.fetch("command"),
+          "command" => command,
           "ok" => ok,
           "exit_status" => status.exitstatus,
           "note" => note,
@@ -250,9 +265,9 @@ module SoulCore
     def recommendations(runtime, version_status, blockers)
       recs = []
       recs << "Keep Ruby project-scoped through rbenv; do not replace the OS Ruby."
-      recs << "Leave .ruby-version local until Ruby 4 smoke checks are clean, then decide whether to commit it."
+      recs << "Launch Soul through the Ruby pinned by .ruby-version and verify Prism is active."
       recs << "Ruby 4 is active for this project; continue only if the assessment remains compatible." if version_status == "ruby_4_active"
-      recs << "Ruby is still 3.4.x for this project; switch with rbenv local before evaluating Ruby 4 compatibility." if version_status == "ruby_3_4_active"
+      recs << "Ruby 3.4 is active; run through `rbenv exec ruby` so the current .ruby-version pin is used." if version_status == "ruby_3_4_active"
       recs << "Resolve blockers before adding more skills or expanding doctor." unless blockers.empty?
       recs << "Current runtime surface is compatible." if blockers.empty?
       recs

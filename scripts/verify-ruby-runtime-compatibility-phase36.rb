@@ -49,7 +49,9 @@ json_ok =
   json["assessment"] == "ruby_runtime_compatibility" &&
   json["ok"] == true &&
   json["status"] == "compatible" &&
-  json.dig("runtime", "ruby_version").to_s.length.positive? &&
+  json.dig("runtime", "ruby_version") == File.read(".ruby-version").strip &&
+  json.dig("runtime", "prism_version").to_s.length.positive? &&
+  json.dig("runtime", "ruby_description").to_s.include?("+PRISM") &&
   json.dig("expected_runtime_strategy", "project_scoped_ruby") == true &&
   json.dig("expected_runtime_strategy", "system_ruby_mutation") == false &&
   json.dig("verification", "no_files_modified") == true &&

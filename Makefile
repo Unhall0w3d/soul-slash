@@ -9,6 +9,22 @@ PROJECT_ROOT := $(CURDIR)
 LOCAL_MAKEFILE ?= $(PROJECT_ROOT)/Makefile.local
 -include $(LOCAL_MAKEFILE)
 
+# Prefer Soul's pinned rbenv Ruby for every Make target on a configured host.
+# CI uses ruby/setup-ruby and has no private rbenv installation.
+PROJECT_RUBY_VERSION := $(strip $(shell cat $(PROJECT_ROOT)/.ruby-version))
+PROJECT_RUBY_BIN := $(HOME)/.rbenv/versions/$(PROJECT_RUBY_VERSION)/bin
+ifneq ($(wildcard $(PROJECT_RUBY_BIN)/ruby),)
+export PATH := $(PROJECT_RUBY_BIN):$(PATH)
+else
+ACTIVE_RUBY_VERSION := $(shell ruby -e 'print RUBY_VERSION' 2>/dev/null)
+ifneq ($(ACTIVE_RUBY_VERSION),$(PROJECT_RUBY_VERSION))
+ifneq ($(or $(MAKECMDGOALS),help),help)
+$(error Soul requires Ruby $(PROJECT_RUBY_VERSION) with Prism; install the project version or activate an exact matching Ruby)
+endif
+endif
+endif
+
+
 ENV_FILE ?= $(PROJECT_ROOT)/.env
 LAN_HOST ?=
 DASHBOARD_PUBLIC_HOST ?=
