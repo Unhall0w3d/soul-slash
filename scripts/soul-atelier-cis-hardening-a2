@@ -1,0 +1,18 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "soul_core/atelier_cis_hardening_a2"
+
+service = SoulCore::AtelierCisHardeningA2.new
+command = ARGV.shift
+result = case command
+         when "plan" then service.plan
+         when "status" then service.status
+         when "install" then service.install(expected_digest: ARGV.fetch(0, ""), confirmation: ARGV.fetch(1, ""))
+         when "remove" then service.remove(expected_digest: ARGV.fetch(0, ""), confirmation: ARGV.fetch(1, ""))
+         else
+           abort "usage: soul-atelier-cis-hardening-a2 plan|status|install DIGEST INSTALL_ATELIER_CIS_HARDENING_A2|remove DIGEST REMOVE_ATELIER_CIS_HARDENING_A2"
+         end
+puts JSON.pretty_generate(result)

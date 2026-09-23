@@ -105,6 +105,7 @@ FLEET_SUBNET ?=
 .PHONY: verify-agent-execution-control-plane verify-agent-operational-readiness
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
 .PHONY: atelier-cis-hardening-plan atelier-cis-hardening-status atelier-cis-hardening-install atelier-cis-hardening-remove verify-atelier-cis-hardening
+.PHONY: atelier-cis-hardening-a2-plan verify-atelier-cis-hardening-a2
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-dev-worker-vault-context verify-dev-worker-vault-skill verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
 
 help:
@@ -1423,6 +1424,12 @@ atelier-cis-hardening-remove:
 
 verify-atelier-cis-hardening:
 > @ruby scripts/verify-atelier-cis-hardening-a1.rb
+
+atelier-cis-hardening-a2-plan:
+> @ruby scripts/soul-atelier-cis-hardening-a2 plan
+
+verify-atelier-cis-hardening-a2:
+> @ruby scripts/verify-atelier-cis-hardening-a2.rb
 
 wazuh-alert-notifications-plan:
 > @test -n "$(WAZUH_ALERTS_INTEGRATION_FILE)" || { echo "WAZUH_ALERTS_INTEGRATION_FILE is required."; exit 2; }
