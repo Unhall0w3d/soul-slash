@@ -29,6 +29,8 @@ escaped_label=${SITE_LABEL//\\/\\\\}
 escaped_label=${escaped_label//&/\\&}
 escaped_label=${escaped_label//|/\\|}
 sed \
+  -e "s|\"__SOUL_SITE_VIEW_LATITUDE__\"|${SITE_LATITUDE}|g" \
+  -e "s|\"__SOUL_SITE_VIEW_LONGITUDE__\"|${SITE_LONGITUDE}|g" \
   -e "s|__SOUL_SITE_LABEL__|${escaped_label}|g" \
   -e "s|__SOUL_SITE_LATITUDE__|${SITE_LATITUDE}|g" \
   -e "s|__SOUL_SITE_LONGITUDE__|${SITE_LONGITUDE}|g" \

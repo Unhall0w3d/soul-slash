@@ -58,7 +58,7 @@
       }],
       "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "#00E5FF"}}, "overrides": []},
       "options": {
-        "basemap": {"config": {}, "name": "World", "type": "default"},
+        "basemap": {"config": {}, "name": "OpenStreetMap", "type": "osm-standard"},
         "controls": {"mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": true, "showZoom": true},
         "layers": [{
           "config": {"showLegend": false, "style": {"color": {"fixed": "#00E5FF"}, "opacity": 0.9, "rotation": {"fixed": 0, "max": 360, "min": -360, "mode": "mod"}, "size": {"fixed": 14, "max": 40, "min": 4}, "symbol": {"fixed": "img/icons/marker/circle.svg", "mode": "fixed"}}},
@@ -69,7 +69,7 @@
           "type": "markers"
         }],
         "tooltip": {"mode": "details"},
-        "view": {"allLayers": true, "id": "coords", "lat": 20, "lon": 0, "zoom": 1.25}
+        "view": {"allLayers": true, "id": "coords", "lat": "__SOUL_SITE_VIEW_LATITUDE__", "lon": "__SOUL_SITE_VIEW_LONGITUDE__", "zoom": 6}
       }
     },
     {
@@ -365,6 +365,95 @@
           "gridPos": {"h": 8, "w": 8, "x": 16, "y": 35},
           "targets": [{"refId": "A", "expr": "sum by (device_id, role) (node_hwmon_power_average_watt)", "legendFormat": "{{device_id}} · {{role}}"}],
           "fieldConfig": {"defaults": {"unit": "watt", "min": 0}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "type": "row",
+      "title": "Linux-host SNMP detail",
+      "collapsed": true,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 27},
+      "panels": [
+        {
+          "id": 71,
+          "type": "stat",
+          "title": "SNMP scrape health",
+          "description": "One read-only result per configured Linux host; an absent or zero result is unavailable evidence, not a healthy zero.",
+          "gridPos": {"h": 8, "w": 6, "x": 0, "y": 28},
+          "targets": [{"refId": "A", "expr": "max by (device_id, role) (up{job=\"linux_host_snmp\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"min": 0, "max": 1, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "options": {"colorMode": "value", "graphMode": "area", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}}
+        },
+        {
+          "id": 72,
+          "type": "timeseries",
+          "title": "SNMP processor load",
+          "description": "Average one-minute HOST-RESOURCES-MIB processor load across each host's logical processors.",
+          "gridPos": {"h": 8, "w": 9, "x": 6, "y": 28},
+          "targets": [{"refId": "A", "expr": "avg by (device_id, role) (hrProcessorLoad{job=\"linux_host_snmp\"})", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 73,
+          "type": "timeseries",
+          "title": "SNMP physical memory used",
+          "description": "Physical memory not reported as immediately available by UCD-SNMP; this complements the more detailed Alloy view.",
+          "gridPos": {"h": 8, "w": 9, "x": 15, "y": 28},
+          "targets": [{"refId": "A", "expr": "100 * (1 - memAvailReal{job=\"linux_host_snmp\"} / clamp_min(memTotalReal{job=\"linux_host_snmp\"}, 1))", "legendFormat": "{{device_id}} · {{role}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 74,
+          "type": "timeseries",
+          "title": "SNMP filesystem used",
+          "description": "Configured UCD-SNMP filesystem checks, labeled by their exported path.",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 36},
+          "targets": [{"refId": "A", "expr": "dskPercent{job=\"linux_host_snmp\"} * on(device_id, role, dskIndex) group_left(dskPath) dskPath{job=\"linux_host_snmp\"}", "legendFormat": "{{device_id}} · {{role}} · {{dskPath}}"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 75,
+          "type": "timeseries",
+          "title": "SNMP temperature sensors",
+          "description": "Named LM-SENSORS readings converted from milli-Celsius; values outside 0–125°C remain absent.",
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 36},
+          "targets": [{"refId": "A", "expr": "((lmTempSensorsValue{job=\"linux_host_snmp\"} / 1000 >= 0) and (lmTempSensorsValue{job=\"linux_host_snmp\"} / 1000 < 125)) * on(device_id, role, lmTempSensorsIndex) group_left(lmTempSensorsDevice) lmTempSensorsDevice{job=\"linux_host_snmp\"}", "legendFormat": "{{device_id}} · {{role}} · {{lmTempSensorsDevice}}"}],
+          "fieldConfig": {"defaults": {"unit": "celsius", "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 85}, {"color": "red", "value": 95}]}}, "overrides": [
+            {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
+            {"matcher": {"id": "byRegexp", "options": "/.* · backup_target/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#73BF69"}}]}
+          ]}
+        },
+        {
+          "id": 76,
+          "type": "timeseries",
+          "title": "SNMP physical-disk throughput",
+          "description": "Read plus write bytes per second for whole physical disks; partitions, device mapper, loop, and zram devices are excluded.",
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 36},
+          "targets": [{"refId": "A", "expr": "sum by (device_id, role, diskIODevice) ((rate(diskIONReadX{job=\"linux_host_snmp\"}[5m]) + rate(diskIONWrittenX{job=\"linux_host_snmp\"}[5m])) * on(device_id, role, diskIOIndex) group_left(diskIODevice) diskIODevice{job=\"linux_host_snmp\",diskIODevice=~\"sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+\"})", "legendFormat": "{{device_id}} · {{role}} · {{diskIODevice}}"}],
+          "fieldConfig": {"defaults": {"unit": "Bps", "min": 0}, "overrides": [
             {"matcher": {"id": "byRegexp", "options": "/.* · operator_workstation/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#00E5FF"}}]},
             {"matcher": {"id": "byRegexp", "options": "/.* · primary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#D4AF37"}}]},
             {"matcher": {"id": "byRegexp", "options": "/.* · secondary_hypervisor/"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "#A970FF"}}]},
