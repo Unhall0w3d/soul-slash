@@ -1151,6 +1151,14 @@ module SoulCore
 
     def build_request(chat_id:, provider:, context:, orchestration:, evidence: [], interface: "internal", message: "")
       messages = context.fetch("messages").map(&:dup)
+      if interface.to_s == "voice_presence"
+        guidance = "This reply will be spoken. Answer directly in one to three short sentences by default, without Markdown lists or a repeated invitation to act. Preserve every relevant safety constraint. Give more detail when the user requests it; brevity must not change a refusal or invent an exception."
+        if messages.first&.fetch("role", nil) == "system"
+          messages.first["content"] = "#{messages.first.fetch('content')}\n#{guidance}"
+        else
+          messages.unshift({ "role" => "system", "content" => guidance })
+        end
+      end
 
       unless evidence.empty?
         research_evidence = evidence.any? { |record| record["evidence_profile"] == "web_research" }

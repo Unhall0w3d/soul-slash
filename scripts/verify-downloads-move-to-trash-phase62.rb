@@ -5,6 +5,8 @@ require "json"
 require "open3"
 
 errors = []
+functional_only = ARGV == ["--functional-only"]
+abort "Usage: #{$PROGRAM_NAME} [--functional-only]" unless ARGV.empty? || functional_only
 
 def run_cmd(*cmd)
   Open3.capture3(*cmd)
@@ -74,16 +76,20 @@ doc_ok =
 puts "- phase 62 docs/backlog: #{doc_ok ? 'ok' : 'missing'}"
 errors << "phase 62 docs missing expected content" unless doc_ok
 
-stdout, stderr, status = run_cmd("ruby", "bin/soul", "assess", "repo-curation", "--json")
-curation = JSON.parse(stdout) rescue nil
-allowed = ["scripts/verify-downloads-move-to-trash-phase62.rb"]
-untracked = curation && curation["untracked_review_candidates"].is_a?(Array) ? curation["untracked_review_candidates"] : []
-curation_ok = status.success? && curation && curation.dig("counts", "tracked_overlay_notes").to_i == 0 && (untracked - allowed).empty?
-puts "- repo curation remains clean apart from current phase verifier: #{curation_ok ? 'ok' : 'missing'}"
-errors << "repo curation unexpected candidates: #{stderr} #{stdout}" unless curation_ok
+if functional_only
+  puts "- repository curation: NOT CHECKED (functional-only mode; separate review remains required)"
+else
+  stdout, stderr, status = run_cmd("ruby", "bin/soul", "assess", "repo-curation", "--json")
+  curation = JSON.parse(stdout) rescue nil
+  allowed = ["scripts/verify-downloads-move-to-trash-phase62.rb"]
+  untracked = curation && curation["untracked_review_candidates"].is_a?(Array) ? curation["untracked_review_candidates"] : []
+  curation_ok = status.success? && curation && curation.dig("counts", "tracked_overlay_notes").to_i == 0 && (untracked - allowed).empty?
+  puts "- repo curation remains clean apart from current phase verifier: #{curation_ok ? 'ok' : 'missing'}"
+  errors << "repo curation unexpected candidates: #{stderr} #{stdout}" unless curation_ok
+end
 
 if errors.empty?
-  puts "Verification complete."
+  puts(functional_only ? "Functional verification complete; repository curation is not approved." : "Verification complete.")
 else
   warn "Verification failed:"
   errors.each { |error| warn "- #{error}" }
