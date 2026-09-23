@@ -9,6 +9,8 @@
     "wan2.2-ti2v-5b-q4": {
       "label": "Wan 2.2 TI2V 5B Q4_K_M",
       "accelerator": "AMD Vulkan with CPU offload",
+      "vulkan_device_selector": "1002:73bf!",
+      "vulkan_device_index": 0,
       "license": "Apache-2.0",
       "mode": "image_to_video",
       "width": 832,

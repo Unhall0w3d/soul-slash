@@ -129,10 +129,7 @@ class MusicVulkanPilot
     # executables without embedding an install-time rpath. Keep resolution
     # bounded to that verified build directory instead of modifying the host
     # linker configuration.
-    env = {
-      "GGML_VK_VISIBLE_DEVICES" => "0",
-      "LD_LIBRARY_PATH" => runtime_library_path
-    }
+    env = vulkan_environment.merge("LD_LIBRARY_PATH" => runtime_library_path)
     lm_attempts = []
     lm_seed = Integer(request.fetch("lm_seed", -1)) & MAX_LM_SEED
     enriched = nil
@@ -210,9 +207,11 @@ class MusicVulkanPilot
   def scope_for(action)
     case action
     when "setup"
-      { "action" => action, "root" => @root, "runtime" => @runtime, "build_targets" => %w[ace-lm ace-synth], "persistent_service" => false }
+      { "action" => action, "root" => @root, "runtime" => @runtime, "build_targets" => %w[ace-lm ace-synth],
+        "vulkan_device" => vulkan_scope, "persistent_service" => false }
     when "download"
-      { "action" => action, "install_dir" => @install_dir, "models" => @models, "automatic_download" => false }
+      { "action" => action, "install_dir" => @install_dir, "models" => @models,
+        "vulkan_device" => vulkan_scope, "automatic_download" => false }
     when "run"
       request = effective_request
       duration = validated_duration!(request)
@@ -329,6 +328,26 @@ class MusicVulkanPilot
     existing = ENV.fetch("LD_LIBRARY_PATH", "").split(File::PATH_SEPARATOR).reject(&:empty?)
     ([build] + existing).uniq.join(File::PATH_SEPARATOR)
   end
+
+  def vulkan_scope
+    {
+      "selector" => vulkan_environment.fetch("MESA_VK_DEVICE_SELECT"),
+      "index" => Integer(vulkan_environment.fetch("GGML_VK_VISIBLE_DEVICES"))
+    }
+  end
+
+  def vulkan_environment
+    selector = @profile.fetch("vulkan_device_selector")
+    index = Integer(@profile.fetch("vulkan_device_index"))
+    raise ArgumentError, "Vulkan device selector must be an exact PCI vendor/device filter" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/)
+    raise ArgumentError, "Vulkan device index must be nonnegative" if index.negative?
+
+    {
+      "MESA_VK_DEVICE_SELECT" => selector,
+      "GGML_VK_VISIBLE_DEVICES" => index.to_s
+    }
+  end
+
   def binary_valid?(name) = File.executable?(binary(name)) && !File.symlink?(binary(name))
   def valid_file?(path, item) = File.file?(path) && !File.symlink?(path) && File.size(path) == Integer(item.fetch("bytes")) && Digest::SHA256.file(path).hexdigest == item.fetch("sha256")
   def all_models_valid? = @models.fetch("files").all? { |item| valid_file?(File.join(@models_dir, item.fetch("filename")), item) }

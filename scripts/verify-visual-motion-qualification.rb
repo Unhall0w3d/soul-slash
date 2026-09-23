@@ -38,6 +38,7 @@ Dir.mktmpdir("soul-visual-motion-") do |temporary|
   manifest = File.join(temporary, "manifest.json")
   profile = {
     "label" => "Wan fixture", "accelerator" => "AMD Vulkan with CPU offload", "mode" => "image_to_video",
+    "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0,
     "width" => 832, "height" => 480, "frames" => 33, "fps" => 8, "steps" => 20,
     "cfg_scale" => 6.0, "flow_shift" => 3.0, "sampling_method" => "euler", "timeout_seconds" => 3,
     "files" => files
@@ -47,6 +48,8 @@ Dir.mktmpdir("soul-visual-motion-") do |temporary|
   runner = File.join(temporary, "fake-sd-cli")
   File.write(runner, <<~'SH')
     #!/bin/sh
+    test "$MESA_VK_DEVICE_SELECT" = "1002:73bf!" || exit 7
+    test "$GGML_VK_VISIBLE_DEVICES" = "0" || exit 8
     output=""
     previous=""
     for value in "$@"; do
@@ -117,7 +120,8 @@ end
 brief = File.read(File.expand_path("../docs/soul/VISUAL_STUDIO_A3_MOTION_QUALIFICATION_BRIEF.md", __dir__))
 makefile = File.read(File.expand_path("../Makefile", __dir__))
 manifest = JSON.parse(File.read(File.expand_path("../config/visual_motion_models.json", __dir__)))
-check.call("production manifest pins exact runtime and model identities", manifest.dig("runtime", "revision").match?(/\A[0-9a-f]{40}\z/) && manifest.fetch("profiles").values.first.fetch("files").all? { |file| file.fetch("sha256").match?(/\A[0-9a-f]{64}\z/) && file.fetch("bytes").positive? })
+production_profile = manifest.fetch("profiles").values.first
+check.call("production manifest pins exact runtime, device, and model identities", manifest.dig("runtime", "revision").match?(/\A[0-9a-f]{40}\z/) && production_profile["vulkan_device_selector"] == "1002:73bf!" && production_profile["vulkan_device_index"] == 0 && production_profile.fetch("files").all? { |file| file.fetch("sha256").match?(/\A[0-9a-f]{64}\z/) && file.fetch("bytes").positive? })
 check.call("Makefile exposes check plan install download and pilot gates", %w[visual-motion-check visual-motion-runtime-plan visual-motion-runtime-install visual-motion-model-download-plan visual-motion-model-download visual-motion-pilot-plan visual-motion-pilot-run].all? { |target| makefile.include?("#{target}:") })
 check.call("brief stops before production enablement", brief.include?("does not yet add a production") && brief.include?("No service, network listener, queue, scheduler, watcher"))
 

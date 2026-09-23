@@ -57,6 +57,7 @@ module SoulCore
       ready = executable?(binary) && missing.empty? && core.fetch("allowed")
       outcome("complete", true, "visual resources inspected", data: {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "vulkan_device_selector" => profile.fetch("vulkan_device_selector"), "vulkan_device_index" => profile.fetch("vulkan_device_index"),
         "runtime_ready" => executable?(binary), "models_ready" => missing.empty?, "ready" => ready,
         "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => motion_resources(core), "native_motion" => native_motion_resources(core),
         "blender" => @blender_scene_service&.resources&.fetch("data", {}) || { "ready" => false }
@@ -488,6 +489,14 @@ module SoulCore
     def read_manifest = JSON.parse(File.binread(@manifest_path, MAX_RECORD_BYTES))
     def dimensions(project) = ASPECTS.fetch(project.fetch("aspect_ratio"))
 
+    def visual_vulkan_environment
+      profile = read_manifest.fetch("profiles").values.first
+      selector = profile.fetch("vulkan_device_selector")
+      index = Integer(profile.fetch("vulkan_device_index"))
+      raise "visual Vulkan device selector is invalid" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/i) && index >= 0
+      { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
+    end
+
     def visual_core_status
       return { "allowed" => true, "core_id" => "unmanaged", "reason" => "standalone bounded invocation" } unless @core_status
       envelope = @core_status.call
@@ -525,7 +534,7 @@ module SoulCore
       write_json(File.join(staging, "input.json"), input)
       progress&.call("stage" => "rendering", "message" => kind == "image_edit" ? "FLUX.2 Klein is shaping an image-guided revision." : "FLUX.2 Klein is shaping one local still.")
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = @runner.run(command(project, output, prompt: prompt, seed: seed, source_path: source_path), timeout_seconds: TIMEOUT_SECONDS, env: { "VK_LOADER_DEBUG" => "none" }, max_output_bytes: 512 * 1024)
+      result = @runner.run(command(project, output, prompt: prompt, seed: seed, source_path: source_path), timeout_seconds: TIMEOUT_SECONDS, env: visual_vulkan_environment, max_output_bytes: 512 * 1024)
       elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)
       File.write(File.join(staging, "generation.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(0, 512 * 1024), mode: "wb", perm: 0o600)
       raise "visual renderer failed safely" unless result.success? && valid_png?(output)
@@ -550,6 +559,7 @@ module SoulCore
       ready = executable?(motion_runtime_binary) && missing.empty? && core.fetch("allowed")
       {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "vulkan_device_selector" => profile.fetch("vulkan_device_selector"), "vulkan_device_index" => profile.fetch("vulkan_device_index"),
         "runtime_ready" => executable?(motion_runtime_binary), "models_ready" => missing.empty?, "ready" => ready,
         "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core,
         "width" => profile.fetch("width"), "height" => profile.fetch("height"), "frames" => profile.fetch("frames"), "fps" => profile.fetch("fps")
@@ -575,6 +585,7 @@ module SoulCore
       ready = executable?(native_runtime_binary) && native_missing.empty? && shared_missing.empty? && delivery_missing.empty? && core.fetch("allowed")
       {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "vulkan_device_selector" => profile.fetch("vulkan_device_selector"), "vulkan_device_index" => profile.fetch("vulkan_device_index"),
         "runtime_ready" => executable?(native_runtime_binary) && delivery_missing.empty?, "models_ready" => native_missing.empty? && shared_missing.empty?, "ready" => ready,
         "missing_roles" => native_missing.map { |file| file.fetch("role") } + shared_missing.map { |file| file.fetch("role") } + delivery_missing.map { |file| file.fetch("role") }, "core" => core,
         "width" => profile.fetch("width"), "height" => profile.fetch("height"), "frames" => profile.fetch("frames"), "fps" => profile.fetch("fps"),
@@ -622,6 +633,15 @@ module SoulCore
        "--flow-shift", profile.fetch("flow_shift").to_s, "--diffusion-fa", "--offload-to-cpu", "-i", source_path, "-o", output]
     end
 
+    def motion_vulkan_environment
+      manifest = JSON.parse(File.binread(@motion_manifest_path, MAX_RECORD_BYTES))
+      profile = manifest.fetch("profiles").values.first
+      selector = profile.fetch("vulkan_device_selector")
+      index = Integer(profile.fetch("vulkan_device_index"))
+      raise "visual motion Vulkan device selector is invalid" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/i) && index >= 0
+      { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
+    end
+
     def native_motion_command(output, instruction, seed, profile_id)
       manifest = JSON.parse(File.binread(@native_manifest_path, MAX_RECORD_BYTES))
       profile = manifest.fetch("profiles").fetch(profile_id)
@@ -638,6 +658,15 @@ module SoulCore
        "--fps", profile.fetch("generation_fps", profile.fetch("fps")).to_s,
        "--flow-shift", profile.fetch("flow_shift").to_s, "--diffusion-fa", "--offload-to-cpu",
        "--backend", "vae=cpu", "--vae-tiling", "-o", output]
+    end
+
+    def native_vulkan_environment(profile_id)
+      manifest = JSON.parse(File.binread(@native_manifest_path, MAX_RECORD_BYTES))
+      profile = manifest.fetch("profiles").fetch(profile_id)
+      selector = profile.fetch("vulkan_device_selector")
+      index = Integer(profile.fetch("vulkan_device_index"))
+      raise "visual native Vulkan device selector is invalid" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/i) && index >= 0
+      { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
     end
 
     def native_motion_delivery_command(input, output, resource)
@@ -662,7 +691,7 @@ module SoulCore
       generated_output = interpolation ? File.join(staging, "motion.generated.webm") : output
       progress&.call("stage" => "native_motion_rendering", "message" => "FastWan is synthesizing one bounded native scene from text alone.")
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = @runner.run(native_motion_command(generated_output, instruction, seed, resource.fetch("profile_id")), timeout_seconds: resource.fetch("timeout_seconds"), env: { "VK_LOADER_DEBUG" => "none" }, max_output_bytes: 512 * 1024)
+      result = @runner.run(native_motion_command(generated_output, instruction, seed, resource.fetch("profile_id")), timeout_seconds: resource.fetch("timeout_seconds"), env: native_vulkan_environment(resource.fetch("profile_id")), max_output_bytes: 512 * 1024)
       log = result.stdout.to_s + result.stderr.to_s
       raise "native video renderer failed safely" unless result.success? && valid_video?(generated_output)
       if interpolation
@@ -698,7 +727,7 @@ module SoulCore
       source_path = artifact_path(project_id: project.fetch("project_id"), candidate_id: source.fetch("candidate_id"))
       progress&.call("stage" => "motion_rendering", "message" => "Wan is synthesizing one bounded four-second motion study from the reviewed still.")
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = @runner.run(motion_command(source_path, output, instruction, seed), timeout_seconds: TIMEOUT_SECONDS * 4, env: { "VK_LOADER_DEBUG" => "none" }, max_output_bytes: 512 * 1024)
+      result = @runner.run(motion_command(source_path, output, instruction, seed), timeout_seconds: TIMEOUT_SECONDS * 4, env: motion_vulkan_environment, max_output_bytes: 512 * 1024)
       elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)
       File.write(File.join(staging, "generation.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(-512 * 1024, 512 * 1024).to_s, mode: "wb", perm: 0o600)
       raise "visual motion renderer failed safely" unless result.success? && valid_video?(output)

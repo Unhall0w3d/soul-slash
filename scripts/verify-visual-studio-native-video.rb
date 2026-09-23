@@ -12,14 +12,16 @@ require_relative "../lib/soul_core/application_contract"
 Result = SoulCore::BoundedCommandRunner::Result
 
 class NativeVideoFixtureRunner
-  attr_reader :commands, :music_conflict
+  attr_reader :commands, :environments, :music_conflict
   def initialize(lease_store)
     @commands = []
+    @environments = []
     @lease_store = lease_store
     @music_conflict = false
   end
-  def run(command, **)
+  def run(command, env: {}, **)
     @commands << command
+    @environments << env
     begin
       lease = @lease_store.acquire_exclusive(
         provider_id: "amd-music", model_id: "ace-step-fixture", request_id: "candidate_fixture",
@@ -66,10 +68,11 @@ Dir.mktmpdir("soul-native-video-") do |root|
   still_manifest = File.join(root, "still.json")
   motion_manifest = File.join(root, "motion.json")
   native_manifest = File.join(root, "native.json")
-  File.write(still_manifest, JSON.generate({ "profiles" => { "still" => { "label" => "Still", "accelerator" => "AMD", "files" => [] } } }))
-  File.write(motion_manifest, JSON.generate({ "profiles" => { "motion" => { "files" => [text, tae] } } }))
+  File.write(still_manifest, JSON.generate({ "profiles" => { "still" => { "label" => "Still", "accelerator" => "AMD", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "files" => [] } } }))
+  File.write(motion_manifest, JSON.generate({ "profiles" => { "motion" => { "label" => "Motion", "accelerator" => "AMD", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "files" => [text, tae] } } }))
   native_profile = {
     "label" => "FastWan fixture", "accelerator" => "AMD Vulkan", "width" => 832, "height" => 480,
+    "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0,
     "duration_seconds" => 4, "frames" => 97, "fps" => 24, "steps" => 3, "cfg_scale" => 1, "flow_shift" => 3,
     "sampling_method" => "euler", "scheduler" => "lcm", "timeout_seconds" => 900,
     "files" => [diffusion], "shared_files" => { "text_encoder" => "text.gguf", "tae" => "tae.safetensors" }
@@ -107,6 +110,7 @@ Dir.mktmpdir("soul-native-video-") do |root|
   check.call("exact approval starts one bounded native render", wrong["lifecycle_state"] == "failed" && rendered["lifecycle_state"] == "blocked_for_human_review" && runner.commands.one?)
   check.call("one shared AMD lease blocks both Studio directions without queueing", occupied["lifecycle_state"] == "blocked_for_human_review" && occupied["message"].include?("AMD generation resource is occupied") && runner.music_conflict && lease_store.active_leases.empty?)
   check.call("native command has no image input, uses distilled schedule, and bounds decoder memory", !command.include?("-i") && command.each_cons(2).include?(["--steps", "3"]) && command.each_cons(2).include?(["--scheduler", "lcm"]) && command.each_cons(2).include?(["--backend", "vae=cpu"]) && command.include?("--vae-tiling"))
+  check.call("native renderer pins the RX 6900 XT as Vulkan GPU 0", runner.environments.first == { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => "1002:73bf!", "GGML_VK_VISIBLE_DEVICES" => "0" })
   motion = service.inspect(project_id: project.fetch("project_id")).dig("data", "project", "motions", 0)
   check.call("candidate records text-to-video lineage for review", motion["generation_kind"] == "text_to_video" && motion["operation"] == "visual_text_to_video" && !motion.key?("source_candidate_id"))
   revised_direction = "Keep the portal empty at first, reveal the organism behind the threshold, then let it cross the portal plane one limb at a time."

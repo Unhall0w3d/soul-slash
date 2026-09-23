@@ -12,10 +12,14 @@ require_relative "../lib/soul_core/application_contract"
 Result = SoulCore::BoundedCommandRunner::Result
 
 class MotionFixtureRunner
-  attr_reader :commands
-  def initialize = (@commands = [])
-  def run(command, **)
+  attr_reader :commands, :environments
+  def initialize
+    @commands = []
+    @environments = []
+  end
+  def run(command, env: {}, **)
     @commands << command
+    @environments << env
     output = command[command.index("-o") + 1]
     bytes = command.include?("vid_gen") ? ("webm-motion" * 300) : ("\x89PNG\r\n\x1a\n".b + ("still" * 300))
     File.binwrite(output, bytes)
@@ -61,8 +65,8 @@ Dir.mktmpdir("soul-generated-motion-") do |root|
   motion_files = %w[diffusion_model text_encoder tae].map { |role| make_file.call(motion_runtime, role) }
   still_manifest = File.join(root, "still.json")
   motion_manifest = File.join(root, "motion.json")
-  File.write(still_manifest, JSON.generate({ "profiles" => { "still" => { "label" => "Still", "accelerator" => "AMD", "steps" => 1, "cfg_scale" => 1, "files" => still_files } }, "motion_candidates" => {} }))
-  File.write(motion_manifest, JSON.generate({ "profiles" => { "motion" => { "label" => "Wan fixture", "accelerator" => "AMD Vulkan", "width" => 832, "height" => 480, "frames" => 33, "fps" => 8, "steps" => 1, "cfg_scale" => 1, "flow_shift" => 3, "sampling_method" => "euler", "decoder_role" => "tae", "files" => motion_files } } }))
+  File.write(still_manifest, JSON.generate({ "profiles" => { "still" => { "label" => "Still", "accelerator" => "AMD", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "steps" => 1, "cfg_scale" => 1, "files" => still_files } }, "motion_candidates" => {} }))
+  File.write(motion_manifest, JSON.generate({ "profiles" => { "motion" => { "label" => "Wan fixture", "accelerator" => "AMD Vulkan", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "width" => 832, "height" => 480, "frames" => 33, "fps" => 8, "steps" => 1, "cfg_scale" => 1, "flow_shift" => 3, "sampling_method" => "euler", "decoder_role" => "tae", "files" => motion_files } } }))
 
   ids = %w[1111111111111111 2222222222222222 3333333333333333]
   runner = MotionFixtureRunner.new
@@ -78,6 +82,8 @@ Dir.mktmpdir("soul-generated-motion-") do |root|
   wrong = service.motion_execute(project_id: project.fetch("project_id"), source_candidate_id: still_preview.fetch("candidate_id"), motion_id: preview.fetch("motion_candidate_id"), instruction: "Locked camera with restrained atmospheric motion.", seed: 77, confirmation: "yes", expected_digest: preview.fetch("expected_digest"))
   rendered = service.motion_execute(project_id: project.fetch("project_id"), source_candidate_id: still_preview.fetch("candidate_id"), motion_id: preview.fetch("motion_candidate_id"), instruction: "Locked camera with restrained atmospheric motion.", seed: 77, confirmation: preview.fetch("confirmation_phrase"), expected_digest: preview.fetch("expected_digest"))
   check.call("exact approval gates one bounded Wan invocation", wrong["lifecycle_state"] == "failed" && rendered["lifecycle_state"] == "blocked_for_human_review" && runner.commands.count { |command| command.include?("vid_gen") } == 1)
+  motion_environment = runner.environments.zip(runner.commands).find { |_environment, command| command.include?("vid_gen") }&.first
+  check.call("bounded Wan invocation pins the RX 6900 XT as Vulkan GPU 0", motion_environment == { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => "1002:73bf!", "GGML_VK_VISIBLE_DEVICES" => "0" })
   motion_id = preview.fetch("motion_candidate_id")
   inspect = service.inspect(project_id: project.fetch("project_id"))
   check.call("motion candidate is immutable archive evidence", inspect.dig("data", "project", "motions", 0, "motion_candidate_id") == motion_id && File.file?(service.motion_artifact_path(project_id: project.fetch("project_id"), motion_id: motion_id)))

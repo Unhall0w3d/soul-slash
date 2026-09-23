@@ -9,6 +9,8 @@
     "flux2-klein-4b-q4": {
       "label": "FLUX.2 Klein 4B Q4",
       "accelerator": "AMD Vulkan",
+      "vulkan_device_selector": "1002:73bf!",
+      "vulkan_device_index": 0,
       "license": "Apache-2.0",
       "steps": 4,
       "cfg_scale": 1.0,
