@@ -4,6 +4,7 @@ require "json"
 require_relative "bounded_command_runner"
 require_relative "model_runtime_lease_store"
 require_relative "model_runtime_profile_registry"
+require_relative "core_orchestration_service"
 
 module SoulCore
   class ModelRuntimeSelectedStarter
@@ -33,12 +34,19 @@ module SoulCore
       @lease_store.with_control_lock do
         selected_id = selected_profile_id(configuration)
         profiles = configuration.fetch("profiles")
+        core_id = CoreOrchestrationService.new(root: @root, env: @env)
+          .persisted_selection(profiles: profiles).fetch("active_core_id")
         states = profiles.to_h { |profile| [profile.fetch("id"), service_state(profile.fetch("service"))] }
         return blocked("one or more model runtime service states are uncertain", selected_id, states) if states.value?("unknown")
 
         active_ids = states.select { |_id, state| state == "active" }.keys
+        if core_id == "free"
+          return blocked("Free Core is selected but a chat runtime is active; no automatic stop was attempted", selected_id, states) unless active_ids.empty?
+
+          return complete("Free Core is selected; no chat runtime was started.", selected_id, states, started: false, core_id: core_id)
+        end
         if active_ids == [selected_id]
-          return complete("Selected model runtime is already active; no startup mutation was needed.", selected_id, states, started: false)
+          return complete("Selected model runtime is already active; no startup mutation was needed.", selected_id, states, started: false, core_id: core_id)
         end
         unless active_ids.empty?
           return blocked("a non-selected or conflicting model runtime is already active", selected_id, states)
@@ -51,12 +59,14 @@ module SoulCore
         after = profiles.to_h { |profile| [profile.fetch("id"), service_state(profile.fetch("service"))] }
         return failed("selected model runtime did not become solely active", "selected_profile_id" => selected_id, "states" => after) unless after[selected_id] == "active" && after.count { |_id, state| state == "active" } == 1
 
-        complete("Selected model runtime started.", selected_id, after, started: true)
+        complete("Selected model runtime started.", selected_id, after, started: true, core_id: core_id)
       end
-    rescue ModelRuntimeProfileRegistry::ConfigurationError, ModelRuntimeLeaseStore::IntegrityError => error
+    rescue ModelRuntimeProfileRegistry::ConfigurationError, ModelRuntimeLeaseStore::IntegrityError, CoreOrchestrationService::IntegrityError => error
       blocked(error.message, nil, {})
     rescue ModelRuntimeLeaseStore::LockUnavailable
       blocked("model runtime control is busy", nil, {})
+    rescue SystemCallError
+      blocked("model runtime startup files could not be read safely", nil, {})
     end
 
     private
@@ -70,6 +80,7 @@ module SoulCore
       raise ModelRuntimeLeaseStore::IntegrityError, "model runtime selection exceeds size limit" if stat.size > MAX_SELECTION_BYTES
 
       record = JSON.parse(File.binread(path, MAX_SELECTION_BYTES))
+      raise ModelRuntimeLeaseStore::IntegrityError, "model runtime selection is invalid" unless record.is_a?(Hash)
       id = record["profile_id"].to_s
       valid = record.keys == ["profile_id"] && configuration.fetch("profiles").any? { |profile| profile.fetch("id") == id }
       raise ModelRuntimeLeaseStore::IntegrityError, "model runtime selection is invalid" unless valid
@@ -99,9 +110,9 @@ module SoulCore
       path && File.file?(path) && File.executable?(path) && !File.symlink?(path)
     end
 
-    def complete(message, selected_id, states, started:)
+    def complete(message, selected_id, states, started:, core_id:)
       Result.new(ok: true, lifecycle_state: "complete", message: message, details: {
-        "selected_profile_id" => selected_id, "profile_states" => states, "started" => started,
+        "selected_profile_id" => selected_id, "profile_states" => states, "started" => started, "active_core_id" => core_id,
         "automatic_stop" => false, "retries" => 0
       })
     end

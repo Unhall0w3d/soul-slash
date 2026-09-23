@@ -47,9 +47,16 @@ model revision: 9b3707625776cc4cf775e9b12ab82f9fe48335ff
 ```
 
 The exact filenames, sizes, and SHA-256 values live in
-`config/music_vulkan_pilot_models.json`. Downloads must use revision-pinned
+`config/music_vulkan_models.json`. Downloads must use revision-pinned
 URLs, reject redirects outside HTTPS, write `.partial` files, verify size and
 digest, and rename atomically. A mismatch fails closed.
+
+On the restored dual-GPU Omarchy host, every bounded ACE-Step invocation must
+set `MESA_VK_DEVICE_SELECT=1002:73bf!` so only the RX 6900 XT is exposed, then
+set `GGML_VK_VISIBLE_DEVICES=0` so GGML selects that sole visible device. Both
+values are manifest-pinned and included in setup, download, and run review
+digests. This is a per-process identity contract; it does not reorder Vulkan
+devices globally.
 
 ## Authorized vertical slice
 
@@ -124,6 +131,20 @@ logs, and owned-child termination. No process survives command return.
   cancellation, artifact validation, review, export, or deletion gates.
 - No promotion based only on successful execution; human listening and
   workflow review remain authoritative.
+
+During the Omarchy recovery exercise, reconstruction stops after the pinned
+runtime and models are independently verified. It does not authorize a pilot,
+Core transition, or production change. Any later recovery qualification must
+begin with Soul on the Soul-Lite/`amd-free` Core at most; Daily, Creative, or a
+heavier Core must not own or compete for the RX 6900 XT.
+
+The 2026-09-03 recovery adaptation permits an exact, Operator-confirmed Music
+Studio generation or revision to lease the existing AMD Vulkan lane directly
+while Soul-Lite remains selected and Qwen chat remains on NVIDIA. This does not
+make music automatic or resident, does not change Core selection, and does not
+bypass the existing digest, active-work, timeout, cancellation, cleanup, or
+human listening gates. Requests from other Cores retain the existing explicit
+Creative Core transition.
 
 ## Acceptance gates
 

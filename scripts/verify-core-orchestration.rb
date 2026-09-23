@@ -178,7 +178,7 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
   selection = JSON.parse(File.read(selection_path))
   check.call("exact Core activation uses the reviewed stop-start controller", switched["ok"] && runner.mutations == [["stop", "soul-model-gemma.service"], ["start", "llama-server.service"]])
   check.call("successful activation records only bounded per-Core profile choices", selection == { "schema_version" => "soul.core_selection.v2", "active_core_id" => "amd-free", "profiles" => { "amd-free" => "nvidia-fallback", "daily" => "amd-gemma" } })
-  check.call("AMD-Free Core discloses NVIDIA music contention", switched.dig("data", "active_core_id") == "amd-free" && switched.dig("data", "music_lane", "available_in_active_core") == false && switched.dig("data", "music_lane", "conflict").include?("NVIDIA chat"))
+  check.call("Soul-Lite exposes only the bounded confirmed AMD music lane", switched.dig("data", "active_core_id") == "amd-free" && switched.dig("data", "music_lane", "available_in_active_core") == true && switched.dig("data", "music_lane", "accelerator") == "AMD Vulkan" && switched.dig("data", "music_lane", "authority") == "exact_generation_confirmation" && switched.dig("data", "music_lane", "conflict").nil?)
 
   shared_preview = cores.preview(core_id: "music")
   check.call("AMD-Free can preview a direct idle-safe Music intent transition without service mutation",
@@ -221,6 +221,8 @@ Dir.mktmpdir("soul-core-orchestration-") do |root|
                        confirmation: free_preview.dig("data", "confirmation_phrase"), expected_digest: free_preview.dig("data", "expected_digest"))
   check.call("Free Core unloads every chat model behind an exact gate",
              free["ok"] && free.dig("data", "active_core_id") == "free" && free.dig("data", "active_profile_count").zero?)
+  check.call("Free selection is not shadowed by a retained chat profile preference",
+             free.dig("data", "selected_core_id") == "free" && free.dig("data", "cores").count { |core| core["selected"] } == 1)
 
   dev_preview = cores.preview(core_id: "dev")
   dev = cores.execute(core_id: "dev", target_profile_id: dev_preview.dig("data", "target_profile", "id"),

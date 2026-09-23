@@ -26,7 +26,7 @@ end
 
 class FakeCore
   attr_reader :executions, :active
-  def initialize = (@active = "daily"; @executions = 0)
+  def initialize(active: "daily") = (@active = active; @executions = 0)
   def status = outcome({ "active_core_id" => @active })
   def preview(core_id:)
     outcome({ "target_core" => { "id" => core_id, "target_profile" => { "id" => "nvidia-qwen" } },
@@ -228,6 +228,27 @@ class FixedPlanClient
 end
 
 checks = {}
+
+Dir.mktmpdir("soul-lite-creative-workflow") do |root|
+  store = SoulCore::ChatStore.new(root: root)
+  chat = store.create_chat
+  core = FakeCore.new(active: "amd-free")
+  music = FakeMusic.new
+  service = SoulCore::ConversationCreativeWorkflowService.new(root: root, chat_store: store, provider_client: Object.new,
+    music_generation: music, visual_studio: FakeVisual.new, core_orchestration: core, planner: FakePlanner.new(plan),
+    review_planner: FakeReviewPlanner.new, revision_drafter: FakeRevisionDrafter.new,
+    visual_revision_drafter: FakeVisualRevisionDrafter.new, music_disposition: FakeMusicDisposition.new)
+  ready = service.plan(chat_id: chat.fetch("id"), message: "Make a song and image", provider: Object.new)
+  action = ready.dig("metadata", "actions", 0)
+  checks["soul_lite_music_uses_exact_bounded_lane_without_core_transfer"] =
+    action.dig("core_requirement", "required_core_id") == "amd-free" &&
+    action.dig("core_requirement", "transition_required") == false &&
+    action.dig("core_requirement", "reason").include?("temporarily leases AMD") &&
+    ready["content"].include?("Already in Soul-Lite Core; no transfer needed")
+  result = service.execute(chat_id: chat.fetch("id"), flow_id: action.fetch("flow_id"),
+    confirmation: action.fetch("confirmation_phrase"), expected_digest: action.fetch("expected_digest"))
+  checks["soul_lite_music_generation_keeps_soul_lite_selected"] = result["ok"] && core.active == "amd-free" && core.executions.zero?
+end
 checks["skill_catalog_requires_explicit_request"] = SoulCore::IntentRouter.new.route("I am working on your skills today").id == "unknown"
 checks["explicit_skill_catalog_still_routes"] = SoulCore::IntentRouter.new.route("What skills do you have?").id == "skill_catalog"
 status_statement = "I'm doing alright, reviewing system status while I check in with you."
@@ -452,9 +473,11 @@ Dir.mktmpdir("soul-creative-workflow") do |root|
   revision_action = proposed.dig("metadata", "actions", 0)
   revision_scope = proposed.dig("metadata", "creative_workflow", "revision_draft", "revision")
   checks["explicit_revision_request_returns_exact_action"] = proposed["mode"] == "creative_music_revision_ready" && revision_action["action_id"] == "creative_music_revision" && revision_scope["lyrics"] == ""
-  checks["music_revision_discloses_creative_core_requirement"] =
-    revision_action.dig("core_requirement", "required_core_id") == "music" &&
-    proposed["content"].include?("Required: Creative Core")
+  checks["music_revision_reuses_soul_lite_bounded_lane"] =
+    revision_action.dig("core_requirement", "active_core_id") == "amd-free" &&
+    revision_action.dig("core_requirement", "required_core_id") == "amd-free" &&
+    revision_action.dig("core_requirement", "transition_required") == false &&
+    proposed["content"].include?("Already in Soul-Lite Core; no transfer needed")
   stale_revision = service.execute(chat_id: revision_chat.fetch("id"), flow_id: revision_action.fetch("flow_id"), action_id: revision_action.fetch("action_id"),
     confirmation: revision_action.fetch("confirmation_phrase"), expected_digest: "0" * 64)
   checks["stale_revision_action_mutates_nothing"] = !stale_revision["ok"] && music.revisions.empty?

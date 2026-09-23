@@ -43,6 +43,14 @@ active NVIDIA or AMD model service during installation.
 
 ## Startup authority and behavior
 
+Restoration correction (2026-09-05): the validated persisted Free Core intent
+suppresses remembered chat-profile startup. All chat units inactive is a no-start
+success; an active chat unit is a review-blocked conflict, never an automatic
+stop. Invalid Core records fail closed. Absent/legacy Core records preserve the
+selected-profile policy. Embedding reconciliation uses the same validated Core
+observation rather than independently parsing the record. This changes no unit
+enablement and requires no live model transition for candidate testing.
+
 The startup selector derives authority only from the locally persisted profile
 ID previously written by Soul's human-confirmed runtime controller. It does not
 derive authority from LLM output.

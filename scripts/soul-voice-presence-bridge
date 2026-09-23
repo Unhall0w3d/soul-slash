@@ -6,7 +6,7 @@ require "json"
 require "securerandom"
 require_relative "../lib/soul_core/application_facade"
 require_relative "../lib/soul_core/configuration_resolver"
-require_relative "../lib/soul_core/voice_transcription_service"
+require_relative "../lib/soul_core/routed_voice_transcription_service"
 require_relative "../lib/soul_core/voice_synthesis_service"
 require_relative "../lib/soul_core/voice_screen_understanding_service"
 require_relative "../lib/soul_core/voice_presence_turn_policy"
@@ -70,7 +70,10 @@ begin
   transcription_options[:model_name] = environment["SOUL_VOICE_TRANSCRIPTION_MODEL"] unless environment["SOUL_VOICE_TRANSCRIPTION_MODEL"].to_s.empty?
 
   emit("type" => "state", "state" => "hearing", "summary" => "Resolving your voice.")
-  transcription = SoulCore::VoiceTranscriptionService.new(**transcription_options).transcribe(
+  transcriber = SoulCore::RoutedVoiceTranscriptionService.new(**transcription_options, process_env: environment)
+  # The AMD adapter returns only after verified recovery. No chat submission
+  # occurs on recovery failure, and this bridge never retries chats.send.
+  transcription = transcriber.transcribe(
     audio_bytes: File.binread(audio_path, SoulCore::VoiceTranscriptionService::MAX_UPLOAD_BYTES),
     content_type: "audio/wav"
   )
