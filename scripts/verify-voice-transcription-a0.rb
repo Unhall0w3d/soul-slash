@@ -16,7 +16,7 @@ check = lambda do |name, condition|
 end
 
 class VoiceFixtureRunner
-  attr_accessor :duration, :failure
+  attr_accessor :duration, :failure, :pcm, :segments, :signal_truncated
   attr_reader :temporary_directories
   attr_reader :commands
 
@@ -25,6 +25,9 @@ class VoiceFixtureRunner
     @failure = nil
     @temporary_directories = []
     @commands = []
+    @pcm = "\x01\x00".b
+    @signal_truncated = false
+    @segments = [" Hello Soul. ", "This remains an editable draft."]
   end
 
   def which(name) = "/fixture/#{name}"
@@ -37,14 +40,17 @@ class VoiceFixtureRunner
       @temporary_directories << File.dirname(argv.last)
       result(status, stdout: @duration.to_s)
     elsif argv.first == "ffmpeg"
+      if argv.include?("-f")
+        File.binwrite(argv.last, @pcm) if status == "ok"
+        value = result(status)
+        value.truncated = @signal_truncated
+        return value
+      end
       File.binwrite(argv.last, "RIFF-voice-fixture") if status == "ok"
       result(status)
     elsif File.basename(argv.first) == "whisper-cli"
       output = argv.fetch(argv.index("--output-file") + 1)
-      File.write("#{output}.json", JSON.generate("transcription" => [
-        { "offsets" => { "from" => 0, "to" => 900 }, "text" => " Hello Soul. " },
-        { "offsets" => { "from" => 950, "to" => 2100 }, "text" => "This remains an editable draft." }
-      ])) if status == "ok"
+      File.write("#{output}.json", JSON.generate("transcription" => @segments.map { |text| { "text" => text } })) if status == "ok"
       result(status)
     else
       result("failed")
@@ -112,9 +118,32 @@ Dir.mktmpdir("soul-voice-test-") do |root|
   check.call("bounded recording becomes an editable transcript and is never sent", completed["lifecycle_state"] == "complete" && completed.dig("data", "transcript") == "Hello Soul. This remains an editable draft." && completed.dig("data", "automatically_sent") == false)
   check.call("source and normalized audio are explicitly not retained", completed.dig("data", "source_audio_retained") == false && completed.dig("data", "normalized_audio_retained") == false)
   check.call("request-private temporary directories are removed at terminal return", runner.temporary_directories.all? { |path| !File.exist?(path) })
+  check.call("generic transcription has no assistant-name bias", runner.commands.none? { |command| command.include?("--prompt") })
   normalization_index = runner.commands.index { |command| command.first == "ffmpeg" }
   probe_index = runner.commands.index { |command| command.first == "ffprobe" }
   check.call("browser containers normalize under a hard ceiling before reliable WAV duration validation", normalization_index < probe_index && runner.commands[normalization_index].include?("-t") && runner.commands[probe_index].last.end_with?("normalized.wav"))
+
+  runner.pcm = "\x00\x00".b * 100
+  before = runner.commands.count { |command| File.basename(command.first) == "whisper-cli" }
+  silent = service.transcribe(audio_bytes: "silent-fixture", content_type: "audio/wav")
+  check.call("digital silence is rejected before recognition", silent["lifecycle_state"] == "awaiting_input" && !silent["ok"] && !silent.fetch("data").key?("transcript") && runner.commands.count { |command| File.basename(command.first) == "whisper-cli" } == before)
+  check.call("silence rejection removes private temporary audio", runner.temporary_directories.all? { |path| !File.exist?(path) })
+  runner.pcm = "\x01\x00".b
+  runner.segments = ["[BLANK_AUDIO]"]
+  blank = service.transcribe(audio_bytes: "marker-fixture", content_type: "audio/wav")
+  check.call("explicit blank-audio marker is not a transcript", blank["lifecycle_state"] == "awaiting_input" && !blank.fetch("data").key?("transcript"))
+  runner.segments = ["[BLANK_AUDIO]", "Thank you.", "Seoul is a city."]
+  mixed = service.transcribe(audio_bytes: "quiet-speech-fixture", content_type: "audio/wav")
+  check.call("nonzero quiet signal and real words are not rewritten or blacklisted", mixed["ok"] && mixed.dig("data", "transcript") == "Thank you. Seoul is a city.")
+  runner.signal_truncated = true
+  invalid_signal = service.transcribe(audio_bytes: "truncated-signal", content_type: "audio/wav")
+  check.call("truncated signal inspection fails safely", invalid_signal["lifecycle_state"] == "failed")
+  runner.signal_truncated = false
+  runner.pcm = "\x00".b
+  invalid_signal = service.transcribe(audio_bytes: "odd-pcm", content_type: "audio/wav")
+  check.call("incomplete PCM sample fails safely", invalid_signal["lifecycle_state"] == "failed")
+  runner.pcm = "\x01\x00".b
+  check.call("signal failure cleans temporary audio", runner.temporary_directories.all? { |path| !File.exist?(path) })
 
   runner.duration = 61.0
   excessive = service.transcribe(audio_bytes: "too-long".b, content_type: "audio/mp4")

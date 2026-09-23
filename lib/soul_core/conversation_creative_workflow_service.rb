@@ -1397,7 +1397,7 @@ module SoulCore
       active_core_id = status.dig("data", "active_core_id").to_s
       raise ArgumentError, "active Core is unavailable" unless CORE_LABELS.key?(active_core_id)
 
-      required_core_id = required_core_id(flow, action_id)
+      required_core_id = required_core_id(flow, action_id, active_core_id: active_core_id)
       {
         "active_core_id" => active_core_id,
         "active_core_label" => CORE_LABELS.fetch(active_core_id),
@@ -1409,13 +1409,13 @@ module SoulCore
       }
     end
 
-    def required_core_id(flow, action_id)
+    def required_core_id(flow, action_id, active_core_id: nil)
       case action_id
-      when "creative_music_revision" then "music"
+      when "creative_music_revision" then active_core_id == "amd-free" ? "amd-free" : "music"
       when "creative_visual_revision" then "amd-free"
       when "creative_native_motion" then "amd-free"
       when "creative_generate"
-        return "music" if new_music?(flow)
+        return active_core_id == "amd-free" ? "amd-free" : "music" if new_music?(flow)
         return "amd-free" if new_visual?(flow)
         nil
       else
@@ -1425,6 +1425,7 @@ module SoulCore
 
     def core_requirement_reason(action_id, required_core_id)
       return "This action resolves reviewed local sources and does not start bounded generation." unless required_core_id
+      return "The exact generation confirmation temporarily leases AMD to ACE-Step while Soul-Lite chat remains on NVIDIA." if %w[creative_generate creative_music_revision].include?(action_id) && required_core_id == "amd-free"
       return "Music generation reserves AMD for ACE-Step while NVIDIA carries chat." if %w[creative_generate creative_music_revision].include?(action_id) && required_core_id == "music"
 
       "Visual generation releases AMD chat before the bounded Vulkan render."
@@ -1449,14 +1450,15 @@ module SoulCore
     end
 
     def ensure_creative_core(flow, action_id:)
-      target_core_id = required_core_id(flow, action_id)
+      status = @core_orchestration.status
+      return status unless status.fetch("ok")
+      active_core_id = status.dig("data", "active_core_id").to_s
+      target_core_id = required_core_id(flow, action_id, active_core_id: active_core_id)
       stored = flow.fetch("core_requirement")
       return domain("blocked_for_human_review", false, "creative Core requirement changed; review the action again") unless stored["required_core_id"] == target_core_id
       return success({ "core_transition" => "not_required" }) unless target_core_id
 
-      status = @core_orchestration.status
-      return status unless status.fetch("ok")
-      return status if status.dig("data", "active_core_id") == target_core_id
+      return status if active_core_id == target_core_id
       preview = @core_orchestration.preview(core_id: target_core_id)
       return preview unless preview.fetch("ok")
       data = preview.fetch("data")

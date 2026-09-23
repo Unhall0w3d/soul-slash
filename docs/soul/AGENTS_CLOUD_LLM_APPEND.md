@@ -1,5 +1,13 @@
 # Soul/ Cloud LLM + Codex Guardrails
 
+The cloud-provider restrictions below govern Soul's advisory provider and
+generated-output ingestion paths. Human-authorized Codex work in this workspace
+may prepare and edit candidate files using the approved tools and delegation
+policy. It remains subject to the task's scope, data-access permissions,
+deterministic checks, and human promotion/merge/release gates. This distinction
+does not authorize forwarding private repository content, credentials or memory
+to another provider, or applying unreviewed provider output as executable work.
+
 Cloud LLMs may be used only for drafting, synthesis, critique, prototype suggestions, and review artifacts.
 
 Cloud LLM outputs must not be applied directly to the repo.

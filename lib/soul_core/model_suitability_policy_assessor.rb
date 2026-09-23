@@ -6,6 +6,9 @@ require "time"
 
 module SoulCore
   class ModelSuitabilityPolicyAssessor
+    RECOMMENDED_MODEL = "gpt-6-astra medium".freeze
+    MODEL_ROLE = "Astra is the primary orchestrator for generic policy assessment; task-specific workloads retain narrower suitability recommendations, so this boundary does not route every workload to Astra.".freeze
+
     POLICY_TIERS = {
       "local_only" => {
         "summary" => "Must remain local. Cloud routing is forbidden unless a future explicit override policy exists.",
@@ -108,7 +111,7 @@ module SoulCore
     }.freeze
 
     CODEX_BOUNDARY = {
-      "recommended_model" => "gpt-5.5 medium",
+      "recommended_model" => RECOMMENDED_MODEL,
       "allowed_use" => [
         "bounded implementation drafts",
         "single-task patch proposals",
@@ -188,6 +191,7 @@ module SoulCore
       lines << ""
       lines << "Codex boundary"
       lines << "- recommended_model: #{report.dig('codex_boundary', 'recommended_model')}"
+      lines << "- role: #{MODEL_ROLE}"
       lines << "- allowed_use:"
       report.dig("codex_boundary", "allowed_use").each { |item| lines << "  - #{item}" }
       lines << "- forbidden_use:"

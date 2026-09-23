@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/soul_core/voice_transcription_service"
+require_relative "../lib/soul_core/routed_voice_transcription_service"
 
 options = {
   root: File.expand_path("..", __dir__),
@@ -24,7 +24,7 @@ end
 
 abort "Usage: scripts/soul-voice-transcription check [--root PATH] [--manifest PATH] [--model EXACT_FILENAME]" unless command == "check"
 
-service = SoulCore::VoiceTranscriptionService.new(
+service = SoulCore::RoutedVoiceTranscriptionService.new(
   root: options.fetch(:root),
   music_root: options.fetch(:runtime_root),
   manifest_path: options.fetch(:manifest),

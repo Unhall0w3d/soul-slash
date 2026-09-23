@@ -1,8 +1,10 @@
 # Maintenance Foreground Execution A2 Brief
 
-> **Current amendment:** A11 supersedes the historical combined Arch/AUR
+> **Current amendments:** A11 supersedes the historical combined Arch/AUR
 > command below. Routine A2 now updates trusted pacman repositories and Flatpak
-> only; AUR updates use a separate interactive review gate.
+> only; AUR updates use a separate interactive review gate. The Omarchy
+> recovery uses the installed freedesktop `xdg-terminal-exec` launcher instead
+> of assuming Kitty is installed.
 
 Status: human-approved for implementation and deterministic rehearsal on
 2026-07-27; live package update not authorized
@@ -14,7 +16,7 @@ transaction that:
 
 1. re-collects and validates the A1 host evidence;
 2. binds the run to one exact reviewed plan digest;
-3. opens one foreground kitty terminal;
+3. opens one foreground terminal through the reviewed native launcher;
 4. requests the administrator password exactly once with `sudo -v`;
 5. runs the reviewed Arch/AUR and applicable Flatpak updates;
 6. verifies bounded postconditions;
@@ -45,7 +47,7 @@ Operator does not retype a confirmation phrase. Ordinary Chat or Voice
 conversation may explain or prepare the preview but cannot press, infer, or
 substitute for this control.
 
-After authorization, one visible kitty window owns the transaction. Package,
+After authorization, one visible terminal window owns the transaction. Package,
 PKGBUILD, replacement, conflict, and Flatpak prompts remain visible and
 interactive. The Dashboard request remains attached to the foreground
 transaction until the terminal command terminates; A2 must not detach an
@@ -119,7 +121,7 @@ Immediately before the terminal opens, A2 revalidates:
 
 - authenticated owner identity and expected UID;
 - A1 plan schema, digest, age, and selected update mode;
-- availability and exact paths of `kitty`, `sudo`, `yay`, and applicable
+- availability and exact paths of `xdg-terminal-exec`, `sudo`, `yay`, and applicable
   `flatpak`;
 - no pacman database lock;
 - bounded free-space thresholds for package caches, root, home, and temporary
@@ -134,8 +136,9 @@ authenticating.
 
 ## Foreground ownership and cancellation
 
-The Dashboard service starts kitty with a fixed class and a fixed A2 runner
-argument vector, without a shell, and waits for its process group to terminate.
+The Dashboard service starts the desktop's selected terminal through a fixed
+`xdg-terminal-exec` argument vector, without a shell, and waits for its process
+group to terminate.
 
 Closing the terminal or pressing `Ctrl+C`:
 

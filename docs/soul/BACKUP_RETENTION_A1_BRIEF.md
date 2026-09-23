@@ -35,11 +35,19 @@ preview. It does not run, wrap, approve, or expose `restic forget` or
 
 `SoulCore::BackupRetentionLedger` accepts at most:
 
-- 64 source roots;
-- 100,000 normalized absolute snapshot paths;
+- 128 source roots by default (Operator-approved increase on 2026-09-05);
+- 1,000,000 normalized absolute snapshot paths;
 - 100,000 deletion holds;
-- a 32 MiB owner-private ledger;
+- a 512 MiB owner-private ledger;
 - 10,000 candidate snapshot IDs in one retention preview.
+
+The separately configured Operator profile retains its 256-root ceiling.
+The Operator-approved capacity increase on 2026-09-11 also permits 256 MiB
+of projected inventory path text for local and Crucible reads. Persisted
+manifest readers use the same 512 MiB ceiling as the ledger. These are hard
+ceilings, not preallocated buffers; parsed objects and intermediate copies
+can consume additional memory. The 100,000 deletion-hold bound is unchanged.
+Other validation, review gates, and deletion protections are unchanged.
 
 Snapshot and repository identifiers must be full 64-character SHA-256
 identifiers. Paths must be sorted, unique, absolute, normalized, and contained

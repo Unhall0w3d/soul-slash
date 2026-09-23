@@ -9,6 +9,22 @@ PROJECT_ROOT := $(CURDIR)
 LOCAL_MAKEFILE ?= $(PROJECT_ROOT)/Makefile.local
 -include $(LOCAL_MAKEFILE)
 
+# Prefer Soul's pinned rbenv Ruby for every Make target on a configured host.
+# CI uses ruby/setup-ruby and has no private rbenv installation.
+PROJECT_RUBY_VERSION := $(strip $(shell cat $(PROJECT_ROOT)/.ruby-version))
+PROJECT_RUBY_BIN := $(HOME)/.rbenv/versions/$(PROJECT_RUBY_VERSION)/bin
+ifneq ($(wildcard $(PROJECT_RUBY_BIN)/ruby),)
+export PATH := $(PROJECT_RUBY_BIN):$(PATH)
+else
+ACTIVE_RUBY_VERSION := $(shell ruby -e 'print RUBY_VERSION' 2>/dev/null)
+ifneq ($(ACTIVE_RUBY_VERSION),$(PROJECT_RUBY_VERSION))
+ifneq ($(or $(MAKECMDGOALS),help),help)
+$(error Soul requires Ruby $(PROJECT_RUBY_VERSION) with Prism; install the project version or activate an exact matching Ruby)
+endif
+endif
+endif
+
+
 ENV_FILE ?= $(PROJECT_ROOT)/.env
 LAN_HOST ?=
 DASHBOARD_PUBLIC_HOST ?=
@@ -86,8 +102,10 @@ FLEET_SUBNET ?=
 .PHONY: operator-backup-config-plan operator-backup-configure verify-operator-backup verify-operator-drs-stream-reconciliation
 .PHONY: operator-drs-credential-plan operator-drs-credential-enroll operator-drs-test-plan operator-drs-test-install operator-drs-automation-status operator-drs-permanent-plan operator-drs-permanent-install
 .PHONY: verify-dev-core-model-bakeoff verify-noctalia-companion
+.PHONY: verify-agent-execution-control-plane verify-agent-operational-readiness
 .PHONY: clamav-check clamav-scan-downloads verify-clamav-bounded-scan
 .PHONY: atelier-cis-hardening-plan atelier-cis-hardening-status atelier-cis-hardening-install atelier-cis-hardening-remove verify-atelier-cis-hardening
+.PHONY: atelier-cis-hardening-a2-plan verify-atelier-cis-hardening-a2
 .PHONY: model-runtime-dev-plan model-runtime-dev-install model-runtime-dev-status model-runtime-dev-uninstall verify-dev-core-runtime verify-dev-core-skill-build verify-codex-soul-dev-worker verify-dev-worker-vault-context verify-dev-worker-vault-skill verify-self-assessment-dev-synthesis verify-self-augmentation-dev-critique verify-self-augmentation-dev-handoff verify-dev-review-bounded-jobs
 
 help:
@@ -1367,6 +1385,9 @@ maintenance-authority-uninstall:
 verify-maintenance-fleet-status:
 > @ruby scripts/verify-maintenance-fleet-status-b1.rb
 
+verify-maintenance-platform-adapters:
+> @ruby scripts/verify-maintenance-platform-adapters-a12.rb
+
 verify-maintenance-local-topology:
 > @ruby scripts/verify-maintenance-local-topology-a1.rb
 
@@ -1407,6 +1428,12 @@ atelier-cis-hardening-remove:
 verify-atelier-cis-hardening:
 > @ruby scripts/verify-atelier-cis-hardening-a1.rb
 
+atelier-cis-hardening-a2-plan:
+> @ruby scripts/soul-atelier-cis-hardening-a2 plan
+
+verify-atelier-cis-hardening-a2:
+> @ruby scripts/verify-atelier-cis-hardening-a2.rb
+
 wazuh-alert-notifications-plan:
 > @test -n "$(WAZUH_ALERTS_INTEGRATION_FILE)" || { echo "WAZUH_ALERTS_INTEGRATION_FILE is required."; exit 2; }
 > @ruby scripts/soul-wazuh-alert-notifications plan --integration-file "$(WAZUH_ALERTS_INTEGRATION_FILE)"
@@ -1430,6 +1457,10 @@ verify-winboat-inventory:
 
 verify-managed-switch-snmp-inventory:
 > @ruby scripts/verify-managed-switch-snmp-inventory-a1.rb
+
+.PHONY: verify-wazuh-network-device-rules
+verify-wazuh-network-device-rules:
+> @ruby scripts/verify-wazuh-network-device-rules-a0.rb
 
 .PHONY: verify-asuswrt-merlin-gateway
 verify-asuswrt-merlin-gateway:
@@ -1592,3 +1623,13 @@ maintenance-resume-uninstall:
 
 verify-noctalia-companion:
 > @ruby scripts/verify-noctalia-companion-a0.rb
+
+verify-agent-execution-control-plane:
+> @ruby scripts/verify-agent-execution-control-plane-a0.rb
+
+verify-agent-operational-readiness:
+> @ruby scripts/verify-agent-operational-readiness-a1.rb
+> @ruby scripts/verify-external-amd-workload-gate.rb
+> @ruby scripts/codex-policy-eval
+
+.PHONY: verify-maintenance-platform-adapters

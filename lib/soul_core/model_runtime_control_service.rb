@@ -148,10 +148,12 @@ module SoulCore
         blocker = mutation_blocker("unload", before, target)
         raise TemporaryReleaseError.new(blocker, lifecycle_state: "blocked_for_human_review", receipt: before) if blocker
 
-        progress(on_progress, "releasing_chat_engine", "The completed response is secure. Releasing the idle chat engine for expressive voice rendering.")
-        stopped = service_command("stop", target)
-        unless stopped.success? && observe_service_state(target.fetch("service")) == "inactive"
-          raise TemporaryReleaseError.new("chat engine could not be released safely", receipt: before)
+        prior_gpu = nil
+        if target.fetch("accelerator", "").downcase.include?("nvidia")
+          prior_gpu = observe_nvidia_allocation(target)
+          unless prior_gpu
+            raise TemporaryReleaseError.new("NVIDIA chat-engine placement is unverified; refusing temporary release", lifecycle_state: "blocked_for_human_review")
+          end
         end
 
         released_at = @monotonic_clock.call
@@ -159,12 +161,21 @@ module SoulCore
         work_error = nil
         restore_error = nil
         begin
+          progress(on_progress, "releasing_chat_engine", "Releasing the verified idle chat engine for bounded accelerator work.")
+          stopped = service_command("stop", target)
+          unless stopped.success? && observe_service_state(target.fetch("service")) == "inactive"
+            raise TemporaryReleaseError.new("chat engine could not be released safely", receipt: before)
+          end
           value = yield
-        rescue Exception => error # ensure restoration for interruption and ordinary synthesis failures
+        rescue Exception => error # Restoration also covers interruptions and ambiguous stop outcomes.
           work_error = error
         ensure
-          progress(on_progress, "restoring_chat_engine", "Expressive rendering is terminal. Restoring the prior chat engine.")
-          restore_error = restore_temporary_profile(target)
+          progress(on_progress, "restoring_chat_engine", "Reconciling the prior chat engine after bounded accelerator work.")
+          begin
+            restore_error = restore_temporary_profile(target, expected_gpu: prior_gpu)
+          rescue StandardError => error
+            restore_error = "prior chat engine restoration failed (#{error.class})"
+          end
         end
 
         receipt = {
@@ -172,12 +183,13 @@ module SoulCore
           "service" => target.fetch("service"),
           "released_seconds" => (@monotonic_clock.call - released_at).round(3),
           "restored" => restore_error.nil?,
+          "gpu_placement_verified" => prior_gpu ? restore_error.nil? : nil,
           "health" => restore_error.nil? ? "ready" : "failed"
         }
         raise TemporaryReleaseError.new(restore_error, receipt: receipt) if restore_error
         raise work_error if work_error
 
-        progress(on_progress, "chat_engine_ready", "The prior chat engine is healthy. Expressive audio is ready.")
+        progress(on_progress, "chat_engine_ready", "The prior chat engine is ready; bounded accelerator work is complete.")
         [value, receipt]
       end
     rescue ModelRuntimeProfileRegistry::ConfigurationError => error
@@ -190,19 +202,48 @@ module SoulCore
 
     private
 
-    def restore_temporary_profile(profile)
+    def restore_temporary_profile(profile, expected_gpu: nil)
       started = service_command("start", profile)
       return "prior chat engine restart command #{started.status}" unless started.success?
 
       deadline = @monotonic_clock.call + TEMPORARY_RESTORE_TIMEOUT_SECONDS
-      loop do
+      (TEMPORARY_RESTORE_TIMEOUT_SECONDS / TEMPORARY_RESTORE_POLL_SECONDS).ceil.times do
         service_ready = observe_service_state(profile.fetch("service")) == "active"
         server_ready = service_ready && observe_server(profile).fetch("health") == "ready"
-        return nil if server_ready
-        return "prior chat engine did not become healthy before the restore timeout" if @monotonic_clock.call >= deadline
+        placement = server_ready && expected_gpu ? observe_nvidia_allocation(profile) : nil
+        gpu_ready = expected_gpu.nil? || (placement && placement.fetch("gpu_uuid") == expected_gpu.fetch("gpu_uuid"))
+        return nil if server_ready && gpu_ready
+        return "prior chat engine health or GPU placement was not verified before the restore timeout" if @monotonic_clock.call >= deadline
 
         @sleeper.call(TEMPORARY_RESTORE_POLL_SECONDS)
       end
+      "prior chat engine restore attempt limit exceeded"
+    end
+
+    def observe_nvidia_allocation(profile)
+      pid_result = @runner.run("systemctl", "--user", "show", profile.fetch("service"), "--property=MainPID", "--value",
+                               timeout_seconds: COMMAND_TIMEOUT_SECONDS, max_output_bytes: 1024)
+      return nil unless pid_result.success? && !pid_result.truncated && pid_result.stdout.to_s.strip.match?(/\A[1-9][0-9]*\z/)
+
+      pid = pid_result.stdout.to_s.strip
+      result = @runner.run("nvidia-smi", "--query-compute-apps=pid,gpu_uuid,used_gpu_memory", "--format=csv,noheader,nounits",
+                          timeout_seconds: 5, max_output_bytes: 16 * 1024)
+      return nil unless result.success? && !result.truncated
+
+      rows = result.stdout.to_s.lines.map { |line| line.strip.split(/\s*,\s*/) }
+      return nil unless rows.all? do |row|
+        row.length == 3 && row[0].match?(/\A[1-9][0-9]*\z/) && row[1].match?(/\AGPU-[a-fA-F0-9-]+\z/) && row[2].match?(/\A[0-9]+\z/)
+      end
+      allocations = rows.select { |row| row.first == pid }
+      return nil unless allocations.one?
+
+      row = allocations.first
+      return nil unless row[2].to_i.positive?
+      # A Soul lease cannot reserve a GPU against external compute workloads.
+      # Require exclusive observed ownership before release and after restore.
+      return nil unless rows.count { |allocation| allocation[1] == row[1] } == 1
+
+      { "pid" => pid.to_i, "gpu_uuid" => row[1], "memory_mib" => row[2].to_i }
     end
 
     def progress(callback, stage, message)

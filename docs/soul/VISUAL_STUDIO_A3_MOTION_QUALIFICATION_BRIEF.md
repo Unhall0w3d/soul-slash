@@ -32,6 +32,11 @@ The exact runtime revision and 8,520,510,320 model bytes are pinned in
 least 24 GiB VRAM at 720p, so fitting the Q4 Vulkan path into this RX 6900 XT is
 a hypothesis to measure, not a compatibility claim.
 
+The dual-GPU host pins this lane with `MESA_VK_DEVICE_SELECT=1002:73bf!` and
+`GGML_VK_VISIBLE_DEVICES=0`. The first variable exposes only the reviewed AMD
+vendor/device pair; the second binds GGML to the resulting Vulkan GPU 0. The
+selector and ordinal are part of every setup, download, and pilot plan digest.
+
 LTX-Video is no longer the first candidate. Current LTX support in the selected
 runtime targets LTX-2.3, a substantially larger 22B lane with additional Gemma,
 connector, VAE, and upscaler dependencies. It remains a possible future option,
@@ -108,6 +113,9 @@ identified, and retained for human review.
 
 The pilot must demonstrate:
 
+- Soul is on the Soul-Lite/`amd-free` Core at most before the pilot begins; a
+  Daily, Creative, or otherwise heavier Core must not own or compete for the
+  RX 6900 XT during qualification;
 - the command uses the Vulkan build and does not substitute CUDA;
 - the RX 6900 XT completes without destabilizing the desktop or active Core;
 - the output is a readable video stream at the expected dimensions and bounded

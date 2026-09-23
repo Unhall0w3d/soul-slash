@@ -42,6 +42,25 @@ alert, notification path, or operational authority.
   errors and transmit drops from explicitly informational receive discards.
 - The region marker is deliberately approximate and owner-maintained.
 
+## 2026-09-03 Omarchy recovery adaptation
+
+The restored Grafana version resolves the geomap `default` basemap to CARTO,
+which renders an `API KEY REQUIRED` watermark. The repository now selects the
+installed plugin's explicit `osm-standard` OpenStreetMap layer. The private
+site label and approximate-coordinate renderer are unchanged, and no map API
+credential or new external integration is introduced. Live dashboard
+replacement remains an Operator-reviewed promotion step.
+
+The initial geomap view now reuses those same owner-private rendered
+coordinates at regional zoom 6 instead of opening on the whole world. The
+public template retains placeholders only, and normal map pan/zoom controls
+remain enabled.
+
+Live recovery promotion completed on 2026-09-03. Grafana restarted active,
+the provisioned dashboard retained its owner-private approximate coordinates,
+and its initial view now opens on that general region at zoom 6. The preceding
+world-view dashboard is retained as a timestamped root-owned backup.
+
 ## Live qualification evidence
 
 All reviewed PromQL families returned successful live results from the existing

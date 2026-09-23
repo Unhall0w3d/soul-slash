@@ -16,10 +16,14 @@ check = lambda do |label, condition|
 end
 
 class VisualFakeRunner
-  attr_reader :commands
-  def initialize = (@commands = [])
-  def run(command, **)
+  attr_reader :commands, :environments
+  def initialize
+    @commands = []
+    @environments = []
+  end
+  def run(command, env: {}, **)
     @commands << command
+    @environments << env
     output = command[command.index("-o") + 1]
     File.binwrite(output, "\x89PNG\r\n\x1a\n".b + ("visual" * 300))
     SoulCore::BoundedCommandRunner::Result.new(stdout: "ok", stderr: "", exit_status: 0, status: "ok", truncated: false)
@@ -37,7 +41,7 @@ Dir.mktmpdir("soul-visual-a1-") do |root|
     { "role" => role, "repository" => "test/models", "revision" => "a" * 40, "filename" => name, "bytes" => File.size(path), "sha256" => Digest::SHA256.file(path).hexdigest }
   end
   manifest = File.join(root, "manifest.json")
-  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => { "repository" => "https://example.invalid/runtime.git", "revision" => "b" * 40, "build" => "vulkan" }, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "steps" => 4, "cfg_scale" => 1.0, "files" => files } }, "motion_candidates" => { "ltx" => { "status" => "qualification_required" } } }))
+  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => { "repository" => "https://example.invalid/runtime.git", "revision" => "b" * 40, "build" => "vulkan" }, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "steps" => 4, "cfg_scale" => 1.0, "files" => files } }, "motion_candidates" => { "ltx" => { "status" => "qualification_required" } } }))
   runner = VisualFakeRunner.new
   service = SoulCore::VisualStudioService.new(root: root, visual_root: File.join(root, "Soul", "visual", "projects"), runtime_root: runtime, manifest_path: manifest, runner: runner, id_generator: -> { "1" * 16 })
 
@@ -55,6 +59,7 @@ Dir.mktmpdir("soul-visual-a1-") do |root|
   generated = service.generation_execute(project_id: project.fetch("project_id"), candidate_id: data.fetch("candidate_id"), confirmation: data.fetch("confirmation_phrase"), expected_digest: data.fetch("expected_digest"))
   check.call("one bounded draft terminates for review", generated["lifecycle_state"] == "blocked_for_human_review" && generated.dig("data", "candidate", "human_review_required") == true)
   check.call("renderer is Vulkan foreground CLI with fixed profile", runner.commands.one? && runner.commands.first.include?("--diffusion-model") && runner.commands.first.include?("--offload-to-cpu") && runner.commands.first.include?("--diffusion-fa"))
+  check.call("renderer pins the RX 6900 XT as the sole GGML Vulkan device", runner.environments.one? && runner.environments.first == { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => "1002:73bf!", "GGML_VK_VISIBLE_DEVICES" => "0" })
   inspected = service.inspect(project_id: project.fetch("project_id"))
   check.call("candidate is retained in newest-first project inventory", inspected.dig("data", "project", "candidates").length == 1)
 end

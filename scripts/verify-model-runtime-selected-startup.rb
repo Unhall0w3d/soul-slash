@@ -149,6 +149,37 @@ Dir.mktmpdir("soul-selected-startup-") do |root|
   failure = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: failure_runner, systemctl_path: systemctl).run
   check("start failure terminates explicitly without retry or fallback", failure.lifecycle_state == "failed" && failure_runner.commands.count { |command| command[2] == "start" } == 1, errors)
 
+  core_selection = File.join(root, "Soul/runtime/model_runtime/core_selection.json")
+  core_record = { "schema_version" => "soul.core_selection.v2", "active_core_id" => "free", "profiles" => {} }
+  File.write(core_selection, JSON.generate(core_record))
+  free_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  free = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: free_runner, systemctl_path: systemctl).run
+  check("Free Core suppresses remembered model startup", free.ok && free.details["active_core_id"] == "free" && !free.details["started"] && free_runner.commands.none? { |command| %w[start stop restart].include?(command[2]) }, errors)
+
+  free_active_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "active")
+  free_active = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: free_active_runner, systemctl_path: systemctl).run
+  check("Free Core with active chat blocks without automatic stop", free_active.lifecycle_state == "blocked_for_human_review" && free_active_runner.commands.none? { |command| %w[start stop restart].include?(command[2]) }, errors)
+
+  ["{", "[]", JSON.generate(core_record.merge("active_core_id" => "unknown")), JSON.generate(core_record.merge("profiles" => { "daily" => "foreign" })), " " * 4097].each_with_index do |body, index|
+    File.write(core_selection, body)
+    runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+    result = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: runner, systemctl_path: systemctl).run
+    check("invalid Core record #{index} blocks before commands", result.lifecycle_state == "blocked_for_human_review" && runner.commands.empty?, errors)
+  end
+  File.unlink(core_selection)
+  File.symlink(profile_file, core_selection)
+  runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  result = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: runner, systemctl_path: systemctl).run
+  check("symlinked Core record blocks before commands", result.lifecycle_state == "blocked_for_human_review" && runner.commands.empty?, errors)
+  File.unlink(core_selection)
+  [core_record.merge("active_core_id" => "daily"), { "schema_version" => "soul.core_selection.v1", "profiles" => {} }].each do |record|
+    File.write(core_selection, JSON.generate(record))
+    runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+    result = SoulCore::ModelRuntimeSelectedStarter.new(root: root, env: env, runner: runner, systemctl_path: systemctl).run
+    check("#{record['schema_version']} non-Free startup remains selected-profile based", result.ok && result.details["started"] && runner.commands.count { |command| command[2] == "start" } == 1, errors)
+  end
+  File.unlink(core_selection)
+
   selection = File.join(root, "Soul/runtime/model_runtime/selected_profile.json")
   File.unlink(selection)
   File.symlink(profile_file, selection)

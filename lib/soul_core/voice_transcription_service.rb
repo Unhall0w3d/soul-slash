@@ -18,6 +18,7 @@ module SoulCore
     TRANSCRIPTION_TIMEOUT_SECONDS = 180
     MAX_COMMAND_OUTPUT_BYTES = 256 * 1024
     MAX_TRANSCRIPT_BYTES = 512 * 1024
+    MAX_PCM_BYTES = ((MAX_DURATION_SECONDS + 0.25) * 16_000 * 2).to_i
 
     CONTENT_TYPES = {
       "audio/webm" => ".webm",
@@ -88,6 +89,10 @@ module SoulCore
         return outcome("awaiting_input", false, "recording duration must be between #{MIN_DURATION_SECONDS} and #{MAX_DURATION_SECONDS.to_i} seconds")
       end
 
+      if digital_silence?(normalized)
+        return outcome("awaiting_input", false, "no speech was detected; nothing was added to the composer")
+      end
+
       whisper = transcribe_file(normalized, output_base)
       transcript = transcript_text(whisper)
       return outcome("awaiting_input", false, "no speech was detected; nothing was added to the composer") if transcript.empty?
@@ -138,6 +143,26 @@ module SoulCore
       raise ArgumentError, "normalized recording is missing" unless File.file?(destination) && !File.symlink?(destination) && File.size(destination).positive?
     end
 
+    def digital_silence?(path)
+      pcm_path = File.join(File.dirname(path), "signal.pcm")
+      result = @runner.run(
+        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-i", path, "-t", (MAX_DURATION_SECONDS + 0.25).to_s,
+        "-vn", "-ac", "1", "-ar", "16000",
+        "-c:a", "pcm_s16le", "-f", "s16le", pcm_path,
+        timeout_seconds: NORMALIZE_TIMEOUT_SECONDS,
+        max_output_bytes: MAX_COMMAND_OUTPUT_BYTES
+      )
+      unless result.success? && !result.truncated && File.file?(pcm_path) && !File.symlink?(pcm_path) && File.size(pcm_path).between?(2, MAX_PCM_BYTES) && File.size(pcm_path).even?
+        raise ArgumentError, "recording signal could not be inspected"
+      end
+      pcm = File.binread(pcm_path, MAX_PCM_BYTES)
+
+      # RNNoise can emit exact zero PCM. Reject that without imposing an
+      # uncalibrated amplitude threshold on quiet but nonzero speech.
+      pcm.each_byte.all?(&:zero?)
+    end
+
     def transcribe_file(path, output_base)
       command = [
         binary_path, "--model", model_path, "--file", path,
@@ -163,7 +188,7 @@ module SoulCore
     def transcript_text(value)
       Array(value["transcription"]).filter_map do |segment|
         text = segment["text"].to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�").strip
-        text unless text.empty?
+        text unless text.empty? || text == "[BLANK_AUDIO]"
       end.join(" ").gsub(/\s+/, " ").strip
     end
 

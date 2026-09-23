@@ -507,10 +507,11 @@ Dir.mktmpdir("soul-device-control-") do |root|
   )
   timer = deployment.rendered.fetch(SoulCore::MaintenanceFleetStatusDeployment::TIMER)
   unit = deployment.rendered.fetch(SoulCore::MaintenanceFleetStatusDeployment::SERVICE)
-  check.call("scheduled collector is one-shot, noon/midnight only, persistent, and mutation-free",
-             timer.scan("OnCalendar=").length == 2 &&
-               timer.include?("*-*-* 00:00:00") &&
-               timer.include?("*-*-* 12:00:00") &&
+  check.call("scheduled collector is one-shot, every 15 minutes, persistent, and mutation-free",
+             timer.scan("OnCalendar=").length == 1 &&
+               timer.include?("OnCalendar=*-*-* *:00/15:00") &&
+               !timer.include?("00:00:00") &&
+               !timer.include?("12:00:00") &&
                timer.include?("Persistent=true") &&
                unit.include?("Type=oneshot") &&
                !unit.include?("Restart=") &&

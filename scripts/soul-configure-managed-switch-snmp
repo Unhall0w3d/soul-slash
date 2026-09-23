@@ -35,8 +35,8 @@ community = STDIN.read(257)
 fail_safely("SNMP community input exceeds 256 bytes") if community.bytesize > 256
 community = community.strip
 community_bytes = community.bytes
-unless community_bytes.length.between?(8, 128) && community_bytes.all? { |byte| byte.between?(33, 126) }
-  fail_safely("SNMP community must contain 8..128 non-whitespace printable ASCII characters")
+unless community_bytes.length.between?(7, 128) && community_bytes.all? { |byte| byte.between?(33, 126) }
+  fail_safely("SNMP community must contain 7..128 non-whitespace printable ASCII characters")
 end
 
 if File.exist?(ENV_PATH)

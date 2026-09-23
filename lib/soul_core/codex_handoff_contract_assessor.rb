@@ -7,6 +7,9 @@ require "fileutils"
 
 module SoulCore
   class CodexHandoffContractAssessor
+    RECOMMENDED_MODEL = "gpt-6-astra medium".freeze
+    MODEL_ROLE = "Astra is the primary orchestrator for generic handoff assessment and integration decisions; this recommendation remains advisory and does not invoke Codex or authorize changes.".freeze
+
     REQUIRED_FIELDS = [
       "task",
       "repo_context",
@@ -86,6 +89,8 @@ module SoulCore
       lines << ""
       lines << "Purpose"
       lines << contract.dig("task", "summary")
+      lines << "Recommended model: #{contract.dig('task', 'model_recommendation')}"
+      lines << "Model role: #{MODEL_ROLE}"
       lines << ""
       lines << "Required fields"
       report.fetch("required_fields").each { |field| lines << "- #{field}" }
@@ -125,7 +130,7 @@ module SoulCore
           "id" => task_id,
           "title" => title_for(task_id),
           "summary" => "Produce a bounded implementation proposal or review artifact for #{task_id}.",
-          "model_recommendation" => "gpt-5.5 medium",
+          "model_recommendation" => RECOMMENDED_MODEL,
           "status" => "handoff_contract_only"
         },
         "repo_context" => {

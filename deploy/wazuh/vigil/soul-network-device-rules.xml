@@ -1,0 +1,25 @@
+<group name="soul_network_device,network_device,">
+  <rule id="100100" level="3">
+    <decoded_as>soul-network-device</decoded_as>
+    <description>Managed network device event</description>
+  </rule>
+
+  <rule id="100101" level="1">
+    <if_sid>100100</if_sid>
+    <match type="pcre2">%SNMP-W-SNMPAUTHFAIL:</match>
+    <description>Count an unauthorized SNMP management attempt below the alert threshold</description>
+  </rule>
+
+  <rule id="100102" level="8" frequency="2" timeframe="900" ignore="900">
+    <if_matched_sid>100101</if_matched_sid>
+    <if_sid>100100</if_sid>
+    <match type="pcre2">%SNMP-W-SNMPAUTHFAIL:</match>
+    <description>Repeated unauthorized SNMP management attempts against a managed switch</description>
+  </rule>
+
+  <rule id="100103" level="7">
+    <if_sid>100100</if_sid>
+    <match type="pcre2">%(?!SNMP-W-SNMPAUTHFAIL:)[A-Z0-9]+-[WE]-[A-Z0-9]+:</match>
+    <description>Managed network device warning or error</description>
+  </rule>
+</group>

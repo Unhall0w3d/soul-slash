@@ -24,7 +24,7 @@ module SoulCore
     HANDOFF_START_TTL_SECONDS = 10 * 60
     MINIMUM_FREE_KIB = 2 * 1024 * 1024
     FIXED_PATHS = {
-      "kitty" => "/usr/bin/kitty",
+      "terminal" => "/usr/bin/xdg-terminal-exec",
       "ruby" => "/usr/bin/ruby",
       "sudo" => "/usr/bin/sudo",
       "pacman" => "/usr/bin/pacman",
@@ -40,9 +40,10 @@ module SoulCore
       def call(transaction_path:, mode:)
         script = File.join(@root, "scripts", "soul-maintenance-transaction")
         argv = [
-          FIXED_PATHS.fetch("kitty"),
-          "--class", "soul-maintenance",
-          "--title", "Soul / Guided Maintenance",
+          FIXED_PATHS.fetch("terminal"),
+          "--app-id=soul-maintenance",
+          "--title=Soul / Guided Maintenance",
+          "--",
           FIXED_PATHS.fetch("ruby"), script,
           "--root", @root,
           "--transaction", transaction_path,

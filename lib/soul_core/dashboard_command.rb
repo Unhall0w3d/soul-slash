@@ -5,7 +5,7 @@ require_relative "configuration_resolver"
 require_relative "dashboard_authentication"
 require_relative "dashboard_http_application"
 require_relative "dashboard_server"
-require_relative "voice_transcription_service"
+require_relative "routed_voice_transcription_service"
 require_relative "voice_synthesis_service"
 
 module SoulCore
@@ -43,7 +43,7 @@ module SoulCore
       voice_options[:music_root] = voice_root unless voice_root.empty?
       voice_options[:manifest_path] = voice_manifest unless voice_manifest.empty?
       voice_options[:model_name] = voice_model unless voice_model.empty?
-      voice_transcription = VoiceTranscriptionService.new(**voice_options)
+      voice_transcription = RoutedVoiceTranscriptionService.new(**voice_options, process_env: resolver.effective_environment)
       synthesis_options = { root: @root, process_env: resolver.effective_environment }
       synthesis_root = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_ROOT"].to_s
       synthesis_manifest = resolver.effective_environment["SOUL_VOICE_SYNTHESIS_MANIFEST"].to_s

@@ -12,12 +12,12 @@ Before accepting any cloud-assisted or Codex-assisted skill, confirm:
 
 ```text
 skill matches the approved brief
-no persistent/background behavior was added
+any persistent/background behavior matches exact human-authored brief authorization
 no safety gates were weakened
 memory keys are appropriate and shared
 deterministic tests pass
 local LLM evals were run where applicable
-cloud LLM output was used only as draft/review artifact
+advisory cloud-provider output was used only as draft/review artifact
 no secrets were exposed
 no private repo data was sent without approval
 failure behavior is predictable

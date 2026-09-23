@@ -175,21 +175,23 @@ For a persistent local dashboard and protected LAN access, follow the preview-fi
 
 ## Common commands
 
+On this host, use the pinned project Ruby through `rbenv exec`; `make` selects the same private interpreter. The operating-system Ruby is left alone.
+
 ```bash
 # Terminal conversation
-ruby bin/soul chat
-ruby bin/soul chat "inspect this machine"
+rbenv exec ruby bin/soul chat
+rbenv exec ruby bin/soul chat "inspect this machine"
 
 # Capability and health inventory
-ruby bin/soul skills
-ruby bin/soul doctor
-ruby bin/soul skill system.status
+rbenv exec ruby bin/soul skills
+rbenv exec ruby bin/soul doctor
+rbenv exec ruby bin/soul skill system.status
 
 # Bounded assessments
-ruby bin/soul assess environment
-ruby bin/soul assess environment --updates
-ruby bin/soul assess models
-ruby bin/soul assess capabilities
+rbenv exec ruby bin/soul assess environment
+rbenv exec ruby bin/soul assess environment --updates
+rbenv exec ruby bin/soul assess models
+rbenv exec ruby bin/soul assess capabilities
 
 # Dashboard
 make dashboard

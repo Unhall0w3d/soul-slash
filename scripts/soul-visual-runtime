@@ -26,7 +26,7 @@ class VisualRuntime
 
   def check
     files = @profile.fetch("files").map { |file| file.merge("verified" => verified?(model_path(file), file)) }
-    emit("lifecycle_state" => "complete", "runtime_ready" => executable?(binary), "models_ready" => files.all? { |file| file["verified"] }, "binary" => binary, "profile_id" => @profile_id, "files" => files.map { |file| file.slice("role", "filename", "bytes", "verified") }, "persistent_service" => false, "network_listener" => false)
+    emit("lifecycle_state" => "complete", "runtime_ready" => executable?(binary), "models_ready" => files.all? { |file| file["verified"] }, "binary" => binary, "profile_id" => @profile_id, "vulkan_device_selector" => @profile.fetch("vulkan_device_selector"), "vulkan_device_index" => @profile.fetch("vulkan_device_index"), "files" => files.map { |file| file.slice("role", "filename", "bytes", "verified") }, "persistent_service" => false, "network_listener" => false)
   end
 
   def plan(action)
@@ -80,7 +80,7 @@ class VisualRuntime
   def plan_data(action)
     raise "action must be setup or download" unless %w[setup download].include?(action)
     confirmation = action == "setup" ? SETUP_CONFIRMATION : DOWNLOAD_CONFIRMATION
-    data = { "operation" => "visual_runtime_#{action}", "root" => @root, "profile_id" => @profile_id, "runtime_repository" => @source.fetch("repository"), "runtime_revision" => @source.fetch("revision"), "download_bytes" => action == "download" ? @profile.fetch("files").sum { |file| file.fetch("bytes") } : 0, "confirmation_phrase" => confirmation, "persistent_service" => false, "network_listener" => false, "bounded_foreground_operation" => true }
+    data = { "operation" => "visual_runtime_#{action}", "root" => @root, "profile_id" => @profile_id, "runtime_repository" => @source.fetch("repository"), "runtime_revision" => @source.fetch("revision"), "vulkan_device_selector" => @profile.fetch("vulkan_device_selector"), "vulkan_device_index" => @profile.fetch("vulkan_device_index"), "download_bytes" => action == "download" ? @profile.fetch("files").sum { |file| file.fetch("bytes") } : 0, "confirmation_phrase" => confirmation, "persistent_service" => false, "network_listener" => false, "bounded_foreground_operation" => true }
     data.merge("expected_digest" => digest(data))
   end
 

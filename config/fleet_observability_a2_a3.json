@@ -4,6 +4,7 @@
   "state": "candidate_complete",
   "a2": {
     "snmp_exporter": "loopback_only_owner_private_auth",
+    "linux_host_snmp": "separate_owner_private_read_only_lane",
     "journal_scope": "reviewed_maintenance_units_redacted_message",
     "alerts": "grafana_and_prometheus_only",
     "notifications": false,

@@ -129,6 +129,8 @@ check.call("invalid target and absent credential fail before any command",
            adapter.collect(address: "8.8.8.8", community: community)["state"] == "invalid_target" &&
              adapter.collect(address: "192.168.124.10", community: "short")["state"] == "credential_not_configured" &&
              runner.calls.length == 4)
+check.call("seven-character legacy switch communities remain compatible",
+           adapter.collect(address: "192.168.124.10", community: "seven77")["available"] == true)
 
 switch_env = {
     "SOUL_FLEET_LATTICE_ENABLED" => "true",

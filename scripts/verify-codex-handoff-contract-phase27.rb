@@ -52,7 +52,7 @@ json_ok =
   json["read_only"] == true &&
   json["write_requested"] == false &&
   json["contract_path"].nil? &&
-  json.dig("contract", "task", "model_recommendation") == "gpt-5.5 medium" &&
+  json.dig("contract", "task", "model_recommendation") == "gpt-6-astra medium" &&
   json.dig("validation", "valid") == true &&
   json.dig("verification", "no_codex_invoked") == true &&
   json.dig("verification", "no_implementation_written") == true

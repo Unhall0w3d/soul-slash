@@ -210,7 +210,7 @@ module SoulCore
         "proxy_unit" => <<~UNIT
           [Unit]
           Description=Soul LAN HTTPS reverse proxy
-          Requires=soul-dashboard.service
+          Wants=soul-dashboard.service
           After=network-online.target soul-dashboard.service
           Wants=network-online.target
           StartLimitIntervalSec=60

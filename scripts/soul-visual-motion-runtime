@@ -123,7 +123,7 @@ class VisualMotionRuntime
     output = File.join(partial_dir, "pilot.webm")
     started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     command = render_command(request_data, output)
-    log = run_command(command, timeout: Integer(@profile.fetch("timeout_seconds")))
+    log = run_command(command, timeout: Integer(@profile.fetch("timeout_seconds")), env: visual_vulkan_environment)
     evidence = probe_video(output)
     elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     receipt = plan.merge(
@@ -162,6 +162,8 @@ class VisualMotionRuntime
       "profile_id" => @profile_id,
       "runtime_repository" => @source.fetch("repository"),
       "runtime_revision" => @source.fetch("revision"),
+      "vulkan_device_selector" => @profile.fetch("vulkan_device_selector"),
+      "vulkan_device_index" => @profile.fetch("vulkan_device_index"),
       "download_bytes" => action == "download" ? model_files.sum { |file| file.fetch("bytes") } : 0,
       "confirmation_phrase" => confirmation,
       "persistent_service" => false,
@@ -227,7 +229,14 @@ class VisualMotionRuntime
   end
 
   def profile_projection
-    @profile.slice("label", "accelerator", "mode", "width", "height", "frames", "fps", "steps", "cfg_scale", "flow_shift", "sampling_method", "decoder_role", "vae_backend", "timeout_seconds")
+    @profile.slice("label", "accelerator", "vulkan_device_selector", "vulkan_device_index", "mode", "width", "height", "frames", "fps", "steps", "cfg_scale", "flow_shift", "sampling_method", "decoder_role", "vae_backend", "timeout_seconds")
+  end
+
+  def visual_vulkan_environment
+    selector = @profile.fetch("vulkan_device_selector")
+    index = Integer(@profile.fetch("vulkan_device_index"))
+    raise "visual motion Vulkan device selector is invalid" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/i) && index >= 0
+    { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
   end
 
   def authorize!(action, phrase)
@@ -253,10 +262,10 @@ class VisualMotionRuntime
     FileUtils.rm_rf(partial) if defined?(partial) && partial && File.exist?(partial)
   end
 
-  def run_command(command, timeout:, chdir: nil)
+  def run_command(command, timeout:, chdir: nil, env: {})
     output = +""; status = nil; wait_thread = nil; reader = nil; stream = nil
     options = { pgroup: true }; options[:chdir] = chdir if chdir
-    stdin, stream, wait_thread = Open3.popen2e(*command, **options)
+    stdin, stream, wait_thread = Open3.popen2e(env, *command, **options)
     stdin.close
     reader = Thread.new { stream.read }
     Timeout.timeout(timeout) { status = wait_thread.value }

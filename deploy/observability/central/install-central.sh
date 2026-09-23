@@ -62,6 +62,14 @@ else
   install -o root -g prometheus -m 0640 /dev/null /etc/prometheus/soul-switch-targets.json
   printf '%s\n' '[]' > /etc/prometheus/soul-switch-targets.json
 fi
+if [[ -f /root/soul-linux-snmp-targets.json ]]; then
+  [[ $(stat -c '%a' /root/soul-linux-snmp-targets.json) == 600 ]] || { echo "Linux host SNMP targets must be mode 0600" >&2; exit 1; }
+  install -o root -g prometheus -m 0640 /root/soul-linux-snmp-targets.json /etc/prometheus/soul-linux-snmp-targets.json
+else
+  printf '%s\n' '[]' > /etc/prometheus/soul-linux-snmp-targets.json
+  chown root:prometheus /etc/prometheus/soul-linux-snmp-targets.json
+  chmod 0640 /etc/prometheus/soul-linux-snmp-targets.json
+fi
 install -d -o prometheus -g prometheus -m 0750 /var/lib/prometheus
 install -d -m 0755 /etc/systemd/system/prometheus-snmp-exporter.service.d
 cat > /etc/systemd/system/prometheus-snmp-exporter.service.d/soul-observability.conf <<'EOF'

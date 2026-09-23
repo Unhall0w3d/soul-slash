@@ -105,8 +105,8 @@ module SoulCore
       availability = @index.availability
       active = @selector.active
       availability["available"] == true && availability["source_digest"] == snapshot["source_digest"] &&
-        active.is_a?(Hash) && active.dig("source_digests", "approved_index") == snapshot["source_digest"]
-        && active.dig("source_digests", "canonical_state") == snapshot["canonical_state_digest"]
+        active.is_a?(Hash) && active.dig("source_digests", "approved_index") == snapshot["source_digest"] &&
+        active.dig("source_digests", "canonical_state") == snapshot["canonical_state_digest"]
     rescue StandardError
       false
     end

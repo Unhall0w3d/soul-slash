@@ -169,7 +169,7 @@ module SoulCore
           },
           {
             "id" => "first_bounded_codex_task",
-            "summary" => "Use Codex with gpt-5.5 medium on one contract-bound task, then review output locally."
+            "summary" => "Use Codex with gpt-6-luna low on one contract-bound documentation-only task, then review output locally."
           },
           {
             "id" => "speech_to_text_assessment",

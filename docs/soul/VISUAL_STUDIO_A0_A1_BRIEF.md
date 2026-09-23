@@ -25,6 +25,13 @@ The selection is based on primary project material:
 - [FLUX.2 Klein](https://github.com/black-forest-labs/flux2) provides a current unified generation/editing family with an Apache-2.0 4B variant.
 - [Z-Image](https://github.com/Tongyi-MAI/Z-Image) is the comparison candidate: its 6B Turbo variant targets 16 GB consumer devices, but its released Turbo lane is generation-focused and the dedicated editing checkpoint is not yet the cleaner first boundary.
 
+On the dual-GPU Atelier host, the bounded still-image renderer pins the RX 6900
+XT by both hardware identity and GGML ordinal. `MESA_VK_DEVICE_SELECT=1002:73bf!`
+makes that AMD vendor/device pair the sole Vulkan device and
+`GGML_VK_VISIBLE_DEVICES=0` constrains GGML to the resulting GPU 0. This avoids
+depending on global Vulkan enumeration order and does not alter other
+applications.
+
 ## Motion decision (superseded by A3 research)
 
 The original LTX-Video 2B choice was a research placeholder. Visual Studio A3

@@ -1,0 +1,55 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "time"
+require_relative "../lib/soul_core/bounded_command_runner"
+
+root = File.expand_path("..", __dir__)
+runner = SoulCore::BoundedCommandRunner.new
+bundled_cli = "/usr/lib/chatgpt/resources/codex"
+cli = ENV.fetch("SOUL_CODEX_CLI", File.executable?(bundled_cli) ? bundled_cli : runner.which("codex"))
+raise "Codex CLI is unavailable" unless cli
+result = runner.run(cli, "doctor", "--json", timeout_seconds: 20, max_output_bytes: 512 * 1024)
+raise "Codex doctor did not return a complete report (#{result.status})" if %w[timeout unavailable].include?(result.status) || result.truncated || result.stdout.empty?
+
+doctor = JSON.parse(result.stdout)
+checks = doctor.fetch("checks")
+raise "Codex doctor checks are not an object" unless checks.is_a?(Hash)
+config = checks.fetch("config.load", {}).fetch("details", {})
+sandbox = checks.fetch("sandbox.helpers", {}).fetch("details", {})
+project_config = File.join(root, ".codex", "config.toml")
+requested_sandbox = if File.file?(project_config) && !File.symlink?(project_config) && File.size(project_config) <= 128 * 1024
+                      File.read(project_config)[/^sandbox_mode\s*=\s*"([^"]+)"/, 1]
+                    end
+git_head = runner.run("git", "-C", root, "rev-parse", "HEAD", timeout_seconds: 5, max_output_bytes: 128)
+git_state = runner.run("git", "-C", root, "status", "--porcelain=v1", "-z", timeout_seconds: 10, max_output_bytes: 256 * 1024)
+review_names = %w[AGENT_EXECUTION_CONTROL_PLANE_A0_REVIEW.md CODEX_OPERATIONAL_READINESS_A1_REVIEW.md]
+review_outcomes = review_names.filter_map do |name|
+  path = File.join(root, "docs", "assessments", name)
+  next unless File.file?(path) && !File.symlink?(path) && File.size(path) <= 128 * 1024
+
+  { "path" => "docs/assessments/#{name}",
+    "human_outcome" => File.read(path)[/^Outcome:\s*(\S+)/i, 1] || "unrecorded" }
+end
+
+puts JSON.pretty_generate(
+  "schema_version" => "soul.codex.preflight.v1",
+  "generated_at" => Time.now.utc.iso8601,
+  "source" => "separate_cli_invocation_not_active_app_turn",
+  "codex_version" => doctor["codexVersion"],
+  "doctor_status" => doctor["overallStatus"],
+  "doctor_attention_checks" => checks.filter_map { |id, check| { "id" => id, "status" => check["status"] } unless check["status"] == "ok" },
+  "configured_model_for_cli" => config["model"],
+  "project_requested_sandbox" => requested_sandbox,
+  "cli_invocation_sandbox" => sandbox["filesystem sandbox"],
+  "cli_invocation_approval_policy" => sandbox["approval policy"],
+  "active_turn_model" => "not_inspected",
+  "active_turn_sandbox" => "not_inspected",
+  "active_turn_writable_roots" => "not_inspected",
+  "active_turn_network" => "not_inspected",
+  "repository_head" => git_head.success? && !git_head.truncated ? git_head.stdout.strip : "unknown",
+  "repository_dirty" => git_state.success? && !git_state.truncated ? !git_state.stdout.empty? : "unknown",
+  "review_artifacts" => review_outcomes,
+  "instruction" => "Use the current turn's platform permission context for effective authority; this CLI probe cannot attest to app-turn overrides."
+)

@@ -9,13 +9,20 @@ fi
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 TARGETS_FILE=${1:-}
 SNMP_FILE=${2:-}
+LINUX_HOST_TARGETS_FILE=${3:-}
 
 if [[ -n ${TARGETS_FILE} || -n ${SNMP_FILE} ]]; then
+  [[ -n ${LINUX_HOST_TARGETS_FILE} ]] || { echo "SNMP replacement requires the rendered Linux host targets too; supply all three renderer outputs to preserve host monitoring" >&2; exit 1; }
   [[ -n ${TARGETS_FILE} && -n ${SNMP_FILE} ]] || { echo "switch targets and SNMP auth must be supplied together" >&2; exit 1; }
   for file in "${TARGETS_FILE}" "${SNMP_FILE}"; do
     [[ -f ${file} && ! -L ${file} ]] || { echo "owner-private SNMP input is unavailable" >&2; exit 1; }
     [[ $(stat -c '%a' "${file}") == 600 ]] || { echo "owner-private SNMP inputs must be mode 0600" >&2; exit 1; }
   done
+fi
+if [[ -n ${LINUX_HOST_TARGETS_FILE} ]]; then
+  [[ -n ${SNMP_FILE} ]] || { echo "Linux host targets require the combined SNMP auth/module file" >&2; exit 1; }
+  [[ -f ${LINUX_HOST_TARGETS_FILE} && ! -L ${LINUX_HOST_TARGETS_FILE} ]] || { echo "owner-private Linux host SNMP targets are unavailable" >&2; exit 1; }
+  [[ $(stat -c '%a' "${LINUX_HOST_TARGETS_FILE}") == 600 ]] || { echo "owner-private Linux host SNMP targets must be mode 0600" >&2; exit 1; }
 fi
 
 export DEBIAN_FRONTEND=noninteractive
@@ -45,6 +52,13 @@ elif [[ ! -f /etc/prometheus/soul-switch-targets.json ]]; then
   printf '%s\n' '[]' > /etc/prometheus/soul-switch-targets.json
   chown root:prometheus /etc/prometheus/soul-switch-targets.json
   chmod 0640 /etc/prometheus/soul-switch-targets.json
+fi
+if [[ -n ${LINUX_HOST_TARGETS_FILE} ]]; then
+  install -o root -g prometheus -m 0640 "${LINUX_HOST_TARGETS_FILE}" /etc/prometheus/soul-linux-snmp-targets.json
+elif [[ ! -f /etc/prometheus/soul-linux-snmp-targets.json ]]; then
+  printf '%s\n' '[]' > /etc/prometheus/soul-linux-snmp-targets.json
+  chown root:prometheus /etc/prometheus/soul-linux-snmp-targets.json
+  chmod 0640 /etc/prometheus/soul-linux-snmp-targets.json
 fi
 
 /usr/bin/promtool check rules /etc/prometheus/rules/soul-fleet-alerts.yml

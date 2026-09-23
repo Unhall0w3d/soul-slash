@@ -4,6 +4,9 @@
 
 require "json"
 require "open3"
+require "tmpdir"
+require "fileutils"
+require_relative "../lib/soul_core/repo_curation_assessor"
 
 errors = []
 
@@ -68,6 +71,31 @@ doc_ok =
   File.read("docs/REPOSITORY_MAP.md").include?("Local/generated areas")
 puts "- phase 21 docs: #{doc_ok ? 'ok' : 'missing'}"
 errors << "phase 21 docs missing expected content" unless doc_ok
+
+Dir.mktmpdir("soul-curation-inventory-") do |root|
+  _out, err, initialized = Open3.capture3("git", "init", "-q", root)
+  raise "fixture git init failed: #{err}" unless initialized.success?
+
+  candidates = %w[
+    .codex/config.toml
+    docs/assessments/review.md
+    lib/soul_core/candidate.rb
+    scripts/verify-restricted-config-capture.py
+  ]
+  generated = "Soul/runtime/local.json"
+  (candidates + [generated]).each do |path|
+    destination = File.join(root, path)
+    FileUtils.mkdir_p(File.dirname(destination))
+    File.write(destination, "fixture\n")
+  end
+
+  inventory = SoulCore::RepoCurationAssessor.new(root: root).assess
+  complete = inventory.fetch("untracked_review_candidates").sort == candidates.sort &&
+    inventory.fetch("untracked_generated_local") == [generated] &&
+    inventory.dig("counts", "untracked_review_candidates") == candidates.length
+  puts "- untracked source, docs, Python verifier and local-state inventory: #{complete ? 'ok' : 'missing'}"
+  errors << "untracked curation inventory missed candidates or generated state" unless complete
+end
 
 if errors.empty?
   puts "Verification complete."

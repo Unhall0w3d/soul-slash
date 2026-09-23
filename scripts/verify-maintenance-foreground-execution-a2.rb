@@ -227,7 +227,7 @@ Dir.mktmpdir("soul-maintenance-a2") do |root|
   check.call("preview is digest-bound and keeps live execution disabled", preview["ok"] && plan["execution_available"] == false && plan["rehearsal_available"] == true && preview.dig("data", "expected_digest").match?(/\A[a-f0-9]{64}\z/))
   check.call("trusted repository maintenance uses only pacman and excludes AUR", plan.fetch("commands").first.fetch("argv") == ["/usr/bin/sudo", "-n", "/usr/bin/pacman", "-Syu"] && plan.dig("aur_review", "included_in_unattended_maintenance") == false)
   check.call("Flatpak user and system scopes retain fixed vectors", plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/flatpak", "update", "--user"]) && plan.fetch("commands").map { |item| item.fetch("argv") }.include?(["/usr/bin/sudo", "-n", "/usr/bin/flatpak", "update", "--system"]))
-  check.call("preflight observes disk, active work, package lock, and fixed tools", plan.dig("preflight", "blockers").empty? && plan.dig("preflight", "disk_free").length == 3 && plan.dig("preflight", "required_executables", "kitty") == "/usr/bin/kitty")
+  check.call("preflight observes disk, active work, package lock, and fixed tools", plan.dig("preflight", "blockers").empty? && plan.dig("preflight", "disk_free").length == 3 && plan.dig("preflight", "required_executables", "terminal") == "/usr/bin/xdg-terminal-exec")
 
   changing_windows = SoulCore::MaintenanceForegroundExecutionService.new(
     root: root, clock: clock, rehearsal_service: A2ChangingWindowRehearsal.new(clock),
@@ -515,7 +515,9 @@ check.call("Dashboard uses click authority and never collects a sudo password",
              html.include?("No password is collected by the Dashboard"))
 check.call("A2 uses only bounded dialog-scoped receipt polling and exposes no combined reboot control",
            !javascript.match?(/(?:setInterval|WebSocket|EventSource)/) &&
-             javascript.scan("window.setTimeout").length == 1 &&
+             javascript.scan(
+               "const maintenancePollDelay = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));"
+             ).length == 1 &&
              javascript.include?("MAINTENANCE_EVIDENCE_POLL_LIMIT = 120") &&
              javascript.include?("MAINTENANCE_RECEIPT_POLL_LIMIT = 600") &&
              javascript.include?("state.maintenanceDeviceFlowToken !== flowToken || !dialog.open") &&

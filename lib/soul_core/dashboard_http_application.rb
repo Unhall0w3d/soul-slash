@@ -6,7 +6,7 @@ require "securerandom"
 require "uri"
 require_relative "dashboard_authentication"
 require_relative "dashboard_music_job_manager"
-require_relative "voice_transcription_service"
+require_relative "routed_voice_transcription_service"
 require_relative "voice_synthesis_service"
 require_relative "voice_presence_launch_service"
 require_relative "notification_center_service"
@@ -362,7 +362,7 @@ module SoulCore
     end
 
     def voice_transcription
-      @voice_transcription ||= VoiceTranscriptionService.new(root: @root)
+      @voice_transcription ||= RoutedVoiceTranscriptionService.new(root: @root)
     end
 
     def voice_synthesis_status(headers)

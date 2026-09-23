@@ -55,7 +55,7 @@ class BackupAdministrationFakeRunner
 
     repository = argv[argv.index("--repo") + 1]
     remote = repository.start_with?("sftp:")
-    action = argv[argv.index("--repo") + 2]
+    action = argv[(argv.index("--repo") + 2)..].find { |item| %w[snapshots cat backup check ls forget restore].include?(item) }
     case action
     when "snapshots"
       snapshots = if remote
@@ -300,6 +300,20 @@ Dir.mktmpdir("soul-backup-administration-") do |root|
                restored["lifecycle_state"] == "blocked_for_human_review" &&
                restored.dig("data", "live_tree_mutation") == false &&
                staged_path.include?("Soul/private/backup/restores/restore_"))
+
+  local_read_actions = runner.calls.filter_map do |call|
+    argv = call.fetch("argv")
+    next unless argv.first == "restic" && argv.include?(repository)
+    action = argv.find { |item| %w[snapshots check ls restore backup forget].include?(item) }
+    [action, argv.include?("--no-lock")]
+  end
+  check.call("local recovery reads bypass repository locks while backup and retention keep locking enabled",
+             local_read_actions.any? { |action, no_lock| action == "snapshots" && no_lock } &&
+               local_read_actions.any? { |action, no_lock| action == "check" && no_lock } &&
+               local_read_actions.any? { |action, no_lock| action == "ls" && no_lock } &&
+               local_read_actions.any? { |action, no_lock| action == "restore" && no_lock } &&
+               local_read_actions.any? { |action, no_lock| action == "backup" && !no_lock } &&
+               local_read_actions.any? { |action, no_lock| action == "forget" && !no_lock })
 
   Dir.mktmpdir("soul-selected-recovery-") do |selected_target|
     File.chmod(0o700, selected_target)

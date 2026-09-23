@@ -141,7 +141,7 @@ puts "Maintenance fleet status B1 verification:"
 
 Dir.mktmpdir("soul-fleet-status-") do |root|
   os_release = File.join(root, "os-release")
-  File.write(os_release, "PRETTY_NAME=\"CachyOS fixture\"\n")
+  File.write(os_release, "PRETTY_NAME=\"CachyOS fixture\"\nID=cachyos\nID_LIKE=arch\n")
   route_path = File.join(root, "route")
   File.write(route_path, <<~ROUTES)
     Iface	Destination	Gateway	Flags	RefCnt	Use	Metric	Mask	MTU	Window	IRTT

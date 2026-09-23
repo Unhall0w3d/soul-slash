@@ -9,7 +9,6 @@ module SoulCore
   class RepoCurationAssessor
     TRACKED_OVERLAY_NOTE = %r{\Adocs/overlays/README_.*(PHASE|REPAIR).*\.md\z}.freeze
     TRACKED_OVERLAY_DIRECTORY = %r{(?:\A|/)[^/]+_overlay/}.freeze
-    UNTRACKED_REVIEW_CANDIDATE = %r{\A(\?\? )?(docs/(overlays|workflows)/.*|scripts/verify-.*\.rb)}.freeze
     GENERATED_LOCAL = %r{\A(\?\? )?(overlay_files/|Soul/improvement/proposals/|Soul/runtime/|README_.*(PHASE|REPAIR).*\.md)}.freeze
 
     def initialize(root: Dir.pwd)
@@ -18,18 +17,20 @@ module SoulCore
 
     def assess
       tracked = git_lines("ls-files")
-      status = git_lines("status", "--porcelain")
+      status = git_lines("status", "--porcelain", "--untracked-files=all")
 
       tracked_overlay_notes = tracked.grep(TRACKED_OVERLAY_NOTE)
       tracked_overlay_directories = tracked.grep(TRACKED_OVERLAY_DIRECTORY).map { |path| path.split('/').first + '/' }.uniq
       untracked = status.select { |line| line.start_with?("??") }.map { |line| line.sub(/\A\?\?\s*/, "") }
-      untracked_review_candidates = untracked.select { |path| path.match?(UNTRACKED_REVIEW_CANDIDATE) }
       untracked_generated_local = untracked.select { |path| path.match?(GENERATED_LOCAL) }
+      # Every visible, non-generated untracked path needs an explicit decision.
+      # A narrow filename pattern missed Python verifiers and assessment docs.
+      untracked_review_candidates = untracked - untracked_generated_local
 
       recommendations = []
       recommendations << recommendation("tracked_overlay_notes", "Review tracked overlay notes and either rewrite into stable docs or remove them from tracking.", tracked_overlay_notes) unless tracked_overlay_notes.empty?
       recommendations << recommendation("tracked_overlay_directories", "Remove tracked extracted overlay directories after confirming durable files exist at canonical paths.", tracked_overlay_directories) unless tracked_overlay_directories.empty?
-      recommendations << recommendation("untracked_review_candidates", "Review untracked docs/verifiers and decide commit, rewrite, or delete.", untracked_review_candidates) unless untracked_review_candidates.empty?
+      recommendations << recommendation("untracked_review_candidates", "Review untracked source and documentation and decide commit, rewrite, or local retention.", untracked_review_candidates) unless untracked_review_candidates.empty?
       recommendations << recommendation("untracked_generated_local", "Remove generated local leftovers after verification, or keep them untracked while actively inspecting them.", untracked_generated_local) unless untracked_generated_local.empty?
 
       {
@@ -109,7 +110,7 @@ module SoulCore
         actions << "Remove tracked extracted overlay directories after verifying canonical copies."
       end
       unless untracked_review_candidates.empty?
-        actions << "Classify each untracked review candidate as commit, rewrite, or delete."
+        actions << "Classify each untracked review candidate as commit, rewrite, or deliberate local retention."
       end
       unless untracked_generated_local.empty?
         actions << "Clean generated local leftovers after any needed inspection."

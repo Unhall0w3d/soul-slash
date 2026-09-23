@@ -33,6 +33,7 @@ module SoulCore
     MAX_RETENTION_SELECTION = 50
     MAX_RESTORE_PATHS = 20
     MAX_INVENTORY_PATHS = BackupRetentionLedger::MAX_PATHS
+    MAX_INVENTORY_BYTES = 256 * 1024 * 1024
     OPERATOR_MAX_SOURCE_ROOTS = 256
     BACKUP_TIMEOUT = 3600
     CHECK_TIMEOUT = 1200
@@ -246,7 +247,7 @@ module SoulCore
       return blocked("Crucible copy preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
 
       progress&.call("stage" => "source_verify", "message" => "Verifying local repository metadata before transmission…")
-      source_check = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024)
+      source_check = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024, read_only: true)
       raise "local repository verification failed#{restic_failure_suffix(source_check)}" unless source_check.success?
       if preview.dig("data", "initialize_target")
         progress&.call("stage" => "initialize", "message" => "Initializing the exact encrypted Crucible repository…")
@@ -780,7 +781,7 @@ module SoulCore
       result = if preview.dig("data", "repository_source") == "crucible_replica"
         replica_restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
       else
-        restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024)
+        restic(password, *args, timeout: RESTORE_TIMEOUT, output: 2 * 1024 * 1024, read_only: true)
       end
       ownership_normalized = !result.success? && restic_ancestor_ownership_only_failure?(
         result, target: target, includes: preview.dig("data", "includes")
@@ -1172,7 +1173,7 @@ module SoulCore
     end
 
     def snapshot_inventory(password)
-      result = restic(password, "snapshots", "--json", "--tag", @snapshot_tag, timeout: 30, output: 1024 * 1024)
+      result = restic(password, "snapshots", "--json", "--tag", @snapshot_tag, timeout: 30, output: 1024 * 1024, read_only: true)
       raise ArgumentError, "repository password was rejected" if result.exit_status == 12
       raise "snapshot inventory failed#{restic_failure_suffix(result)}" unless result.success?
       parsed = JSON.parse(result.stdout)
@@ -1227,8 +1228,9 @@ module SoulCore
     def snapshot_paths(password, snapshot_id)
       result = restic(
         password, "ls", "--json", snapshot_id,
-        timeout: CHECK_TIMEOUT, output: 24 * 1024 * 1024,
-        capture_mode: :json_lines, max_records: MAX_INVENTORY_PATHS
+        timeout: CHECK_TIMEOUT, output: MAX_INVENTORY_BYTES,
+        capture_mode: :json_lines, max_records: MAX_INVENTORY_PATHS,
+        read_only: true
       ) { |item| item["path"].to_s if item["struct_type"] == "node" }
       raise "snapshot path inventory failed#{restic_failure_suffix(result)}" unless result.success?
       raise "snapshot path inventory is too large" if result.truncated
@@ -1241,7 +1243,7 @@ module SoulCore
     def replica_snapshot_paths(password, snapshot_id)
       result = replica_restic(
         password, "ls", "--json", snapshot_id,
-        timeout: CHECK_TIMEOUT, output: 24 * 1024 * 1024,
+        timeout: CHECK_TIMEOUT, output: MAX_INVENTORY_BYTES,
         capture_mode: :json_lines, max_records: MAX_INVENTORY_PATHS
       ) { |item| item["path"].to_s if item["struct_type"] == "node" }
       raise "Crucible snapshot path inventory failed#{restic_failure_suffix(result)}" unless result.success?
@@ -1253,14 +1255,15 @@ module SoulCore
     end
 
     def verify_repository!(password)
-      result = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024)
+      result = restic(password, "check", timeout: CHECK_TIMEOUT, output: 1024 * 1024, read_only: true)
       raise "repository verification failed#{restic_failure_suffix(result)}" unless result.success?
       true
     end
 
-    def restic(password, *args, timeout:, output: 256 * 1024, capture_mode: :prefix, max_records: 100_000, &record_transform)
+    def restic(password, *args, timeout:, output: 256 * 1024, capture_mode: :prefix, max_records: 100_000, read_only: false, &record_transform)
+      lock_arguments = read_only ? ["--no-lock"] : []
       @runner.run(
-        "restic", "--repo", @repository, *args,
+        "restic", "--repo", @repository, *lock_arguments, *args,
         timeout_seconds: timeout, max_output_bytes: output,
         capture_mode: capture_mode,
         max_records: max_records,
@@ -1443,7 +1446,7 @@ module SoulCore
 
     def snapshot_manifest_source_roots(snapshot_id, inventory)
       path = File.join(@manifest_root, "#{snapshot_id}.json")
-      raise "verified snapshot manifest is unavailable for recovery rehearsal" unless regular_file?(path) && File.size(path) <= 64 * 1024 * 1024
+      raise "verified snapshot manifest is unavailable for recovery rehearsal" unless regular_file?(path) && File.size(path) <= BackupRetentionLedger::MAX_LEDGER_BYTES
       manifest = JSON.parse(File.read(path))
       raise "verified snapshot manifest does not match the selected snapshot" unless manifest["snapshot_id"] == snapshot_id
       raise "verified snapshot manifest repository identity changed" unless manifest["repository_id"] == repository_fingerprint

@@ -35,6 +35,10 @@ module SoulCore
       raise ArgumentError, "Core selection path must remain inside the project root" unless within?(@selection_path, @root)
     end
 
+    def persisted_selection(profiles:)
+      read_selection(profiles: profiles)
+    end
+
     def status
       runtime = @runtime_control.status
       return runtime unless runtime["ok"]
@@ -162,7 +166,7 @@ module SoulCore
           "profile_ids" => members.map { |profile| profile.fetch("id") },
           "target_profile" => target,
           "active" => false,
-          "selected" => members.any? { |profile| profile.fetch("selected") },
+          "selected" => active_intent ? active_intent == definition.fetch("id") : members.any? { |profile| profile.fetch("selected") },
           "can_activate" => can_activate_core?(
             definition.fetch("id"), target, observation, active_intent
           )
@@ -634,8 +638,9 @@ module SoulCore
           "residency" => "foreground_on_demand", "duration_range_seconds" => { "minimum" => 30, "maximum" => 300 },
           "fixed_durations" => [600], "conflict" => nil }.compact
       when "amd-free"
-        { "engine" => "ACE-Step 1.5", "accelerator" => "NVIDIA CUDA", "available_in_active_core" => false,
-          "conflict" => "NVIDIA chat is active and AMD is reserved for the Operator" }
+        { "engine" => "ACE-Step 1.5 4B LM / 2B Turbo Q8_0", "accelerator" => "AMD Vulkan", "available_in_active_core" => true,
+          "residency" => "foreground_on_demand", "duration_range_seconds" => { "minimum" => 30, "maximum" => 300 },
+          "fixed_durations" => [600], "authority" => "exact_generation_confirmation", "conflict" => nil }.compact
       else
         { "engine" => "ACE-Step 1.5 4B LM / 2B Turbo Q8_0", "accelerator" => "AMD Vulkan", "available_in_active_core" => false,
           "conflict" => "Activate Creative Core to release AMD and preserve chat on NVIDIA" }

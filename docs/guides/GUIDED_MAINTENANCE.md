@@ -437,7 +437,7 @@ bounded scan of the reviewed subnet. Exactly one MAC match retargets only the
 private status record and appends a bounded address-history event. Zero or
 multiple matches do not retarget. One transient user-level oneshot retries ten
 minutes later; a second miss terminates recovery until the next manual or
-noon/midnight collection. There is no sleeper, daemon, repeating ten-minute
+15-minute collection. There is no sleeper, daemon, repeating ten-minute
 timer, or background polling loop. Devices on the same subnet share one
 recovery scan per invocation, and a collection will scan at most four distinct
 reviewed subnets.
@@ -465,8 +465,8 @@ explicit per-candidate inspection can add bounded service fingerprinting when
 neighbor and vendor hints are insufficient.
 
 The snapshot is private, atomic, and survives Dashboard reloads. When separately
-installed, the owner-level oneshot timer collects it at local noon and
-midnight. The timer cannot maintain or reboot anything and has no persistent
+installed, the owner-level oneshot timer collects it every 15 minutes. The timer
+cannot maintain or reboot anything and has no persistent
 worker or polling loop. Atelier refreshes official pacman metadata into an
 isolated temporary database, queries that database, and deletes it before
 returning. The fixed adapter uses `fakeroot`, an alternate `--dbpath`, and

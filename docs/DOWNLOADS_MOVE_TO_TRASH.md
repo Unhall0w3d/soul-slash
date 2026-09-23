@@ -44,3 +44,10 @@ filenames_omitted: true
 The token is consumed after an execution attempt.
 
 Execution is recorded in local chat execution history.
+# Focused regression checks during active development
+
+Run `ruby scripts/verify-downloads-move-to-trash-phase62.rb --functional-only`
+to check the fixture-based trash behavior and confirmation boundaries without
+claiming repository curation approval. The default invocation still includes
+the strict curation check. Untracked review artifacts must be reviewed separately;
+do not delete or broadly stage them to make functional checks pass.

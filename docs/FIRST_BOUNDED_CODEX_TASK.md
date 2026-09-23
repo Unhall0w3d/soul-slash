@@ -33,7 +33,7 @@ Soul/codex/tasks/phase33_first_bounded_task/README.md
 
 ```text
 1. Generate the task package locally.
-2. Paste codex_prompt.md into Codex using gpt-5.5 medium.
+2. Paste codex_prompt.md into Codex using gpt-6-luna low for this documentation-only task.
 3. Save Codex's JSON response locally.
 4. Run codex-dry-run-review against contract.json and the saved response.
 5. Apply nothing automatically.

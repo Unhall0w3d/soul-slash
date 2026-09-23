@@ -20,7 +20,13 @@ Add one practical, bounded text-to-video path beside the existing still and imag
 - 832×480 at 24 fps delivery, three Euler/LCM steps, CFG 1. The twelve-second profile generates 193 frames at 16 fps and derives the 289-frame review artifact through bounded local optical interpolation.
 - Four, eight, or twelve seconds of native video. A three-minute companion repeats the exact accepted clip; the system does not claim to synthesize 180 unique seconds.
 - Runtime varies by duration, runtime build, and decoder placement. The exact approval scope exposes the selected envelope; the 1,050-second hard timeout is authoritative.
-- AMD-Free Core or Music Core; foreground invocation exits and releases its shared AMD-generation lease at success, failure, cancellation, or timeout.
+- Soul-Lite/AMD-Free Core at most during qualification; a Daily, Creative, or
+  heavier Core must not own or compete for the RX 6900 XT. The foreground
+  invocation exits and releases its shared AMD-generation lease at success,
+  failure, cancellation, or timeout.
+- `MESA_VK_DEVICE_SELECT=1002:73bf!` exposes only the reviewed RX 6900 XT
+  vendor/device pair and `GGML_VK_VISIBLE_DEVICES=0` binds GGML to that resulting
+  Vulkan GPU 0. The selector and ordinal are included in every native profile.
 
 ## Boundaries
 

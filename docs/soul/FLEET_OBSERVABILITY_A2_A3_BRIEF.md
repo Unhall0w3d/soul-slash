@@ -17,14 +17,25 @@ The A2 dashboard may show:
 - endpoint freshness and resource pressure;
 - storage and host-network behavior already collected by Alloy;
 - read-only switch and interface health through Prometheus SNMP Exporter;
+- complementary read-only Linux-host hardware and operating-system evidence
+  through a separately labeled SNMP target lane;
 - reboot markers derived from `node_boot_time_seconds`;
 - maintenance lifecycle markers from a narrowly filtered journal source; and
 - bounded Prometheus alerts rendered inside Grafana.
 
 SNMP targets, addresses, credentials, auth profiles, and private device names
-remain owner-local. SNMPv3 is preferred where the device supports it. The
-committed Prometheus configuration accepts only a rendered file-discovery
-document and a loopback-only exporter. It does not enable SNMP on a switch.
+remain owner-local. SNMPv3 is preferred where the device supports it, while
+owner-approved v2c remains supported for devices where its lower complexity is
+the deliberate tradeoff. The committed Prometheus configuration accepts only
+rendered file-discovery documents and a loopback-only exporter. It does not
+enable SNMP on a switch or host.
+
+Linux-host SNMP complements rather than replaces Alloy. Its repository module
+is generic and bounded to identity, uptime, processor load, storage, memory,
+load, process-presence, sensor, and disk-I/O MIB surfaces. It excludes software
+inventory, boot parameters, command extensions, read-write communities, and
+trap configuration. Host-side listeners, source ACLs, and communities remain
+owner-controlled deployment inputs.
 
 Journal collection is limited to the reviewed Soul maintenance and reboot
 units. Alloy replaces the original message before transmission, retaining only
@@ -82,7 +93,8 @@ remain unchanged.
 - public assets contain no owner-local identity, address, or credential;
 - Prometheus rules validate and remain dashboard-only;
 - journal filtering cannot forward original message content;
-- switch data is honestly absent until owner-private SNMP configuration exists;
+- switch and Linux-host SNMP data are honestly absent until their respective
+  owner-private configuration exists;
 - A3 rejects arbitrary queries and bounds every returned collection;
 - Dashboard, chat/voice, and Incident Narrator consume the same normalized
   summary; and

@@ -13,7 +13,7 @@ module SoulCore
     def initialize(
       root: Dir.pwd,
       home: Dir.home,
-      ruby_path: "/usr/bin/ruby",
+      ruby_path: RbConfig.ruby,
       systemctl_path: "/usr/bin/systemctl",
       command_runner: nil
     )

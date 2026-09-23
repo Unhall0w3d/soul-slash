@@ -27,24 +27,14 @@ embedding_configured = %w[SOUL_MEMORY_EMBEDDING_ENDPOINT SOUL_MEMORY_EMBEDDING_P
   !value.empty? && value != "0"
 end
 if result.ok && embedding_configured
-  selection_path = File.join(root, "Soul/runtime/model_runtime/core_selection.json")
-  core_id = begin
-    if File.file?(selection_path) && !File.symlink?(selection_path) && File.size(selection_path) <= 4 * 1024
-      JSON.parse(File.binread(selection_path, 4 * 1024))["active_core_id"].to_s
-    else
-      "daily"
-    end
-  rescue JSON::ParserError, SystemCallError
-    "free"
-  end
-  core_id = "daily" unless %w[daily amd-free music free dev].include?(core_id)
+  core_id = result.details["active_core_id"] || "daily"
   embedding = SoulCore::MemoryEmbeddingRuntimeCoordinator.new.reconcile(core_id: core_id)
   result.details["memory_embedding_reconciliation"] = embedding
   unless embedding["ok"]
     result = SoulCore::ModelRuntimeSelectedStarter::Result.new(
       ok: false,
       lifecycle_state: embedding["lifecycle_state"],
-      message: "Selected chat runtime started, but memory embedding reconciliation failed safely.",
+      message: "Chat startup policy completed, but memory embedding reconciliation failed safely.",
       details: result.details
     )
   end

@@ -4,8 +4,11 @@
 require "json"
 require "yaml"
 
-abort "usage: render-fleet-observability-snmp-config ENV_FILE UPSTREAM_SNMP_YML OUTPUT_DIRECTORY" unless ARGV.length == 3
-env_path, upstream_path, output_directory = ARGV.map { |value| File.expand_path(value) }
+unless [3, 4].include?(ARGV.length)
+  abort "usage: render-fleet-observability-snmp-config ENV_FILE UPSTREAM_SNMP_YML OUTPUT_DIRECTORY [LINUX_HOST_MODULE_YML]"
+end
+env_path, upstream_path, output_directory = ARGV.first(3).map { |value| File.expand_path(value) }
+linux_host_module_path = File.expand_path(ARGV[3]) if ARGV[3]
 abort "private environment file must be a regular mode-0600 file" unless File.file?(env_path) && !File.symlink?(env_path) && (File.stat(env_path).mode & 0o777) == 0o600
 abort "upstream SNMP configuration is unavailable" unless File.file?(upstream_path) && !File.symlink?(upstream_path)
 abort "output directory must exist and must not be a symlink" unless File.directory?(output_directory) && !File.symlink?(output_directory)
@@ -25,34 +28,83 @@ switches = (1..8).filter_map do |slot|
   abort "switch slot #{slot} SNMP owner input is incomplete" if [device_id, address, community].any?(&:empty?)
   abort "switch slot #{slot} identifier is invalid" unless device_id.match?(/\A[a-z0-9_.-]{1,80}\z/i)
   abort "#{device_id} address is invalid" unless address.match?(/\A(?:[a-z0-9-]+\.)*[a-z0-9-]+\z|\A(?:\d{1,3}\.){3}\d{1,3}\z/i)
-  abort "#{device_id} community is invalid" unless community.bytesize.between?(8, 128) && !community.match?(/[\r\n]/)
+  abort "#{device_id} community is invalid" unless community.bytesize.between?(7, 128) && !community.match?(/[\r\n]/)
   {"device_id" => device_id, "address" => address, "auth" => "switch_#{slot}_v2", "community" => community}
 end
 abort "at least one complete owner-private switch slot is required" if switches.empty?
 
+linux_hosts = (1..8).filter_map do |slot|
+  prefix = "SOUL_OBSERVABILITY_LINUX_HOST_#{slot}"
+  device_id = environment.fetch("#{prefix}_ID", "")
+  address = environment.fetch("#{prefix}_ADDRESS", "")
+  community = environment.fetch("#{prefix}_SNMP_COMMUNITY", "")
+  role = environment.fetch("#{prefix}_ROLE", "")
+  next if [device_id, address, community, role].all?(&:empty?)
+  abort "Linux host slot #{slot} SNMP owner input is incomplete" if [device_id, address, community, role].any?(&:empty?)
+  abort "Linux host slot #{slot} identifier is invalid" unless device_id.match?(/\A[a-z0-9_.-]{1,80}\z/i)
+  abort "#{device_id} address is invalid" unless address.match?(/\A(?:[a-z0-9-]+\.)*[a-z0-9-]+\z|\A(?:\d{1,3}\.){3}\d{1,3}\z/i)
+  abort "#{device_id} role is invalid" unless role.match?(/\A[a-z0-9_-]{1,80}\z/)
+  abort "#{device_id} community is invalid" unless community.bytesize.between?(7, 128) && !community.match?(/[\r\n]/)
+  {"device_id" => device_id, "address" => address, "role" => role, "auth" => "linux_host_#{slot}_v2", "community" => community}
+end
+
+if linux_hosts.any?
+  abort "Linux host module input is unavailable" unless linux_host_module_path && File.file?(linux_host_module_path) && !File.symlink?(linux_host_module_path)
+elsif linux_host_module_path
+  abort "Linux host module input was supplied without a configured Linux host slot"
+end
+
 upstream = YAML.safe_load_file(upstream_path, aliases: false)
 abort "upstream if_mib module is unavailable" unless upstream.is_a?(Hash) && upstream.dig("modules", "if_mib").is_a?(Hash)
 
-auths = switches.to_h do |switch|
-  [switch.fetch("auth"), {
-    "community" => switch.fetch("community"),
+linux_host_module = if linux_hosts.any?
+  generated = YAML.safe_load_file(linux_host_module_path, aliases: false)
+  generated.dig("modules", "linux_host").tap do |value|
+    abort "generated linux_host module is unavailable" unless value.is_a?(Hash)
+  end
+end
+
+auths = (switches + linux_hosts).to_h do |device|
+  [device.fetch("auth"), {
+    "community" => device.fetch("community"),
     "security_level" => "noAuthNoPriv",
     "auth_protocol" => "MD5",
     "priv_protocol" => "DES",
     "version" => 2
   }]
 end
-snmp = {"auths" => auths, "modules" => {"if_mib" => upstream.fetch("modules").fetch("if_mib")}}
+modules = {"if_mib" => upstream.fetch("modules").fetch("if_mib")}
+modules["linux_host"] = linux_host_module if linux_host_module
+snmp = {"auths" => auths, "modules" => modules}
 targets = switches.map do |switch|
   {
     "targets" => [switch.fetch("address")],
     "labels" => {"device_id" => switch.fetch("device_id"), "role" => "managed_switch", "snmp_auth" => switch.fetch("auth")}
   }
 end
+linux_host_targets = linux_hosts.map do |host|
+  {
+    "targets" => [host.fetch("address")],
+    "labels" => {"device_id" => host.fetch("device_id"), "role" => host.fetch("role"), "snmp_auth" => host.fetch("auth")}
+  }
+end
 
 snmp_path = File.join(output_directory, "soul-snmp.yml")
 targets_path = File.join(output_directory, "soul-switch-targets.json")
+linux_host_targets_path = File.join(output_directory, "soul-linux-snmp-targets.json")
+if File.exist?(linux_host_targets_path)
+  abort "existing Linux host targets must be a regular file" unless File.file?(linux_host_targets_path) && !File.symlink?(linux_host_targets_path)
+  existing_hosts = JSON.parse(File.read(linux_host_targets_path))
+  abort "existing Linux host targets are invalid" unless existing_hosts.is_a?(Array)
+  existing_ids = existing_hosts.map { |host| host.fetch("labels").fetch("device_id") }
+  missing_ids = existing_ids - linux_hosts.map { |host| host.fetch("device_id") }
+  abort "render would remove existing Linux hosts; use a fresh staging directory for an intentional removal" unless missing_ids.empty?
+end
+[snmp_path, targets_path, linux_host_targets_path].each do |path|
+  abort "output path is unsafe" if File.symlink?(path) || (File.exist?(path) && !File.file?(path))
+end
 File.open(snmp_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) { |file| file.write(YAML.dump(snmp)) }
 File.open(targets_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) { |file| file.write(JSON.pretty_generate(targets) << "\n") }
-File.chmod(0o600, snmp_path, targets_path)
-puts "Rendered #{switches.length} owner-private SNMP target(s) with the pinned upstream if_mib module; no credential was printed."
+File.open(linux_host_targets_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) { |file| file.write(JSON.pretty_generate(linux_host_targets) << "\n") }
+File.chmod(0o600, snmp_path, targets_path, linux_host_targets_path)
+puts "Rendered #{switches.length} switch and #{linux_hosts.length} Linux-host owner-private SNMP target(s); no credential was printed."

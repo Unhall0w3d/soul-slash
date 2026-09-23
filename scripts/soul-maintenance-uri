@@ -5,7 +5,7 @@ require "json"
 require_relative "../lib/soul_core/maintenance_desktop_handoff"
 
 ROOT = File.expand_path("..", __dir__)
-KITTY = "/usr/bin/kitty"
+TERMINAL = "/usr/bin/xdg-terminal-exec"
 RUBY = "/usr/bin/ruby"
 URI_PATTERN = %r{\Asoul-maintenance://(?:evidence/maintenance_evidence_[a-f0-9]{16}|transaction/maintenance_tx_[a-f0-9]{16}|aur-review/maintenance_aur_review_[a-f0-9]{16})/[a-f0-9]{64}\z}
 
@@ -18,14 +18,15 @@ unless URI_PATTERN.match?(uri) && ARGV.empty?
 end
 
 unless inside_terminal
-  unless File.executable?(KITTY) && File.executable?(RUBY)
-    warn "Soul maintenance requires the reviewed kitty and Ruby executables."
+  unless File.executable?(TERMINAL) && File.executable?(RUBY)
+    warn "Soul maintenance requires the reviewed terminal launcher and Ruby executables."
     exit 1
   end
   Process.exec(
-    KITTY,
-    "--class", "soul-maintenance",
-    "--title", "Soul / Guided Maintenance",
+    TERMINAL,
+    "--app-id=soul-maintenance",
+    "--title=Soul / Guided Maintenance",
+    "--",
     RUBY, File.expand_path(__FILE__),
     "--inside-terminal", uri
   )

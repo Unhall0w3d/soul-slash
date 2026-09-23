@@ -20,6 +20,8 @@
     "id": "ace-step-vulkan-4b",
     "label": "ACE-Step 1.5 4B LM / 2B Turbo Q8_0",
     "accelerator": "AMD Vulkan",
+    "vulkan_device_selector": "1002:73bf!",
+    "vulkan_device_index": 0,
     "durations": [30, 90, 180, 600],
     "qualification_durations": [210],
     "variable_duration_qualification": {

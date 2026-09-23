@@ -132,6 +132,16 @@ Dir.mktmpdir("soul-wazuh-a4a-") do |root|
              envelope["lifecycle_state"] == "complete" && envelope.dig("data", "schema_version") == SoulCore::WazuhSecurityStatusService::SCHEMA_VERSION)
 
   failed_transport = WazuhFixtureTransport.new(fail_auth: true)
+  original_manifest = File.read(manifest)
+  retired_config = JSON.parse(original_manifest)
+  retired_config["retired_agent_ids"] = ["002"]
+  retired_config["device_mappings"].reject! { |mapping| mapping["agent_id"] == "002" }
+  File.write(manifest, JSON.generate(retired_config))
+  retired = service.collect.fetch("data")
+  check.call("retirement preserves historical agent evidence without an offline alarm",
+    retired["state"] == "healthy" && retired.dig("summary", "agent_count") == 1 &&
+    retired.fetch("retired_agents").map { |agent| agent["id"] } == ["002"])
+  File.write(manifest, original_manifest)
   failed = SoulCore::WazuhSecurityStatusService.new(
     root: root,
     process_env: {"SOUL_WAZUH_INTEGRATION_FILE" => manifest},

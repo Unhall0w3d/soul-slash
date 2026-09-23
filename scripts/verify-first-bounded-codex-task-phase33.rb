@@ -44,7 +44,7 @@ json_ok =
   json &&
   json["assessment"] == "first_bounded_codex_task" &&
   json["ok"] == true &&
-  json["recommended_model"] == "gpt-5.5 medium" &&
+  json["recommended_model"] == "gpt-6-luna low" &&
   json.dig("verification", "no_codex_invoked") == true &&
   expected_files.all? { |path| File.exist?(path) }
 
@@ -54,7 +54,7 @@ errors << "JSON bounded Codex task generation failed: #{stderr} #{stdout}" unles
 contract = JSON.parse(File.read("Soul/codex/tasks/phase33_first_bounded_task/contract.json")) rescue nil
 contract_ok =
   contract &&
-  contract.dig("task", "model_recommendation") == "gpt-5.5 medium" &&
+  contract.dig("task", "model_recommendation") == "gpt-6-luna low" &&
   contract.fetch("allowed_files").include?("docs/CODEX_DRY_RUN_FIXTURE_PACK.md") &&
   contract.fetch("allowed_files").include?("docs/CODEX_DRY_RUN_REVIEW.md") &&
   contract.fetch("allowed_files").include?("docs/fixtures/codex_dry_run/README.md") &&

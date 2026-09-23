@@ -47,8 +47,8 @@ row_titles = [
 ]
 rows = dashboard.fetch("panels").select { |panel| panel["type"] == "row" }
 check.call("five detail rows are collapsed by default",
-  rows.map { |row| row["title"] } == row_titles &&
-    rows.all? { |row| row["collapsed"] == true && row.fetch("panels").any? })
+  rows.first(5).map { |row| row["title"] } == row_titles &&
+    rows.first(5).all? { |row| row["collapsed"] == true && row.fetch("panels").any? })
 
 expressions = panels.flat_map { |panel| panel.fetch("targets", []).map { |target| target["expr"] } }.compact.join("\n")
 metric_families = %w[
@@ -69,7 +69,10 @@ role_colors = {
   "/.* · secondary_hypervisor/" => "#A970FF",
   "/.* · backup_target/" => "#73BF69"
 }
-time_series = panels.select { |panel| panel["type"] == "timeseries" }
+time_series = panels.select do |panel|
+  panel["type"] == "timeseries" &&
+    panel.fetch("targets", []).none? { |target| target["expr"].to_s.include?('job="linux_host_snmp"') }
+end
 check.call("role colors remain stable across every time-series panel",
   time_series.length == 16 && time_series.all? do |panel|
     overrides = panel.dig("fieldConfig", "overrides") || []
@@ -109,9 +112,15 @@ check.call("CPU activity is adjacent to package temperature",
 map = panels.find { |panel| panel["type"] == "geomap" }
 map_expression = map&.dig("targets", 0, "expr").to_s
 check.call("global presence uses owner-private render placeholders",
-  map_expression.include?("__SOUL_SITE_LABEL__") &&
+    map_expression.include?("__SOUL_SITE_LABEL__") &&
     map_expression.include?("__SOUL_SITE_LATITUDE__") &&
     map_expression.include?("__SOUL_SITE_LONGITUDE__") &&
+    map.dig("options", "basemap", "type") == "osm-standard" &&
+    map.dig("options", "basemap", "name") == "OpenStreetMap" &&
+    map.dig("options", "view", "id") == "coords" &&
+    map.dig("options", "view", "lat") == "__SOUL_SITE_VIEW_LATITUDE__" &&
+    map.dig("options", "view", "lon") == "__SOUL_SITE_VIEW_LONGITUDE__" &&
+    map.dig("options", "view", "zoom") == 6 &&
     map.dig("options", "layers", 0, "location", "mode") == "coords")
 
 check.call("renderer validates a root-owned bounded region file",

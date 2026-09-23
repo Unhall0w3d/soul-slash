@@ -129,7 +129,7 @@ A cloud skill should return:
 ```text
 complete
 failed
-blocked_for_input
+awaiting_input
 blocked_for_human_review
 canceled
 ```

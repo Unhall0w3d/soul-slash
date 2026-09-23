@@ -61,3 +61,9 @@ blocked
 ```
 
 A passing review does not approve implementation for production. It only says the implementation task pack is structurally ready for human review or a bounded Codex handoff.
+
+Model recommendations are advisory. The gate recognizes the reviewed Astra,
+Sol, Terra and Luna workload recommendations as well as legacy `gpt-5.5 medium`
+handoffs. An unfamiliar recommendation produces a routing-review warning; no
+model name grants execution, implementation or promotion authority. Existing
+artifacts are not rewritten by this compatibility check.

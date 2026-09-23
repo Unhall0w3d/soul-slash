@@ -49,10 +49,24 @@ Dir.mktmpdir("soul-backup-retention-") do |sandbox|
     max_roots: SoulCore::BackupRetentionLedger::MAX_CONFIGURABLE_ROOTS
   )
   configured_root_limit = operator_service.observe_preview(manifest: operator_manifest)
-  check.call("the default Soul root ceiling remains 64 while a bounded Operator ledger accepts 117 roots",
-    default_root_limit["lifecycle_state"] == "awaiting_input" &&
-      default_root_limit["reason"].include?("source roots exceed 64") &&
+  check.call("Soul and Operator both accept the 117-root fixture",
+    default_root_limit["lifecycle_state"] == "complete" &&
       configured_root_limit["lifecycle_state"] == "complete")
+  [73, 128, 129].each do |count|
+    roots = count.times.map { |index| format("/home/operator/source-%03d", index) }
+    candidate = manifest.call(id: "f", at: current_time, entries: roots, roots: roots)
+    result = service.observe_preview(manifest: candidate)
+    check.call("Soul #{count}-root boundary is enforced without ledger mutation",
+      (count <= 128 ? result["ok"] : result["ok"] == false && result["reason"].include?("source roots exceed 128")) &&
+        !File.exist?(ledger_path))
+  end
+  [256, 257].each do |count|
+    roots = count.times.map { |index| format("/home/operator/source-%03d", index) }
+    candidate = manifest.call(id: "f", at: current_time, entries: roots, roots: roots)
+    result = operator_service.observe_preview(manifest: candidate)
+    check.call("Operator #{count}-root boundary remains unchanged",
+      count == 256 ? result["ok"] : result["ok"] == false && result["reason"].include?("source roots exceed 256"))
+  end
 
   initial = manifest.call(id: "a", at: current_time, entries: paths.values)
   preview = service.observe_preview(manifest: initial)

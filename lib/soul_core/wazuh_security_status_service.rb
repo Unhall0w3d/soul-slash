@@ -66,6 +66,7 @@ module SoulCore
       )
       collected_at = @clock.call.iso8601
       normalized_agents = normalize_agents(agents)
+      retired_agents, normalized_agents = normalized_agents.partition { |agent| config.fetch("retired_agent_ids").include?(agent.fetch("id")) }
       data = {
         "schema_version" => SCHEMA_VERSION,
         "available" => true,
@@ -82,6 +83,7 @@ module SoulCore
         "manager" => normalize_manager(manager),
         "summary" => summarize_agents(normalized_agents),
         "agents" => normalized_agents,
+        "retired_agents" => retired_agents,
         "devices" => associate_devices(config.fetch("device_mappings"), normalized_agents, config.fetch("dashboard_url")),
         "verification" => {
           "bounded_responses" => true,
@@ -130,6 +132,9 @@ module SoulCore
       credential_path = validate_file_path(config.fetch("credential_path"), private: true, maximum: MAX_CREDENTIAL_BYTES, label: "credential")
       ca_certificate_path = validate_file_path(config.fetch("ca_certificate_path"), private: false, maximum: 128 * 1024, label: "CA certificate")
       mappings = normalize_mappings(config.fetch("device_mappings", []))
+      retired_ids = config.fetch("retired_agent_ids", [])
+      raise "retired Wazuh agent identities are invalid" unless retired_ids.is_a?(Array) && retired_ids.length <= MAX_AGENTS && retired_ids.all? { |id| id.is_a?(String) && id.match?(AGENT_ID_PATTERN) && id != "000" } && retired_ids.uniq == retired_ids
+      raise "retired Wazuh agents cannot have active device mappings" if mappings.any? { |mapping| retired_ids.include?(mapping.fetch("agent_id")) }
       {
         "enabled" => true,
         "server_api_url" => server_api.fetch("origin"),
@@ -137,7 +142,8 @@ module SoulCore
         "dashboard_url" => dashboard.fetch("origin"),
         "credential_path" => credential_path,
         "ca_certificate_path" => ca_certificate_path,
-        "device_mappings" => mappings
+        "device_mappings" => mappings,
+        "retired_agent_ids" => retired_ids
       }
     end
 

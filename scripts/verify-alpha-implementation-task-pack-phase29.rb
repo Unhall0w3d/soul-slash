@@ -75,7 +75,7 @@ errors << "JSON implementation-pack generation failed: #{stderr} #{stdout}" unle
 pack = JSON.parse(File.read("#{fixture}/alpha/implementation_task_pack.json")) rescue nil
 pack_ok =
   pack &&
-  pack.dig("task", "model_recommendation") == "gpt-5.5 medium" &&
+  pack.dig("task", "model_recommendation") == "gpt-6-luna high" &&
   pack.key?("codex_handoff_contract") &&
   pack.key?("allowed_files") &&
   pack.key?("forbidden_files") &&
@@ -91,7 +91,7 @@ errors << "task pack missing required shape" unless pack_ok
 contract = JSON.parse(File.read("#{fixture}/alpha/codex_handoff_contract.json")) rescue nil
 contract_ok =
   contract &&
-  contract.dig("task", "model_recommendation") == "gpt-5.5 medium" &&
+  contract.dig("task", "model_recommendation") == "gpt-6-luna high" &&
   contract.key?("allowed_files") &&
   contract.key?("forbidden_files") &&
   contract.key?("acceptance_criteria") &&

@@ -67,7 +67,7 @@ Dir.mktmpdir("soul-visual-a2-") do |root|
     { "role" => role, "repository" => "test/models", "revision" => "a" * 40, "filename" => name, "bytes" => File.size(path), "sha256" => Digest::SHA256.file(path).hexdigest }
   end
   manifest = File.join(root, "manifest.json")
-  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => {}, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "steps" => 4, "cfg_scale" => 1.0, "files" => files } }, "motion_candidates" => {} }))
+  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => {}, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "steps" => 4, "cfg_scale" => 1.0, "files" => files } }, "motion_candidates" => {} }))
   ids = (1..20).map { |number| number.to_s(16).rjust(16, "0") }
   clock_ticks = (0..20).map { |number| Time.utc(2026, 7, 18, 12, 0, number) }
   runner = VisualA2Runner.new
@@ -135,7 +135,7 @@ Dir.mktmpdir("soul-visual-resource-cache-") do |root|
     { "role" => role, "repository" => "test/models", "revision" => "b" * 40, "filename" => name, "bytes" => File.size(path), "sha256" => Digest::SHA256.file(path).hexdigest }
   end
   manifest = File.join(root, "manifest.json")
-  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => {}, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "steps" => 4, "cfg_scale" => 1.0, "files" => model_files } }, "motion_candidates" => {} }))
+  File.write(manifest, JSON.generate({ "schema_version" => "soul.visual_studio.models.v1", "runtime" => {}, "profiles" => { "test" => { "label" => "Test visual", "accelerator" => "AMD Vulkan", "vulkan_device_selector" => "1002:73bf!", "vulkan_device_index" => 0, "steps" => 4, "cfg_scale" => 1.0, "files" => model_files } }, "motion_candidates" => {} }))
   service = CountingVisualA2Service.new(root: root, visual_root: File.join(root, "Soul", "visual", "projects"), runtime_root: runtime, manifest_path: manifest)
 
   first = service.resources

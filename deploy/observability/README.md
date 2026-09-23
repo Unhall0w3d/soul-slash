@@ -36,8 +36,21 @@ can combine the pinned upstream exporter configuration with the existing
 owner-private indexed switch values. Slots 1 through 8 use
 `SOUL_OBSERVABILITY_SWITCH_N_ID`, `_ADDRESS`, and `_SNMP_COMMUNITY`; partial
 slots fail closed. The renderer emits mode-`0600` files outside Git and never
-prints a community. The central A2 upgrade accepts those two rendered files as
-optional exact inputs.
+prints a community. Optional Linux-host slots use
+`SOUL_OBSERVABILITY_LINUX_HOST_N_ID`, `_ADDRESS`, `_SNMP_COMMUNITY`, and
+`_ROLE`, plus a generated `linux_host` module produced from
+`central/linux-host-generator.yml`. The backward-compatible switch-only call
+still accepts three arguments; a fourth module input is required only when a
+Linux-host slot is configured. The renderer always emits separate switch and
+Linux-host target files and one combined authentication/module file. The
+central A2 upgrade accepts those three rendered files as optional exact inputs.
+When replacing SNMP configuration, supply all three outputs together, including
+the Linux-host target file. The upgrade rejects incomplete bundles before any
+package or service change. Rendering over an existing output directory also
+refuses to drop previously rendered Linux hosts. Use a fresh staging directory
+to review an intentional host removal. Existing deployments using legacy auth
+or module names must be migrated with the combined configuration and matching
+target files; a switch-only export is not a replacement for their live file.
 
 After the Operator saves the initial Grafana credential, run the reviewed
 `central/finalize-credential-handoff.sh` inside the central guest. It removes

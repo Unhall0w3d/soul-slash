@@ -26,3 +26,20 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: 127.0.0.1:9116
+
+  - job_name: linux_host_snmp
+    metrics_path: /snmp
+    params:
+      module: [linux_host]
+    file_sd_configs:
+      - files: [/etc/prometheus/soul-linux-snmp-targets.json]
+        refresh_interval: 5m
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [snmp_auth]
+        target_label: __param_auth
+      - source_labels: [device_id]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9116
