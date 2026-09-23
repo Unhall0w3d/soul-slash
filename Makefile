@@ -1455,6 +1455,10 @@ verify-winboat-inventory:
 verify-managed-switch-snmp-inventory:
 > @ruby scripts/verify-managed-switch-snmp-inventory-a1.rb
 
+.PHONY: verify-wazuh-network-device-rules
+verify-wazuh-network-device-rules:
+> @ruby scripts/verify-wazuh-network-device-rules-a0.rb
+
 .PHONY: verify-asuswrt-merlin-gateway
 verify-asuswrt-merlin-gateway:
 > @ruby scripts/verify-asuswrt-merlin-gateway-a2.rb
