@@ -57,7 +57,9 @@ class NightlyDrsRunner
     return failed("unexpected command") unless argv.first == "restic"
 
     repository = argv[argv.index("--repo") + 1]
-    action = argv[argv.index("--repo") + 2]
+    action_index = argv.index("--repo") + 2
+    action_index += 1 if argv[action_index] == "--no-lock"
+    action = argv[action_index]
     remote = repository.start_with?("sftp:")
     return failed("Crucible offline") if remote && @fail_remote_after_backup && @local_backup_created
 

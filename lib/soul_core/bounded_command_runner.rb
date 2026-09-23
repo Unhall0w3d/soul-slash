@@ -50,6 +50,12 @@ module SoulCore
           run_status = "timeout"
           terminate_group(wait_thread)
           process_status = wait_thread.value
+        rescue SignalException
+          # Foreground cancellation must reap the owned process before callers
+          # release accelerator ownership or attempt runtime restoration.
+          terminate_group(wait_thread)
+          process_status = wait_thread.value
+          raise
         ensure
           stdout, stdout_truncated, records, parse_error = reader_value(stdout_reader)
           stderr, stderr_truncated, = reader_value(stderr_reader)
@@ -60,12 +66,15 @@ module SoulCore
         stderr = parse_error
       end
 
+      stdout, stdout_encoding_truncated = bounded_text(stdout, max_output_bytes)
+      stderr, stderr_encoding_truncated = bounded_text(stderr, max_output_bytes)
+
       Result.new(
-        stdout: safe_text(stdout, max_output_bytes),
-        stderr: safe_text(stderr, max_output_bytes),
+        stdout: stdout,
+        stderr: stderr,
         exit_status: process_status&.exitstatus,
         status: run_status,
-        truncated: stdout_truncated || stderr_truncated,
+        truncated: stdout_truncated || stderr_truncated || stdout_encoding_truncated || stderr_encoding_truncated,
         records: records
       )
     rescue Errno::ENOENT => error
@@ -248,8 +257,25 @@ module SoulCore
       wait_thread.join
     end
 
+    def bounded_text(value, maximum)
+      # Pipes are binary strings; decoding them as ASCII-8BIT treats every
+      # valid UTF-8 byte sequence as invalid. Scrub first, then cap the
+      # resulting text so replacement characters cannot exceed the byte bound.
+      text = value.to_s.dup.force_encoding(Encoding::UTF_8).scrub("�")
+      return ["", text.bytesize.positive?] unless maximum.positive?
+      return [text, false] if text.bytesize <= maximum
+
+      limited = +""
+      text.each_char do |character|
+        break if limited.bytesize + character.bytesize > maximum
+
+        limited << character
+      end
+      [limited, true]
+    end
+
     def safe_text(value, maximum)
-      value.to_s.byteslice(0, maximum).to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�")
+      bounded_text(value, maximum).first
     end
   end
 end

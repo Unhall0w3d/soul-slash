@@ -43,7 +43,9 @@ class CrucibleBackupRunner
     return failure(1, "unexpected command") unless argv.first == "restic"
 
     repository = argv[argv.index("--repo") + 1]
-    action = argv[argv.index("--repo") + 2]
+    action_index = argv.index("--repo") + 2
+    action_index += 1 if argv[action_index] == "--no-lock"
+    action = argv[action_index]
     remote = repository.start_with?("sftp:")
     return failure(10, "repository does not exist") if remote && !@initialized && action != "init"
     case action

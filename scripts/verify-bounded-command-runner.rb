@@ -17,6 +17,35 @@ runner = SoulCore::BoundedCommandRunner.new
 prefix = runner.run(RbConfig.ruby, "-e", 'print "abcdefghijk"', max_output_bytes: 8)
 check.call("default prefix capture remains unchanged", prefix.success? && prefix.stdout == "abcdefgh" && prefix.truncated)
 
+unicode = "café — ✓"
+unicode_result = runner.run(
+  RbConfig.ruby, "-e", 'STDOUT.write(ARGV[0]); STDERR.write(ARGV[0])', unicode
+)
+check.call("prefix capture preserves valid UTF-8 on stdout and stderr",
+           unicode_result.success? && unicode_result.stdout == unicode && unicode_result.stderr == unicode &&
+             unicode_result.stdout.valid_encoding? && unicode_result.stderr.valid_encoding?)
+
+malformed = runner.run(
+  RbConfig.ruby, "-e", 'STDOUT.write("\xff\xfe".b); STDERR.write("\xe2\x82".b)'
+)
+check.call("prefix capture scrubs malformed and incomplete UTF-8",
+           malformed.success? && malformed.stdout == "��" && malformed.stderr == "�" &&
+             malformed.stdout.valid_encoding? && malformed.stderr.valid_encoding?)
+
+cut_boundary = runner.run(
+  RbConfig.ruby, "-e", 'STDOUT.write("abc€")', max_output_bytes: 5
+)
+check.call("prefix capture drops a cut multibyte suffix at the byte boundary",
+           cut_boundary.success? && cut_boundary.stdout == "abc" && cut_boundary.truncated &&
+             cut_boundary.stdout.bytesize <= 5 && cut_boundary.stdout.valid_encoding?)
+
+expanded_replacement = runner.run(
+  RbConfig.ruby, "-e", 'STDOUT.write("✓".b + [0xff].pack("C"))', max_output_bytes: 5
+)
+check.call("replacement expansion truncates within the byte cap without raw overflow",
+           expanded_replacement.success? && expanded_replacement.stdout == "✓" && expanded_replacement.truncated &&
+             expanded_replacement.stdout.bytesize <= 5)
+
 # The child emits more than 2 MiB in fixed-size JSON records, then a final
 # record without a newline. The tail must remain parseable at every boundary.
 fixture = <<~'RUBY'
@@ -37,6 +66,14 @@ check.call("large NDJSON tail stays within the byte bound", tail.success? && tai
 check.call("large NDJSON tail reports discarded earlier records", tail.truncated && tail_ids.length < 2_501)
 check.call("large NDJSON tail contains only complete valid JSON records", parsed_records.length == tail_records.length && tail.stdout.valid_encoding?)
 check.call("large NDJSON tail retains the final non-newline record", tail_ids.last == "eof" && !tail.stdout.end_with?("\n"))
+
+unicode_tail = runner.run(
+  RbConfig.ruby, "-e", 'puts ARGV[0]', unicode,
+  max_output_bytes: 64, capture_mode: :complete_line_tail
+)
+check.call("complete-line tail preserves valid UTF-8",
+           unicode_tail.success? && unicode_tail.stdout == "#{unicode}\n" && unicode_tail.stdout.valid_encoding? &&
+             unicode_tail.stdout.bytesize <= 64)
 
 oversized = runner.run(
   RbConfig.ruby,
@@ -60,6 +97,14 @@ check.call("JSON-line projection drains large raw output without retaining it",
            streamed.success? && streamed.stdout.empty? && streamed.records.length == 2_501 &&
              streamed.records.first == "0" && streamed.records.last == "eof" && !streamed.truncated)
 
+unicode_json = runner.run(
+  RbConfig.ruby, "-rjson", "-e", 'puts JSON.generate("value" => ARGV[0])', unicode,
+  max_output_bytes: 64, capture_mode: :json_lines
+) { |item| item.fetch("value") }
+check.call("JSON-line capture preserves valid UTF-8 projection",
+           unicode_json.success? && unicode_json.stdout.empty? && unicode_json.records == [unicode] &&
+             unicode_json.records.first.valid_encoding? && !unicode_json.truncated)
+
 bounded_records = runner.run(
   RbConfig.ruby, "-rjson", "-e", '10.times { |id| puts({"id" => id}.to_json) }',
   max_output_bytes: 3,
@@ -80,7 +125,7 @@ invalid_mode = runner.run(RbConfig.ruby, "-e", "print 'must not run'", capture_m
 check.call("capture mode is closed and rejects unknown values", invalid_mode.status == "failed" && invalid_mode.stderr.include?("ArgumentError"))
 
 if errors.empty?
-  puts "PASS: 11 checks"
+  puts "PASS: 17 checks"
   exit 0
 end
 

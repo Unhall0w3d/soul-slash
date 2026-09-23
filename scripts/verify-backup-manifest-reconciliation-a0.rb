@@ -41,6 +41,9 @@ Dir.mktmpdir("soul-backup-manifest-reconciliation-") do |root|
 
   [
     File.join(root, ".env"),
+    File.join(root, "lib", "fixture.rb"),
+    File.join(root, "docs", "fixture.md"),
+    File.join(root, "scripts", "fixture.rb"),
     File.join(root, "Soul", "runtime", "creative_flows", "state.json"),
     File.join(root, "Soul", "runtime", "youtube_auth", "state.json"),
     File.join(root, "Soul", "runtime", "youtube_description_sync", "state.json"),
@@ -54,6 +57,11 @@ Dir.mktmpdir("soul-backup-manifest-reconciliation-") do |root|
   end
 
   policy = SoulCore::BackupManifestPolicy.new(root: root, home: root)
+  check.call("source worktree roots are explicit without whole project capture",
+             %w[lib docs scripts].all? { |name| policy.sources.include?(File.join(root, name)) } &&
+               !policy.sources.include?(root))
+  File.symlink(File.join(root, "lib"), File.join(root, "assets"))
+  check.call("symlinked source root is not selected", !policy.sources.include?(File.join(root, "assets")))
   durable_local_run_roots = [
     File.join(root, ".local", "share", "soul", "blender-visual", "runs"),
     File.join(root, ".local", "share", "soul", "music", "vulkan-pilot-runs"),

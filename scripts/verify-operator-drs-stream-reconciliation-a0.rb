@@ -39,7 +39,9 @@ class OperatorDrsRepairRunner
     return ok("4096 #{@source}\n") if argv.first == "du"
     return failed("unexpected command") unless argv.first == "restic"
 
-    action = argv[argv.index("--repo") + 2]
+    action_index = argv.index("--repo") + 2
+    action_index += 1 if argv[action_index] == "--no-lock"
+    action = argv[action_index]
     case action
     when "snapshots"
       ok(JSON.generate(@snapshots))

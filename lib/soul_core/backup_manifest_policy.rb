@@ -34,6 +34,8 @@ module SoulCore
     def source_candidates
       [
         File.join(@root, ".env"),
+        *%w[lib scripts docs config assets deploy bin skills templates .github].map { |name| File.join(@root, name) },
+        *%w[AGENTS.md CHANGELOG.md CONTRIBUTING.md MANIFEST.txt Makefile README.md SECURITY.md VERSION .env.example .gitignore .ruby-version].map { |name| File.join(@root, name) },
         File.join(@root, "Soul", "private"),
         File.join(@root, "Soul", "config", "cloud_providers.yaml"),
         File.join(@root, "Soul", "config", "model_runtime_profiles.local.yaml"),
