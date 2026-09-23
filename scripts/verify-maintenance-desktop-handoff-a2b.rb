@@ -249,7 +249,12 @@ end
 
 uri_script = File.read(File.expand_path("soul-maintenance-uri", __dir__))
 dashboard = File.read(File.expand_path("../assets/dashboard/dashboard.js", __dir__))
-check.call("URI process uses fixed argv exec rather than a shell", uri_script.include?("Process.exec(") && !uri_script.match?(/system\s*\(\s*['\"]|sh -c|bash -c/))
+check.call("URI process uses the native fixed terminal argv rather than a shell",
+           uri_script.include?("Process.exec(") &&
+             uri_script.include?('TERMINAL = "/usr/bin/xdg-terminal-exec"') &&
+             uri_script.include?('"--app-id=soul-maintenance"') &&
+             uri_script.include?('"--title=Soul / Guided Maintenance"') &&
+             !uri_script.match?(/system\s*\(\s*['\"]|sh -c|bash -c/))
 check.call("Dashboard launches only strict maintenance URIs and contains no polling loop",
            dashboard.include?("function launchMaintenanceUri") &&
              dashboard.include?("soul-maintenance:") &&

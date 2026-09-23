@@ -1385,6 +1385,9 @@ maintenance-authority-uninstall:
 verify-maintenance-fleet-status:
 > @ruby scripts/verify-maintenance-fleet-status-b1.rb
 
+verify-maintenance-platform-adapters:
+> @ruby scripts/verify-maintenance-platform-adapters-a12.rb
+
 verify-maintenance-local-topology:
 > @ruby scripts/verify-maintenance-local-topology-a1.rb
 
@@ -1628,3 +1631,5 @@ verify-agent-operational-readiness:
 > @ruby scripts/verify-agent-operational-readiness-a1.rb
 > @ruby scripts/verify-external-amd-workload-gate.rb
 > @ruby scripts/codex-policy-eval
+
+.PHONY: verify-maintenance-platform-adapters

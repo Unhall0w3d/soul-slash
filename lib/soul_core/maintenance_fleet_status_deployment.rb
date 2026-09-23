@@ -27,10 +27,10 @@ module SoulCore
       errors << "fleet collector script is unavailable" unless File.file?(collector_script)
       return result(false, "failed", errors.first, {"errors" => errors}) unless errors.empty?
 
-      result(true, "blocked_for_human_review", "Review the exact noon/midnight fleet-status timer.", {
+      result(true, "blocked_for_human_review", "Review the exact 15-minute fleet-status timer.", {
         "confirmation" => CONFIRM_INSTALL,
         "files" => paths,
-        "calendar" => ["*-*-* 00:00:00", "*-*-* 12:00:00"],
+        "calendar" => ["*-*-* *:00/15:00"],
         "persistent" => true,
         "mutation_authority" => "status_cache_only",
         "units" => rendered
@@ -53,7 +53,7 @@ module SoulCore
         execution = @runner.call(command)
         return result(false, "failed", "Timer installation failed safely.", {"command" => command.drop(1), "stderr" => bounded(execution["stderr"])}) unless execution["success"]
       end
-      result(true, "complete", "Noon/midnight fleet-status timer installed.", {"files" => paths, "timer" => TIMER}, "deployment_state")
+      result(true, "complete", "15-minute fleet-status timer installed.", {"files" => paths, "timer" => TIMER}, "deployment_state")
     rescue SystemCallError, IOError => error
       result(false, "failed", "Timer installation failed safely: #{error.class}.", {})
     end
@@ -101,11 +101,10 @@ module SoulCore
         UNIT
         TIMER => <<~UNIT
           [Unit]
-          Description=Collect Soul fleet status at noon and midnight
+          Description=Collect Soul fleet status every 15 minutes
 
           [Timer]
-          OnCalendar=*-*-* 00:00:00
-          OnCalendar=*-*-* 12:00:00
+          OnCalendar=*-*-* *:00/15:00
           Persistent=true
           Unit=#{SERVICE}
 

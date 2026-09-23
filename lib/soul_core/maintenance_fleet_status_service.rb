@@ -12,6 +12,7 @@ require_relative "bounded_command_runner"
 require_relative "apple_mobile_inventory_adapter"
 require_relative "asuswrt_merlin_inventory_adapter"
 require_relative "managed_switch_snmp_inventory_adapter"
+require_relative "maintenance_platform_adapter_registry"
 require_relative "winboat_inventory_adapter"
 
 module SoulCore
@@ -63,7 +64,10 @@ module SoulCore
       apple_mobile_inventory_adapter: nil,
       asuswrt_merlin_inventory_adapter: nil,
       managed_switch_snmp_inventory_adapter: nil,
-      winboat_inventory_adapter: nil
+      winboat_inventory_adapter: nil,
+      platform_adapter_registry: nil,
+      omarchy_path: "/usr/bin/omarchy",
+      omarchy_state_root: File.expand_path("~/.local/state/omarchy")
     )
       @runner = runner
       @clock = clock
@@ -82,6 +86,9 @@ module SoulCore
       @asuswrt_merlin_inventory_adapter = asuswrt_merlin_inventory_adapter || AsuswrtMerlinInventoryAdapter.new(runner: @runner, ssh_config: @ssh_config)
       @managed_switch_snmp_inventory_adapter = managed_switch_snmp_inventory_adapter || ManagedSwitchSnmpInventoryAdapter.new(runner: @runner)
       @winboat_inventory_adapter = winboat_inventory_adapter || WinboatInventoryAdapter.new(runner: @runner)
+      @platform_adapter_registry = platform_adapter_registry || MaintenancePlatformAdapterRegistry.new
+      @omarchy_path = File.expand_path(omarchy_path)
+      @omarchy_state_root = File.expand_path(omarchy_state_root)
       @addresses = {
         WORKSTATION_ID => configured_display_value(
           "SOUL_FLEET_WORKSTATION_ADDRESS",
@@ -297,6 +304,7 @@ module SoulCore
     end
 
     def collect_workstation
+      adapter = workstation_platform_adapter
       kernel = local_run("workstation.kernel", "/usr/bin/uname", "-r")
       native = collect_fresh_pacman_updates
       native_freshness = "fresh_pacman_metadata"
@@ -315,7 +323,9 @@ module SoulCore
         "/usr/bin/flatpak", "remote-ls", "--updates", "--system", "--columns=application,version,branch",
         timeout: 30
       )
-      installed_kernel = local_run("workstation.installed_kernel", "/usr/bin/pacman", "-Q", "linux-cachyos")
+      kernel_package = adapter.fetch("id") == "omarchy" ? "linux" : "linux-cachyos"
+      installed_kernel = local_run("workstation.installed_kernel", PACMAN_PATH, "-Q", kernel_package)
+      omarchy = adapter.fetch("id") == "omarchy" ? collect_omarchy_status : nil
 
       native_count = line_count(native, empty_exit_statuses: [0, 2])
       aur_count = line_count(aur)
@@ -341,6 +351,7 @@ module SoulCore
       running_kernel = output(kernel)
       available_kernel = output(installed_kernel).split(/\s+/, 2)[1].to_s
       kernel_update = !available_kernel.empty? && !running_kernel.start_with?(available_kernel)
+      reboot_required = kernel_update || omarchy&.fetch("reboot_required", false)
       updates = update_summary(
         native: native_count,
         aur: aur_count,
@@ -352,24 +363,87 @@ module SoulCore
       device(
         id: WORKSTATION_ID,
         label: @labels.fetch(WORKSTATION_ID),
-        role: "Hyprland workstation · maintenance controller",
+        role: adapter.fetch("id") == "omarchy" ? "Omarchy workstation · maintenance controller" : "Hyprland workstation · maintenance controller",
         address: @addresses.fetch(WORKSTATION_ID),
         reachable: true,
         os: os_release_summary,
-        version: output(local_run("workstation.hyprland_version", "/usr/bin/hyprland", "-v")).lines.first.to_s.strip,
+        version: workstation_version(adapter, omarchy),
         kernel: kernel_summary(running_kernel, available_kernel, kernel_update),
         updates: updates,
-        reboot: {"required" => kernel_update, "reason" => kernel_update ? "newer kernel package is installed" : "running kernel matches installed package"},
+        reboot: {"required" => reboot_required, "reason" => workstation_reboot_reason(kernel_update, omarchy)},
         services: [],
         facts: {
           "hostname" => safe_text(@hostname_reader.call),
           "management_channel" => "local",
-          "maintenance_adapter" => "arch_pacman",
+          "platform" => adapter.fetch("id"),
+          "os_id" => adapter.fetch("matched_os_id"),
+          "platform_adapter" => adapter.fetch("id"),
+          "platform_base_family" => adapter.fetch("base_family"),
+          "status_adapter" => adapter.fetch("status_adapter"),
+          "maintenance_adapter" => adapter.fetch("maintenance_adapter"),
+          "reboot_adapter" => adapter.fetch("reboot_adapter"),
           "maintenance_lifecycle" => "device_scoped_v1",
           "package_managers" => package_managers,
-          "flatpak_applicable" => flatpak_user.status != "unavailable" || flatpak_system.status != "unavailable"
+          "flatpak_applicable" => flatpak_user.status != "unavailable" || flatpak_system.status != "unavailable",
+          "mutation_supported" => false,
+          "omarchy" => omarchy
         }
       )
+    end
+
+    def workstation_platform_adapter
+      values = os_release_values
+      @platform_adapter_registry.resolve(
+        os_id: values.fetch("ID", ""),
+        os_id_like: values.fetch("ID_LIKE", "")
+      )
+    end
+
+    def collect_omarchy_status
+      executable = File.file?(@omarchy_path) && File.executable?(@omarchy_path) && !File.symlink?(@omarchy_path)
+      version = executable ? local_run("workstation.omarchy_version", @omarchy_path, "version") : nil
+      pending = executable ? local_run(
+        "workstation.omarchy_pending_migrations",
+        @omarchy_path, "migrate", "--pending",
+        accepted_exit_statuses: [0, 1]
+      ) : nil
+      markers = omarchy_state_markers
+
+      {
+        "entrypoint" => @omarchy_path,
+        "entrypoint_executable" => executable,
+        "version" => version ? output(version) : "",
+        "pending_migrations" => pending ? line_count(pending) : 0,
+        "pending_migrations_status" => pending&.status || "unavailable",
+        "state_markers" => markers,
+        "reboot_required" => markers.include?("reboot-required")
+      }
+    end
+
+    def omarchy_state_markers
+      return [] unless File.directory?(@omarchy_state_root) && !File.symlink?(@omarchy_state_root)
+
+      Dir.children(@omarchy_state_root).filter_map do |name|
+        next unless name == "reboot-required" || name.match?(/\Arestart-[a-z0-9_.-]+-required\z/)
+
+        path = File.join(@omarchy_state_root, name)
+        name if File.file?(path) && !File.symlink?(path)
+      end.sort.first(64)
+    rescue SystemCallError
+      []
+    end
+
+    def workstation_version(adapter, omarchy)
+      return omarchy.fetch("version", "") if adapter.fetch("id") == "omarchy"
+
+      output(local_run("workstation.hyprland_version", "/usr/bin/hyprland", "-v")).lines.first.to_s.strip
+    end
+
+    def workstation_reboot_reason(kernel_update, omarchy)
+      return "newer kernel package is installed" if kernel_update
+      return "Omarchy recorded a reboot requirement" if omarchy&.fetch("reboot_required", false)
+
+      "running kernel matches installed package"
     end
 
     def collect_fresh_pacman_updates
@@ -2417,6 +2491,11 @@ module SoulCore
     end
 
     def os_release_summary
+      values = os_release_values
+      values["PRETTY_NAME"].to_s.empty? ? values["NAME"].to_s : values["PRETTY_NAME"].to_s
+    end
+
+    def os_release_values
       values = {}
       File.foreach(@os_release_path, encoding: "UTF-8") do |line|
         key, value = line.strip.split("=", 2)
@@ -2424,9 +2503,9 @@ module SoulCore
 
         values[key] = value.sub(/\A["']/, "").sub(/["']\z/, "")
       end
-      values["PRETTY_NAME"].to_s.empty? ? values["NAME"].to_s : values["PRETTY_NAME"].to_s
+      values
     rescue SystemCallError
-      "Linux workstation"
+      {}
     end
 
     def integer(value)

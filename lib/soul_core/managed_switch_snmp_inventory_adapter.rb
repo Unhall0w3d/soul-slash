@@ -115,7 +115,7 @@ module SoulCore
 
     def valid_community?(value)
       bytes = value.to_s.bytes
-      bytes.length.between?(8, 128) && bytes.all? { |byte| byte.between?(33, 126) }
+      bytes.length.between?(7, 128) && bytes.all? { |byte| byte.between?(33, 126) }
     end
 
     def parse_interfaces(table_output, high_speed_output)
