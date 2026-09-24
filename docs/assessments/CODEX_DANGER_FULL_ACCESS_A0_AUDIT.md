@@ -128,3 +128,29 @@ qualified under `workspace-write` before the default changes.
 
 Only after that qualification should `.codex/config.toml` move to
 `sandbox_mode = "workspace-write"`.
+
+## Project-default repair and bounded qualification — 2026-09-24
+
+With the Operator's approval to proceed, the ignored project-local
+`.codex/config.toml` was changed from `danger-full-access`/`never` to
+`workspace-write`/`on-request`; other keys were preserved. An owner-only copy
+of the prior file is retained under
+`Soul/private/operations/baseline-stabilization-20260923/`. No global setting
+was changed in this action.
+
+A separate Codex CLI `doctor --json` reported restricted filesystem sandbox
+and OnRequest approvals. A no-model CLI sandbox probe with the Soul project
+selected allowed repository writes while denying protected `.git` and
+`.codex` writes, an outside-home write, and loopback. Read-only profile
+denied all probe writes and loopback. Soul's 13-check operational-readiness
+verifier passed inside the workspace profile. The maintenance-resume
+deployment `plan` returned `blocked_for_human_review` with no mutation. An
+explicitly escalated host read saw HTTP 200 from the dashboard and model
+health endpoints; that is not an in-sandbox exception.
+
+These are configuration and no-model sandbox checks. This Annex-hosted task
+did not start a fresh interactive Soul Codex session or exercise its live
+approval prompt, so the exact future task's effective permissions remain a
+first-session qualification gate. See the official OpenAI Docs on
+[configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic)
+and [sandbox versus approval controls](https://learn.chatgpt.com/docs/sandboxing).

@@ -1,0 +1,6 @@
+
+web_search = "live"
+sandbox_mode = "workspace-write"
+model_verbosity = "medium"
+model_reasoning_summary = "auto"
+approval_policy = "on-request"

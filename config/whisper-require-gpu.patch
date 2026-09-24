@@ -1,0 +1,16 @@
+--- a/src/whisper.cpp
++++ b/src/whisper.cpp
+@@ -1331,6 +1331,13 @@ static std::vector<ggml_backend_t> whisper_backend_init(const whisper_context_params & params) {
+ 
+     ggml_backend_t backend_gpu = whisper_backend_init_gpu(params);
+ 
++    // A requested GPU must initialize successfully; CPU-only execution is
++    // reserved for callers that explicitly select --no-gpu.
++    if (params.use_gpu && !backend_gpu) {
++        WHISPER_LOG_ERROR("%s: required GPU unavailable; refusing CPU fallback\n", __func__);
++        return result;
++    }
++
+     if (backend_gpu) {
+         result.push_back(backend_gpu);
+     }
