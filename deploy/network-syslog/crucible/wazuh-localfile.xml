@@ -1,0 +1,6 @@
+  <!-- Soul network-device logs are retained locally and forwarded passively. -->
+  <localfile>
+    <location>/var/log/network-devices/*.log</location>
+    <log_format>syslog</log_format>
+    <only-future-events>yes</only-future-events>
+  </localfile>

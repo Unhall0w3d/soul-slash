@@ -274,6 +274,7 @@ help:
 > @echo "  make verify-apple-mobile-fleet-inventory"
 > @echo "  make apple-mobile-inventory-check  Check optional usbmuxd/libimobiledevice support"
 > @echo "  make verify-crucible-fedora-status"
+> @echo "  make verify-crucible-network-syslog  Verify the fixed-source receiver candidate"
 > @echo "  make verify-crucible-maintenance-control"
 > @echo "  make verify-nixos-maintenance"
 > @echo "  make crucible-maintenance-authority-plan"
@@ -1461,6 +1462,10 @@ verify-managed-switch-snmp-inventory:
 .PHONY: verify-wazuh-network-device-rules
 verify-wazuh-network-device-rules:
 > @ruby scripts/verify-wazuh-network-device-rules-a0.rb
+
+.PHONY: verify-crucible-network-syslog
+verify-crucible-network-syslog:
+> @ruby scripts/verify-crucible-network-syslog-a0.rb
 
 .PHONY: verify-asuswrt-merlin-gateway
 verify-asuswrt-merlin-gateway:

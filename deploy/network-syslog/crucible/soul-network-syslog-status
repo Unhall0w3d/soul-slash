@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+log_root=/var/log/network-devices
+limit_bytes=$((2 * 1024 * 1024 * 1024))
+systemctl is-active --quiet rsyslog.service || { echo 'network syslog receiver: inactive'; exit 1; }
+ss -H -l -u -n | awk '$4 == "192.168.124.2:514" || $5 == "192.168.124.2:514" { found=1 } END { exit found ? 0 : 1 }' || {
+  echo 'network syslog receiver: expected private UDP listener absent'
+  exit 1
+}
+bytes=$(du -sb "$log_root" 2>/dev/null | awk '{print $1}')
+bytes=${bytes:-0}
+if (( bytes > limit_bytes )); then
+  printf 'network syslog receiver: attention retained_bytes=%s limit_bytes=%s\n' "$bytes" "$limit_bytes"
+  exit 2
+fi
+printf 'network syslog receiver: healthy retained_bytes=%s limit_bytes=%s\n' "$bytes" "$limit_bytes"
