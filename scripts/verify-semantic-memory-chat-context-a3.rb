@@ -99,10 +99,16 @@ Dir.mktmpdir("soul-semantic-chat-a3") do |directory|
   system_prompt = built.fetch("messages").first.fetch("content")
   check.call("ordinary chat system prompt receives semantic memory", system_prompt.include?(semantic.fetch("content")))
   check.call("ordinary chat reports semantic retrieval diagnostics", built.dig("memory", "retrieval_mode") == "hybrid" && built.dig("memory", "semantic_record_ids").include?(semantic.fetch("id")))
+
+  ledger_time = File.stat(memory.path).mtime
+  ledger_bytes = File.binread(memory.path)
+  ConversationContextBuilder.new(store: chats).build(chat_id: chat_id)
+  check.call("default chat context reads memory without touching the ledger",
+             File.stat(memory.path).mtime == ledger_time && File.binread(memory.path) == ledger_bytes)
 end
 
 if errors.empty?
-  puts "Semantic memory Chat context A3 verifier passed (11 checks)."
+  puts "Semantic memory Chat context A3 verifier passed (12 checks)."
 else
   warn "Semantic memory Chat context A3 verifier failed:"
   errors.each { |error| warn "- #{error}" }

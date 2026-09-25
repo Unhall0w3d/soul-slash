@@ -26,6 +26,7 @@ require_relative "conversation_research_reflection_service"
 require_relative "conversation_security_status_service"
 require_relative "conversation_fleet_observability_service"
 require_relative "conversation_state_store"
+require_relative "downloads_restore_policy_answer"
 require_relative "conversation_weather_service"
 require_relative "voice_conversation_inference_policy"
 require_relative "host_system_status_collector"
@@ -124,6 +125,7 @@ module SoulCore
       @fleet_observability_service = fleet_observability_service
       @identity_compact_resolver = identity_compact_resolver
       @weather_service = ConversationWeatherService.new(env: env)
+      @downloads_restore_policy_answer = DownloadsRestorePolicyAnswer.new
       @response_truth_guard = ConversationResponseTruthGuard.new
       @context_builder = context_builder || ConversationContextBuilder.new(
         store: store,
@@ -157,6 +159,15 @@ module SoulCore
       if @creative_workflow_service&.candidate_message?(chat_id: chat_id, message: text)
         creative = @creative_workflow_service.plan(chat_id: chat_id, message: text, provider: provider, progress: progress)
         return bounded_workflow_result(chat_id, text, creative, provider, kind: "creative_workflow", reason: "an explicit or active creative workflow is handled by the bounded studio planner") if creative
+      end
+      previous_user_message = if @downloads_restore_policy_answer.needs_context?(text)
+        @store.messages(chat_id, limit: 4, scan_limit: ChatStore::APPLICATION_SCAN_LIMIT)
+          .reverse.find { |entry| entry["role"] == "user" && entry["content"] != text }&.fetch("content", nil)
+      end
+      if (answer = @downloads_restore_policy_answer.answer(message: text, previous_user_message: previous_user_message))
+        return bounded_workflow_result(chat_id, text,
+          { "content" => answer, "mode" => "deterministic", "metadata" => { "policy" => "downloads.restore_last_cleanup" } },
+          provider, kind: "restore_policy", reason: "the Downloads restore safeguard is fixed by the skill preflight")
       end
       emit_progress(progress, "context", "Reading the active transmission and reviewed context.")
       recent_evidence = @evidence_store.recent(chat_id, limit: 5)

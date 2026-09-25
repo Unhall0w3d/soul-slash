@@ -8,10 +8,18 @@ service.
 
 ## Install
 
-Voice Presence reuses the reviewed whisper.cpp transcription runtime,
-the exact low-latency `ggml-base.en.bin` voice model, Supertonic responsive
-voice, and optional RNNoise PipeWire source. Music Studio lyric analysis keeps
-its separate `ggml-small.en.bin` selection. Set those
+Voice Presence uses the shared routed transcription path. The reviewed
+AMD Vulkan Whisper large-v3-turbo runtime runs only after a foreground GPU
+handoff admits the request and later verifies model recovery. Active foreign
+AMD workloads can make transcription refuse safely; it does not fall back to
+CPU or evict that workload. For a supervised session while an AMD game is open,
+launch with `SOUL_WHISPER_GPU_BACKEND=cuda` to use the pinned GTX 1070 CUDA
+Whisper candidate. The NVIDIA handoff verifies free GPU ownership or releases
+and restores an idle Qwen chat model before a transcript is submitted. The
+ordinary route remains AMD when this setting is absent. Voice Presence also
+uses Supertonic responsive
+voice and the optional RNNoise PipeWire source. Music Studio lyric analysis
+keeps its separate `ggml-small.en.bin` selection. Set the voice components
 up first, then review and execute the wake-runtime plan:
 
 ```bash
@@ -84,6 +92,12 @@ coda uses a more conservative 3.0 / 0.18. Pronounce either as one natural short
 phrase; no special theatrical pacing or inflection is intended. These remain
 fixed local keyword-token sequences rather than general transcription or broad
 fuzzy matching.
+
+For a direct spoken address such as “Sol, what…” or “Seoul, can you…”,
+Voice Presence preserves the raw transcript in the window and interprets that
+opening as the assistant name **Soul** for the chat turn. Ordinary statements
+about Seoul, South Korea remain unchanged. Generic transcription is not
+rewritten.
 
 Voice Presence displays request-private stage timing after each completed
 turn. These measurements contain durations only and disappear with the visible

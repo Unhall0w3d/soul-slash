@@ -303,7 +303,7 @@ module SoulCore
     end
     def default_memory_store(store)
       if store.respond_to?(:project_root)
-        ConversationMemoryStore.new(root: store.project_root)
+        ConversationMemoryStore.new(root: store.project_root, create: false)
       else
         NullConversationMemoryStore.new
       end

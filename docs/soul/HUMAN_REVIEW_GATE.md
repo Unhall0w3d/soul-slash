@@ -79,3 +79,11 @@ agreement alone does not confer that authority.
 
 Soul/ may stage other candidates. It may not self-certify merge, release,
 protected-memory, or persistence decisions.
+
+## Approved Voice candidates (September 25, 2026)
+
+- [Conversation and Voice Presence fidelity A1](../assessments/SOUL_CONVERSATION_VOICE_A1_REVIEW_20260924.md): attended microphone and five-second follow-up passed; approved for merge.
+- [Whisper beside Warframe](../assessments/WHISPER_WARFRAME_COEXISTENCE_REVIEW_20260925.md): session-selected CUDA transcription and Qwen restoration passed; approved for merge.
+
+This approval covers the Voice and Whisper candidate changes. Camera review and
+Qwen cold-boot readiness remain separate.

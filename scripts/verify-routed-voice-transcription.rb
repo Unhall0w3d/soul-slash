@@ -73,6 +73,11 @@ Dir.mktmpdir("soul-routed-voice-test-") do |root|
     data: { "source_audio_retained" => false, "automatically_sent" => false }
   )
 
+  invalid = SoulCore::RoutedVoiceTranscriptionService.new(root: root, process_env: { "SOUL_WHISPER_GPU_BACKEND" => "cpu" })
+  check.call("unsupported backend fails closed without CPU fallback", invalid.status.dig("data", "cpu_fallback") == false && invalid.transcribe(audio_bytes: "private", content_type: "audio/wav")["lifecycle_state"] == "blocked_for_human_review")
+  check.call("default backend remains AMD", SoulCore::RoutedVoiceTranscriptionService.new(root: root, process_env: {}, coordinator: RoutedVoiceFixtureCoordinator.new, adapter: RoutedVoiceFixtureAdapter.new(status_result: complete_status, transcribe_result: complete_transcription)).backend == "amd")
+  check.call("session-selected CUDA backend is explicit", SoulCore::RoutedVoiceTranscriptionService.new(root: root, process_env: { "SOUL_WHISPER_GPU_BACKEND" => "cuda" }, coordinator: RoutedVoiceFixtureCoordinator.new, adapter: RoutedVoiceFixtureAdapter.new(status_result: complete_status, transcribe_result: complete_transcription)).backend == "cuda")
+
   coordinator = RoutedVoiceFixtureCoordinator.new(blocker: "Free Core disables transcription; select a chat Core first")
   adapter = RoutedVoiceFixtureAdapter.new(status_result: complete_status, transcribe_result: complete_transcription)
   service = SoulCore::RoutedVoiceTranscriptionService.new(root: root, process_env: {}, coordinator: coordinator, adapter: adapter)

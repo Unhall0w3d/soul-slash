@@ -21,6 +21,7 @@ module SoulCore
       creative_workflow
       maintenance_workflow
       core_control
+      restore_policy
       deterministic_fallback
     ].freeze
 

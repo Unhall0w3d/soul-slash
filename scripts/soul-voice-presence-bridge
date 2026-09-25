@@ -10,6 +10,7 @@ require_relative "../lib/soul_core/routed_voice_transcription_service"
 require_relative "../lib/soul_core/voice_synthesis_service"
 require_relative "../lib/soul_core/voice_screen_understanding_service"
 require_relative "../lib/soul_core/voice_presence_turn_policy"
+require_relative "../lib/soul_core/voice_presence_address_resolver"
 
 ROOT = File.expand_path("..", __dir__)
 STATE_ROOT = File.expand_path(ENV.fetch("SOUL_VOICE_PRESENCE_STATE_ROOT", "~/.local/state/soul/voice-presence"))
@@ -78,10 +79,12 @@ begin
     content_type: "audio/wav"
   )
   raise transcription.dig("data", "message").to_s.empty? ? "transcription failed" : transcription.dig("data", "message") unless transcription["ok"]
-  transcript = transcription.dig("data", "transcript").to_s.strip
+  raw_transcript = transcription.dig("data", "transcript").to_s.strip
+  transcript = SoulCore::VoicePresenceAddressResolver.new.resolve(raw_transcript)
   now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
   timings["transcription_ms"] = ((now - stage_started) * 1_000).round
-  emit("type" => "transcript", "text" => transcript)
+  emit("type" => "transcript", "text" => raw_transcript,
+       "interpreted_address" => (transcript != raw_transcript ? "Soul" : nil))
 
   repeat_request = SoulCore::VoicePresenceTurnPolicy.new.repeat_request?(transcript)
   if repeat_request && replay_path && File.file?(replay_path) && !File.symlink?(replay_path)

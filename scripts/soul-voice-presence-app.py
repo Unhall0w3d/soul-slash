@@ -180,7 +180,8 @@ class PresenceWindow(QMainWindow):
         elif event_type == "progress":
             self.set_state("thinking", event.get("summary", "Soul is working."))
         elif event_type == "transcript":
-            self.detail.setText(f'Heard: “{event.get("text", "")[:180]}”')
+            address = " · Interpreted as addressing Soul" if event.get("interpreted_address") == "Soul" else ""
+            self.detail.setText(f'Heard: “{event.get("text", "")[:180]}”{address}')
         elif event_type == "level" and self.current_state == "listening":
             level = float(event.get("rms", 0))
             signal = "voice activity" if level >= 120 else ("room signal" if level >= 12 else "quiet")
