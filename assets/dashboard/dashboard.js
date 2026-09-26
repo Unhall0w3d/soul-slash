@@ -32,6 +32,8 @@ state.followedBoundedJobIds = new Set();
 state.voiceRoundTripPending = false;
 state.pictureAttachment = null;
 state.screenCapturing = false;
+state.cameraPopup = null;
+state.cameraToken = null;
 state.coreLocked = false;
 state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
@@ -455,6 +457,7 @@ async function changePassword(event) {
 }
 
 async function logout() {
+  closeCameraWindow();
   if (state.voiceRecorder) cancelVoiceRecording("Voice capture canceled at logout.");
   stopVoicePlayback();
   byId("logout-button").disabled = true;
@@ -526,6 +529,7 @@ function setBusy(busy, message = "") {
   byId("message-input").disabled = coreLocked || !state.activeChat;
   byId("attach-picture").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("capture-screen").disabled = coreLocked || state.busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  byId("open-camera").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("send-message").querySelector("span").textContent = state.busy ? "Working" : "Send";
   byId("composer-hint").textContent = coreLocked
     ? "No local Core is loaded · choose one above to continue."
@@ -582,6 +586,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   const chat = name === "chat";
   const host = name === "host";
   const timeline = name === "timeline";
+  if (!chat) closeCameraWindow();
   if (!chat && state.voiceRecorder) cancelVoiceRecording("Voice capture stopped because Chat was closed.");
   if (!chat) stopVoicePlayback();
   const studio = name === "studio";
@@ -1294,6 +1299,7 @@ async function loadChats(selectFirst = true) {
 }
 
 function resetConversationView() {
+  closeCameraWindow();
   if (state.voiceRecorder) cancelVoiceRecording("Voice capture stopped because the conversation closed.");
   clearPictureAttachment();
   state.activeChat = null;
@@ -1312,7 +1318,10 @@ function resetConversationView() {
 
 async function selectChat(chat) {
   stopVoicePlayback();
-  if (state.activeChat?.id && state.activeChat.id !== chat.id) clearPictureAttachment();
+  if (state.activeChat?.id && state.activeChat.id !== chat.id) {
+    closeCameraWindow();
+    clearPictureAttachment();
+  }
   state.activeChat = chat; renderChatList();
   byId("active-chat-kicker").textContent = chat.id;
   byId("active-chat-title").textContent = chat.title || "Untitled conversation";
@@ -2711,6 +2720,60 @@ async function captureScreenPreview() {
   } finally {
     state.screenCapturing = false; button.disabled = false;
     byId("capture-screen").disabled = state.coreLocked || state.busy || !state.activeChat;
+  }
+}
+
+function closeCameraWindow() {
+  if (state.cameraPopup && !state.cameraPopup.closed) state.cameraPopup.close();
+  state.cameraPopup = null;
+  state.cameraToken = null;
+}
+
+function openCameraWindow() {
+  if (!state.activeChat || state.busy || state.coreLocked || !state.authenticated) return;
+  closeCameraWindow();
+  const random = crypto.getRandomValues(new Uint8Array(16));
+  const token = Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const popup = window.open("/camera#" + token, "soul-camera", "width=800,height=850");
+  if (!popup) { announce("Browser blocked the camera window. Allow the popup and try again."); return; }
+  state.cameraPopup = popup;
+  state.cameraToken = token;
+  popup.focus();
+  announce("Camera window opened. Start the camera there when ready.");
+}
+
+function handleCameraSnapshot(event) {
+  const data = event.data;
+  if (event.origin !== location.origin || event.source !== state.cameraPopup ||
+      data?.type !== "soul.camera.snapshot.v1" || data.token !== state.cameraToken) return;
+  const reply = (ok, message) => event.source?.postMessage({ type: "soul.camera.snapshot.ack", token: state.cameraToken, ok, message }, location.origin);
+  if (!state.authenticated || !state.activeChat || state.busy || state.coreLocked ||
+      data.mediaType !== "image/jpeg" || typeof data.imageBase64 !== "string" ||
+      data.imageBase64.length > 14 * 1024 * 1024 ||
+      !Number.isInteger(data.width) || !Number.isInteger(data.height) ||
+      data.width < 1 || data.height < 1 || data.width > 960 || data.height > 720) {
+    reply(false, "Chat is unavailable for this preview.");
+    return;
+  }
+  try {
+    const decoded = atob(data.imageBase64);
+    if (!decoded.length || decoded.length > 10 * 1024 * 1024) throw new Error("Camera frame exceeds the picture limit.");
+    const bytes = Uint8Array.from(decoded, (character) => character.charCodeAt(0));
+    const previewUrl = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+    clearPictureAttachment();
+    const filename = "camera-" + Date.now() + ".jpg";
+    state.pictureAttachment = { filename, mediaType: "image/jpeg", bytes: bytes.length,
+      imageBase64: data.imageBase64, previewUrl, source: "camera" };
+    byId("picture-attachment-preview").src = previewUrl;
+    byId("picture-attachment-name").textContent = filename;
+    byId("picture-attachment-meta").textContent = formatBytes(bytes.length) + " · JPEG · camera · local preview";
+    byId("picture-attachment").hidden = false;
+    byId("composer-hint").textContent = "Camera preview ready · ask one explicit question";
+    byId("message-input").focus();
+    announce("Camera frame staged locally; no model has inspected it");
+    reply(true, "One frame is staged in Soul Chat. The camera has stopped.");
+  } catch (error) {
+    reply(false, error.message || "Camera preview could not be staged.");
   }
 }
 
@@ -7235,6 +7298,9 @@ byId("attach-picture").addEventListener("click", () => byId("picture-input").cli
 byId("picture-input").addEventListener("change", selectPictureAttachment);
 byId("picture-attachment-remove").addEventListener("click", () => { clearPictureAttachment(); byId("message-input").focus(); });
 byId("capture-screen").addEventListener("click", openScreenCaptureDialog);
+byId("open-camera").addEventListener("click", openCameraWindow);
+window.addEventListener("message", handleCameraSnapshot);
+window.addEventListener("pagehide", closeCameraWindow);
 byId("execute-screen-capture").addEventListener("click", captureScreenPreview);
 byId("record-voice").addEventListener("click", toggleVoiceRecording);
 byId("notification-mode").addEventListener("click", cycleNotificationMode);
