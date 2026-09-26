@@ -64,8 +64,8 @@ required to qualify the original race end to end; no reboot is authorized here.
 ## Human review outcome
 
 ```text
-Outcome: pending
-Reviewer:
-Date:
-Decision summary:
+Outcome: approved for merge
+Reviewer: repository owner
+Date: 2026-09-25
+Decision summary: Owner approved the Qwen startup changes for merge. Cold-boot qualification remains pending; no reboot was requested.
 ```

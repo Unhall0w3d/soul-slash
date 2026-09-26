@@ -2,7 +2,7 @@
 
 ```text
 Candidate status: candidate_complete
-Outcome: pending human review
+Outcome: approved for merge by repository owner
 Branch: codex/qwen-cuda-startup-readiness
 Risk: consequential persistent startup behavior
 ```
@@ -69,11 +69,12 @@ Therefore the candidate uses direct bounded device and driver checks.
 
 ## Boundaries and remaining qualification
 
-The candidate is isolated in a separate worktree. No live startup code or
-service has been changed by this review, and no boot was performed. The
-deterministic suite proves decision logic; the host read proves current Qwen
-placement and query shape. The original cold-boot race remains to be qualified
-after an approved merge and a future normal boot.
+The implementation was prepared in an isolated worktree. Review and tests
+did not restart the live service or perform a boot. The deterministic suite
+proves decision logic; the host read proves current Qwen placement and query
+shape. The installed selector invokes the repository script, so merged code
+will be used at the next normal boot. The original cold-boot race still needs
+end-to-end qualification at that boot.
 
 A very late driver start beyond 15 seconds will leave Qwen unstarted and
 report a visible failure. If the exact cleanup command itself fails, the
@@ -91,15 +92,15 @@ selector's cleanup authority.
 [x] Bounded readiness and placement checks
 [x] Deterministic CPU fallback and cleanup failure coverage
 [x] No credentials, private memory, or projection changes
-[ ] Owner approves merge and next-boot deployment
+[x] Owner approves merge; installed selector will use the merged code at next boot
 [ ] Subsequent cold boot verifies NVIDIA placement end to end
 ```
 
 ## Human review outcome
 
 ```text
-Outcome: pending
-Reviewer:
-Date:
-Decision summary:
+Outcome: approved for merge
+Reviewer: repository owner
+Date: 2026-09-25
+Decision summary: Owner approved the Qwen startup changes for merge. No reboot was requested; cold-boot qualification remains open.
 ```
