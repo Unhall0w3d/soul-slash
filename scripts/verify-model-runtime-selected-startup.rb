@@ -24,29 +24,50 @@ end
 
 class StartupRunner
   attr_reader :commands
-  attr_accessor :states, :fail_start
+  attr_accessor :states, :fail_start, :fail_stop, :gpu_uuid, :gpu_memory_mib, :gpu_probe_delay, :gpu_rows
 
   def initialize(states)
     @states = states
     @commands = []
     @fail_start = false
+    @fail_stop = false
+    @gpu_uuid = "GPU-92d94102-e241-1a40-62c5-832d60874aab"
+    @gpu_memory_mib = 5296
+    @gpu_probe_delay = 0
+    @gpu_rows = nil
   end
 
   def which(_name) = nil
 
   def run(*command, **_options)
     @commands << command
+    if command.first.end_with?("nvidia-smi")
+      if command.include?("--query-gpu=uuid")
+        return command_result(true, "#{gpu_uuid}\n")
+      end
+      if command.any? { |part| part.start_with?("--query-compute-apps=") }
+        if gpu_probe_delay.positive?
+          self.gpu_probe_delay -= 1
+          return command_result(true, "")
+        end
+        return command_result(true, gpu_rows || "4242, #{gpu_uuid}, #{gpu_memory_mib}\n")
+      end
+    end
     action = command[2]
     service = command[3]
     case action
     when "show"
-      command_result(true, "loaded\n")
+      command_result(true, command.include?("--property=MainPID") ? "4242\n" : "loaded\n")
     when "is-active"
       state = states.fetch(service)
       command_result(state == "active", "#{state}\n", state == "active" ? 0 : 3)
     when "start"
       return command_result(false) if fail_start
       states[service] = "active"
+      command_result(true)
+    when "stop"
+      return command_result(false) if fail_stop
+      states[service] = "inactive"
       command_result(true)
     else
       command_result(false)
@@ -188,6 +209,99 @@ Dir.mktmpdir("soul-selected-startup-") do |root|
   check("symlinked selection fails closed before model mutation", unsafe.lifecycle_state == "blocked_for_human_review" && unsafe_runner.commands.none? { |command| command[2] == "start" }, errors)
 end
 
+Dir.mktmpdir("soul-nvidia-startup-") do |root|
+  profile_file = File.join(root, "config/profiles.yaml")
+  FileUtils.mkdir_p(File.dirname(profile_file))
+  File.write(profile_file, <<~YAML)
+    schema_version: soul.model_runtime_profiles.v2
+    default_profile: nvidia-fallback
+    profiles:
+      - id: nvidia-fallback
+        label: NVIDIA fallback
+        model_name: Qwen3 8B
+        accelerator: NVIDIA CUDA
+        service: llama-server.service
+      - id: amd-quality
+        label: AMD quality
+        model_name: Ministral
+        accelerator: AMD Vulkan
+        service: soul-model-amd.service
+  YAML
+  systemctl = executable(File.join(root, "systemctl"))
+  nvidia_smi = executable(File.join(root, "nvidia-smi"))
+  env = { "SOUL_MODEL_RUNTIME_PROFILES_FILE" => profile_file }
+
+  make_start = lambda do |states:, device_ready:, runner: nil|
+    runner ||= StartupRunner.new(states)
+    elapsed = [0.0]
+    starter = SoulCore::ModelRuntimeSelectedStarter.new(
+      root: root, env: env, runner: runner, systemctl_path: systemctl,
+      nvidia_smi_path: nvidia_smi, nvidia_device_ready: device_ready,
+      monotonic_clock: -> { elapsed[0] }, sleeper: ->(seconds) { elapsed[0] += seconds }
+    )
+    [starter.run, runner, elapsed[0]]
+  end
+
+  checks = 0
+  delayed_device = -> { checks += 1; checks >= 4 }
+  delayed_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  delayed_runner.gpu_probe_delay = 2
+  delayed, delayed_runner, elapsed = make_start.call(states: delayed_runner.states, device_ready: delayed_device, runner: delayed_runner)
+  check("late NVIDIA nodes and model allocation complete with one start", delayed.ok && delayed.details["started"] &&
+        delayed_runner.commands.count { |command| command[2] == "start" } == 1 &&
+        delayed_runner.commands.none? { |command| command[2] == "stop" } && elapsed >= 1.25, errors)
+
+  absent_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  absent, absent_runner, elapsed = make_start.call(states: absent_runner.states, device_ready: -> { false }, runner: absent_runner)
+  check("missing NVIDIA nodes fail before model start within bound", absent.lifecycle_state == "failed" &&
+        absent_runner.commands.none? { |command| %w[start stop].include?(command[2]) } && elapsed <= 15, errors)
+
+  cpu_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  cpu_runner.gpu_memory_mib = 0
+  cpu, cpu_runner, elapsed = make_start.call(states: cpu_runner.states, device_ready: -> { true }, runner: cpu_runner)
+  check("CPU fallback is stopped after bounded placement failure", cpu.lifecycle_state == "failed" &&
+        cpu_runner.commands.count { |command| command[2] == "start" } == 1 &&
+        cpu_runner.commands.count { |command| command[2] == "stop" } == 1 &&
+        cpu_runner.states["llama-server.service"] == "inactive" && elapsed <= 30, errors)
+
+  failed_stop_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  failed_stop_runner.gpu_memory_mib = 0
+  failed_stop_runner.fail_stop = true
+  failed_stop, _, = make_start.call(states: failed_stop_runner.states, device_ready: -> { true }, runner: failed_stop_runner)
+  check("failed CPU fallback cleanup is explicit", failed_stop.lifecycle_state == "failed" &&
+        failed_stop.message.include?("cleanup failed") && failed_stop.details["cleanup_state"] == "active", errors)
+
+  existing_runner = StartupRunner.new("llama-server.service" => "active", "soul-model-amd.service" => "inactive")
+  existing_runner.gpu_memory_mib = 0
+  existing, existing_runner, = make_start.call(states: existing_runner.states, device_ready: -> { true }, runner: existing_runner)
+  check("preexisting CPU-backed Qwen blocks without mutation", existing.lifecycle_state == "blocked_for_human_review" &&
+        existing_runner.commands.none? { |command| %w[start stop].include?(command[2]) }, errors)
+
+  healthy_runner = StartupRunner.new("llama-server.service" => "active", "soul-model-amd.service" => "inactive")
+  healthy, healthy_runner, = make_start.call(states: healthy_runner.states, device_ready: -> { true }, runner: healthy_runner)
+  check("preexisting GPU-backed Qwen completes without mutation", healthy.ok && !healthy.details["started"] &&
+        healthy_runner.commands.none? { |command| %w[start stop].include?(command[2]) }, errors)
+
+  foreign_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  foreign_runner.gpu_rows = "7777, #{foreign_runner.gpu_uuid}, 5296\n"
+  foreign, foreign_runner, = make_start.call(states: foreign_runner.states, device_ready: -> { true }, runner: foreign_runner)
+  check("foreign GPU allocation cannot prove Qwen placement", foreign.lifecycle_state == "failed" &&
+        foreign_runner.commands.count { |command| command[2] == "stop" } == 1, errors)
+  select_profile(root, "amd-quality")
+  amd_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  amd, amd_runner, = make_start.call(states: amd_runner.states, device_ready: -> { false }, runner: amd_runner)
+  check("AMD selection starts without NVIDIA guard", amd.ok &&
+        amd_runner.commands.count { |command| command[2] == "start" } == 1 &&
+        amd_runner.commands.none? { |command| command.first.end_with?("nvidia-smi") }, errors)
+  select_profile(root, "nvidia-fallback")
+  core_file = File.join(root, "Soul/runtime/model_runtime/core_selection.json")
+  File.write(core_file, JSON.generate("schema_version" => "soul.core_selection.v2", "active_core_id" => "free", "profiles" => {}))
+  free_runner = StartupRunner.new("llama-server.service" => "inactive", "soul-model-amd.service" => "inactive")
+  free, free_runner, = make_start.call(states: free_runner.states, device_ready: -> { false }, runner: free_runner)
+  check("Free Core suppresses Qwen and NVIDIA probing", free.ok && !free.details["started"] &&
+        free_runner.commands.none? { |command| command[2] == "start" || command.first.end_with?("nvidia-smi") }, errors)
+end
+
 Dir.mktmpdir("soul-startup-deploy-") do |root|
   home = File.join(root, "home")
   FileUtils.mkdir_p(home)
@@ -221,7 +335,7 @@ end
 
 starter_source = File.read(File.join(__dir__, "../lib/soul_core/model_runtime_selected_starter.rb"))
 brief = File.read(File.join(__dir__, "../docs/soul/MODEL_RUNTIME_PORTABILITY_2D_SELECTED_STARTUP_BRIEF.md"))
-check("startup source has no automatic stop, enable, disable, or polling", !starter_source.match?(/run_systemctl\("(?:stop|enable|disable|restart)"/) && !starter_source.include?("sleep"), errors)
+check("startup never enables, disables, or restarts a model unit", !starter_source.match?(/run_systemctl\("(?:enable|disable|restart)"/), errors)
 check("human brief explicitly authorizes the persistent bounded oneshot", brief.include?("persistent_oneshot_authorized: yes") && brief.include?("without requiring a system reboot"), errors)
 
 if errors.empty?

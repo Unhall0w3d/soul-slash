@@ -87,3 +87,7 @@ protected-memory, or persistence decisions.
 
 This approval covers the Voice and Whisper candidate changes. Camera review and
 Qwen cold-boot readiness remain separate.
+
+## Pending Qwen startup candidate (September 25, 2026)
+
+- [Qwen CUDA cold-boot readiness](../assessments/QWEN_CUDA_COLD_BOOT_READINESS_REVIEW_20260925.md): bounded NVIDIA readiness and process-owned GPU placement checks pass deterministic tests; live deployment and cold-boot qualification remain pending owner review.
