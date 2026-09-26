@@ -95,5 +95,49 @@ vm.runInNewContext(fs.readFileSync("assets/camera/camera.js", "utf8"), context);
   element("capture-frame").listeners.click();
   assert(failedEncodeTrack.stopped, "canvas failure must stop the stream");
   element("canvas").toDataURL = originalEncode;
+  const dashboard = fs.readFileSync("assets/dashboard/dashboard.js", "utf8");
+  const dashboardHtml = fs.readFileSync("assets/dashboard/index.html", "utf8");
+  assert(dashboardHtml.includes('id="open-camera" class="voice-button" type="button" aria-label="Open a visible camera session" hidden disabled'),
+    "camera control must start hidden while the resident route is unqualified");
+  assert(dashboard.includes('byId("open-camera").disabled = !state.cameraAvailable ||'),
+    "composer updates must preserve the unavailable-route gate");
+  assert(dashboard.includes('if (!state.cameraAvailable || !state.activeChat'),
+    "direct camera-open calls must preserve the unavailable-route gate");
+  const gateStart = dashboard.indexOf("async function refreshCameraAvailability() {");
+  const gateEnd = dashboard.indexOf("function closeCameraWindow() {", gateStart);
+  assert(gateStart >= 0 && gateEnd > gateStart, "camera route gate must exist");
+  const gateButton = { hidden: true };
+  const gateState = { authenticated: true, cameraAvailable: false, busy: false };
+  let routeResponse = { status: 404, headers: { get: () => null } };
+  let routeCalls = 0;
+  let renderCalls = 0;
+  const gateContext = { state: gateState, byId: () => gateButton,
+    setBusy: () => { renderCalls += 1; }, fetch: async (path, options) => {
+      assert.strictEqual(path, "/camera");
+      assert.strictEqual(options.credentials, "same-origin");
+      assert.strictEqual(options.cache, "no-store");
+      routeCalls += 1;
+      return routeResponse;
+    } };
+  vm.runInNewContext(dashboard.slice(gateStart, gateEnd), gateContext);
+  await gateContext.refreshCameraAvailability();
+  assert.strictEqual(gateState.cameraAvailable, false);
+  assert.strictEqual(gateButton.hidden, true);
+  routeResponse = { status: 200, headers: { get: () => "camera=(), microphone=(self)" } };
+  await gateContext.refreshCameraAvailability();
+  assert.strictEqual(gateButton.hidden, true, "an unrelated 200 response cannot enable camera");
+  routeResponse = { status: 200, headers: { get: () => "camera=(self), microphone=()" } };
+  await gateContext.refreshCameraAvailability();
+  assert.strictEqual(gateState.cameraAvailable, true);
+  assert.strictEqual(gateButton.hidden, false);
+  routeResponse = { status: 401, headers: { get: () => null } };
+  await gateContext.refreshCameraAvailability();
+  assert.strictEqual(gateState.cameraAvailable, false);
+  assert.strictEqual(gateButton.hidden, true);
+  gateState.authenticated = false;
+  await gateContext.refreshCameraAvailability();
+  assert.strictEqual(routeCalls, 4, "no route request before authentication");
+  assert.strictEqual(renderCalls, 5, "each route check must update composer controls");
+  console.log("PASS camera control is hidden until the authenticated resident route advertises camera access");
   console.log("PASS explicit camera start/stop, one-frame transfer, hidden-window shutdown, intermittent local palm cue, stalled playback, and capture failures");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

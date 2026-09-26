@@ -34,6 +34,7 @@ state.pictureAttachment = null;
 state.screenCapturing = false;
 state.cameraPopup = null;
 state.cameraToken = null;
+state.cameraAvailable = false;
 state.coreLocked = false;
 state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
@@ -529,7 +530,7 @@ function setBusy(busy, message = "") {
   byId("message-input").disabled = coreLocked || !state.activeChat;
   byId("attach-picture").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("capture-screen").disabled = coreLocked || state.busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
-  byId("open-camera").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  byId("open-camera").disabled = !state.cameraAvailable || coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("send-message").querySelector("span").textContent = state.busy ? "Working" : "Send";
   byId("composer-hint").textContent = coreLocked
     ? "No local Core is loaded · choose one above to continue."
@@ -2723,6 +2724,20 @@ async function captureScreenPreview() {
   }
 }
 
+async function refreshCameraAvailability() {
+  let available = false;
+  if (state.authenticated) {
+    try {
+      const response = await fetch("/camera", { credentials: "same-origin", cache: "no-store" });
+      available = response.status === 200 &&
+        response.headers.get("Permissions-Policy")?.includes("camera=(self)") === true;
+    } catch (_error) { /* the camera control stays hidden until the route is available */ }
+  }
+  state.cameraAvailable = available;
+  byId("open-camera").hidden = !available;
+  setBusy(state.busy);
+}
+
 function closeCameraWindow() {
   if (state.cameraPopup && !state.cameraPopup.closed) state.cameraPopup.close();
   state.cameraPopup = null;
@@ -2730,7 +2745,7 @@ function closeCameraWindow() {
 }
 
 function openCameraWindow() {
-  if (!state.activeChat || state.busy || state.coreLocked || !state.authenticated) return;
+  if (!state.cameraAvailable || !state.activeChat || state.busy || state.coreLocked || !state.authenticated) return;
   closeCameraWindow();
   const random = crypto.getRandomValues(new Uint8Array(16));
   const token = Array.from(random, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -6545,7 +6560,7 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence(); await refreshNotificationCenter();
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await refreshCameraAvailability(); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence(); await refreshNotificationCenter();
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 

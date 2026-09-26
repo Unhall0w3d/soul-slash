@@ -1,10 +1,11 @@
 # Soul camera session A0
 
-Lifecycle: blocked_for_human_review. Candidate implementation, synthetic
-browser qualification, physical NexiGo capture, and an attended open-palm
-demonstration are complete. Risk: camera privacy and browser execution policy.
-Candidate branch: `codex/soul-camera-session-a0`. Merge and resident-dashboard
-deployment remain pending owner review.
+Lifecycle: approved for merge; resident-dashboard deployment remains
+blocked_for_human_review. Candidate implementation, synthetic browser
+qualification, physical NexiGo capture, and an attended open-palm demonstration
+are complete. Risk: camera privacy and browser execution policy.
+Candidate branch: `codex/soul-camera-session-a0`. The owner approved merge on
+September 26; resident-dashboard deployment remains a separate decision.
 
 ## Implementation summary
 
@@ -165,16 +166,22 @@ JavaScript in the main dashboard, and `GET /camera` remained 404. The
 resident dashboard was not restarted; unrelated dirty work and the ignored
 pinned gesture runtime were left in place.
 
-A later approved merge needs a coordinated dashboard restart and read-back:
-the main page should expose the control, unauthenticated `/camera` should
-return 401, and authenticated capture should reach a removable Chat preview.
-Do not treat copying source files into this live checkout as deployment proof.
+The September 26 merge repair starts the Camera control hidden and disabled.
+After authentication, dashboard JavaScript shows it only if the resident
+`GET /camera` route returns 200 with `camera=(self)` in its permissions policy.
+The 404, unrelated 200, 401, and positive-route cases pass deterministic
+checks. This keeps the live pre-camera process consistent while source files
+are merged. Deployment still requires an approved dashboard restart and
+read-back: the main page should then expose the control, unauthenticated
+`/camera` should return 401, and authenticated capture should reach a
+removable Chat preview. Do not treat a Git merge as deployment proof.
 
 ## Human review outcome
 
 ```text
-Outcome: pending
-Reviewer:
-Date:
-Decision summary:
+Outcome: approved for merge; deployment pending
+Reviewer: repository owner, current conversation
+Date: September 26, 2026
+Decision summary: Merge the finished camera work and lifecycle fixes. The
+resident dashboard is not approved for restart by this decision.
 ```

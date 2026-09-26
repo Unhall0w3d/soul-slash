@@ -64,8 +64,10 @@ Soul does not transfer Cores silently.
 
 ## Capture a camera frame
 
-The **Camera** control beside **Picture** opens a separate, authenticated local
-camera window. Soul's main dashboard keeps camera access disabled. The camera
+The **Camera** control beside **Picture** appears only after the running
+dashboard confirms its authenticated camera route is available. It opens a
+separate, authenticated local camera window. Soul's main dashboard keeps
+camera access disabled. The camera
 window starts with its camera off; press **Start camera** to show a visible
 preview. **Stop camera**, closing or hiding the window, and the two-minute
 session limit all stop the video track. The microphone is never requested.
