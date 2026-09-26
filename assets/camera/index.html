@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soul Camera</title>
+  <link rel="stylesheet" href="/assets/camera.css">
+  <script src="/assets/camera.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">Soul · local perception</p><h1>Camera session</h1></div>
+      <span id="camera-indicator" class="indicator" aria-live="polite">Camera off</span>
+    </header>
+    <p class="intro">Press Start to preview the camera. Capture sends one frame to the open Soul Chat as a removable picture preview. No model sees it until you send a question. This window never recognizes faces or controls the desktop.</p>
+    <div class="preview">
+      <video id="camera-video" autoplay muted playsinline aria-label="Live camera preview"></video>
+      <div id="camera-placeholder">Camera is off</div>
+    </div>
+    <div class="controls">
+      <button id="start-camera" type="button">Start camera</button>
+      <button id="capture-frame" type="button" disabled>Capture preview to Chat</button>
+      <button id="stop-camera" type="button" disabled>Stop camera</button>
+    </div>
+    <section class="gesture-panel" aria-labelledby="gesture-title">
+      <h2 id="gesture-title">Local hand gestures</h2>
+      <p>Optional: open palm, thumbs up, or victory displays feedback here only. Gesture results never send commands or pixels to Soul.</p>
+      <p>In low light, aim soft light toward your palm from the camera side. A bright monitor or light bounced off a wall can help. Keep your hand centered, large in the preview, and still for a moment.</p>
+      <label><input id="enable-gestures" type="checkbox" disabled> Recognize gestures while the camera is open</label>
+      <p id="gesture-status" aria-live="polite">Gesture recognition is off.</p>
+    </section>
+    <p id="camera-status" role="status" aria-live="polite">No camera stream is active. Sessions stop automatically after two minutes.</p>
+    <button id="close-camera" type="button" class="quiet">Close window</button>
+  </main>
+</body>
+</html>

@@ -11,6 +11,7 @@ require_relative "voice_synthesis_service"
 require_relative "voice_presence_launch_service"
 require_relative "notification_center_service"
 require_relative "picture_understanding_service"
+require_relative "camera_gesture_assets"
 require_relative "screen_capture_service"
 
 module SoulCore
@@ -20,6 +21,8 @@ module SoulCore
     STATIC_ROUTES = {
       "/assets/dashboard.css" => ["assets/dashboard/dashboard.css", "text/css; charset=utf-8"],
       "/assets/dashboard.js" => ["assets/dashboard/dashboard.js", "text/javascript; charset=utf-8"],
+      "/assets/camera.css" => ["assets/camera/camera.css", "text/css; charset=utf-8"],
+      "/assets/camera.js" => ["assets/camera/camera.js", "text/javascript; charset=utf-8"],
       "/brand/micro-mark.svg" => ["assets/brand/soul-slash-micro-mark.svg", "image/svg+xml"],
       "/brand/repo-header.png" => ["assets/brand/soul-slash-repo-header.png", "image/png"],
       "/brand/character/soul-full-body.png" => ["assets/brand/character/soul-full-body.png", "image/png"],
@@ -64,6 +67,11 @@ module SoulCore
       "Connection" => "close"
     }.freeze
 
+    CAMERA_SECURITY_HEADERS = {
+      "Content-Security-Policy" => "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      "Permissions-Policy" => "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+    }.freeze
+
     AUTH_ROUTES = %w[/auth/v1/session /auth/v1/login /auth/v1/change-password /auth/v1/logout].freeze
     SESSION_COOKIE = "soul_session"
 
@@ -98,6 +106,19 @@ module SoulCore
         html = File.binread(File.join(@root, "assets/dashboard/index.html")).sub("__SOUL_CSRF_TOKEN__", @csrf_token)
         html = "" if method == "HEAD"
         return response(200, html, "Content-Type" => "text/html; charset=utf-8", "Cache-Control" => "no-store")
+      end
+
+      if target == "/camera"
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        session_error = authenticated_session_error(normalized_headers)
+        return session_error if session_error
+        html = File.binread(File.join(@root, "assets/camera/index.html"))
+        return response(200, html, CAMERA_SECURITY_HEADERS.merge("Content-Type" => "text/html; charset=utf-8", "Cache-Control" => "private, no-store"))
+      end
+
+      if (asset = target.match(%r{\A/api/v1/camera/gesture/(vision_bundle\.mjs|gesture_recognizer\.task|wasm/vision_wasm_(?:internal|module_internal|nosimd_internal)\.(?:js|wasm))\z}))
+        return response(405, "Method Not Allowed", "Allow" => "GET") unless method == "GET"
+        return camera_gesture_asset(normalized_headers, asset[1])
       end
 
       if STATIC_ROUTES.key?(target)
@@ -519,6 +540,14 @@ module SoulCore
       )
     rescue Errno::ENOENT, ArgumentError
       response(404, "Not Found")
+    end
+
+    def camera_gesture_asset(headers, name)
+      session_error = authenticated_session_error(headers)
+      return session_error if session_error
+      asset = CameraGestureAssets.new(root: @root).read(name)
+      return response(503, "Pinned local gesture assets are unavailable") unless asset
+      response(200, asset.fetch("bytes"), "Content-Type" => asset.fetch("content_type"), "Cache-Control" => "private, no-store")
     end
 
     def picture_understanding
