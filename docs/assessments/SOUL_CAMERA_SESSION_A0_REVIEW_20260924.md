@@ -148,6 +148,28 @@ verifiers, Perception A1/A2 regressions, JavaScript syntax checks, and
 `git diff --check` passed in that isolated worktree. No webcam or resident
 dashboard service was started for this validation.
 
+## Live dashboard boundary — September 25
+
+The resident dashboard Ruby process began on September 23, before this camera
+candidate. Its HTML and dashboard JavaScript are read from the working tree on
+each request, while its route table was loaded when the process started. A
+read-only loopback check found the Camera button and script exposed from the
+dirty working tree but `GET /camera` returned 404 from the older process.
+That was an inconsistent partial exposure, not camera deployment.
+
+After preserving the 13 candidate files in this committed branch and an exact
+hash-checked local backup, the five tracked camera-related main-tree files
+were returned to committed `HEAD` and the six untracked camera entries were
+moved to the backup. A fresh loopback check found no Camera control or camera
+JavaScript in the main dashboard, and `GET /camera` remained 404. The
+resident dashboard was not restarted; unrelated dirty work and the ignored
+pinned gesture runtime were left in place.
+
+A later approved merge needs a coordinated dashboard restart and read-back:
+the main page should expose the control, unauthenticated `/camera` should
+return 401, and authenticated capture should reach a removable Chat preview.
+Do not treat copying source files into this live checkout as deployment proof.
+
 ## Human review outcome
 
 ```text
