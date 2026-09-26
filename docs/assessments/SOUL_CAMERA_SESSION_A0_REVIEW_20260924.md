@@ -176,6 +176,19 @@ read-back: the main page should then expose the control, unauthenticated
 `/camera` should return 401, and authenticated capture should reach a
 removable Chat preview. Do not treat a Git merge as deployment proof.
 
+## Merge and live read-back — September 26
+
+After the owner's merge approval, `codex/soul-camera-session-a0` merged into
+local `main` as `1acf0abb75c3f5264fc4b1f92a75998811736d54`. Focused camera
+Ruby and JavaScript verifiers, JavaScript syntax, and `git diff --check`
+passed on the merged tree. The unrelated modified and untracked files did not
+overlap the 13 camera paths and were preserved.
+
+The resident dashboard was not restarted. Its live loopback response served
+`/` and `/assets/dashboard.js` with the hidden route gate, while `/camera`
+still returned 404 from the old Ruby process. This is source merge only;
+resident deployment and authenticated capture read-back remain pending.
+
 ## Human review outcome
 
 ```text

@@ -84,7 +84,7 @@ protected-memory, or persistence decisions.
 
 - [Conversation and Voice Presence fidelity A1](../assessments/SOUL_CONVERSATION_VOICE_A1_REVIEW_20260924.md): attended microphone and five-second follow-up passed; approved for merge.
 - [Whisper beside Warframe](../assessments/WHISPER_WARFRAME_COEXISTENCE_REVIEW_20260925.md): session-selected CUDA transcription and Qwen restoration passed; approved for merge; cold-boot GPU placement is separate.
-- [Camera session A0](../assessments/SOUL_CAMERA_SESSION_A0_REVIEW_20260924.md): physical NexiGo capture and visible open-palm cue passed; owner approved merge September 26. Resident-dashboard deployment review remains open.
+- [Camera session A0](../assessments/SOUL_CAMERA_SESSION_A0_REVIEW_20260924.md): physical NexiGo capture and visible open-palm cue passed; merged into local `main` as `1acf0ab` after owner approval September 26. Resident-dashboard deployment review remains open.
 
 The Voice, Whisper, and Camera candidates are approved for merge. Camera deployment review remains open.
 
