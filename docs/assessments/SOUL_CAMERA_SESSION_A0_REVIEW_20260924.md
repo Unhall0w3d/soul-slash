@@ -189,6 +189,27 @@ The resident dashboard was not restarted. Its live loopback response served
 still returned 404 from the old Ruby process. This is source merge only;
 resident deployment and authenticated capture read-back remain pending.
 
+## Resident dashboard deployment read-back — September 26
+
+The Operator approved restarting only `soul-dashboard.service`. The exact
+merged camera Ruby and JavaScript verifiers and syntax checks passed first.
+The unit changed from PID 1244587 (started September 23) to PID 1025202
+(started September 26 at 20:55 EDT), with `ActiveState=active` and
+`Result=success`. No warning-level journal entries followed the restart.
+
+Live loopback returned 200 for `/`, `/assets/dashboard.js`,
+`/assets/camera.js`, and `/assets/camera.css`; the served JavaScript and camera
+assets matched merged source bytes. The main page retained its hidden Camera
+control and `camera=()` policy; browser JavaScript unhides the control only
+after authentication and a successful camera-route check. Unauthenticated
+`/camera` and the pinned gesture asset route
+returned 401. Qwen remained active as PID 484511 with 5,296 MiB on the same
+NVIDIA GPU. No webcam was opened for this read-back.
+
+The resident route and access boundary are deployed. Authenticated UI display,
+physical capture, stopped-track indication, and removable Chat preview remain
+C1 operator acceptance in the [test queue](../soul/OPERATOR_TEST_QUEUE.md).
+
 ## Human review outcome
 
 ```text
