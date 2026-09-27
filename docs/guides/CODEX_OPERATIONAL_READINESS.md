@@ -22,6 +22,12 @@ Use an existing exact workflow rather than a general-purpose privileged account:
 
 No new sudoers rule, root account, background daemon, or generic command executor is installed by this work. A future privileged wrapper should be specified by exact binary, arguments, targets, owner, logging, rollback, and acceptance checks before implementation. Text in this guide cannot expand the active sandbox or grant root access.
 
+### First host-operation route
+
+The first recurring Codex boundary is the **owner's user-service bus**, not a missing root command. For dashboard/proxy diagnosis, use the exact read-only command `systemctl --user show soul-dashboard.service soul-dashboard-proxy.service --property=Id,LoadState,ActiveState,UnitFileState --no-pager`. If the active sandbox cannot reach the bus, request supported escalation for that command; do not switch the whole project to full access. Only when the user has requested dashboard/proxy repair should a restart be considered, using the exact `systemctl --user restart soul-dashboard.service` or `systemctl --user restart soul-dashboard-proxy.service` target followed by unit status and HTTP read-back. A restart is not part of a status check.
+
+For root work, reuse the component-specific reviewed installer or the existing digest-bound maintenance authority. Do not expose `sudo systemctl`, `sudo install`, `chown`, a shell, or an interpreter as a standing general-purpose Codex privilege. The first new root wrapper is deferred until a real task demonstrates a repeated fixed operation that none of those routes covers; its command, target, authorization, logging, and rollback must then be specified against that task. This is a deliberate no-new-wrapper decision, not a grant of implicit root authority.
+
 ## Behavior qualification
 
 `ruby scripts/codex-policy-eval` validates the synthetic task catalog without contacting a model. Run each prompt in a fresh, appropriately permissioned Codex task and retain its answer and relevant tool trace. Human-label its decision in a `soul.codex.policy_observations.v1` JSON file; `ruby scripts/codex-policy-eval --score FILE` checks coverage and compares labels. This deterministic scorer does not establish that a human label is correct or that the model is safe in every context.

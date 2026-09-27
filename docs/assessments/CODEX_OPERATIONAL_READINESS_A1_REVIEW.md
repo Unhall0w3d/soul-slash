@@ -91,7 +91,7 @@ Reads: none. Writes/updates: none. Forget behavior: not applicable.
 - [ ] Policy scenarios represent the expected decisions without overfitting prose.
 - [ ] AMD gate is used only for explicitly requested, foreground external work and never presented as an OS-wide reservation.
 - [ ] Confirm active-turn model and effort against the current Astra-baseline policy without treating this preflight as authority.
-- [ ] Select exact privileged operation(s), if a root-owned wrapper is still desired.
+- [ ] Confirm the no-new-root-wrapper decision remains appropriate when the next real system mutation arises.
 
 ## Human review outcome
 
@@ -100,3 +100,11 @@ Outcome: pending
 Reviewer: operator
 
 Decision summary: pending
+
+## Host-operation follow-up — 2026-09-26
+
+The Operator deferred selection of a first command to Codex. The recurring dashboard/proxy case is owner-level `systemctl --user`, not root. A sandboxed read-only `systemctl --user show` could not reach the user bus; the same exact status command succeeded through supported host escalation and reported both `soul-dashboard.service` and `soul-dashboard-proxy.service` loaded, active, and enabled. No service was restarted or changed.
+
+The route is now explicit in `docs/guides/CODEX_OPERATIONAL_READINESS.md`: use exact read-only user-unit status for diagnosis, and only a user-requested exact unit restart with read-back for repair. Existing component installers and the digest-bound maintenance authority cover the known root cases. No new root account, sudo rule, or generic helper is warranted on this evidence; a genuinely uncovered fixed operation remains a future task-specific design gate.
+
+The Operator approved merging and pushing this follow-up documentation. The A1 packet-wide human outcome above remains pending; this approval does not claim live model-behavior qualification or authorization for a future host mutation.
