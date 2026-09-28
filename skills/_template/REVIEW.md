@@ -107,6 +107,13 @@ Confirmation gate weakened: no
 Skill-private memory store added: no
 ```
 
+## Evidence and privacy boundary
+
+For an operation that summarizes external or retained evidence, record the
+source readers actually invoked, whether they can refresh or query, how
+malformed and partial evidence appears, and the fixture used to prove that
+free-form private source text stays out of the response.
+
 ## Known weaknesses
 
 ```text

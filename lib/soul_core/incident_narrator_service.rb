@@ -10,6 +10,7 @@ module SoulCore
     MAX_EVENTS = 64
     MAX_FINDINGS = 32
     MAX_RECEIPTS_PER_SOURCE = 32
+    MAX_ALERT_INPUT = 256
     MAX_TEXT_BYTES = 240
     SOURCE_IDS = %w[
       wazuh_alerts
@@ -17,15 +18,14 @@ module SoulCore
       maintenance_device_receipts
       maintenance_host_receipts
       backup_drs
-      fleet_observability
     ].freeze
     FAILURE_STATES = %w[failed blocked blocked_for_human_review unavailable invalid].freeze
+    SAFE_STATES = %w[available healthy active attention partial stale unavailable unknown complete failed blocked blocked_for_human_review invalid canceled awaiting_input not_run pending].freeze
     SEVERITY_ORDER = {"critical" => 4, "high" => 3, "elevated" => 2, "informational" => 1}.freeze
     FRESHNESS_SECONDS = {
       "wazuh_alerts" => 24 * 60 * 60,
       "security_snapshot" => 24 * 60 * 60,
-      "backup_drs" => 36 * 60 * 60,
-      "fleet_observability" => 15 * 60
+      "backup_drs" => 36 * 60 * 60
     }.freeze
 
     def initialize(
@@ -34,7 +34,6 @@ module SoulCore
       maintenance_device_receipt_source:,
       maintenance_host_receipt_source:,
       backup_source:,
-      observability_source: nil,
       clock: -> { Time.now.utc }
     )
       @sources = {
@@ -42,8 +41,7 @@ module SoulCore
         "security_snapshot" => security_source,
         "maintenance_device_receipts" => maintenance_device_receipt_source,
         "maintenance_host_receipts" => maintenance_host_receipt_source,
-        "backup_drs" => backup_source,
-        "fleet_observability" => observability_source
+        "backup_drs" => backup_source
       }
       @clock = clock
     end
@@ -58,19 +56,19 @@ module SoulCore
       append_maintenance(events, findings, source_results.fetch("maintenance_device_receipts"), "maintenance_device_receipts")
       append_maintenance(events, findings, source_results.fetch("maintenance_host_receipts"), "maintenance_host_receipts")
       append_backup(events, findings, source_results.fetch("backup_drs"))
-      append_observability(events, findings, source_results.fetch("fleet_observability"))
 
-      source_results.each_value { |result| findings << gap_finding(result) if !result.fetch("available") || result.dig("source", "stale") == true }
-      events = sort_events(events).first(MAX_EVENTS)
+      source_results.each_value { |result| findings << gap_finding(result) if source_gap?(result) }
+      # Select urgent evidence before the display bound, then present the selection newest first.
+      events = select_events(events)
       findings = align_findings(findings, events)
       append_cross_source_inference(findings, events)
       findings = prioritize_findings(findings).first(MAX_FINDINGS)
-      state = incident_state(source_results, events)
+      state = incident_state(source_results, events, findings)
       complete(
         "schema_version" => SCHEMA_VERSION,
         "generated_at" => iso8601(@clock.call),
         "state" => state,
-        "headline" => headline_for(state, source_results),
+        "headline" => headline_for(state, findings),
         "summary" => summary_for(events, findings),
         "events" => events,
         "findings" => findings,
@@ -80,8 +78,8 @@ module SoulCore
         "mutation_authority" => "none",
         "model_used" => false
       )
-    rescue StandardError => error
-      failed("incident narrative failed safely: #{safe_text(error.message, 160)}")
+    rescue StandardError
+      failed("incident narrative failed safely")
     end
 
     private
@@ -91,10 +89,11 @@ module SoulCore
       return unavailable_source(source_id, "source callable is unavailable") unless callable.respond_to?(:call)
 
       raw = callable.call
-      return unavailable_source(source_id, unavailable_reason(raw)) if unavailable_payload?(raw)
+      return unavailable_source(source_id, "retained source is unavailable") if unavailable_payload?(raw)
 
       payload = unwrap(raw)
-      return unavailable_source(source_id, unavailable_reason(payload)) if unavailable_payload?(payload)
+      return unavailable_source(source_id, "retained source is unavailable") if unavailable_payload?(payload)
+      return unavailable_source(source_id, "retained source is malformed") unless valid_payload?(source_id, payload)
 
       source = {
         "source_id" => source_id,
@@ -103,6 +102,7 @@ module SoulCore
         "observed_at" => source_observed_at(payload),
         "event_count" => 0
       }.compact
+      source["state"] = "partial" if source_id == "wazuh_alerts" && payload.dig("query", "truncated") == true
       if stale_source?(source_id, source["observed_at"])
         source["stale"] = true
         source["state"] = "stale"
@@ -114,15 +114,68 @@ module SoulCore
         "payload" => payload,
         "source" => source
       }
-    rescue StandardError => error
-      unavailable_source(source_id, "source could not be read: #{safe_text(error.message, 120)}")
+    rescue StandardError
+      unavailable_source(source_id, "retained source could not be read")
     end
 
     def unwrap(value)
-      return {} unless value.is_a?(Hash)
-      return value.fetch("data") if value["data"].is_a?(Hash)
+      return nil unless value.is_a?(Hash)
+      return value["data"] if value.key?("data")
 
       value
+    end
+
+    def valid_payload?(source_id, payload)
+      return false unless payload.is_a?(Hash)
+
+      case source_id
+      when "wazuh_alerts"
+        alerts = payload["alerts"]
+        query = payload["query"]
+        query_valid = query.nil? || (query.is_a?(Hash) && (!query.key?("truncated") || [true, false].include?(query["truncated"])))
+        query_valid && alerts.is_a?(Array) && alerts.length <= MAX_ALERT_INPUT &&
+          alerts.all? { |alert| valid_alert?(alert) }
+      when "security_snapshot"
+        payload["manager"].is_a?(Hash) && valid_security_summary?(payload["summary"]) &&
+          (payload["manager"]["state"] || payload["manager"]["status"]).is_a?(String)
+      when "maintenance_device_receipts", "maintenance_host_receipts"
+        receipts = payload["receipts"]
+        receipts.is_a?(Array) && receipts.length <= MAX_RECEIPTS_PER_SOURCE &&
+          receipts.all? { |receipt| valid_receipt?(receipt) }
+      when "backup_drs"
+        payload["drs"].is_a?(Hash) && payload["drs"]["state"].is_a?(String)
+      else false
+      end
+    end
+
+    def valid_alert?(alert)
+      return false unless alert.is_a?(Hash)
+      return false unless (alert["event_id"] || alert["id"]).is_a?(String)
+      return false unless normalized_time(alert["occurred_at"] || alert["timestamp"])
+      return false unless alert["rule_id"].is_a?(String) && alert["agent_name"].is_a?(String)
+
+      severity = alert["severity"]
+      level = safe_integer(alert["level"], -1)
+      severity.nil? ? level.between?(0, 15) : SEVERITY_ORDER.key?(severity.to_s.downcase)
+    end
+
+    def valid_security_summary?(summary)
+      return false unless summary.is_a?(Hash)
+
+      active = summary["active"]
+      total = summary["total"] || summary["agent_count"]
+      disconnected = summary["disconnected"]
+      active.is_a?(Integer) && total.is_a?(Integer) &&
+        active.between?(0, total) &&
+        (disconnected.nil? || (disconnected.is_a?(Integer) && disconnected.between?(0, total)))
+    end
+
+    def valid_receipt?(receipt)
+      return false unless receipt.is_a?(Hash)
+      return false unless (receipt["receipt_id"] || receipt["transaction_id"] || receipt["id"]).is_a?(String)
+      return false unless (receipt["lifecycle_state"] || receipt["state"]).is_a?(String)
+
+      normalized_time(receipt["finished_at"] || receipt["completed_at"] || receipt["executed_at"] || receipt["created_at"]) != nil
     end
 
     def unavailable_payload?(payload)
@@ -130,10 +183,6 @@ module SoulCore
       return true if payload["available"] == false || payload["ok"] == false
 
       FAILURE_STATES.include?(payload["state"].to_s) || FAILURE_STATES.include?(payload["lifecycle_state"].to_s)
-    end
-
-    def unavailable_reason(payload)
-      safe_text(payload["reason"] || payload["message"] || "retained source is unavailable", 160)
     end
 
     def unavailable_source(source_id, reason)
@@ -153,12 +202,11 @@ module SoulCore
     def append_alerts(events, findings, result)
       return unless result.fetch("available")
 
-      alerts = Array(result.fetch("payload")["alerts"]).first(MAX_EVENTS)
+      alerts = result.fetch("payload").fetch("alerts")
       result.fetch("source")["event_count"] = alerts.length
       critical = 0
       high = 0
-      normalized = alerts.each_with_index.filter_map do |alert, index|
-        next unless alert.is_a?(Hash)
+      normalized = alerts.each_with_index.map do |alert, index|
         severity = normalize_severity(alert["severity"] || alert["level"])
         critical += 1 if severity == "critical"
         high += 1 if severity == "high"
@@ -201,7 +249,7 @@ module SoulCore
 
       payload = result.fetch("payload")
       manager_state = safe_state(payload.dig("manager", "state") || payload.dig("manager", "status") || payload["manager_state"] || payload["state"] || "unknown")
-      agent_summary = payload["summary"].is_a?(Hash) ? payload.fetch("summary") : {}
+      agent_summary = payload.fetch("summary")
       active_agents = safe_integer(agent_summary["active"] || agent_summary["active_agents"] || agent_summary["connected"], 0)
       total_agents = safe_integer(agent_summary["total"] || agent_summary["agent_count"], 0)
       disconnected_agents = safe_integer(agent_summary["disconnected"], 0)
@@ -222,23 +270,23 @@ module SoulCore
       return unless result.fetch("available")
 
       payload = result.fetch("payload")
-      receipts = Array(payload["receipts"] || payload["receipt"] || payload["transactions"]).first(MAX_RECEIPTS_PER_SOURCE)
+      receipts = payload.fetch("receipts")
       result.fetch("source")["event_count"] = receipts.length
       issue_ids = []
       receipts.each_with_index do |receipt, index|
-        next unless receipt.is_a?(Hash)
-
         lifecycle = safe_state(receipt["lifecycle_state"] || receipt["state"] || "unknown")
         evidence_id = "#{source_id}:#{safe_identifier(receipt["receipt_id"] || receipt["transaction_id"] || receipt["id"], "receipt-#{index + 1}")}"
-        suffix = safe_text(receipt["summary"] || receipt["reason"], 160)
+        operation = source_id == "maintenance_device_receipts" ?
+          safe_enum(receipt["action"], %w[maintenance reboot], "maintenance") : "maintenance"
+        mode = safe_enum(receipt["mode"], %w[live rehearsal foreground], "unspecified")
         events << event(
           evidence_id: evidence_id,
           occurred_at: receipt["finished_at"] || receipt["completed_at"] || receipt["executed_at"] || receipt["created_at"],
           category: source_id,
-          severity: FAILURE_STATES.include?(lifecycle) ? "high" : "informational",
-          statement: "Retained #{safe_identifier(receipt["action"] || receipt["operation"], "maintenance")} receipt in #{safe_identifier(receipt["mode"], "unspecified")} mode ended #{lifecycle}.#{suffix.empty? ? "" : " #{suffix}"}"
+          severity: lifecycle == "complete" ? "informational" : "high",
+          statement: "Retained #{operation} receipt in #{mode} mode ended #{lifecycle}."
         )
-        issue_ids << evidence_id if FAILURE_STATES.include?(lifecycle)
+        issue_ids << evidence_id unless lifecycle == "complete"
       end
       return if issue_ids.empty?
 
@@ -253,7 +301,7 @@ module SoulCore
       return unless result.fetch("available")
 
       payload = result.fetch("payload")
-      drs = payload["drs"].is_a?(Hash) ? payload.fetch("drs") : payload
+      drs = payload.fetch("drs")
       state = safe_state(drs["state"] || "unknown")
       evidence_id = "backup:#{safe_identifier(drs["receipt_id"], "drs-latest")}"
       statement = "Latest DRS backup status is #{state}."
@@ -261,39 +309,11 @@ module SoulCore
         evidence_id: evidence_id,
         occurred_at: drs["completed_at"] || drs["checked_at"] || payload["collected_at"],
         category: "backup_drs",
-        severity: FAILURE_STATES.include?(state) ? "high" : "informational",
+        severity: state == "complete" ? "informational" : "high",
         statement: statement
       )
       result.fetch("source")["event_count"] = 1
-      findings << observation("backup-drs", statement, [evidence_id]) if FAILURE_STATES.include?(state)
-    end
-
-    def append_observability(events, findings, result)
-      return unless result.fetch("available")
-
-      payload = result.fetch("payload")
-      endpoints = payload["endpoints"].is_a?(Hash) ? payload.fetch("endpoints") : {}
-      network = payload["network"].is_a?(Hash) ? payload.fetch("network") : {}
-      alerts = Array(payload["alerts"])
-      gaps = Array(payload["gaps"])
-      state = safe_state(payload["state"] || "unknown")
-      statement = "Fleet observability reports #{safe_integer(endpoints['reporting'], 0)} reporting and #{safe_integer(endpoints['stale'], 0)} stale endpoints, #{safe_integer(network['switches_reporting'], 0)} reporting switches, and #{alerts.length} firing bounded alerts."
-      evidence_id = "observability:summary"
-      events << event(
-        evidence_id: evidence_id,
-        occurred_at: payload["collected_at"],
-        category: "fleet_observability",
-        severity: %w[attention unavailable].include?(state) ? "elevated" : "informational",
-        statement: statement
-      )
-      result.fetch("source")["event_count"] = 1
-      findings << observation("fleet-observability", statement, [evidence_id]) if state != "healthy"
-      findings << {
-        "kind" => "gap",
-        "finding_id" => "fleet-observability-query-gaps",
-        "statement" => "Fleet observability completed with #{gaps.length} bounded query gap#{gaps.length == 1 ? '' : 's'}; absent metrics were not treated as healthy.",
-        "supporting_evidence_ids" => [evidence_id]
-      } if gaps.any?
+      findings << observation("backup-drs", statement, [evidence_id]) unless state == "complete"
     end
 
     def append_cross_source_inference(findings, events)
@@ -319,6 +339,15 @@ module SoulCore
 
     def gap_finding(result)
       source = result.fetch("source")
+      if %w[partial unknown].include?(source["state"])
+        return {
+          "kind" => "gap",
+          "finding_id" => "#{source.fetch("source_id")}-#{source["state"]}",
+          "statement" => "#{source.fetch("source_id").tr("_", " ")} evidence has #{source["state"]} state; missing evidence was not treated as healthy.",
+          "supporting_evidence_ids" => [],
+          "confidence" => "low"
+        }
+      end
       if source["stale"] == true
         return {
           "kind" => "gap",
@@ -364,6 +393,13 @@ module SoulCore
       events.sort_by { |record| [record.fetch("observed_at") || "", record.fetch("evidence_id")] }.reverse
     end
 
+    def select_events(events)
+      prioritized = events.sort_by do |record|
+        [SEVERITY_ORDER.fetch(record.fetch("severity"), 0), record.fetch("observed_at") || "", record.fetch("evidence_id")]
+      end.reverse
+      sort_events(prioritized.first(MAX_EVENTS))
+    end
+
     def prioritize_findings(findings)
       order = {"gap" => 0, "observation" => 1, "inference" => 2}
       findings.sort_by { |record| [order.fetch(record.fetch("kind"), 3), record.fetch("finding_id")] }
@@ -380,21 +416,26 @@ module SoulCore
       end
     end
 
-    def incident_state(source_results, events)
+    def source_gap?(result)
+      !result.fetch("available") || result.dig("source", "stale") == true ||
+        %w[partial unknown].include?(result.dig("source", "state"))
+    end
+
+    def incident_state(source_results, events, findings)
       return "critical" if events.any? { |record| record["category"] == "security_alert" && record["severity"] == "critical" }
-      return "attention" if source_results.values.any? { |result| !result.fetch("available") }
-      return "attention" if source_results.values.any? { |result| result.dig("source", "stale") == true }
+      return "attention" if findings.any? { |finding| finding["kind"] == "gap" }
+      return "attention" if source_results.values.any? { |result| result.dig("source", "state") == "attention" }
       return "attention" if events.any? { |record| %w[high elevated].include?(record["severity"]) }
 
       "quiet"
     end
 
-    def headline_for(state, source_results)
+    def headline_for(state, findings)
       case state
       when "critical" then "Critical retained security evidence requires operator review."
       when "attention"
-        source_results.values.any? { |result| !result.fetch("available") || result.dig("source", "stale") == true } ?
-          "Retained evidence is incomplete; review stale or unavailable sources." :
+        findings.any? { |finding| finding["kind"] == "gap" } ?
+          "Retained evidence is incomplete; review source gaps." :
           "Retained evidence requires operator attention."
       else "No critical retained incident evidence in this bounded snapshot."
       end
@@ -418,7 +459,12 @@ module SoulCore
     end
 
     def safe_state(value)
-      safe_identifier(value, "unknown").downcase
+      safe_enum(value.to_s.downcase, SAFE_STATES, "unknown")
+    end
+
+    def safe_enum(value, allowed, fallback)
+      text = value.to_s
+      allowed.include?(text) ? text : fallback
     end
 
     def safe_identifier(value, fallback)

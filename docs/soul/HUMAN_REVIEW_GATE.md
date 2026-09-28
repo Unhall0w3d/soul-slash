@@ -90,6 +90,13 @@ See the [current operator test queue](OPERATOR_TEST_QUEUE.md) for resident deplo
 
 The Voice, Whisper, and Camera candidates are approved for merge. Camera deployment review remains open.
 
+## Incident Narrator A0 repair (September 28, 2026)
+
+- [Incident Narrator A0 review](../assessments/INCIDENT_NARRATOR_A0_REVIEW.md):
+  the five-source retained-only repair passed deterministic and adjacent
+  checks. The owner approved commit and merge. Resident deployment and
+  post-repair live report review remain separate gates.
+
 ## Approved Qwen startup candidate (September 25, 2026)
 
 - [Qwen CUDA cold-boot readiness](../assessments/QWEN_CUDA_COLD_BOOT_READINESS_REVIEW_20260925.md): bounded NVIDIA readiness and process-owned GPU placement checks pass deterministic tests; owner approved merge. Cold-boot qualification remains open.

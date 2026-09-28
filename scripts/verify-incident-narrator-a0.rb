@@ -60,11 +60,11 @@ backup = {
 
 build = lambda do |alert_source: alerts, security_source: security, device_source: device_receipts, host_source: host_receipts, backup_source: backup, current_clock: clock|
   SoulCore::IncidentNarratorService.new(
-    alert_source: -> { alert_source },
-    security_source: -> { security_source },
-    maintenance_device_receipt_source: -> { device_source },
-    maintenance_host_receipt_source: -> { host_source },
-    backup_source: -> { backup_source },
+    alert_source: alert_source.respond_to?(:call) ? alert_source : -> { alert_source },
+    security_source: security_source.respond_to?(:call) ? security_source : -> { security_source },
+    maintenance_device_receipt_source: device_source.respond_to?(:call) ? device_source : -> { device_source },
+    maintenance_host_receipt_source: host_source.respond_to?(:call) ? host_source : -> { host_source },
+    backup_source: backup_source.respond_to?(:call) ? backup_source : -> { backup_source },
     clock: current_clock
   )
 end
@@ -90,7 +90,7 @@ check.call(
   "retained input descriptions, paths, credentials, and commands do not leak",
   !serialized.include?("leak") && !serialized.include?("/home/operator") && !serialized.include?("/etc/soul") &&
     !serialized.include?("/mnt/private") && !serialized.include?("not-for-output") && !serialized.include?("pacman -Syu") &&
-    serialized.include?("[private path]") && serialized.include?("[command redacted]") && serialized.include?("[redacted]")
+    !serialized.include?("password=secret") && serialized.include?("ended failed.")
 )
 check.call(
   "maintenance failure is retained and every inference is bounded low confidence",
@@ -199,6 +199,169 @@ check.call(
     backup_source.match?(/def retained_drs_status.*?latest_drs_status/m) &&
     !device_retained.include?("prepare_directories") && !host_retained.include?("desktop_handoff") &&
     !host_retained.include?("native_evidence") && !backup_retained.include?("@runner")
+)
+
+quiet_sources = {
+  alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => []}},
+  security_source: {"data" => {"state" => "healthy", "collected_at" => "2026-08-14T17:55:00Z", "manager" => {"state" => "healthy"}, "summary" => {"active" => 1, "total" => 1}}},
+  device_source: {"data" => {"receipts" => []}},
+  host_source: {"data" => {"receipts" => []}},
+  backup_source: {"data" => {"drs" => {"state" => "complete", "completed_at" => "2026-08-14T17:55:00Z"}}}
+}
+quiet = build.call(**quiet_sources).compose.fetch("data")
+check.call(
+  "five retained sources can compose a quiet report without a remote query",
+  quiet["state"] == "quiet" && quiet["sources"].map { |source| source["source_id"] } == SoulCore::IncidentNarratorService::SOURCE_IDS &&
+    quiet["sources"].length == 5
+)
+
+overflow_alerts = 64.times.map do |index|
+  {"event_id" => "info-#{index}", "occurred_at" => (Time.utc(2026, 8, 14, 16, 30) + index * 60).iso8601,
+   "severity" => "informational", "rule_id" => "routine", "agent_name" => "atelier"}
+end
+overflow_alerts << {"event_id" => "older-critical", "occurred_at" => "2026-08-14T16:00:00Z",
+                    "severity" => "critical", "rule_id" => "urgent", "agent_name" => "atelier"}
+overflow = build.call(**quiet_sources.merge(alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => overflow_alerts}})).compose.fetch("data")
+check.call(
+  "grouping occurs before the event bound so an older critical alert survives",
+  overflow["state"] == "critical" && overflow["events"].any? { |event| event["evidence_id"] == "wazuh:older-critical" } &&
+    overflow["sources"].first["event_count"] == 65 && overflow["events"].count { |event| event["category"] == "security_alert" } == 2
+)
+
+distinct_overflow = build.call(**quiet_sources.merge(
+  alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => many_alerts + [overflow_alerts.last]}}
+)).compose.fetch("data")
+check.call(
+  "urgent evidence survives the output bound and selected events remain newest first",
+  distinct_overflow["state"] == "critical" && distinct_overflow["events"].length == SoulCore::IncidentNarratorService::MAX_EVENTS &&
+    distinct_overflow["events"].any? { |event| event["evidence_id"] == "wazuh:older-critical" } &&
+    distinct_overflow["events"].map { |event| event["observed_at"] || "" } ==
+      distinct_overflow["events"].map { |event| event["observed_at"] || "" }.sort.reverse
+)
+
+malformed_sources = {
+  "wazuh_alerts" => {alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => "not-an-array"}}},
+  "security_snapshot" => {security_source: {"data" => {"manager" => "healthy", "summary" => {}}}},
+  "maintenance_device_receipts" => {device_source: {"data" => {"receipts" => "not-an-array"}}},
+  "maintenance_host_receipts" => {host_source: {"data" => {"receipts" => [false]}}},
+  "backup_drs" => {backup_source: {"data" => {"drs" => "not-an-object"}}}
+}
+check.call(
+  "malformed retained source shapes become explicit attention gaps",
+  malformed_sources.all? do |source_id, override|
+    report = build.call(**quiet_sources.merge(override)).compose.fetch("data")
+    report["state"] == "attention" &&
+      report["sources"].any? { |source| source["source_id"] == source_id && source["available"] == false } &&
+      report["findings"].any? { |finding| finding["kind"] == "gap" && finding["finding_id"] == "#{source_id}-unavailable" }
+  end
+)
+
+partial = build.call(**quiet_sources.merge(
+  security_source: {"data" => quiet_sources.fetch(:security_source).fetch("data").merge("state" => "partial")}
+)).compose.fetch("data")
+truncated = build.call(**quiet_sources.merge(
+  alert_source: {"data" => quiet_sources.fetch(:alert_source).fetch("data").merge("query" => {"truncated" => true})}
+)).compose.fetch("data")
+check.call(
+  "partial and truncated retained evidence cannot present as quiet",
+  [partial, truncated].all? { |report| report["state"] == "attention" && report["headline"].include?("incomplete") } &&
+    partial["findings"].any? { |finding| finding["finding_id"] == "security_snapshot-partial" } &&
+    truncated["findings"].any? { |finding| finding["finding_id"] == "wazuh_alerts-partial" }
+)
+
+private_text = "Authorization: Bearer fixtureopaque AWS_ACCESS_KEY_ID=FIXTUREKEY"
+private_receipt = {"receipt_id" => "private-one", "finished_at" => "2026-08-14T17:50:00Z", "action" => "maintenance",
+                   "lifecycle_state" => "failed", "summary" => private_text, "reason" => private_text}
+private_report = build.call(**quiet_sources.merge(
+  device_source: {"data" => {"receipts" => [private_receipt]}}
+)).compose
+unavailable_report = build.call(**quiet_sources.merge(
+  security_source: {"ok" => false, "reason" => private_text}
+)).compose
+raised_report = build.call(**quiet_sources.merge(
+  security_source: -> { raise private_text }
+)).compose
+check.call(
+  "free-form receipt diagnostics, unavailable reasons, and source exceptions stay private",
+  [private_report, unavailable_report, raised_report].none? { |report| JSON.generate(report).include?("fixtureopaque") || JSON.generate(report).include?("FIXTUREKEY") }
+)
+failed_private = build.call(**quiet_sources.merge(current_clock: -> { raise private_text })).compose
+check.call(
+  "top-level failure does not echo exception text",
+  failed_private["lifecycle_state"] == "failed" && !JSON.generate(failed_private).include?("fixtureopaque")
+)
+
+invalid_semantics = [
+  {alert_source: {"data" => {"alerts" => [{"event_id" => "bad", "occurred_at" => "2026-08-14T17:00:00Z",
+                                            "severity" => "nonsense", "level" => 15, "rule_id" => "123",
+                                            "agent_name" => "atelier"}], "collected_at" => "2026-08-14T17:55:00Z"}}},
+  {alert_source: {"data" => {"alerts" => [], "query" => {"truncated" => "false"}, "collected_at" => "2026-08-14T17:55:00Z"}}},
+  {security_source: {"data" => {"state" => "healthy", "collected_at" => "2026-08-14T17:55:00Z",
+                                 "manager" => {"state" => "healthy"}, "summary" => {"active" => "unknown", "total" => 1}}}}
+]
+check.call(
+  "contradictory alert severity and malformed source counts cannot read as healthy",
+  invalid_semantics.all? do |override|
+    report = build.call(**quiet_sources.merge(override)).compose.fetch("data")
+    report["state"] == "attention" && report["findings"].any? { |finding| finding["kind"] == "gap" }
+  end
+)
+
+too_many_receipts = build.call(**quiet_sources.merge(
+  host_source: {"data" => {"receipts" => many_receipts}}
+)).compose.fetch("data")
+check.call(
+  "out-of-contract receipt counts are explicit gaps",
+  too_many_receipts["state"] == "attention" &&
+    too_many_receipts["findings"].any? { |finding| finding["finding_id"] == "maintenance_host_receipts-unavailable" }
+)
+
+malformed_nested = build.call(**quiet_sources.merge(
+  alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => [{"event_id" => "bad", "severity" => "high"}]}}
+)).compose.fetch("data")
+oversized_alert_input = build.call(**quiet_sources.merge(
+  alert_source: {"data" => {"collected_at" => "2026-08-14T17:55:00Z", "alerts" => many_alerts * 4}}
+)).compose.fetch("data")
+check.call(
+  "invalid nested alerts and out-of-contract alert counts become gaps",
+  [malformed_nested, oversized_alert_input].all? do |report|
+    report["state"] == "attention" &&
+      report["findings"].any? { |finding| finding["finding_id"] == "wazuh_alerts-unavailable" }
+  end
+)
+
+unknown_state = build.call(**quiet_sources.merge(
+  security_source: {"data" => quiet_sources.fetch(:security_source).fetch("data").merge("state" => "FIXTUREKEY")}
+)).compose.fetch("data")
+unknown_fields = build.call(**quiet_sources.merge(
+  device_source: {"data" => {"receipts" => [private_receipt.merge("action" => "FIXTUREKEY", "mode" => "fixtureopaque", "lifecycle_state" => "FIXTUREKEY")]}},
+  backup_source: {"data" => {"drs" => {"state" => "FIXTUREKEY"}}}
+)).compose
+check.call(
+  "unknown state, operation, and mode values never echo private source text",
+  unknown_state["state"] == "attention" &&
+    unknown_state["findings"].any? { |finding| finding["finding_id"] == "security_snapshot-unknown" } &&
+    !JSON.generate(unknown_state).include?("FIXTUREKEY") &&
+    !JSON.generate(unknown_fields).include?("FIXTUREKEY") &&
+    !JSON.generate(unknown_fields).include?("fixtureopaque")
+)
+
+stub_source = ->(method_name, value) do
+  Object.new.tap { |object| object.define_singleton_method(method_name) { |**_kwargs| value } }
+end
+active_facade = SoulCore::ApplicationFacade.new(root: Dir.pwd, clock: clock)
+active_facade.define_singleton_method(:wazuh_alert_evidence) { stub_source.call(:snapshot, quiet_sources.fetch(:alert_source)) }
+active_facade.define_singleton_method(:wazuh_security_status) { stub_source.call(:snapshot, quiet_sources.fetch(:security_source)) }
+active_facade.define_singleton_method(:maintenance_device_control) { stub_source.call(:retained_receipts, quiet_sources.fetch(:device_source)) }
+active_facade.define_singleton_method(:maintenance_foreground_execution) { stub_source.call(:retained_receipts, quiet_sources.fetch(:host_source)) }
+active_facade.define_singleton_method(:backup_administration) { stub_source.call(:retained_drs_status, quiet_sources.fetch(:backup_source)) }
+fleet_calls = 0
+active_facade.define_singleton_method(:fleet_observability_summary) { fleet_calls += 1; raise "A0 must not query fleet observability" }
+active_result = active_facade.call({"schema_version" => "soul.application.v1", "request_id" => "verify-incident-101",
+                                   "operation" => "incident_narrator.compose", "parameters" => {}, "context" => {"interface" => "dashboard_test"}})
+check.call(
+  "real facade composition reads only five retained sources",
+  active_result["lifecycle_state"] == "complete" && active_result.dig("data", "sources")&.length == 5 && fleet_calls.zero?
 )
 
 exit(errors.empty? ? 0 : 1)
