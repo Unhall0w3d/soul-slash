@@ -970,7 +970,6 @@ module SoulCore
         maintenance_device_receipt_source: -> { maintenance_device_control.retained_receipts(limit: 16) },
         maintenance_host_receipt_source: -> { maintenance_foreground_execution.retained_receipts(limit: 16) },
         backup_source: -> { backup_administration.retained_drs_status },
-        observability_source: -> { fleet_observability_summary.summary },
         clock: @clock
       )
     end
