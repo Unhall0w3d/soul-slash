@@ -1,0 +1,9 @@
+# Reply-only subset of the existing ordered v3.1 grammar; action validators remain authoritative.
+alternative-0 ::= "{" space alternative-0-action-kv "," space alternative-0-content-kv space "}"
+alternative-0-action ::= "\"reply\""
+alternative-0-action-kv ::= "\"action\"" space ":" space alternative-0-action
+alternative-0-content-kv ::= "\"content\"" space ":" space string
+char ::= [^"\\\x7F\x00-\x1F] | [\\] (["\\bfnrt] | "u" [0-9a-fA-F]{4})
+root ::= alternative-0
+space ::= | " " | "\n"{1,2} [ \t]{0,20}
+string ::= "\"" char* "\""

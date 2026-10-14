@@ -1,0 +1,36 @@
+{
+  "source": {
+    "collection": "corpus",
+    "content_digest": "b1637246d9e137f2cee748a9451acac7d0affec55848fe12bf366e41e6103fdf",
+    "id": "veltor-router-catalog",
+    "lineage_id": "1dfb647968c90996d600e1ed20db404e",
+    "provenance": "operator_selected_source_not_authority",
+    "revision": 1,
+    "span": [
+      0,
+      162
+    ],
+    "text": "Veltor router catalog. Aven router: 15 watts, 74 crowns. Branic router: 21 watts, 53 crowns. Corda router: 18 watts, 68 crowns. Deyra router: 12 watts, 82 crowns."
+  },
+  "request": {
+    "constraints": [
+      {
+        "field": "power",
+        "op": "lte",
+        "unit": "W",
+        "value": "18"
+      }
+    ],
+    "objective": {
+      "direction": "min",
+      "field": "price"
+    },
+    "source_ref": {
+      "content_digest": "b1637246d9e137f2cee748a9451acac7d0affec55848fe12bf366e41e6103fdf",
+      "id": "veltor-router-catalog",
+      "lineage_id": "1dfb647968c90996d600e1ed20db404e",
+      "revision": 1
+    },
+    "version": "selection_request_v1"
+  }
+}

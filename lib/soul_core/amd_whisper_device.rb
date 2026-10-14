@@ -9,6 +9,9 @@ module SoulCore
     class AllocationUnsettled < ArgumentError; end
     PCI = "0000:0a:00.0"
     GIB = 1024**3
+    # Shared foreground admission limit; active compute and free-memory checks
+    # remain independent of an otherwise idle client's resident allocation.
+    FOREIGN_ALLOCATION_LIMIT = GIB
     DESKTOP_BINARIES = %w[/usr/bin/Hyprland /usr/bin/quickshell].freeze
     VULKAN_ENV = {"VK_DRIVER_FILES"=>"/usr/share/vulkan/icd.d/radeon_icd.json", "VK_ICD_FILENAMES"=>nil,
                   "GGML_VK_VISIBLE_DEVICES"=>"0", "VK_LOADER_LAYERS_DISABLE"=>"~implicit~"}.freeze
@@ -42,7 +45,7 @@ module SoulCore
           raise ArgumentError, "managed AMD model is computing; refusing release"
         end
         next if row["owner"] || row["desktop"]
-        raise ArgumentError, "foreign AMD allocation is present" if row["bytes"] >= 512 * 1024**2
+        raise ArgumentError, "foreign AMD allocation is present" if row["bytes"] >= FOREIGN_ALLOCATION_LIMIT
         if (!previous && row["compute"].positive?) || (previous && row["compute"] - previous["compute"] > 10_000_000)
           raise ArgumentError, "foreign AMD compute is active"
         end

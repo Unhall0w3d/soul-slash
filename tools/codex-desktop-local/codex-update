@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+package_name=openai-codex-desktop
+feed_url=https://persistent.oaistatic.com/codex-app-prod/linux/deb/dists/stable/main/binary-amd64/Packages
+recipe_dir=$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")
+
+error() { printf 'codex-update: %s\n' "$*" >&2; exit 1; }
+note() { printf 'codex-update: %s\n' "$*"; }
+
+usage() {
+  printf '%s\n' \
+    'Usage: codex-update [--check | --build-only | --rebuild | --help]' \
+    '  No option     Check OpenAI, build a newer local Arch package, and install it' \
+    '                with sudo when ChatGPT Desktop is closed.' \
+    '  --check       Report versions without changing local files.' \
+    '  --build-only  Build the package but do not install it.' \
+    '  --rebuild     Rebuild and reinstall the current upstream version.'
+}
+
+# Emit the newest complete chatgpt/amd64 stanza as: version sha256 filename.
+# Refuse unexpected metadata instead of allowing it into the PKGBUILD template.
+newest_release() {
+  local index=$1 row pkg arch version filename sha256
+  local best_version= best_sha256= best_filename=
+
+  while IFS='|' read -r pkg arch version filename sha256; do
+    [[ "$pkg" == chatgpt && "$arch" == amd64 ]] || continue
+    [[ "$version" =~ ^[0-9]+(\.[0-9]+){2,}$ ]] || return 1
+    [[ "$filename" == "pool/main/c/chatgpt/chatgpt_${version}_amd64.deb" ]] || return 1
+    [[ "$sha256" =~ ^[0-9A-Fa-f]{64}$ ]] || return 1
+    if [[ -z "$best_version" || $(vercmp "$version" "$best_version") -gt 0 ]]; then
+      best_version=$version
+      best_sha256=${sha256,,}
+      best_filename=$filename
+    fi
+  done < <(awk '
+    BEGIN { RS = ""; FS = "\n" }
+    {
+      pkg = arch = version = filename = sha256 = ""
+      for (i = 1; i <= NF; i++) {
+        sub(/\r$/, "", $i)
+        if ($i ~ /^Package: /) pkg = substr($i, 10)
+        else if ($i ~ /^Architecture: /) arch = substr($i, 15)
+        else if ($i ~ /^Version: /) version = substr($i, 10)
+        else if ($i ~ /^Filename: /) filename = substr($i, 11)
+        else if ($i ~ /^SHA256: /) sha256 = substr($i, 9)
+      }
+      print pkg "|" arch "|" version "|" filename "|" sha256
+    }
+  ' <<<"$index")
+
+  [[ -n "$best_version" ]] || return 1
+  printf '%s %s %s\n' "$best_version" "$best_sha256" "$best_filename"
+}
+
+installed_version() {
+  local line
+  line=$(pacman -Q "$package_name" 2>/dev/null) || return 1
+  printf '%s\n' "${line#* }"
+}
+
+render_pkgbuild() {
+  local version=$1 sha256=$2 launcher_sha256 tmp
+  launcher_sha256=$(sha256sum "$recipe_dir/chatgpt-launcher.sh")
+  launcher_sha256=${launcher_sha256%% *}
+  tmp=$(mktemp "$recipe_dir/.PKGBUILD.XXXXXX")
+  sed \
+    -e "s/@VERSION@/$version/g" \
+    -e "s/@DEB_SHA256@/$sha256/g" \
+    -e "s/@LAUNCHER_SHA256@/$launcher_sha256/g" \
+    "$recipe_dir/PKGBUILD.in" > "$tmp"
+  mv -f -- "$tmp" "$recipe_dir/PKGBUILD"
+}
+
+main() {
+  local mode=install index release upstream_version upstream_sha256 upstream_filename
+  local current_version= current_epoch=0 current_upstream= package_file package_info
+
+  case "${1:-}" in
+    '') ;;
+    --check) mode=check ;;
+    --build-only) mode=build ;;
+    --rebuild) mode=rebuild ;;
+    --help|-h) usage; return 0 ;;
+    *) usage >&2; return 2 ;;
+  esac
+  [[ $# -le 1 ]] || { usage >&2; return 2; }
+  [[ $(uname -m) == x86_64 ]] || error 'This local recipe is for x86_64 only.'
+  for command_name in awk curl flock makepkg pacman pgrep readlink sed sha256sum vercmp; do
+    command -v "$command_name" >/dev/null || error "Missing prerequisite: $command_name"
+  done
+
+  index=$(curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+    --retry 2 --connect-timeout 10 --max-time 45 "$feed_url") || error 'Cannot read the OpenAI package index.'
+  release=$(newest_release "$index") || error 'OpenAI package index has no usable chatgpt/amd64 release.'
+  read -r upstream_version upstream_sha256 upstream_filename <<< "$release"
+
+  if current_version=$(installed_version); then
+    if [[ "$current_version" == *:* ]]; then
+      current_epoch=${current_version%%:*}
+      current_upstream=${current_version#*:}
+    else
+      current_upstream=$current_version
+    fi
+    current_upstream=${current_upstream%-*}
+    [[ "$current_epoch" == 0 || "$current_epoch" == 1 ]] ||
+      error "Unexpected installed package epoch $current_epoch; inspect before replacing it."
+    [[ "$current_upstream" =~ ^[0-9]+(\.[0-9]+){2,}$ ]] ||
+      error "Unexpected installed version $current_version; inspect before replacing it."
+    if [[ $(vercmp "$upstream_version" "$current_upstream") -lt 0 ]]; then
+      error "Upstream $upstream_version is older than installed $current_version; refusing a downgrade."
+    fi
+  fi
+
+  note "Installed: ${current_version:-none}; OpenAI upstream: $upstream_version; Omarchy repo is not used."
+  if [[ "$mode" != rebuild && "$current_epoch" == 1 && -n "$current_upstream" &&
+        $(vercmp "$upstream_version" "$current_upstream") -le 0 ]]; then
+    note 'The local pacman package is already current.'
+    return 0
+  fi
+  if [[ "$mode" == check ]]; then
+    note 'A local package build or migration is available.'
+    return 0
+  fi
+
+  [[ -f "$recipe_dir/PKGBUILD.in" && -f "$recipe_dir/chatgpt-launcher.sh" ]] ||
+    error "Missing reviewed recipe files in $recipe_dir"
+  exec 9>"$recipe_dir/.codex-update.lock"
+  flock -n 9 || error 'Another codex-update run is in progress.'
+  render_pkgbuild "$upstream_version" "$upstream_sha256"
+  package_file=$(cd "$recipe_dir" && makepkg --packagelist | head -n 1)
+  [[ "$package_file" == /* ]] || package_file="$recipe_dir/$package_file"
+  case "$package_file" in
+    "$recipe_dir"/openai-codex-desktop-*.pkg.tar.zst) ;;
+    *) error "Unexpected package output path: $package_file" ;;
+  esac
+
+  if [[ "$mode" == rebuild || ! -f "$package_file" ]]; then
+    note "Building $upstream_filename into a local pacman package."
+    (cd "$recipe_dir" && makepkg --cleanbuild --clean --force)
+  else
+    note "Reusing already-built package: $package_file"
+  fi
+  [[ -f "$package_file" ]] || error 'makepkg did not produce the expected package.'
+  package_info=$(LC_ALL=C pacman -Qip "$package_file") || error 'Cannot inspect the built package.'
+  [[ "$package_info" == *"Name            : $package_name"* &&
+     "$package_info" == *"Version         : 1:$upstream_version-1"* ]] ||
+    error 'Built package name/version does not match the verified upstream release.'
+  note "Built: $package_file"
+  [[ "$mode" != build ]] || return 0
+
+  if pgrep -u "$(id -u)" -x ChatGPT >/dev/null; then
+    note 'ChatGPT Desktop is running. Close it, then rerun codex-update to install this cached build.'
+    return 3
+  fi
+
+  note 'Installing through pacman; sudo may ask for your password in this terminal.'
+  sudo pacman -U -- "$package_file"
+  [[ $(installed_version) == "1:$upstream_version-1" ]] ||
+    error 'pacman returned, but the installed version did not match the build.'
+  note 'Installed. Relaunch ChatGPT Desktop and check chat/file loading before relying on it.'
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

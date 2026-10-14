@@ -1,0 +1,23 @@
+{
+  "qwen35": {
+    "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+    "revision": "a483e9e6cbd595906af30beda3187c2663a1118c",
+    "file": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+    "size": 22134528992,
+    "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61"
+  },
+  "ministral14": {
+    "repo": "mistralai/Ministral-3-14B-Instruct-2512-GGUF",
+    "revision": "74fac473c43357d7fb2671713608183cc72496d0",
+    "file": "Ministral-3-14B-Instruct-2512-Q4_K_M.gguf",
+    "size": 8239593024,
+    "sha256": "824e0f3373e69b84f2cae46fdcb9bd1ebc6ab3bfc7acc125d818b7b8178cc613"
+  },
+  "qwen30": {
+    "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+    "revision": "eea7b2be5805a5f151f8847ede8e5f9a9284bf77",
+    "file": "Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf",
+    "size": 18556686752,
+    "sha256": "6c997b8af17debdfb01d890214400ccbab00db6acc0ba8da5de1cc906c4774d0"
+  }
+}

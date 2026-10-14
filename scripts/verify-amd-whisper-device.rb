@@ -118,10 +118,35 @@ expect_snapshot_failure.call(
   total: minimum_total, used: minimum_total + 1, first: {}, second: {}, message: "VRAM telemetry is invalid"
 )
 
-large_foreign = row.call(bytes: 512 * 1024**2)
+large_foreign = row.call(bytes: SoulCore::AmdWhisperDevice::FOREIGN_ALLOCATION_LIMIT)
 expect_snapshot_failure.call(
-  "a large foreign VRAM client blocks admission",
+  "a foreign VRAM client at exactly 1 GiB blocks admission",
   total: minimum_total, used: large_foreign["bytes"], first: { "foreign" => large_foreign }, second: { "foreign" => large_foreign }, message: "foreign AMD allocation"
+)
+
+[512 * 1024**2, SoulCore::AmdWhisperDevice::FOREIGN_ALLOCATION_LIMIT - 1].each do |bytes|
+  idle = row.call(bytes: bytes)
+  device = AmdWhisperDeviceFixture.new(total: minimum_total, used: bytes,
+    client_snapshots: [{ "browser" => idle }, { "browser" => idle }])
+  begin
+    snapshot = device.snapshot
+    check.call("idle foreign allocation of #{bytes} bytes below 1 GiB is admitted", snapshot["used"] == bytes)
+  rescue ArgumentError
+    check.call("idle foreign allocation of #{bytes} bytes below 1 GiB is admitted", false)
+  end
+end
+above_limit = row.call(bytes: SoulCore::AmdWhisperDevice::FOREIGN_ALLOCATION_LIMIT + 1)
+expect_snapshot_failure.call(
+  "a foreign allocation above 1 GiB blocks admission",
+  total: minimum_total, used: above_limit["bytes"], first: { "foreign" => above_limit },
+  second: { "foreign" => above_limit }, message: "foreign AMD allocation"
+)
+active_before = row.call(bytes: 768 * 1024**2, compute: 1)
+active_after = row.call(bytes: 768 * 1024**2, compute: 10_000_002)
+expect_snapshot_failure.call(
+  "active compute below the new allocation limit still blocks admission",
+  total: minimum_total, used: active_after["bytes"], first: { "foreign" => active_before },
+  second: { "foreign" => active_after }, message: "foreign AMD compute"
 )
 
 new_compute = row.call(compute: 1)

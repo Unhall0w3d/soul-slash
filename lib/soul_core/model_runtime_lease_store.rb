@@ -112,6 +112,25 @@ module SoulCore
       end
     end
 
+    # Called under with_control_lock by a dedicated foreground qualification.
+    # Expiration is not proof that a provider request finished. Unlike normal
+    # status inspection, this view never prunes a retained lease, even stale ones.
+    def leases_for_quiescent_admission_unlocked
+      entries = Dir.children(@leases_directory).sort
+      raise IntegrityError, "model runtime lease limit exceeded" if entries.length > MAX_LEASES
+      entries.map do |name|
+        raise IntegrityError, "invalid model runtime lease entry" unless name.match?(/\A[0-9a-f]{32}\.json\z/)
+        path = File.join(@leases_directory, name)
+        stat = File.lstat(path)
+        raise IntegrityError, "unsafe model runtime lease" unless stat.file? && !stat.symlink? && stat.nlink == 1 && stat.size <= MAX_LEASE_BYTES
+        record = JSON.parse(File.binread(path, MAX_LEASE_BYTES))
+        validate_record!(record, name)
+        record
+      end
+    rescue JSON::ParserError, ArgumentError, Errno::ENOENT => error
+      raise IntegrityError, "invalid admission lease: #{error.class}"
+    end
+
     private
 
     def write_record(provider_id:, model_id:, request_id:, conversation_id:, ttl_seconds:, resource_group: nil)

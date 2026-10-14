@@ -1,0 +1,66 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "timeout"
+require_relative "../lib/soul_core/reviewer/fake_runner"
+
+if $PROGRAM_NAME == __FILE__
+  reviewer = SoulCore::Reviewer
+  lab = SoulCore::ContinuityLab
+  store = nil
+  begin
+    command, path, *args = ARGV
+    raise lab::ValidationError, "usage: soul-reviewer init|enqueue|status|run-fake|cancel|recover ROOT [ID]" unless path
+    if command == "init"
+      raise lab::ValidationError, "unexpected arguments" unless args.empty?
+      store = reviewer::Store.create(path: path)
+      result = { "status" => "complete", "mode" => "detached_fake_only", "store" => store.snapshot }
+    else
+      raise lab::ValidationError, "unknown command" unless %w[enqueue status run-fake cancel recover].include?(command)
+      store = reviewer::Store.open(path: path)
+      now = Time.now.to_i
+      case command
+      when "enqueue"
+        raise lab::ValidationError, "unexpected arguments" unless args.empty?
+        raw = Timeout.timeout(5) { STDIN.read(reviewer::Contract::MAX_REQUEST_BYTES + 1) }
+        raise lab::ValidationError, "request too large" if raw.bytesize > reviewer::Contract::MAX_REQUEST_BYTES
+        raw.force_encoding(Encoding::UTF_8)
+        raise lab::ValidationError, "invalid UTF-8" unless raw.valid_encoding?
+        result = { "status" => "complete", "review" => store.enqueue(lab.parse(raw), now: now) }
+      when "status"
+        raise lab::ValidationError, "status takes ID and optionally both current revision digests" unless [0, 1, 3].include?(args.length)
+        result = if args.empty?
+                   state = store.snapshot
+                   { "status" => "complete", "sequence" => state["sequence"], "reviews" => state["reviews"].transform_values do |entry|
+                       { "status" => entry["status"], "availability" => entry["availability"],
+                         "validation_requirement" => entry["request"]["validation_requirement"],
+                         "visibility" => entry["visibility"], "acceptance" => entry["acceptance"] }
+                     end }
+                 else
+                   { "status" => "complete", "review" => store.inspect_review(review_id: args[0], source_revision: args[1], evidence_revision: args[2]) }
+                 end
+      when "run-fake"
+        unless args.length == 1 || (args.length == 2 && args[1] == "--unavailable")
+          raise lab::ValidationError, "run-fake takes ID and optional --unavailable"
+        end
+        result = reviewer::FakeRunner.new(store: store).run(review_id: args[0], now: now, available: args.length == 1)
+      when "cancel"
+        raise lab::ValidationError, "cancel takes ID" unless args.length == 1
+        result = { "status" => "complete", "review" => store.cancel(review_id: args[0], now: now) }
+      when "recover"
+        raise lab::ValidationError, "unexpected arguments" unless args.empty?
+        result = { "status" => "complete", "recovery" => store.recover(now: now) }
+      end
+    end
+    puts lab.encode(result)
+  rescue lab::Error, JSON::ParserError, SystemCallError, IOError, Timeout::Error => error
+    # Do not echo input packets or arbitrary OS paths from errors into receipts.
+    puts lab.encode({ "status" => "failed", "error_class" => error.class.name, "state_may_require_inspection" => true })
+    exit 2
+  rescue SignalException
+    puts lab.encode({ "status" => "canceled", "recovery" => "Inspect store; expired unresolved attempts require explicit recover. No automatic replay." })
+    exit 130
+  ensure
+    store&.close
+  end
+end

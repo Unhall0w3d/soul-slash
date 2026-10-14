@@ -1,0 +1,17 @@
+{
+  "qwen35": {
+    "repo": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+    "revision": "182be2fd6c7bc44887d88a91cb03ff009cc9f549",
+    "file": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+    "size": 6169341984,
+    "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43",
+    "thinking": false
+  },
+  "phi4": {
+    "repo": "microsoft/phi-4-gguf",
+    "revision": "6edc2ef6664b739a8e11e62f2672ff6afe0c15ac",
+    "file": "phi-4-Q4_K_S.gguf",
+    "size": 8440762560,
+    "sha256": "8a8189132ef70cd737e136d38b706e8cb832f9cdf3c744547694769e9313550e"
+  }
+}

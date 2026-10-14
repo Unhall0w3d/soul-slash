@@ -1,0 +1,8 @@
+/PKGBUILD
+/.PKGBUILD.*
+/.codex-update.lock
+/src/
+/pkg/
+/*.deb
+/*.pkg.tar.*
+/rollback/

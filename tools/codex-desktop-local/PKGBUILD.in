@@ -1,0 +1,47 @@
+# Local, x86_64 Arch repackaging of OpenAI's official ChatGPT Desktop .deb.
+# Generated PKGBUILD version/checksums are supplied by codex-update after
+# validating OpenAI's HTTPS Debian Packages index. Do not build this template.
+pkgname=openai-codex-desktop
+epoch=1
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='ChatGPT Desktop with Codex, repackaged locally from OpenAI'
+arch=('x86_64')
+url='https://chatgpt.com/codex/'
+license=('custom')
+depends=(
+  'alsa-lib' 'at-spi2-core' 'bash' 'cairo' 'dbus' 'expat' 'gcc-libs'
+  'gdk-pixbuf2' 'glib2' 'glibc' 'gtk3' 'libcups' 'libdrm' 'libglvnd'
+  'libnotify' 'libusb' 'libx11' 'libxcb' 'libxcomposite' 'libxdamage'
+  'libxext' 'libxfixes' 'libxkbcommon' 'libxrandr' 'mesa' 'nspr'
+  'nss' 'openssl' 'pango' 'systemd-libs' 'xdg-utils' 'xz'
+)
+optdepends=(
+  'apparmor: load the bundled user-namespace profile on AppArmor systems'
+  'git: version control integration'
+)
+makedepends=('libarchive')
+provides=('chatgpt')
+conflicts=('chatgpt')
+options=('!debug' '!strip')
+
+_deb="chatgpt_${pkgver}_amd64.deb"
+_pool='https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt'
+source=('chatgpt-launcher.sh' "${_deb}::${_pool}/${_deb}")
+noextract=("${_deb}")
+sha256sums=('@LAUNCHER_SHA256@' '@DEB_SHA256@')
+
+package() {
+  local payload
+  payload=$(bsdtar -tf "${srcdir}/${_deb}" | grep -E '^data\.tar\.(xz|zst|gz)$' | head -n 1)
+  [[ -n "$payload" ]] || return 1
+  bsdtar -xOf "${srcdir}/${_deb}" "$payload" |
+    bsdtar --no-same-owner -xf - -C "${pkgdir}"
+
+  rm -f -- "${pkgdir}/usr/bin/chatgpt" "${pkgdir}/usr/bin/codex-desktop"
+  install -Dm755 "${srcdir}/chatgpt-launcher.sh" "${pkgdir}/usr/bin/chatgpt"
+  ln -s chatgpt "${pkgdir}/usr/bin/codex-desktop"
+  install -Dm644 "${pkgdir}/usr/share/doc/chatgpt/copyright" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/copyright"
+  rm -rf -- "${pkgdir}/usr/share/doc" "${pkgdir}/usr/share/lintian"
+}
