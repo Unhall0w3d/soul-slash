@@ -111,7 +111,7 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
     File.write(File.join(path, "fixture.txt"), "#{directory}\n")
   end
   %w[
-    JetBrains blender codex-desktop corectrl fastfetch gpu-screen-recorder
+    Codex JetBrains blender codex-desktop corectrl fastfetch gpu-screen-recorder
     hypr kate kitty noctalia opera-gx soul systemd
   ].each do |directory|
     path = File.join(home, ".config", directory)
@@ -244,13 +244,23 @@ Dir.mktmpdir("soul-operator-backup-") do |root|
                exclusions.include?(File.join(home, ".config", "qBittorrent", "ipc-socket")) &&
                exclusions.include?(File.join(home, "Projects", "soul", "**")) &&
                exclusions.include?(File.join(home, "Knowledge", "soul-vault", "**")))
-  check.call("Opera GX transient caches and active Codex sessions remain excluded",
-             exclusions.include?(File.join(home, ".codex", "sessions", "**")) &&
+  check.call("Codex durable parent and desktop profile are selected without transient roots",
+             sources.include?(File.join(home, ".codex")) &&
+               sources.include?(File.join(home, ".config", "Codex")) &&
+               sources.none? { |path| path.end_with?("-wal", "-shm") } &&
+               summary["application_state_consistency"] == "live_file_copy_not_atomic")
+  check.call("dependency lockfiles and active Codex sessions are no longer excluded",
+             !exclusions.include?("*.lock") &&
+               !exclusions.include?(File.join(home, ".codex", "sessions", "**")) &&
+               exclusions.include?("**/.git/*.lock"))
+  check.call("Codex reproducible packages and browser transient caches remain excluded",
+             exclusions.include?(File.join(home, ".codex", "packages", "**")) &&
+               exclusions.include?(File.join(home, ".config", "Codex", "**", "Cache", "**")) &&
                exclusions.include?(File.join(home, ".config", "opera-gx", "**", "Cache", "**")) &&
                exclusions.include?(File.join(home, ".config", "opera-gx", "**", "Service Worker", "CacheStorage", "**")) &&
                exclusions.include?(File.join(home, ".config", "opera-gx", "SingletonSocket")))
   check.call("ambiguous and privileged gaps remain explicit",
-             summary["explicit_manual_review_gaps"].include?("browser profiles other than selected Opera GX state and active Codex session stores") &&
+             summary["explicit_manual_review_gaps"].include?("atomic recovery of live application databases and profiles") &&
                summary["explicit_manual_review_gaps"].include?("root-only NetworkManager connection profiles"))
 
   script = File.expand_path("soul-backup-config", __dir__)

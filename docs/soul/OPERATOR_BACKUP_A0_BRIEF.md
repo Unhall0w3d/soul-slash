@@ -40,6 +40,22 @@ without changing the approved Soul nightly DRS schedule.
 
 ## Human review boundary
 
+### Authorized October 14, 2026 coverage extension
+
+The operator requested routine protection for identified Codex sessions/state
+and project dependency lockfiles, followed by fresh backup and replication.
+Select the durable `.codex` parent (retaining previous child roots for ledger
+compatibility) and case-sensitive `.config/Codex` profile; exclude reproducible
+package/cache payloads and runtime locks, not dependency lockfiles. Database
+versions and WAL/SHM companions are directory contents, never volatile source
+roots. This remains a live file-level backup, not an atomic application snapshot.
+A separate closed-writer migration capture remains required for Codex consistency.
+Existing source-root, confirmation, byte/path, credential and retention safeguards
+are unchanged. Deploy additions and remove only the obsolete global `*.lock` and
+active-session exclusions, with exact before/after hashes and rollback copies.
+No pruning, disk formatting, extra schedule or restoration promotion is added.
+Use recent accepted restoration evidence; do not add another full rehearsal.
+
 Manifest configuration is candidate-complete only after the generated exact
 source and exclusion lists are reviewed. Backup coverage is not proven until a
 fresh Operator snapshot and its exact Crucible lineage both verify. Staged

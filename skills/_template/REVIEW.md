@@ -1,5 +1,11 @@
 # Skill Candidate Review
 
+Current authorized Operator coverage extension:
+[Codex state and dependency lockfiles](../../docs/assessments/OPERATOR_CODEX_COVERAGE_20261014.md).
+Routine selection and native-Restic fixture checks pass. Existing shared locks,
+confirmation, credential, retention and replication safeguards remain. Live
+application consistency is explicitly unproven; separate cold capture remains.
+
 Current scoped operational repair:
 [Backup retention capacity and failure evidence](../../docs/assessments/BACKUP_RETENTION_CAPACITY_REPAIR_20261014.md).
 Repair/reconciliation authorized; deterministic capacity, failure and existing

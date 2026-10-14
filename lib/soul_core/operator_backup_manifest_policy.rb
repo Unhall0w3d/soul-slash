@@ -32,6 +32,7 @@ module SoulCore
     ].freeze
 
     CONFIG_DIRECTORIES = %w[
+      Codex
       JetBrains
       MangoHud
       SoulSlash
@@ -117,7 +118,8 @@ module SoulCore
 
     def exclusions
       [
-        "*.lock", "*.part", "*.pid", "*.sock", "*.tmp", ".DS_Store",
+        "*.part", "*.pid", "*.sock", "*.tmp", ".DS_Store",
+        "**/.git/*.lock",
         "**/.cache/**", "**/.gradle/**", "**/.mypy_cache/**",
         "**/.pytest_cache/**", "**/.ruff_cache/**", "**/.tox/**",
         "**/.venv/**", "**/__pycache__/**", "**/build/**", "**/dist/**",
@@ -125,7 +127,17 @@ module SoulCore
         File.join(@home, "Knowledge", "soul-vault", "**"),
         File.join(@home, "Music", "soul-music", "**"),
         File.join(@home, "Projects", "soul", "**"),
-        File.join(@home, ".codex", "sessions", "**"),
+        *%w[packages cache tmp .tmp ipc thread-writer-locks app-server-daemon app-server-control].map do |name|
+          File.join(@home, ".codex", name, "**")
+        end,
+        File.join(@home, ".codex", ".sqlite-maintenance.lock"),
+        *["Cache", "Code Cache", "GPUCache", "ShaderCache", "DawnCache", "Crashpad"].map do |name|
+          File.join(@home, ".config", "Codex", "**", name, "**")
+        end,
+        File.join(@home, ".config", "Codex", "**", "Service Worker", "CacheStorage", "**"),
+        *%w[SingletonCookie SingletonLock SingletonSocket].map do |name|
+          File.join(@home, ".config", "Codex", name)
+        end,
         File.join(@home, ".config", "opera-gx", "**", "Cache", "**"),
         File.join(@home, ".config", "opera-gx", "**", "Code Cache", "**"),
         File.join(@home, ".config", "opera-gx", "**", "GPUCache", "**"),
@@ -159,6 +171,8 @@ module SoulCore
         "profile_id" => PROFILE_ID,
         "snapshot_tag" => SNAPSHOT_TAG,
         "raw_model_weights_included" => false,
+        "application_state_consistency" => "live_file_copy_not_atomic",
+        "codex_recovery_note" => "Sessions, registries, SQLite files and sidecars, attachments, worktrees and desktop state are selected. A live file copy is not a consistent application snapshot; close all writers for a migration capture. External worktree targets need separate coverage.",
         "reproducible_asset_count" => assets.length,
         "reproducible_asset_bytes" => assets.sum { |asset| asset.fetch("bytes") },
         "reproducible_assets" => assets.map do |asset|
@@ -168,7 +182,8 @@ module SoulCore
           {"label" => label, "path" => path, "selected" => sources.include?(path)}
         end,
         "explicit_manual_review_gaps" => [
-          "browser profiles other than selected Opera GX state and active Codex session stores",
+          "browser profiles other than selected Opera GX and Codex desktop state",
+          "atomic recovery of live application databases and profiles",
           "Downloads and recovered-file holding areas",
           "WinBoat container disk images",
           "root-only NetworkManager connection profiles",
@@ -197,6 +212,10 @@ module SoulCore
       candidates.concat(CONFIG_FILES.map { |name| File.join(@home, ".config", name) })
       candidates.concat(HOME_FILES.map { |name| File.join(@home, name) })
       candidates.concat([
+        # Keep older child roots for additive retention-ledger compatibility.
+        # The durable parent covers versioned databases and transient sidecars
+        # without making disappearing WAL files independent required roots.
+        File.join(@home, ".codex"),
         File.join(@home, ".codex", "AGENTS.md"),
         File.join(@home, ".codex", "auth.json"),
         File.join(@home, ".codex", "config.toml"),

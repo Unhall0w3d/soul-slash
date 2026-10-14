@@ -6,6 +6,14 @@ approved, audited, reversible memory policy.
 
 Candidate-complete work is not approved work.
 
+## Operator recovery coverage (October 14, 2026)
+
+The operator authorized missing Codex session/state and dependency-lockfile
+coverage, live manifest adjustment, fresh capture and replication. See the
+[coverage review](../assessments/OPERATOR_CODEX_COVERAGE_20261014.md).
+Policy/native-Restic fixtures pass. Live receipts and closed-writer migration
+capture are separate evidence; live application copies are not atomic.
+
 ## Scoped backup repair (October 14, 2026)
 
 Current user authorized backup repair and evidence-only reconciliation.
