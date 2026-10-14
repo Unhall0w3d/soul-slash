@@ -7,6 +7,7 @@ require_relative "../lib/soul_core/backup_administration_service"
 ledger_class = SoulCore::BackupRetentionLedger
 backup_class = SoulCore::BackupAdministrationService
 raise "path ceiling drift" unless ledger_class::MAX_PATHS == 1_000_000
+raise "hold ceiling must support a complete inventory deletion" unless ledger_class::MAX_HOLDS == ledger_class::MAX_PATHS
 raise "inventory ceiling drift" unless backup_class::MAX_INVENTORY_BYTES == 256 * 1024 * 1024
 raise "ledger ceiling drift" unless ledger_class::MAX_LEDGER_BYTES == 512 * 1024 * 1024
 
@@ -32,6 +33,40 @@ Dir.mktmpdir("soul-inventory-capacity-") do |directory|
   before = Digest::SHA256.file(path).hexdigest
   rejected = ledger.observe_preview(manifest: manifest.merge("paths" => Array.new(ledger_class::MAX_PATHS + 1, root)))
   raise "overflow accepted or mutated" if rejected["ok"] || Digest::SHA256.file(path).hexdigest != before
+
+  deleted = manifest.merge("snapshot_id" => "c" * 64,
+    "verified_at" => (Time.iso8601(manifest.fetch("verified_at")) + 60).iso8601,
+    "paths" => [root])
+  deletion_preview = ledger.observe_preview(manifest: deleted)
+  raise deletion_preview["reason"] unless deletion_preview["ok"]
+  raise "large deletion lost holds" unless deletion_preview.dig("data", "total_hold_count_after") == 170_000
+  deleted_result = ledger.observe_execute(manifest: deleted,
+    confirmation: ledger_class::OBSERVE_CONFIRMATION,
+    expected_digest: deletion_preview.dig("data", "expected_digest"))
+  raise deleted_result["reason"] unless deleted_result["ok"]
+  retained = JSON.parse(File.read(path))
+  raise "large hold ledger did not persist" unless retained.fetch("holds").length == 170_000 && ledger.checkpoint["ok"]
+  raise "deletion clocks or lineage changed" unless retained.fetch("holds").all? { |hold|
+    hold.fetch("protective_snapshot_id") == "a" * 64 &&
+      hold.fetch("detected_by_snapshot_id") == "c" * 64 &&
+      Time.iso8601(hold.fetch("hold_until")) - Time.iso8601(hold.fetch("detected_at")) == ledger_class::HOLD_SECONDS
+  }
+  before = Digest::SHA256.file(path).hexdigest
+  begin
+    ledger.send(:validate_ledger!, retained.merge("holds" => Array.new(ledger_class::MAX_HOLDS + 1)))
+    raise "hold overflow accepted"
+  rescue RuntimeError => error
+    raise if error.message == "hold overflow accepted"
+  end
+  raise "hold overflow mutated ledger" unless Digest::SHA256.file(path).hexdigest == before
+  reappeared = deleted.merge("snapshot_id" => "d" * 64,
+    "verified_at" => (Time.iso8601(deleted.fetch("verified_at")) + 60).iso8601,
+    "paths" => paths.first(5_001))
+  reappearance = ledger.observe_preview(manifest: reappeared)
+  raise reappearance["reason"] unless reappearance["ok"]
+  raise "large reappearance miscounted" unless reappearance.dig("data", "reappeared_path_count") == 5_000 &&
+    reappearance.dig("data", "total_hold_count_after") == 165_000 &&
+    Digest::SHA256.file(path).hexdigest == before
 
   service = backup_class.allocate
   captured = []
@@ -60,4 +95,4 @@ Dir.mktmpdir("soul-inventory-capacity-") do |directory|
     end
   end
 end
-puts "Backup inventory capacity verification passed: large persisted ledger, replay, overflow refusal, and both inventory readers."
+puts "Backup inventory capacity verification passed: large persisted inventory/holds, clocks/lineage, reappearance, overflow refusal, and both inventory readers."

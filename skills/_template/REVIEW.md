@@ -1,5 +1,11 @@
 # Skill Candidate Review
 
+Current scoped operational repair:
+[Backup retention capacity and failure evidence](../../docs/assessments/BACKUP_RETENTION_CAPACITY_REPAIR_20261014.md).
+Repair/reconciliation authorized; deterministic capacity, failure and existing
+backup regressions passed. Live evidence remains separate. No snapshot deletion,
+new capture, credential change, scheduled feature or model experiment is added.
+
 2026-10-14 migration hold: Continuity/reviewer experimentation is paused until
 post-migration restoration and an explicit resumption decision. A source
 checkpoint is preservation, not release or deployment approval.

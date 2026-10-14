@@ -321,6 +321,10 @@ module SoulCore
     end
 
     def backup_execute(password:, confirmation:, expected_digest:, progress: nil)
+      capture_started = false
+      snapshot_id = nil
+      verification = "not_attempted"
+      stage = "preflight"
       password = validate_password(password)
       return awaiting("exact backup confirmation is required") unless confirmation.to_s == @confirmations.fetch(:backup)
       operation_lock = acquire_operation_lock
@@ -330,10 +334,12 @@ module SoulCore
       return blocked("backup preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
 
       progress&.call("stage" => "capture", "message" => "Capturing the approved #{@profile_label} sources…")
+      stage = "capture"
+      capture_started = true
       result = restic(password, "backup", "--json", "--quiet", "--files-from", @sources_path, "--exclude-file", @excludes_path, "--tag", @snapshot_tag, "--host", Socket.gethostname, timeout: BACKUP_TIMEOUT, output: 2 * 1024 * 1024, capture_mode: :complete_line_tail)
-      raise "restic backup failed#{restic_failure_suffix(result)}" unless result.success?
       summary = json_lines(result.stdout).reverse.find { |item| item["message_type"] == "summary" }
       snapshot_id = summary.to_h["snapshot_id"].to_s
+      raise "restic backup failed#{restic_failure_suffix(result)}" unless result.success?
       unless snapshot_id.match?(SNAPSHOT_ID)
         receipt = write_receipt("backup_indeterminate", {
           "process_state" => "complete",
@@ -349,11 +355,16 @@ module SoulCore
       end
 
       progress&.call("stage" => "verify", "message" => "Verifying repository metadata before recording deletion evidence…")
+      stage = "verify"
+      verification = "incomplete"
       verify_repository!(password)
+      verification = "passed"
+      stage = "manifest"
       manifest = build_snapshot_manifest(password, snapshot_id)
       FileUtils.mkdir_p(@manifest_root, mode: 0o700)
       manifest_path = File.join(@manifest_root, "#{snapshot_id}.json")
       atomic_json(manifest_path, manifest)
+      stage = "retention_observation"
       observation = @ledger.observe_preview(manifest: manifest)
       raise observation["reason"] unless observation["ok"]
       recorded = @ledger.observe_execute(
@@ -362,6 +373,7 @@ module SoulCore
         expected_digest: observation.dig("data", "expected_digest")
       )
       raise recorded["reason"] unless recorded["ok"]
+      stage = "receipt"
       receipt = write_receipt("backup", {
         "snapshot_id" => snapshot_id,
         "manifest_sha256" => Digest::SHA256.file(manifest_path).hexdigest,
@@ -372,8 +384,10 @@ module SoulCore
       progress&.call("stage" => "complete", "message" => "Verified snapshot and retention evidence recorded.")
       complete("verified backup completed", receipt.merge("snapshot_id" => snapshot_id), "backup_snapshot_created")
     rescue ArgumentError => error
+      return incomplete_backup(error, snapshot_id: snapshot_id, stage: stage, verification: verification) if capture_started
       awaiting(error.message)
     rescue StandardError => error
+      return incomplete_backup(error, snapshot_id: snapshot_id, stage: stage, verification: verification) if capture_started
       failed("backup failed safely: #{safe_error(error)}")
     ensure
       release_operation_lock(operation_lock)
@@ -860,7 +874,30 @@ module SoulCore
         "state" => outcome["ok"] ? "complete" : outcome.fetch("lifecycle_state", "failed"),
         "reason" => outcome.fetch("reason", "").to_s.slice(0, 240),
         "mutation" => outcome.fetch("mutation", "none")
+      }.merge(outcome.fetch("data", {}).slice(
+        "snapshot_id", "receipt_id", "reconciliation_required", "stage", "verification"
+      ))
+    end
+
+    def incomplete_backup(error, snapshot_id:, stage:, verification:)
+      known_snapshot = snapshot_id.to_s.match?(SNAPSHOT_ID)
+      mutation = known_snapshot ? "backup_snapshot_created_requires_reconciliation" : "backup_snapshot_indeterminate_requires_reconciliation"
+      evidence = {
+        "snapshot_id" => known_snapshot ? snapshot_id : nil,
+        "snapshot_state" => known_snapshot ? "created_requires_reconciliation" : "indeterminate_requires_reconciliation",
+        "stage" => stage,
+        "verification" => verification,
+        "reconciliation_required" => true,
+        "review_required" => true
       }
+      begin
+        receipt = write_receipt("backup_incomplete", evidence.merge("mutation" => mutation))
+      rescue StandardError
+        # Receipt-storage failure cannot turn an already-started capture into
+        # a no-mutation claim or hide its snapshot ID from the caller.
+        receipt = {"receipt_write_failed" => true}
+      end
+      failed("backup capture requires reconciliation: #{safe_error(error)}", evidence.merge(receipt), mutation)
     end
 
     def successful_local_component(outcome)

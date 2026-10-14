@@ -351,6 +351,12 @@ cannot be parsed, the run is classified as indeterminate rather than as a
 no-mutation failure. The bounded reconciliation command can then preview and
 record only the existing unrecorded local snapshots, in repository order:
 
+Failures after capture at verification, manifest, ledger or receipt stages also
+retain the known snapshot ID (or an explicit indeterminate capture), stage and
+reconciliation requirement. A partial Restic exit is not a successful backup.
+Parent DRS records carry this evidence; receipt-storage failure does not imply
+that no snapshot was created.
+
 ```sh
 scripts/soul-backup-snapshot-reconcile --root "$PWD" --profile operator --preview
 scripts/soul-backup-snapshot-reconcile \
@@ -383,6 +389,9 @@ For every verified snapshot, Soul records:
 - holds created for paths present in the preceding snapshot but absent now.
 
 Each hold protects the preceding snapshot until 30 full days after detection.
+The hold count is bounded at the same one-million-entry ceiling as snapshot
+inventories, independently of the 512 MiB ledger byte bound. Retiring a project
+does not discard its deletion holds or authorize snapshot pruning.
 Later captures do not reset the clock. A verified reappearance resolves the
 hold. An additive source-root expansion is disclosed by count and path digest
 and bound into the exact observation approval. Removing or replacing any prior

@@ -15,7 +15,9 @@ module SoulCore
     OBSERVE_CONFIRMATION = "RECORD_VERIFIED_BACKUP_SNAPSHOT"
     MAX_LEDGER_BYTES = 512 * 1024 * 1024
     MAX_PATHS = 1_000_000
-    MAX_HOLDS = 100_000
+    # A supported inventory can disappear in one observation. Keep its full
+    # protection history; the independent serialized-byte bound still applies.
+    MAX_HOLDS = MAX_PATHS
     MAX_ROOTS = 128
     MAX_CONFIGURABLE_ROOTS = 256
     SNAPSHOT_ID = /\A[a-f0-9]{64}\z/
@@ -186,7 +188,8 @@ module SoulCore
       current_paths = manifest.fetch("paths")
       deleted_paths = previous_paths - current_paths
       reappeared_paths = current_paths & ledger.fetch("holds").map { |hold| hold.fetch("path") }
-      retained_holds = ledger.fetch("holds").reject { |hold| reappeared_paths.include?(hold.fetch("path")) }
+      reappeared_lookup = reappeared_paths.to_h { |path| [path, true] }
+      retained_holds = ledger.fetch("holds").reject { |hold| reappeared_lookup.key?(hold.fetch("path")) }
       held_paths = retained_holds.map { |hold| hold.fetch("path") }
       new_holds = (deleted_paths - held_paths).map do |path|
         {

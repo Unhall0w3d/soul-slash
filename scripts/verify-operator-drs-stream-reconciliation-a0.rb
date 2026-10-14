@@ -196,6 +196,69 @@ Dir.mktmpdir("soul-operator-drs-repair-") do |root|
                absent_checkpoint["lifecycle_state"] == "blocked_for_human_review")
 end
 
+%w[verification manifest ledger receipt unknown_capture known_partial_capture].each do |failure_stage|
+  Dir.mktmpdir("soul-backup-incomplete-") do |root|
+    mount, repository, source, state = fixture(root)
+    runner = OperatorDrsRepairRunner.new(mount: mount, source: source, snapshots: [])
+    service = SoulCore::BackupAdministrationService.new(
+      root: root, home: root, runner: runner, profile_id: "operator",
+      process_env: {"OPERATOR_BACKUP_REPOSITORY" => repository, "OPERATOR_BACKUP_MOUNT" => mount})
+    expected_stage = {
+      "verification" => "verify", "manifest" => "manifest", "ledger" => "retention_observation",
+      "receipt" => "receipt", "unknown_capture" => "capture", "known_partial_capture" => "capture"
+    }.fetch(failure_stage)
+    case failure_stage
+    when "verification"
+      service.define_singleton_method(:verify_repository!) { |_password| raise "fixture check failed" }
+    when "manifest"
+      service.define_singleton_method(:build_snapshot_manifest) { |*_args| raise ArgumentError, "fixture inventory invalid" }
+    when "ledger"
+      service.instance_variable_get(:@ledger).define_singleton_method(:observe_preview) do |manifest:|
+        {"ok" => false, "reason" => "fixture hold capacity refusal"}
+      end
+    when "receipt"
+      service.define_singleton_method(:write_receipt) { |*_args| raise IOError, "fixture receipt storage failure" }
+    else
+      original_run = runner.method(:run)
+      runner.define_singleton_method(:run) do |*args, **options|
+        result = original_run.call(*args, **options)
+        if args.flatten.include?("backup")
+          result.exit_status = 3
+          result.status = "failed"
+          result.stdout = "" if failure_stage == "unknown_capture"
+        end
+        result
+      end
+    end
+    preview = service.backup_preview(password: "fixture-secret")
+    result = service.backup_execute(password: "fixture-secret",
+      confirmation: preview.dig("data", "confirmation_phrase"),
+      expected_digest: preview.dig("data", "expected_digest"))
+    known = failure_stage != "unknown_capture"
+    check.call("#{failure_stage} failure preserves capture evidence",
+      !result["ok"] && result["lifecycle_state"] == "failed" &&
+        result["mutation"] == (known ? "backup_snapshot_created_requires_reconciliation" : "backup_snapshot_indeterminate_requires_reconciliation") &&
+        result.dig("data", "snapshot_id") == (known ? "f" * 64 : nil) &&
+        result.dig("data", "stage") == expected_stage && result.dig("data", "reconciliation_required"))
+    component = service.send(:component_result, result)
+    check.call("#{failure_stage} evidence survives the parent DRS component",
+      component["snapshot_id"] == (known ? "f" * 64 : nil) &&
+        component["reconciliation_required"] && component["stage"] == expected_stage)
+    if failure_stage == "ledger"
+      check.call("ledger rejection preserves written manifest without forging ledger",
+        File.file?(File.join(state, "manifests", "f" * 64 + ".json")) &&
+          !File.exist?(File.join(state, "retention-ledger.json")) &&
+          result.dig("data", "verification") == "passed")
+    elsif failure_stage == "receipt"
+      check.call("receipt failure cannot erase completed ledger evidence",
+        result.dig("data", "receipt_write_failed") &&
+          JSON.parse(File.read(File.join(state, "retention-ledger.json"))).dig("last_verified_snapshot", "snapshot_id") == "f" * 64)
+    end
+    receipt_text = Dir.glob(File.join(state, "receipts", "*.json")).map { |path| File.read(path) }.join
+    check.call("#{failure_stage} retains no credential", !receipt_text.include?("fixture-secret") && !JSON.generate(result).include?("fixture-secret"))
+  end
+end
+
 if errors.empty?
   puts "Operator DRS stream reconciliation A0 verification passed."
   exit 0

@@ -6,6 +6,14 @@ approved, audited, reversible memory policy.
 
 Candidate-complete work is not approved work.
 
+## Scoped backup repair (October 14, 2026)
+
+Current user authorized backup repair and evidence-only reconciliation.
+The [capacity/failure-evidence review](../assessments/BACKUP_RETENTION_CAPACITY_REPAIR_20261014.md)
+records passing deterministic checks and unchanged deletion/credential gates.
+Live reconciliation needs its own receipt; these fixtures do not establish a
+fresh capture, replication or recovery acceptance. No model work is resumed.
+
 ## Current Continuity A24/A25 execution status (October 14, 2026)
 
 Migration hold: the operator paused further experimental/model work for the
