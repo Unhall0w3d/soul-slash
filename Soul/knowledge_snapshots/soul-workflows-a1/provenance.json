@@ -1,0 +1,19 @@
+{
+  "id": "soul-workflows-a1",
+  "repository_head": "7f9dcc89df9420895e36e37909b6ed294b11004a",
+  "note": "Public source-only navigation fixture, reproduced from exact bytes already in the public parent commit. No private enrollment, memory, production receipt or private commit provenance is included. Not a migration binding for existing deployment journals.",
+  "sources": {
+    "workflow_handler_registry.rb": {
+      "path": "lib/soul_core/workflow_handler_registry.rb",
+      "sha256": "014a4b3ae7b37f7a8436266f8b8a6879fc9d4a1c737157c54bb8fd41f98a536c"
+    },
+    "workflow_intent_handler_dispatch.rb": {
+      "path": "lib/soul_core/workflow_intent_handler_dispatch.rb",
+      "sha256": "476c81ca6041b295408682cc539e73db26153653d9735ee67d950207a6901844"
+    },
+    "workflow_session_handler_dispatch.rb": {
+      "path": "lib/soul_core/workflow_session_handler_dispatch.rb",
+      "sha256": "c084f0e25fd232aa01e9b4f8f8d5ffafcbc03a62e6489d1f69a87351a359ece0"
+    }
+  }
+}

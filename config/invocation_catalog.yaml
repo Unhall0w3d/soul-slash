@@ -286,3 +286,223 @@ entries:
     examples:
       - Run maintenance on Crucible.
       - Reboot Crucible.
+
+  - id: cpu-assistance-requests
+    label: CPU member assistance requests
+    category: Supported requests
+    summary: In a new conversation select the Gemma CPU member preset, then request one named GPU member's bounded analysis or draft. Review the displayed member and exact request before replying yes in the same conversation.
+    handler_id: cpu_member_assistance_gateway
+    required_inputs: [A CPU member conversation, Exact member and task text of 1 to 1800 bytes]
+    optional_inputs: [GPT-OSS or GPT-OSS 20b, Gemma or Gemma 26b, Qwen]
+    core: CPU member preset; GPU work still requires separate compute admission.
+    approval: The first request shows a proposal only. Reply yes immediately after that proposal to save one confirmed queue task; confirmation without a preceding proposal saves nothing.
+    output: A scoped proposal followed by a retained task ID after confirmation; one attempt when compute permits.
+    boundary: Closed request forms such as Ask MEMBER to TASK are supported; unrestricted natural-language task routing is not promised. No new execution permissions, automatic retry, or change to Compute Availability.
+    examples:
+      - Ask GPT-OSS to summarize these supplied notes.
+      - Have Gemma review this supplied paragraph.
+      - Use Qwen to draft a short outline from these supplied points.
+      - yes
+  - id: cpu-queue-requests
+    label: CPU compute and queue requests
+    category: Supported requests
+    summary: Inspect GPU availability, confirmed queued tasks, and retained results, or cancel one exact queued task from a CPU member conversation.
+    handler_id: cpu_member_assistance_gateway
+    required_inputs: [A CPU member conversation, A full returned task ID for result or cancellation requests]
+    optional_inputs: []
+    core: CPU member preset in a new conversation.
+    approval: Inspection needs no task confirmation. An explicit cancellation targets only the named task.
+    output: Compute Availability evidence, queued task states, retained result when present, or a cancellation receipt.
+    boundary: Availability evidence does not reserve compute or bypass admission. Replace the example ID with the actual returned t- plus 24 lowercase hexadecimal characters. Queue requests differ from explicit /task ledger commands.
+    examples:
+      - Check compute availability
+      - Show my queue
+      - Show result for t-0123456789abcdef01234567
+      - Cancel queued task t-0123456789abcdef01234567
+  - id: cpu-calculation-requests
+    label: CPU whole-number calculation requests
+    category: Supported requests
+    summary: Calculate one addition, subtraction, or multiplication from two whole numbers written in the current message using the supported complete-sentence forms.
+    handler_id: cpu_member_assistance_gateway
+    required_inputs: [A CPU member conversation, Two explicit whole numbers each between -1000000 and 1000000]
+    optional_inputs: ["Forms: A plus B; A minus B; A times B; A multiplied by B", "Forms: add A and B; add A to B; subtract A from B; multiply A by B", "Optional please and what is or calculate prefixes for A operator B"]
+    core: CPU member preset; deterministic calculation invokes no model.
+    approval: No confirmation for this bounded calculation.
+    output: The exact operands, operation, and result, or a request for a supported calculation.
+    boundary: No division, decimals, multi-step expressions, or numbers recalled from prior turns. Credit and budget remainder forms require nonnegative amounts. The entire message must match; quoted snippets and extra instructions are not extracted.
+    examples:
+      - What is 847 minus 286?
+      - Multiply 4 by 5
+      - I have 100 credits and spent 25 credits, how much is left?
+      - My budget is 100 and my deposit is 25, what is the remaining balance?
+  - id: cpu-calculation-command
+    label: /calculate command
+    category: Commands
+    summary: Supply explicit typed JSON for one bounded whole-number addition, subtraction, or multiplication in a CPU member conversation.
+    handler_id: cpu_member_calculation_gateway
+    required_inputs: ["Exact JSON fields: operation, sources, left, right", "operation is add, subtract, or multiply; sources has exactly two named integers from -1000000 to 1000000", "left and right name entries in sources; source names start with a letter and contain at most 32 letters, digits, underscores, or hyphens"]
+    optional_inputs: []
+    core: CPU member preset in a new conversation; calculation invokes no model.
+    approval: The literal user command supplies the operands; no confirmation required.
+    output: Deterministic calculation evidence and result.
+    boundary: Maximum command size is 2048 bytes. No duplicate or extra JSON fields, expression evaluation, division, decimals, or implicit operands from memory. Documentation examples do not execute.
+    examples:
+      - '/calculate {"operation":"subtract","sources":{"budget":100,"deposit":25},"left":"budget","right":"deposit"}'
+  - id: cpu-task-commands
+    label: /task commands
+    category: Commands
+    summary: Use explicit typed task-ledger commands to add, list, preview, run, or cancel one task. This ledger is separate from the prose confirmed queue.
+    handler_id: cpu_member_handoff_gateway
+    required_inputs: [A CPU member conversation, Exact JSON fields for the chosen command, A returned task ID and preview expected_digest for run]
+    optional_inputs: ["/task help; /task list; /task list {\"cursor\":\"t-...\"}", "/task cancel {\"task_id\":\"t-...\"}"]
+    core: CPU member preset in a new conversation; supported GPU member and resource admission required for run.
+    approval: Add records a pending task only. Review preview contents and target before an explicit run with its exact expected_digest; yes does not run a /task ledger task.
+    output: Task ledger, digest-bound preview, or one foreground attempt and retained run receipt.
+    boundary: Maximum command size is 4096 bytes; exact fields and no duplicate JSON keys. Replace task IDs with returned t- plus 24 lowercase hex characters and digest with 64 lowercase hex characters. No automatic dispatch or retry; use Stop for active work and a new conversation after cancellation.
+    examples:
+      - '/task help'
+      - '/task add {"title":"Review","detail":"Summarize these supplied notes","member":"gpt-oss-20b"}'
+      - '/task preview {"task_id":"t-0123456789abcdef01234567"}'
+      - '/task run {"task_id":"t-0123456789abcdef01234567","expected_digest":"REPLACE_WITH_EXACT_PREVIEW_DIGEST"}'
+  - id: cpu-approved-memory
+    label: CPU approved memory questions
+    category: Supported requests
+    summary: In a new Soul — Gemma CPU conversation, ordinary questions can use relevant approved shared memories and memories scoped to this CPU member.
+    handler_id: cpu_member_memory_gateway
+    skill_ids: []
+    required_inputs: [A question about a remembered fact or preference]
+    optional_inputs: []
+    core: Soul — Gemma CPU; new memory-enabled conversations only.
+    approval: Reads existing approved scopes only. This does not approve, share, save or modify a memory.
+    output: A model answer using a bounded selection of approved reference records, or an acknowledgement that the information is absent.
+    boundary: Prose is not an exact command here. Retrieval is relevance-ranked and bounded; other-member and unscoped records are excluded. Memory cannot authorize a tool or queued task. Old conversations keep their original memory policy.
+    examples:
+      - What do you remember about my restore preferences?
+      - Do you have an approved memory of my preferred location?
+  - id: cpu-operational-guide
+    label: CPU invocation guide requests
+    category: Supported requests
+    summary: Show the invocation guide or its commands and supported prose from a new Soul — Gemma CPU conversation.
+    handler_id: cpu_member_operations_gateway
+    required_inputs: [An explicit guide request]
+    optional_inputs: [Ask how to invoke one named capability]
+    core: Soul — Gemma CPU; new A8 conversations. No inference is needed.
+    approval: Read-only documentation. Examples do not execute or authorize operations.
+    output: Curated syntax, inputs and approval boundaries; registered capabilities are not all connected to this member.
+    boundary: No raw skill file access or arbitrary file lookup. Old conversations retain their bound behavior.
+    examples: [Show commands, Show supported requests, How can I invoke /task commands?]
+  - id: cpu-security-status
+    label: CPU security status requests
+    category: Supported requests
+    summary: Collect the existing aggregate Wazuh manager, agent, alert and posture evidence without loading a model.
+    handler_id: cpu_member_operations_gateway
+    required_inputs: [An explicit security status request]
+    optional_inputs: []
+    core: Soul — Gemma CPU; new A8 conversations.
+    approval: No confirmation for the aggregate read. Existing private status caches may refresh; remediation remains separate.
+    output: Bounded security summary with its timestamp, missing evidence and recorded attribution.
+    boundary: No raw alert events, credentials, scans, remote changes or remediation. ClamAV freshness is not collected. Replaying a saved reply does not refresh the source; send a new request for a new check.
+    examples: [Security status, Check security status, Show security status]
+  - id: cpu-fleet-status
+    label: CPU fleet status requests
+    category: Supported requests
+    summary: Collect the existing bounded Observatory summary of endpoint, resource, network and alert evidence without loading a model.
+    handler_id: cpu_member_operations_gateway
+    required_inputs: [An explicit fleet status request]
+    optional_inputs: []
+    core: Soul — Gemma CPU; new A8 conversations.
+    approval: Read-only foreground collection through the existing Observatory access. Maintenance and reboot remain separate.
+    output: Bounded fleet summary with collection time and gaps; missing evidence is not healthy evidence.
+    boundary: No caller-selected host, query, command or path. No remote mutation. Replaying a saved reply does not recollect; send a new request for a new check.
+    examples: [Fleet status, Check fleet status, Fleet observability]
+  - id: cpu-creative-preview
+    label: Creative Studio preview requests
+    category: Supported requests
+    summary: Gather an image or song brief in a new Soul — Gemma CPU conversation, inspect every proposed value, revise it, or cancel the preview.
+    handler_id: cpu_member_creative_preview_gateway
+    required_inputs: [Explicit image or song intent, "Songs also need Duration: (30–300 whole seconds or exactly 600), Mode: (vocal or instrumental), and Rights: (original, licensed or public_domain)"]
+    optional_inputs: ["Title:, Intent:, Frame:, Prompt:, Exclusions:, Seed: for images", "Title:, Sound:, Lyrics:, BPM:, Key:, Meter:, Seed: for songs; one field per line"]
+    core: New Soul — Gemma CPU conversations. Preview needs no model inference or GPU allocation.
+    approval: Preview is task state only. Yes does not approve or queue generation. The existing exact Studio approval and compute handoff remain required for the later execution step.
+    output: A source-bound brief with visible supplied/proposed values, selected Studio profile, compute snapshot and preview digest, or one question for a required choice.
+    boundary: Preview does not create a native Studio project, render, publish, reserve compute or approve memory. Use the separate exact native execution commands after reviewing the brief. Inspecting or replaying a preview does not refresh its compute/configuration snapshot; revising it does.
+    examples:
+      - 'Preview an image: A blue bowl on a wooden table'
+      - "Preview a song: Quiet synth music for an imaginary library\nDuration: 90 seconds\nMode: instrumental\nRights: original"
+      - "Frame: portrait\nSeed: 0"
+      - 'Show creative preview; or send Cancel creative preview as its own message.'
+
+  - id: cpu-creative-execution
+    label: Native Studio creation and generation
+    category: Supported requests
+    summary: Create a reviewed native Studio project, approve one exact generation attempt, and inspect or cancel it through LibreChat.
+    handler_id: cpu_member_creative_execution_gateway
+    required_inputs: [A current ready creative brief, Its exact preview digest, A separate exact native approval digest to render]
+    optional_inputs: [Status or cancellation using the creative receipt ID]
+    core: Sequential shared GPU compute handoff; CPU controls require no inference. Uses the existing bounded dashboard job runner.
+    approval: Prepare creative generation DIGEST creates only the reviewed native project. Generate creative DIGEST approves the shown native candidate and compute handoff. A bare yes never executes. Human review remains required afterward.
+    output: Native project and candidate IDs, bounded execution receipt, and authenticated image or MP3/FLAC review links when complete. Send Creative status ID to retrieve the result.
+    boundary: No automatic retry or restart, arbitrary paths, export, publication, candidate promotion or memory approval. Cancel requests owned-process shutdown; a cancellation request alone does not establish cleanup. Existing conversations retain their original capabilities; use a new CPU conversation.
+    examples:
+      - 'Prepare creative generation PREVIEW_DIGEST (replace with the exact 64-character digest shown)'
+      - 'Generate creative APPROVAL_DIGEST (replace with the native action digest shown)'
+      - 'Creative status RECEIPT_ID'
+      - 'Cancel creative generation RECEIPT_ID'
+
+  - id: cpu-weather-requests
+    label: CPU weather requests
+    category: Supported requests
+    summary: Retrieve current conditions for an explicitly named public city through the existing weather service.
+    handler_id: cpu_member_reference_gateway
+    required_inputs: [A new CPU conversation, An explicit city or previously configured weather location]
+    optional_inputs: []
+    core: CPU deterministic reference route; no model or GPU inference.
+    approval: The current explicit request permits one bounded public read.
+    output: Current weather or an honest missing-location or fetch failure, with source attribution.
+    boundary: Weather is not inferred from memory. No private context is added to the location query.
+    examples:
+      - Weather in Toronto
+      - Weather
+  - id: cpu-web-reference-requests
+    label: CPU public research and lookup
+    category: Supported requests
+    summary: Perform one configured public research pass or a distinct narrow public instant-answer lookup.
+    handler_id: cpu_member_reference_gateway
+    required_inputs: [A new CPU conversation, An explicit public question or topic]
+    optional_inputs: [Existing configured research provider for Research]
+    core: CPU deterministic reference route; no model or GPU inference.
+    approval: The current explicit public-topic request permits the bounded lookup or research pass.
+    output: Untrusted source evidence with provenance, excerpts and declared limits, or an unavailable-provider result.
+    boundary: No arbitrary URL fetching, private source/context forwarding, automatic synthesis, new provider configuration, memory approval or action authority.
+    examples:
+      - 'Research: Ruby syntax tree parser documentation'
+      - 'Lookup: Ruby programming language'
+  - id: cpu-file-reference-requests
+    label: CPU approved source and guide files
+    category: Supported requests
+    summary: Inspect only fixed repository source and guide roots with the existing file-inspection safeguards.
+    handler_id: cpu_member_reference_gateway
+    required_inputs: [A new CPU conversation, A declared root ID and relative path for list or read]
+    optional_inputs: []
+    core: CPU deterministic reference route; no model or GPU inference.
+    approval: One explicit bounded metadata or text read; no write authority.
+    output: Reference-only metadata or bounded text and content digest.
+    boundary: source means lib/soul_core; guides means docs/guides. No private state, root expansion, hidden paths, traversal, symlinks, hardlinks, secrets or Downloads access. Reads are limited to 32 KiB and 400 lines, with an explicit smaller presentation bound.
+    examples:
+      - Show reference roots
+      - 'List files source: .'
+      - 'Read file source: cpu_member_adapter.rb'
+      - 'Read file guides: CONVERSATIONAL_CREATIVE_WORKFLOWS.md'
+  - id: cpu-guide-search
+    label: CPU guide search
+    category: Supported requests
+    summary: Search a bounded subset of repository guides using the existing local-search ranking.
+    handler_id: cpu_member_reference_gateway
+    required_inputs: [A new CPU conversation, Search words]
+    optional_inputs: []
+    core: CPU deterministic reference route; no model or GPU inference.
+    approval: One bounded read-only search.
+    output: Up to five reference-only guide matches with source hashes and excerpts.
+    boundary: At most 200 guides of at most 32 KiB each and their first 400 lines; no private operational reports, personal memory or persistent index.
+    examples:
+      - 'Search guides: creative workflow'

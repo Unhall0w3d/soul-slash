@@ -3,6 +3,7 @@
 require "digest"
 require "fileutils"
 require "json"
+require_relative "verified_asset_cache"
 
 module SoulCore
   class MusicVulkanGenerationBackend
@@ -14,14 +15,19 @@ module SoulCore
       def success? = status == "ok"
     end
 
-    def initialize(music_root:, manifest:, runner:)
+    def initialize(music_root:, manifest:, runner:, asset_verifier: VerifiedAssetCache.new, verification_cancel: nil)
       @music_root = File.expand_path(music_root)
       @manifest = manifest
       @runner = runner
+      @asset_verifier = asset_verifier
+      @verification_cancel = verification_cancel
       raise ArgumentError, "unsupported production Vulkan music manifest" unless @manifest["schema_version"] == SUPPORTED_SCHEMA
       @runtime = @manifest.fetch("runtime")
       @models = @manifest.fetch("models")
       @profile = @manifest.fetch("profile")
+      @synth_model = @profile.fetch("synth_model")
+      @synth_checkpoint = @models.fetch("files").find { |item| item.fetch("filename") == @synth_model }
+      raise ArgumentError, "selected Vulkan synthesizer is absent from the model manifest" unless @synth_checkpoint
       @install_dir = File.join(@music_root, "acestep-cpp", @runtime.fetch("revision"))
       @models_dir = File.join(@install_dir, "models")
     end
@@ -38,8 +44,7 @@ module SoulCore
       validate_source!
       @models.fetch("files").each do |item|
         path = File.join(@models_dir, item.fetch("filename"))
-        valid = File.file?(path) && !File.symlink?(path) && File.size(path) == Integer(item.fetch("bytes")) &&
-          Digest::SHA256.file(path).hexdigest == item.fetch("sha256")
+        valid = @asset_verifier.verified?(path, bytes: Integer(item.fetch("bytes")), sha256: item.fetch("sha256"), cancel: @verification_cancel)
         raise "missing or invalid Vulkan checkpoint #{item.fetch('filename')}" unless valid
       end
       true
@@ -48,9 +53,10 @@ module SoulCore
     def model_profile
       {
         "source_revision" => @runtime.fetch("revision"),
-        "model_revision" => @models.fetch("revision"),
+        "model_revision" => @synth_checkpoint.fetch("revision", @models.fetch("revision")),
         "profile_id" => @profile.fetch("id"),
         "label" => @profile.fetch("label"),
+        "synth_model" => @synth_model,
         "accelerator" => @profile.fetch("accelerator"),
         "quantization" => "Q8_0",
         "vae_chunk" => Integer(@profile.fetch("vae_chunk")),
@@ -64,12 +70,14 @@ module SoulCore
       request = input.except("language").merge(
         "vocal_language" => input.fetch("lyrics") == "[Instrumental]" ? "unknown" : input.fetch("language"),
         "lm_model" => "acestep-5Hz-lm-4B-Q8_0.gguf",
-        "synth_model" => "acestep-v15-turbo-Q8_0.gguf",
+        "synth_model" => @synth_model,
         "output_format" => "wav16",
         "batch_size" => 1,
         "inference_steps" => Integer(@profile.fetch("inference_steps"))
       )
-      env = { "GGML_VK_VISIBLE_DEVICES" => "0", "LD_LIBRARY_PATH" => runtime_library_path }
+      # Numeric device zero is stable only within the AMD-only driver view.
+      env = { "VK_DRIVER_FILES" => "/usr/share/vulkan/icd.d/radeon_icd.json",
+        "GGML_VK_VISIBLE_DEVICES" => "0", "LD_LIBRARY_PATH" => runtime_library_path }
       attempts = []
       output = +""
       seed = Integer(input.fetch("lm_seed", input.fetch("seed", -1))) & MAX_LM_SEED

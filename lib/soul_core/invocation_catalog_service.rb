@@ -10,7 +10,7 @@ module SoulCore
     MAX_QUERY = 120
     REQUEST_PATTERNS = [
       /\A\s*(?:please\s+)?(?:show|list|open|explain|describe)\s+(?:the\s+)?(?:invocation|invocations|invocation catalog|invocation list)\b/i,
-      /\A\s*(?:please\s+)?(?:show|list|explain|describe)\s+(?:the\s+)?(?:Everyday|Knowledge|Perception|Creative|Runtime|Project|Administration)\s+invocations?\b/i,
+      /\A\s*(?:please\s+)?(?:show|list|explain|describe)\s+(?:the\s+)?(?:Everyday|Knowledge|Perception|Creative|Runtime|Project|Administration|Commands|Supported requests)\s+invocations?\b/i,
       /\A\s*(?:what|which)\s+(?:invocations?|actions)\s+(?:can|do)\s+(?:i|you)\b/i,
       /\A\s*how\s+(?:can|do)\s+i\s+(?:invoke|ask for|request)\s+.+\z/i
     ].freeze
@@ -141,7 +141,7 @@ module SoulCore
     def resolve_entry(entries, text)
       lowered = text.downcase
       entries
-        .select { |entry| lowered.match?(/\b#{Regexp.escape(entry['label'].downcase)}\b/) || lowered.match?(/\b#{Regexp.escape(entry['id'].tr('-', ' '))}\b/) }
+        .select { |entry| lowered.match?(/(?<![a-z0-9_])#{Regexp.escape(entry['label'].downcase)}(?![a-z0-9_])/) || lowered.match?(/\b#{Regexp.escape(entry['id'].tr('-', ' '))}\b/) }
         .max_by { |entry| entry["label"].length }
     end
 
@@ -184,7 +184,7 @@ module SoulCore
         "Approval: #{entry.fetch('approval')}",
         "Result: #{entry.fetch('output')}",
         "Boundary: #{entry.fetch('boundary')}",
-        "Example wording: #{entry.fetch('examples').first}",
+        "Example wording:\n#{entry.fetch('examples').map { |example| "- #{example}" }.join("\n")}",
         "",
         "The example is inert documentation here. A later request still enters the owning deterministic gates.",
         "Lifecycle: complete. Mutation: none."

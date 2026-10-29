@@ -16,6 +16,9 @@ module SoulCore
       music.generation.execute
       music.candidates.revision.execute
       chats.creative.execute
+      creative.bridge.generate
+      creative.bridge.v2.generate
+      creative.bridge.v2.prepare
       skill_studio.betas.dev_build.execute
       self_improvement.dev_synthesis.execute
       self_augmentation.dev_critique.execute
@@ -23,7 +26,9 @@ module SoulCore
     ].freeze
     MAX_RECORDS = 100
 
-    def initialize(root:, facade:, clock: -> { Time.now }, id_generator: -> { SecureRandom.hex(8) })
+    def initialize(root:, facade:, clock: -> { Time.now }, id_generator: -> { SecureRandom.hex(8) }, creative_bridge: nil, creative_bridge_v2: nil)
+      @creative_bridge_v2 = creative_bridge_v2
+      @creative_bridge = creative_bridge
       @facade = facade
       @clock = clock
       @id_generator = id_generator
@@ -48,7 +53,12 @@ module SoulCore
       scope = parameters["scope"].to_s
       proposal_id = parameters["proposal_id"].to_s
       experiment_id = parameters["experiment_id"].to_s
-      if operation == "chats.creative.execute"
+      if %w[creative.bridge.v2.generate creative.bridge.v2.prepare].include?(operation)
+        keys=operation.end_with?("prepare") ? %w[bridge_id] : %w[approval_digest bridge_id]
+        raise ArgumentError, "creative bridge parameters are invalid" unless @creative_bridge_v2 && parameters.keys.sort==keys && parameters.values.all?{|v|v.is_a?(String)&&v.match?(/\A[a-f0-9]{64}\z/)}
+      elsif operation == "creative.bridge.generate"
+        raise ArgumentError, "creative bridge parameters are invalid" unless @creative_bridge && parameters.keys.sort == %w[approval_digest bridge_id] && parameters.values.all? { |v| v.is_a?(String) && v.match?(/\A[a-f0-9]{64}\z/) }
+      elsif operation == "chats.creative.execute"
         raise ArgumentError, "creative job chat_id is invalid" unless chat_id.match?(/\Achat_[A-Za-z0-9_.-]+\z/)
         raise ArgumentError, "creative job flow_id is invalid" unless flow_id.match?(/\Acreative_[a-f0-9]{16}\z/)
       elsif operation == "skill_studio.betas.dev_build.execute"
@@ -109,6 +119,11 @@ module SoulCore
       end
     end
 
+    def record(job_id)
+      raise ArgumentError, "bounded job id is invalid" unless job_id.to_s.match?(JOB_ID)
+      @mutex.synchronize { read_record_unlocked(job_id) }
+    end
+
     def stream(job_id)
       raise ArgumentError, "bounded job id is invalid" unless job_id.to_s.match?(JOB_ID)
       queue = Queue.new
@@ -138,7 +153,17 @@ module SoulCore
       progress = lambda do |event|
         update(job_id) { |record| record.merge("latest_progress" => safe_progress(event)) }
       end
-      envelope = @facade.call(request, progress: progress)
+      envelope = if request["operation"] == "creative.bridge.v2.prepare"
+        @creative_bridge_v2.call.execute_prepare_job(id: request.dig("parameters","bridge_id"), progress: progress)
+      elsif request["operation"] == "creative.bridge.v2.generate"
+        p = request.fetch("parameters")
+        @creative_bridge_v2.call.execute_job(id: p.fetch("bridge_id"), approval_digest: p.fetch("approval_digest"), progress: progress)
+      elsif request["operation"] == "creative.bridge.generate"
+        p = request.fetch("parameters")
+        @creative_bridge.call.execute_job(id: p.fetch("bridge_id"), approval_digest: p.fetch("approval_digest"), progress: progress)
+      else
+        @facade.call(request, progress: progress)
+      end
       update(job_id) do |record|
         record.merge("status" => "terminal", "lifecycle_state" => envelope["lifecycle_state"].to_s,
           "result" => envelope, "latest_progress" => { "stage" => "complete", "message" => terminal_message(envelope) })

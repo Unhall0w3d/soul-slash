@@ -6,6 +6,7 @@ require "json"
 require "securerandom"
 require "time"
 require_relative "bounded_command_runner"
+require_relative "verified_asset_cache"
 require_relative "model_runtime_lease_store"
 
 module SoulCore
@@ -27,7 +28,7 @@ module SoulCore
     MAX_RECORD_BYTES = 128 * 1024
     TIMEOUT_SECONDS = 900
 
-    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, motion_runtime_root: nil, motion_manifest_path: nil, native_runtime_root: nil, native_manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil, generation_lease_store: nil, blender_scene_service: nil)
+    def initialize(root: Dir.pwd, visual_root: nil, runtime_root: nil, manifest_path: nil, motion_runtime_root: nil, motion_manifest_path: nil, native_runtime_root: nil, native_manifest_path: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, core_status: nil, music_visual_companion: nil, generation_lease_store: nil, blender_scene_service: nil, compute_handoff: nil, asset_verifier: VerifiedAssetCache.new, verification_cancel: nil)
       @root = File.expand_path(root)
       @visual_root = File.expand_path(visual_root || File.join(@root, "Soul", "visual", "projects"))
       @runtime_root = File.expand_path(runtime_root || File.join(Dir.home, ".local", "share", "soul", "visual"))
@@ -40,23 +41,26 @@ module SoulCore
       @clock = clock
       @id_generator = id_generator
       @core_status = core_status
+      @compute_handoff = compute_handoff
       @music_visual_companion = music_visual_companion
       @blender_scene_service = blender_scene_service
       @generation_lease_store = generation_lease_store || ModelRuntimeLeaseStore.new(root: @root)
-      @verification_mutex = Mutex.new
-      @verification_cache = {}
+      @asset_verifier = asset_verifier
+      @verification_cancel = verification_cancel
       raise ArgumentError, "visual project root must remain inside the repository" unless within?(@visual_root, @root)
     end
 
-    def resources
+    def resources(profile_id: nil)
       manifest = read_manifest
-      profile_id, profile = manifest.fetch("profiles").first
-      binary = runtime_binary
+      profile_id, profile = selected_visual_profile(manifest, profile_id: profile_id)
+      binary = profile_runtime_binary(profile)
       missing = profile.fetch("files").reject { |file| verified_file?(model_path(file), file) }
       core = visual_core_status
       ready = executable?(binary) && missing.empty? && core.fetch("allowed")
       outcome("complete", true, "visual resources inspected", data: {
         "profile_id" => profile_id, "profile" => profile.fetch("label"), "accelerator" => profile.fetch("accelerator"),
+        "profile_choices" => manifest.fetch("profiles").map { |id, item| {"id"=>id,"label"=>item.fetch("label"),"enabled"=>item["enabled"] != false,"reason"=>item["disabled_reason"],"license"=>item["license"]} },
+        "runtime_identity" => executable?(binary) ? digest({"profile"=>profile,"binary_sha256"=>Digest::SHA256.file(binary).hexdigest}) : nil,
         "vulkan_device_selector" => profile.fetch("vulkan_device_selector"), "vulkan_device_index" => profile.fetch("vulkan_device_index"),
         "runtime_ready" => executable?(binary), "models_ready" => missing.empty?, "ready" => ready,
         "missing_roles" => missing.map { |file| file.fetch("role") }, "core" => core, "motion" => motion_resources(core), "native_motion" => native_motion_resources(core),
@@ -74,7 +78,8 @@ module SoulCore
 
     def create(attributes)
       data = stringify_keys(attributes)
-      raise ArgumentError, "visual project fields are invalid" unless data.keys.sort == CREATE_FIELDS.sort
+      raise ArgumentError, "visual project fields are invalid" unless (data.keys - ["profile_id"]).sort == CREATE_FIELDS.sort
+      data["profile_id"] = selected_visual_profile(read_manifest, profile_id: data["profile_id"]).first
       validate_project_inputs!(data)
       prepare_root!
       raise "visual project limit exceeded" if safe_children(@visual_root).grep(PROJECT_ID).length >= MAX_PROJECTS
@@ -106,7 +111,8 @@ module SoulCore
     def update(project_id:, attributes:)
       current = read_project(project_id)
       data = stringify_keys(attributes)
-      raise ArgumentError, "visual project fields are invalid" unless data.keys.sort == CREATE_FIELDS.sort
+      raise ArgumentError, "visual project fields are invalid" unless (data.keys - ["profile_id"]).sort == CREATE_FIELDS.sort
+      data["profile_id"] = selected_visual_profile(read_manifest, profile_id: data.fetch("profile_id", current["profile_id"])).first
       validate_project_inputs!(data)
       revisions = File.join(project_dir(project_id), "revisions")
       FileUtils.mkdir_p(revisions, mode: 0o700)
@@ -149,10 +155,10 @@ module SoulCore
 
     def generation_preview(project_id:)
       project = read_project(project_id)
-      resource = resources.dig("data") || {}
+      resource = resources(profile_id: project["profile_id"]).dig("data") || {}
       return outcome("blocked_for_human_review", false, "Visual runtime or exact model files are not ready", data: resource) unless resource["ready"]
       candidate_id = "visual_candidate_#{@id_generator.call}"
-      scope = { "operation" => "visual_generation", "project_id" => project.fetch("project_id"), "candidate_id" => candidate_id, "project_digest" => digest(project), "profile_id" => resource.fetch("profile_id"), "width" => dimensions(project).first, "height" => dimensions(project).last }
+      scope = { "operation" => "visual_generation", "project_id" => project.fetch("project_id"), "candidate_id" => candidate_id, "project_digest" => digest(project), "profile_id" => resource.fetch("profile_id"), "runtime_identity" => resource.fetch("runtime_identity"), "width" => dimensions(project).first, "height" => dimensions(project).last }
       outcome("blocked_for_human_review", true, "exact local visual generation requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => CONFIRMATION))
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
@@ -163,11 +169,11 @@ module SoulCore
     def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil)
       project = read_project(project_id)
       raise ArgumentError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
-      resource = resources.fetch("data")
-      scope = { "operation" => "visual_generation", "project_id" => project.fetch("project_id"), "candidate_id" => candidate_id, "project_digest" => digest(project), "profile_id" => resource.fetch("profile_id"), "width" => dimensions(project).first, "height" => dimensions(project).last }
+      resource = resources(profile_id: project["profile_id"]).fetch("data")
+      scope = { "operation" => "visual_generation", "project_id" => project.fetch("project_id"), "candidate_id" => candidate_id, "project_digest" => digest(project), "profile_id" => resource.fetch("profile_id"), "runtime_identity" => resource.fetch("runtime_identity"), "width" => dimensions(project).first, "height" => dimensions(project).last }
       raise "exact visual approval did not match" unless confirmation == CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Visual runtime or exact model files are not ready" unless resource["ready"]
-      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS) do
+      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS, input_digest: digest(scope)) do
         render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: project.fetch("prompt"), seed: project.fetch("seed"), source_path: nil, kind: "text_to_image", progress: progress)
       end
     rescue ArgumentError => error
@@ -185,10 +191,10 @@ module SoulCore
       source = read_candidate(project_id, source_candidate_id)
       edit_instruction = validate_edit_instruction!(instruction)
       edit_seed = validate_seed!(seed)
-      resource = resources.fetch("data")
+      resource = resources(profile_id: project["profile_id"]).fetch("data")
       return outcome("blocked_for_human_review", false, "Visual runtime or exact model files are not ready", data: resource) unless resource["ready"]
       candidate_id = "visual_candidate_#{@id_generator.call}"
-      scope = edit_scope(project, source, candidate_id, edit_instruction, edit_seed, resource.fetch("profile_id"))
+      scope = edit_scope(project, source, candidate_id, edit_instruction, edit_seed, resource.fetch("profile_id")).merge("runtime_identity"=>resource.fetch("runtime_identity"))
       outcome("blocked_for_human_review", true, "exact image-guided edit requires approval", data: scope.merge("expected_digest" => digest(scope), "confirmation_phrase" => EDIT_CONFIRMATION))
     rescue ArgumentError => error
       outcome("awaiting_input", false, error.message)
@@ -202,11 +208,11 @@ module SoulCore
       raise ArgumentError, "candidate_id is invalid" unless candidate_id.to_s.match?(CANDIDATE_ID)
       edit_instruction = validate_edit_instruction!(instruction)
       edit_seed = validate_seed!(seed)
-      resource = resources.fetch("data")
-      scope = edit_scope(project, source, candidate_id, edit_instruction, edit_seed, resource.fetch("profile_id"))
+      resource = resources(profile_id: project["profile_id"]).fetch("data")
+      scope = edit_scope(project, source, candidate_id, edit_instruction, edit_seed, resource.fetch("profile_id")).merge("runtime_identity"=>resource.fetch("runtime_identity"))
       raise "exact visual edit approval did not match" unless confirmation == EDIT_CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Visual runtime or exact model files are not ready" unless resource["ready"]
-      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS) do
+      with_amd_generation_lease(project_id: project_id, request_id: candidate_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS, input_digest: digest(scope)) do
         render_candidate(project: project, candidate_id: candidate_id, scope: scope, resource: resource, prompt: edit_instruction, seed: edit_seed, source_path: artifact_path(project_id: project_id, candidate_id: source_candidate_id), kind: "image_edit", progress: progress)
       end
     rescue ArgumentError => error
@@ -301,7 +307,7 @@ module SoulCore
       scope = motion_scope(project, source, motion_id, motion_instruction, motion_seed, resource)
       raise "exact visual motion approval did not match" unless confirmation == MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Visual motion runtime or exact model files are not ready" unless resource["ready"]
-      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS * 4) do
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: TIMEOUT_SECONDS * 4, input_digest: digest(scope)) do
         render_motion(project: project, source: source, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
       end
     rescue ArgumentError => error
@@ -336,7 +342,7 @@ module SoulCore
       scope = native_motion_scope(project, motion_id, motion_instruction, motion_seed, resource)
       raise "exact native video approval did not match" unless confirmation == NATIVE_MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Native video runtime or exact model files are not ready" unless resource["ready"]
-      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds")) do
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds"), input_digest: digest(scope)) do
         render_native_motion(project: project, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
       end
     rescue ArgumentError => error
@@ -379,7 +385,7 @@ module SoulCore
       )
       raise "exact native-video revision approval did not match" unless confirmation == NATIVE_MOTION_CONFIRMATION && secure_compare(expected_digest, digest(scope))
       raise "Native video runtime or exact model files are not ready" unless resource["ready"]
-      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds")) do
+      with_amd_generation_lease(project_id: project_id, request_id: motion_id, model_id: resource.fetch("profile_id"), timeout_seconds: resource.fetch("timeout_seconds"), input_digest: digest(scope)) do
         render_native_motion(project: project, motion_id: motion_id, scope: scope, resource: resource, instruction: motion_instruction, seed: motion_seed, progress: progress)
       end
     rescue ArgumentError => error
@@ -467,7 +473,17 @@ module SoulCore
 
     private
 
-    def with_amd_generation_lease(project_id:, request_id:, model_id:, timeout_seconds:)
+    def with_amd_generation_lease(project_id:, request_id:, model_id:, timeout_seconds:, input_digest:, &work)
+      if @compute_handoff
+        @compute_handoff.run(provider_id: "amd-visual", request_id: request_id, project_id: project_id, input_digest: input_digest) do
+          leased_generation(project_id: project_id, request_id: request_id, model_id: model_id, timeout_seconds: timeout_seconds, &work)
+        end
+      else
+        leased_generation(project_id: project_id, request_id: request_id, model_id: model_id, timeout_seconds: timeout_seconds, &work)
+      end
+    end
+
+    def leased_generation(project_id:, request_id:, model_id:, timeout_seconds:)
       lease = @generation_lease_store.acquire_exclusive(
         provider_id: "amd-visual", model_id: model_id, request_id: request_id,
         conversation_id: project_id, resource_group: "amd-vulkan-generation",
@@ -487,17 +503,53 @@ module SoulCore
     def native_model_path(file) = File.join(@native_runtime_root, "models", file.fetch("filename"))
     def executable?(path) = File.file?(path) && !File.symlink?(path) && File.executable?(path)
     def read_manifest = JSON.parse(File.binread(@manifest_path, MAX_RECORD_BYTES))
+    # Explicit defaults must fail closed rather than silently choose a different
+    # model. Single-profile historical manifests retain their original behavior.
+    def selected_visual_profile(manifest = read_manifest, profile_id: nil)
+      profiles = manifest.fetch("profiles")
+      id = profile_id || manifest.fetch("default_profile", profiles.keys.first)
+      profile = profiles.fetch(id)
+      raise KeyError, "visual profile disabled" if profile["enabled"] == false
+      validate_runtime_binding!(profile)
+      raise KeyError, "mmap must be boolean" if profile.key?("mmap") && ![true, false].include?(profile["mmap"])
+      [id, profile]
+    end
+
+    # Fixed runtime slots, never a manifest-supplied arbitrary executable or env.
+    # Pacing is part of the pinned binary and cannot be disabled by a caller.
+    def validate_runtime_binding!(profile)
+      binding = profile["renderer"]
+      raise KeyError, "paced renderer binding required" if profile["requires_paced_runtime"] == true && (!binding || binding["kind"] != "paced-v1")
+      return unless binding
+      raise KeyError, "invalid renderer binding" unless binding.keys.sort == %w[kind sha256] && %w[standard paced-v1].include?(binding["kind"]) && binding["sha256"].is_a?(String) && binding["sha256"].match?(/\A[0-9a-f]{64}\z/)
+    end
+
+    def profile_runtime_binary(profile)
+      validate_runtime_binding!(profile)
+      binding = profile["renderer"]
+      return runtime_binary unless binding
+      path = binding.fetch("kind") == "paced-v1" ? File.join(@runtime_root, "paced", binding.fetch("sha256"), "sd-cli") : runtime_binary
+      raise KeyError, "renderer identity mismatch" unless executable?(path) && Digest::SHA256.file(path).hexdigest == binding.fetch("sha256")
+      path
+    end
     def dimensions(project) = ASPECTS.fetch(project.fetch("aspect_ratio"))
 
-    def visual_vulkan_environment
-      profile = read_manifest.fetch("profiles").values.first
+    def visual_vulkan_environment(profile_id: nil)
+      _, profile = selected_visual_profile(read_manifest, profile_id: profile_id)
       selector = profile.fetch("vulkan_device_selector")
       index = Integer(profile.fetch("vulkan_device_index"))
       raise "visual Vulkan device selector is invalid" unless selector.match?(/\A[0-9a-f]{4}:[0-9a-f]{4}!\z/i) && index >= 0
-      { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
+      environment = { "VK_LOADER_DEBUG" => "none", "MESA_VK_DEVICE_SELECT" => selector, "GGML_VK_VISIBLE_DEVICES" => index.to_s }
+      environment["SOUL_RENDER_PACING"] = "1" if profile.dig("renderer", "kind") == "paced-v1"
+      environment
     end
 
     def visual_core_status
+      if @compute_handoff
+        status = @compute_handoff.status
+        allowed = status["ok"] && status.dig("data", "policy") == "available" && status.dig("data", "handoff").nil?
+        return {"allowed"=>!!allowed, "core_id"=>"shared-compute", "reason"=>allowed ? "Exact approval includes a verified sequential compute handoff" : "Compute reserved, busy, or awaiting handoff recovery"}
+      end
       return { "allowed" => true, "core_id" => "unmanaged", "reason" => "standalone bounded invocation" } unless @core_status
       envelope = @core_status.call
       data = envelope.fetch("data", {})
@@ -509,11 +561,12 @@ module SoulCore
     end
 
     def command(project, output, prompt:, seed:, source_path: nil)
-      profile = read_manifest.fetch("profiles").values.first
+      _, profile = selected_visual_profile(read_manifest, profile_id: project["profile_id"])
       files = profile.fetch("files").to_h { |file| [file.fetch("role"), model_path(file)] }
       width, height = dimensions(project)
-      command = [runtime_binary, "--diffusion-model", files.fetch("diffusion_model"), "--vae", files.fetch("vae"), "--llm", files.fetch("text_encoder"), "-p", prompt, "-n", project.fetch("negative_prompt"), "--cfg-scale", profile.fetch("cfg_scale").to_s, "--steps", profile.fetch("steps").to_s, "--seed", seed.to_s, "-W", width.to_s, "-H", height.to_s, "--offload-to-cpu", "--diffusion-fa"]
+      command = [profile_runtime_binary(profile), "--diffusion-model", files.fetch("diffusion_model"), "--vae", files.fetch("vae"), "--llm", files.fetch("text_encoder"), "-p", prompt, "-n", project.fetch("negative_prompt"), "--cfg-scale", profile.fetch("cfg_scale").to_s, "--steps", profile.fetch("steps").to_s, "--seed", seed.to_s, "-W", width.to_s, "-H", height.to_s, "--offload-to-cpu", "--diffusion-fa"]
       command.concat(["-r", source_path]) if source_path
+      command << "--mmap" if profile["mmap"] == true
       command.concat(["-o", output])
     end
 
@@ -525,6 +578,7 @@ module SoulCore
       output = File.join(staging, "image.png")
       input = project.slice(*CREATE_FIELDS).merge(
         "profile_id" => resource.fetch("profile_id"), "generation_kind" => kind,
+        "runtime_identity" => resource.fetch("runtime_identity"),
         "effective_prompt" => prompt, "effective_seed" => seed
       )
       if source_path
@@ -534,7 +588,8 @@ module SoulCore
       write_json(File.join(staging, "input.json"), input)
       progress&.call("stage" => "rendering", "message" => kind == "image_edit" ? "FLUX.2 Klein is shaping an image-guided revision." : "FLUX.2 Klein is shaping one local still.")
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      result = @runner.run(command(project, output, prompt: prompt, seed: seed, source_path: source_path), timeout_seconds: TIMEOUT_SECONDS, env: visual_vulkan_environment, max_output_bytes: 512 * 1024)
+      raise "visual runtime changed after approval" unless resources(profile_id: project["profile_id"]).dig("data", "runtime_identity") == scope.fetch("runtime_identity")
+      result = @runner.run(command(project, output, prompt: prompt, seed: seed, source_path: source_path), timeout_seconds: TIMEOUT_SECONDS, env: visual_vulkan_environment(profile_id: project["profile_id"]), max_output_bytes: 512 * 1024)
       elapsed = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - started).round(3)
       File.write(File.join(staging, "generation.log"), (result.stdout.to_s + result.stderr.to_s).byteslice(0, 512 * 1024), mode: "wb", perm: 0o600)
       raise "visual renderer failed safely" unless result.success? && valid_png?(output)
@@ -796,7 +851,12 @@ module SoulCore
       raise ArgumentError, "project_id is invalid" unless id.to_s.match?(PROJECT_ID)
       path = File.join(project_dir(id), "project.json")
       raise ArgumentError, "visual project does not exist" unless File.file?(path) && !File.symlink?(path) && File.size(path) <= MAX_RECORD_BYTES
-      JSON.parse(File.binread(path, MAX_RECORD_BYTES))
+      record = JSON.parse(File.binread(path, MAX_RECORD_BYTES))
+      unless record.key?("profile_id")
+        manifest = read_manifest
+        record["profile_id"] = manifest.fetch("legacy_profile", manifest.fetch("profiles").keys.first)
+      end
+      record
     end
 
     def read_candidate(project_id, candidate_id)
@@ -911,36 +971,9 @@ module SoulCore
     end
 
     def verified_file?(path, record)
-      expected_size = record.fetch("bytes")
-      expected_sha256 = record.fetch("sha256")
-      identity = verification_identity(path, expected_size, expected_sha256)
-      return false unless identity
-
-      @verification_mutex.synchronize do
-        identity = verification_identity(path, expected_size, expected_sha256)
-        return false unless identity
-        cached = @verification_cache[path]
-        return cached.fetch("verified") if cached && cached.fetch("identity") == identity
-
-        verified = file_sha256(path) == expected_sha256
-        final_identity = verification_identity(path, expected_size, expected_sha256)
-        return false unless final_identity == identity
-        @verification_cache[path] = { "identity" => identity, "verified" => verified }
-        verified
-      end
-    rescue SystemCallError
-      false
+      @asset_verifier.verified?(path, bytes: record.fetch("bytes"), sha256: record.fetch("sha256"), cancel: @verification_cancel)
     end
 
-    def verification_identity(path, expected_size, expected_sha256)
-      stat = File.lstat(path)
-      return nil unless stat.file? && !stat.symlink? && stat.size == expected_size
-      [expected_sha256, stat.dev, stat.ino, stat.size, stat.mtime.to_r.to_s, stat.ctime.to_r.to_s]
-    rescue SystemCallError
-      nil
-    end
-
-    def file_sha256(path) = Digest::SHA256.file(path).hexdigest
     def valid_png?(path) = File.file?(path) && !File.symlink?(path) && File.size(path) > 1024 && File.binread(path, 8) == "\x89PNG\r\n\x1a\n".b
     def valid_video?(path) = File.file?(path) && !File.symlink?(path) && File.size(path) > 1024
     def digest(value) = Digest::SHA256.hexdigest(JSON.generate(value))

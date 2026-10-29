@@ -21,7 +21,7 @@ module SoulCore
     REQUEST_SLOT_WAIT_SECONDS = 2.0
 
     STATUS_TEXT = {
-      200 => "OK", 206 => "Partial Content", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
+      200 => "OK", 206 => "Partial Content", 303 => "See Other", 400 => "Bad Request", 401 => "Unauthorized", 403 => "Forbidden", 404 => "Not Found",
       405 => "Method Not Allowed", 408 => "Request Timeout", 413 => "Payload Too Large",
       415 => "Unsupported Media Type", 416 => "Range Not Satisfiable", 422 => "Unprocessable Content", 429 => "Too Many Requests",
       500 => "Internal Server Error"
@@ -59,12 +59,14 @@ module SoulCore
             next
           end
           gate = Queue.new
-          thread = Thread.new do
-            gate.pop
+          # Bind per-request values before accept advances: workers may begin
+          # after the loop has already assigned another socket and start gate.
+          thread = Thread.new(client, gate) do |request_client, start_gate|
+            start_gate.pop
             begin
-              handle(client)
+              handle(request_client)
             ensure
-              release_request(client)
+              release_request(request_client)
             end
           end
           register_thread(thread, client)

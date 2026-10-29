@@ -6,6 +6,85 @@
     "build": "vulkan"
   },
   "profiles": {
+    "flux2-klein-9b-q4-isolated": {
+      "label": "FLUX.2 Klein 9B Q4 distilled · non-commercial",
+      "renderer": {"kind": "standard", "sha256": "6aeb8f028f70db3d22dbe1844a87634d4341c427d5258dfd5aa498b18e8bb496"},
+      "accelerator": "AMD Vulkan",
+      "vulkan_device_selector": "1002:73bf!",
+      "vulkan_device_index": 0,
+      "license": "FLUX Non-Commercial License v2.1",
+      "steps": 4,
+      "cfg_scale": 1,
+      "offload_to_cpu": true,
+      "files": [
+        {
+          "role": "diffusion_model",
+          "repository": "leejet/FLUX.2-klein-9B-GGUF",
+          "revision": "cc588497a95ffc2937ebbd6b9b3916a11ada6e5b",
+          "filename": "flux-2-klein-9b-Q4_0.gguf",
+          "bytes": 5616208032,
+          "sha256": "a7e77afa96871d16679ff7b949bd25f20c8179f219c4b662cac91e81ed99b944"
+        },
+        {
+          "role": "text_encoder",
+          "repository": "unsloth/Qwen3-8B-GGUF",
+          "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+          "filename": "Qwen3-8B-Q4_K_M.gguf",
+          "bytes": 5027784512,
+          "sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4"
+        },
+        {
+          "role": "vae",
+          "repository": "black-forest-labs/FLUX.2-small-decoder",
+          "revision": "a3efc24f613ef42d9428af62fdbd6f5fd8856c4a",
+          "filename": "full_encoder_small_decoder.safetensors",
+          "bytes": 249519092,
+          "sha256": "ea4273f02d1fafbf8e1d1c2cf6018ed8748652eb0bf34f2dd91171f16f15ab62"
+        }
+      ],
+      "mmap": true
+    },
+    "flux2-klein-base-9b-q4-isolated": {
+      "label": "FLUX.2 Klein Base 9B Q4 paced · non-commercial",
+      "renderer": {"kind": "paced-v1", "sha256": "c02e89357f6f418bf9dbe9d7ceaa2263f4bc0ae41be2d5a9b9a1e58100169f73"},
+      "accelerator": "AMD Vulkan",
+      "vulkan_device_selector": "1002:73bf!",
+      "vulkan_device_index": 0,
+      "license": "FLUX Non-Commercial License v2.1",
+      "steps": 20,
+      "cfg_scale": 4,
+      "offload_to_cpu": true,
+      "files": [
+        {
+          "repository": "leejet/FLUX.2-klein-base-9B-GGUF",
+          "revision": "4dde6cb0cffef6dc12adbd152d2b9ab6f01e6085",
+          "filename": "flux-2-klein-base-9b-Q4_0.gguf",
+          "bytes": 5616208032,
+          "sha256": "53aa0e4b079af15499243b12bf5505dca37cf08000cc84b2502e130a7e0a4807",
+          "role": "diffusion_model"
+        },
+        {
+          "role": "text_encoder",
+          "repository": "unsloth/Qwen3-8B-GGUF",
+          "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+          "filename": "Qwen3-8B-Q4_K_M.gguf",
+          "bytes": 5027784512,
+          "sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4"
+        },
+        {
+          "role": "vae",
+          "repository": "black-forest-labs/FLUX.2-small-decoder",
+          "revision": "a3efc24f613ef42d9428af62fdbd6f5fd8856c4a",
+          "filename": "full_encoder_small_decoder.safetensors",
+          "bytes": 249519092,
+          "sha256": "ea4273f02d1fafbf8e1d1c2cf6018ed8748652eb0bf34f2dd91171f16f15ab62"
+        }
+      ],
+      "mmap": true,
+      "enabled": false,
+      "disabled_reason": "Paced runtime integrated; post-repaste live acceptance pending",
+      "requires_paced_runtime": true
+    },
     "flux2-klein-4b-q4": {
       "label": "FLUX.2 Klein 4B Q4",
       "accelerator": "AMD Vulkan",
@@ -13,7 +92,7 @@
       "vulkan_device_index": 0,
       "license": "Apache-2.0",
       "steps": 4,
-      "cfg_scale": 1.0,
+      "cfg_scale": 1,
       "offload_to_cpu": true,
       "files": [
         {
@@ -47,8 +126,12 @@
     "wan2.2-ti2v-5b-q4": {
       "status": "qualification_required",
       "reason": "The separate pinned stable-diffusion.cpp Vulkan lane must pass the RX 6900 XT image-to-video pilot before dashboard enablement.",
-      "allowed_effects": ["image_to_video"],
+      "allowed_effects": [
+        "image_to_video"
+      ],
       "qualification_manifest": "config/visual_motion_models.json"
     }
-  }
+  },
+  "default_profile": "flux2-klein-9b-q4-isolated",
+  "legacy_profile": "flux2-klein-4b-q4"
 }

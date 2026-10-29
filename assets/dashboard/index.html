@@ -42,12 +42,12 @@
     </div>
   </section>
   <header class="app-header">
-    <a class="brand" href="#chat-panel" aria-label="Soul dashboard home">
+    <a class="brand" href="#dashboard-panel" aria-label="Soul dashboard home">
       <img src="/brand/micro-mark.svg" width="44" height="44" alt="">
       <span class="brand-copy"><strong>Soul<span>/</span></strong><small>local machine familiar</small></span>
     </a>
     <nav class="primary-tabs" aria-label="Primary" role="tablist">
-      <button id="chat-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="chat-panel">Chat</button>
+      <button id="dashboard-tab" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="dashboard-panel">Dashboard</button>
       <div id="self-improvement-navigation" class="tab-menu">
         <button id="self-improvement-tab" class="tab" type="button" role="tab" aria-selected="false" aria-haspopup="menu" aria-expanded="false" aria-controls="self-improvement-menu">Self Improvement <span class="tab-menu-caret" aria-hidden="true">◇</span></button>
         <div id="self-improvement-menu" class="self-improvement-menu" role="menu" aria-label="Self Improvement surfaces" hidden>
@@ -78,11 +78,10 @@
     </nav>
     <div class="header-state" aria-label="Runtime state">
       <span class="status-chip status-chip--verified"><i></i><span id="connection-label">Local</span></span>
-      <button id="voice-presence-launch" class="status-chip voice-presence-launch" type="button" title="Open the visible local Hey Soul window"><i></i><span>Voice Presence</span></button>
       <button id="notification-mode" class="status-chip notification-mode" type="button" title="Change local notification delivery"><i></i><span>Alerts Voice</span></button>
       <div id="core-navigation" class="core-navigation">
-        <button id="core-selector" class="status-chip core-selector" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="core-menu"><i></i><span id="core-label">Core —</span><span class="core-caret" aria-hidden="true">◇</span></button>
-        <div id="core-menu" class="core-menu" role="menu" aria-label="Configured Cores" hidden><p>Inspecting configured Cores…</p></div>
+        <button id="core-selector" class="status-chip core-selector" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="core-menu"><i></i><span id="core-label">Compute —</span><span class="core-caret" aria-hidden="true">◇</span></button>
+        <div id="core-menu" class="core-menu" role="menu" aria-label="Compute availability" hidden><p>Checking compute availability…</p></div>
       </div>
       <span class="status-chip"><span id="provider-label">Provider —</span></span>
       <span class="status-chip"><span id="config-label">Config —</span></span>
@@ -90,112 +89,55 @@
       <button id="logout-button" class="logout-button" type="button" hidden>Logout</button>
     </div>
   </header>
-  <section id="core-unavailable-banner" class="core-unavailable-banner" role="dialog" aria-modal="true" aria-labelledby="core-unavailable-title" hidden>
+  <section id="core-unavailable-banner" class="core-unavailable-banner" role="status" aria-labelledby="core-unavailable-title" hidden>
     <div class="core-unavailable-copy">
-      <p class="eyebrow">All model lanes released</p>
-      <h2 id="core-unavailable-title">Free Core is active.</h2>
-      <p id="core-unavailable-message">Load a configured Core to resume chat and creative workflows.</p>
-      <p class="core-unavailable-subtitle">Available Cores</p>
+      <p class="eyebrow">Shared compute</p>
+      <h2 id="core-unavailable-title">Compute status unavailable</h2>
+      <p id="core-unavailable-message">Refresh compute status before changing availability.</p>
+      <p class="core-unavailable-subtitle">Policy controls</p>
       <div id="core-unavailable-core-list" class="core-unavailable-core-list"></div>
     </div>
   </section>
 
   <main>
-    <section id="chat-panel" class="tab-panel" role="tabpanel" aria-labelledby="chat-tab">
-      <div class="chat-layout">
-        <aside class="conversation-rail" aria-labelledby="conversations-heading">
-          <div class="rail-heading">
-            <div><p class="eyebrow">Continuity archive</p><h1 id="conversations-heading">Transmissions</h1></div>
-            <div class="rail-actions">
-              <button id="clear-chats" class="text-icon-button" type="button">Clear</button>
-              <button id="new-chat" class="icon-button" type="button" aria-label="Start new transmission">+</button>
+    <section id="dashboard-panel" class="tab-panel operations-dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+      <header class="studio-header"><div><p class="eyebrow">Atelier / Soul</p><h1>Dashboard</h1><p>Compute, system health, capabilities, and shared work.</p></div><a class="gate-button" href="http://127.0.0.1:3080" target="_blank" rel="noopener">Open LibreChat on this machine ↗</a></header>
+      <p id="operation-state" class="muted" role="status">Ready</p>
+      <div class="operations-grid">
+<section class="context-card runtime-card" aria-labelledby="runtime-heading">
+            <div class="card-heading"><div><p class="eyebrow">Shared resource</p><h2 id="runtime-heading">Compute availability</h2></div><button id="refresh-model-runtime" class="refresh-button" type="button">Refresh</button></div>
+            <div class="runtime-state-line"><span class="runtime-state-dot" aria-hidden="true"></span><strong id="runtime-state-label">Checking…</strong></div>
+            <dl id="runtime-details" class="details-list">
+              <div><dt>Policy</dt><dd>Not collected</dd></div>
+              <div><dt>Model</dt><dd>Unknown</dd></div>
+              <div><dt>Coordinator</dt><dd>Unknown</dd></div>
+            </dl>
+            <div id="runtime-profile-list" class="runtime-profile-list" aria-label="Compute policy"></div>
+            <div class="runtime-actions">
+              <button id="load-model-runtime" class="runtime-button" type="button" disabled>Make available</button>
+              <button id="unload-model-runtime" class="runtime-button runtime-button--attention" type="button" disabled>Reserve compute</button>
             </div>
-          </div>
-          <div id="chat-list" class="chat-list" aria-live="polite"></div>
-          <section id="soul-presence" class="soul-presence" data-state="idle" aria-labelledby="soul-presence-title">
-            <div class="soul-familiar" aria-hidden="true"><span class="familiar-halo familiar-halo--outer"></span><span class="familiar-halo familiar-halo--inner"></span><span class="familiar-frame"><img class="familiar-portrait familiar-portrait--unmasked" src="/brand/character/soul-portrait-unmasked.png" alt=""><img class="familiar-portrait familiar-portrait--masked" src="/brand/character/soul-portrait-masked.png" alt=""><i class="familiar-signal"></i></span></div>
-            <div class="soul-presence-copy"><p class="eyebrow">Core presence</p><strong id="soul-presence-title">Soul is listening.</strong><small id="soul-activity-summary" aria-live="polite">The local thread is quiet.</small></div>
+            <p id="runtime-card-status" class="runtime-card-status" role="status" aria-live="polite">Checking shared compute status…</p>
           </section>
-          <div class="rail-footer"><span class="local-seal" aria-hidden="true">◉</span><span>Local continuity<br><small>Stored on this machine</small></span></div>
-        </aside>
-
-        <section class="conversation" aria-labelledby="active-chat-title">
-          <header class="conversation-header">
-            <div><p class="eyebrow" id="active-chat-kicker">No active transmission</p><h2 id="active-chat-title">Open a conversation</h2></div>
-            <button id="pin-chat" class="quiet-button" type="button" disabled>Pin</button>
-          </header>
-          <div class="state-ribbon" aria-label="Conversation state">
-            <span><i class="state-dot"></i><strong id="lifecycle-state">ready</strong></span>
-            <span>privacy <strong>local</strong></span>
-            <span>interface <strong>dashboard</strong></span>
-            <span id="mutation-state">mutation none</span>
-          </div>
-          <div id="messages" class="messages" aria-live="polite">
-            <div class="empty-state">
-              <img src="/brand/micro-mark.svg" alt="">
-              <div><p class="eyebrow">Soul chamber open</p><h2>Resume a transmission or begin anew.</h2><p>The local core is listening. Conversation, memory, capability, and authority remain bound to this machine.</p></div>
-            </div>
-          </div>
-          <form id="composer" class="composer">
-            <label for="message-input">Message Soul</label>
-            <div id="picture-attachment" class="picture-attachment" hidden>
-              <img id="picture-attachment-preview" alt="Selected local picture preview">
-              <div><strong id="picture-attachment-name">Selected picture</strong><span id="picture-attachment-meta"></span><label><input id="picture-attachment-retain" type="checkbox"> Keep this picture with the conversation</label></div>
-              <button id="picture-attachment-remove" type="button" aria-label="Remove selected picture">Remove</button>
-            </div>
-            <div class="composer-row">
-              <textarea id="message-input" name="message" rows="2" maxlength="65536" placeholder="Choose or create a conversation to begin…" disabled required></textarea>
-              <input id="picture-input" type="file" accept="image/png,image/jpeg" hidden>
-              <button id="attach-picture" class="voice-button" type="button" aria-label="Attach a local picture" disabled><span aria-hidden="true">◇</span><span>Picture</span></button>
-              <button id="capture-screen" class="voice-button" type="button" aria-label="Capture one screen preview" disabled><span aria-hidden="true">▣</span><span>Screen</span></button>
-              <button id="open-camera" class="voice-button" type="button" aria-label="Open a visible camera session" hidden disabled><span aria-hidden="true">◌</span><span>Camera</span></button>
-              <button id="record-voice" class="voice-button" type="button" aria-label="Start push-to-talk recording" aria-pressed="false" disabled><span aria-hidden="true">◉</span><span>Speak</span></button>
-              <button id="send-message" class="send-button" type="submit" disabled><span>Send</span><span aria-hidden="true">↗</span></button>
-            </div>
-            <div class="composer-meta"><span id="composer-hint">No conversation selected</span><label class="voice-profile-control" for="voice-output-profile">Voice <select id="voice-output-profile"><option value="F3">Feminine · F3</option><option value="M3">Masculine · M3</option></select></label><label class="voice-profile-control" for="voice-output-quality">Delivery <select id="voice-output-quality"><option value="responsive">Responsive</option><option value="expressive">Expressive</option></select></label><span>Enter to send · Shift+Enter for newline</span></div>
-          </form>
-        </section>
-
-        <aside class="context-rail" aria-label="Workspace and system context">
-          <section class="context-card system-card" aria-labelledby="system-heading">
+<section class="context-card system-card" aria-labelledby="system-heading">
             <div class="card-heading"><div><p class="eyebrow">Host telemetry</p><h2 id="system-heading">System status</h2></div><button id="refresh-status" class="refresh-button" type="button">Refresh</button></div>
-            <div class="system-orbit" aria-hidden="true"><span></span></div>
+            <p id="cpu-member-status" role="status">CPU member status not checked.</p><button id="cpu-member-refresh" class="refresh-button" type="button">Refresh CPU status</button><div class="system-orbit" aria-hidden="true"><span></span></div>
             <dl id="system-details" class="details-list">
               <div><dt>Collection</dt><dd>Not requested</dd></div>
               <div><dt>Scope</dt><dd>Manual only</dd></div>
               <div><dt>State</dt><dd>Unknown</dd></div>
             </dl>
           </section>
-          <section class="context-card runtime-card" aria-labelledby="runtime-heading">
-            <div class="card-heading"><div><p class="eyebrow">Inference resource</p><h2 id="runtime-heading">Model runtime</h2></div><button id="refresh-model-runtime" class="refresh-button" type="button">Refresh</button></div>
-            <div class="runtime-state-line"><span class="runtime-state-dot" aria-hidden="true"></span><strong id="runtime-state-label">Checking…</strong></div>
-            <dl id="runtime-details" class="details-list">
-              <div><dt>Profile</dt><dd>Not collected</dd></div>
-              <div><dt>Model</dt><dd>Unknown</dd></div>
-              <div><dt>Active work</dt><dd>Unknown</dd></div>
-            </dl>
-            <div id="runtime-profile-list" class="runtime-profile-list" aria-label="Configured model runtime profiles"></div>
-            <div class="runtime-actions">
-              <button id="load-model-runtime" class="runtime-button" type="button" disabled>Load model</button>
-              <button id="unload-model-runtime" class="runtime-button runtime-button--attention" type="button" disabled>Unload model</button>
-            </div>
-            <p id="runtime-card-status" class="runtime-card-status" role="status" aria-live="polite">Manual controls require an idle, verified runtime.</p>
-          </section>
-          <section class="context-card invocation-card" aria-labelledby="invocation-heading">
+<section class="context-card invocation-card" aria-labelledby="invocation-heading">
             <div class="card-heading"><div><p class="eyebrow">Operational vocabulary</p><h2 id="invocation-heading">Invocations</h2></div><span id="invocation-count" class="count-badge">—</span></div>
             <p class="card-note">What Soul can do, what it needs, and where your authority remains.</p>
             <button id="open-invocation-catalog" class="gate-button" type="button" aria-haspopup="dialog" aria-controls="invocation-catalog">Open invocation guide</button>
           </section>
-          <section class="context-card" aria-labelledby="workspace-heading">
-            <div class="card-heading"><div><p class="eyebrow">Collaboration slate</p><h2 id="workspace-heading">Workspace</h2></div><span id="workspace-count" class="count-badge">0</span></div>
-            <p class="card-note">Metadata attached to this conversation.</p>
-            <div id="workspace-list" class="artifact-list"><p class="muted">Select a conversation to inspect its workspace.</p></div>
-          </section>
-          <section class="context-card inbox-card" aria-labelledby="inbox-heading">
-            <div class="card-heading"><div><p class="eyebrow">Incoming signals</p><h2 id="inbox-heading">Inbox</h2></div><span id="inbox-count" class="count-badge">0</span></div>
-            <p id="inbox-summary" class="muted">No active conversation.</p>
-          </section>
-        </aside>
+        <section class="context-card workspace-card" aria-labelledby="workspace-heading">
+          <div class="card-heading"><div><p class="eyebrow">Shared work</p><h2 id="workspace-heading">Workspace</h2></div><button id="refresh-workspace" type="button" class="refresh-button">Refresh</button></div>
+          <p class="card-note">Registered workspace files, grouped by directory. This read-only view shows up to 50 recent artifact records across conversations; it does not scan disk contents or grant models additional file access.</p>
+          <p id="workspace-summary" role="status">Not requested</p><div id="workspace-tree" class="workspace-tree"></div>
+        </section>
       </div>
     </section>
 
@@ -402,6 +344,8 @@
         <aside class="visual-projects"><div class="studio-list-heading"><div><p class="eyebrow">Image archive</p><h2>Projects</h2></div><span id="visual-project-count" class="count-badge">0</span></div><div class="project-folder-tabs" role="group" aria-label="Visual project folder"><button id="visual-folder-active" class="is-active" type="button">Active</button><button id="visual-folder-released" type="button">Released</button></div><button id="new-visual-project" class="gate-button" type="button">New visual</button><div id="visual-project-list" class="studio-list"><p class="muted">Open the workshop to inspect projects.</p></div></aside>
         <section class="visual-workbench">
           <form id="visual-project-form" class="music-form visual-form">
+            <label>Image model<select id="visual-profile" required disabled aria-describedby="visual-profile-help"><option value="">Inspect resources first</option></select></label>
+            <p id="visual-profile-help" class="muted">Model choices reflect the installed configuration. Save a model change, then request a fresh preview. GPU testing remains on hold until after repaste.</p>
             <div class="studio-detail-heading"><div><p class="eyebrow">Visual brief</p><h2 id="visual-workbench-title">New visual</h2></div><span id="visual-resource-state" class="maturity-chip">Not inspected</span></div>
             <div class="visual-form-grid"><label>Title<input id="visual-title" maxlength="120" required></label><label>Intent<input id="visual-intent" maxlength="2000" required></label><label>Frame<select id="visual-aspect"><option value="landscape">Landscape · 16:9</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 9:16</option></select></label><label>Seed<input id="visual-seed" type="number" min="0" max="2147483647" value="42" required></label></div>
             <label>Scene and aesthetic<textarea id="visual-prompt" rows="8" maxlength="8000" required placeholder="A locked-camera nocturnal observatory above dark water, weathered brass instruments, cyan instrument light, painterly cinematic realism, deep indigo shadows, precise atmospheric detail."></textarea></label>
@@ -756,7 +700,7 @@
 
     <section id="memory-observatory-panel" class="tab-panel memory-observatory-panel" role="tabpanel" aria-labelledby="administration-tab memory-observatory-tab" hidden>
       <header class="improvement-header memory-observatory-header">
-        <div><p class="eyebrow">Owner-private retrieval evidence</p><h1>Memory Observatory</h1><p>Inspect the approved-memory ledger and its disposable retrieval index. This surface observes only; existing reviewed Chat controls remain the sole memory mutation path.</p></div>
+        <div><p class="eyebrow">Owner-private retrieval evidence</p><h1>Memory Observatory</h1><p>Inspect the approved-memory ledger and its disposable retrieval index. This surface observes only; this page does not change or migrate memory records.</p></div>
         <div class="improvement-boundary"><strong>Read-only observatory</strong><span>Authenticated summary → explicit diagnostic query</span><small>Mutation authority: none · no polling · no automatic indexing</small></div>
       </header>
       <section class="memory-observatory-toolbar" aria-labelledby="memory-observatory-status-heading">
@@ -824,7 +768,7 @@
         <p id="memory-observatory-query-status" class="dialog-status" role="status" aria-live="polite">No diagnostic query submitted.</p>
         <div id="memory-observatory-results" class="memory-observatory-results"><p class="muted">Results appear after an explicit query.</p></div>
       </section>
-      <aside class="unavailable-boundary memory-observatory-guidance"><div><p class="eyebrow">Reviewed Chat path</p><h2>Review memory in Chat</h2></div><p>Use the existing Chat memory review commands to inspect, propose, approve, supersede, or forget records. Observatory search and refresh never replace those confirmation gates.</p><div id="memory-observatory-review-guidance" class="memory-observatory-guidance-list"><p class="muted">Existing Chat review guidance will appear with the authenticated summary.</p></div></aside>
+      <aside class="unavailable-boundary memory-observatory-guidance"><div><p class="eyebrow">Memory boundary</p><h2>Retained memory evidence</h2></div><p>Existing records remain intact. Observatory search and refresh are read-only. Removing dashboard chat does not promote, share, migrate, or delete memories.</p><div id="memory-observatory-review-guidance" class="memory-observatory-guidance-list"><p class="muted">Memory mutation remains subject to its existing review gates.</p></div></aside>
     </section>
 
     <section id="maintenance-panel" class="tab-panel improvement-panel" role="tabpanel" aria-labelledby="administration-tab maintenance-tab" hidden>
@@ -1102,7 +1046,7 @@
   <dialog id="invocation-catalog" class="review-center invocation-catalog" aria-labelledby="invocation-catalog-title">
     <div class="review-shell">
       <header class="review-header">
-        <div class="review-title-lockup"><span class="review-sigil" aria-hidden="true">⌁</span><div><p class="eyebrow">Operational vocabulary</p><h2 id="invocation-catalog-title">Invocation Guide</h2><p>Inspect what Soul may invoke, the information each path needs, and its exact authority boundary.</p></div></div>
+        <div class="review-title-lockup"><span class="review-sigil" aria-hidden="true">⌁</span><div><p class="eyebrow">Operational vocabulary</p><h2 id="invocation-catalog-title">Invocation Guide</h2><p>Inspect Soul’s underlying capabilities and their authority boundaries. Some examples use legacy conversation commands; LibreChat exposes only the tools enabled for each member. Shared compute is managed on the Dashboard.</p></div></div>
         <div class="review-header-actions"><button id="refresh-invocation-catalog" class="refresh-button" type="button">Refresh</button><button id="close-invocation-catalog" class="icon-button" type="button" aria-label="Close Invocation Guide">×</button></div>
       </header>
       <div class="invocation-toolbar">
@@ -1153,98 +1097,22 @@
       <footer class="review-footer"><p id="review-center-status" role="status" aria-live="polite">Review Center loads only when opened and never polls in the background.</p><span>Read-only · local · bounded</span></footer>
     </div>
   </dialog>
-  <dialog id="clear-dialog" class="clear-dialog" aria-labelledby="clear-dialog-title">
-    <form id="clear-form" method="dialog">
-      <div class="dialog-heading"><div><p class="eyebrow">Conversation lifecycle</p><h2 id="clear-dialog-title">Manage conversations</h2></div><button id="close-clear-dialog" class="icon-button" type="button" aria-label="Close conversation management dialog">×</button></div>
-      <p class="dialog-note">Choose one scope below, then either archive it from the active list or permanently delete it. Each action has its own preview and confirmation.</p>
-      <label for="clear-mode">Conversation scope</label>
-      <select id="clear-mode" name="mode">
-        <option value="title">Exact title</option>
-        <option value="selected">Selected conversations</option>
-        <option value="all">All conversations</option>
-      </select>
-      <div id="clear-title-field">
-        <label for="clear-title">Exact conversation title</label>
-        <input id="clear-title" name="title" type="text" maxlength="120" autocomplete="off">
-      </div>
-      <div id="clear-selection-field" class="clear-selection-field" hidden>
-        <div class="clear-selection-heading">
-          <label id="clear-selection-label">Choose active conversations</label>
-          <span id="clear-selection-count">0 selected</span>
-        </div>
-        <div class="clear-selection-actions" aria-label="Conversation selection actions">
-          <button id="select-all-clear" type="button">Select all shown</button>
-          <button id="select-none-clear" type="button">Select none</button>
-        </div>
-        <div id="clear-selection-list" class="clear-selection-list" role="group" aria-labelledby="clear-selection-label"></div>
-      </div>
-      <section aria-labelledby="archive-heading">
-        <p class="eyebrow">Reversible list cleanup</p>
-        <h3 id="archive-heading">Archive this scope</h3>
-        <p>Removes matching conversations from the active list. Transcripts and related data remain stored locally.</p>
-        <button id="preview-clear" class="dialog-button" type="button">Preview archive</button>
-      </section>
-      <section id="clear-preview" class="clear-preview" aria-live="polite" hidden>
-        <h3>Verified preview</h3>
-        <p id="clear-preview-summary"></p>
-        <div id="clear-preview-list" class="clear-preview-list"></div>
-        <label for="clear-confirmation">Type <code>CLEAR_CONVERSATIONS</code> to confirm</label>
-        <input id="clear-confirmation" name="confirmation" type="text" autocomplete="off" spellcheck="false">
-        <button id="execute-clear" class="danger-button" type="button" disabled>Archive previewed conversations</button>
-      </section>
-      <section class="forget-panel" aria-labelledby="forget-heading">
-        <p class="eyebrow">Irreversible deletion</p>
-        <h3 id="forget-heading">Permanently delete this scope</h3>
-        <p>Deletes every matching transcript, chat metadata record, conversation state, and grounded evidence file. Linked shared memories are logically forgotten; artifact files and append-only safety records remain. This cannot be undone.</p>
-        <button id="preview-forget" class="dialog-button destructive-button" type="button">Preview permanent deletion</button>
-        <section id="forget-preview" class="clear-preview" aria-live="polite" hidden>
-          <h3>Destructive-action preview</h3>
-          <p id="forget-preview-summary"></p>
-          <div id="forget-preview-list" class="clear-preview-list"></div>
-          <label for="forget-confirmation">Type <code id="forget-confirmation-phrase"></code> to confirm</label>
-          <input id="forget-confirmation" name="forget-confirmation" type="text" autocomplete="off" spellcheck="false">
-          <button id="execute-forget" class="danger-button destructive-button" type="button" disabled>Permanently delete previewed conversations</button>
-        </section>
-        <p id="forget-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
-      </section>
-      <p id="clear-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
-    </form>
-  </dialog>
   <dialog id="model-runtime-dialog" class="clear-dialog runtime-dialog" aria-labelledby="model-runtime-dialog-title">
     <form method="dialog">
-      <div class="dialog-heading"><div><p class="eyebrow">Class 3 runtime mutation</p><h2 id="model-runtime-dialog-title">Model runtime control</h2></div><button id="close-model-runtime-dialog" class="icon-button" type="button" aria-label="Close model runtime dialog">×</button></div>
-      <p class="dialog-note">Soul rechecks active provider leases and the selected runtime's bounded activity evidence immediately before changing the configured user service. It will not force-stop active work.</p>
+      <div class="dialog-heading"><div><p class="eyebrow">Shared compute policy</p><h2 id="model-runtime-dialog-title">Compute availability</h2></div><button id="close-model-runtime-dialog" class="icon-button" type="button" aria-label="Close compute dialog">×</button></div>
+      <p class="dialog-note">Review the exact policy change. Reserving compute refuses active work safely; it does not stop an active request.</p>
       <div id="model-runtime-preview" class="clear-preview">
         <h3 id="model-runtime-preview-title">Review runtime boundary</h3>
         <dl id="model-runtime-preview-details" class="details-list"></dl>
         <label for="model-runtime-confirmation">Approval phrase</label>
         <code id="model-runtime-confirmation-phrase"></code>
         <input id="model-runtime-confirmation" type="text" autocomplete="off" spellcheck="false">
-        <button id="execute-model-runtime" class="danger-button" type="button" disabled>Apply model runtime change</button>
+        <button id="execute-model-runtime" class="danger-button" type="button" disabled>Apply compute policy</button>
       </div>
       <p id="model-runtime-dialog-status" class="dialog-status" role="status" aria-live="polite"></p>
     </form>
   </dialog>
 
-  <dialog id="screen-capture-dialog" class="clear-dialog screen-capture-dialog" aria-labelledby="screen-capture-title">
-    <form method="dialog">
-      <div class="dialog-heading">
-        <div><p class="eyebrow">One-shot perception</p><h2 id="screen-capture-title">Capture a screen preview</h2></div>
-        <button id="close-screen-capture-dialog" class="quiet-button" value="cancel" type="submit">Close</button>
-      </div>
-      <p class="dialog-copy">One deliberate capture is staged locally and shown in Chat before Gemma sees it. Opening this panel captures nothing.</p>
-      <fieldset class="screen-capture-scopes">
-        <legend>Capture scope</legend>
-        <label><input type="radio" name="screen-capture-mode" value="monitor" checked><span><strong>Current monitor</strong><small>The monitor focused when you press Capture.</small></span></label>
-        <label><input type="radio" name="screen-capture-mode" value="active_window"><span><strong>Active window</strong><small>The exact active-window geometry at capture time.</small></span></label>
-        <label><input type="radio" name="screen-capture-mode" value="region"><span><strong>Select region</strong><small>Choose one region through the desktop selector.</small></span></label>
-      </fieldset>
-      <div class="dialog-actions">
-        <button id="execute-screen-capture" class="primary-button" type="button">Capture preview</button>
-      </div>
-      <p id="screen-capture-status" class="dialog-copy" aria-live="polite">No pixels have been captured.</p>
-    </form>
-  </dialog>
   <div id="live-status" class="sr-only" role="status" aria-live="polite"></div>
 </body>
 </html>

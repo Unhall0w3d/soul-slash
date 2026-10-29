@@ -47,6 +47,22 @@ module ContinuityLibreChatA24
     original + (original.end_with?("\n") ? "" : "\n") + "#{SECRET_NAME}=#{token}\n"
   end
 
+  def self.resolve_token(original, local_token: nil)
+    assignments = original.lines.grep(/\A\s*(?:export\s+)?#{SECRET_NAME}\s*=/)
+    raise ArgumentError, "duplicate credential assignment" if assignments.length > 1
+    enrolled = nil
+    if assignments.one?
+      match = /\A#{SECRET_NAME}=([0-9a-f]{64})\n\z/.match(assignments.first)
+      raise ArgumentError, "unsupported credential assignment format" unless match
+      enrolled = match[1]
+    end
+    if local_token
+      raise ArgumentError, "invalid local credential" unless local_token.match?(/\A[0-9a-f]{64}\z/)
+      raise ArgumentError, "credential mismatch" if enrolled && enrolled != local_token
+    end
+    local_token || enrolled || SecureRandom.hex(32)
+  end
+
   def self.regular(path, uid:)
     stat = File.lstat(path)
     raise ArgumentError unless File.realpath(path) == path && stat.file? &&
@@ -116,7 +132,7 @@ module ContinuityLibreChatA24
     system("/usr/bin/systemctl", "is-active", "--quiet", "librechat.service") || raise(RuntimeError)
   end
 
-  def self.run
+  def self.run(staged_path: STAGED)
     stage = "validate_invocation"
     raise ArgumentError unless ARGV == ["--apply"] && Process.uid.zero?
     File.umask(0o077)
@@ -124,7 +140,7 @@ module ContinuityLibreChatA24
     stage = "read_configuration"
     config_stat, env_stat = [CONFIG, ENVIRONMENT].map { |path| regular(path, uid: 0) }
     originals = [CONFIG, ENVIRONMENT].to_h { |path| [path, File.binread(path)] }
-    staged = YAML.safe_load(File.read(STAGED), aliases: false)
+    staged = YAML.safe_load(File.read(staged_path), aliases: false)
     config = merge(YAML.safe_load(originals.fetch(CONFIG), aliases: false), staged)
     # Only serialized configuration, never environment values, enters this validator.
     stage = "validate_schema_as_librechat"
@@ -136,16 +152,20 @@ module ContinuityLibreChatA24
     parent = File.dirname(KEY)
     raise ArgumentError unless File.realpath(parent) == parent && File.stat(parent).uid == operator.uid &&
       File.stat(parent).directory? && (File.stat(parent).mode & 0o777) == 0o700
-    if File.exist?(KEY) || File.symlink?(KEY)
+    stage = "validate_local_token"
+    key_present = File.exist?(KEY) || File.symlink?(KEY)
+    if key_present
       key_stat = regular(KEY, uid: operator.uid)
       raise ArgumentError unless (key_stat.mode & 0o777) == 0o600
-      token = File.read(KEY).delete_suffix("\n")
-    else
-      token = SecureRandom.hex(32)
+      local_token = File.read(KEY).delete_suffix("\n")
     end
+    stage = "reconcile_enrolled_token"
+    # A restored service may retain its credential while the owner-side key is
+    # absent. Recover that same credential locally; never silently rotate it.
+    token = resolve_token(originals.fetch(ENVIRONMENT), local_token: local_token)
     env = environment(originals.fetch(ENVIRONMENT), token)
     serialized = YAML.dump(config)
-    if YAML.safe_load(originals.fetch(CONFIG), aliases: false) == config && env == originals.fetch(ENVIRONMENT)
+    if key_present && YAML.safe_load(originals.fetch(CONFIG), aliases: false) == config && env == originals.fetch(ENVIRONMENT)
       puts JSON.generate(state: "already_configured", secrets_printed: false)
       return 0
     end

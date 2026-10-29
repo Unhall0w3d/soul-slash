@@ -50,6 +50,13 @@ module SoulCore
       return result(false, "awaiting_input", "Exact Wazuh notification installation confirmation is required.", planned["data"]) unless confirmation == CONFIRM_INSTALL
 
       FileUtils.mkdir_p(@unit_root, mode: 0o700)
+      raise IOError, "notification state must not be a symlink" if File.symlink?(notification_state_root)
+      FileUtils.mkdir_p(notification_state_root, mode: 0o700)
+      state = File.stat(notification_state_root)
+      unless File.realpath(notification_state_root) == notification_state_root && state.directory? &&
+             state.uid == Process.uid && (state.mode & 0o077).zero?
+        raise IOError, "notification state must be an owner-private directory"
+      end
       rendered.each { |name, content| write_atomic(File.join(@unit_root, name), content, 0o644) }
       [[@systemctl_path, "--user", "daemon-reload"], [@systemctl_path, "--user", "enable", "--now", TIMER]].each do |command|
         execution = @runner.call(command)
@@ -95,7 +102,8 @@ module SoulCore
           PrivateTmp=true
           ProtectSystem=strict
           ProtectHome=read-only
-          ReadWritePaths=#{unit_path(private_root)}
+          # Notification delivery also persists its lock and duplicate-suppression state.
+          ReadWritePaths=#{unit_path(private_root)} #{unit_path(notification_state_root)}
           ProtectControlGroups=true
           ProtectKernelModules=true
           ProtectKernelTunables=true
@@ -123,6 +131,7 @@ module SoulCore
 
     private
 
+    def notification_state_root = File.join(@home, ".local", "state", "soul", "notification-center")
     def poller_script = File.join(@root, "scripts", "poll-wazuh-alert-notifications")
     def paths = {SERVICE => File.join(@unit_root, SERVICE), TIMER => File.join(@unit_root, TIMER)}
 

@@ -13,12 +13,14 @@
       { "filename": "Qwen3-Embedding-0.6B-Q8_0.gguf", "bytes": 784144960, "sha256": "972f23255e46adfe744a0eb9a0039f3c63988f65753b0968d776e8b27168c321" },
       { "filename": "acestep-5Hz-lm-4B-Q8_0.gguf", "bytes": 4457323648, "sha256": "972f91147a167f0c041f1b158d67985a82c0f6a852e68cdf70e46030cf08b1bc" },
       { "filename": "acestep-v15-turbo-Q8_0.gguf", "bytes": 2549528000, "sha256": "288f708a61cfc241013a98a62f98ba331f83fe34d0d3559acdd9b0f6a2f7cd6b" },
+      { "filename": "acestep-v15-xl-turbo-Q8_0.gguf", "revision": "666ac70204440867d8c01ba4b119cc79c95b370a", "bytes": 5305828736, "sha256": "4f1044fb646374fb5730e10f64325766883eb2fc02a643c1b403f2d61f39dc19" },
       { "filename": "vae-BF16.gguf", "bytes": 337420928, "sha256": "0599862ac5d15cd308e1d2e368373aea6c02e25ebd1737ad4a4562a0901b0ef8" }
     ]
   },
   "profile": {
-    "id": "ace-step-vulkan-4b",
-    "label": "ACE-Step 1.5 4B LM / 2B Turbo Q8_0",
+    "id": "ace-step-vulkan-4b-xl",
+    "label": "ACE-Step 1.5 4B LM / XL Turbo Q8_0",
+    "synth_model": "acestep-v15-xl-turbo-Q8_0.gguf",
     "accelerator": "AMD Vulkan",
     "vulkan_device_selector": "1002:73bf!",
     "vulkan_device_index": 0,

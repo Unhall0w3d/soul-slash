@@ -1,0 +1,7 @@
+{
+  "source_tree_sha256": "89a02b0011f03380e72a2e74f0a024d3520f30adce9c05119ac020f000b180f8",
+  "gems": {
+    "ruby-lsp-0.26.11.gem": "4cc8f1587237ff8c9031680b5491df901a82559eeaa1ae96863ffe700b32583d",
+    "language_server-protocol-3.17.0.5.gem": "fd1e39a51a28bf3eec959379985a72e296e9f9acfce46f6a79d31ca8760803cc"
+  }
+}

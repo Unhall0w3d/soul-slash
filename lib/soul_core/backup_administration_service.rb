@@ -9,11 +9,13 @@ require "time"
 
 require_relative "backup_manifest_policy"
 require_relative "backup_retention_ledger"
+require_relative "backup_scope_migration"
 require_relative "bounded_command_runner"
 require_relative "operator_backup_manifest_policy"
 
 module SoulCore
   class BackupAdministrationService
+    include BackupScopeMigration
     BACKUP_CONFIRMATION = "CREATE_VERIFIED_BACKUP"
     RETENTION_CONFIRMATION = "FORGET_SELECTED_BACKUP_SNAPSHOTS"
     RESTORE_CONFIRMATION = "STAGE_BACKUP_RESTORE"
@@ -1190,6 +1192,7 @@ module SoulCore
     end
 
     def backup_preflight(password)
+      raise ArgumentError, "pending scope migration requires explicit reconciliation" if File.exist?(scope_migration_pending_path) || File.symlink?(scope_migration_pending_path)
       raise ArgumentError, "restic is unavailable" unless @runner.which("restic")
       mount = mount_status
       raise ArgumentError, "backup target is not mounted" unless mount["mounted"]
@@ -1633,6 +1636,7 @@ module SoulCore
     end
 
     def acquire_operation_lock
+      return nil if File.exist?(scope_migration_pending_path) || File.symlink?(scope_migration_pending_path)
       FileUtils.mkdir_p(@state_root, mode: 0o700)
       FileUtils.mkdir_p(File.dirname(@operation_lock_path), mode: 0o700)
       lock = File.open(@operation_lock_path, File::RDWR | File::CREAT, 0o600)

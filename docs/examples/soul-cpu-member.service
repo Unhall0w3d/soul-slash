@@ -1,0 +1,19 @@
+[Unit]
+Description=Soul CPU member — explicit tasks and on-demand Gemma
+
+[Service]
+Type=simple
+WorkingDirectory=/home/bhones/Projects/soul
+ExecStart=/home/bhones/.rbenv/versions/4.0.7/bin/ruby /home/bhones/Projects/soul/scripts/soul-cpu-member.rb --serve /home/bhones/Projects/soul/Soul/private/cpu_member_service_v1
+Restart=no
+TimeoutStopSec=25
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/bhones/Projects/soul/Soul/private/cpu_member_service_v1
+
+[Install]
+WantedBy=default.target

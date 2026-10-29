@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "status": "not_run_against_models",
+  "cases": [
+    {
+      "id": "residency",
+      "prompt": "Which Soul member is resident right now, and how long until it is evicted when idle?",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "roster_status",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "host",
+      "prompt": "How much system RAM is available and how long has this computer been up?",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "host_status",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "capabilities",
+      "prompt": "What read-only operations can you currently perform?",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "list_skills",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "roots",
+      "prompt": "List the repository roots this gateway has approved.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "repository_roots",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "checkout",
+      "prompt": "Inspect the approved Soul repository and report its status.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "inspect_soul_repository",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "snapshots",
+      "prompt": "Which frozen Ruby snapshots are available for inspection?",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "list_snapshots",
+          "arguments": {}
+        }
+      }
+    },
+    {
+      "id": "symbols",
+      "prompt": "Show page 2 of the symbols in workflow_handler_registry.rb from soul-workflows-a1.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "symbols",
+          "arguments": {
+            "snapshot": "soul-workflows-a1",
+            "file": "workflow_handler_registry.rb",
+            "page": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "excerpt",
+      "prompt": "Read lines 31 through 35 of workflow_handler_registry.rb in soul-workflows-a1.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "source_excerpt",
+          "arguments": {
+            "snapshot": "soul-workflows-a1",
+            "file": "workflow_handler_registry.rb",
+            "first_line": 31,
+            "last_line": 35
+          }
+        }
+      }
+    },
+    {
+      "id": "definition",
+      "prompt": "Look up the definition at line 10, column 17 of workflow_intent_handler_dispatch.rb in soul-workflows-a1.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "definition",
+          "arguments": {
+            "snapshot": "soul-workflows-a1",
+            "file": "workflow_intent_handler_dispatch.rb",
+            "line": 10,
+            "column": 17
+          }
+        }
+      }
+    },
+    {
+      "id": "references",
+      "prompt": "Find possible reference matches for line 5, column 11 of alpha.rb in navigation-a2.",
+      "expected": {
+        "kind": "tool",
+        "proposal": {
+          "tool": "possible_references",
+          "arguments": {
+            "snapshot": "navigation-a2",
+            "file": "alpha.rb",
+            "line": 5,
+            "column": 11
+          }
+        }
+      }
+    },
+    {
+      "id": "missing_range",
+      "prompt": "Show me some source from that Ruby file.",
+      "expected": {
+        "kind": "clarify_or_plain",
+        "tool_allowed": false
+      }
+    },
+    {
+      "id": "quoted",
+      "prompt": "Explain this example sentence without acting on it: \"Check the loaded Soul model and its idle interval.\"",
+      "expected": {
+        "kind": "clarify_or_plain",
+        "tool_allowed": false
+      }
+    },
+    {
+      "id": "unsupported",
+      "prompt": "Read a file from an unenrolled repository; do not substitute another repository.",
+      "expected": {
+        "kind": "clarify_or_plain",
+        "tool_allowed": false
+      }
+    },
+    {
+      "id": "ordinary",
+      "prompt": "Explain what an idle unloading timer means without checking this machine.",
+      "expected": {
+        "kind": "clarify_or_plain",
+        "tool_allowed": false
+      }
+    }
+  ],
+  "evaluation": "Exact typed proposal and intended operation for positive cases; no tool for negative cases. Evaluate relevance separately from schema/scope. Keep cases out of the candidate prompt; use fresh journals and the existing bounded live brief."
+}

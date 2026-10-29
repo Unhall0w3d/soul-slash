@@ -1,0 +1,230 @@
+[
+  {
+    "id": "alpha",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "calls.rb",
+      "line": 3,
+      "character": 35
+    },
+    "expected": [
+      [
+        "alpha.rb",
+        4
+      ]
+    ]
+  },
+  {
+    "id": "beta",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "calls.rb",
+      "line": 4,
+      "character": 34
+    },
+    "expected": [
+      [
+        "beta.rb",
+        3
+      ]
+    ]
+  },
+  {
+    "id": "inherited",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "child.rb",
+      "line": 6,
+      "character": 8
+    },
+    "expected": [
+      [
+        "alpha.rb",
+        4
+      ]
+    ]
+  },
+  {
+    "id": "mixin",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "child.rb",
+      "line": 9,
+      "character": 8
+    },
+    "expected": [
+      [
+        "location.rb",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "constant",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "calls.rb",
+      "line": 5,
+      "character": 25
+    },
+    "expected": [
+      [
+        "alpha.rb",
+        2
+      ]
+    ]
+  },
+  {
+    "id": "absent",
+    "query": {
+      "method": "textDocument/definition",
+      "file": "calls.rb",
+      "line": 6,
+      "character": 23
+    },
+    "expected": []
+  },
+  {
+    "id": "symbols0",
+    "query": {
+      "method": "textDocument/documentSymbol",
+      "file": "alpha.rb",
+      "line": 0,
+      "character": 0
+    },
+    "expected": [
+      [
+        "NavigationPilot",
+        2,
+        0
+      ],
+      [
+        "NavigationPilot::Alpha",
+        2,
+        1
+      ],
+      [
+        "NavigationPilot::Alpha::CODE",
+        14,
+        2
+      ],
+      [
+        "NavigationPilot::Alpha::Worker",
+        5,
+        3
+      ],
+      [
+        "NavigationPilot::Alpha::Worker::perform",
+        6,
+        4
+      ]
+    ]
+  },
+  {
+    "id": "symbols1",
+    "query": {
+      "method": "textDocument/documentSymbol",
+      "file": "beta.rb",
+      "line": 0,
+      "character": 0
+    },
+    "expected": [
+      [
+        "NavigationPilot",
+        2,
+        0
+      ],
+      [
+        "NavigationPilot::Beta",
+        2,
+        1
+      ],
+      [
+        "NavigationPilot::Beta::Worker",
+        5,
+        2
+      ],
+      [
+        "NavigationPilot::Beta::Worker::perform",
+        6,
+        3
+      ]
+    ]
+  },
+  {
+    "id": "symbols2",
+    "query": {
+      "method": "textDocument/documentSymbol",
+      "file": "location.rb",
+      "line": 0,
+      "character": 0
+    },
+    "expected": [
+      [
+        "NavigationPilot",
+        2,
+        0
+      ],
+      [
+        "NavigationPilot::Located",
+        2,
+        1
+      ],
+      [
+        "NavigationPilot::Located::location",
+        6,
+        2
+      ]
+    ]
+  },
+  {
+    "id": "symbols3",
+    "query": {
+      "method": "textDocument/documentSymbol",
+      "file": "child.rb",
+      "line": 0,
+      "character": 0
+    },
+    "expected": [
+      [
+        "NavigationPilot",
+        2,
+        2
+      ],
+      [
+        "NavigationPilot::Child",
+        5,
+        3
+      ],
+      [
+        "NavigationPilot::Child::report",
+        6,
+        5
+      ],
+      [
+        "NavigationPilot::Child::whereabouts",
+        6,
+        8
+      ]
+    ]
+  },
+  {
+    "id": "symbols4",
+    "query": {
+      "method": "textDocument/documentSymbol",
+      "file": "calls.rb",
+      "line": 0,
+      "character": 0
+    },
+    "expected": []
+  },
+  {
+    "id": "possibleReferences",
+    "query": {
+      "method": "textDocument/references",
+      "file": "alpha.rb",
+      "line": 4,
+      "character": 10
+    }
+  }
+]

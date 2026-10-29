@@ -21,7 +21,7 @@ module SoulCore
       "dev" => "Dev Core"
     }.freeze
 
-    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, music_visual_companion: nil, publication_package: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc })
+    def initialize(root:, chat_store:, provider_client:, music_generation:, visual_studio:, core_orchestration:, music_disposition: nil, music_visual_companion: nil, publication_package: nil, flow_store: nil, planner: nil, review_planner: nil, revision_drafter: nil, visual_revision_drafter: nil, clock: -> { Time.now.utc }, compute_handoff: nil)
       @root = File.expand_path(root)
       @chat_store = chat_store
       @music_generation = music_generation
@@ -30,6 +30,7 @@ module SoulCore
       @publication_package = publication_package
       @visual_studio = visual_studio
       @core_orchestration = core_orchestration
+      @compute_handoff = compute_handoff
       @flow_store = flow_store || ConversationCreativeFlowStore.new(root: @root, clock: clock)
       @planner = planner || ConversationCreativePlanner.new(provider_client: provider_client)
       @review_planner = review_planner || ConversationCreativeReviewPlanner.new(provider_client: provider_client)
@@ -121,7 +122,16 @@ module SoulCore
       failure_result("creative workflow planning failed safely: #{error.class}", prior)
     end
 
-    def execute(chat_id:, flow_id:, action_id: nil, confirmation:, expected_digest:, progress: nil)
+    def execute(chat_id:, **arguments)
+      return execute_action(chat_id: chat_id, **arguments) unless @compute_handoff
+      chat = @chat_store.chat(chat_id)
+      return domain("awaiting_input", false, "creative conversation was not found") unless chat
+      @compute_handoff.with_origin(member: chat.dig("metadata", "roster_member") || "studio", conversation_id: chat_id) do
+        execute_action(chat_id: chat_id, **arguments)
+      end
+    end
+
+    def execute_action(chat_id:, flow_id:, action_id: nil, confirmation:, expected_digest:, progress: nil)
       flow = @flow_store.read(flow_id: flow_id, chat_id: chat_id)
       return domain("awaiting_input", false, "creative workflow was not found") unless flow
       if flow["pending_action"].nil? && flow["last_action_id"] == action_id.to_s && flow["result_message_id"]
@@ -1391,6 +1401,12 @@ module SoulCore
     end
 
     def core_requirement(flow, action_id:)
+      if @compute_handoff
+        status = @compute_handoff.status
+        raise ArgumentError, "Shared compute is unavailable" unless status["ok"]
+        return {"kind"=>"shared_compute", "policy"=>status.dig("data", "policy"),
+          "authorization"=>"included_in_exact_action_click", "reason"=>"Chat residency is released before each bounded creative workload; verified cleanup precedes any follow-up. No fallback model is started."}
+      end
       status = @core_orchestration.status
       raise ArgumentError, status.fetch("reason", "Core status is unavailable") unless status.fetch("ok")
 
@@ -1433,6 +1449,7 @@ module SoulCore
 
     def render_core_requirement(flow)
       requirement = flow.fetch("core_requirement")
+      return ["Shared compute preflight", "Policy: #{requirement.fetch('policy')}", requirement.fetch("reason")] if requirement["kind"] == "shared_compute"
       transition = if requirement.fetch("transition_required")
         "#{requirement.fetch('active_core_label')} → #{requirement.fetch('required_core_label')} after your click"
       elsif requirement["required_core_id"]
@@ -1450,6 +1467,13 @@ module SoulCore
     end
 
     def ensure_creative_core(flow, action_id:)
+      if @compute_handoff
+        return domain("blocked_for_human_review", false, "Legacy creative approval must be reviewed under shared compute") unless flow.dig("core_requirement", "kind") == "shared_compute"
+        status = @compute_handoff.status
+        return status unless status["ok"]
+        return domain("blocked_for_human_review", false, "Compute is reserved or a handoff needs recovery") unless status.dig("data", "policy") == "available" && status.dig("data", "handoff").nil?
+        return success({"compute_handoff"=>"required_at_native_admission"})
+      end
       status = @core_orchestration.status
       return status unless status.fetch("ok")
       active_core_id = status.dig("data", "active_core_id").to_s

@@ -1,0 +1,9 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #14191c; color: #eef2ed; }
+body { margin: 0; }
+main { max-width: 960px; margin: 2.5rem auto; padding: 1.25rem; }
+h1 { font-size: 1.8rem; }
+p { line-height: 1.5; }
+a { color: #8de5c2; }
+img { display: block; max-width: 100%; max-height: 72vh; object-fit: contain; border-radius: 8px; }
+audio { display: block; width: 100%; margin: 2rem 0; }
+.identity { color: #adbab3; overflow-wrap: anywhere; font-size: .8rem; }

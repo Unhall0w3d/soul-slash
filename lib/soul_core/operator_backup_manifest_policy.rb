@@ -57,12 +57,14 @@ module SoulCore
       lact
       libfm
       micro
+      mozilla
       mpv
       noctalia
       obsidian
       opera-gx
       pcmanfm
       pipewire
+      psd
       qBittorrent
       qt5ct
       qt6ct
@@ -80,10 +82,30 @@ module SoulCore
       QtProject.conf
       arkrc
       baloofileinformationrc
+      baloofilerc
+      bluedevilglobalrc
       dolphinrc
+      kactivitymanagerdrc
+      kcminputrc
+      kded5rc
       kdeglobals
+      kglobalshortcutsrc
       kiorc
+      konsolerc
+      konsolesshconfig
+      kscreenlockerrc
+      ksmserverrc
+      kwalletrc
+      kwinoutputconfig.json
+      kwinrc
       mimeapps.list
+      plasma-localerc
+      plasma-org.kde.plasma.desktop-appletsrc
+      plasmanotifyrc
+      plasmashellrc
+      powerdevilrc
+      powermanagementprofilesrc
+      spectaclerc
       trashrc
       user-dirs.dirs
       user-dirs.locale
@@ -173,6 +195,7 @@ module SoulCore
         "raw_model_weights_included" => false,
         "application_state_consistency" => "live_file_copy_not_atomic",
         "codex_recovery_note" => "Sessions, registries, SQLite files and sidecars, attachments, worktrees and desktop state are selected. A live file copy is not a consistent application snapshot; close all writers for a migration capture. External worktree targets need separate coverage.",
+        "firefox_recovery_note" => "Select the Mozilla parent, including PSD's durable -backup and -back-ovfs siblings. A profile symlink into /run is not followed; changes since PSD's last resync may be absent. Stop browsers and complete PSD unsync before a consistent migration capture.",
         "reproducible_asset_count" => assets.length,
         "reproducible_asset_bytes" => assets.sum { |asset| asset.fetch("bytes") },
         "reproducible_assets" => assets.map do |asset|
@@ -182,7 +205,7 @@ module SoulCore
           {"label" => label, "path" => path, "selected" => sources.include?(path)}
         end,
         "explicit_manual_review_gaps" => [
-          "browser profiles other than selected Opera GX and Codex desktop state",
+          "browser profiles other than selected Opera GX, XDG Mozilla and Codex desktop state",
           "atomic recovery of live application databases and profiles",
           "Downloads and recovered-file holding areas",
           "WinBoat container disk images",
@@ -247,6 +270,10 @@ module SoulCore
         File.join(@home, ".local", "share", "fonts"),
         File.join(@home, ".local", "share", "icons"),
         File.join(@home, ".local", "share", "keyrings"),
+        # Preserve Plasma profiles and wallet state, not the whole desktop cache.
+        File.join(@home, ".local", "share", "konsole"),
+        File.join(@home, ".local", "share", "kscreen"),
+        File.join(@home, ".local", "share", "kwalletd"),
         File.join(@home, ".local", "share", "Larian Studios"),
         File.join(@home, ".local", "share", "lutris", "games"),
         File.join(@home, ".local", "share", "lutris", "lutris.conf"),
@@ -278,6 +305,10 @@ module SoulCore
         system_path("etc/modules-load.d"),
         system_path("etc/pacman.conf"),
         system_path("etc/pacman.d/hooks"),
+        system_path("etc/pacman.d/mirrorlist"),
+        system_path("etc/pacman.d/cachyos-mirrorlist"),
+        system_path("etc/pacman.d/cachyos-v3-mirrorlist"),
+        system_path("etc/pacman.d/cachyos-v4-mirrorlist"),
         system_path("etc/systemd/system"),
         system_path("etc/sysctl.d"),
         system_path("etc/udev/rules.d"),

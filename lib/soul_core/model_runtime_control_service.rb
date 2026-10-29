@@ -363,6 +363,10 @@ module SoulCore
     end
 
     def mutation_blocker(action, observation, target)
+      if %w[load switch].include?(action)
+        compute=@lease_store.compute_policy_unlocked.read
+        return "shared compute is reserved or held for a workload handoff" if compute["policy"]!="available" || compute["handoff"]
+      end
       return "multiple model runtime profiles are active; resolve the conflict manually" if observation["profile_conflict"]
       return "one or more model runtime service states are uncertain" if observation.fetch("profiles").any? { |profile| profile.fetch("service_state") == "unknown" }
 

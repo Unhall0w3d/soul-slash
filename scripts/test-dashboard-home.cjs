@@ -1,0 +1,20 @@
+"use strict";
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const html=fs.readFileSync('assets/dashboard/index.html','utf8'),js=fs.readFileSync('assets/dashboard/dashboard.js','utf8');
+for(const id of ['composer','chat-list','new-chat','inbox-summary','soul-presence','clear-dialog','screen-capture-dialog']) assert(!html.includes(`id="${id}"`),id);
+for(const id of ['dashboard-panel','runtime-heading','system-heading','invocation-heading','workspace-tree','studio-panel','improvement-panel','augmentation-panel','music-panel','visual-panel','mix-panel','maintenance-panel','memory-observatory-panel','model-runtime-dialog']) assert(html.includes(`id="${id}"`),id);
+const bootstrap=js.slice(js.indexOf('async function bootstrap()'),js.indexOf('byId("login-form").addEventListener'));
+assert(!/loadChats|refreshCameraAvailability|refreshVoicePresence/.test(bootstrap));assert(bootstrap.includes('refreshSharedWorkspace'));
+class Element { constructor(tag){this.tag=tag;this.children=[];this.textContent='';} append(...c){this.children.push(...c)} replaceChildren(...c){this.children=c} }
+const tree=new Element('div');const context=vm.createContext({document:{createElement:t=>new Element(t)},byId:id=>{assert.equal(id,'workspace-tree');return tree;}});
+const start=js.indexOf('function renderSharedWorkspace('),end=js.indexOf('\nbyId("refresh-workspace")',start);
+vm.runInContext(js.slice(start,end),context);
+context.records=[{relative_path:'shared/sub/a.txt',kind:'text',size_bytes:4,lifecycle:'active'},{relative_path:'shared/<img src=x onerror=evil()>.txt',kind:'text'},{relative_path:'__proto__/safe.txt'}];
+vm.runInContext('renderSharedWorkspace(records)',context);
+const nodes=[];function collect(x){nodes.push(x);x.children.forEach(collect)}collect(tree);
+assert(nodes.some(n=>n.textContent==='<img src=x onerror=evil()>.txt'));
+assert(nodes.some(n=>n.textContent==='__proto__/'));
+assert(nodes.every(n=>!['a','img','script','iframe'].includes(n.tag)));
+assert.equal(nodes.filter(n=>n.tag==='details').length,3);
+vm.runInContext('renderSharedWorkspace([])',context);assert.equal(tree.children[0].children.length,0);
+console.log('Dashboard home: retired chat controls absent, retained sections, metadata-only tree and literal hostile filenames passed.');

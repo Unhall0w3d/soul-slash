@@ -2,7 +2,7 @@
 
 const csrf = document.querySelector('meta[name="soul-csrf"]').content;
 const TAB_LOCATIONS = Object.freeze({
-  chat: "#chat-panel",
+  chat: "#dashboard-panel",
   host: "#host-stewardship-panel",
   timeline: "#timeline-panel",
   studio: "#studio-panel",
@@ -35,7 +35,9 @@ state.screenCapturing = false;
 state.cameraPopup = null;
 state.cameraToken = null;
 state.cameraAvailable = false;
-state.coreLocked = false;
+state.coreLocked = true; // Legacy creative and non-member chat paths await a verified shared-compute handoff.
+state.computeStatus = null;
+state.computePreview = null;
 state.betaDevBuildPreview = null;
 Object.assign(state, { visualLoaded: false, visualProjects: [], visualProjectView: "active", selectedVisualProject: null, visualPreview: null, visualGenerating: false, visualProjectDeletePreview: null, visualBlenderPreview: null, visualBlenderResumePreview: null, visualBlenderGenerating: false, visualBlenderTemplates: [], visualBlenderSourceSceneId: null });
 Object.assign(state, { mixLoaded: false, mixSources: [], mixPlans: [], mixSequence: [], selectedMixPlan: null, mixHandoffPreview: null, mixRenderPreview: null, mixFinalPreview: null });
@@ -202,9 +204,11 @@ function renderInvocationDetail(record) {
     invocationDetailRow("Boundary", record.boundary)
   );
   const exampleHeading = document.createElement("p"); exampleHeading.className = "eyebrow"; exampleHeading.textContent = "Example wording · inert";
-  const example = document.createElement("code"); example.className = "invocation-example"; example.textContent = record.examples?.[0] || "No example supplied.";
+  const examples = (record.examples?.length ? record.examples.slice(0, 4) : ["No example supplied."]).map((wording) => {
+    const example = document.createElement("code"); example.className = "invocation-example"; example.textContent = wording; return example;
+  });
   const note = document.createElement("p"); note.className = "muted"; note.textContent = "Reading or copying this example provides no authority. A later request still enters the owning deterministic gate.";
-  detail.append(eyebrow, heading, summary, facts, exampleHeading, example, note);
+  detail.append(eyebrow, heading, summary, facts, exampleHeading, ...examples, note);
   byId("invocation-list").querySelectorAll("button").forEach((button) => button.classList.toggle("is-active", button.dataset.invocationId === record.id));
 }
 
@@ -232,14 +236,14 @@ async function loadInvocationCatalog() {
   const status = byId("invocation-catalog-status"); status.textContent = "Loading the curated read-only map…";
   try {
     const envelope = await callSoul("invocations.list"); const data = dataOf(envelope);
-    state.invocationRecords = data.records || []; state.invocationCategories = data.categories || [];
-    byId("invocation-count").textContent = String(data.count || 0);
+    state.invocationRecords = (data.records || []).filter(record => !["conversation-management", "core-control"].includes(record.id)); state.invocationCategories = data.categories || [];
+    byId("invocation-count").textContent = String(state.invocationRecords.length);
     const select = byId("invocation-category"); const current = select.value; select.replaceChildren();
     const all = document.createElement("option"); all.value = ""; all.textContent = "All categories"; select.append(all);
     state.invocationCategories.forEach((category) => { const option = document.createElement("option"); option.value = category; option.textContent = category; select.append(option); });
     if (state.invocationCategories.includes(current)) select.value = current;
     renderInvocationCatalog();
-    status.textContent = `${data.count || 0} invocations loaded. Inspection performed no mutation.`;
+    status.textContent = `${state.invocationRecords.length} capability references loaded. Inspection performed no mutation.`;
   } catch (error) {
     status.textContent = error.message || "Invocation Guide failed safely.";
   }
@@ -481,10 +485,7 @@ function prefillApprovalGate(inputOrId, buttonOrId, phrase, enabled = true) {
 }
 function lifecycle(envelope) {
   const value = envelope.lifecycle_state || "failed";
-  byId("lifecycle-state").textContent = value.replaceAll("_", " ");
-  document.querySelector(".state-ribbon").dataset.lifecycle = value;
-  document.querySelector(".conversation").dataset.lifecycle = value;
-  byId("mutation-state").textContent = `mutation ${envelope.meta?.mutation || "none"}`;
+  byId("operation-state").textContent = value.replaceAll("_", " ");
   return value;
 }
 
@@ -516,7 +517,7 @@ function hideGenerationProgress(progress) { if (progress) progress.hidden = true
 function setSoulActivity(activityState, summary) {
   const presence = byId("soul-presence"); if (!presence) return;
   presence.dataset.state = activityState || "idle";
-  const titles = { idle: "Soul is listening.", received: "Transmission received.", context: "Reading the thread.", planning: "Tracing a path.", inspecting: "Inspecting local evidence.", researching: "Following public signals.", synthesizing: "Shaping a response.", speaking: "Soul is speaking.", drafting: "Preparing an artifact.", reviewing: "Reviewing the result.", finalizing: "Sealing continuity.", complete: "Soul is present.", failed: "The path closed safely." };
+  const titles = { awaiting_input: "Waiting for your retry.", idle: "Soul is listening.", received: "Transmission received.", context: "Reading the thread.", planning: "Tracing a path.", inspecting: "Inspecting local evidence.", researching: "Following public signals.", synthesizing: "Shaping a response.", speaking: "Soul is speaking.", drafting: "Preparing an artifact.", reviewing: "Reviewing the result.", finalizing: "Sealing continuity.", complete: "Soul is present.", failed: "The path closed safely." };
   byId("soul-presence-title").textContent = titles[activityState] || "Soul is working.";
   byId("soul-activity-summary").textContent = summary || "Foreground work remains bounded to this request.";
 }
@@ -525,15 +526,23 @@ function chatWorkActive() { return state.localChatRequests.size > 0 || state.cha
 
 function setBusy(busy, message = "") {
   state.busy = Boolean(busy || chatWorkActive());
-  const coreLocked = Boolean(state.coreLocked);
+  if (!byId("composer")) { if (message) announce(message); return; }
+  const coreLocked = Boolean(state.coreLocked && !state.activeChat?.roster_member);
   byId("send-message").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("message-input").disabled = coreLocked || !state.activeChat;
   byId("attach-picture").disabled = coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("capture-screen").disabled = coreLocked || state.busy || state.screenCapturing || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
   byId("open-camera").disabled = !state.cameraAvailable || coreLocked || state.busy || state.voiceTranscribing || Boolean(state.voiceRecorder) || !state.activeChat;
+  if (state.activeChat?.roster_member) {
+    byId("attach-picture").disabled = true;
+    byId("capture-screen").disabled = true;
+    byId("open-camera").disabled = true;
+  }
+  byId("stop-member-chat").hidden = !state.rosterRequest;
+  byId("stop-member-chat").disabled = !state.rosterRequest || Boolean(state.rosterStopRequested);
   byId("send-message").querySelector("span").textContent = state.busy ? "Working" : "Send";
   byId("composer-hint").textContent = coreLocked
-    ? "No local Core is loaded · choose one above to continue."
+    ? "Legacy chat handoff to shared compute is pending."
     : (state.busy ? "Soul is working · you may draft, but ordinary Enter will not interrupt" : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected"));
   updateVoiceControl();
   if (message) announce(message);
@@ -580,7 +589,7 @@ async function launchVoicePresence() {
   finally { button.disabled = false; }
 }
 
-function tabFromLocation() { return Object.entries(TAB_LOCATIONS).find(([, hash]) => hash === window.location.hash)?.[0] || null; }
+function tabFromLocation() { if (window.location.hash === "#chat-panel") return "chat"; return Object.entries(TAB_LOCATIONS).find(([, hash]) => hash === window.location.hash)?.[0] || null; }
 
 function switchTab(name, { updateLocation = true } = {}) {
   if (!Object.hasOwn(TAB_LOCATIONS, name)) name = "chat";
@@ -604,7 +613,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   const selfImprovement = studio || improvement || augmentation;
   const creative = music || visual || mix;
   const administration = host || timeline || maintenance || topology || backup || memoryObservatory;
-  byId("chat-panel").hidden = !chat;
+  byId("dashboard-panel").hidden = !chat;
   byId("host-stewardship-panel").hidden = !host;
   byId("timeline-panel").hidden = !timeline;
   byId("studio-panel").hidden = !studio;
@@ -617,7 +626,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("local-topology-panel").hidden = !topology;
   byId("backup-panel").hidden = !backup;
   byId("memory-observatory-panel").hidden = !memoryObservatory;
-  byId("chat-tab").classList.toggle("is-active", chat);
+  byId("dashboard-tab").classList.toggle("is-active", chat);
   byId("host-stewardship-tab").classList.toggle("is-active", host);
   byId("timeline-tab").classList.toggle("is-active", timeline);
   byId("self-improvement-tab").classList.toggle("is-active", selfImprovement);
@@ -633,7 +642,7 @@ function switchTab(name, { updateLocation = true } = {}) {
   byId("backup-tab").classList.toggle("is-active", backup);
   byId("memory-observatory-tab").classList.toggle("is-active", memoryObservatory);
   byId("local-topology-tab").classList.toggle("is-active", topology);
-  byId("chat-tab").setAttribute("aria-selected", String(chat));
+  byId("dashboard-tab").setAttribute("aria-selected", String(chat));
   byId("host-stewardship-tab").setAttribute("aria-current", host ? "page" : "false");
   byId("timeline-tab").setAttribute("aria-current", timeline ? "page" : "false");
   byId("self-improvement-tab").setAttribute("aria-selected", String(selfImprovement));
@@ -809,11 +818,9 @@ function renderMemoryObservatoryRelationships(duplicates, supersessions) {
   });
 }
 
-function renderMemoryObservatoryGuidance(guidance) {
-  const container = byId("memory-observatory-review-guidance"); container.replaceChildren();
-  const rows = Array.isArray(guidance) ? guidance.slice(0, 20) : observatoryEntries(guidance);
-  if (!rows.length) { const empty = document.createElement("p"); empty.className = "muted"; empty.textContent = "Use Chat's existing reviewed memory commands; no command catalog was returned."; container.append(empty); return; }
-  rows.forEach((record) => { const item = document.createElement("div"); item.className = "memory-observatory-guidance-item"; item.textContent = typeof record === "object" ? observatoryText(observatoryField(record, "label", "command", "title", "name"), "Chat review command") : observatoryText(record); container.append(item); });
+function renderMemoryObservatoryGuidance(_guidance) {
+  const container = byId("memory-observatory-review-guidance");
+  container.textContent = "Legacy conversation controls are retired from this website. Existing memory records and review protections remain intact; this observatory does not authorize changes.";
 }
 
 function memoryHash(value) {
@@ -1293,7 +1300,8 @@ async function loadChats(selectFirst = true) {
     callSoul("chats.list", { limit: 50 }),
     callSoul("chats.progress", { limit: 20 })
   ]);
-  lifecycle(envelope); replaceChatProgress(dataOf(progress).records || []);
+  // A successful list refresh is not completion of the active chat request.
+  replaceChatProgress(dataOf(progress).records || []);
   state.chats = dataOf(envelope).records || []; renderChatList();
   if (selectFirst && !state.activeChat && state.chats.length) await selectChat(state.chats[0]);
   if (!state.chats.length) resetConversationView();
@@ -1324,10 +1332,10 @@ async function selectChat(chat) {
     clearPictureAttachment();
   }
   state.activeChat = chat; renderChatList();
-  byId("active-chat-kicker").textContent = chat.id;
+  byId("active-chat-kicker").textContent = chat.roster_member ? `${chat.roster_member} · text only · ${chat.id}` : chat.id;
   byId("active-chat-title").textContent = chat.title || "Untitled conversation";
   byId("pin-chat").disabled = false; byId("pin-chat").textContent = chat.pinned ? "Unpin" : "Pin";
-  byId("composer-hint").textContent = state.coreLocked ? "No local Core is loaded · choose one above to continue." : "Local provider request · foreground only";
+  byId("composer-hint").textContent = state.coreLocked && !chat.roster_member ? "Legacy chat handoff to shared compute is pending." : "Local provider request · foreground only";
   byId("message-input").placeholder = "Write a message to Soul…"; setBusy(true, "Loading conversation");
   try {
     const [messages, workspace, inbox, progress] = await Promise.all([
@@ -1553,25 +1561,9 @@ function renderMessageActions(article, actions) {
   if (!safe.length) return;
   const region = document.createElement("div"); region.className = "message-actions";
   safe.forEach((action) => {
-    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = action.label || "Continue exact creative workflow";
+    const button = document.createElement("button"); button.type = "button"; button.className = "gate-button gate-button--gold"; button.textContent = action.label || "Continue exact creative workflow"; button.disabled = true;
     const status = document.createElement("small"); status.className = "message-action-status";
-    button.addEventListener("click", async () => {
-      button.disabled = true; status.textContent = action.operation === "core.activate.execute" ? "Core transfer accepted…" : "Creative workflow accepted…";
-      try {
-        if (action.operation === "core.activate.execute") {
-          status.textContent = "Revalidating active work and Core state…";
-          const envelope = await callSoul(action.operation, { core_id: action.core_id, target_profile_id: action.target_profile_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest });
-          lifecycle(envelope); status.textContent = envelope.errors?.[0]?.message || dataOf(envelope).reason || "Core activation complete.";
-          if (envelope.lifecycle_state !== "complete") { button.disabled = false; return; }
-          await reconcileCoreTransitionSurfaces();
-          return;
-        }
-        const envelope = await callNdjson("/api/v1/music-job-stream", action.operation, { chat_id: action.chat_id, flow_id: action.flow_id, action_id: action.action_id, confirmation: action.confirmation_phrase, expected_digest: action.expected_digest }, { current_chat_id: action.chat_id }, (event) => { status.textContent = event.message || "Bounded creative work in progress…"; });
-        lifecycle(envelope); status.textContent = envelope.errors?.[0]?.message || dataOf(envelope).reason || "Creative workflow reached a review gate.";
-        if (state.activeChat?.id === action.chat_id) await selectChat(state.activeChat);
-        await refreshCores({ automatic: true }); await refreshModelRuntime({ automatic: true });
-      } catch (error) { status.textContent = error.message || "Creative workflow failed safely."; button.disabled = false; }
-    });
+    status.textContent = "Saved Core and creative actions are unavailable while their shared-compute handoff is pending.";
     region.append(button, status);
   });
   article.append(region);
@@ -1625,7 +1617,7 @@ function renderInbox(data) {
 
 async function createChat() {
   setBusy(true, "Creating conversation");
-  try { const envelope = await callSoul("chats.create"); lifecycle(envelope); const chat = dataOf(envelope).record; await loadChats(false); await selectChat(chat); } catch (error) { showError(error); } finally { setBusy(false); }
+  try { const member = byId("new-chat-member").value; const envelope = await callSoul("chats.create", member ? { member } : {}); lifecycle(envelope); const chat = dataOf(envelope).record; await loadChats(false); await selectChat(chat); } catch (error) { showError(error); } finally { setBusy(false); }
 }
 
 function musicProjectInput() {
@@ -2658,8 +2650,8 @@ function clearPictureAttachment() {
   const preview = byId("picture-attachment-preview"); if (preview) preview.removeAttribute("src");
   const retain = byId("picture-attachment-retain"); if (retain) retain.checked = false;
   if (!state.busy && byId("composer-hint")) {
-    byId("composer-hint").textContent = state.coreLocked
-      ? "No local Core is loaded · choose one above to continue."
+    byId("composer-hint").textContent = state.coreLocked && !state.activeChat?.roster_member
+      ? "Legacy chat handoff to shared compute is pending."
       : (state.activeChat ? "Ready · local continuity enabled" : "No conversation selected");
   }
 }
@@ -2793,11 +2785,13 @@ function handleCameraSnapshot(event) {
 }
 
 async function sendMessage(event) {
-  event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy || state.voiceTranscribing || state.voiceRecorder || state.coreLocked) return;
+  event.preventDefault(); const input = byId("message-input"); const message = input.value.trim(); if (!message || !state.activeChat || state.busy || state.voiceTranscribing || state.voiceRecorder || (state.coreLocked && !state.activeChat.roster_member)) return;
+  if (state.activeChat.roster_member && state.pictureAttachment) { announce("Member conversations are text-only; remove the picture first."); return; }
   const voiceRoundTrip = state.voiceRoundTripPending; state.voiceRoundTripPending = false;
   const picture = state.pictureAttachment;
   const chatId = state.activeChat.id; const chatRequestId = requestId(); input.value = ""; appendPendingExchange(message, chatRequestId);
   if (!picture) state.localChatRequests.add(chatRequestId);
+  if (state.activeChat.roster_member) { state.rosterRequest = { chat_id: chatId, target_request_id: chatRequestId }; state.rosterStopRequested = false; }
   emitSoulNotification("submit"); setSoulActivity("received", picture ? "The local picture and question have entered a bounded perception path." : "Submitting this transmission to local continuity.");
   setBusy(true, "Soul is responding"); byId("lifecycle-state").textContent = "pending"; document.querySelector(".state-ribbon").dataset.lifecycle = "pending"; document.querySelector(".conversation").dataset.lifecycle = "pending";
   try {
@@ -2830,9 +2824,14 @@ async function sendMessage(event) {
       renderMessages(records);
       const workspace = await callSoul("workspace.chat", { chat_id: chatId, limit: 50 }, { current_chat_id: chatId }); renderWorkspace(dataOf(workspace).records || []);
     }
-    await loadChats(false); announce(`Request ${envelope.lifecycle_state || "finished"}`);
-    if (!voiceRoundTrip) emitSoulNotification("chat_ready", `chat:${chatId}:${records.at(-1)?.id || requestId()}`);
-    if (voiceRoundTrip && state.activeChat?.id === chatId) {
+    await loadChats(false);
+    if (dataOf(envelope).code === "roster_busy" && dataOf(envelope).request_admitted === false) {
+      if (state.activeChat?.id === chatId && !input.value) input.value = message;
+      setSoulActivity("awaiting_input", dataOf(envelope).reason);
+      announce(dataOf(envelope).reason);
+    } else { announce(`Request ${envelope.lifecycle_state || "finished"}`); }
+    if (!voiceRoundTrip && envelope.lifecycle_state === "complete") emitSoulNotification("chat_ready", `chat:${chatId}:${records.at(-1)?.id || requestId()}`);
+    if (voiceRoundTrip && envelope.lifecycle_state === "complete" && state.activeChat?.id === chatId) {
       const reply = [...records].reverse().find((record) => record.role === "assistant" && String(record.content || record.text || "").trim());
       const buttons = [...document.querySelectorAll(".message--assistant .message-speak-button")];
       const button = buttons.at(-1);
@@ -2865,6 +2864,7 @@ async function sendMessage(event) {
     }
   } finally {
     state.localChatRequests.delete(chatRequestId);
+    if (state.rosterRequest?.target_request_id === chatRequestId) { state.rosterRequest = null; state.rosterStopRequested = false; }
     setBusy(false);
     if (state.activeChat?.id === chatId) input.focus();
   }
@@ -2951,7 +2951,7 @@ async function previewCore(coreId) {
 }
 async function refreshStatus({ automatic = false } = {}) {
   const button = byId("refresh-status"); button.disabled = true; announce("Collecting bounded host status");
-  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; const core = data.core || {}; const chat = core.chat_engine || {}; const music = core.music_engine || {}; const chatEngine = [chat.model, chat.runtime?.replaceAll("_", " "), chat.accelerator].filter(Boolean).join(" · ") || "Unavailable"; const musicEngine = [music.model, music.accelerator, music.residency?.replaceAll("_", " ")].filter(Boolean).join(" · ") || "Unavailable"; const musicLane = core.music_lane?.conflict || (core.music_lane?.available_in_active_core === true ? "Available on demand" : "Unavailable"); const details = byId("system-details"); details.replaceChildren(detailRow("Core", core.label || core.mode || "Unavailable"), detailRow("Chat engine", chatEngine), detailRow("Music engine", musicEngine), detailRow("Music lane", musicLane), detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("State", core.runtime_status || envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { const details = byId("system-details"); details.replaceChildren(detailRow("Core", "Unavailable"), detailRow("Chat engine", "Unavailable"), detailRow("Music engine", "Unavailable"), detailRow("Music lane", "Unavailable"), detailRow("Host", "Unavailable"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
+  try { const envelope = await callSoul("system_status.refresh"); lifecycle(envelope); const data = dataOf(envelope); const host = data.collected?.host?.hostname || data.hostname || data.host || "Unavailable"; byId("system-details").replaceChildren(detailRow("Host", host), detailRow("Collected", data.collected_at ? formatTime(data.collected_at) : "Completed"), detailRow("State", envelope.lifecycle_state || "unknown")); announce(automatic ? "Initial system status collected" : "System status refreshed manually"); } catch (error) { byId("system-details").replaceChildren(detailRow("Host", "Unavailable"), detailRow("State", "failed")); if (!automatic) showError(error); } finally { button.disabled = false; }
 }
 
 function renderModelRuntime(runtime, message = "") {
@@ -3022,7 +3022,106 @@ async function executeModelRuntime() {
   } catch (error) { status.textContent = error.message || "Runtime change failed safely."; }
 }
 
-function showError(error) { byId("lifecycle-state").textContent = "failed"; document.querySelector(".state-ribbon").dataset.lifecycle = "failed"; document.querySelector(".conversation").dataset.lifecycle = "failed"; announce(error.message || "Request failed safely"); }
+const COMPUTE_POLICIES = new Set(["available", "reserved"]);
+const COMPUTE_STATES = new Set(["unloaded", "resident", "working", "blocked"]);
+function checkedComputeData(envelope, fallback) {
+  if (envelope?.lifecycle_state !== "complete") throw new Error(envelope?.errors?.[0]?.message || envelope?.data?.reason || fallback);
+  const data = dataOf(envelope);
+  if (!data || !COMPUTE_POLICIES.has(data.policy) || !COMPUTE_STATES.has(data.state) || typeof data.available !== "boolean" || !Number.isInteger(data.revision)) throw new Error("Compute response is incomplete.");
+  return data;
+}
+
+function renderCompute(status, message = "") {
+  state.computeStatus = status;
+  state.computePreview = null;
+  const known = Boolean(status);
+  const policy = known ? status.policy : "unknown";
+  byId("core-label").textContent = known ? `Compute ${policy}` : "Compute unavailable";
+  byId("runtime-state-label").textContent = known ? status.state : "unavailable";
+  document.querySelector(".runtime-card").dataset.state = known ? status.state : "unavailable";
+  byId("runtime-details").replaceChildren(
+    detailRow("Policy", known ? policy : "unknown"),
+    detailRow("State", known ? status.state : "unknown"),
+    detailRow("Model", known ? (status.model || "none loaded") : "unknown"),
+    detailRow("Coordinator", known ? (status.available ? "online" : "unavailable") : "unknown"),
+    detailRow("Revision", known ? String(status.revision) : "unknown")
+  );
+  const handoff = status?.handoff;
+  const handoffReason = handoff && `${handoff.state} · ${handoff.provider_id} · ${handoff.member}`;
+  const note = message || (handoffReason ? `Handoff: ${handoffReason}. Compute remains held until verified cleanup; no automatic retry.` : "Policy changes require preview and confirmation. Studio generation uses sequential handoffs; follow-up remains a separate request.");
+  byId("runtime-card-status").textContent = note;
+  byId("runtime-profile-list").replaceChildren();
+  byId("load-model-runtime").disabled = !known || Boolean(handoff) || policy === "available";
+  byId("unload-model-runtime").disabled = !known || Boolean(handoff) || policy === "reserved";
+  const menu = byId("core-menu"); menu.replaceChildren();
+  const summary = document.createElement("p"); summary.textContent = known ? `${status.state} · ${status.model || "no model"} · revision ${status.revision}` : note; menu.append(summary);
+  for (const [target, label] of [["available", "Make available"], ["reserved", "Reserve compute"]]) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "core-menu-item"; button.textContent = label; button.disabled = !known || Boolean(handoff) || target === policy; button.addEventListener("click", () => { setCoreMenu(false); previewCompute(target); }); menu.append(button);
+  }
+  byId("core-unavailable-banner").hidden = true;
+  setBusy(state.busy);
+}
+
+async function refreshCompute({ automatic = false } = {}) {
+  const button = byId("refresh-model-runtime"); button.disabled = true;
+  try {
+    const status = checkedComputeData(await callSoul("compute.status"), "Compute status is unavailable.");
+    renderCompute(status);
+    if (!automatic) announce("Compute availability refreshed");
+  } catch (error) {
+    renderCompute(null, error.message || "Compute status failed safely.");
+    if (!automatic) announce(error.message || "Compute status failed safely.");
+  } finally { button.disabled = false; }
+}
+
+async function previewCompute(policy) {
+  if (!COMPUTE_POLICIES.has(policy) || !state.computeStatus || state.computeStatus.policy === policy) return;
+  state.computePreview = null;
+  byId("runtime-card-status").textContent = `Checking ${policy} policy…`;
+  try {
+    const envelope = await callSoul("compute.preview", { policy });
+    const preview = checkedComputeData(envelope, "Compute policy preview was blocked.");
+    if (preview.target_policy !== policy || preview.confirmation_phrase !== "SET_COMPUTE_POLICY" || !/^[a-f0-9]{64}$/.test(preview.expected_digest || "")) throw new Error("Compute preview is incomplete.");
+    state.computePreview = { policy, digest: preview.expected_digest, confirmation: preview.confirmation_phrase };
+    byId("model-runtime-dialog-title").textContent = policy === "reserved" ? "Reserve shared compute" : "Make shared compute available";
+    byId("model-runtime-preview-title").textContent = "Review compute policy change";
+    byId("model-runtime-preview-details").replaceChildren(
+      detailRow("Current policy", preview.policy), detailRow("Target policy", policy),
+      detailRow("State", preview.state), detailRow("Model", preview.model || "none loaded"),
+      detailRow("Coordinator", preview.available ? "online" : "unavailable"), detailRow("Revision", String(preview.revision))
+    );
+    byId("model-runtime-confirmation-phrase").textContent = preview.confirmation_phrase;
+    prefillApprovalGate("model-runtime-confirmation", "execute-model-runtime", preview.confirmation_phrase);
+    byId("execute-model-runtime").textContent = policy === "reserved" ? "Reserve shared compute" : "Make compute available";
+    byId("model-runtime-dialog-status").textContent = "The backend will recheck active work before applying this exact policy.";
+    byId("model-runtime-dialog").showModal();
+    byId("runtime-card-status").textContent = "Preview ready. Review and confirm the exact policy.";
+  } catch (error) {
+    byId("runtime-card-status").textContent = error.message || "Compute preview failed safely.";
+  }
+}
+
+async function executeCompute() {
+  const preview = state.computePreview;
+  if (!preview || byId("model-runtime-confirmation").value !== preview.confirmation) return;
+  const button = byId("execute-model-runtime"); button.disabled = true;
+  const statusLine = byId("model-runtime-dialog-status"); statusLine.textContent = "Rechecking compute policy and active work…";
+  try {
+    const envelope = await callSoul("compute.execute", { policy: preview.policy, confirmation: preview.confirmation, expected_digest: preview.digest });
+    const status = checkedComputeData(envelope, "Compute policy change was blocked.");
+    if (status.policy !== preview.policy) throw new Error("Compute policy was not verified after execution.");
+    renderCompute(status);
+    byId("model-runtime-dialog").close();
+    announce(`Compute policy ${status.policy}`);
+  } catch (error) {
+    state.computePreview = null;
+    statusLine.textContent = error.message || "Compute policy change failed safely.";
+    byId("runtime-card-status").textContent = statusLine.textContent;
+    renderCompute(null, statusLine.textContent);
+  }
+}
+
+function showError(error) { byId("operation-state").textContent = "Failed"; announce(error.message || "Request failed safely"); }
 
 function studioItem(titleText, metaText, active, onClick) {
   const button = document.createElement("button"); button.type = "button"; button.className = "studio-item"; button.classList.toggle("is-active", active);
@@ -5344,7 +5443,7 @@ function closeReviewCenter() { byId("review-center").close(); }
 
 function resetVisualForm() {
   state.selectedVisualProject = null; state.visualPreview = null; state.visualProjectDeletePreview = null; state.visualBlenderPreview = null; state.visualBlenderResumePreview = null; state.visualBlenderSourceSceneId = null;
-  byId("visual-project-form").reset(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
+  byId("visual-project-form").reset(); renderVisualModelChoices(); byId("visual-seed").value = String(Math.floor(Math.random() * 2147483647));
   byId("visual-workbench-title").textContent = "New visual"; byId("save-visual-project").hidden = false; byId("update-visual-project").hidden = true; byId("visual-project-release").hidden = true;
   byId("visual-generation-card").hidden = true; byId("visual-blender-card").hidden = true; byId("visual-candidates").hidden = true; byId("visual-project-delete").hidden = true; byId("visual-form-status").textContent = "";
   byId("visual-blender-confirm").hidden = true; byId("execute-visual-blender").disabled = true; byId("preview-visual-blender").disabled = true; byId("visual-blender-status").textContent = "Select or create a visual project first.";
@@ -5353,7 +5452,32 @@ function resetVisualForm() {
 }
 
 function visualProjectInput() {
-  return { title: byId("visual-title").value, intent: byId("visual-intent").value, prompt: byId("visual-prompt").value, negative_prompt: byId("visual-negative").value, aspect_ratio: byId("visual-aspect").value, seed: Number(byId("visual-seed").value) };
+  return { title: byId("visual-title").value, intent: byId("visual-intent").value, prompt: byId("visual-prompt").value, negative_prompt: byId("visual-negative").value, aspect_ratio: byId("visual-aspect").value, seed: Number(byId("visual-seed").value), profile_id: byId("visual-profile").value };
+}
+
+function renderVisualModelChoices() {
+  const select = byId("visual-profile");
+  const selected = state.selectedVisualProject?.profile_id || state.visualDefaultProfile;
+  select.replaceChildren();
+  for (const profile of state.visualProfileChoices || []) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = `${profile.label}${profile.license ? ` · ${profile.license}` : ""}${profile.enabled ? "" : ` — ${profile.reason || "Unavailable"}`}`;
+    option.disabled = !profile.enabled;
+    select.append(option);
+  }
+  if (selected && !Array.from(select.options).some((option) => option.value === selected)) {
+    const missing = document.createElement("option"); missing.value = selected; missing.textContent = `${selected} — unavailable historical profile`; missing.disabled = true; select.append(missing);
+  }
+  select.value = selected || "";
+  select.disabled = !select.options.length;
+}
+
+function invalidateVisualApproval() {
+  state.visualPreviewRevision = (state.visualPreviewRevision || 0) + 1;
+  state.visualPreview = null;
+  byId("visual-generation-confirm").hidden = true;
+  byId("start-visual-generation").disabled = true;
 }
 
 function renderVisualProjects() {
@@ -5618,7 +5742,7 @@ async function previewVisualCandidateDeletion(gate, project, candidate, status) 
 async function selectVisualProject(projectId) {
   try {
     const envelope = await callSoul("visual.projects.get", { visual_project_id: projectId }); lifecycle(envelope); const project = dataOf(envelope).project;
-    state.selectedVisualProject = project; byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
+    state.selectedVisualProject = project; renderVisualModelChoices(); byId("visual-title").value = project.title; byId("visual-intent").value = project.intent; byId("visual-prompt").value = project.prompt; byId("visual-negative").value = project.negative_prompt; byId("visual-aspect").value = project.aspect_ratio; byId("visual-seed").value = String(project.seed);
     byId("visual-native-motion-instruction").value = project.prompt; byId("visual-native-motion-seed").value = String(project.seed);
     byId("visual-workbench-title").textContent = project.title; byId("save-visual-project").hidden = true; byId("update-visual-project").hidden = false; const release = byId("visual-project-release"); release.hidden = false; release.textContent = project.release_state === "released" ? "Restore to Active" : "Move to Released"; byId("visual-generation-card").hidden = false; byId("visual-blender-card").hidden = false; byId("visual-project-delete").hidden = false; byId("visual-generation-confirm").hidden = true; byId("visual-blender-confirm").hidden = true; byId("visual-project-delete-confirm").hidden = true; state.visualPreview = null; state.visualBlenderPreview = null; state.visualBlenderResumePreview = null; state.visualBlenderSourceSceneId = null; state.visualProjectDeletePreview = null;
     byId("visual-blender-direction").value = project.prompt; byId("visual-blender-seed").value = String(project.seed); await loadVisualBlenderMusicProjects();
@@ -5650,9 +5774,17 @@ async function previewNativeMotion() {
   finally { button.disabled = false; }
 }
 
+function visualReadinessBlockers(data) {
+  const blockers = [];
+  if (!data.runtime_ready) blockers.push("Configured renderer is missing or not executable");
+  if (!data.models_ready) blockers.push(`Missing or unverified model files: ${(data.missing_roles || []).join(", ") || "unknown"}`);
+  if (!data.core?.allowed) blockers.push(data.core?.reason || "Compute admission is unavailable");
+  return blockers.join(" · ") || "Visual readiness could not be established";
+}
+
 async function refreshVisualResources() {
   const button = byId("refresh-visual-resources"); button.disabled = true; byId("visual-form-status").textContent = "Verifying the pinned visual runtime and model files… the first pass may take several seconds.";
-  try { const [envelope, blenderEnvelope, templateEnvelope] = await Promise.all([callSoul("visual.resources.status"), callSoul("visual.blender.resources"), callSoul("visual.blender.templates")]); lifecycle(envelope); lifecycle(blenderEnvelope); lifecycle(templateEnvelope); const data = dataOf(envelope); const blender = dataOf(blenderEnvelope); const native = data.native_motion || {}; const label = byId("visual-resource-state"); label.textContent = data.ready && native.ready && blender.ready ? "All visual lanes ready" : (data.ready ? `${data.profile} ready` : "Runtime attention"); label.classList.toggle("is-ready", data.ready && native.ready && blender.ready); const blenderLabel = byId("visual-blender-resource-state"); blenderLabel.textContent = blender.ready ? "Blender ready" : "Runtime attention"; blenderLabel.classList.toggle("is-ready", blender.ready); state.visualBlenderTemplates = dataOf(templateEnvelope).templates || []; byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · still verified · native video ${native.ready ? `${native.profile} verified` : "attention"} · Blender ${blender.ready ? `${blender.templates.length} trusted templates` : "attention"} · ${data.core?.core_id || "bounded lane"}` : (data.core?.reason || `Missing: ${(data.missing_roles || []).join(", ") || "runtime"}`); }
+  try { const [envelope, blenderEnvelope, templateEnvelope] = await Promise.all([callSoul("visual.resources.status"), callSoul("visual.blender.resources"), callSoul("visual.blender.templates")]); lifecycle(envelope); lifecycle(blenderEnvelope); lifecycle(templateEnvelope); const data = dataOf(envelope); state.visualDefaultProfile = data.profile_id; state.visualProfileChoices = data.profile_choices || []; renderVisualModelChoices(); const blender = dataOf(blenderEnvelope); const native = data.native_motion || {}; const label = byId("visual-resource-state"); label.textContent = data.ready && native.ready && blender.ready ? "All visual lanes ready" : (data.ready ? `${data.profile} ready` : "Runtime attention"); label.classList.toggle("is-ready", data.ready && native.ready && blender.ready); const blenderLabel = byId("visual-blender-resource-state"); blenderLabel.textContent = blender.ready ? "Blender ready" : "Runtime attention"; blenderLabel.classList.toggle("is-ready", blender.ready); state.visualBlenderTemplates = dataOf(templateEnvelope).templates || []; byId("visual-form-status").textContent = data.ready ? `${data.accelerator} · still verified · native video ${native.ready ? `${native.profile} verified` : "attention"} · Blender ${blender.ready ? `${blender.templates.length} trusted templates` : "attention"} · ${data.core?.core_id || "bounded lane"}` : visualReadinessBlockers(data); }
   catch (error) { byId("visual-form-status").textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -5718,8 +5850,17 @@ async function executeVisualProjectDeletion() {
 
 async function previewVisualGeneration() {
   if (!state.selectedVisualProject) return;
+  invalidateVisualApproval();
+  const revision = state.visualPreviewRevision;
+  const saved = state.selectedVisualProject;
+  const input = visualProjectInput();
+  if (Object.keys(input).some((key) => String(input[key]) !== String(saved[key] ?? (key === "profile_id" ? state.visualDefaultProfile : "")))) {
+    invalidateVisualApproval();
+    byId("visual-generation-status").textContent = "Save the revised brief and model before requesting a new preview.";
+    return;
+  }
   const button = byId("preview-visual-generation"); button.disabled = true; byId("visual-generation-status").textContent = "Revalidating the exact visual project, Core, runtime, and pinned models…";
-  try { const envelope = await callSoul("visual.generation.preview", { visual_project_id: state.selectedVisualProject.project_id }); lifecycle(envelope); const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.data?.message || "Visual runtime is not ready"); state.visualPreview = data; byId("visual-generation-scope").textContent = JSON.stringify(data, null, 2); byId("visual-generation-confirm").hidden = false; byId("start-visual-generation").disabled = false; byId("visual-generation-status").textContent = "Clicking generate authorizes this exact local draft."; }
+  try { const envelope = await callSoul("visual.generation.preview", { visual_project_id: saved.project_id }); lifecycle(envelope); if (revision !== state.visualPreviewRevision || state.selectedVisualProject?.project_id !== saved.project_id || JSON.stringify(visualProjectInput()) !== JSON.stringify(input)) return; const data = dataOf(envelope); if (!data.expected_digest) throw new Error(envelope.data?.message || "Visual runtime is not ready"); state.visualPreview = data; byId("visual-generation-scope").textContent = JSON.stringify(data, null, 2); byId("visual-generation-confirm").hidden = false; byId("start-visual-generation").disabled = false; byId("visual-generation-status").textContent = "Clicking generate authorizes this exact local draft."; }
   catch (error) { byId("visual-generation-status").textContent = error.message; }
   finally { button.disabled = false; }
 }
@@ -6560,14 +6701,13 @@ async function bootstrap() {
   try {
     const envelope = await callSoul("application.bootstrap"); lifecycle(envelope); const data = dataOf(envelope); const providers = data.providers?.providers || [];
     const active = providers.find((provider) => provider.available || provider.configured) || providers[0]; byId("provider-label").textContent = active ? `Provider ${active.id || active.name || "ready"}` : "Provider local";
-    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await refreshCameraAvailability(); await loadChats(true); await refreshCores({ automatic: true }); await refreshStatus({ automatic: true }); await refreshModelRuntime({ automatic: true }); await refreshVoicePresence(); await refreshNotificationCenter();
+    byId("config-label").textContent = data.configuration?.ok ? "Config valid" : "Config attention"; switchTab(tabFromLocation() || "chat"); await refreshCompute({ automatic: true }); await refreshStatus({ automatic: true }); await refreshSharedWorkspace(); await refreshCpuMemberStatus(); await refreshNotificationCenter();
   } catch (error) { state.bootstrapped = false; byId("connection-label").textContent = "Disconnected"; showError(error); }
 }
 
 byId("login-form").addEventListener("submit", login);
 byId("password-change-form").addEventListener("submit", changePassword);
 byId("logout-button").addEventListener("click", logout);
-byId("voice-presence-launch").addEventListener("click", launchVoicePresence);
 byId("core-selector").addEventListener("click", () => setCoreMenu(byId("core-menu").hidden));
 byId("review-center-button").addEventListener("click", openReviewCenter);
 byId("close-review-center").addEventListener("click", closeReviewCenter);
@@ -7030,7 +7170,7 @@ byId("review-activity-tab").addEventListener("click", () => switchReviewView("ac
 document.querySelectorAll("[data-activity-filter]").forEach((button) => button.addEventListener("click", () => filterReviewActivity(button.dataset.activityFilter)));
 byId("review-center").addEventListener("close", () => { if (state.reviewOpener instanceof HTMLElement) state.reviewOpener.focus(); });
 byId("review-center").addEventListener("click", (event) => { if (event.target === byId("review-center")) closeReviewCenter(); });
-byId("chat-tab").addEventListener("click", () => switchTab("chat"));
+byId("dashboard-tab").addEventListener("click", () => switchTab("chat"));
 byId("host-stewardship-tab").addEventListener("click", () => switchTab("host"));
 byId("timeline-tab").addEventListener("click", () => switchTab("timeline"));
 byId("self-improvement-tab").addEventListener("click", () => setSelfImprovementMenu(byId("self-improvement-menu").hidden));
@@ -7176,6 +7316,8 @@ byId("visual-folder-active").addEventListener("click", () => setVisualProjectVie
 byId("visual-folder-released").addEventListener("click", () => setVisualProjectView("released"));
 byId("visual-project-release").addEventListener("click", toggleVisualProjectRelease);
 byId("visual-project-form").addEventListener("submit", createVisualProject);
+byId("visual-project-form").addEventListener("input", invalidateVisualApproval);
+byId("visual-profile").addEventListener("change", invalidateVisualApproval);
 byId("update-visual-project").addEventListener("click", updateVisualProject);
 byId("refresh-visual-resources").addEventListener("click", refreshVisualResources);
 byId("preview-visual-generation").addEventListener("click", previewVisualGeneration);
@@ -7287,37 +7429,13 @@ byId("execute-beta-promotion").addEventListener("click", executeBetaPromotion);
 byId("preview-production-promotion").addEventListener("click", previewProductionPromotion);
 byId("production-promotion-confirmation").addEventListener("input", () => { byId("execute-production-promotion").disabled = !state.productionPromotionPreview || byId("production-promotion-confirmation").value !== state.productionPromotionPreview.confirmation_phrase; });
 byId("execute-production-promotion").addEventListener("click", executeProductionPromotion);
-byId("new-chat").addEventListener("click", createChat);
-byId("clear-chats").addEventListener("click", openClearDialog);
-byId("close-clear-dialog").addEventListener("click", () => byId("clear-dialog").close());
-byId("clear-mode").addEventListener("change", () => { setClearModeFields(); resetConversationPreviews(); });
-byId("clear-title").addEventListener("input", resetConversationPreviews);
-byId("select-all-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = true; }); updateClearSelectionCount(); resetConversationPreviews(); });
-byId("select-none-clear").addEventListener("click", () => { byId("clear-selection-list").querySelectorAll('input[type="checkbox"]').forEach((input) => { input.checked = false; }); updateClearSelectionCount(); resetConversationPreviews(); });
-byId("preview-clear").addEventListener("click", previewClear);
-byId("clear-confirmation").addEventListener("input", () => { byId("execute-clear").disabled = !state.clearPreview || byId("clear-confirmation").value !== "CLEAR_CONVERSATIONS"; });
-byId("execute-clear").addEventListener("click", executeClear);
-byId("preview-forget").addEventListener("click", previewForget);
-byId("forget-confirmation").addEventListener("input", () => { byId("execute-forget").disabled = !state.forgetPreview || byId("forget-confirmation").value !== state.forgetPreview.confirmation; });
-byId("execute-forget").addEventListener("click", executeForget);
-byId("pin-chat").addEventListener("click", togglePin);
 byId("refresh-status").addEventListener("click", refreshStatus);
-byId("refresh-model-runtime").addEventListener("click", refreshModelRuntime);
-byId("load-model-runtime").addEventListener("click", () => previewModelRuntime("load"));
-byId("unload-model-runtime").addEventListener("click", () => previewModelRuntime("unload"));
+byId("refresh-model-runtime").addEventListener("click", refreshCompute);
+byId("load-model-runtime").addEventListener("click", () => previewCompute("available"));
+byId("unload-model-runtime").addEventListener("click", () => previewCompute("reserved"));
 byId("close-model-runtime-dialog").addEventListener("click", () => byId("model-runtime-dialog").close());
-byId("model-runtime-confirmation").addEventListener("input", () => { byId("execute-model-runtime").disabled = !state.modelRuntimePreview || byId("model-runtime-confirmation").value !== state.modelRuntimePreview.confirmation; });
-byId("execute-model-runtime").addEventListener("click", executeModelRuntime);
-byId("composer").addEventListener("submit", sendMessage);
-byId("attach-picture").addEventListener("click", () => byId("picture-input").click());
-byId("picture-input").addEventListener("change", selectPictureAttachment);
-byId("picture-attachment-remove").addEventListener("click", () => { clearPictureAttachment(); byId("message-input").focus(); });
-byId("capture-screen").addEventListener("click", openScreenCaptureDialog);
-byId("open-camera").addEventListener("click", openCameraWindow);
-window.addEventListener("message", handleCameraSnapshot);
-window.addEventListener("pagehide", closeCameraWindow);
-byId("execute-screen-capture").addEventListener("click", captureScreenPreview);
-byId("record-voice").addEventListener("click", toggleVoiceRecording);
+byId("model-runtime-confirmation").addEventListener("input", () => { byId("execute-model-runtime").disabled = !state.computePreview || byId("model-runtime-confirmation").value !== state.computePreview.confirmation; });
+byId("execute-model-runtime").addEventListener("click", executeCompute);
 byId("notification-mode").addEventListener("click", cycleNotificationMode);
 byId("open-invocation-catalog").addEventListener("click", openInvocationCatalog);
 byId("close-invocation-catalog").addEventListener("click", closeInvocationCatalog);
@@ -7326,23 +7444,67 @@ byId("invocation-category").addEventListener("change", renderInvocationCatalog);
 byId("invocation-query").addEventListener("input", renderInvocationCatalog);
 byId("invocation-catalog").addEventListener("click", (event) => { if (event.target === byId("invocation-catalog")) closeInvocationCatalog(); });
 renderNotificationMode();
-byId("voice-output-profile").value = state.voiceOutputProfile;
-byId("voice-output-profile").addEventListener("change", (event) => {
-  const voice = event.target.value;
-  if (!VOICE_OUTPUT_PROFILES.has(voice)) { event.target.value = state.voiceOutputProfile; return; }
-  stopVoicePlayback(); state.voiceOutputProfile = voice;
-  state.notificationVoice = voice; persistNotificationSettings().catch(showError);
-  try { localStorage.setItem("soul.voice.output.profile", voice); } catch (_error) { /* browser preference remains session-local */ }
-  announce(`${event.target.selectedOptions[0].textContent} selected for the next spoken response`);
-});
-byId("voice-output-quality").value = state.voiceOutputQuality;
-byId("voice-output-quality").addEventListener("change", (event) => {
-  const quality = event.target.value;
-  if (!VOICE_OUTPUT_QUALITIES.has(quality)) { event.target.value = state.voiceOutputQuality; return; }
-  stopVoicePlayback(); state.voiceOutputQuality = quality;
-  try { localStorage.setItem("soul.voice.output.quality", quality); } catch (_error) { /* browser preference remains session-local */ }
-  announce(`${event.target.selectedOptions[0].textContent} delivery selected`);
-});
-byId("message-input").addEventListener("keydown", (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if (state.busy) { announce("Soul is still working; the draft was not sent or used as an interruption."); return; } byId("composer").requestSubmit(); } });
 syncMusicCompositionMode();
 initializeAuthentication();
+
+// Explicit clicks submit user commands through the ordinary authenticated chat
+// path. Model replies are never read by this action code.
+function submitCpuTaskCommand(text) {
+  if (state.activeChat?.roster_member !== "gemma-4-e4b-cpu") { announce("Select a Gemma CPU conversation first."); return; }
+  if (state.busy || state.rosterRequest) { announce("Wait for the current request to finish."); return; }
+  const input = byId("message-input");
+  if (input.value.trim()) { announce("Send or clear the current draft first."); return; }
+  input.value = text;
+  byId("composer").requestSubmit();
+}
+
+async function refreshCpuMemberStatus() {
+  const label = byId("cpu-member-status");
+  try {
+    const envelope = await callSoul("cpu.status");
+    const data = dataOf(envelope);
+    if (envelope.lifecycle_state !== "complete" || data.cpu_only !== true || !["loaded", "unloaded"].includes(data.state)) throw new Error("CPU coordinator unavailable");
+    label.textContent = data.state === "loaded" ? "CPU member: resident in system RAM; no idle unload. GPU availability is separate." : "CPU member: ready to load on demand. GPU availability is separate.";
+  } catch (_) { label.textContent = "CPU member status unavailable; no model was started."; }
+}
+byId("cpu-member-refresh").addEventListener("click", refreshCpuMemberStatus);
+
+// Shared metadata only: filenames are text, never executable HTML or file URLs.
+async function refreshSharedWorkspace() {
+  const summary = byId("workspace-summary"), tree = byId("workspace-tree");
+  summary.textContent = "Reading registered workspace files…";
+  try {
+    const envelope = await callSoul("workspace.list", {limit: 50});
+    requireLifecycle(envelope, ["complete"], "Workspace listing unavailable");
+    const records = dataOf(envelope).records || [];
+    renderSharedWorkspace(records);
+    summary.textContent = `${records.length} registered artifact records shown (maximum 50). File contents were not opened.`;
+  } catch (error) { tree.replaceChildren(); summary.textContent = error.message || "Workspace unavailable"; }
+}
+function renderSharedWorkspace(records) {
+  const root = {directories: new Map(), files: []};
+  for (const record of records) {
+    const parts = String(record.relative_path || record.artifact_id || "Unnamed").split("/").filter(Boolean);
+    let node = root;
+    for (const part of parts.slice(0, -1)) {
+      if (!node.directories.has(part)) node.directories.set(part, {directories: new Map(), files: []});
+      node = node.directories.get(part);
+    }
+    node.files.push({name: parts.at(-1), record});
+  }
+  function rows(node) {
+    const list = document.createElement("ul");
+    for (const [name, child] of [...node.directories.entries()].sort(([a],[b]) => a.localeCompare(b))) {
+      const item = document.createElement("li"), detail = document.createElement("details"), label = document.createElement("summary");
+      label.textContent = name + "/"; detail.append(label, rows(child)); item.append(detail); list.append(item);
+    }
+    for (const {name, record} of node.files.sort((a,b) => a.name.localeCompare(b.name))) {
+      const item = document.createElement("li"), label = document.createElement("span"), meta = document.createElement("small");
+      label.textContent = name; meta.textContent = ` — ${record.kind || "file"} · ${record.size_bytes ?? "?"} bytes · ${record.lifecycle || "unknown"}`;
+      item.append(label, meta); list.append(item);
+    }
+    return list;
+  }
+  byId("workspace-tree").replaceChildren(rows(root));
+}
+byId("refresh-workspace").addEventListener("click", refreshSharedWorkspace);

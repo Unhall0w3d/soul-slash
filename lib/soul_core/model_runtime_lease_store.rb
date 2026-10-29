@@ -4,6 +4,7 @@ require "fileutils"
 require "json"
 require "securerandom"
 require "time"
+require_relative "shared_compute_policy"
 
 module SoulCore
   class ModelRuntimeLeaseStore
@@ -39,7 +40,7 @@ module SoulCore
 
     def acquire(provider_id:, model_id:, request_id:, conversation_id: nil, ttl_seconds: DEFAULT_TTL_SECONDS)
       with_control_lock do
-        active_leases_unlocked
+        refuse_retained!(active_leases_unlocked)
         write_record(provider_id: provider_id, model_id: model_id, request_id: request_id, conversation_id: conversation_id, ttl_seconds: ttl_seconds)
       end
     end
@@ -50,6 +51,7 @@ module SoulCore
 
       with_control_lock do
         active = active_leases_unlocked
+        refuse_retained!(active)
         conflict = active.find { |lease| lease["resource_group"] == group }
         if conflict
           raise ResourceBusy, "#{group} is occupied by #{conflict.fetch('provider_id')} request #{conflict.fetch('request_id')}"
@@ -58,6 +60,28 @@ module SoulCore
           provider_id: provider_id, model_id: model_id, request_id: request_id,
           conversation_id: conversation_id, ttl_seconds: ttl_seconds, resource_group: group
         )
+      end
+    end
+
+    # Foreground roster ownership must not treat expiration or a dead owner as
+    # proof that its model child released the GPUs. Retained leases block loading
+    # until their ownership and cleanup can be reconciled.
+    def acquire_quiescent(provider_id:, model_id:, request_id:, conversation_id:, resource_group:, ttl_seconds:)
+      with_control_lock do
+        raise ResourceBusy, "retained leases require reconciliation" unless leases_for_quiescent_admission_unlocked.empty?
+        write_record(provider_id: provider_id, model_id: model_id, request_id: request_id,
+          conversation_id: conversation_id, resource_group: resource_group, ttl_seconds: ttl_seconds)
+      end
+    end
+
+    # Opt-in session ownership. Status/legacy admission must not prune or step
+    # around an unverified GPU release, even after process death or TTL expiry.
+    def acquire_retained(provider_id:, model_id:, request_id:, conversation_id:, resource_group:, ttl_seconds:)
+      with_control_lock do
+        raise ResourceBusy, "retained leases require reconciliation" unless leases_for_quiescent_admission_unlocked.empty?
+        write_record(provider_id: provider_id, model_id: model_id, request_id: request_id,
+          conversation_id: conversation_id, resource_group: resource_group, ttl_seconds: ttl_seconds,
+          release_policy: "verified")
       end
     end
 
@@ -74,6 +98,8 @@ module SoulCore
     def active_leases
       with_control_lock { active_leases_unlocked }
     end
+
+    def compute_policy_unlocked = SharedComputePolicy.new(directory: @directory)
 
     def with_control_lock
       prepare_directories
@@ -101,11 +127,11 @@ module SoulCore
 
         record = JSON.parse(File.binread(path, MAX_LEASE_BYTES))
         validate_record!(record, name)
-        if stale?(record)
+        if record["release_policy"] != "verified" && stale?(record)
           FileUtils.rm_f(path)
           nil
         else
-          record.slice("lease_id", "pid", "provider_id", "model_id", "request_id", "conversation_id", "resource_group", "started_at", "expires_at")
+          record.slice("lease_id", "pid", "provider_id", "model_id", "request_id", "conversation_id", "resource_group", "started_at", "expires_at", "release_policy")
         end
       rescue JSON::ParserError, ArgumentError, Errno::ENOENT => error
         raise IntegrityError, "invalid model runtime lease: #{error.class}"
@@ -133,7 +159,12 @@ module SoulCore
 
     private
 
-    def write_record(provider_id:, model_id:, request_id:, conversation_id:, ttl_seconds:, resource_group: nil)
+    def refuse_retained!(records)
+      raise ResourceBusy, "verified release required before admission" if records.any? { |r| r["release_policy"] == "verified" }
+    end
+
+    def write_record(provider_id:, model_id:, request_id:, conversation_id:, ttl_seconds:, resource_group: nil, release_policy: nil)
+      compute_policy_unlocked.admit!(provider_id: provider_id,request_id: request_id,conversation_id: conversation_id)
       now = @clock.call
       record = {
         "lease_id" => SecureRandom.hex(16),
@@ -144,6 +175,7 @@ module SoulCore
         "request_id" => safe_identifier(request_id),
         "conversation_id" => safe_identifier(conversation_id),
         "resource_group" => resource_group,
+        "release_policy" => release_policy,
         "started_at" => now.iso8601,
         "expires_at" => (now + Integer(ttl_seconds)).iso8601
       }.compact
@@ -167,6 +199,7 @@ module SoulCore
       raise IntegrityError, "model runtime lease identity mismatch" unless filename == "#{record['lease_id']}.json"
       raise IntegrityError, "model runtime lease PID is invalid" unless record["pid"].is_a?(Integer) && record["pid"].positive?
       raise IntegrityError, "model runtime lease process identity is missing" if record["process_start"].to_s.empty?
+      raise IntegrityError, "unknown release policy" if record.key?("release_policy") && record["release_policy"] != "verified"
       Time.iso8601(record.fetch("expires_at"))
     end
 

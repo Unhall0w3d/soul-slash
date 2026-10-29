@@ -21,6 +21,14 @@ check(checks, "examples explicitly carry no authority", catalog["examples_are_au
 check(checks, "human-facing fields are complete", catalog["records"].all? { |record| %w[id label category summary status required_inputs optional_inputs core approval output boundary examples].all? { |key| record.key?(key) } })
 check(checks, "production skill references resolve", catalog["records"].all? { |record| record["status"] == "available" && Array(record["unavailable_skill_ids"]).empty? })
 
+cpu_commands = service.list(category: "Commands")["records"]
+cpu_requests = service.list(category: "Supported requests")["records"]
+check(checks, "CPU slash commands and supported prose have distinct categories", cpu_commands.map { |row| row["id"] }.sort == %w[cpu-calculation-command cpu-task-commands] && cpu_requests.map { |row| row["id"] }.sort == %w[cpu-approved-memory cpu-assistance-requests cpu-calculation-requests cpu-creative-execution cpu-creative-preview cpu-file-reference-requests cpu-fleet-status cpu-guide-search cpu-operational-guide cpu-queue-requests cpu-security-status cpu-weather-requests cpu-web-reference-requests])
+check(checks, "CPU guide entries reference gateways rather than skills", (cpu_commands + cpu_requests).all? { |row| row["skill_ids"].empty? && row["handler_id"].start_with?("cpu_member_") })
+check(checks, "new categories route through the read-only catalog", service.match?("List Commands invocations") && service.match?("Show Supported requests invocations"))
+check(checks, "CPU guide preserves confirmation and admission boundaries", cpu_requests.find { |row| row["id"] == "cpu-assistance-requests" }["approval"].include?("immediately after") && cpu_requests.find { |row| row["id"] == "cpu-queue-requests" }["boundary"].include?("does not reserve compute"))
+check(checks, "conversational detail renders all typed task command examples", service.respond("How can I invoke /task commands?").include?("/task run") && service.respond("How can I invoke /task commands?").include?("/task preview"))
+
 creative = service.list(category: "Creative")
 check(checks, "category filter is exact and bounded", creative["count"].positive? && creative["records"].all? { |record| record["category"] == "Creative" })
 music = service.list(query: "ACE-Step")

@@ -6,6 +6,9 @@ require "securerandom"
 require "uri"
 require_relative "dashboard_authentication"
 require_relative "dashboard_music_job_manager"
+require_relative "creative_studio_bridge_http"
+require_relative "creative_studio_bridge_http_v2"
+require_relative "studio_result_review"
 require_relative "routed_voice_transcription_service"
 require_relative "voice_synthesis_service"
 require_relative "voice_presence_launch_service"
@@ -19,6 +22,8 @@ module SoulCore
     Response = Struct.new(:status, :headers, :body, keyword_init: true)
 
     STATIC_ROUTES = {
+      "/assets/studio-result.js" => ["assets/dashboard/studio-result.js", "text/javascript; charset=utf-8"],
+      "/assets/studio-result.css" => ["assets/dashboard/studio-result.css", "text/css; charset=utf-8"],
       "/assets/dashboard.css" => ["assets/dashboard/dashboard.css", "text/css; charset=utf-8"],
       "/assets/dashboard.js" => ["assets/dashboard/dashboard.js", "text/javascript; charset=utf-8"],
       "/assets/camera.css" => ["assets/camera/camera.css", "text/css; charset=utf-8"],
@@ -86,6 +91,8 @@ module SoulCore
       @authentication = authentication || DashboardAuthentication.new(root: @root)
       @public_origin = public_origin.to_s.empty? ? nil : normalize_public_origin(public_origin)
       @music_jobs = music_jobs
+      @creative_bridge_mutex = Mutex.new
+      @music_jobs_mutex = Mutex.new
       @voice_transcription = voice_transcription
       @voice_synthesis = voice_synthesis
       @voice_presence = voice_presence
@@ -99,6 +106,18 @@ module SoulCore
       normalized_headers = headers.each_with_object({}) { |(key, value), memo| memo[key.to_s.downcase] = value.to_s }
       return response(400, "Bad Request") unless valid_host?(normalized_headers["host"])
       return response(404, "Not Found") unless target.is_a?(String) && target.start_with?("/") && !target.include?("?") && !target.include?("#")
+
+      if CreativeStudioBridgeHttpV2::ROUTES.key?(target)
+        return CreativeStudioBridgeHttpV2.call(self, method: method, target: target, headers: normalized_headers, body: body)
+      end
+      if CreativeStudioBridgeHttp::ROUTES.key?(target)
+        return CreativeStudioBridgeHttp.call(self, method: method, target: target, headers: normalized_headers, body: body)
+      end
+
+      if method == "GET" && (review = StudioResultReview.route(target, normalized_headers))
+        return response(303, "", "Location" => review.fetch("redirect"), "Cache-Control" => "no-store") if review["redirect"]
+        return response(200, review.fetch("html"), "Content-Type" => "text/html; charset=utf-8", "Cache-Control" => "private, no-store")
+      end
 
       if target == "/"
         return response(405, "Method Not Allowed", "Allow" => "GET, HEAD") unless %w[GET HEAD].include?(method)
@@ -362,8 +381,22 @@ module SoulCore
       nil
     end
 
+    def creative_bridge
+      @creative_bridge_mutex.synchronize do
+        @creative_bridge ||= CreativeStudioBridge.new(root: @root,
+          services: ->(cancel) { @facade.creative_bridge_services(cancel: cancel) }, jobs: -> { music_jobs })
+      end
+    end
+
+    def creative_bridge_v2
+      @creative_bridge_mutex.synchronize do
+        @creative_bridge_v2 ||= CreativeStudioBridgeV2.new(root: @root,
+          services: ->(cancel) { @facade.creative_bridge_services(cancel: cancel) }, jobs: -> { music_jobs })
+      end
+    end
+
     def music_jobs
-      @music_jobs ||= DashboardMusicJobManager.new(root: @root, facade: @facade)
+      @music_jobs_mutex.synchronize { @music_jobs ||= DashboardMusicJobManager.new(root: @root, facade: @facade, creative_bridge: -> { creative_bridge }, creative_bridge_v2: -> { creative_bridge_v2 }) }
     end
 
     def voice_status(headers)

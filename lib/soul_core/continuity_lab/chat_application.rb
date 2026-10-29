@@ -27,7 +27,7 @@ module SoulCore
         @token_digest = Digest::SHA256.digest(bearer_token).freeze
       end
 
-      def call(method:, target:, headers:, body: nil)
+      def call(method:, target:, headers:, body: nil, cancel: -> { false })
         normalized = normalize_headers(headers)
         return error_response(403, "origin_forbidden", "Cross-origin requests are not supported.") if normalized.key?("origin")
         return error_response(401, "unauthorized", "A valid bearer token is required.") unless authenticated?(normalized["authorization"])
@@ -35,7 +35,7 @@ module SoulCore
         case [method, target]
         when ["GET", "/v1/models"] then models_response
         when ["GET", "/health"] then health_response
-        when ["POST", "/v1/chat/completions"] then completion_response(normalized, body)
+        when ["POST", "/v1/chat/completions"] then completion_response(normalized, body, cancel: cancel)
         else error_response(404, "not_found", "The requested route is not available.")
         end
       rescue ValidationError
@@ -76,14 +76,23 @@ module SoulCore
       end
 
       def models_response
-        json_response(200, { "object" => "list", "data" => [{ "id" => MODEL, "object" => "model", "owned_by" => "local" }] })
+        json_response(200, { "object" => "list", "data" => supported_models.map { |id| { "id" => id, "object" => "model", "owned_by" => "local" } } })
+      end
+
+      def supported_models = [MODEL]
+      def completion_model(result) = MODEL
+      def generation_parameters = { "max_tokens" => 768, "temperature" => 0.6, "top_p" => 0.95 }
+      def valid_temperature?(value) = value.instance_of?(Float) && value == generation_parameters.fetch("temperature")
+
+      def backend_complete(conversation_id, request, messages, cancel)
+        @backend.complete(conversation_id: conversation_id, messages: messages)
       end
 
       def health_response
         json_response(200, { "status" => "available", "backend_health_checked" => false })
       end
 
-      def completion_response(headers, body)
+      def completion_response(headers, body, cancel:)
         raise ValidationError, "missing conversation identifier" unless headers.key?("x-soul-conversation-id")
         conversation_id = headers.fetch("x-soul-conversation-id")
         unless conversation_id.is_a?(String) && conversation_id.ascii_only? &&
@@ -98,7 +107,7 @@ module SoulCore
 
         request = ContinuityLab.parse(request_body)
         messages, stream = validate_completion!(request)
-        result = @backend.complete(conversation_id: conversation_id, messages: messages)
+        result = backend_complete(conversation_id, request, messages, cancel)
         validate_backend_result!(result)
         stream ? stream_response(result) : completion_json(result)
       end
@@ -106,17 +115,17 @@ module SoulCore
       def validate_completion!(request)
         allowed = %w[model messages stream user max_tokens temperature top_p stream_options]
         raise ValidationError, "invalid completion object" unless request.is_a?(Hash) && (request.keys - allowed).empty?
-        raise ValidationError, "unsupported model" unless request["model"] == MODEL
+        raise ValidationError, "unsupported model" unless supported_models.include?(request["model"])
         raise ValidationError, "invalid messages" unless request["messages"].is_a?(Array) && request["messages"].length.between?(1, MAX_MESSAGES)
         raise ValidationError, "invalid stream flag" if request.key?("stream") && ![true, false].include?(request["stream"])
         raise ValidationError, "invalid user field" if request.key?("user") && !bounded_text?(request["user"], 256, allow_empty: false)
-        if request.key?("max_tokens") && !(request["max_tokens"].instance_of?(Integer) && request["max_tokens"] == 768)
+        if request.key?("max_tokens") && !(request["max_tokens"].instance_of?(Integer) && request["max_tokens"] == generation_parameters.fetch("max_tokens"))
           raise ValidationError, "invalid max_tokens"
         end
-        if request.key?("temperature") && !(request["temperature"].instance_of?(Float) && request["temperature"] == 0.6)
+        if request.key?("temperature") && !valid_temperature?(request["temperature"])
           raise ValidationError, "invalid temperature"
         end
-        if request.key?("top_p") && !(request["top_p"].instance_of?(Float) && request["top_p"] == 0.95)
+        if request.key?("top_p") && !(request["top_p"].instance_of?(Float) && request["top_p"] == generation_parameters.fetch("top_p"))
           raise ValidationError, "invalid top_p"
         end
         if request.key?("stream_options")
@@ -155,14 +164,14 @@ module SoulCore
       def completion_json(result)
         json_response(200, {
           "id" => result.fetch("id"), "object" => "chat.completion", "created" => result.fetch("created"),
-          "model" => MODEL, "choices" => [{ "index" => 0, "message" => { "role" => "assistant", "content" => result.fetch("content") }, "finish_reason" => "stop" }],
+          "model" => completion_model(result), "choices" => [{ "index" => 0, "message" => { "role" => "assistant", "content" => result.fetch("content") }, "finish_reason" => "stop" }],
           "soul" => result.fetch("soul")
         })
       end
 
       def stream_response(result)
         id = result.fetch("id")
-        base = { "id" => id, "object" => "chat.completion.chunk", "created" => result.fetch("created"), "model" => MODEL }
+        base = { "id" => id, "object" => "chat.completion.chunk", "created" => result.fetch("created"), "model" => completion_model(result) }
         frames = []
         frames << sse_frame(base.merge("choices" => [{ "index" => 0, "delta" => { "role" => "assistant" }, "finish_reason" => nil }]))
         frames << sse_frame(base.merge("choices" => [{ "index" => 0, "delta" => { "content" => result.fetch("content") }, "finish_reason" => nil }]))

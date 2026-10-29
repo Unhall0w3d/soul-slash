@@ -1,0 +1,9 @@
+{
+  "workflow_handler_registry.rb": "014a4b3ae7b37f7a8436266f8b8a6879fc9d4a1c737157c54bb8fd41f98a536c",
+  "workflow_intent_handler_dispatch.rb": "476c81ca6041b295408682cc539e73db26153653d9735ee67d950207a6901844",
+  "workflow_session_handler_dispatch.rb": "c084f0e25fd232aa01e9b4f8f8d5ffafcbc03a62e6489d1f69a87351a359ece0",
+  "dependencies.json": "5875d2689468a3f22161c6958361aef9368c04899b10c2974949e96c5eb300da",
+  "Gemfile": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "provenance.json": "6a35d215d37166540376e191ff826751744c52cc2e2f60b084d21d3f6e68c3ed",
+  "cases.json": "c3f3f99d7375f0be40ee792d8489606979aa0142f68642b63a5244bc83b7aecb"
+}

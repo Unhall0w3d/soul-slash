@@ -1,0 +1,184 @@
+[
+  {
+    "id": "registryconstant",
+    "action": "definition",
+    "file": "workflow_intent_handler_dispatch.rb",
+    "line": 10,
+    "character": 17,
+    "expected": [
+      [
+        "workflow_handler_registry.rb",
+        6
+      ]
+    ]
+  },
+  {
+    "id": "matchintent",
+    "action": "definition",
+    "file": "workflow_intent_handler_dispatch.rb",
+    "line": 10,
+    "character": 45,
+    "expected": [
+      [
+        "workflow_handler_registry.rb",
+        35
+      ]
+    ]
+  },
+  {
+    "id": "includemethod",
+    "action": "definition",
+    "file": "workflow_session_handler_dispatch.rb",
+    "line": 11,
+    "character": 38,
+    "expected": [
+      [
+        "workflow_handler_registry.rb",
+        21
+      ]
+    ]
+  },
+  {
+    "id": "handlerlookup",
+    "action": "definition",
+    "file": "workflow_session_handler_dispatch.rb",
+    "line": 12,
+    "character": 47,
+    "expected": [
+      [
+        "workflow_handler_registry.rb",
+        25
+      ]
+    ]
+  },
+  {
+    "id": "localregister",
+    "action": "definition",
+    "file": "workflow_handler_registry.rb",
+    "line": 72,
+    "character": 7,
+    "expected": [
+      [
+        "workflow_handler_registry.rb",
+        13
+      ]
+    ]
+  },
+  {
+    "id": "symbols5",
+    "action": "symbols",
+    "file": "workflow_handler_registry.rb",
+    "line": 1,
+    "character": 1,
+    "expected": [
+      [
+        "SoulCore",
+        2,
+        5
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry",
+        5,
+        6
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::handler_for",
+        6,
+        25
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::handlers",
+        6,
+        31
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::include?",
+        6,
+        21
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::initialize",
+        9,
+        7
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::match_intent",
+        6,
+        35
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::register",
+        6,
+        13
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::register_defaults",
+        6,
+        70
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::to_h",
+        6,
+        44
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::initialize::@registry",
+        8,
+        8
+      ],
+      [
+        "SoulCore::WorkflowHandlerRegistry::initialize::@handlers",
+        8,
+        9
+      ]
+    ]
+  },
+  {
+    "id": "symbols6",
+    "action": "symbols",
+    "file": "workflow_intent_handler_dispatch.rb",
+    "line": 1,
+    "character": 1,
+    "expected": [
+      [
+        "SoulCore",
+        2,
+        5
+      ],
+      [
+        "SoulCore::WorkflowIntentHandlerDispatchPatch",
+        2,
+        6
+      ],
+      [
+        "SoulCore::WorkflowIntentHandlerDispatchPatch::route",
+        6,
+        7
+      ]
+    ]
+  },
+  {
+    "id": "symbols7",
+    "action": "symbols",
+    "file": "workflow_session_handler_dispatch.rb",
+    "line": 1,
+    "character": 1,
+    "expected": [
+      [
+        "SoulCore",
+        2,
+        4
+      ],
+      [
+        "SoulCore::WorkflowSessionHandlerDispatchPatch",
+        2,
+        5
+      ],
+      [
+        "SoulCore::WorkflowSessionHandlerDispatchPatch::respond",
+        6,
+        6
+      ]
+    ]
+  }
+]

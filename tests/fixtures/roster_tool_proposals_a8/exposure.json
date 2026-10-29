@@ -1,0 +1,10 @@
+{
+  "packet": "held-out.json",
+  "exposed_cases": [
+    "symbols",
+    "excerpt",
+    "ordinary"
+  ],
+  "evaluation": "tool-proposals-v2-20261027",
+  "note": "One sample each; selected adaptively after the three-member status check. These three cases are no longer unseen. The packet itself is retained unchanged."
+}

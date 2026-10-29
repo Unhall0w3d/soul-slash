@@ -16,7 +16,7 @@ module SoulCore
       end
     end
 
-    def run(*command, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES, chdir: nil, env: nil, capture_mode: :prefix, max_records: 100_000, max_line_bytes: 1024 * 1024, &record_transform)
+    def run(*command, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, max_output_bytes: DEFAULT_MAX_OUTPUT_BYTES, chdir: nil, env: nil, capture_mode: :prefix, max_records: 100_000, max_line_bytes: 1024 * 1024, monitor: nil, &record_transform)
       argv = command.flatten.map(&:to_s)
       raise ArgumentError, "command is required" if argv.empty?
       raise ArgumentError, "capture mode must be one of: #{CAPTURE_MODES.join(', ')}" unless CAPTURE_MODES.include?(capture_mode)
@@ -44,7 +44,15 @@ module SoulCore
         stdout_reader = bounded_reader(out, max_output_bytes, capture_mode, max_records, max_line_bytes, record_transform)
         stderr_reader = bounded_reader(err, max_output_bytes, :prefix, max_records, max_line_bytes, nil)
         begin
-          Timeout.timeout(Float(timeout_seconds)) { process_status = wait_thread.value }
+          Timeout.timeout(Float(timeout_seconds)) do
+            if monitor
+              while wait_thread.alive?
+                monitor.call(wait_thread.pid)
+                wait_thread.join(0.5)
+              end
+            end
+            process_status = wait_thread.value
+          end
           run_status = process_status.success? ? "ok" : "failed"
         rescue Timeout::Error
           run_status = "timeout"
@@ -56,9 +64,15 @@ module SoulCore
           terminate_group(wait_thread)
           process_status = wait_thread.value
           raise
+        rescue StandardError => error
+          run_status = "guard_refused"
+          terminate_group(wait_thread)
+          process_status = wait_thread.value
+          monitor_error = "Resource monitor: #{error.class}: #{error.message}"
         ensure
           stdout, stdout_truncated, records, parse_error = reader_value(stdout_reader)
           stderr, stderr_truncated, = reader_value(stderr_reader)
+          stderr = "#{stderr}\n#{monitor_error}" if defined?(monitor_error) && monitor_error
         end
       end
       if parse_error

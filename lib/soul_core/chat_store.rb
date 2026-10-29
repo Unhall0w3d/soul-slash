@@ -4,6 +4,7 @@ require "fileutils"
 require "json"
 require "securerandom"
 require "time"
+require_relative "roster_chat_adapter"
 
 module SoulCore
   class ChatStore
@@ -18,7 +19,10 @@ module SoulCore
       FileUtils.mkdir_p(@root)
     end
 
-    def create_chat(initial_title: nil)
+    def create_chat(initial_title: nil, member: nil)
+      unless member.nil? || (RosterChatAdapter::MODELS + RosterChatAdapter::ISOLATED_MODELS + ["gemma-4-e4b-cpu"]).include?(member)
+        raise ArgumentError, "unknown roster member"
+      end
       now = Time.now.iso8601
       id = "chat_#{now.gsub(/[^0-9]/, '')}_#{SecureRandom.hex(3)}"
       record = {
@@ -32,6 +36,7 @@ module SoulCore
         "summary" => "",
         "metadata" => { "schema" => "phase41_jsonl" }
       }
+      record["metadata"]["roster_member"] = member if member
       File.write(metadata_path(id), "#{JSON.pretty_generate(record)}\n")
       File.write(messages_path(id), "")
       record

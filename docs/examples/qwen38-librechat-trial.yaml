@@ -1,0 +1,47 @@
+# Candidate-only additive endpoint; does not rebind old Qwen conversations.
+version: 1.3.1
+cache: false
+endpoints:
+  custom:
+    - name: SoulQwen38Trial
+      apiKey: '${SOUL_CONTINUITY_API_KEY}'
+      baseURL: 'http://127.0.0.1:8095/v1'
+      models:
+        default: ['qwen3.8-27b']
+        fetch: false
+      headers:
+        X-Soul-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+      titleConvo: false
+      summarize: false
+      modelDisplayLabel: 'Soul Qwen 3.8 — isolated trial'
+      addParams:
+        temperature: 1.0
+        topP: 0.95
+        maxTokens: 2048
+        timeout: 240000
+        maxRetries: 0
+        streamUsage: false
+      dropParams:
+        - user
+        - n
+        - stop
+        - frequency_penalty
+        - presence_penalty
+        - logprobs
+        - top_logprobs
+        - logit_bias
+        - seed
+        - response_format
+        - tools
+        - tool_choice
+        - parallel_tool_calls
+modelSpecs:
+  list:
+    - name: soul-roster-qwen38-trial
+      label: 'Soul Qwen 3.8 (isolated trial)'
+      description: 'New chats only. Explicit bounded session; four-minute idle unload. Native thinking-off controls; buffered final text. No tools or shared memory import. Source claims need checking.'
+      preset:
+        endpoint: SoulQwen38Trial
+        model: qwen3.8-27b
+        promptPrefix: ''
+        maxContextTokens: 65536

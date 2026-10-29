@@ -531,11 +531,12 @@ module SoulCore
       running_kernel = output(kernel)
       available_kernel = newest_proxmox_kernel(output(boot_kernels))
       kernel_update = !available_kernel.empty? && running_kernel != available_kernel
-      containers = parse_json_array(output(lxc)).map do |record|
-        next unless record["type"] == "lxc"
+      guests = parse_json_array(output(lxc)).map do |record|
+        next unless %w[lxc qemu].include?(record["type"])
 
         {
           "id" => record["vmid"],
+          "type" => record["type"],
           "name" => safe_text(record["name"]),
           "status" => safe_text(record["status"]),
           "tags" => safe_text(record["tags"]),
@@ -544,6 +545,7 @@ module SoulCore
           "uptime_seconds" => integer(record["uptime"])
         }
       end.compact
+      containers = guests.select { |record| record["type"] == "lxc" }
 
       device(
         id: node_name,
@@ -577,6 +579,7 @@ module SoulCore
           "maintenance_lifecycle" => "device_scoped_v1",
           "package_managers" => ["apt"],
           "containers" => containers,
+          "guests" => guests,
           "pihole_container" => containers.find { |record| record["id"] == 100 }
         }
       )

@@ -45,7 +45,9 @@ module SoulCore
           "created_at" => @clock.call.iso8601
         }
         append!(file, event)
-        { "status" => "reserved", "receipt" => public_receipt(event) }
+        # Transient ownership, not persisted state: seeing an existing reserved
+        # receipt does not authorize a second execution of the same request.
+        { "status" => "reserved", "receipt" => public_receipt(event), "acquired" => true }
       end
     end
 

@@ -3,6 +3,12 @@
 require "digest"
 require "time"
 require_relative "application_chat_service"
+require_relative "roster_dashboard_runtime"
+require_relative "shared_compute_service"
+require_relative "creative_render_guard"
+require_relative "music_render_guard"
+require_relative "creative_bridge_runners"
+require_relative "cpu_studio_compute_handoff"
 require_relative "application_contract"
 require_relative "application_request_receipt_store"
 require_relative "approval_token_store"
@@ -30,6 +36,7 @@ require_relative "conversation_runtime"
 require_relative "conversation_security_status_service"
 require_relative "conversation_fleet_observability_service"
 require_relative "conversation_creative_workflow_service"
+require_relative "creative_compute_handoff"
 require_relative "conversation_maintenance_workflow_service"
 require_relative "conversation_core_workflow_service"
 require_relative "conversation_clear_service"
@@ -62,6 +69,7 @@ require_relative "wazuh_alert_notification_service"
 require_relative "wazuh_compliance_posture_service"
 require_relative "maintenance_fleet_discovery_service"
 require_relative "maintenance_device_control_service"
+require_relative "maintenance_skill_service"
 require_relative "maintenance_rehearsal_service"
 require_relative "maintenance_foreground_execution_service"
 require_relative "maintenance_reboot_restore_service"
@@ -260,6 +268,7 @@ module SoulCore
       @network_diagnostic_service = network_diagnostic_service
       @repository_inspection_service = repository_inspection_service
       @invocation_catalog_service = invocation_catalog_service
+      @creative_asset_verifier = VerifiedAssetCache.new
     end
 
     def call(request, progress: nil)
@@ -283,6 +292,17 @@ module SoulCore
       safe_error_envelope(request, "blocked_for_human_review", "runtime_integrity", error.message)
     rescue StandardError => error
       safe_error_envelope(request, "failed", "dependency_failure", "application dependency failed safely: #{error.class}")
+    end
+
+    # A request-scoped factory: retains native guards and the existing shared
+    # compute controller without granting the CPU service Studio write access.
+    def creative_bridge_services(cancel:)
+      runner = CreativeBridgeCommandRunner.new(cancel: cancel)
+      handoff = CpuStudioComputeHandoff.new(control: shared_compute)
+      {control: shared_compute, handoff: handoff,
+       visual: VisualStudioService.new(root: @root, asset_verifier: @creative_asset_verifier, verification_cancel: cancel, runner: CreativeRenderGuard.new(root: @root, control: shared_compute, runner: runner), compute_handoff: handoff),
+       music: MusicGenerationService.new(root: @root, asset_verifier: @creative_asset_verifier, verification_cancel: cancel, runner: runner, compute_handoff: handoff,
+         process_runner: MusicRenderGuard.new(root: @root, control: shared_compute, runner: CreativeBridgeMusicRunner.new(cancel: cancel)))}
     end
 
     def music_artifact_path(project_id:, candidate_id:, artifact:)
@@ -320,6 +340,7 @@ module SoulCore
       when "chats.progress" then domain(chat_service.progress(chat_id: parameters["chat_id"], limit: bounded_limit(parameters["limit"], ApplicationRequestReceiptStore::MAX_ACTIVE)))
       when "chats.create" then domain(chats_create(parameters))
       when "chats.send" then domain(chats_send(parameters, context, request_id, progress: progress))
+      when "chats.cancel" then domain(chat_service.cancel(chat_id: required(parameters, "chat_id"), target_request_id: required(parameters, "target_request_id")))
       when "chats.creative.execute" then domain(conversation_creative_workflow.execute(chat_id: required(parameters, "chat_id"), flow_id: required(parameters, "flow_id"), action_id: parameters["action_id"], confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "chats.pin" then domain(chat_flag(parameters, true))
       when "chats.unpin" then domain(chat_flag(parameters, false))
@@ -381,6 +402,10 @@ module SoulCore
       when "project_tracker.items.create" then domain(project_tracker.create(attributes: required(parameters, "item")))
       when "project_tracker.items.update" then domain(project_tracker.update(item_id: required(parameters, "item_id"), attributes: required(parameters, "item"), expected_revision: required(parameters, "expected_revision")))
       when "core.status" then domain(core_orchestration.status)
+      when "compute.status" then domain(shared_compute.status)
+      when "cpu.status" then domain(CpuMemberDashboardRuntime.new(store:nil).status)
+      when "compute.preview" then domain(shared_compute.preview(policy:required(parameters,"policy")))
+      when "compute.execute" then domain(shared_compute.execute(policy:required(parameters,"policy"),confirmation:parameters["confirmation"],expected_digest:parameters["expected_digest"]))
       when "core.activate.preview" then domain(core_orchestration.preview(core_id: required(parameters, "core_id")))
       when "core.activate.execute" then domain(core_orchestration.execute(core_id: required(parameters, "core_id"), target_profile_id: required(parameters, "target_profile_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "model_runtime.status" then domain(model_runtime_control.status)
@@ -500,6 +525,10 @@ module SoulCore
       when "maintenance.discovery.remove.preview" then domain(maintenance_fleet_discovery.removal_preview(device_id: required(parameters, "device_id")))
       when "maintenance.discovery.remove.execute" then domain(maintenance_fleet_discovery.remove(device_id: required(parameters, "device_id"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"]))
       when "maintenance.device.preview" then domain(maintenance_device_control.preview(device_id: required(parameters, "device_id"), action: required(parameters, "action")))
+      when "maintenance.skill.preview" then domain(maintenance_skills.preview(device_id: required(parameters, "device_id"), action: "maintenance"))
+      when "maintenance.skill.execute" then domain(maintenance_skills.execute(device_id: required(parameters, "device_id"), action: "maintenance", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
+      when "reboot.skill.preview" then domain(maintenance_skills.preview(device_id: required(parameters, "device_id"), action: "reboot"))
+      when "reboot.skill.execute" then domain(maintenance_skills.execute(device_id: required(parameters, "device_id"), action: "reboot", confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "maintenance.device.execute" then domain(maintenance_device_control.execute(device_id: required(parameters, "device_id"), action: required(parameters, "action"), confirmation: parameters["confirmation"], expected_digest: parameters["expected_digest"], progress: progress))
       when "maintenance.device.receipts" then domain(maintenance_device_control.receipts(limit: bounded_limit(parameters["limit"], MaintenanceDeviceControlService::MAX_RECEIPTS)))
       when "maintenance.preview" then domain(maintenance_rehearsal.preview(force_database_refresh: parameters.fetch("force_database_refresh", false)))
@@ -656,7 +685,7 @@ module SoulCore
       {
         "application_schema_version" => Contract::SCHEMA_VERSION,
         "operations" => Contract::OPERATIONS.keys,
-        "product_tabs" => ["Chat", "Self Improvement", "Creative Studios", "Administration"],
+        "product_tabs" => ["Dashboard", "Self Improvement", "Creative Studios", "Administration"],
         "administration_surfaces" => ["Host Stewardship", "Project Timeline", "Local Topology", "Backup & Recovery", "Guided Maintenance"],
         "creative_surfaces" => ["Music Studio", "Visual Studio", "Mix Studio"],
         "self_improvement_surfaces" => ["Skill Studio", "Self Assessment", "Self Augmentation"],
@@ -767,7 +796,9 @@ module SoulCore
       title = parameters["title"].to_s.strip
       raise ArgumentError, "chat title exceeds 120 characters" if title.length > 120
 
-      chat = chat_store.create_chat(initial_title: title.empty? ? nil : title)
+      options = {initial_title: title.empty? ? nil : title}
+      options[:member] = parameters["member"] if parameters.key?("member")
+      chat = chat_store.create_chat(**options)
       success({ "record" => chat_projection(chat) }, mutation: "chat_created")
     end
 
@@ -929,7 +960,8 @@ module SoulCore
     end
 
     def chat_service
-      @chat_service ||= @injected_chat_service || ApplicationChatService.new(root: @root, store: chat_store, runtime: conversation_runtime)
+      @chat_service ||= @injected_chat_service || ApplicationChatService.new(root: @root, store: chat_store, runtime: nil, runtime_resolver: -> { conversation_runtime },
+        member_runtime: RosterDashboardRuntime.new(store: chat_store, maintenance_workflow: conversation_maintenance_workflow))
     end
 
     def workspace
@@ -1039,6 +1071,10 @@ module SoulCore
         runtime_control: model_runtime_control,
         memory_runtime: configured_memory_embedding_runtime(resolver.effective_environment)
       )
+    end
+
+    def shared_compute
+      @shared_compute ||= SharedComputeService.new
     end
 
     def configured_memory_embedding_runtime(environment)
@@ -1321,7 +1357,7 @@ module SoulCore
     end
 
     def music_generation
-      @music_generation_service ||= MusicGenerationService.new(root: @root)
+      @music_generation_service ||= MusicGenerationService.new(root: @root, asset_verifier: @creative_asset_verifier, compute_handoff: creative_compute_handoff, process_runner: MusicRenderGuard.new(root: @root, control: shared_compute))
     end
 
     def music_vocal_diagnostic
@@ -1332,7 +1368,11 @@ module SoulCore
     end
 
     def visual_studio
-      @visual_studio_service ||= VisualStudioService.new(root: @root, core_status: -> { core_orchestration.status }, music_visual_companion: music_visual_companion, blender_scene_service: blender_scene)
+      @visual_studio_service ||= VisualStudioService.new(root: @root, asset_verifier: @creative_asset_verifier, runner: CreativeRenderGuard.new(root: @root, control: shared_compute), compute_handoff: creative_compute_handoff, music_visual_companion: music_visual_companion, blender_scene_service: blender_scene)
+    end
+
+    def creative_compute_handoff
+      @creative_compute_handoff ||= CreativeComputeHandoff.new(control: shared_compute)
     end
 
     def blender_scene
@@ -1411,7 +1451,7 @@ module SoulCore
         root: @root, chat_store: chat_store,
         provider_client: ConversationProviderClient.new(env: env, root: @root),
         music_generation: music_generation, visual_studio: visual_studio,
-        core_orchestration: core_orchestration, music_disposition: music_candidate_disposition,
+        core_orchestration: core_orchestration, compute_handoff: creative_compute_handoff, music_disposition: music_candidate_disposition,
         music_visual_companion: music_visual_companion, publication_package: music_publication_package
       )
     end
@@ -1424,8 +1464,13 @@ module SoulCore
       @conversation_maintenance_workflow ||= ConversationMaintenanceWorkflowService.new(
         root: @root,
         fleet_status_service: maintenance_fleet_status,
-        device_control_service: maintenance_device_control
+        device_control_service: maintenance_skills
       )
+    end
+
+    def maintenance_skills
+      @maintenance_skills ||= MaintenanceSkillService.new(
+        fleet_status_service: maintenance_fleet_status, device_control_service: maintenance_device_control)
     end
 
     def music_candidate_analysis
@@ -1556,7 +1601,7 @@ module SoulCore
     end
 
     def chat_projection(chat)
-      chat.slice("id", "title", "created_at", "updated_at", "pinned", "pin_order", "archived", "summary")
+      chat.slice("id", "title", "created_at", "updated_at", "pinned", "pin_order", "archived", "summary").merge("roster_member" => chat.dig("metadata", "roster_member"))
     end
 
     def required(parameters, key)

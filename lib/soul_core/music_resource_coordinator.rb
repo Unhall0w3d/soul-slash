@@ -21,7 +21,7 @@ module SoulCore
     class Busy < StandardError; end
     class IntegrityError < StandardError; end
 
-    def initialize(root: Dir.pwd, directory: DEFAULT_DIRECTORY, lane: "nvidia-music", runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, process_start: nil, signaler: ->(signal, target) { Process.kill(signal, target) }, sleeper: ->(seconds) { sleep(seconds) }, model_lease_store: nil)
+    def initialize(root: Dir.pwd, directory: DEFAULT_DIRECTORY, lane: "nvidia-music", runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, id_generator: -> { SecureRandom.hex(8) }, process_start: nil, signaler: ->(signal, target) { Process.kill(signal, target) }, sleeper: ->(seconds) { sleep(seconds) }, model_lease_store: nil, shared_compute: false)
       @root = File.expand_path(root)
       @directory = File.expand_path(directory, @root)
       @runner = runner
@@ -34,6 +34,7 @@ module SoulCore
       @lock_path = File.join(@directory, "control.lock")
       raise IntegrityError, "music resource lane is invalid" unless %w[nvidia-music amd-music].include?(lane)
       @lane = lane
+      @shared_compute = shared_compute
       @lease_path = File.join(@directory, "#{@lane}.json")
       raise IntegrityError, "music runtime directory must remain inside repository root" unless within?(@directory, @root)
     end
@@ -255,8 +256,14 @@ module SoulCore
 
     def amd_blockers(hardware, lease)
       items = []
-      items << "Creative Core is not active" unless hardware["active_core_id"] == "music"
-      items << "NVIDIA reserve chat service is not active" unless hardware["fallback_state"] == "active"
+      if @shared_compute
+        policy = @model_lease_store.with_control_lock { @model_lease_store.compute_policy_unlocked.read }
+        items << "Compute reserved for the user" unless policy["policy"] == "available"
+        items << "Legacy NVIDIA runtime must be stopped" unless %w[inactive failed].include?(hardware["fallback_state"])
+      else
+        items << "Creative Core is not active" unless hardware["active_core_id"] == "music"
+        items << "NVIDIA reserve chat service is not active" unless hardware["fallback_state"] == "active"
+      end
       items << "Gemma AMD chat service is still active" if hardware["gemma_state"] == "active"
       items << "Gemma AMD chat service state is uncertain" unless %w[inactive failed].include?(hardware["gemma_state"])
       items << "AMD Vulkan music device is unavailable" unless hardware["amd_vulkan_state"] == "available"

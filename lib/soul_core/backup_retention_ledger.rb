@@ -9,6 +9,10 @@ require "time"
 module SoulCore
   class BackupRetentionLedger
     SCHEMA_VERSION = "soul.backup_retention_ledger.v1"
+    MIGRATED_SCHEMA_VERSION = "soul.backup_retention_ledger.v2"
+    SCOPE_CONFIRMATION = "MIGRATE_REVIEWED_BACKUP_SCOPE"
+    MAX_RETIRED_ROOTS = 1024
+    MAX_SCOPE_MIGRATIONS = 128
     MANIFEST_SCHEMA_VERSION = "soul.backup_snapshot_manifest.v1"
     RETENTION_DAYS = 30
     HOLD_SECONDS = RETENTION_DAYS * 24 * 60 * 60
@@ -109,6 +113,66 @@ module SoulCore
       blocked("retention checkpoint failed safely: #{error.message}")
     end
 
+    # This explicit operation changes future capture requirements, never the
+    # historical snapshot record or any existing hold. Ordinary observation
+    # cannot grant itself a source retirement.
+    def scope_migration_preview(source_roots:, repository_id:, receipt_id:)
+      ledger = read_ledger
+      raise ArgumentError, "a verified retention ledger is required" unless ledger
+      roots = normalize_paths(source_roots, maximum: @max_roots, label: "source roots")
+      raise ArgumentError, "at least one source root must remain" if roots.empty?
+      raise ArgumentError, "scope migration repository identity changed" unless repository_id == ledger.dig("last_verified_snapshot", "repository_id")
+      raise ArgumentError, "scope receipt ID is invalid" unless receipt_id.to_s.match?(/\Ascope_migration_[a-zA-Z0-9_-]{1,100}\z/)
+      previous = ledger.fetch("approved_source_roots", ledger.fetch("last_verified_snapshot").fetch("source_roots"))
+      removed = previous - roots
+      raise ArgumentError, "scope migration must retire at least one source root" if removed.empty?
+      historical = (ledger.fetch("retired_source_roots", []) + removed).uniq.sort
+      raise ArgumentError, "retired source root limit exceeded" if historical.length > MAX_RETIRED_ROOTS
+      receipts = ledger.fetch("scope_migration_receipts", [])
+      raise ArgumentError, "scope receipt was already used" if receipts.include?(receipt_id)
+      raise ArgumentError, "scope migration history limit exceeded" if receipts.length >= MAX_SCOPE_MIGRATIONS
+      scope = {
+        "operation" => "backup_scope_migration", "receipt_id" => receipt_id,
+        "repository_id" => repository_id, "previous_ledger_digest" => digest(ledger),
+        "last_verified_snapshot_id" => ledger.dig("last_verified_snapshot", "snapshot_id"),
+        "previous_source_roots" => previous, "source_roots" => roots,
+        "source_removals" => removed, "retired_source_roots" => historical,
+        "holds_preserved" => ledger.fetch("holds").length,
+        "snapshot_record_preserved" => true, "deletion" => false
+      }
+      complete("exact future backup scope prepared; history and holds remain unchanged",
+               scope.merge("confirmation_phrase" => SCOPE_CONFIRMATION, "expected_digest" => digest(scope)))
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("scope migration preview failed safely: #{error.message}")
+    end
+
+    def scope_migration_execute(source_roots:, repository_id:, receipt_id:, confirmation:, expected_digest:)
+      preview = scope_migration_preview(source_roots: source_roots, repository_id: repository_id, receipt_id: receipt_id)
+      return preview unless preview["ok"]
+      return awaiting("exact scope migration confirmation is required") unless confirmation == SCOPE_CONFIRMATION
+      return blocked("scope migration preview digest is stale or invalid") unless secure_equal?(expected_digest, preview.dig("data", "expected_digest"))
+      ledger = read_ledger
+      return blocked("retention ledger changed during scope migration") unless digest(ledger) == preview.dig("data", "previous_ledger_digest")
+      migrated = ledger.merge(
+        "schema_version" => MIGRATED_SCHEMA_VERSION,
+        "updated_at" => @clock.call.utc.iso8601,
+        "approved_source_roots" => preview.dig("data", "source_roots"),
+        "retired_source_roots" => preview.dig("data", "retired_source_roots"),
+        "scope_migration_receipts" => ledger.fetch("scope_migration_receipts", []) + [receipt_id]
+      )
+      validate_ledger!(migrated)
+      atomic_json(@ledger_path, migrated)
+      complete("reviewed future capture scope recorded without changing snapshot history or holds",
+               {"receipt_id" => receipt_id, "ledger_digest" => digest(migrated),
+                "holds_preserved" => migrated.fetch("holds").length}, "backup_scope_migrated")
+    rescue ArgumentError => error
+      awaiting(error.message)
+    rescue StandardError => error
+      blocked("scope migration failed safely: #{error.message}")
+    end
+
     def retention_preview(candidate_snapshot_ids:)
       ledger = read_ledger
       return blocked("retention ledger does not exist; pruning must remain disabled") unless ledger
@@ -178,7 +242,8 @@ module SoulCore
       raise ArgumentError, "repository identity changed; review the backup destination before recording deletions" unless manifest.fetch("repository_id") == previous.fetch("repository_id")
       previous_roots = previous.fetch("source_roots")
       current_roots = manifest.fetch("source_roots")
-      removed_roots = previous_roots - current_roots
+      required_roots = ledger.fetch("approved_source_roots", previous_roots)
+      removed_roots = required_roots - current_roots
       unless removed_roots.empty?
         raise ArgumentError, "source roots were removed or replaced; review the backup scope before recording deletions"
       end
@@ -211,6 +276,15 @@ module SoulCore
         "last_verified_snapshot" => snapshot_record(manifest),
         "holds" => holds
       }
+      if ledger["schema_version"] == MIGRATED_SCHEMA_VERSION
+        updated.merge!(
+          "schema_version" => MIGRATED_SCHEMA_VERSION,
+          "approved_source_roots" => current_roots,
+          "retired_source_roots" => ledger.fetch("retired_source_roots"),
+          "scope_migration_receipts" => ledger.fetch("scope_migration_receipts")
+        )
+      end
+      validate_ledger!(updated)
       {
         "ledger" => updated,
         "source_root_additions" => source_root_additions,
@@ -289,8 +363,10 @@ module SoulCore
 
     def validate_ledger!(ledger)
       required = %w[schema_version retention_days updated_at last_verified_snapshot holds]
+      migrated = ledger.is_a?(Hash) && ledger["schema_version"] == MIGRATED_SCHEMA_VERSION
+      required += %w[approved_source_roots retired_source_roots scope_migration_receipts] if migrated
       raise unless ledger.is_a?(Hash) && ledger.keys.sort == required.sort
-      raise unless ledger["schema_version"] == SCHEMA_VERSION && ledger["retention_days"] == RETENTION_DAYS
+      raise unless [SCHEMA_VERSION, MIGRATED_SCHEMA_VERSION].include?(ledger["schema_version"]) && ledger["retention_days"] == RETENTION_DAYS
       utc_time(Time.iso8601(ledger.fetch("updated_at")), "ledger updated_at")
       snapshot = ledger.fetch("last_verified_snapshot")
       raise unless snapshot.is_a?(Hash) && snapshot.keys.sort == %w[manifest_digest paths repository_id snapshot_id source_roots verified_at].sort
@@ -299,6 +375,17 @@ module SoulCore
       paths = normalize_paths(snapshot["paths"], maximum: MAX_PATHS, label: "snapshot paths")
       raise unless (roots - paths).empty?
       raise if paths.any? { |path| roots.none? { |root| within?(path, root) } }
+      hold_roots = roots
+      if migrated
+        approved = normalize_paths(ledger["approved_source_roots"], maximum: @max_roots, label: "approved source roots")
+        retired = normalize_paths(ledger["retired_source_roots"], maximum: MAX_RETIRED_ROOTS, label: "retired source roots")
+        receipts = ledger["scope_migration_receipts"]
+        raise if approved.empty? || retired.empty?
+        raise unless receipts.is_a?(Array) && receipts.length.between?(1, MAX_SCOPE_MIGRATIONS) && receipts.uniq == receipts
+        raise unless receipts.all? { |id| id.is_a?(String) && id.match?(/\Ascope_migration_[a-zA-Z0-9_-]{1,100}\z/) }
+        raise unless (roots - approved - retired).empty?
+        hold_roots = (roots + retired).uniq
+      end
       holds = ledger.fetch("holds")
       raise unless holds.is_a?(Array) && holds.length <= MAX_HOLDS
       seen = {}
@@ -307,7 +394,7 @@ module SoulCore
         raise unless hold.is_a?(Hash) && hold.keys.sort == keys.sort
         path = normalize_path(hold["path"])
         raise unless hold["path_sha256"] == path_digest(path) && !seen[path]
-        raise unless roots.any? { |root| within?(path, root) }
+        raise unless hold_roots.any? { |root| within?(path, root) }
         raise unless hold["protective_snapshot_id"].to_s.match?(SNAPSHOT_ID) && hold["detected_by_snapshot_id"].to_s.match?(SNAPSHOT_ID)
         detected = utc_time(Time.iso8601(hold["detected_at"]), "detected_at")
         expires = utc_time(Time.iso8601(hold["hold_until"]), "hold_until")

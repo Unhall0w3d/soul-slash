@@ -7,6 +7,7 @@ require_relative "conversation_capability_action_store"
 module SoulCore
   class ConversationMaintenanceWorkflowService
     CAPABILITY_ID = "maintenance.device"
+    REBOOT_CAPABILITY_ID = "maintenance.reboot"
     CONFIRMATION_TTL_SECONDS = 10 * 60
     EXPLICIT_MAINTENANCE = /
       (?:
@@ -32,19 +33,22 @@ module SoulCore
       @clock = clock
       @id_generator = id_generator
       @store = store || ConversationCapabilityActionStore.new(root: root, clock: clock)
+      @invocation_mutex = Mutex.new
     end
 
     def candidate_message?(chat_id:, message:)
       text = message.to_s.strip
       return true if explicit_request?(text)
 
-      pending = @store.active(chat_id)
+      pending = pending_action(chat_id)
       pending && (text.match?(AFFIRMATIVE) || text.match?(NEGATIVE))
     end
 
     def plan(chat_id:, message:, progress: nil)
+      owns_invocation = @invocation_mutex.try_lock
+      return result("Another maintenance skill invocation is active; no action was sent.", "maintenance_blocked", lifecycle: "blocked_for_human_review") unless owns_invocation
       text = message.to_s.strip
-      pending = @store.active(chat_id)
+      pending = pending_action(chat_id)
 
       if pending && text.match?(NEGATIVE)
         @store.cancel(chat_id)
@@ -73,9 +77,16 @@ module SoulCore
         "maintenance_failed",
         lifecycle: "failed"
       )
+    ensure
+      @invocation_mutex.unlock if owns_invocation
     end
 
     private
+
+    def pending_action(chat_id)
+      pending = @store.active(chat_id)
+      pending if pending && [CAPABILITY_ID, REBOOT_CAPABILITY_ID].include?(pending["capability_id"]) && pending["stage"] == "confirmation"
+    end
 
     def explicit_request?(text)
       text.match?(EXPLICIT_MAINTENANCE) || reboot_request?(text)
@@ -115,7 +126,8 @@ module SoulCore
         return result(
           "I could not prepare #{operation} for #{target.fetch('label')}: #{preview['reason']}. No command was run.",
           "maintenance_blocked",
-          lifecycle: preview["lifecycle_state"] || "blocked_for_human_review"
+          lifecycle: preview["lifecycle_state"] || "blocked_for_human_review",
+          capability_id: operation == "reboot" ? REBOOT_CAPABILITY_ID : CAPABILITY_ID
         )
       end
 
@@ -125,7 +137,7 @@ module SoulCore
         "schema_version" => ConversationCapabilityActionStore::SCHEMA,
         "action_id" => "capability_#{@id_generator.call}",
         "chat_id" => chat_id,
-        "capability_id" => CAPABILITY_ID,
+        "capability_id" => operation == "reboot" ? REBOOT_CAPABILITY_ID : CAPABILITY_ID,
         "lifecycle_state" => "awaiting_input",
         "stage" => "confirmation",
         "authority_class" => "routine_mutation",
@@ -160,6 +172,10 @@ module SoulCore
       return protected_handoff("This action requires an Operator-controlled interface.", action.fetch("target")) unless action["authority_class"] == "routine_mutation"
 
       operation = action.fetch("operation")
+      # Consume before entering the mutating controller. An interrupted request
+      # must require a new preview, not turn a later "yes" into a retry.
+      @store.write(action.merge("lifecycle_state" => "failed", "stage" => "execution_started",
+        "confirmation" => nil, "expected_digest" => nil))
       progress&.call({
         "state" => operation == "reboot" ? "rebooting" : "maintaining",
         "summary" => "Running the fixed #{operation} workflow on #{action.dig('target', 'label')}."
@@ -226,7 +242,13 @@ module SoulCore
       if fleet_device
         lines << "Current status: #{fleet_device['status']}"
         lines << "Updates remaining: #{fleet_device.dig('updates', 'total')}" unless fleet_device.dig("updates", "total").nil?
-        lines << "Reboot required: #{fleet_device.dig('reboot', 'required') == true ? 'yes' : 'no'}"
+        required = fleet_device.dig("reboot", "required")
+        lines << "Reboot required: #{required == true ? 'yes' : required == false ? 'no' : 'unknown'}"
+      end
+      followup = data["reboot_followup"]
+      if followup
+        lines << "Post-maintenance reboot assessment: #{followup['state']}"
+        lines << "A separate Reboot skill preview and authorization is required; no reboot was requested." if followup["state"] == "required"
       end
       operation = action.fetch("operation", "maintenance")
       evidence = Array(receipt["evidence"])
@@ -325,9 +347,9 @@ module SoulCore
       action.slice("action_id", "capability_id", "lifecycle_state", "stage", "authority_class", "target", "operation", "created_at", "expires_at")
     end
 
-    def result(content, mode, lifecycle:, action: nil)
+    def result(content, mode, lifecycle:, action: nil, capability_id: CAPABILITY_ID)
       metadata = {
-        "capability_id" => CAPABILITY_ID,
+        "capability_id" => action && action["capability_id"] || capability_id,
         "lifecycle_state" => lifecycle,
         "authority_source" => "authenticated_operator_message",
         "model_authorization" => false

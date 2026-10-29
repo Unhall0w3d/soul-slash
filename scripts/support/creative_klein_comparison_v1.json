@@ -1,0 +1,84 @@
+{
+  "schema_version": "soul.creative.comparison.preparation.v1",
+  "status": "prepared_not_executable",
+  "baseline": {
+    "profile": "flux2-klein-4b-q4",
+    "manifest": "config/visual_studio_models.json",
+    "manifest_sha256": "8d06c14db760b62806734157831d28746f940fed2606f1584e932d941f1ffd11",
+    "preserve_active_configuration": true
+  },
+  "candidate": {
+    "profile": "flux2-klein-9b-q4-isolated",
+    "license": "FLUX Non-Commercial License v2.1",
+    "license_url": "https://huggingface.co/black-forest-labs/FLUX.2-klein-9B/blob/main/LICENSE.md",
+    "license_acceptance": "Owner explicitly accepted terms for isolated non-commercial evaluation on 2026-10-25; not production deployment",
+    "files": [
+      {
+        "role": "diffusion_model",
+        "repository": "leejet/FLUX.2-klein-9B-GGUF",
+        "revision": "cc588497a95ffc2937ebbd6b9b3916a11ada6e5b",
+        "filename": "flux-2-klein-9b-Q4_0.gguf",
+        "bytes": 5616208032,
+        "sha256": "a7e77afa96871d16679ff7b949bd25f20c8179f219c4b662cac91e81ed99b944"
+      },
+      {
+        "role": "text_encoder",
+        "repository": "unsloth/Qwen3-8B-GGUF",
+        "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+        "filename": "Qwen3-8B-Q4_K_M.gguf",
+        "bytes": 5027784512,
+        "sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4"
+      }
+    ],
+    "decoder": "Reuse exact baseline full_encoder_small_decoder.safetensors only after isolated loader/render qualification",
+    "checksum_evidence": "Public repository LFS metadata; downloaded bytes have not been verified"
+  },
+  "controls": {
+    "runtime_revision": "ea4e566ccffa10f853ecc3f29e74b1820bc91beb",
+    "placement": "AMD Vulkan with CPU offload, one model workload at a time",
+    "steps": 4,
+    "cfg_scale": 1.0,
+    "width": 1024,
+    "height": 576,
+    "seeds": [42, 314],
+    "power_cap_w": 252,
+    "amd_junction_cutoff_c": 100,
+    "swap_out_limit_pages": 131072,
+    "other_guards": "All existing identity, freshness, memory, thermal, lease and verified-release checks unchanged",
+    "no_automatic_retries": true,
+    "no_model_promotion": true
+  },
+  "feasibility": {
+    "maximum_candidates": 1,
+    "maximum_seconds": 900,
+    "prompt": "A single matte orange bowl centered on a plain white table, soft diffuse lighting, no text and no people.",
+    "seed": 71,
+    "pass_requires": ["verified exact files and runtime", "valid 1024 by 576 image", "all guards pass", "owned processes released", "no retained lease or handoff", "baseline manifest unchanged"]
+  },
+  "scored_pilot": {
+    "maximum_candidates": 16,
+    "maximum_seconds": 2640,
+    "per_candidate_seconds": 900,
+    "order": "For each case in listed order: seed 42 baseline then candidate; seed 314 candidate then baseline",
+    "edit_input": {
+      "candidate_id": "visual_candidate_41e668dcaedf4de4",
+      "sha256": "e4d7863a6ae7a6b8f9fb30cf1277b001928ca3adb3364a3466d5ecb004e27977",
+      "human_review": "pending",
+      "same_bytes_for_both_models": true
+    },
+    "cases": [
+      {"id": "spatial", "kind": "text_to_image", "prompt": "On a plain white tabletop are exactly three objects: a red cube on the left, a blue sphere in the middle, and a yellow cone on the right. All three are separate and fully visible. Straight-on studio photograph, neutral gray background, no text.", "checks": ["exactly three objects", "red cube left", "blue sphere middle", "yellow cone right", "no overlap hiding objects"]},
+      {"id": "signage", "kind": "text_to_image", "prompt": "A straight-on photograph of a small wooden shop sign bearing exactly the words OPEN AT NINE in large clear black capital letters. Plain cream wall behind it. No other writing, numbers, logos, or people.", "checks": ["exact literal text OPEN AT NINE", "no extra text", "wooden sign", "cream wall"]},
+      {"id": "materials", "kind": "text_to_image", "prompt": "A still life of a transparent glass cup beside a brushed copper kettle on dark blue velvet. Soft warm light from the left and a faint cool rim light from the right. Close-up studio photograph, all objects fully visible, no text or people.", "checks": ["transparent glass", "brushed copper kettle", "dark blue velvet", "warm left illumination", "cool right rim light"]},
+      {"id": "edit", "kind": "image_edit", "prompt": "Change only the blue ceramic teapot to red ceramic. Preserve the teapot shape, camera angle, gray tabletop, background, lighting and shadows. Do not add or remove objects or text.", "checks": ["teapot changed to red", "shape retained", "composition retained", "background retained", "lighting and shadows retained", "no new objects or text"]}
+    ],
+    "review": {
+      "instruction_score": "Each listed check separately: met, not_met, or uncertain, with visual evidence",
+      "preference": "Human blind A/B per case and seed: A, B, tie or neither; randomized labels recorded separately",
+      "outcome_classes": ["rendered", "guard_refused", "transport_failure", "malformed_artifact", "canceled", "deadline", "unstarted"],
+      "metrics": ["integrity time", "load time if exposed", "render time", "full operation time", "AMD and NVIDIA memory", "RAM minimum", "host swap delta", "thermal peaks", "release evidence"],
+      "limits": "Same seeds do not pair latent noise across architectures. Quantized pipeline comparison, not parameter-count causality. No global superiority claim. Missing phase metrics remain unknown. No cold-cache claim. Paging issue remains open."
+    }
+  },
+  "execution_gates": ["owner license decision", "isolated download and byte verification", "runtime executable digest frozen", "shared decoder feasibility", "edit input human review", "fresh GPU admission", "bounded runner and cleanup validation before GPU execution"]
+}

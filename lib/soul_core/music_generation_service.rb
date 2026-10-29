@@ -23,7 +23,7 @@ module SoulCore
     end
 
     class ForegroundProcessRunner
-      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:, progress: nil, rlimit_fsize_bytes: nil)
+      def run(command, env:, chdir:, timeout_seconds:, max_output_bytes:, on_spawn:, canceled:, progress: nil, rlimit_fsize_bytes: nil, monitor: nil)
         stdout = +""; stderr = +""; process_status = nil; state = "failed"; pid = nil
         spawn_options = { chdir: chdir, pgroup: true }
         spawn_options[:rlimit_fsize] = Integer(rlimit_fsize_bytes) if rlimit_fsize_bytes
@@ -52,7 +52,13 @@ module SoulCore
           end
           begin
             deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + Float(timeout_seconds)
+            next_sample = 0.0
             until wait.join(0.1)
+              now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+              if monitor && now >= next_sample
+                monitor.call(pid)
+                next_sample = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 0.5
+              end
               drain_progress(events, progress)
               raise Interrupt, "music generation canceled" if canceled.call
               raise Timeout::Error if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
@@ -125,20 +131,30 @@ module SoulCore
       end
     end
 
-    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_vulkan_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: ForegroundProcessRunner.new, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) })
+    def initialize(root: Dir.pwd, music_root: File.join(Dir.home, ".local", "share", "soul", "music"), manifest_path: File.expand_path("../../config/music_vulkan_models.json", __dir__), project_store: nil, coordinator: nil, process_runner: nil, runner: BoundedCommandRunner.new, clock: -> { Time.now.utc }, monotonic_clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }, compute_handoff: nil, asset_verifier: VerifiedAssetCache.new, verification_cancel: nil)
       @root = File.expand_path(root)
       @music_root = File.expand_path(music_root)
       @manifest_path = File.expand_path(manifest_path)
       @store = project_store || MusicProjectStore.new(root: @root)
       @runner = runner
-      @process_runner = process_runner
       @clock = clock
       @monotonic_clock = monotonic_clock
       @manifest = load_manifest
       @vulkan = @manifest["schema_version"] == MusicVulkanGenerationBackend::SUPPORTED_SCHEMA
-      @coordinator = coordinator || MusicResourceCoordinator.new(root: @root, lane: @vulkan ? "amd-music" : "nvidia-music", runner: runner)
+      # Guard default Vulkan callers too (including CLI), not only the dashboard.
+      # Explicit process runners remain an injection seam for bounded fixtures.
+      if process_runner
+        @process_runner = process_runner
+      elsif @vulkan
+        require_relative "music_render_guard"
+        @process_runner = MusicRenderGuard.new(root: @root, control: nil)
+      else
+        @process_runner = ForegroundProcessRunner.new
+      end
+      @compute_handoff = compute_handoff if @vulkan
+      @coordinator = coordinator || MusicResourceCoordinator.new(root: @root, lane: @vulkan ? "amd-music" : "nvidia-music", runner: runner, shared_compute: !@compute_handoff.nil?)
       if @vulkan
-        @vulkan_backend = MusicVulkanGenerationBackend.new(music_root: @music_root, manifest: @manifest, runner: @runner)
+        @vulkan_backend = MusicVulkanGenerationBackend.new(music_root: @music_root, manifest: @manifest, runner: @runner, asset_verifier: asset_verifier, verification_cancel: verification_cancel)
       else
         @source = @manifest.fetch("source")
         @dit_name = @manifest.fetch("dit_models").keys.first
@@ -242,7 +258,7 @@ module SoulCore
       outcome("blocked_for_human_review", false, error.message)
     end
 
-    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil, input_override: nil, scope_override: nil, confirmation_phrase: CONFIRMATION, source_candidate_id: nil)
+    def generation_execute(project_id:, candidate_id:, confirmation:, expected_digest:, progress: nil, input_override: nil, scope_override: nil, confirmation_phrase: CONFIRMATION, source_candidate_id: nil, handoff_active: false)
       progress&.call({ "stage" => "validation", "message" => "Validating exact project scope" })
       return outcome("awaiting_input", false, "confirmation and expected_digest are required") if confirmation.to_s.empty? || expected_digest.to_s.empty?
       return outcome("awaiting_input", false, "candidate_id is invalid") unless candidate_id.to_s.match?(MusicProjectStore::CANDIDATE_ID)
@@ -254,6 +270,13 @@ module SoulCore
       return outcome("blocked_for_human_review", false, blockers.join("; ")) unless blockers.empty?
       progress&.call({ "stage" => "checkpoints", "message" => "Verifying pinned local checkpoints" })
       verify_checkpoints!
+      if @compute_handoff && !handoff_active
+        return @compute_handoff.run(provider_id: "amd-music", request_id: candidate_id, project_id: project_id, input_digest: expected_digest) do
+          generation_execute(project_id: project_id, candidate_id: candidate_id, confirmation: confirmation,
+            expected_digest: expected_digest, progress: progress, input_override: input_override, scope_override: scope_override,
+            confirmation_phrase: confirmation_phrase, source_candidate_id: source_candidate_id, handoff_active: true)
+        end
+      end
       generation_started_at = @clock.call
       total_started = @monotonic_clock.call
 

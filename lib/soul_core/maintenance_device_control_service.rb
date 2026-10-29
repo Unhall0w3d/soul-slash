@@ -263,6 +263,14 @@ module SoulCore
         "fleet_wide" => false
       }
       if action == "reboot"
+        if target.fetch("maintenance_adapter") == "proxmox_apt"
+          snapshot = @fleet_status_service.snapshot
+          device = Array(snapshot.dig("data", "devices")).find { |d| d["id"] == device_id || d.dig("facts", "control_target_id") == device_id }
+          guests = Array(device&.dig("facts", "guests"))
+          basis["guest_impact"] = guests.map { |g| g.slice("id", "type", "name", "status") }
+          basis["impact"] += ["All hosted guests may be interrupted; fixed host readiness checks do not verify every guest application."]
+          basis["impact"] += guests.map { |g| "Hosted #{g['type']} #{g['id']}: #{g['name']} (#{g['status']})" }
+        end
         basis["boot_identity"] = {
           "argv" => target.fetch("boot_identity", ["/usr/bin/cat", "/proc/sys/kernel/random/boot_id"])
         }

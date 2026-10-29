@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "gpt-oss-20b": {
+    "status": "cached_weight_hash_verified_native_interface_pending",
+    "publisher": "OpenAI",
+    "format": "GGUF",
+    "quantization": "MXFP4",
+    "path": "/home/bhones/Projects/soul/Soul/runtime/qualification/demand-loaded-assets/gpt-oss-20b-MXFP4.gguf",
+    "size_bytes": 12109566624,
+    "sha256": "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901",
+    "repo": "ggml-org/gpt-oss-20b-GGUF",
+    "revision": "15dcfc7e7c608c6161507211ed43c5b590801b4b",
+    "artifact_producer": "ggml-org llama.cpp maintainers; OpenAI base model",
+    "supersedes_for_this_trial_only": "Ollama e7b273f9636059a689e3ddcab3716e4f65abe0143ac978e46673ad0e52d09efb uses unsupported gptoss architecture; original preserved",
+    "interface_requirements": ["native Harmony template", "reasoning effort control", "separate analysis and final parsing", "native tool-call round trip"],
+    "live_qualified": false
+  },
+  "gemma-4-26b-a4b": {
+    "status": "cached_weight_hash_verified_native_interface_pending",
+    "repo": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+    "revision": "d1c082be9cf3c8a514acf63b8761f4b41935842e",
+    "path": "/home/bhones/Projects/soul/Soul/runtime/qualification/demand-loaded-assets/gemma-4-26B_q4_0-it.gguf",
+    "size_bytes": 14439363584,
+    "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+    "publisher": "Google",
+    "preferred_format": "official QAT Q4_0 GGUF",
+    "live_qualified": false
+  },
+  "devstral-small-2-24b": {
+    "status": "isolated_no_mmap_native_probes_passed_scored_and_sequential_pending",
+    "qualified_probe_loading": "--no-mmap",
+    "probe_evidence": "demand-loaded-probes-20261021-233655-l8vfyj",
+    "publisher": "Mistral AI",
+    "artifact_producer": "bartowski; community conversion linked by publisher",
+    "repo": "bartowski/mistralai_Devstral-Small-2-24B-Instruct-2512-GGUF",
+    "revision": "027695770ae1de77c2f6fb19f8e1ba9d65fcd15d",
+    "path": "/home/bhones/Projects/soul/Soul/runtime/qualification/demand-loaded-assets/Devstral-Small-2-24B-Q4_K_M.gguf",
+    "size_bytes": 14334438272,
+    "sha256": "bfd11c8679c6b81eb43763505465d7dcfa72e460ab1c220ecc235a3efadd7f7f",
+    "quantization": "Q4_K_M",
+    "live_qualified": false
+  },
+  "gemma-4-31b": {
+    "status": "withdrawn_by_user_preserve_evidence_no_retry",
+    "repo": "google/gemma-4-31B-it-qat-q4_0-gguf",
+    "revision": "59dde24573e7e61570dba08b18a2e1fe246955ed",
+    "path": "/home/bhones/Projects/soul/Soul/runtime/qualification/demand-loaded-assets/gemma-4-31B_q4_0-it.gguf",
+    "size_bytes": 17651001568,
+    "sha256": "179cfb99212709597eae5929112cfca677e1bbf566178b479ae1da0c4772874b",
+    "publisher": "Google",
+    "preferred_format": "official QAT Q4_0 GGUF",
+    "live_qualified": false
+  }
+}
