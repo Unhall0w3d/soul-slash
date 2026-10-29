@@ -198,7 +198,7 @@ function renderInvocationDetail(record) {
   facts.append(
     invocationDetailRow("Required", record.required_inputs?.length ? record.required_inputs.join(" · ") : "No required fields"),
     invocationDetailRow("Optional", record.optional_inputs?.length ? record.optional_inputs.join(" · ") : "None"),
-    invocationDetailRow("Core", record.core),
+    invocationDetailRow("Execution", record.core),
     invocationDetailRow("Approval", record.approval),
     invocationDetailRow("Result", record.output),
     invocationDetailRow("Boundary", record.boundary)

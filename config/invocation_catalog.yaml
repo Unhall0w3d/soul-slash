@@ -486,7 +486,7 @@ entries:
     optional_inputs: []
     core: CPU deterministic reference route; no model or GPU inference.
     approval: One explicit bounded metadata or text read; no write authority.
-    output: Reference-only metadata or bounded text and content digest.
+    output: Compact reference-only text or listings; bounded metadata and content digest are retained in the local receipt. At most ten directory entries are presented.
     boundary: source means lib/soul_core; guides means docs/guides. No private state, root expansion, hidden paths, traversal, symlinks, hardlinks, secrets or Downloads access. Reads are limited to 32 KiB and 400 lines, with an explicit smaller presentation bound.
     examples:
       - Show reference roots
@@ -502,7 +502,7 @@ entries:
     optional_inputs: []
     core: CPU deterministic reference route; no model or GPU inference.
     approval: One bounded read-only search.
-    output: Up to five reference-only guide matches with source hashes and excerpts.
-    boundary: At most 200 guides of at most 32 KiB each and their first 400 lines; no private operational reports, personal memory or persistent index.
+    output: Up to three compact guide matches from at most five collected results; source hashes and bounded metadata are retained in the local receipt.
+    boundary: At most 200 guides of at most 32 KiB each and their first 400 lines; private review/runtime trees and personal memory are excluded. Allowed guides can be locally sensitive; no persistent index or automatic public forwarding.
     examples:
       - 'Search guides: creative workflow'
